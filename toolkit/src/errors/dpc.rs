@@ -18,6 +18,15 @@
 pub enum DPCError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
+
+    #[error("Invalid number of inputs. (Current: {}, Max: {})", _0, _1)]
+    InvalidNumberOfInputs(usize, usize),
+
+    #[error("Invalid number of outputs. (Current: {}, Max: {})", _0, _1)]
+    InvalidNumberOfOutputs(usize, usize),
+
+    #[error("Missing transaction outputs)")]
+    MissingOutputs,
 }
 
 impl From<hex::FromHexError> for DPCError {

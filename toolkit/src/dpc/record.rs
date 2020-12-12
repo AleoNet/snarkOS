@@ -24,7 +24,7 @@ use snarkos_utilities::{
 
 use std::{fmt, str::FromStr};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Record {
     pub(crate) record: DPCRecord<Components>,
 }

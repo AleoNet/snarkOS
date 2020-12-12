@@ -21,13 +21,178 @@ use std::{fmt, str::FromStr};
 
 pub type MerkleTreeLedger = EmptyLedger<Tx, CommitmentMerkleParameters>;
 
+#[derive(Clone, Debug)]
+pub struct Input {
+    pub(crate) private_key: PrivateKey,
+    pub(crate) record: Record,
+}
+
+#[derive(Clone, Debug)]
+pub struct Output {
+    pub(crate) recipient: Address,
+    pub(crate) amount: u64,
+    // TODO (raychu86): Add support for payloads and birth/death program ids.
+    // pub(crate) payload: Option<Vec<u8>>,
+}
+
 pub struct OfflineTransaction {
     pub(crate) execute_context: ExecuteContext<Components>,
 }
 
+#[derive(Clone, Debug)]
+pub struct OfflineTransactionBuilder {
+    /// Transaction inputs
+    pub(crate) inputs: Vec<Input>,
+
+    /// Transaction outputs
+    pub(crate) outputs: Vec<Output>,
+
+    /// Network ID
+    pub(crate) network_id: u8,
+
+    /// Transaction memo
+    pub(crate) memo: Option<[u8; 32]>,
+}
+
+impl OfflineTransactionBuilder {
+    pub fn new() -> Self {
+        // TODO (raychu86) update the default to `0` for mainnet.
+        Self {
+            inputs: vec![],
+            outputs: vec![],
+            network_id: 1,
+            memo: None,
+        }
+    }
+
+    ///
+    /// Returns a new transaction builder with the added transaction input.
+    /// Otherwise, returns a `DPCError`.
+    ///
+    pub fn add_input(self, private_key: PrivateKey, record: Record) -> Result<Self, DPCError> {
+        // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
+        if self.inputs.len() > Components::NUM_INPUT_RECORDS {
+            return Err(DPCError::InvalidNumberOfInputs(
+                self.inputs.len() + 1,
+                Components::NUM_INPUT_RECORDS,
+            ));
+        }
+
+        // Construct the transaction input.
+        let input = Input { private_key, record };
+
+        // Update the current builder instance.
+        let mut builder = self.clone();
+        builder.inputs.push(input);
+
+        Ok(builder)
+    }
+
+    ///
+    /// Returns a new transaction builder with the added transaction output.
+    /// Otherwise, returns a `DPCError`.
+    ///
+    pub fn add_output(self, recipient: Address, amount: u64) -> Result<Self, DPCError> {
+        // Check that the transaction is limited to `Components::NUM_OUTPUT_RECORDS` outputs.
+        if self.outputs.len() > Components::NUM_OUTPUT_RECORDS {
+            return Err(DPCError::InvalidNumberOfOutputs(
+                self.outputs.len() + 1,
+                Components::NUM_OUTPUT_RECORDS,
+            ));
+        }
+
+        // Construct the transaction output.
+        let output = Output { recipient, amount };
+
+        // Update the current builder instance.
+        let mut builder = self;
+        builder.outputs.push(output);
+
+        Ok(builder)
+    }
+
+    ///
+    /// Returns a new transaction builder with the updated network id.
+    ///
+    pub fn network_id(self, network_id: u8) -> Self {
+        let mut builder = self;
+        builder.network_id = network_id;
+
+        builder
+    }
+
+    ///
+    /// Returns a new transaction builder with the updated network id.
+    ///
+    pub fn memo(self, memo: [u8; 32]) -> Self {
+        let mut builder = self;
+        builder.memo = Some(memo);
+
+        builder
+    }
+
+    ///
+    /// Returns the execution context (offline transaction) derived from the provided builder
+    /// attributes.
+    ///
+    /// Otherwise, returns `DPCError`.
+    ///
+    pub fn build<R: Rng>(&self, rng: &mut R) -> Result<OfflineTransaction, DPCError> {
+        // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
+        match self.inputs.len() {
+            1 | 2 => {}
+            num_inputs => {
+                return Err(DPCError::InvalidNumberOfInputs(
+                    num_inputs,
+                    Components::NUM_INPUT_RECORDS,
+                ));
+            }
+        }
+
+        // Check that the transaction has at least one output and is limited to `Components::NUM_OUTPUT_RECORDS` outputs.
+        match self.outputs.len() {
+            0 => return Err(DPCError::MissingOutputs),
+            1 | 2 => {}
+            num_inputs => {
+                return Err(DPCError::InvalidNumberOfInputs(
+                    num_inputs,
+                    Components::NUM_INPUT_RECORDS,
+                ));
+            }
+        }
+
+        // Construct the parameters from the given transaction inputs.
+        let mut spenders = vec![];
+        let mut records_to_spend = vec![];
+
+        for input in &self.inputs {
+            spenders.push(input.private_key.clone());
+            records_to_spend.push(input.record.clone());
+        }
+
+        // Construct the parameters from the given transaction outputs.
+        let mut recipients = vec![];
+        let mut recipient_amounts = vec![];
+
+        for output in &self.outputs {
+            recipients.push(output.recipient.clone());
+            recipient_amounts.push(output.amount);
+        }
+
+        OfflineTransaction::offline_transaction_execution(
+            spenders,
+            records_to_spend,
+            recipients,
+            recipient_amounts,
+            self.network_id,
+            rng,
+        )
+    }
+}
+
 impl OfflineTransaction {
     /// Returns an offline transaction execution context
-    pub fn offline_transaction_execution<R: Rng>(
+    pub(crate) fn offline_transaction_execution<R: Rng>(
         spenders: Vec<PrivateKey>,
         records_to_spend: Vec<Record>,
         recipients: Vec<Address>,
@@ -74,14 +239,14 @@ impl OfflineTransaction {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                parameters,
+                parameters.clone(),
                 old_sn_nonce,
                 address,
                 true, // The input record is dummy
                 0,
                 RecordPayload::default(),
-                noop_program_id,
-                noop_program_id,
+                noop_program_id.clone(),
+                noop_program_id.clone(),
                 rng,
             )?;
 

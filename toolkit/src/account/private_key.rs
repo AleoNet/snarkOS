@@ -22,7 +22,7 @@ use snarkos_objects::AccountPrivateKey;
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PrivateKey {
     pub(crate) private_key: AccountPrivateKey<Components>,
 }
