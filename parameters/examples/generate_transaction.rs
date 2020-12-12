@@ -112,7 +112,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
             .serial_number_nonce
             .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
-            parameters.system_parameters.clone(),
+            &parameters.system_parameters,
             old_sn_nonce.clone(),
             dummy_account.address.clone(),
             true, // The input record is dummy

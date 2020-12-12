@@ -495,7 +495,7 @@ impl<Components: BaseDPCComponents> DPC<Components> {
 
     #[allow(clippy::too_many_arguments)]
     pub fn generate_record<R: Rng>(
-        system_parameters: SystemParameters<Components>,
+        system_parameters: &SystemParameters<Components>,
         sn_nonce: <Components::SerialNumberNonceCRH as CRH>::Output,
         owner: AccountAddress<Components>,
         is_dummy: bool,
@@ -709,7 +709,7 @@ where
             end_timer!(sn_nonce_time);
 
             let record = Self::generate_record(
-                parameters.clone(),
+                &parameters,
                 sn_nonce,
                 new_record_owner,
                 new_is_dummy_flags[j],

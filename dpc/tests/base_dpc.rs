@@ -99,7 +99,7 @@ fn base_dpc_integration_test() {
         )
         .unwrap();
         let old_record = DPC::generate_record(
-            parameters.system_parameters.clone(),
+            &parameters.system_parameters,
             old_sn_nonce,
             genesis_account.address.clone(),
             true, // The input record is dummy

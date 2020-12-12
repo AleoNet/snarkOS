@@ -239,7 +239,7 @@ impl OfflineTransaction {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                parameters.clone(),
+                &parameters,
                 old_sn_nonce,
                 address,
                 true, // The input record is dummy

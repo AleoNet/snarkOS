@@ -118,7 +118,7 @@ fn test_execute_base_dpc_constraints() {
 
     let sn_nonce = SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &[0u8; 1]).unwrap();
     let old_record = DPC::generate_record(
-        system_parameters.clone(),
+        &system_parameters,
         sn_nonce,
         dummy_account.address,
         true,

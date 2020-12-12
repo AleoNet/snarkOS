@@ -62,7 +62,7 @@ fn test_record_serialization() {
             let payload: [u8; 32] = rng.gen();
 
             let given_record = DPC::generate_record(
-                system_parameters.clone(),
+                &system_parameters,
                 SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &sn_nonce_input).unwrap(),
                 dummy_account.address,
                 false,
@@ -129,7 +129,7 @@ fn test_record_encryption() {
             let payload: [u8; 32] = rng.gen();
 
             let given_record = DPC::generate_record(
-                system_parameters.clone(),
+                &system_parameters,
                 SerialNumberNonce::hash(&system_parameters.serial_number_nonce, &sn_nonce_input).unwrap(),
                 dummy_account.address,
                 false,

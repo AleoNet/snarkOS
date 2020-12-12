@@ -287,7 +287,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                self.parameters.system_parameters.clone(),
+                &self.parameters.system_parameters,
                 old_sn_nonce,
                 address,
                 true, // The input record is dummy
