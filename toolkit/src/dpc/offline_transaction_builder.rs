@@ -39,7 +39,7 @@ pub struct OfflineTransaction {
     pub(crate) execute_context: ExecuteContext<Components>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct OfflineTransactionBuilder {
     /// Transaction inputs
     pub(crate) inputs: Vec<TransactionInput>,
@@ -82,7 +82,7 @@ impl OfflineTransactionBuilder {
         let input = TransactionInput { private_key, record };
 
         // Update the current builder instance.
-        let mut builder = self.clone();
+        let mut builder = self;
         builder.inputs.push(input);
 
         Ok(builder)
@@ -294,7 +294,7 @@ impl OfflineTransaction {
         assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
 
         let new_birth_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![noop_program_id; Components::NUM_OUTPUT_RECORDS];
         let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
 
         // Generate a random memo
