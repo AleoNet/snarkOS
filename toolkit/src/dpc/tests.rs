@@ -16,7 +16,7 @@
 
 use crate::{
     account::{Address, PrivateKey},
-    dpc::{OfflineTransaction, Record},
+    dpc::{OfflineTransaction, OfflineTransactionBuilder, Record},
 };
 
 use rand::SeedableRng;
@@ -33,6 +33,31 @@ pub fn record_test() {
 
     println!("{} == {}", record_string, candidate_record);
     assert_eq!(record_string, candidate_record);
+}
+
+#[test]
+pub fn offline_transaction_builder_test() {
+    let rng = &mut ChaChaRng::seed_from_u64(1231275789u64);
+
+    let private_key = PrivateKey::from_str("APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn").unwrap();
+    let address = Address::from(&private_key).unwrap();
+
+    let record_string = "4f6d042c3bc73e412f4b4740ad27354a1b25bb9df93f29313350356aa88dca050080d1f008000000000000000000000000000000000000000000000000000000000000000000000000304e7ae3ef9577877ddcef8f8c5d9b5e3bf544c78c50c51213857f35c33c3502df12f0fb72a0d7c56ccd31a87dada92b00304e7ae3ef9577877ddcef8f8c5d9b5e3bf544c78c50c51213857f35c33c3502df12f0fb72a0d7c56ccd31a87dada92b003f07ea7279544031efc42c1c785f4f403146e6fdbfcae26bfaa61f2d2202fd0117df47122a693ceaf27c4ceabb3c4b619333f4663bb7e85a6e741252ba1c6e11af1e1c74edf8ae1963c3532ec6e05a07f96d6731334bc368f93b428491343004";
+    let record = Record::from_str(record_string).unwrap();
+
+    let builder = OfflineTransactionBuilder::new()
+        .add_input(private_key, record)
+        .unwrap()
+        .add_output(address, 10000)
+        .unwrap()
+        .network_id(1);
+
+    let offline_transaction = builder.build(rng);
+    assert!(offline_transaction.is_ok());
+
+    let offline_transaction_string = offline_transaction.unwrap().to_string();
+    let recovered_offline_transaction = OfflineTransaction::from_str(&offline_transaction_string);
+    assert!(recovered_offline_transaction.is_ok());
 }
 
 #[test]

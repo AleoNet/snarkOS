@@ -16,12 +16,67 @@
 
 use crate::{
     account::{Address, PrivateKey},
-    dpc::{OfflineTransaction as OfflineTransactionNative, Record},
+    dpc::{
+        OfflineTransaction as OfflineTransactionNative,
+        OfflineTransactionBuilder as OfflineTransactionBuilderNative,
+        Record,
+    },
 };
 
 use rand::{rngs::StdRng, SeedableRng};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub struct OfflineTransactionBuilder {
+    pub(crate) builder: OfflineTransactionBuilderNative,
+}
+
+#[wasm_bindgen]
+impl OfflineTransactionBuilder {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            builder: OfflineTransactionBuilderNative::new(),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn add_input(self, private_key: &str, record: &str) -> Self {
+        let private_key = PrivateKey::from_str(private_key).unwrap();
+        let record = Record::from_str(record).unwrap();
+
+        Self {
+            builder: self.builder.add_input(private_key, record).unwrap(),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn add_output(self, address: &str, amount: u64) -> Self {
+        let recipient = Address::from_str(address).unwrap();
+
+        Self {
+            builder: self.builder.add_output(recipient, amount).unwrap(),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn network_id(self, network_id: u8) -> Self {
+        let builder = self.builder;
+        Self {
+            builder: builder.network_id(network_id),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn build(&self) -> OfflineTransaction {
+        let rng = &mut StdRng::from_entropy();
+
+        OfflineTransaction {
+            offline_transaction: self.builder.build(rng).unwrap(),
+        }
+    }
+}
 
 #[wasm_bindgen]
 pub struct OfflineTransaction {
@@ -33,52 +88,6 @@ impl OfflineTransaction {
     #[wasm_bindgen]
     pub fn from_string(offline_transaction: &str) -> Self {
         let offline_transaction = OfflineTransactionNative::from_str(offline_transaction).unwrap();
-        Self { offline_transaction }
-    }
-
-    // TODO genericize to Vec<&str> - Currently WasmAbi doesnt support vectors or arrays of strings
-    #[wasm_bindgen]
-    pub fn create_offline_transaction(
-        spender1: &str,
-        spender2: Option<String>,
-        record1: &str,
-        record2: Option<String>,
-        recipient1: &str,
-        recipient2: Option<String>,
-        recipient_amounts: Vec<u64>,
-        network_id: u8,
-    ) -> Self {
-        let rng = &mut StdRng::from_entropy();
-
-        let mut spenders = vec![PrivateKey::from_str(spender1).unwrap()];
-        if let Some(spender) = spender2 {
-            spenders.push(PrivateKey::from_str(&spender).unwrap());
-        }
-
-        let mut records_to_spend = vec![Record::from_str(record1).unwrap()];
-        if let Some(record) = record2 {
-            records_to_spend.push(Record::from_str(&record).unwrap());
-        }
-
-        assert_eq!(spenders.len(), records_to_spend.len());
-
-        let mut recipients = vec![Address::from_str(recipient1).unwrap()];
-        if let Some(recipient) = recipient2 {
-            recipients.push(Address::from_str(&recipient).unwrap());
-        }
-
-        assert_eq!(recipients.len(), recipient_amounts.len());
-
-        let offline_transaction = OfflineTransactionNative::offline_transaction_execution(
-            spenders,
-            records_to_spend,
-            recipients,
-            recipient_amounts,
-            network_id,
-            rng,
-        )
-        .unwrap();
-
         Self { offline_transaction }
     }
 

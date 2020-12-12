@@ -22,13 +22,13 @@ use std::{fmt, str::FromStr};
 pub type MerkleTreeLedger = EmptyLedger<Tx, CommitmentMerkleParameters>;
 
 #[derive(Clone, Debug)]
-pub struct Input {
+pub struct TransactionInput {
     pub(crate) private_key: PrivateKey,
     pub(crate) record: Record,
 }
 
 #[derive(Clone, Debug)]
-pub struct Output {
+pub struct TransactionOutput {
     pub(crate) recipient: Address,
     pub(crate) amount: u64,
     // TODO (raychu86): Add support for payloads and birth/death program ids.
@@ -42,10 +42,10 @@ pub struct OfflineTransaction {
 #[derive(Clone, Debug)]
 pub struct OfflineTransactionBuilder {
     /// Transaction inputs
-    pub(crate) inputs: Vec<Input>,
+    pub(crate) inputs: Vec<TransactionInput>,
 
     /// Transaction outputs
-    pub(crate) outputs: Vec<Output>,
+    pub(crate) outputs: Vec<TransactionOutput>,
 
     /// Network ID
     pub(crate) network_id: u8,
@@ -79,7 +79,7 @@ impl OfflineTransactionBuilder {
         }
 
         // Construct the transaction input.
-        let input = Input { private_key, record };
+        let input = TransactionInput { private_key, record };
 
         // Update the current builder instance.
         let mut builder = self.clone();
@@ -102,7 +102,7 @@ impl OfflineTransactionBuilder {
         }
 
         // Construct the transaction output.
-        let output = Output { recipient, amount };
+        let output = TransactionOutput { recipient, amount };
 
         // Update the current builder instance.
         let mut builder = self;
@@ -179,6 +179,7 @@ impl OfflineTransactionBuilder {
             recipient_amounts.push(output.amount);
         }
 
+        // Construct the offline transaction
         OfflineTransaction::offline_transaction_execution(
             spenders,
             records_to_spend,

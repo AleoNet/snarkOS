@@ -16,7 +16,15 @@
 
 use crate::{
     record::tests::*,
-    wasm::{Account, OfflineTransaction, Record, SignatureScheme, SignatureSchemePublicKey, ViewKey},
+    wasm::{
+        Account,
+        OfflineTransaction,
+        OfflineTransactionBuilder,
+        Record,
+        SignatureScheme,
+        SignatureSchemePublicKey,
+        ViewKey,
+    },
 };
 
 use wasm_bindgen_test::*;
@@ -194,16 +202,12 @@ pub fn offline_transaction_test() {
     let given_record = "4f6d042c3bc73e412f4b4740ad27354a1b25bb9df93f29313350356aa88dca050080d1f008000000000000000000000000000000000000000000000000000000000000000000000000304e7ae3ef9577877ddcef8f8c5d9b5e3bf544c78c50c51213857f35c33c3502df12f0fb72a0d7c56ccd31a87dada92b00304e7ae3ef9577877ddcef8f8c5d9b5e3bf544c78c50c51213857f35c33c3502df12f0fb72a0d7c56ccd31a87dada92b003f07ea7279544031efc42c1c785f4f403146e6fdbfcae26bfaa61f2d2202fd0117df47122a693ceaf27c4ceabb3c4b619333f4663bb7e85a6e741252ba1c6e11af1e1c74edf8ae1963c3532ec6e05a07f96d6731334bc368f93b428491343004";
     let given_address = "aleo1faksgtpmculyzt6tgaq26fe4fgdjtwualyljjvfn2q6k42ydegzspfz9uh";
 
-    let offline_transaction = OfflineTransaction::create_offline_transaction(
-        given_private_key,
-        None,
-        given_record,
-        None,
-        given_address,
-        None,
-        vec![10000],
-        1,
-    );
+    let builder = OfflineTransactionBuilder::new()
+        .add_input(given_private_key, given_record)
+        .add_output(given_address, 10000)
+        .network_id(1);
+
+    let offline_transaction = builder.build();
 
     let offline_transaction_string = offline_transaction.offline_transaction.to_string();
 
