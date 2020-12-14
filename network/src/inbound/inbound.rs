@@ -142,7 +142,6 @@ impl Inbound {
             let (message_name, message_bytes) = match channel.read().await {
                 Ok((message_name, message_bytes)) => (message_name, message_bytes),
                 Err(error) => {
-                    error!("Failed to read message from channel\n{}", error);
                     Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
@@ -234,10 +233,7 @@ impl Inbound {
             // Update the state to reflect a new failure.
             *failure = true;
             *failure_count += 1;
-            warn!(
-                "Connection errored {} time(s) (error message: {})",
-                failure_count, error
-            );
+            error!("Connection error: {}", error);
 
             // Determine if we should disconnect.
             *disconnect_from_peer = should_disconnect(failure_count);
