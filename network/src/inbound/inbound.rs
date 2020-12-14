@@ -449,20 +449,6 @@ impl Inbound {
                 // Deserialize the message bytes into a verack message.
                 let verack = Verack::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
-                let local_address = verack.receiver;
-
-                // TODO (howardwu): Check whether this remote address needs to
-                //   be derive the same way as the version message case above
-                //  (using a remote_address.ip() and address_sender.port()).
-                let remote_address = verack.sender;
-
-                // Store the new channel.
-                self.channels.write().await.insert(remote_address, channel.clone());
-
-                self.sender
-                    .send(Response::ConnectingTo(remote_address, verack.nonce))
-                    .await?;
-
                 Ok(channel)
             }
             _ => Err(NetworkError::InvalidHandshake),
