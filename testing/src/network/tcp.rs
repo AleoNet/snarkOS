@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use rand::Rng;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
-use tracing::*;
 
 /// Returns a random tcp socket address and binds it to a listener
 pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
@@ -66,16 +64,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_listen() {
-        let remote_address = random_bound_address();
+        let (socket_address, _listener) = random_bound_address().await;
 
         // Start a TcpServer.
         tokio::task::spawn(async move {
-            let server = TcpServer::new(remote_address);
+            let mut server = TcpServer::new().await;
             server.listen(false).await.unwrap();
         });
 
         // Connect to the TcpServer.
-        let mut channel = TcpStream::connect(remote_address).await.unwrap();
+        let mut channel = TcpStream::connect(socket_address).await.unwrap();
 
         // Send a message.
         let result = channel.write_all(b"hello").await;
