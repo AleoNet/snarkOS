@@ -210,7 +210,7 @@ impl Server {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::{message::message::Message, Version};
+    use crate::external::{channel::Channel, message::Message, Verack, Version};
 
     use snarkos_consensus::MemoryPool;
     use snarkos_testing::{
@@ -218,20 +218,15 @@ mod tests {
         dpc::load_verifying_parameters,
     };
 
-    use std::{
-        sync::{atomic::AtomicBool, Arc},
-        time::Duration,
-    };
+    use std::{sync::Arc, time::Duration};
 
     use tokio::{
-        io::AsyncWriteExt,
-        net::TcpStream,
+        net::{TcpListener, TcpStream},
         sync::{Mutex, RwLock},
     };
 
-    fn environment() -> Environment {
+    async fn test_node() -> Server {
         let storage = FIXTURE_VK.ledger();
-        let storage_path = storage.storage.db.path().to_owned();
         let memory_pool = MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
         let consensus = TEST_CONSENSUS.clone();
@@ -245,7 +240,7 @@ mod tests {
         let is_bootnode = false;
         let is_miner = false;
 
-        Environment::new(
+        let environment = Environment::new(
             Arc::new(RwLock::new(storage)),
             memory_pool_lock,
             Arc::new(consensus),
@@ -259,15 +254,59 @@ mod tests {
             is_bootnode,
             is_miner,
         )
-        .unwrap()
+        .unwrap();
+
+        Server::new(environment).await.unwrap()
     }
 
     #[tokio::test]
     async fn starts_server() {
-        let environment = environment();
-        let mut server = Server::new(environment).await.unwrap();
+        let mut server = test_node().await;
 
         assert!(server.start().await.is_ok());
         assert_eq!(server.peers.number_of_connected_peers().await, 0);
+    }
+
+    #[tokio::test]
+    async fn receive_version_handshake() {
+        let filter =
+            tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_target(false)
+            .init();
+
+        let mut server = test_node().await;
+        server.start().await.unwrap();
+
+        let node_address = server.local_address().unwrap();
+
+        let peer_out = TcpStream::connect(&node_address).await.unwrap();
+        // let mut peer_in = TcpListener::bind("127.0.0.1:0").await.unwrap();
+
+        let peer_in = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let peer_address = peer_in.local_addr().unwrap();
+        let channel = Channel::new(node_address, peer_out);
+
+        // Send a Version message to initiate handshake.
+        let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
+        channel.write(&version).await.unwrap();
+
+        sleep(Duration::new(3, 0)).await;
+        assert!(server.peers.is_connecting(&peer_address).await);
+
+        // let (stream, remote_address) = peer_in.accept().await.unwrap();
+        // let channel = channel.update_reader(stream).await.unwrap();
+        // let (message_name, bytes) = channel.read().await.unwrap();
+        // let message = Verack::deserialize(bytes).unwrap();
+
+        // // Send a Verack message to finish setting up the connection.
+        // let verack = Verack::new(message.nonce, peer_address, node_address);
+        // channel.write(&verack).await.unwrap();
+
+        // sleep(Duration::new(3, 0)).await;
+        // assert!(server.peers.is_connected(&peer_address).await);
+        // assert_eq!(server.peers.number_of_connected_peers().await, 1);
     }
 }
