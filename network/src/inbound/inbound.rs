@@ -93,28 +93,29 @@ impl Inbound {
                         info!("Got a connection request from {}", remote_address);
 
                         let height = environment.current_block_height().await;
-                        if let Some((channel, discovered_local_address)) = inbound
-                            .connection_request(height, remote_address, channel)
-                            .await
-                            .unwrap()
-                        {
-                            // TODO (howardwu): Enable this peer address discovery again.
-                            // // Bootstrap discovery of local node IP via VERACK responses
-                            //     let local_address = peers.local_address();
-                            //     if local_address != discovered_local_address {
-                            //         peers.set_local_address(discovered_local_address).await;
-                            //         info!("Discovered local address: {:?}", local_address);
-                            //     }
+                        match inbound.connection_request(height, remote_address, channel).await {
+                            Ok(channel) => {
+                                trace!("Established connection with {}", remote_address);
 
-                            let inbound = inbound.clone();
-                            let channel = channel.clone();
-                            tokio::spawn(async move {
-                                inbound.inbound(listener_address, channel).await.unwrap();
-                                // inbound.inbound(&discovered_local_address, channel).await?;
-                            });
+                                // TODO (howardwu): Enable this peer address discovery again.
+                                // // Bootstrap discovery of local node IP via VERACK responses
+                                //     let local_address = peers.local_address();
+                                //     if local_address != discovered_local_address {
+                                //         peers.set_local_address(discovered_local_address).await;
+                                //         info!("Discovered local address: {:?}", local_address);
+                                //     }
+
+                                let inbound = inbound.clone();
+                                let channel = channel.clone();
+                                tokio::spawn(async move {
+                                    inbound.inbound(listener_address, channel).await.unwrap();
+                                    // inbound.inbound(&discovered_local_address, channel).await?;
+                                });
+                            }
+                            Err(e) => error!("Failed to accept a connection: {}", e),
                         }
                     }
-                    Err(error) => error!("Failed to accept connection request\n{}", error),
+                    Err(e) => error!("Failed to accept a connection: {}", e),
                 }
             }
         });
@@ -348,45 +349,37 @@ impl Inbound {
     ///     4. Return the accepted handshake and your address as seen by sender.
     ///
     /// TODO (howardwu): Fix the return type so it does not return Result<Option<T>>.
-    #[inline]
     pub async fn connection_request(
         &self,
         block_height: u32,
         remote_address: SocketAddr,
         reader: TcpStream,
-    ) -> Result<Option<(Channel, SocketAddr)>, NetworkError> {
+    ) -> Result<Channel, NetworkError> {
+        let channel = Channel::new(remote_address, reader);
         // Parse the inbound message into the message name and message bytes.
-        let (channel, (message_name, message_bytes)) = match Channel::new(remote_address, reader) {
-            // Read the next message from the channel.
-            // Note this is a blocking operation.
-            Ok(channel) => match channel.read().await {
-                Ok(inbound_message) => (channel, inbound_message),
-                _ => return Ok(None),
-            },
-            _ => return Ok(None),
+
+        // Read the next message from the channel.
+        // Note: this is a blocking operation.
+        let (message_name, message_bytes) = match channel.read().await {
+            Ok(inbound_message) => inbound_message,
+            _ => return Err(NetworkError::InvalidHandshake),
         };
 
-        // Handles a version message request.
         // Create and store a new handshake in the manager.
         match message_name {
+            // connection recipient path
             name if name == Version::name() => {
                 // Deserialize the message bytes into a version message.
-                let remote_version = match Version::deserialize(message_bytes) {
-                    Ok(remote_version) => remote_version,
-                    _ => return Ok(None),
-                };
+                let remote_version = Version::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
+                // FIXME(ljedrz): we should obtain our actual local address here instead of trusting the sender
                 let local_address = remote_version.receiver;
 
                 // Create the remote address from the given peer address, and specified port from the version message.
                 let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
 
-                // Create the local version message.
                 // TODO (raychu86): Establish a formal node version.
                 let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
-
-                debug_assert_eq!(local_address, local_version.sender);
-                debug_assert_eq!(remote_address, local_version.receiver);
 
                 // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
                 // if let Some(version) = version_message {
@@ -421,23 +414,20 @@ impl Inbound {
                 channel
                     .write(&Verack::new(remote_version.nonce, local_address, remote_address))
                     .await?;
-                // Write version request to the remote peer.
+
+                // Write a version request to the remote peer.
                 channel.write(&local_version).await?;
+
+                // notify the server that the peer is being connected to
                 self.sender
                     .send(Response::ConnectingTo(local_version.receiver, local_version.nonce))
                     .await?;
 
                 // Parse the inbound message into the message name and message bytes.
-                let (message_name, message_bytes) = match channel.read().await {
-                    Ok(inbound_message) => inbound_message,
-                    _ => return Ok(None),
-                };
+                let (message_name, message_bytes) = channel.read().await?;
 
                 // Deserialize the message bytes into a verack message.
-                let verack = match Verack::deserialize(message_bytes) {
-                    Ok(verack) => verack,
-                    _ => return Ok(None),
-                };
+                let verack = Verack::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
                 let local_address = verack.receiver;
 
@@ -453,19 +443,15 @@ impl Inbound {
                     .send(Response::ConnectedTo(remote_address, verack.nonce))
                     .await?;
 
-                trace!("Established connection with {}", remote_address);
-
-                return Ok(Some((channel, local_address)));
+                Ok(channel)
             }
+            // connection initiator path
             name if name == Verack::name() => {
                 // Handles a verack message request.
                 // Establish the channel with the remote peer.
 
                 // Deserialize the message bytes into a verack message.
-                let verack = match Verack::deserialize(message_bytes) {
-                    Ok(verack) => verack,
-                    _ => return Ok(None),
-                };
+                let verack = Verack::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
                 let local_address = verack.receiver;
 
@@ -478,16 +464,12 @@ impl Inbound {
                 self.channels.write().await.insert(remote_address, channel.clone());
 
                 self.sender
-                    .send(Response::ConnectedTo(remote_address, verack.nonce))
+                    .send(Response::ConnectingTo(remote_address, verack.nonce))
                     .await?;
 
-                trace!("Established connection with {}", remote_address);
-
-                return Ok(Some((channel, local_address)));
+                Ok(channel)
             }
-            _ => warn!("Received a different message than Version/Verack when establishing a connection!"),
+            _ => Err(NetworkError::InvalidHandshake),
         }
-
-        Ok(None)
     }
 }

@@ -233,6 +233,32 @@ impl Peers {
         peer_book.handshake(remote_address)
     }
 
+    async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+        let own_address = self.local_address().unwrap(); // must be known by now
+        if remote_address == own_address {
+            return Err(NetworkError::SelfConnectAttempt);
+        }
+        if self.is_connecting(&remote_address).await {
+            return Err(NetworkError::PeerAlreadyConnecting);
+        }
+        if self.is_connected(&remote_address).await {
+            return Err(NetworkError::PeerAlreadyConnected);
+        }
+
+        let block_height = self.environment.current_block_height().await;
+        // TODO (raychu86): Establish a formal node version.
+        let version = Version::new_with_rng(1u64, block_height, own_address, remote_address);
+
+        // Set the peer as a connecting peer in the peer book.
+        self.connecting_to_peer(remote_address, version.nonce).await?;
+
+        // Send a connection request with the outbound handler.
+        let request = Request::Version(version);
+        self.outbound.write().await.broadcast(&request).await;
+
+        Ok(())
+    }
+
     ///
     /// Broadcasts a connection request to all default bootnodes of the network.
     ///
@@ -245,31 +271,17 @@ impl Peers {
     async fn connect_to_bootnodes(&self) -> Result<(), NetworkError> {
         trace!("Connecting to bootnodes");
 
-        // Fetch the local address of this node.
-        let local_address = self.local_address().unwrap(); // must be known by now
         // Fetch the current connected peers of this node.
         let connected_peers = self.connected_peers().await;
-        // Fetch the current block height of this node.
-        let block_height = self.environment.current_block_height().await;
 
         // Iterate through each bootnode address and attempt a connection request.
-
         for bootnode_address in self
             .environment
             .bootnodes()
             .iter()
             .filter(|addr| !connected_peers.contains_key(addr))
         {
-            // Initialize the `Version` request.
-            // TODO (raychu86): Establish a formal node version.
-            let version = Version::new_with_rng(1u64, block_height, local_address, *bootnode_address);
-            let request = Request::Version(version.clone());
-
-            // Set the bootnode as a connecting peer in the peer book.
-            self.connecting_to_peer(*bootnode_address, version.nonce).await?;
-
-            // Send a connection request with the outbound handler.
-            self.outbound.write().await.broadcast(&request).await;
+            self.initiate_connection(*bootnode_address).await?;
         }
 
         Ok(())
@@ -278,23 +290,11 @@ impl Peers {
     /// Broadcasts a connection request to all disconnected peers.
     #[inline]
     async fn connect_to_disconnected_peers(&self) -> Result<(), NetworkError> {
-        // Fetch the local address of this node.
-        let local_address = self.local_address().unwrap(); // must be known by now
-        // Fetch the current block height of this node.
-        let block_height = self.environment.current_block_height().await;
+        trace!("Connecting to disconnected peers");
 
         // Iterate through each connected peer and attempts a connection request.
         for (remote_address, _) in self.disconnected_peers().await {
-            // Initialize the `Version` request.
-            // TODO (raychu86): Establish a formal node version.
-            let version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
-            let request = Request::Version(version.clone());
-
-            // Set the disconnected peer as a connecting peer in the peer book.
-            self.connecting_to_peer(remote_address, version.nonce).await?;
-
-            // Send a connection request with the outbound handler.
-            self.outbound.write().await.broadcast(&request).await;
+            self.initiate_connection(remote_address).await?;
         }
 
         Ok(())
@@ -399,14 +399,9 @@ impl Peers {
     ///
     #[inline]
     pub(crate) async fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        let own_address = self.environment.local_address().unwrap(); // must be known by now
-        if remote_address == own_address {
-            return Err(NetworkError::SelfConnectAttempt);
-        }
+        // Initialize the peer's outbound channel and state
+        self.outbound.write().await.initialize_state(remote_address).await?;
 
-        if self.connected_peers().await.contains_key(&remote_address) {
-            return Err(NetworkError::PeerAlreadyConnected);
-        }
         // Set the peer as connecting with this node server.
         self.peer_book.write().await.set_connecting(&remote_address, nonce)
     }
@@ -415,7 +410,7 @@ impl Peers {
     /// Sets the given remote address in the peer book as connected to this node server.
     ///
     #[inline]
-    pub(crate) async fn connected_to_peer(&self, remote_address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+    pub(crate) async fn connected_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
         // Set the peer as connected with this node server.

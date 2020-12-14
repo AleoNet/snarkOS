@@ -144,11 +144,26 @@ impl Outbound {
     /// if it does not exist.
     ///
     #[inline]
-    async fn initialize_state(&self, remote_address: SocketAddr) {
+    pub async fn initialize_state(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         debug!("Initializing Outbound state for {}", remote_address);
+
+        // a channel already exists if the node accepted (i.e. didn't initiate) the connection;
+        // it needs to be connected to the remote address otherwise
+        let channel_exists = self.channels.read().await.contains_key(&remote_address);
+
+        if !channel_exists {
+            let channel = TcpStream::connect(remote_address).await?;
+            self.channels
+                .write()
+                .await
+                .insert(remote_address, Arc::new(Mutex::new(channel)));
+        }
+
         self.pending.write().await.insert(remote_address, Default::default());
         self.success.write().await.insert(remote_address, Default::default());
         self.failure.write().await.insert(remote_address, Default::default());
+
+        Ok(())
     }
 
     ///
@@ -156,17 +171,6 @@ impl Outbound {
     ///
     #[inline]
     async fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Channel, NetworkError> {
-        let channel_exists = self.channels.read().await.contains_key(&remote_address);
-        if !channel_exists {
-            trace!("Establishing an outbound channel to {}", remote_address);
-            let channel = TcpStream::connect(remote_address).await?;
-            self.channels
-                .write()
-                .await
-                .insert(remote_address, Arc::new(Mutex::new(channel)));
-
-            self.initialize_state(remote_address).await;
-        }
         Ok(self
             .channels
             .read()
@@ -248,7 +252,12 @@ impl Outbound {
 
     #[inline]
     async fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Request, error: E) {
-        warn!("Failed to send a {} to {}", request.name(), request.receiver());
+        warn!(
+            "Failed to send a {} to {}: {}",
+            request.name(),
+            request.receiver(),
+            error
+        );
 
         // Acquire the pending requests write lock.
         let mut pending = self.pending.write().await;
@@ -268,8 +277,6 @@ impl Outbound {
             // Increment the failure counter.
             self.send_failure_count.fetch_add(1, Ordering::SeqCst);
         }
-
-        trace!("{}", error);
     }
 }
 

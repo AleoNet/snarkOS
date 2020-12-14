@@ -134,13 +134,6 @@ impl PeerBook {
     ///
     #[inline]
     pub fn handshake(&self, address: &SocketAddr) -> Result<u64, NetworkError> {
-        /* TODO(ljedrz): move this check higher up
-        if self.local_address() == *address {
-            error!("Attempting to fetch handshake with the local address {}", address);
-            return Err(NetworkError::PeerAddressIsLocalAddress);
-        }
-        */
-
         // Check if the address is a connecting peer.
         if self.is_connecting(address) {
             // Fetch the handshake of the connecting peer.
@@ -199,16 +192,9 @@ impl PeerBook {
     /// if the given nonce matches the stored nonce from `Self::set_connecting`.
     ///
     #[inline]
-    pub fn set_connected(&mut self, address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        /* TODO(ljedrz): move this check higher up
-        if self.local_address() == *address {
-            error!("Attempting to connect to the local address - {}", address);
-            return Err(NetworkError::PeerAddressIsLocalAddress);
-        }
-        */
-
+    pub fn set_connected(&mut self, address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Remove the address from the connecting peers, if it exists.
-        let mut peer_info = match self.connecting_peers.remove(address) {
+        let mut peer_info = match self.connecting_peers.remove(&address) {
             // Case 1 - A previously connecting peer.
             Some(peer_info) => peer_info,
             // Case 2 - A peer that was previously not connecting or unknown.
@@ -218,7 +204,7 @@ impl PeerBook {
         peer_info.set_connected(nonce)?;
 
         // Add the address into the connected peers.
-        let success = self.connected_peers.insert(*address, peer_info).is_none();
+        let success = self.connected_peers.insert(address, peer_info).is_none();
         // On success, increment the connected peer count.
         connected_peers_inc!(success);
 
@@ -231,13 +217,6 @@ impl PeerBook {
     ///
     #[inline]
     pub fn set_disconnected(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
-        /* TODO(ljedrz): move this check higher up
-        if self.local_address() == *address {
-            error!("Attempting to disconnect from the local address - {}", address);
-            return Err(NetworkError::PeerAddressIsLocalAddress);
-        }
-        */
-
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
         if let Some(mut peer_info) = self.connecting_peers.remove(address) {
             // Update the peer info to disconnected.
@@ -281,13 +260,6 @@ impl PeerBook {
     ///
     #[inline]
     pub fn add_peer(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
-        /* TODO(ljedrz): move this check higher up
-        if self.local_address() == *address {
-            error!("Attempting to find the local address - {}", address);
-            return Err(NetworkError::PeerAddressIsLocalAddress);
-        }
-        */
-
         // Check if the peer is a connecting peer.
         if self.is_connecting(address) {
             // Fetch the peer info of the given address.
@@ -345,13 +317,6 @@ impl PeerBook {
     ///
     #[inline]
     pub fn get_peer(&mut self, address: &SocketAddr) -> Result<&PeerInfo, NetworkError> {
-        /* TODO(ljedrz): move this check higher up
-        if self.local_address() == *address {
-            error!("Attempting to fetch the local address {}", address);
-            return Err(NetworkError::PeerAddressIsLocalAddress);
-        }
-        */
-
         // Check if the address is a connecting peer.
         if self.is_connecting(address) {
             // Fetch the peer info of the connecting peer.

@@ -109,8 +109,12 @@ impl Server {
         task::spawn(async move {
             loop {
                 info!("Updating peers and blocks");
-                peers.update().await.unwrap();
-                blocks.update().await.unwrap();
+                if let Err(e) = peers.update().await {
+                    error!("Peer update error: {}", e);
+                }
+                if let Err(e) = blocks.update().await {
+                    error!("Block update error: {}", e);
+                }
                 sleep(Duration::from_secs(10)).await;
             }
         });
@@ -150,7 +154,7 @@ impl Server {
                 self.peers.connecting_to_peer(remote_address, nonce).await?;
             }
             Response::ConnectedTo(remote_address, nonce) => {
-                self.peers.connected_to_peer(&remote_address, nonce).await?;
+                self.peers.connected_to_peer(remote_address, nonce).await?;
             }
             Response::VersionToVerack(remote_address, remote_version) => {
                 self.peers.version_to_verack(remote_address, &remote_version).await?;

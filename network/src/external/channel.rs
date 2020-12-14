@@ -43,20 +43,20 @@ pub struct Channel {
 }
 
 impl Channel {
-    pub fn new(remote_address: SocketAddr, stream: TcpStream) -> Result<Self, ConnectError> {
+    pub fn new(remote_address: SocketAddr, stream: TcpStream) -> Self {
         let (reader, writer) = stream.into_split();
 
-        Ok(Self {
+        Self {
             remote_address,
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
-        })
+        }
     }
 
     pub async fn from_addr(remote_address: SocketAddr) -> Result<Self, ConnectError> {
         let stream = TcpStream::connect(remote_address).await?;
 
-        Channel::new(remote_address, stream)
+        Ok(Channel::new(remote_address, stream))
     }
 
     /// Returns a new channel with the specified address and new writer stream.
