@@ -143,7 +143,7 @@ mod tests {
 
         // 2. Peer accepts server connection.
         let (stream, address) = remote_listener.accept().await.unwrap();
-        let peer_channel = Channel::new(address, stream).unwrap();
+        let peer_channel = Channel::new(address, stream);
 
         // 4. Peer reads GetPeers message.
         let (name, buffer) = peer_channel.read().await.unwrap();
@@ -188,7 +188,7 @@ mod tests {
 
         // 2. Remote node accepts Local node connection.
         let (stream, _) = remote_listener.accept().await.unwrap();
-        let mut channel = Channel::new(local_address, stream).unwrap();
+        let mut channel = Channel::new(local_address, stream);
 
         // 3. Remote node connects to Local node.
         channel = channel.update_writer(local_address).await.unwrap();

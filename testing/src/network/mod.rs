@@ -105,7 +105,7 @@ pub fn start_test_server(mut server: Server) {
 /// Returns the next tcp channel connected to the listener
 pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
     let (stream, address) = listener.accept().await.unwrap();
-    Channel::new(address, stream).unwrap()
+    Channel::new(address, stream)
 }
 
 /// Starts a fake node that accepts all tcp connections at the given socket address
