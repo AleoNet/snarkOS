@@ -109,7 +109,6 @@ impl Inbound {
                             let inbound = inbound.clone();
                             let channel = channel.clone();
                             tokio::spawn(async move {
-                                debug!("Spawning a task for requests from {}", remote_address);
                                 inbound.inbound(listener_address, channel).await.unwrap();
                                 // inbound.inbound(&discovered_local_address, channel).await?;
                             });
@@ -140,10 +139,7 @@ impl Inbound {
 
             // Read the next message from the channel. This is a blocking operation.
             let (message_name, message_bytes) = match channel.read().await {
-                Ok((message_name, message_bytes)) => {
-                    trace!("Received a {} message from channel", message_name);
-                    (message_name, message_bytes)
-                }
+                Ok((message_name, message_bytes)) => (message_name, message_bytes),
                 Err(error) => {
                     error!("Failed to read message from channel\n{}", error);
                     Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;

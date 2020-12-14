@@ -77,7 +77,11 @@ impl Request {
     /// Locks the given channel and writes the request to it.
     #[inline]
     pub async fn write_to_channel(&self, channel: &Channel) -> anyhow::Result<()> {
-        Ok(channel.lock().await.write_all(&self.serialize()?).await?)
+        channel.lock().await.write_all(&self.serialize()?).await?;
+
+        debug!("Sent a {} to {}", self.name(), self.receiver());
+
+        Ok(())
     }
 
     #[inline]

@@ -91,15 +91,15 @@ impl Peers {
             // Check if this node server is below the permitted number of connected peers.
             if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
                 // // Broadcast a `GetPeers` message to request for more peers.
-                // trace!("Broadcasting getpeers requests to all connected peers");
+                // trace!("Sending getpeers requests to all connected peers");
                 // self.broadcast_getpeers_requests().await?;
 
                 // Attempt to connect to the default bootnodes of the network.
-                trace!("Broadcasting connection requests to default bootnodes");
+                trace!("Sending connection requests to default bootnodes");
                 self.connect_to_bootnodes().await?;
 
                 // Attempt to connect to each disconnected peer saved in the peer book.
-                trace!("Broadcasting connection requests to disconnected peers");
+                trace!("Sending connection requests to disconnected peers");
                 self.connect_to_disconnected_peers().await?;
             }
         }
@@ -309,9 +309,8 @@ impl Peers {
         let block_height = self.environment.current_block_height().await;
 
         // Broadcast a `Version` message to each connected peer of this node server.
+        trace!("Broadcasting Version messages");
         for (remote_address, _) in self.connected_peers().await {
-            debug!("Broadcasting version message to {}", remote_address);
-
             // Get the handshake nonce.
             if let Ok(nonce) = self.nonce(&remote_address).await {
                 // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
@@ -344,6 +343,7 @@ impl Peers {
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     #[inline]
     async fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
+        trace!("Broadcasting GetPeers messages");
         for (remote_address, _) in self.connected_peers().await {
             // Broadcast a `GetPeers` message to the connected peer.
             self.outbound
@@ -455,8 +455,6 @@ impl Peers {
             if !self.connected_peers().await.contains_key(&remote_address) {
                 self.connecting_to_peer(remote_address, remote_version.nonce).await?;
             }
-
-            debug!("Sent `Verack` request to {}", remote_address);
         }
 
         Ok(())

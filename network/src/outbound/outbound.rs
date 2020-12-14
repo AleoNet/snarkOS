@@ -181,8 +181,6 @@ impl Outbound {
     ///
     #[inline]
     async fn authorize(&self, request: &Request) {
-        trace!("Authorizing `{}` request to {}", request.name(), request.receiver());
-
         // Acquire the pending requests write lock.
         let mut pending = self.pending.write().await;
 
@@ -193,10 +191,8 @@ impl Outbound {
 
                 // Increment the request counter.
                 self.send_pending_count.fetch_add(1, Ordering::SeqCst);
-
-                trace!("Authorized `{}` request to {}", request.name(), request.receiver());
             }
-            None => trace!(
+            None => warn!(
                 "Failed to authorize `{}` request to {}",
                 request.name(),
                 request.receiver()
@@ -206,8 +202,6 @@ impl Outbound {
 
     #[inline]
     async fn send(&self, request: &Request) {
-        debug!("Sending `{}` request to {}", request.name(), request.receiver());
-
         // Fetch the outbound channel.
         let channel = match self.outbound_channel(request.receiver()).await {
             Ok(channel) => channel,
@@ -232,8 +226,6 @@ impl Outbound {
 
     #[inline]
     async fn success(&self, request: &Request) {
-        debug!("Sent `{}` request to {}", request.name(), request.receiver());
-
         // Acquire the pending requests write lock.
         let mut pending = self.pending.write().await;
 
@@ -256,7 +248,7 @@ impl Outbound {
 
     #[inline]
     async fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Request, error: E) {
-        debug!("Failed to send `{}` request to {}", request.name(), request.receiver());
+        warn!("Failed to send a {} to {}", request.name(), request.receiver());
 
         // Acquire the pending requests write lock.
         let mut pending = self.pending.write().await;
