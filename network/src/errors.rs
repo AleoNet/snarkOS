@@ -14,12 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_errors::{
-    consensus::ConsensusError,
-    network::{ConnectError, SendError},
-    objects::BlockError,
-    storage::StorageError,
-};
+use snarkos_errors::{consensus::ConsensusError, network::SendError, objects::BlockError, storage::StorageError};
+
+pub use snarkos_errors::network::ConnectError;
 
 use std::fmt;
 

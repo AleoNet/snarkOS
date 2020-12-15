@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    errors::ConnectError,
     external::{message::Message, message_types::*, Channel, MessageName},
     inbound::Response,
     Environment,
@@ -26,6 +27,7 @@ use crate::{
 use std::{
     collections::HashMap,
     fmt::Display,
+    io::ErrorKind,
     net::SocketAddr,
     sync::{atomic::AtomicU64, Arc},
 };
@@ -198,17 +200,15 @@ impl Inbound {
                 let message = Self::parse::<Verack>(&bytes)?;
                 self.route(Response::Verack(channel.remote_address, message)).await;
             } else if name == MessageName::from("disconnect") {
-                info!("Disconnected from peer {:?}", channel.remote_address);
                 self.route(Response::DisconnectFrom(channel.remote_address)).await;
-            } else {
-                debug!("Message name not recognized {:?}", name.to_string());
-            }
-            // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
-            // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
-            // Break out of the loop if the peer disconnects.
-            if disconnect_from_peer {
+
+                // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
+                // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
+                // Break out of the loop if the peer disconnects.
                 warn!("Disconnecting from an unreliable peer");
                 break;
+            } else {
+                debug!("Message name not recognized {:?}", name.to_string());
             }
         }
 
@@ -216,18 +216,12 @@ impl Inbound {
     }
 
     /// Logs the failure and determines whether to disconnect from a peer.
-    async fn handle_failure<T: Display>(
+    async fn handle_failure(
         failure: &mut bool,
         failure_count: &mut u8,
         disconnect_from_peer: &mut bool,
-        error: T,
+        error: ConnectError,
     ) {
-        // Determines the criteria for disconnecting from a peer.
-        fn should_disconnect(failure_count: &u8) -> bool {
-            // Tolerate up to 10 failed communications.
-            *failure_count >= 10
-        }
-
         // Only increment failure_count if we haven't seen a failure yet.
         if !*failure {
             // Update the state to reflect a new failure.
@@ -236,7 +230,22 @@ impl Inbound {
             error!("Connection error: {}", error);
 
             // Determine if we should disconnect.
-            *disconnect_from_peer = should_disconnect(failure_count);
+            *disconnect_from_peer = if let ConnectError::Std(err) = error {
+                [
+                    ErrorKind::BrokenPipe,
+                    ErrorKind::ConnectionReset,
+                    ErrorKind::UnexpectedEof,
+                ]
+                .contains(&err.kind())
+            } else {
+                // Tolerate up to 10 failed communications.
+                *failure_count >= 10
+            };
+
+            if *disconnect_from_peer {
+                warn!("should disconnect");
+                return;
+            }
         } else {
             debug!("Connection errored again in the same loop (error message: {})", error);
         }
@@ -261,7 +270,7 @@ impl Inbound {
     #[inline]
     async fn route(&self, response: Response) {
         if let Err(err) = self.sender.send(response).await {
-            error!("Failed to route response for a message\n{}", err);
+            error!("Failed to route response for a message: {}", err);
             // error!("Failed to route `{}` message from {}\n{}", name, remote_address, err);
         }
     }

@@ -20,8 +20,8 @@ use std::net::SocketAddr;
 
 #[derive(Debug, Error)]
 pub enum ConnectError {
-    #[error("{}: {}", _0, _1)]
-    Crate(&'static str, String),
+    #[error("{}", _0)]
+    Std(std::io::Error),
 
     #[error("{}", _0)]
     Message(String),
@@ -50,6 +50,6 @@ impl From<MessageHeaderError> for ConnectError {
 
 impl From<std::io::Error> for ConnectError {
     fn from(error: std::io::Error) -> Self {
-        ConnectError::Crate("std::io", format!("{:?}", error))
+        ConnectError::Std(error)
     }
 }
