@@ -95,19 +95,10 @@ impl Inbound {
                         let height = environment.current_block_height().await;
                         match inbound.connection_request(height, remote_address, channel).await {
                             Ok(channel) => {
-                                // TODO (howardwu): Enable this peer address discovery again.
-                                // // Bootstrap discovery of local node IP via VERACK responses
-                                //     let local_address = peers.local_address();
-                                //     if local_address != discovered_local_address {
-                                //         peers.set_local_address(discovered_local_address).await;
-                                //         info!("Discovered local address: {:?}", local_address);
-                                //     }
-
                                 let inbound = inbound.clone();
                                 let channel = channel.clone();
                                 tokio::spawn(async move {
-                                    inbound.inbound(channel).await.unwrap();
-                                    // inbound.inbound(&discovered_local_address, channel).await?;
+                                    inbound.listen_for_messages(channel).await.unwrap();
                                 });
                             }
                             Err(e) => error!("Failed to accept a connection: {}", e),
@@ -121,7 +112,7 @@ impl Inbound {
         Ok(())
     }
 
-    pub async fn inbound(&self, channel: Channel) -> Result<(), NetworkError> {
+    pub async fn listen_for_messages(&self, channel: Channel) -> Result<(), NetworkError> {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut channel = channel;

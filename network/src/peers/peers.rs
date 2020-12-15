@@ -281,7 +281,7 @@ impl Peers {
             let inbound = self.inbound.clone();
             let channel_clone = channel.clone();
             tokio::spawn(async move {
-                inbound.inbound(channel_clone).await.unwrap();
+                inbound.listen_for_messages(channel_clone).await.unwrap();
             });
 
             // save the outbound channel
