@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{outbound::Request, NetworkError};
+use crate::{external::Channel, outbound::Request, NetworkError};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -32,9 +32,6 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// The TCP stream for sending outbound requests to a single remote address.
-pub(super) type Channel = Arc<Mutex<TcpStream>>;
-
 /// The map of remote addresses to their active write channels.
 type Channels = HashMap<SocketAddr, Channel>;
 
@@ -51,10 +48,10 @@ type Success = HashMap<SocketAddr, Requests>;
 type Failure = HashMap<SocketAddr, Requests>;
 
 /// A core data structure for handling outbound network traffic.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Outbound {
     /// The map of remote addresses to their active write channels.
-    channels: Arc<RwLock<Channels>>,
+    pub(crate) channels: Arc<RwLock<Channels>>,
     /// The map of remote addresses to their pending requests.
     pending: Arc<RwLock<Pending>>,
     /// The map of remote addresses to their successful requests.
@@ -70,6 +67,18 @@ pub struct Outbound {
 }
 
 impl Outbound {
+    pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
+        Self {
+            channels,
+            pending: Default::default(),
+            success: Default::default(),
+            failure: Default::default(),
+            send_pending_count: Default::default(),
+            send_success_count: Default::default(),
+            send_failure_count: Default::default(),
+        }
+    }
+
     ///
     /// Returns `true` if the given request is a pending request.
     ///
@@ -146,19 +155,6 @@ impl Outbound {
     #[inline]
     pub async fn initialize_state(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         debug!("Initializing Outbound state for {}", remote_address);
-
-        // a channel already exists if the node accepted (i.e. didn't initiate) the connection;
-        // it needs to be connected to the remote address otherwise
-        let channel_exists = self.channels.read().await.contains_key(&remote_address);
-
-        if !channel_exists {
-            let channel = TcpStream::connect(remote_address).await?;
-            self.channels
-                .write()
-                .await
-                .insert(remote_address, Arc::new(Mutex::new(channel)));
-        }
-
         self.pending.write().await.insert(remote_address, Default::default());
         self.success.write().await.insert(remote_address, Default::default());
         self.failure.write().await.insert(remote_address, Default::default());
@@ -330,7 +326,7 @@ mod tests {
         let request = request(remote_address);
 
         // Create a new instance.
-        let outbound = Outbound::default();
+        let outbound = Outbound::new(Default::default());
         outbound.initialize_state(remote_address).await;
 
         assert!(!outbound.is_pending(&request).await);
@@ -361,7 +357,7 @@ mod tests {
         let request = request(remote_address);
 
         // Create a new instance.
-        let outbound = Outbound::default();
+        let outbound = Outbound::new(Default::default());
         outbound.initialize_state(remote_address).await;
 
         assert!(!outbound.is_pending(&request).await);
@@ -386,7 +382,7 @@ mod tests {
         let request = request(remote_address);
 
         // Create a new instance.
-        let outbound = Outbound::default();
+        let outbound = Outbound::new(Default::default());
         outbound.initialize_state(remote_address).await;
 
         assert!(!outbound.is_pending(&request).await);

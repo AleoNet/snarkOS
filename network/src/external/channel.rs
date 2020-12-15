@@ -61,13 +61,10 @@ impl Channel {
 
     /// Returns a new channel with the specified address and new writer stream.
     pub async fn update_writer(self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
-        let stream = TcpStream::connect(remote_address).await?;
-        let writer = stream.into_split().1;
-
         Ok(Self {
             remote_address,
             reader: self.reader,
-            writer: Arc::new(Mutex::new(writer)),
+            writer: self.writer,
         })
     }
 
@@ -150,57 +147,5 @@ mod tests {
 
         assert_eq!(GetPeers::name(), name);
         assert!(GetPeers::deserialize(buffer).is_ok());
-    }
-
-    #[tokio::test]
-    async fn channel_update() {
-        // start a listener for the "remote" node
-        let (remote_address, remote_listener) = random_bound_address().await;
-
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let (ty, ry) = tokio::sync::oneshot::channel();
-
-        tokio::spawn(async move {
-            // start a listener for the "local" node
-            let (local_address, server_listener) = random_bound_address().await;
-
-            tx.send(local_address).unwrap();
-
-            // 1. Local node connects to Remote node
-            let mut channel = Channel::from_addr(remote_address).await.unwrap();
-
-            // 4. Local node accepts Remote node connection
-            let (stream, address) = server_listener.accept().await.unwrap();
-            channel = channel.update_reader(stream).await.unwrap();
-
-            // 5. Local node writes GetPeers message
-            channel.write(&GetPeers).await.unwrap();
-
-            // 6. Local node reads Peers message
-            let (name, buffer) = channel.read().await.unwrap();
-            assert_eq!(Peers::name(), name);
-            assert_eq!(Peers::new(vec![]), Peers::deserialize(buffer).unwrap());
-
-            ty.send(()).unwrap();
-        });
-
-        let local_address = rx.await.unwrap();
-
-        // 2. Remote node accepts Local node connection.
-        let (stream, _) = remote_listener.accept().await.unwrap();
-        let mut channel = Channel::new(local_address, stream);
-
-        // 3. Remote node connects to Local node.
-        channel = channel.update_writer(local_address).await.unwrap();
-
-        // 6. Remote node reads GetPeers message.
-        let (name, buffer) = channel.read().await.unwrap();
-        assert_eq!(GetPeers::name(), name);
-        assert_eq!(GetPeers, GetPeers::deserialize(buffer).unwrap());
-
-        // 7. Remote node writes Peers message.
-        channel.write(&Peers::new(vec![])).await.unwrap();
-
-        ry.await.unwrap();
     }
 }

@@ -57,23 +57,21 @@ pub struct Inbound {
     receive_failure_count: Arc<AtomicU64>,
 }
 
-impl Default for Inbound {
-    fn default() -> Self {
+impl Inbound {
+    pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
         // Initialize the sender and receiver.
         let (sender, receiver) = tokio::sync::mpsc::channel(1024);
 
         Self {
             sender,
             receiver: Arc::new(Mutex::new(receiver)),
-            channels: Default::default(),
+            channels,
             receive_response_count: Default::default(),
             receive_success_count: Default::default(),
             receive_failure_count: Default::default(),
         }
     }
-}
 
-impl Inbound {
     pub async fn listen(&self, environment: &mut Environment) -> Result<(), NetworkError> {
         let (listener_address, listener) = if let Some(addr) = environment.local_address() {
             let listener = TcpListener::bind(&addr).await?;
@@ -97,8 +95,6 @@ impl Inbound {
                         let height = environment.current_block_height().await;
                         match inbound.connection_request(height, remote_address, channel).await {
                             Ok(channel) => {
-                                trace!("Established connection with {}", remote_address);
-
                                 // TODO (howardwu): Enable this peer address discovery again.
                                 // // Bootstrap discovery of local node IP via VERACK responses
                                 //     let local_address = peers.local_address();
@@ -110,7 +106,7 @@ impl Inbound {
                                 let inbound = inbound.clone();
                                 let channel = channel.clone();
                                 tokio::spawn(async move {
-                                    inbound.inbound(listener_address, channel).await.unwrap();
+                                    inbound.inbound(channel).await.unwrap();
                                     // inbound.inbound(&discovered_local_address, channel).await?;
                                 });
                             }
@@ -125,7 +121,7 @@ impl Inbound {
         Ok(())
     }
 
-    async fn inbound(&self, local_address: SocketAddr, channel: Channel) -> Result<(), NetworkError> {
+    pub async fn inbound(&self, channel: Channel) -> Result<(), NetworkError> {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut channel = channel;
@@ -192,7 +188,7 @@ impl Inbound {
             } else if name == Version::name() {
                 let message = Self::parse::<Version>(&bytes)?;
                 // TODO (raychu86) Does `receive_version` need to return a channel?
-                match self.receive_version(local_address, message, channel.clone()).await {
+                match self.receive_version(message, channel.clone()).await {
                     Ok(returned_channel) => channel = returned_channel,
                     Err(err) => error!("Failed to route response for a message\n{}", err),
                 }
@@ -286,50 +282,43 @@ impl Inbound {
     ///
     /// This method may seem redundant to handshake protocol functions but a peer can send additional
     /// Version messages if they want to update their ip address/port or want to share their chain height.
-    async fn receive_version(
-        &self,
-        local_address: SocketAddr,
-        version: Version,
-        channel: Channel,
-    ) -> Result<Channel, NetworkError> {
+    async fn receive_version(&self, version: Version, channel: Channel) -> Result<Channel, NetworkError> {
         let remote_address = SocketAddr::new(channel.remote_address.ip(), version.sender.port());
 
-        if local_address != remote_address {
-            // Route version message to peer manager.
-            self.route(Response::VersionToVerack(remote_address, version.clone()))
-                .await;
+        // Route version message to peer manager.
+        self.route(Response::VersionToVerack(remote_address, version.clone()))
+            .await;
 
-            // TODO (howardwu): Implement this.
-            {
-                // // If our peer has a longer chain, send a sync message
-                // if version.height > environment.storage_read().await.get_current_block_height() {
-                //     debug!("Received a version message with a greater height {}", version.height);
-                //     // Update the sync node if the sync_handler is idle and there are no requested block headers
-                //     if let Ok(mut sync_handler) = environment.sync_manager().await.try_lock() {
-                //         if !sync_handler.is_syncing()
-                //             && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
-                //         {
-                //             debug!("Attempting to sync with peer {}", remote_address);
-                //             sync_handler.sync_node_address = remote_address;
-                //
-                //             if let Ok(block_locator_hashes) = environment.storage_read().await.get_block_locator_hashes() {
-                //                 channel.write(&GetSync::new(block_locator_hashes)).await?;
-                //             }
-                //         } else {
-                //             // TODO (howardwu): Implement this.
-                //             {
-                //                 // if let Some(channel) = environment
-                //                 //     .peers_read()
-                //                 //     .await
-                //                 //     .get_channel(&sync_handler.sync_node_address)
-                //                 // {
-                //                 //     sync_handler.increment(channel.clone()).await?;
-                //                 // }
-                //             }
-                //         }
-                //     }
-                // }
-            }
+        // TODO (howardwu): Implement this.
+        {
+            // // If our peer has a longer chain, send a sync message
+            // if version.height > environment.storage_read().await.get_current_block_height() {
+            //     debug!("Received a version message with a greater height {}", version.height);
+            //     // Update the sync node if the sync_handler is idle and there are no requested block headers
+            //     if let Ok(mut sync_handler) = environment.sync_manager().await.try_lock() {
+            //         if !sync_handler.is_syncing()
+            //             && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
+            //         {
+            //             debug!("Attempting to sync with peer {}", remote_address);
+            //             sync_handler.sync_node_address = remote_address;
+            //
+            //             if let Ok(block_locator_hashes) = environment.storage_read().await.get_block_locator_hashes() {
+            //                 channel.write(&GetSync::new(block_locator_hashes)).await?;
+            //             }
+            //         } else {
+            //             // TODO (howardwu): Implement this.
+            //             {
+            //                 // if let Some(channel) = environment
+            //                 //     .peers_read()
+            //                 //     .await
+            //                 //     .get_channel(&sync_handler.sync_node_address)
+            //                 // {
+            //                 //     sync_handler.increment(channel.clone()).await?;
+            //                 // }
+            //             }
+            //         }
+            //     }
+            // }
         }
         Ok(channel)
     }
@@ -358,10 +347,10 @@ impl Inbound {
         &self,
         block_height: u32,
         remote_address: SocketAddr,
-        reader: TcpStream,
+        stream: TcpStream,
     ) -> Result<Channel, NetworkError> {
-        let channel = Channel::new(remote_address, reader);
-        // Parse the inbound message into the message name and message bytes.
+        // Register the new channel.
+        let channel = Channel::new(remote_address, stream);
 
         // Read the next message from the channel.
         // Note: this is a blocking operation.
@@ -383,8 +372,19 @@ impl Inbound {
                 // Create the remote address from the given peer address, and specified port from the version message.
                 let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
 
+                // TODO: rename update_writer to update_address
+                let channel = channel.update_writer(remote_address).await?;
+
+                // Save the channel under the provided remote address
+                self.channels.write().await.insert(remote_address, channel.clone());
+
                 // TODO (raychu86): Establish a formal node version.
                 let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
+
+                // notify the server that the peer is being connected to
+                self.sender
+                    .send(Response::ConnectingTo(remote_address, local_version.nonce))
+                    .await?;
 
                 // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
                 // if let Some(version) = version_message {
@@ -412,9 +412,6 @@ impl Inbound {
                 //     }
                 // }
 
-                // Connect to the remote address.
-                let channel = channel.update_writer(remote_address).await?;
-
                 // Write a verack response to the remote peer.
                 channel
                     .write(&Verack::new(remote_version.nonce, local_address, remote_address))
@@ -423,40 +420,15 @@ impl Inbound {
                 // Write a version request to the remote peer.
                 channel.write(&local_version).await?;
 
-                // notify the server that the peer is being connected to
-                self.sender
-                    .send(Response::ConnectingTo(local_version.receiver, local_version.nonce))
-                    .await?;
-
                 // Parse the inbound message into the message name and message bytes.
                 let (message_name, message_bytes) = channel.read().await?;
 
                 // Deserialize the message bytes into a verack message.
                 let verack = Verack::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
-                let local_address = verack.receiver;
-
-                // TODO (howardwu): Check whether this remote address needs to
-                //   be derive the same way as the version message case above
-                //  (using a remote_address.ip() and address_sender.port()).
-                let remote_address = verack.sender;
-
-                // Store the new channel.
-                self.channels.write().await.insert(remote_address, channel.clone());
-
                 self.sender
-                    .send(Response::ConnectedTo(remote_address, verack.nonce))
+                    .send(Response::ConnectedTo(remote_address, local_version.nonce))
                     .await?;
-
-                Ok(channel)
-            }
-            // connection initiator path
-            name if name == Verack::name() => {
-                // Handles a verack message request.
-                // Establish the channel with the remote peer.
-
-                // Deserialize the message bytes into a verack message.
-                let verack = Verack::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
                 Ok(channel)
             }

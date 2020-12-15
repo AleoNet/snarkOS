@@ -40,7 +40,7 @@ pub struct Blocks {
     /// The parameters and settings of this node server.
     pub(crate) environment: Environment,
     /// The outbound handler of this node server.
-    outbound: Arc<RwLock<Outbound>>,
+    outbound: Arc<Outbound>,
 }
 
 impl Blocks {
@@ -48,7 +48,7 @@ impl Blocks {
     /// Creates a new instance of `Blocks`.
     ///
     #[inline]
-    pub fn new(environment: Environment, outbound: Arc<RwLock<Outbound>>) -> Result<Self, NetworkError> {
+    pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
         trace!("Instantiating block service");
         Ok(Self { environment, outbound })
     }
@@ -92,8 +92,6 @@ impl Blocks {
             if *remote_address != block_miner && *remote_address != local_address {
                 // Broadcast a `Block` message to the connected peer.
                 self.outbound
-                    .write()
-                    .await
                     .broadcast(&Request::Block(*remote_address, Block::new(block_bytes.clone())))
                     .await;
             }
@@ -117,8 +115,6 @@ impl Blocks {
             if *remote_address != transaction_sender && *remote_address != local_address {
                 // Broadcast a `Transaction` message to the connected peer.
                 self.outbound
-                    .write()
-                    .await
                     .broadcast(&Request::Transaction(
                         *remote_address,
                         Transaction::new(transaction_bytes.clone()),
@@ -235,8 +231,6 @@ impl Blocks {
         if let Ok(block) = self.environment.storage_read().await.get_block(&message.block_hash) {
             // Broadcast a `SyncBlock` message to the connected peer.
             self.outbound
-                .write()
-                .await
                 .broadcast(&Request::SyncBlock(remote_address, SyncBlock::new(block.serialize()?)))
                 .await;
         }
@@ -257,8 +251,6 @@ impl Blocks {
         if !transactions.is_empty() {
             // Broadcast a `MemoryPool` message to the connected peer.
             self.outbound
-                .write()
-                .await
                 .broadcast(&Request::MemoryPool(remote_address, MemoryPool::new(transactions)))
                 .await;
         }
@@ -334,11 +326,7 @@ impl Blocks {
         };
 
         // Broadcast a `Sync` message to the connected peer.
-        self.outbound
-            .write()
-            .await
-            .broadcast(&Request::Sync(remote_address, sync))
-            .await;
+        self.outbound.broadcast(&Request::Sync(remote_address, sync)).await;
 
         Ok(())
     }

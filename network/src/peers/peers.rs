@@ -15,10 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::message_types::{Peers as PeersStruct, *},
+    external::{
+        message_types::{Peers as PeersStruct, *},
+        Channel,
+        Message,
+        Verack,
+    },
     outbound::Request,
     peers::{PeerBook, PeerInfo},
     Environment,
+    Inbound,
     NetworkError,
     Outbound,
 };
@@ -28,15 +34,21 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
 };
-use tokio::sync::RwLock;
+
+use tokio::{
+    net::TcpStream,
+    sync::{Mutex, RwLock},
+};
 
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
 pub struct Peers {
     /// The parameters and settings of this node server.
     pub(crate) environment: Environment,
+    /// The inbound service of this node server.
+    inbound: Arc<Inbound>,
     /// The outbound service of this node server.
-    outbound: Arc<RwLock<Outbound>>,
+    outbound: Arc<Outbound>,
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
 }
@@ -46,7 +58,7 @@ impl Peers {
     /// Creates a new instance of `Peers`.
     ///
     #[inline]
-    pub fn new(environment: Environment, outbound: Arc<RwLock<Outbound>>) -> Result<Self, NetworkError> {
+    pub fn new(environment: Environment, inbound: Arc<Inbound>, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
         trace!("Instantiating peer manager");
 
         // Load the peer book from storage, or create a new peer book.
@@ -62,6 +74,7 @@ impl Peers {
         // Instantiate the peer manager.
         let peers = Self {
             environment,
+            inbound,
             outbound,
             peer_book: Arc::new(RwLock::new(peer_book)),
         };
@@ -245,6 +258,9 @@ impl Peers {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
+        // open the connection
+        let channel = Channel::new(remote_address, TcpStream::connect(remote_address).await?);
+
         let block_height = self.environment.current_block_height().await;
         // TODO (raychu86): Establish a formal node version.
         let version = Version::new_with_rng(1u64, block_height, own_address, remote_address);
@@ -253,10 +269,29 @@ impl Peers {
         self.connecting_to_peer(remote_address, version.nonce).await?;
 
         // Send a connection request with the outbound handler.
-        let request = Request::Version(version);
-        self.outbound.write().await.broadcast(&request).await;
+        channel.write(&version).await?;
 
-        Ok(())
+        let (message_name, message_bytes) = match channel.read().await {
+            Ok(inbound_message) => inbound_message,
+            _ => return Err(NetworkError::InvalidHandshake),
+        };
+
+        if message_name == Verack::name() {
+            // spawn the inbound loop
+            let inbound = self.inbound.clone();
+            let channel_clone = channel.clone();
+            tokio::spawn(async move {
+                inbound.inbound(channel_clone).await.unwrap();
+            });
+
+            // save the outbound channel
+            self.outbound.channels.write().await.insert(remote_address, channel);
+
+            self.connected_to_peer(remote_address, version.nonce).await
+        } else {
+            // TODO(ljedrz): remove the peer from connecting
+            Err(NetworkError::InvalidHandshake)
+        }
     }
 
     ///
@@ -318,8 +353,6 @@ impl Peers {
                 // TODO (raychu86): Establish a formal node version.
                 // Broadcast a `Version` message to the connected peer.
                 self.outbound
-                    .write()
-                    .await
                     .broadcast(&Request::Version(Version::new(
                         1u64,
                         block_height,
@@ -347,8 +380,6 @@ impl Peers {
         for (remote_address, _) in self.connected_peers().await {
             // Broadcast a `GetPeers` message to the connected peer.
             self.outbound
-                .write()
-                .await
                 .broadcast(&Request::GetPeers(remote_address, GetPeers))
                 .await;
 
@@ -400,7 +431,7 @@ impl Peers {
     #[inline]
     pub(crate) async fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Initialize the peer's outbound channel and state
-        self.outbound.write().await.initialize_state(remote_address).await?;
+        self.outbound.initialize_state(remote_address).await?;
 
         // Set the peer as connecting with this node server.
         self.peer_book.write().await.set_connecting(&remote_address, nonce)
@@ -411,6 +442,7 @@ impl Peers {
     ///
     #[inline]
     pub(crate) async fn connected_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+        debug!("Connected to {}", remote_address);
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
         // Set the peer as connected with this node server.
@@ -438,8 +470,6 @@ impl Peers {
     ) -> Result<(), NetworkError> {
         if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
             self.outbound
-                .write()
-                .await
                 .broadcast(&Request::Verack(Verack::new(
                     remote_version.nonce,
                     remote_version.receiver, /* local_address */
@@ -479,8 +509,6 @@ impl Peers {
             peers.push((peer_address, *peer_info.last_seen()));
         }
         self.outbound
-            .write()
-            .await
             .broadcast(&Request::Peers(remote_address, PeersStruct::new(peers)))
             .await;
 

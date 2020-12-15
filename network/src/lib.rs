@@ -47,9 +47,9 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
-use crate::peers::peers::Peers;
+use crate::{external::Channel, peers::peers::Peers};
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::RwLock, task, time::sleep};
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Response>;
@@ -62,9 +62,9 @@ pub struct Server {
     /// The parameters and settings of this node server.
     environment: Environment,
     /// The inbound handler of this node server.
-    inbound: Arc<RwLock<Inbound>>,
+    inbound: Arc<Inbound>,
     /// The outbound handler of this node server.
-    outbound: Arc<RwLock<Outbound>>,
+    outbound: Arc<Outbound>,
 
     peers: Peers,
     blocks: Blocks,
@@ -74,12 +74,13 @@ pub struct Server {
 impl Server {
     /// Creates a new instance of `Server`.
     pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
+        let channels: Arc<RwLock<HashMap<SocketAddr, Channel>>> = Default::default();
         // Create the inbound and outbound handlers.
-        let inbound = Arc::new(RwLock::new(Inbound::default()));
-        let outbound = Arc::new(RwLock::new(Outbound::default()));
+        let inbound = Arc::new(Inbound::new(channels.clone()));
+        let outbound = Arc::new(Outbound::new(channels));
 
         // Initialize the peer and block services.
-        let peers = Peers::new(environment.clone(), outbound.clone())?;
+        let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
         let blocks = Blocks::new(environment.clone(), outbound.clone())?;
 
         Ok(Self {
@@ -94,7 +95,7 @@ impl Server {
     #[inline]
     pub async fn start(&mut self) -> Result<(), NetworkError> {
         debug!("Initializing server");
-        self.inbound.write().await.listen(&mut self.environment).await?;
+        self.inbound.listen(&mut self.environment).await?;
 
         // update the local address for Blocks and Peers
         self.peers
@@ -140,8 +141,6 @@ impl Server {
     async fn receive_response(&self) -> Result<(), NetworkError> {
         let response = self
             .inbound
-            .write()
-            .await
             .receiver()
             .lock()
             .await
@@ -210,7 +209,12 @@ impl Server {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::{channel::Channel, message::Message, Verack, Version};
+    use crate::external::{
+        channel::Channel,
+        message::{read_header, read_message, Message, MessageHeader},
+        Verack,
+        Version,
+    };
 
     use snarkos_consensus::MemoryPool;
     use snarkos_testing::{
@@ -221,6 +225,7 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
         sync::{Mutex, RwLock},
     };
@@ -269,41 +274,63 @@ mod tests {
 
     #[tokio::test]
     async fn receive_version_handshake() {
-        // Start the node under test.
-        let mut server = test_node().await;
-        server.start().await.unwrap();
-        let node_address = server.local_address().unwrap();
+        let filter =
+            tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
 
-        // Set up listener and channel for peer.
-        let peer_out = TcpStream::connect(&node_address).await.unwrap();
-        let peer_in = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let peer_address = peer_in.local_addr().unwrap();
-        let channel = Channel::new(node_address, peer_out);
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_target(false)
+            .init();
 
-        // Send a Version message to initiate handshake.
+        // start a test node and listen for incoming connections
+        let mut node = test_node().await;
+        node.start().await.unwrap();
+        let node_listener = node.local_address().unwrap();
+
+        // set up a fake node (peer), which is just a socket
+        let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
+
+        // register the addresses bound to the connection between the node and the peer
+        let peer_address = peer_stream.local_addr().unwrap();
+        let node_address = peer_stream.peer_addr().unwrap();
+
+        // the peer initiates a handshake by sending a Version message
         let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
-        channel.write(&version).await.unwrap();
+        let serialized = version.serialize().unwrap();
+        let header = MessageHeader::new(Version::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
 
-        sleep(Duration::new(3, 0)).await;
-        assert!(server.peers.is_connecting(&peer_address).await);
+        // at this point the node should have marked the peer as 'connecting'
+        sleep(Duration::from_millis(1900)).await;
+        assert!(node.peers.is_connecting(&peer_address).await);
 
-        // Read Verack (sent first) and Version responses from the node.
-        let (stream, remote_address) = peer_in.accept().await.unwrap();
-        let channel = channel.update_reader(stream).await.unwrap();
+        // check if the peer has received the Verack message from the node
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let verack = Verack::deserialize(message).unwrap();
 
-        let (verack_name, verack_bytes) = channel.read().await.unwrap();
-        let verack = Verack::deserialize(verack_bytes).unwrap();
+        // check if it was followed by a Version message
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let version = Version::deserialize(message).unwrap();
 
-        let (version_name, version_bytes) = channel.read().await.unwrap();
-        let version = Version::deserialize(version_bytes).unwrap();
-
-        // Send a Verack message in response to the Version response form the node to finish
-        // setting up the connection.
+        // in response to the Version, the peer sends a Verack message to finish the handshake
         let verack = Verack::new(version.nonce, peer_address, node_address);
-        channel.write(&verack).await.unwrap();
+        let serialized = verack.serialize().unwrap();
+        let header = MessageHeader::new(Verack::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
 
-        sleep(Duration::new(3, 0)).await;
-        assert!(server.peers.is_connected(&peer_address).await);
-        assert_eq!(server.peers.number_of_connected_peers().await, 1);
+        // the node should now have register the peer as 'connected'
+        sleep(Duration::from_millis(200)).await;
+        assert!(node.peers.is_connected(&peer_address).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 1);
     }
 }

@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::{message_types::*, Message, MessageHeader},
-    outbound::Channel,
-};
+use crate::external::{message_types::*, Channel, Message, MessageHeader};
 
 use std::{fmt, net::SocketAddr};
 use tokio::io::AsyncWriteExt;
@@ -77,7 +74,7 @@ impl Request {
     /// Locks the given channel and writes the request to it.
     #[inline]
     pub async fn write_to_channel(&self, channel: &Channel) -> anyhow::Result<()> {
-        channel.lock().await.write_all(&self.serialize()?).await?;
+        channel.writer.lock().await.write_all(&self.serialize()?).await?;
 
         debug!("Sent a {} to {}", self.name(), self.receiver());
 
