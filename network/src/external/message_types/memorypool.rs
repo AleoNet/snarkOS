@@ -56,7 +56,7 @@ mod tests {
         let message = MemoryPool::new(vec![TRANSACTION_1.to_vec()]);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = MemoryPool::deserialize(serialized).unwrap();
+        let deserialized = MemoryPool::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

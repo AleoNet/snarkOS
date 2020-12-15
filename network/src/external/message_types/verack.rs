@@ -82,7 +82,7 @@ mod tests {
         let message = Verack::new(version.nonce, version.receiver, version.sender);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Verack::deserialize(serialized).unwrap();
+        let deserialized = Verack::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

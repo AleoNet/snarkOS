@@ -50,7 +50,7 @@ mod tests {
         let message = GetMemoryPool;
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetMemoryPool::deserialize(serialized).unwrap();
+        let deserialized = GetMemoryPool::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

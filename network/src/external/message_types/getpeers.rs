@@ -48,7 +48,7 @@ mod tests {
         let message = GetPeers;
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetPeers::deserialize(serialized).unwrap();
+        let deserialized = GetPeers::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

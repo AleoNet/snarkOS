@@ -124,7 +124,7 @@ mod tests {
         let (mut stream, _socket) = listener.accept().await.unwrap();
 
         let buffer = read_message(&mut stream, 48usize).await.unwrap();
-        let candidate = Version::deserialize(buffer).unwrap();
+        let candidate = Version::deserialize(&buffer).unwrap();
         assert_eq!(expected, candidate);
     }
 }

@@ -58,7 +58,7 @@ mod tests {
         let message = Peers { addresses: Vec::new() };
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Peers::deserialize(serialized).unwrap();
+        let deserialized = Peers::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

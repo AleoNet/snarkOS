@@ -111,7 +111,7 @@ mod tests {
         );
 
         let serialized = version.serialize().unwrap();
-        let deserialized = Version::deserialize(serialized).unwrap();
+        let deserialized = Version::deserialize(&serialized).unwrap();
 
         assert_eq!(version, deserialized);
     }

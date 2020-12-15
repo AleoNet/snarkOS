@@ -56,7 +56,7 @@ mod tests {
         let message = Block::new(BLOCK_1.to_vec());
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Block::deserialize(serialized).unwrap();
+        let deserialized = Block::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

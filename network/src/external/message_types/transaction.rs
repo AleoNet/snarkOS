@@ -56,7 +56,7 @@ mod tests {
         let message = Transaction::new(TRANSACTION_1.to_vec());
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Transaction::deserialize(serialized).unwrap();
+        let deserialized = Transaction::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

@@ -58,7 +58,7 @@ mod tests {
         let message = GetSync::new(vec![data]);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetSync::deserialize(serialized).unwrap();
+        let deserialized = GetSync::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

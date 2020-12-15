@@ -58,7 +58,7 @@ mod tests {
         let message = Sync::new(vec![data]);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = Sync::deserialize(serialized).unwrap();
+        let deserialized = Sync::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

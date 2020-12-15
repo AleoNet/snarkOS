@@ -146,6 +146,6 @@ mod tests {
         let (name, buffer) = peer_channel.read().await.unwrap();
 
         assert_eq!(GetPeers::name(), name);
-        assert!(GetPeers::deserialize(buffer).is_ok());
+        assert!(GetPeers::deserialize(&buffer).is_ok());
     }
 }

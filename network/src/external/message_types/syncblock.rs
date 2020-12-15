@@ -56,7 +56,7 @@ mod tests {
         let message = SyncBlock::new(BLOCK_1.to_vec());
 
         let serialized = message.serialize().unwrap();
-        let deserialized = SyncBlock::deserialize(serialized).unwrap();
+        let deserialized = SyncBlock::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }

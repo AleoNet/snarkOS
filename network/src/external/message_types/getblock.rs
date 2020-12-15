@@ -58,7 +58,7 @@ mod tests {
         let message = GetBlock::new(block_hash);
 
         let serialized = message.serialize().unwrap();
-        let deserialized = GetBlock::deserialize(serialized).unwrap();
+        let deserialized = GetBlock::deserialize(&serialized).unwrap();
 
         assert_eq!(message, deserialized);
     }
