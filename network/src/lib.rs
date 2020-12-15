@@ -274,14 +274,6 @@ mod tests {
 
     #[tokio::test]
     async fn receive_version_handshake() {
-        let filter =
-            tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-
-        tracing_subscriber::fmt()
-            .with_env_filter(filter)
-            .with_target(false)
-            .init();
-
         // start a test node and listen for incoming connections
         let mut node = test_node().await;
         node.start().await.unwrap();

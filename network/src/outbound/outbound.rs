@@ -137,7 +137,8 @@ impl Outbound {
     pub async fn broadcast(&self, request: &Request) -> JoinHandle<()> {
         let outbound = self.clone();
         let request = request.clone();
-        // Spawn a thread to send the request.
+
+        // TODO(ljedrz): check if spawning a task for the ops below makes sense
         task::spawn(async move {
             // Wait for authorization.
             outbound.authorize(&request).await;
@@ -153,13 +154,11 @@ impl Outbound {
     /// if it does not exist.
     ///
     #[inline]
-    pub async fn initialize_state(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub async fn initialize_state(&self, remote_address: SocketAddr) {
         debug!("Initializing Outbound state for {}", remote_address);
         self.pending.write().await.insert(remote_address, Default::default());
         self.success.write().await.insert(remote_address, Default::default());
         self.failure.write().await.insert(remote_address, Default::default());
-
-        Ok(())
     }
 
     ///
@@ -278,7 +277,7 @@ impl Outbound {
 
 #[cfg(test)]
 mod tests {
-    use crate::{external::GetPeers, outbound::*};
+    use crate::{external::GetPeers, outbound::*, Channel};
     use snarkos_testing::network::{random_bound_address, TcpServer};
 
     use serial_test::serial;
@@ -322,7 +321,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_pending() {
-        let (remote_address, _listener) = random_bound_address().await;
+        let remote_address = "127.0.0.1:7777".parse::<SocketAddr>().unwrap();
         let request = request(remote_address);
 
         // Create a new instance.
@@ -333,16 +332,10 @@ mod tests {
         assert!(!outbound.is_success(&request).await);
         assert!(!outbound.is_failure(&request).await);
 
-        // Send the request to a non-existent server.
-        let outbound_ = outbound.clone();
-        let request_ = request.clone();
-        tokio::task::spawn(async move {
-            outbound_.broadcast(&request_).await;
-        })
-        .await
-        .unwrap();
+        // Authorize the request only.
+        outbound.authorize(&request).await;
 
-        // Check that the request failed.
+        // Check that the request is only pending.
         assert!(outbound.is_pending(&request).await);
         assert!(!outbound.is_success(&request).await);
         assert!(!outbound.is_failure(&request).await);
@@ -352,12 +345,14 @@ mod tests {
     async fn test_is_success() {
         // Create a test server.
         let server = test_server().await.unwrap();
-        let remote_address = server.address;
-
+        let stream = TcpStream::connect(server.address).await.unwrap();
+        let remote_address = stream.peer_addr().unwrap();
         let request = request(remote_address);
 
         // Create a new instance.
         let outbound = Outbound::new(Default::default());
+        let channel = Channel::new(remote_address, stream);
+        outbound.channels.write().await.insert(remote_address, channel);
         outbound.initialize_state(remote_address).await;
 
         assert!(!outbound.is_pending(&request).await);

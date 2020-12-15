@@ -431,7 +431,7 @@ impl Peers {
     #[inline]
     pub(crate) async fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Initialize the peer's outbound channel and state
-        self.outbound.initialize_state(remote_address).await?;
+        self.outbound.initialize_state(remote_address).await;
 
         // Set the peer as connecting with this node server.
         self.peer_book.write().await.set_connecting(&remote_address, nonce)
