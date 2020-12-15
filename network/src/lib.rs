@@ -303,12 +303,12 @@ mod tests {
         // check if the peer has received the Verack message from the node
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let verack = Verack::deserialize(message).unwrap();
+        let verack = Verack::deserialize(&message).unwrap();
 
         // check if it was followed by a Version message
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let version = Version::deserialize(message).unwrap();
+        let version = Version::deserialize(&message).unwrap();
 
         // in response to the Version, the peer sends a Verack message to finish the handshake
         let verack = Verack::new(version.nonce, peer_address, node_address);
