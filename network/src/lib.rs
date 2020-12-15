@@ -269,22 +269,13 @@ mod tests {
 
     #[tokio::test]
     async fn receive_version_handshake() {
-        let filter =
-            tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-
-        tracing_subscriber::fmt()
-            .with_env_filter(filter)
-            .with_target(false)
-            .init();
-
+        // Start the node under test.
         let mut server = test_node().await;
         server.start().await.unwrap();
-
         let node_address = server.local_address().unwrap();
 
+        // Set up listener and channel for peer.
         let peer_out = TcpStream::connect(&node_address).await.unwrap();
-        // let mut peer_in = TcpListener::bind("127.0.0.1:0").await.unwrap();
-
         let peer_in = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let peer_address = peer_in.local_addr().unwrap();
         let channel = Channel::new(node_address, peer_out);
@@ -296,17 +287,23 @@ mod tests {
         sleep(Duration::new(3, 0)).await;
         assert!(server.peers.is_connecting(&peer_address).await);
 
-        // let (stream, remote_address) = peer_in.accept().await.unwrap();
-        // let channel = channel.update_reader(stream).await.unwrap();
-        // let (message_name, bytes) = channel.read().await.unwrap();
-        // let message = Verack::deserialize(bytes).unwrap();
+        // Read Verack (sent first) and Version responses from the node.
+        let (stream, remote_address) = peer_in.accept().await.unwrap();
+        let channel = channel.update_reader(stream).await.unwrap();
 
-        // // Send a Verack message to finish setting up the connection.
-        // let verack = Verack::new(message.nonce, peer_address, node_address);
-        // channel.write(&verack).await.unwrap();
+        let (verack_name, verack_bytes) = channel.read().await.unwrap();
+        let verack = Verack::deserialize(verack_bytes).unwrap();
 
-        // sleep(Duration::new(3, 0)).await;
-        // assert!(server.peers.is_connected(&peer_address).await);
-        // assert_eq!(server.peers.number_of_connected_peers().await, 1);
+        let (version_name, version_bytes) = channel.read().await.unwrap();
+        let version = Version::deserialize(version_bytes).unwrap();
+
+        // Send a Verack message in response to the Version response form the node to finish
+        // setting up the connection.
+        let verack = Verack::new(version.nonce, peer_address, node_address);
+        channel.write(&verack).await.unwrap();
+
+        sleep(Duration::new(3, 0)).await;
+        assert!(server.peers.is_connected(&peer_address).await);
+        assert_eq!(server.peers.number_of_connected_peers().await, 1);
     }
 }
