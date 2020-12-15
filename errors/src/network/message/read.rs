@@ -16,8 +16,8 @@
 
 #[derive(Debug, Error)]
 pub enum StreamReadError {
-    #[error("{}: {}", _0, _1)]
-    Crate(&'static str, String),
+    #[error("IO error: {}", _0)]
+    Io(std::io::Error),
 
     #[error("{}", _0)]
     Message(String),
@@ -25,6 +25,6 @@ pub enum StreamReadError {
 
 impl From<std::io::Error> for StreamReadError {
     fn from(error: std::io::Error) -> Self {
-        StreamReadError::Crate("std::io", format!("{:?}", error))
+        StreamReadError::Io(error)
     }
 }

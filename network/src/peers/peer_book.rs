@@ -224,6 +224,8 @@ impl PeerBook {
 
             // Add the address into the disconnected peers.
             self.disconnected_peers.insert(*address, peer_info);
+
+            return Ok(());
         }
 
         // Case 2 - The given address is a connected peer, attempt to disconnect.
@@ -235,18 +237,18 @@ impl PeerBook {
             let success = self.disconnected_peers.insert(*address, peer_info).is_none();
             // On success, decrement the connected peer count.
             connected_peers_dec!(success);
+
+            return Ok(());
         }
 
         // Case 3 - The given address is not a connected peer.
         // Check if the peer is a known disconnected peer, and attempt to
         // add them to the disconnected peers if they are undiscovered.
-        {
-            // Check if the peer is a known disconnected peer.
-            if !self.disconnected_peers.contains_key(address) {
-                // If not, add the address into the disconnected peers.
-                trace!("Adding an undiscovered peer to the peer book - {}", address);
-                self.add_peer(address)?;
-            }
+        // Check if the peer is a known disconnected peer.
+        if !self.disconnected_peers.contains_key(address) {
+            // If not, add the address into the disconnected peers.
+            warn!("Adding an undiscovered peer to the peer book - {}", address);
+            self.add_peer(address)?;
         }
 
         Ok(())

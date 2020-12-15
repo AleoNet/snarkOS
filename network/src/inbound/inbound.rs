@@ -116,9 +116,10 @@ impl Inbound {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut channel = channel;
+        let mut failure;
         loop {
-            // Initialize the failure indicator.
-            let mut failure = false;
+            // Reset the failure indicator.
+            failure = false;
 
             // warn!(
             //     "LISTENING AT {} {:?} {:?}",
@@ -217,20 +218,9 @@ impl Inbound {
             error!("Connection error: {}", error);
 
             // Determine if we should disconnect.
-            *disconnect_from_peer = if let ConnectError::Std(err) = error {
-                [
-                    ErrorKind::BrokenPipe,
-                    ErrorKind::ConnectionReset,
-                    ErrorKind::UnexpectedEof,
-                ]
-                .contains(&err.kind())
-            } else {
-                // Tolerate up to 10 failed communications.
-                *failure_count >= 10
-            };
+            *disconnect_from_peer = error.is_fatal() || *failure_count >= 10;
 
             if *disconnect_from_peer {
-                warn!("should disconnect");
                 return;
             }
         } else {
@@ -243,12 +233,10 @@ impl Inbound {
 
     #[inline]
     fn parse<M: Message>(buffer: &[u8]) -> Result<M, NetworkError> {
-        // TODO (howardwu): Remove usage of `to_vec`, wasteful convention and
-        //  requires a function signature change to fix.
         match M::deserialize(buffer) {
             Ok(message) => Ok(message),
             Err(error) => {
-                error!("Failed to deserialize a {}-byte message\n{}", buffer.len(), error);
+                error!("Failed to deserialize a message or {}B: {}", buffer.len(), error);
                 Err(NetworkError::InboundDeserializationFailed)
             }
         }
@@ -257,8 +245,7 @@ impl Inbound {
     #[inline]
     async fn route(&self, response: Response) {
         if let Err(err) = self.sender.send(response).await {
-            error!("Failed to route response for a message: {}", err);
-            // error!("Failed to route `{}` message from {}\n{}", name, remote_address, err);
+            error!("Failed to route a response for a message: {}", err);
         }
     }
 

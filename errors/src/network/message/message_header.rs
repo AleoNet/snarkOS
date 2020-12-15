@@ -18,8 +18,11 @@ use crate::network::message::StreamReadError;
 
 #[derive(Debug, Error)]
 pub enum MessageHeaderError {
-    #[error("{}: {}", _0, _1)]
-    Crate(&'static str, String),
+    #[error("IO error: {}", _0)]
+    Io(std::io::Error),
+
+    #[error("Serialization error: {}", _0)]
+    Serialization(bincode::Error),
 
     #[error("{}", _0)]
     Message(String),
@@ -39,12 +42,12 @@ impl From<StreamReadError> for MessageHeaderError {
 
 impl From<bincode::Error> for MessageHeaderError {
     fn from(error: bincode::Error) -> Self {
-        MessageHeaderError::Crate("bincode", format!("{:?}", error))
+        MessageHeaderError::Serialization(error)
     }
 }
 
 impl From<std::io::Error> for MessageHeaderError {
     fn from(error: std::io::Error) -> Self {
-        MessageHeaderError::Crate("std::io", format!("{:?}", error))
+        MessageHeaderError::Io(error)
     }
 }
