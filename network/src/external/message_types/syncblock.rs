@@ -35,9 +35,9 @@ impl Message for SyncBlock {
         MessageName::from("syncblock")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         Ok(Self {
-            data: bincode::deserialize(&vec)?,
+            data: bincode::deserialize(bytes)?,
         })
     }
 

@@ -70,18 +70,18 @@ impl Message for Version {
         MessageName::from("version")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 48 {
-            return Err(MessageError::InvalidLength(vec.len(), 48));
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
+        if bytes.len() != 48 {
+            return Err(MessageError::InvalidLength(bytes.len(), 48));
         }
 
         Ok(Version {
-            version: bincode::deserialize(&vec[..8])?,
-            height: bincode::deserialize(&vec[8..12])?,
-            nonce: bincode::deserialize(&vec[12..20])?,
-            sender: bincode::deserialize(&vec[20..30])?,
-            receiver: bincode::deserialize(&vec[30..40])?,
-            timestamp: bincode::deserialize(&vec[40..48])?,
+            version: bincode::deserialize(&bytes[..8])?,
+            height: bincode::deserialize(&bytes[8..12])?,
+            nonce: bincode::deserialize(&bytes[12..20])?,
+            sender: bincode::deserialize(&bytes[20..30])?,
+            receiver: bincode::deserialize(&bytes[30..40])?,
+            timestamp: bincode::deserialize(&bytes[40..48])?,
         })
     }
 

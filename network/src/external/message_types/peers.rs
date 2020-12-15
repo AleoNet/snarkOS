@@ -38,9 +38,9 @@ impl Message for Peers {
         MessageName::from("peers")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         Ok(Self {
-            addresses: bincode::deserialize(&vec)?,
+            addresses: bincode::deserialize(bytes)?,
         })
     }
 

@@ -36,9 +36,9 @@ impl Message for Sync {
         MessageName::from("sync")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         Ok(Self {
-            block_hashes: bincode::deserialize(&vec)?,
+            block_hashes: bincode::deserialize(bytes)?,
         })
     }
 

@@ -23,7 +23,7 @@ pub trait Message: Send + 'static {
     where
         Self: Sized;
 
-    fn deserialize(buffer: Vec<u8>) -> Result<Self, MessageError>
+    fn deserialize(buffer: &[u8]) -> Result<Self, MessageError>
     where
         Self: Sized;
 

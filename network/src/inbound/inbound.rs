@@ -254,7 +254,7 @@ impl Inbound {
     fn parse<M: Message>(buffer: &[u8]) -> Result<M, NetworkError> {
         // TODO (howardwu): Remove usage of `to_vec`, wasteful convention and
         //  requires a function signature change to fix.
-        match M::deserialize(buffer.to_vec()) {
+        match M::deserialize(buffer) {
             Ok(message) => Ok(message),
             Err(error) => {
                 error!("Failed to deserialize a {}-byte message\n{}", buffer.len(), error);
@@ -364,7 +364,8 @@ impl Inbound {
             // connection recipient path
             name if name == Version::name() => {
                 // Deserialize the message bytes into a version message.
-                let remote_version = Version::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
+                let remote_version =
+                    Version::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
                 // FIXME(ljedrz): we should obtain our actual local address here instead of trusting the sender
                 let local_address = remote_version.receiver;
@@ -424,7 +425,7 @@ impl Inbound {
                 let (message_name, message_bytes) = channel.read().await?;
 
                 // Deserialize the message bytes into a verack message.
-                let verack = Verack::deserialize(message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
+                let verack = Verack::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
                 self.sender
                     .send(Response::ConnectedTo(remote_address, local_version.nonce))

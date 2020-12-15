@@ -35,9 +35,9 @@ impl Message for Transaction {
         MessageName::from("transaction")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         Ok(Self {
-            bytes: bincode::deserialize(&vec)?,
+            bytes: bincode::deserialize(bytes)?,
         })
     }
 

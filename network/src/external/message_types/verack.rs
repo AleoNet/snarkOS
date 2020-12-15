@@ -45,15 +45,15 @@ impl Message for Verack {
         MessageName::from("verack")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 28 {
-            return Err(MessageError::InvalidLength(vec.len(), 28));
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
+        if bytes.len() != 28 {
+            return Err(MessageError::InvalidLength(bytes.len(), 28));
         }
 
         Ok(Self {
-            nonce: bincode::deserialize(&vec[0..8])?,
-            sender: bincode::deserialize(&vec[8..18])?,
-            receiver: bincode::deserialize(&vec[18..28])?,
+            nonce: bincode::deserialize(&bytes[0..8])?,
+            sender: bincode::deserialize(&bytes[8..18])?,
+            receiver: bincode::deserialize(&bytes[18..28])?,
         })
     }
 

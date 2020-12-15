@@ -36,9 +36,9 @@ impl Message for GetBlock {
         MessageName::from("getblock")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         Ok(Self {
-            block_hash: bincode::deserialize(&vec)?,
+            block_hash: bincode::deserialize(bytes)?,
         })
     }
 

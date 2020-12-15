@@ -28,10 +28,10 @@ impl Message for GetMemoryPool {
     }
 
     #[inline]
-    fn deserialize(buffer: Vec<u8>) -> Result<Self, MessageError> {
-        match buffer.is_empty() {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
+        match bytes.is_empty() {
             true => Ok(Self),
-            false => return Err(MessageError::InvalidLength(buffer.len(), 0)),
+            false => return Err(MessageError::InvalidLength(bytes.len(), 0)),
         }
     }
 

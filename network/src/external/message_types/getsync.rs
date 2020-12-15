@@ -36,9 +36,9 @@ impl Message for GetSync {
         MessageName::from("getsync")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         Ok(Self {
-            block_locator_hashes: bincode::deserialize(&vec)?,
+            block_locator_hashes: bincode::deserialize(bytes)?,
         })
     }
 

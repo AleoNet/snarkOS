@@ -35,9 +35,9 @@ impl Message for MemoryPool {
         MessageName::from("memorypool")
     }
 
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
+    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         Ok(Self {
-            transactions: bincode::deserialize(&vec)?,
+            transactions: bincode::deserialize(bytes)?,
         })
     }
 
