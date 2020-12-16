@@ -25,12 +25,7 @@ use std::{
         Arc,
     },
 };
-use tokio::{
-    net::TcpStream,
-    sync::{Mutex, RwLock},
-    task,
-    task::JoinHandle,
-};
+use tokio::{sync::RwLock, task, task::JoinHandle};
 
 /// The map of remote addresses to their active write channels.
 type Channels = HashMap<SocketAddr, Channel>;
@@ -278,11 +273,10 @@ impl Outbound {
 #[cfg(test)]
 mod tests {
     use crate::{external::GetPeers, outbound::*, Channel};
-    use snarkos_testing::network::{random_bound_address, TcpServer};
+    use snarkos_testing::network::TcpServer;
 
-    use serial_test::serial;
-    use std::{net::SocketAddr, sync::Arc, time::Duration};
-    use tokio::{net::TcpStream, sync::Mutex, time::sleep};
+    use std::net::SocketAddr;
+    use tokio::net::TcpStream;
 
     ///
     /// Returns a `Request` for testing.

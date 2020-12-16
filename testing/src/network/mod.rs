@@ -103,7 +103,7 @@ pub fn start_test_server(mut server: Server) {
 }
 
 /// Returns the next tcp channel connected to the listener
-pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
+pub async fn accept_channel(listener: &mut TcpListener) -> Channel {
     let (stream, address) = listener.accept().await.unwrap();
     Channel::new(address, stream)
 }
@@ -116,7 +116,7 @@ pub async fn simulate_active_node() -> SocketAddr {
 }
 
 /// Starts a fake node that accepts all tcp connections received by the given peer listener
-pub fn accept_all_messages(mut peer_listener: TcpListener) {
+pub fn accept_all_messages(peer_listener: TcpListener) {
     tokio::spawn(async move {
         loop {
             peer_listener.accept().await.unwrap();

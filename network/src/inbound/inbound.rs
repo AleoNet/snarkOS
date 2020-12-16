@@ -26,8 +26,6 @@ use crate::{
 
 use std::{
     collections::HashMap,
-    fmt::Display,
-    io::ErrorKind,
     net::SocketAddr,
     sync::{atomic::AtomicU64, Arc},
 };

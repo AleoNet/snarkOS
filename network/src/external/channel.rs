@@ -108,11 +108,10 @@ impl Channel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::message_types::{GetPeers, Peers};
+    use crate::external::message_types::GetPeers;
     use snarkos_testing::network::{random_bound_address, simulate_active_node};
 
     use serial_test::serial;
-    use tokio::net::TcpListener;
 
     #[tokio::test]
     async fn channel_write() {

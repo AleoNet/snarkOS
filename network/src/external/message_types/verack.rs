@@ -70,7 +70,6 @@ impl Message for Verack {
 mod tests {
     use super::*;
     use crate::external::message_types::Version;
-    use snarkos_testing::network::random_bound_address;
 
     #[test]
     fn test_verack() {

@@ -70,10 +70,8 @@ pub trait DPCComponents: 'static + Sized {
     type ProgramVerificationKeyCommitment: CommitmentScheme;
     /// Used to commit to hashes of verification keys on the smaller curve and to decommit hashes
     /// of verification keys on the larger curve
-    type ProgramVerificationKeyCommitmentGadget: CommitmentGadget<
-        Self::ProgramVerificationKeyCommitment,
-        Self::InnerField,
-    > + CommitmentGadget<Self::ProgramVerificationKeyCommitment, Self::OuterField>;
+    type ProgramVerificationKeyCommitmentGadget: CommitmentGadget<Self::ProgramVerificationKeyCommitment, Self::InnerField>
+        + CommitmentGadget<Self::ProgramVerificationKeyCommitment, Self::OuterField>;
 
     /// PRF for computing serial numbers. Invoked only over `Self::InnerField`.
     type PRF: PRF;

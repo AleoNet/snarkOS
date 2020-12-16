@@ -29,16 +29,9 @@ use crate::{
     Outbound,
 };
 
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use tokio::{
-    net::TcpStream,
-    sync::{Mutex, RwLock},
-};
+use tokio::{net::TcpStream, sync::RwLock};
 
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
@@ -268,13 +261,13 @@ impl Peers {
         // Send a connection request with the outbound handler.
         channel.write(&version).await?;
 
-        let (message_name, message_bytes) = match channel.read().await {
+        let (message_name, _) = match channel.read().await {
             Ok(inbound_message) => inbound_message,
             _ => return Err(NetworkError::InvalidHandshake),
         };
 
         if message_name == Verack::name() {
-            let (message_name, message_bytes) = match channel.read().await {
+            let (message_name, _) = match channel.read().await {
                 Ok(inbound_message) => inbound_message,
                 _ => return Err(NetworkError::InvalidHandshake),
             };
@@ -419,7 +412,7 @@ impl Peers {
     #[inline]
     async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
+        let peer_book = self.peer_book.write().await;
         // Acquire the storage write lock.
         let storage = self.environment.storage_mut().await;
 
@@ -495,7 +488,11 @@ impl Peers {
     }
 
     #[inline]
-    pub(crate) async fn verack(&self, remote_address: &SocketAddr, remote_verack: &Verack) -> Result<(), NetworkError> {
+    pub(crate) async fn verack(
+        &self,
+        _remote_address: &SocketAddr,
+        _remote_verack: &Verack,
+    ) -> Result<(), NetworkError> {
         Ok(())
     }
 
@@ -523,11 +520,7 @@ impl Peers {
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
     #[inline]
-    pub(crate) async fn inbound_peers(
-        &self,
-        remote_address: SocketAddr,
-        peers: PeersMessage,
-    ) -> Result<(), NetworkError> {
+    pub(crate) async fn process_inbound_peers(&self, peers: PeersMessage) -> Result<(), NetworkError> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.

@@ -197,8 +197,8 @@ impl Server {
             Response::GetPeers(remote_address) => {
                 self.peers.send_get_peers(remote_address).await?;
             }
-            Response::Peers(remote_address, peers) => {
-                self.peers.inbound_peers(remote_address, peers).await?;
+            Response::Peers(_, peers) => {
+                self.peers.process_inbound_peers(peers).await?;
             }
         }
 
@@ -210,7 +210,6 @@ impl Server {
 mod tests {
     use super::*;
     use crate::external::{
-        channel::Channel,
         message::{read_header, read_message, Message, MessageHeader},
         Verack,
         Version,
@@ -225,7 +224,7 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use tokio::{
-        io::{AsyncReadExt, AsyncWriteExt},
+        io::AsyncWriteExt,
         net::{TcpListener, TcpStream},
         sync::{Mutex, RwLock},
     };
