@@ -211,6 +211,7 @@ mod tests {
     use super::*;
     use crate::external::{
         message::{read_header, read_message, Message, MessageHeader},
+        GetMemoryPool,
         GetPeers,
         Verack,
         Version,
@@ -381,6 +382,7 @@ mod tests {
         // start the fake node (peer) which is just a socket
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
 
+        // send a GetPeers message without a prior handshake established
         let get_peers = GetPeers;
         let serialized = get_peers.serialize().unwrap();
         let header = MessageHeader::new(GetPeers::name(), serialized.len() as u32)
@@ -390,10 +392,43 @@ mod tests {
         peer_stream.write_all(&serialized).await.unwrap();
         peer_stream.flush().await.unwrap();
 
+        // check the response is empty
         sleep(Duration::from_millis(200)).await;
         let mut buffer = String::new();
         let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
 
+        // check the node's state hasn't been altered by the GetPeers message
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+    }
+
+    #[tokio::test]
+    async fn reject_get_memory_pool_before_handshake() {
+        // start the node
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+
+        // start the fake node (peer) which is just a socket
+        let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+
+        // send a GetMemoryPool message without a prior handshake established
+        let get_memory_pool = GetMemoryPool;
+        let serialized = get_memory_pool.serialize().unwrap();
+        let header = MessageHeader::new(GetMemoryPool::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
+        // check the response is empty
+        sleep(Duration::from_millis(200)).await;
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        // check the node's state hasn'te been altered by the GetMemoryPool message
         assert_eq!(bytes_read, 0);
         assert!(buffer.is_empty());
         assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
