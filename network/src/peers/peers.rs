@@ -239,8 +239,8 @@ impl Peers {
     async fn nonce(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
         // Acquire a peer book read lock.
         let peer_book = self.peer_book.read().await;
-        // Fetch the handshake of connected peer.
-        peer_book.handshake(remote_address)
+        // Fetch the handshake nonce of connected peer.
+        peer_book.handshake_nonce(remote_address)
     }
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {

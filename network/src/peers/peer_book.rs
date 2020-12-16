@@ -133,10 +133,10 @@ impl PeerBook {
     /// Returns the handshake nonce if the given address is a connecting or connected peer.
     ///
     #[inline]
-    pub fn handshake(&self, address: &SocketAddr) -> Result<u64, NetworkError> {
+    pub fn handshake_nonce(&self, address: &SocketAddr) -> Result<u64, NetworkError> {
         // Check if the address is a connecting peer.
         if self.is_connecting(address) {
-            // Fetch the handshake of the connecting peer.
+            // Fetch the handshake nonce of the connecting peer.
             return match self
                 .connecting_peers
                 .get(address)
@@ -150,7 +150,7 @@ impl PeerBook {
 
         // Check if the address is a connected peer.
         if self.is_connected(address) {
-            // Fetch the handshake of the connected peer.
+            // Fetch the handshake nonce of the connected peer.
             return match self
                 .connected_peers
                 .get(address)
@@ -387,8 +387,8 @@ mod tests {
         assert_eq!(true, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake(&remote_address));
-        assert_eq!(&None, peer_book.handshake(&local_address));
+        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
+        assert_eq!(&None, peer_book.handshake_nonce(&local_address));
     }
 
     #[test]
@@ -398,13 +398,13 @@ mod tests {
         assert_eq!(true, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake(&remote_address));
+        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
 
         peer_book.set_connected(&remote_address).unwrap();
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(true, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake(&remote_address));
+        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
     }
 
     #[test]
@@ -414,13 +414,13 @@ mod tests {
         assert_eq!(true, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake(&remote_address));
+        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
 
         peer_book.set_disconnected(&remote_address).unwrap();
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake(&remote_address));
+        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
     }
 
     #[test]
@@ -430,19 +430,19 @@ mod tests {
         assert_eq!(true, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake(&remote_address));
+        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
 
         peer_book.set_connected(&remote_address).unwrap();
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(true, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake(&remote_address));
+        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
 
         peer_book.set_disconnected(&remote_address).unwrap();
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake(&remote_address));
+        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
     }
 
     #[test]
@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake(&remote_address));
+        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
     }
 
     #[test]
@@ -464,7 +464,7 @@ mod tests {
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake(&remote_address));
+        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
     }
 
     #[test]
@@ -476,13 +476,13 @@ mod tests {
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake(&remote_address));
+        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
 
         assert!(peer_book.set_connected(&remote_address, 1).is_err());
 
         assert_eq!(false, peer_book.is_connecting(&remote_address));
         assert_eq!(false, peer_book.is_connected(&remote_address));
         assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake(&remote_address));
+        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
     }
 }
