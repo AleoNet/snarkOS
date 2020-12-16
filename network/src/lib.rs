@@ -211,6 +211,7 @@ mod tests {
     use super::*;
     use crate::external::{
         message::{read_header, read_message, Message, MessageHeader},
+        GetPeers,
         Verack,
         Version,
     };
@@ -369,5 +370,33 @@ mod tests {
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connected(&peer_address).await);
         assert_eq!(node.peers.number_of_connected_peers().await, 1);
+    }
+
+    #[tokio::test]
+    async fn reject_get_peers_before_handshake() {
+        // start the node
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+
+        // start the fake node (peer) which is just a socket
+        let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+
+        let get_peers = GetPeers;
+        let serialized = get_peers.serialize().unwrap();
+        let header = MessageHeader::new(GetPeers::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
+        sleep(Duration::from_millis(200)).await;
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
     }
 }
