@@ -1,3 +1,19 @@
+// Copyright (C) 2019-2020 Aleo Systems Inc.
+// This file is part of the snarkOS library.
+
+// The snarkOS library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// The snarkOS library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use crate::{
     account::{Address, PrivateKey},
     dpc::{EmptyLedger, Record},
@@ -7,7 +23,7 @@ use snarkos_dpc::base_dpc::{
     instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
     parameters::{NoopProgramSNARKParameters, SystemParameters},
     record_payload::RecordPayload,
-    ExecuteContext,
+    TransactionKernel as TransactionKernelNative,
 };
 use snarkos_models::{
     algorithms::CRH,
@@ -35,12 +51,12 @@ pub struct TransactionOutput {
     // pub(crate) payload: Option<Vec<u8>>,
 }
 
-pub struct OfflineTransaction {
-    pub(crate) execute_context: ExecuteContext<Components>,
+pub struct TransactionKernel {
+    pub(crate) transaction_kernel: TransactionKernelNative<Components>,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct OfflineTransactionBuilder {
+pub struct TransactionKernelBuilder {
     /// Transaction inputs
     pub(crate) inputs: Vec<TransactionInput>,
 
@@ -54,7 +70,7 @@ pub struct OfflineTransactionBuilder {
     pub(crate) memo: Option<[u8; 32]>,
 }
 
-impl OfflineTransactionBuilder {
+impl TransactionKernelBuilder {
     pub fn new() -> Self {
         // TODO (raychu86) update the default to `0` for mainnet.
         Self {
@@ -132,12 +148,12 @@ impl OfflineTransactionBuilder {
     }
 
     ///
-    /// Returns the execution context (offline transaction) derived from the provided builder
+    /// Returns the transaction kernel (offline transaction) derived from the provided builder
     /// attributes.
     ///
     /// Otherwise, returns `DPCError`.
     ///
-    pub fn build<R: Rng>(&self, rng: &mut R) -> Result<OfflineTransaction, DPCError> {
+    pub fn build<R: Rng>(&self, rng: &mut R) -> Result<TransactionKernel, DPCError> {
         // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
         match self.inputs.len() {
             1 | 2 => {}
@@ -179,8 +195,8 @@ impl OfflineTransactionBuilder {
             recipient_amounts.push(output.amount);
         }
 
-        // Construct the offline transaction
-        OfflineTransaction::offline_transaction_execution(
+        // Construct the transaction kernel
+        TransactionKernel::new(
             spenders,
             records_to_spend,
             recipients,
@@ -191,9 +207,9 @@ impl OfflineTransactionBuilder {
     }
 }
 
-impl OfflineTransaction {
-    /// Returns an offline transaction execution context
-    pub(crate) fn offline_transaction_execution<R: Rng>(
+impl TransactionKernel {
+    /// Returns an offline transaction kernel
+    pub(crate) fn new<R: Rng>(
         spenders: Vec<PrivateKey>,
         records_to_spend: Vec<Record>,
         recipients: Vec<Address>,
@@ -303,7 +319,7 @@ impl OfflineTransaction {
         // Generate transaction
 
         // Offline execution to generate a DPC transaction
-        let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
+        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
             parameters,
             old_records,
             old_account_private_keys,
@@ -318,26 +334,26 @@ impl OfflineTransaction {
             rng,
         )?;
 
-        Ok(Self { execute_context })
+        Ok(Self { transaction_kernel })
     }
 }
 
-impl FromStr for OfflineTransaction {
+impl FromStr for TransactionKernel {
     type Err = DPCError;
 
-    fn from_str(execute_context: &str) -> Result<Self, Self::Err> {
+    fn from_str(transaction_kernel: &str) -> Result<Self, Self::Err> {
         Ok(Self {
-            execute_context: ExecuteContext::<Components>::read(&hex::decode(execute_context)?[..])?,
+            transaction_kernel: TransactionKernelNative::<Components>::read(&hex::decode(transaction_kernel)?[..])?,
         })
     }
 }
 
-impl fmt::Display for OfflineTransaction {
+impl fmt::Display for TransactionKernel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{}",
-            hex::encode(to_bytes![self.execute_context].expect("couldn't serialize to bytes"))
+            hex::encode(to_bytes![self.transaction_kernel].expect("couldn't serialize to bytes"))
         )
     }
 }

@@ -17,9 +17,9 @@
 use crate::{
     account::{Address, PrivateKey},
     dpc::{
-        OfflineTransaction as OfflineTransactionNative,
-        OfflineTransactionBuilder as OfflineTransactionBuilderNative,
         Record,
+        TransactionKernel as TransactionKernelNative,
+        TransactionKernelBuilder as TransactionKernelBuilderNative,
     },
 };
 
@@ -28,16 +28,16 @@ use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub struct OfflineTransactionBuilder {
-    pub(crate) builder: OfflineTransactionBuilderNative,
+pub struct TransactionKernelBuilder {
+    pub(crate) builder: TransactionKernelBuilderNative,
 }
 
 #[wasm_bindgen]
-impl OfflineTransactionBuilder {
+impl TransactionKernelBuilder {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
-            builder: OfflineTransactionBuilderNative::new(),
+            builder: TransactionKernelBuilderNative::new(),
         }
     }
 
@@ -69,33 +69,33 @@ impl OfflineTransactionBuilder {
     }
 
     #[wasm_bindgen]
-    pub fn build(&self) -> OfflineTransaction {
+    pub fn build(&self) -> TransactionKernel {
         let rng = &mut StdRng::from_entropy();
 
-        OfflineTransaction {
-            offline_transaction: self.builder.build(rng).unwrap(),
+        TransactionKernel {
+            transaction_kernel: self.builder.build(rng).unwrap(),
         }
     }
 }
 
 #[wasm_bindgen]
-pub struct OfflineTransaction {
-    pub(crate) offline_transaction: OfflineTransactionNative,
+pub struct TransactionKernel {
+    pub(crate) transaction_kernel: TransactionKernelNative,
 }
 
 #[wasm_bindgen]
-impl OfflineTransaction {
+impl TransactionKernel {
     #[wasm_bindgen]
     pub fn from_string(offline_transaction: &str) -> Self {
-        let offline_transaction = OfflineTransactionNative::from_str(offline_transaction).unwrap();
-        Self { offline_transaction }
+        let transaction_kernel = TransactionKernelNative::from_str(offline_transaction).unwrap();
+        Self { transaction_kernel }
     }
 
     #[wasm_bindgen]
     pub fn to_string(&self) -> String {
         format!(
-            "OfflineTransaction {{ offline_transaction: {} }}",
-            self.offline_transaction
+            "TransactionKernel {{ transaction_kernel: {} }}",
+            self.transaction_kernel
         )
     }
 }
