@@ -96,7 +96,7 @@ impl Channel {
     pub async fn read(&self) -> Result<(MessageName, Vec<u8>), ConnectError> {
         let header = read_header(&mut *self.reader.lock().await).await?;
 
-        debug!("Received a {} from {}", header.name, self.remote_address);
+        debug!("Received a '{}' message from {}", header.name, self.remote_address);
 
         Ok((
             header.name,

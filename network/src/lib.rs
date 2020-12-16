@@ -195,7 +195,7 @@ impl Server {
                 self.peers.disconnected_from_peer(&remote_address).await?;
             }
             Response::GetPeers(remote_address) => {
-                self.peers.get_peers(remote_address).await?;
+                self.peers.send_get_peers(remote_address).await?;
             }
             Response::Peers(remote_address, peers) => {
                 self.peers.inbound_peers(remote_address, peers).await?;

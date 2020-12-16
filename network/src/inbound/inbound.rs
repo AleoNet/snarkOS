@@ -172,7 +172,8 @@ impl Inbound {
             } else if name == Transaction::name() {
                 let message = Self::parse(&bytes)?;
                 self.route(Response::Transaction(channel.remote_address, message)).await;
-            } else if name == GetPeers::name() && Self::parse::<GetPeers>(&bytes).is_ok() {
+            } else if name == GetPeers::name() {
+                let _message = Self::parse::<GetPeers>(&bytes)?; // TODO(ljedrz): does a GetPeers request require any body?
                 self.route(Response::GetPeers(channel.remote_address)).await;
             } else if name == Peers::name() {
                 let message = Self::parse::<Peers>(&bytes)?;
@@ -250,8 +251,8 @@ impl Inbound {
     }
 
     #[inline]
-    pub(crate) fn receiver(&self) -> Arc<Mutex<Receiver>> {
-        self.receiver.clone()
+    pub(crate) fn receiver(&self) -> &Mutex<Receiver> {
+        &self.receiver
     }
 
     /// A connected peer has sent handshake request.

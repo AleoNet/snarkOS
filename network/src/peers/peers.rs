@@ -376,9 +376,7 @@ impl Peers {
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     #[inline]
     async fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
-        trace!("Broadcasting GetPeers messages");
         for (remote_address, _) in self.connected_peers().await {
-            // Broadcast a `GetPeers` message to the connected peer.
             self.outbound
                 .broadcast(&Request::GetPeers(remote_address, GetPeers))
                 .await;
