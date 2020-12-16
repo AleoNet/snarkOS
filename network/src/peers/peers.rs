@@ -16,7 +16,7 @@
 
 use crate::{
     external::{
-        message_types::{Peers as PeersStruct, *},
+        message_types::{Peers as PeersMessage, *},
         Channel,
         Message,
         Verack,
@@ -103,17 +103,14 @@ impl Peers {
         if !self.environment.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
             if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
-                // // Broadcast a `GetPeers` message to request for more peers.
-                // trace!("Sending getpeers requests to all connected peers");
-                // self.broadcast_getpeers_requests().await?;
-
                 // Attempt to connect to the default bootnodes of the network.
-                trace!("Sending connection requests to default bootnodes");
                 self.connect_to_bootnodes().await?;
 
                 // Attempt to connect to each disconnected peer saved in the peer book.
-                trace!("Sending connection requests to disconnected peers");
                 self.connect_to_disconnected_peers().await?;
+
+                // Broadcast a `GetPeers` message to request for more peers.
+                self.broadcast_getpeers_requests().await?;
             }
         }
 
@@ -214,7 +211,7 @@ impl Peers {
     /// Adds the given address to the disconnected peers in this peer book.
     ///
     #[inline]
-    pub async fn found_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
+    pub async fn add_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
         let mut peer_book = self.peer_book.write().await;
         // Add the given address to the peer book.
@@ -304,7 +301,7 @@ impl Peers {
     ///
     #[inline]
     async fn connect_to_bootnodes(&self) -> Result<(), NetworkError> {
-        trace!("Connecting to bootnodes");
+        trace!("Connecting to default bootnodes");
 
         // Fetch the current connected peers of this node.
         let connected_peers = self.connected_peers().await;
@@ -376,6 +373,8 @@ impl Peers {
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     #[inline]
     async fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
+        trace!("Sending GetPeers requests to connected peers");
+
         for (remote_address, _) in self.connected_peers().await {
             self.outbound
                 .broadcast(&Request::GetPeers(remote_address, GetPeers))
@@ -489,12 +488,7 @@ impl Peers {
     }
 
     #[inline]
-    pub(crate) async fn get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        // Add the remote address to the peer book.
-        if !self.is_connecting(&remote_address).await && !self.is_connected(&remote_address).await {
-            self.found_peer(&remote_address).await?;
-        }
-
+    pub(crate) async fn send_get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
@@ -507,7 +501,7 @@ impl Peers {
             peers.push((peer_address, *peer_info.last_seen()));
         }
         self.outbound
-            .broadcast(&Request::Peers(remote_address, PeersStruct::new(peers)))
+            .broadcast(&Request::Peers(remote_address, PeersMessage::new(peers)))
             .await;
 
         Ok(())
@@ -520,29 +514,24 @@ impl Peers {
     pub(crate) async fn inbound_peers(
         &self,
         remote_address: SocketAddr,
-        peers: PeersStruct,
+        peers: PeersMessage,
     ) -> Result<(), NetworkError> {
-        // Add the remote address to the peer book.
-        if !self.is_connecting(&remote_address).await && !self.is_connected(&remote_address).await {
-            self.found_peer(&remote_address).await?;
-        }
-
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
         let local_address = self.environment.local_address().unwrap(); // the address must be known by now
 
-        for (peer_address, _) in peers.addresses.iter() {
-            // Skip if the peer address is this node's local address.
-            let is_zero_address = (*peer_address).ip() == IpAddr::V4(Ipv4Addr::LOCALHOST);
-            if *peer_address == local_address || is_zero_address {
-                continue;
-            }
+        for peer_address in peers
+            .addresses
+            .iter()
+            .map(|(addr, _)| addr)
+            .filter(|&peer_addr| *peer_addr != local_address)
+        {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            else if !self.is_connecting(peer_address).await && !self.is_connected(peer_address).await {
-                self.found_peer(peer_address).await?;
+            if !self.is_connecting(peer_address).await && !self.is_connected(peer_address).await {
+                self.add_peer(peer_address).await?;
             }
         }
 
