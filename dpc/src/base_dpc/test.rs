@@ -23,7 +23,7 @@ use crate::base_dpc::{
     record::record_encryption::*,
     record_payload::RecordPayload,
     BaseDPCComponents,
-    ExecuteContext,
+    TransactionKernel,
     DPC,
 };
 use snarkos_algorithms::merkle_tree::MerklePath;
@@ -210,7 +210,7 @@ fn test_execute_base_dpc_constraints() {
         new_proof_and_vk.push(private_input);
     }
 
-    let ExecuteContext {
+    let TransactionKernel {
         system_parameters: _,
 
         old_records,

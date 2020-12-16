@@ -468,7 +468,7 @@ impl ConsensusParameters {
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         // Offline execution to generate a DPC transaction
-        let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
+        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
             parameters.system_parameters.clone(),
             old_records,
             old_account_private_keys,
@@ -485,7 +485,7 @@ impl ConsensusParameters {
 
         // Construct the program proofs
 
-        let local_data = execute_context.into_local_data();
+        let local_data = transaction_kernel.into_local_data();
 
         let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
             &parameters.system_parameters.program_verification_key_crh,
@@ -524,7 +524,7 @@ impl ConsensusParameters {
         // Online execution to generate a DPC transaction
         let (new_records, transaction) = InstantiatedDPC::execute_online(
             &parameters,
-            execute_context,
+            transaction_kernel,
             old_death_program_proofs,
             new_birth_program_proofs,
             ledger,

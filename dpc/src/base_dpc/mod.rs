@@ -128,7 +128,7 @@ pub struct DPC<Components: BaseDPCComponents> {
 /// final transaction after `execute_offline` has created old serial numbers,
 /// new records and commitments. For convenience, it also
 /// stores references to existing information like old records and secret keys.
-pub struct ExecuteContext<Components: BaseDPCComponents> {
+pub struct TransactionKernel<Components: BaseDPCComponents> {
     system_parameters: SystemParameters<Components>,
 
     // Old record stuff
@@ -158,7 +158,7 @@ pub struct ExecuteContext<Components: BaseDPCComponents> {
     network_id: u8,
 }
 
-impl<Components: BaseDPCComponents> ExecuteContext<Components> {
+impl<Components: BaseDPCComponents> TransactionKernel<Components> {
     #[allow(clippy::wrong_self_convention)]
     pub fn into_local_data(&self) -> LocalData<Components> {
         LocalData {
@@ -178,7 +178,7 @@ impl<Components: BaseDPCComponents> ExecuteContext<Components> {
     }
 }
 
-impl<Components: BaseDPCComponents> ToBytes for ExecuteContext<Components> {
+impl<Components: BaseDPCComponents> ToBytes for TransactionKernel<Components> {
     #[inline]
     fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
         // Write old record components
@@ -243,7 +243,7 @@ impl<Components: BaseDPCComponents> ToBytes for ExecuteContext<Components> {
     }
 }
 
-impl<Components: BaseDPCComponents> FromBytes for ExecuteContext<Components> {
+impl<Components: BaseDPCComponents> FromBytes for TransactionKernel<Components> {
     #[inline]
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
         let system_parameters = SystemParameters::<Components>::load().expect("Could not load system parameters");
@@ -555,7 +555,6 @@ where
     >,
 {
     type Account = Account<Components>;
-    type ExecuteContext = ExecuteContext<Components>;
     type LocalData = LocalData<Components>;
     type Metadata = [u8; 32];
     type Parameters = PublicParameters<Components>;
@@ -564,6 +563,7 @@ where
     type Record = DPCRecord<Components>;
     type SystemParameters = SystemParameters<Components>;
     type Transaction = DPCTransaction<Components>;
+    type TransactionKernel = TransactionKernel<Components>;
 
     fn setup<R: Rng>(
         ledger_parameters: &Components::MerkleParameters,
@@ -651,7 +651,7 @@ where
         memorandum: <Self::Transaction as Transaction>::Memorandum,
         network_id: u8,
         rng: &mut R,
-    ) -> Result<Self::ExecuteContext, DPCError> {
+    ) -> Result<Self::TransactionKernel, DPCError> {
         assert_eq!(Components::NUM_INPUT_RECORDS, old_records.len());
         assert_eq!(Components::NUM_INPUT_RECORDS, old_account_private_keys.len());
 
@@ -820,7 +820,7 @@ where
             new_encrypted_record_hashes.push(encrypted_record_hash);
         }
 
-        let context = ExecuteContext {
+        let context = TransactionKernel {
             system_parameters: parameters,
 
             old_records,
@@ -850,7 +850,7 @@ where
 
     fn execute_online<R: Rng>(
         parameters: &Self::Parameters,
-        context: Self::ExecuteContext,
+        transaction_kernel: Self::TransactionKernel,
         old_death_program_proofs: Vec<Self::PrivateProgramInput>,
         new_birth_program_proofs: Vec<Self::PrivateProgramInput>,
         ledger: &L,
@@ -861,7 +861,7 @@ where
 
         let exec_time = start_timer!(|| "BaseDPC::execute_online");
 
-        let ExecuteContext {
+        let TransactionKernel {
             system_parameters,
 
             old_records,
@@ -884,7 +884,7 @@ where
             value_balance,
             memorandum,
             network_id,
-        } = context;
+        } = transaction_kernel;
 
         let local_data_root = local_data_merkle_tree.root();
 
