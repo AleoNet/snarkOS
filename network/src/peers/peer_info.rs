@@ -48,9 +48,9 @@ pub struct PeerInfo {
     /// The timestamp of the last disconnect from this peer.
     last_disconnected: DateTime<Utc>,
     /// The number of times we have connected to this peer.
-    connected_count: i64,
+    connected_count: u64,
     /// The number of times we have disconnected from this peer.
-    disconnected_count: i64,
+    disconnected_count: u64,
 }
 
 impl PeerInfo {
@@ -134,7 +134,7 @@ impl PeerInfo {
     /// Returns the number of times we have connected to this peer.
     ///
     #[inline]
-    pub fn connected_count(&self) -> i64 {
+    pub fn connected_count(&self) -> u64 {
         self.connected_count
     }
 
@@ -142,7 +142,7 @@ impl PeerInfo {
     /// Returns the number of times we have disconnected from this peer.
     ///
     #[inline]
-    pub fn disconnected_count(&self) -> i64 {
+    pub fn disconnected_count(&self) -> u64 {
         self.disconnected_count
     }
 
