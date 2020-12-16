@@ -339,80 +339,77 @@ impl Inbound {
         };
 
         // Create and store a new handshake in the manager.
-        match message_name {
-            // connection recipient path
-            name if name == Version::name() => {
-                // Deserialize the message bytes into a version message.
-                let remote_version =
-                    Version::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
+        if message_name == Version::name() {
+            // Deserialize the message bytes into a version message.
+            let remote_version = Version::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
-                // FIXME(ljedrz): we should obtain our actual local address here instead of trusting the sender
-                let local_address = remote_version.receiver;
+            // FIXME(ljedrz): we should obtain our actual local address here instead of trusting the sender
+            let local_address = remote_version.receiver;
 
-                // Create the remote address from the given peer address, and specified port from the version message.
-                let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
+            // Create the remote address from the given peer address, and specified port from the version message.
+            let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
 
-                // TODO: rename update_writer to update_address
-                let channel = channel.update_writer(remote_address).await?;
+            // TODO: rename update_writer to update_address
+            let channel = channel.update_writer(remote_address).await?;
 
-                // Save the channel under the provided remote address
-                self.channels.write().await.insert(remote_address, channel.clone());
+            // Save the channel under the provided remote address
+            self.channels.write().await.insert(remote_address, channel.clone());
 
-                // TODO (raychu86): Establish a formal node version.
-                let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
+            // TODO (raychu86): Establish a formal node version.
+            let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
 
-                // notify the server that the peer is being connected to
-                self.sender
-                    .send(Response::ConnectingTo(remote_address, local_version.nonce))
-                    .await?;
+            // notify the server that the peer is being connected to
+            self.sender
+                .send(Response::ConnectingTo(remote_address, local_version.nonce))
+                .await?;
 
-                // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
-                // if let Some(version) = version_message {
-                //     // If our peer has a longer chain, send a sync message
-                //     if version.height > environment.current_block_height().await {
-                //         // Update the sync node if the sync_handler is Idle
-                //         if let Ok(mut sync_handler) = sync_manager.try_lock() {
-                //             if !sync_handler.is_syncing() {
-                //                 sync_handler.sync_node_address = handshake.channel.address;
-                //
-                //                 if let Ok(block_locator_hashes) =
-                //                     environment.storage_read().await.get_block_locator_hashes()
-                //                 {
-                //                     if let Err(err) =
-                //                         handshake.channel.write(&GetSync::new(block_locator_hashes)).await
-                //                     {
-                //                         error!(
-                //                             "Error sending GetSync message to {}, {}",
-                //                             handshake.channel.address, err
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //     }
-                // }
+            // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
+            // if let Some(version) = version_message {
+            //     // If our peer has a longer chain, send a sync message
+            //     if version.height > environment.current_block_height().await {
+            //         // Update the sync node if the sync_handler is Idle
+            //         if let Ok(mut sync_handler) = sync_manager.try_lock() {
+            //             if !sync_handler.is_syncing() {
+            //                 sync_handler.sync_node_address = handshake.channel.address;
+            //
+            //                 if let Ok(block_locator_hashes) =
+            //                     environment.storage_read().await.get_block_locator_hashes()
+            //                 {
+            //                     if let Err(err) =
+            //                         handshake.channel.write(&GetSync::new(block_locator_hashes)).await
+            //                     {
+            //                         error!(
+            //                             "Error sending GetSync message to {}, {}",
+            //                             handshake.channel.address, err
+            //                         );
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
 
-                // Write a verack response to the remote peer.
-                channel
-                    .write(&Verack::new(remote_version.nonce, local_address, remote_address))
-                    .await?;
+            // Write a verack response to the remote peer.
+            channel
+                .write(&Verack::new(remote_version.nonce, local_address, remote_address))
+                .await?;
 
-                // Write a version request to the remote peer.
-                channel.write(&local_version).await?;
+            // Write a version request to the remote peer.
+            channel.write(&local_version).await?;
 
-                // Parse the inbound message into the message name and message bytes.
-                let (message_name, message_bytes) = channel.read().await?;
+            // Parse the inbound message into the message name and message bytes.
+            let (_, message_bytes) = channel.read().await?;
 
-                // Deserialize the message bytes into a verack message.
-                let verack = Verack::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
+            // Deserialize the message bytes into a verack message.
+            let _verack = Verack::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
-                self.sender
-                    .send(Response::ConnectedTo(remote_address, local_version.nonce))
-                    .await?;
+            self.sender
+                .send(Response::ConnectedTo(remote_address, local_version.nonce))
+                .await?;
 
-                Ok(channel)
-            }
-            _ => Err(NetworkError::InvalidHandshake),
+            Ok(channel)
+        } else {
+            Err(NetworkError::InvalidHandshake)
         }
     }
 }

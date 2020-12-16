@@ -272,7 +272,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn receive_version_handshake() {
+    async fn handshake_responder_side() {
         // start a test node and listen for incoming connections
         let mut node = test_node(vec![]).await;
         node.start().await.unwrap();
@@ -296,13 +296,13 @@ mod tests {
         peer_stream.flush().await.unwrap();
 
         // at this point the node should have marked the peer as 'connecting'
-        sleep(Duration::from_millis(1900)).await;
+        sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connecting(&peer_address).await);
 
         // check if the peer has received the Verack message from the node
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let verack = Verack::deserialize(&message).unwrap();
+        let _verack = Verack::deserialize(&message).unwrap();
 
         // check if it was followed by a Version message
         let header = read_header(&mut peer_stream).await.unwrap();
@@ -326,17 +326,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn initiate_version_handshake() {
+    async fn handshake_initiator_side() {
         // start a fake peer which is just a socket
         let peer_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let peer_address = peer_listener.local_addr().unwrap();
 
-        // start node with peer as a bootnode
+        // start node with the peer as a bootnode; that way it will get connected to
         let mut node = test_node(vec![peer_address.to_string()]).await;
         node.start().await.unwrap();
 
-        // the peer should receive a Version message from the node (initiator of the handshake)
+        // accept the node's connection on peer side
         let (mut peer_stream, node_address) = peer_listener.accept().await.unwrap();
+
+        // the peer should receive a Version message from the node (initiator of the handshake)
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
         let version = Version::deserialize(&message).unwrap();
@@ -344,7 +346,7 @@ mod tests {
         // at this point the node should have marked the peer as 'connecting'
         assert!(node.peers.is_connecting(&peer_address).await);
 
-        // the peer responds with a Verack acknowladging the Version message
+        // the peer responds with a Verack acknowledging the Version message
         let verack = Verack::new(version.nonce, peer_address, node_address);
         let serialized = verack.serialize().unwrap();
         let header = MessageHeader::new(Verack::name(), serialized.len() as u32)
@@ -354,9 +356,17 @@ mod tests {
         peer_stream.write_all(&serialized).await.unwrap();
         peer_stream.flush().await.unwrap();
 
+        // the peer then follows up with a Version message
+        let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
+        let serialized = version.serialize().unwrap();
+        let header = MessageHeader::new(Version::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
         // the node should now have registered the peer as 'connected'
-        // note: the reverse version/verack cycle initiated from the peer doesn't seem necessary to
-        // establish the connection so it has been ommited in this test.
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connected(&peer_address).await);
         assert_eq!(node.peers.number_of_connected_peers().await, 1);

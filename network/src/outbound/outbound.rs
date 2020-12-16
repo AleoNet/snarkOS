@@ -282,7 +282,7 @@ mod tests {
 
     use serial_test::serial;
     use std::{net::SocketAddr, sync::Arc, time::Duration};
-    use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex, time::sleep};
+    use tokio::{net::TcpStream, sync::Mutex, time::sleep};
 
     ///
     /// Returns a `Request` for testing.

@@ -274,17 +274,29 @@ impl Peers {
         };
 
         if message_name == Verack::name() {
-            // spawn the inbound loop
-            let inbound = self.inbound.clone();
-            let channel_clone = channel.clone();
-            tokio::spawn(async move {
-                inbound.listen_for_messages(channel_clone).await.unwrap();
-            });
+            let (message_name, message_bytes) = match channel.read().await {
+                Ok(inbound_message) => inbound_message,
+                _ => return Err(NetworkError::InvalidHandshake),
+            };
 
-            // save the outbound channel
-            self.outbound.channels.write().await.insert(remote_address, channel);
+            if message_name == Version::name() {
+                let verack = Verack::new(version.nonce, own_address, remote_address);
+                channel.write(&verack).await?;
 
-            self.connected_to_peer(remote_address, version.nonce).await
+                // spawn the inbound loop
+                let inbound = self.inbound.clone();
+                let channel_clone = channel.clone();
+                tokio::spawn(async move {
+                    inbound.listen_for_messages(channel_clone).await.unwrap();
+                });
+
+                // save the outbound channel
+                self.outbound.channels.write().await.insert(remote_address, channel);
+
+                self.connected_to_peer(remote_address, version.nonce).await
+            } else {
+                Err(NetworkError::InvalidHandshake)
+            }
         } else {
             // TODO(ljedrz): remove the peer from connecting
             Err(NetworkError::InvalidHandshake)
