@@ -274,6 +274,16 @@ mod tests {
         Server::new(environment).await.unwrap()
     }
 
+    async fn write_message_to_stream(message_name: MessageName, message: impl Message, peer_stream: &mut TcpStream) {
+        let serialized = message.serialize().unwrap();
+        let header = MessageHeader::new(message_name, serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+    }
+
     #[tokio::test]
     async fn starts_server() {
         let mut server = test_node(vec![]).await;
@@ -298,13 +308,7 @@ mod tests {
 
         // the peer initiates a handshake by sending a Version message
         let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
-        let serialized = version.serialize().unwrap();
-        let header = MessageHeader::new(Version::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(Version::name(), version, &mut peer_stream).await;
 
         // at this point the node should have marked the peer as 'connecting'
         sleep(Duration::from_millis(200)).await;
@@ -322,13 +326,7 @@ mod tests {
 
         // in response to the Version, the peer sends a Verack message to finish the handshake
         let verack = Verack::new(version.nonce, peer_address, node_address);
-        let serialized = verack.serialize().unwrap();
-        let header = MessageHeader::new(Verack::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
 
         // the node should now have register the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
@@ -359,38 +357,16 @@ mod tests {
 
         // the peer responds with a Verack acknowledging the Version message
         let verack = Verack::new(version.nonce, peer_address, node_address);
-        let serialized = verack.serialize().unwrap();
-        let header = MessageHeader::new(Verack::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
 
         // the peer then follows up with a Version message
         let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
-        let serialized = version.serialize().unwrap();
-        let header = MessageHeader::new(Version::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(Version::name(), version, &mut peer_stream).await;
 
         // the node should now have registered the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connected(&peer_address).await);
         assert_eq!(node.peers.number_of_connected_peers().await, 1);
-    }
-
-    async fn write_message_to_stream(message_name: MessageName, message: impl Message, peer_stream: &mut TcpStream) {
-        let serialized = message.serialize().unwrap();
-        let header = MessageHeader::new(message_name, serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
     }
 
     async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream) {
