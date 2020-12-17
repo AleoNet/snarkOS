@@ -215,6 +215,7 @@ mod tests {
         GetMemoryPool,
         GetPeers,
         GetSync,
+        Peers,
         Verack,
         Version,
     };
@@ -228,6 +229,7 @@ mod tests {
 
     use std::{sync::Arc, time::Duration};
 
+    use chrono::{DateTime, Utc};
     use tokio::{
         io::AsyncWriteExt,
         net::{TcpListener, TcpStream},
@@ -496,6 +498,37 @@ mod tests {
         let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
 
         // check the node's state hasn't been altered by the GetSync message
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+    }
+
+    #[tokio::test]
+    async fn reject_peers_before_handshake() {
+        // start the node
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+
+        // start the fake node (peer) which is just a socket
+        let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+
+        // send a Peers message without a prior handshake established
+        let peers = Peers::new(vec![("127.0.0.1:0".parse().unwrap(), Utc::now())]);
+        let serialized = peers.serialize().unwrap();
+        let header = MessageHeader::new(Peers::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
+        // check the response is empty
+        sleep(Duration::from_millis(200)).await;
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        // check the node's state hasn't been altered by the Peers message
         assert_eq!(bytes_read, 0);
         assert!(buffer.is_empty());
         assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
