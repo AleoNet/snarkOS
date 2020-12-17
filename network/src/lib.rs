@@ -220,6 +220,7 @@ mod tests {
         Peers,
         Sync,
         SyncBlock,
+        Transaction,
         Verack,
         Version,
     };
@@ -657,6 +658,68 @@ mod tests {
         let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
 
         // check the node's state hasn't been altered by the Sync message
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+    }
+
+    #[tokio::test]
+    async fn reject_transaction_before_handshake() {
+        // start the node
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+
+        // start the fake node (peer) which is just a socket
+        let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+
+        // send a Transaction message without a prior handshake established
+        let transaction = Transaction::new([0u8, 10].to_vec());
+        let serialized = transaction.serialize().unwrap();
+        let header = MessageHeader::new(Transaction::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
+        // check the response is empty
+        sleep(Duration::from_millis(200)).await;
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        // check the node's state hasn't been altered by the Transaction message
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+    }
+
+    #[tokio::test]
+    async fn reject_verack_before_version() {
+        // start the node
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+
+        // start the fake node (peer) which is just a socket
+        let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+
+        // send a Verack message without a prior handshake established
+        let verack = Verack::new(1u64, peer_stream.local_addr().unwrap(), node.local_address().unwrap());
+        let serialized = verack.serialize().unwrap();
+        let header = MessageHeader::new(Verack::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
+        // check the response is empty
+        sleep(Duration::from_millis(200)).await;
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        // check the node's state hasn't been altered by the Verack message
         assert_eq!(bytes_read, 0);
         assert!(buffer.is_empty());
         assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
