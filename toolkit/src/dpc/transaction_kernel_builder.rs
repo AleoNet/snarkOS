@@ -55,6 +55,7 @@ pub struct TransactionKernel {
     pub(crate) transaction_kernel: TransactionKernelNative<Components>,
 }
 
+// TODO (raychu86) Look into genericizing this model into `dpc`.
 #[derive(Clone, Debug, Default)]
 pub struct TransactionKernelBuilder {
     /// Transaction inputs
@@ -335,6 +336,14 @@ impl TransactionKernel {
         )?;
 
         Ok(Self { transaction_kernel })
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut output = vec![];
+        self.transaction_kernel
+            .write(&mut output)
+            .expect("serialization to bytes failed");
+        output
     }
 }
 

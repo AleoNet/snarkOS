@@ -91,6 +91,10 @@ pub trait ProtectedRpcFunctions {
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError>;
 
+    fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError>;
+
+    fn create_transaction(&self, transaction_kernel: String) -> Result<CreateRawTransactionOuput, RpcError>;
+
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrecordcommitments.md"))]
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError>;
 

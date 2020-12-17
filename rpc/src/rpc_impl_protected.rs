@@ -25,19 +25,25 @@ use snarkos_dpc::base_dpc::{
     record::DPCRecord,
     record_encryption::RecordEncryption,
     record_payload::RecordPayload,
+    TransactionKernel,
 };
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{
     algorithms::CRH,
-    dpc::{DPCComponents, Record},
+    dpc::{DPCComponents, Record as RecordModel},
     objects::AccountScheme,
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
+use snarkos_toolkit::{
+    account::{Address, PrivateKey},
+    dpc::{Record, TransactionKernelBuilder},
+};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
 
+use itertools::Itertools;
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use rand::{thread_rng, Rng};
 use std::{str::FromStr, sync::Arc};
@@ -229,6 +235,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
+    // TODO (raychu86): Deprecate this rpc endpoint in favor of the more secure offline/online model.
     /// Create a new transaction, returning the encoded transaction and the new records.
     fn create_raw_transaction(
         &self,
@@ -372,6 +379,69 @@ impl ProtectedRpcFunctions for RpcImpl {
             encoded_transaction,
             encoded_records,
         })
+    }
+
+    fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError> {
+        let rng = &mut thread_rng();
+
+        assert!(!transaction_input.old_records.is_empty());
+        assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
+        assert!(!transaction_input.old_account_private_keys.is_empty());
+        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(!transaction_input.recipients.is_empty());
+        assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
+
+        let mut builder = TransactionKernelBuilder::new();
+
+        // Add individual transaction inputs to the transaction kernel builder.
+        for (record_string, private_key_string) in transaction_input
+            .old_records
+            .iter()
+            .zip_eq(&transaction_input.old_account_private_keys)
+        {
+            let record = Record::from_str(&record_string).unwrap();
+            let private_key = PrivateKey::from_str(&private_key_string).unwrap();
+
+            builder = builder.add_input(private_key, record).unwrap();
+        }
+
+        // Add individual transaction outputs to the transaction kernel builder.
+        for recipient in &transaction_input.recipients {
+            let address = Address::from_str(&recipient.address).unwrap();
+
+            builder = builder.add_output(address, recipient.amount).unwrap();
+        }
+
+        // Decode memo
+        let mut memo = [0u8; 32];
+        if let Some(memo_string) = transaction_input.memo {
+            if let Ok(bytes) = hex::decode(memo_string) {
+                bytes.write(&mut memo[..])?;
+            }
+        }
+
+        // If the request did not specify a valid memo, generate one from random.
+        if memo == [0u8; 32] {
+            memo = rng.gen();
+        }
+
+        // Set the memo in the transaction kernel builder.
+        builder = builder.memo(memo);
+
+        // Set the network id in the transaction kernel builder.
+        builder = builder.network_id(transaction_input.network_id);
+
+        // Construct the transaction kernel
+        let transaction_kernel = builder.build(rng).unwrap();
+
+        Ok(hex::encode(transaction_kernel.to_bytes()))
+    }
+
+    fn create_transaction(&self, transaction_kernel: String) -> Result<CreateRawTransactionOuput, RpcError> {
+        let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
+        let transaction_kernel = TransactionKernel::<Components>::read(&transaction_kernel_bytes[..])?;
+
+        unimplemented!()
     }
 
     /// Returns the number of record commitments that are stored on the full node.

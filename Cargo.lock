@@ -2821,6 +2821,7 @@ dependencies = [
  "base64 0.13.0",
  "chrono",
  "hex",
+ "itertools",
  "jsonrpc-core",
  "jsonrpc-core-client",
  "jsonrpc-derive",
@@ -2838,6 +2839,7 @@ dependencies = [
  "snarkos-objects",
  "snarkos-storage",
  "snarkos-testing",
+ "snarkos-toolkit",
  "snarkos-utilities",
  "tokio 0.2.22",
 ]

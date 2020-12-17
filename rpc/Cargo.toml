@@ -19,11 +19,13 @@ snarkos-models = { path = "../models", version = "1.1.4"}
 snarkos-network = { path = "../network", version = "1.1.4"}
 snarkos-objects = { path = "../objects", version = "1.1.4"}
 snarkos-storage = { path = "../storage", version = "1.1.4"}
+snarkos-toolkit = { path = "../toolkit", version = "1.1.4"}
 snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
 base64 = { version = "0.13.0" }
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
+itertools = { version = "0.9.0" }
 jsonrpc-core = { version = "14.2.0" }
 jsonrpc-core-client = { version = "14.0.5" }
 jsonrpc-derive = { version = "14.2.2" }
