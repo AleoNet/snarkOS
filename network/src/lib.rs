@@ -211,6 +211,7 @@ mod tests {
     use super::*;
     use crate::external::{
         message::{read_header, read_message, Message, MessageHeader},
+        message_name::MessageName,
         Block,
         GetBlock,
         GetMemoryPool,
@@ -235,7 +236,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use tokio::{
-        io::AsyncWriteExt,
+        io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
         sync::{Mutex, RwLock},
     };
@@ -382,347 +383,107 @@ mod tests {
         assert_eq!(node.peers.number_of_connected_peers().await, 1);
     }
 
+    async fn write_message_to_stream(peer_stream: &mut TcpStream, message_name: MessageName, message: impl Message) {
+        let serialized = message.serialize().unwrap();
+        let header = MessageHeader::new(message_name, serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+    }
+
+    async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream) {
+        // slight delay for server to process the message
+        sleep(Duration::from_millis(200)).await;
+
+        // read the response from the stream
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        // check node's response is empty
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+
+        // check the node's state hasn't been altered by the message
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+    }
+
     #[tokio::test]
-    async fn reject_get_peers_before_handshake() {
+    async fn reject_non_version_messages_before_handshake() {
         // start the node
         let mut node = test_node(vec![]).await;
         node.start().await.unwrap();
 
         // start the fake node (peer) which is just a socket
+        // note: the connection needs to be re-established as it is reset
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
 
         // send a GetPeers message without a prior handshake established
-        let get_peers = GetPeers;
-        let serialized = get_peers.serialize().unwrap();
-        let header = MessageHeader::new(GetPeers::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, GetPeers::name(), GetPeers).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+        // verify the node rejected the message, the response to the peer is empty and the node's
+        // state is unaltered
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the node's state hasn't been altered by the GetPeers message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_get_memory_pool_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // GetMemoryPool
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+        write_message_to_stream(&mut peer_stream, GetMemoryPool::name(), GetMemoryPool).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // send a GetMemoryPool message without a prior handshake established
-        let get_memory_pool = GetMemoryPool;
-        let serialized = get_memory_pool.serialize().unwrap();
-        let header = MessageHeader::new(GetMemoryPool::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
-
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the GetMemoryPool message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_get_block_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // GetBlock
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a GetBlock message without a prior handshake established
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        let get_block = GetBlock::new(block_hash);
-        let serialized = get_block.serialize().unwrap();
-        let header = MessageHeader::new(GetBlock::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, GetBlock::name(), GetBlock::new(block_hash)).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the GetBlock message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_get_sync_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // GetSync
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a GetSync message without a prior handshake established
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        let get_sync = GetSync::new(vec![block_hash]);
-        let serialized = get_sync.serialize().unwrap();
-        let header = MessageHeader::new(GetSync::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, GetSync::name(), GetSync::new(vec![block_hash])).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the GetSync message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_peers_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // Peers
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a Peers message without a prior handshake established
         let peers = Peers::new(vec![("127.0.0.1:0".parse().unwrap(), Utc::now())]);
-        let serialized = peers.serialize().unwrap();
-        let header = MessageHeader::new(Peers::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, Peers::name(), peers).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the Peers message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_memory_pool_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // MemoryPool
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a MemoryPool message without a prior handshake established
         let memory_pool = MemoryPool::new(vec![[0u8, 10].to_vec()]);
-        let serialized = memory_pool.serialize().unwrap();
-        let header = MessageHeader::new(MemoryPool::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, MemoryPool::name(), memory_pool).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the MemoryPool message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_block_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // Block
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a Block message without a prior handshake established
         let block = Block::new([0u8, 10].to_vec());
-        let serialized = block.serialize().unwrap();
-        let header = MessageHeader::new(Block::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, Block::name(), block).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the Block message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_sync_block_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // SyncBlock
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a SyncBlock message without a prior handshake established
         let sync_block = SyncBlock::new([0u8, 10].to_vec());
-        let serialized = sync_block.serialize().unwrap();
-        let header = MessageHeader::new(SyncBlock::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, SyncBlock::name(), sync_block).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the SyncBlock message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_sync_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // Sync
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a Sync message without a prior handshake established
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        let sync = Sync::new(vec![block_hash]);
-        let serialized = sync.serialize().unwrap();
-        let header = MessageHeader::new(Sync::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, Sync::name(), Sync::new(vec![block_hash])).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the Sync message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_transaction_before_handshake() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // Transaction
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a Transaction message without a prior handshake established
         let transaction = Transaction::new([0u8, 10].to_vec());
-        let serialized = transaction.serialize().unwrap();
-        let header = MessageHeader::new(Transaction::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
+        write_message_to_stream(&mut peer_stream, Transaction::name(), transaction).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
 
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the Transaction message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
-    }
-
-    #[tokio::test]
-    async fn reject_verack_before_version() {
-        // start the node
-        let mut node = test_node(vec![]).await;
-        node.start().await.unwrap();
-
-        // start the fake node (peer) which is just a socket
+        // Verack
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-
-        // send a Verack message without a prior handshake established
         let verack = Verack::new(1u64, peer_stream.local_addr().unwrap(), node.local_address().unwrap());
-        let serialized = verack.serialize().unwrap();
-        let header = MessageHeader::new(Verack::name(), serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
-        peer_stream.flush().await.unwrap();
-
-        // check the response is empty
-        sleep(Duration::from_millis(200)).await;
-        let mut buffer = String::new();
-        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
-
-        // check the node's state hasn't been altered by the Verack message
-        assert_eq!(bytes_read, 0);
-        assert!(buffer.is_empty());
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+        write_message_to_stream(&mut peer_stream, Verack::name(), verack).await;
+        assert_node_rejected_message(&node, &mut peer_stream).await;
     }
 }
