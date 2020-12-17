@@ -215,12 +215,12 @@ mod tests {
         GetMemoryPool,
         GetPeers,
         GetSync,
+        MemoryPool,
         Peers,
         Verack,
         Version,
     };
 
-    use snarkos_consensus::MemoryPool;
     use snarkos_objects::block_header_hash::BlockHeaderHash;
     use snarkos_testing::{
         consensus::{FIXTURE_VK, TEST_CONSENSUS},
@@ -238,7 +238,7 @@ mod tests {
 
     async fn test_node(bootnodes: Vec<String>) -> Server {
         let storage = FIXTURE_VK.ledger();
-        let memory_pool = MemoryPool::new();
+        let memory_pool = snarkos_consensus::MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
         let consensus = TEST_CONSENSUS.clone();
         let parameters = load_verifying_parameters();
@@ -529,6 +529,37 @@ mod tests {
         let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
 
         // check the node's state hasn't been altered by the Peers message
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+    }
+
+    #[tokio::test]
+    async fn reject_memory_pool_before_handshake() {
+        // start the node
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+
+        // start the fake node (peer) which is just a socket
+        let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+
+        // send a MemoryPool message without a prior handshake established
+        let memory_pool = MemoryPool::new(vec![[0u8, 10].to_vec()]);
+        let serialized = memory_pool.serialize().unwrap();
+        let header = MessageHeader::new(MemoryPool::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
+        // check the response is empty
+        sleep(Duration::from_millis(200)).await;
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        // check the node's state hasn't been altered by the MemoryPool message
         assert_eq!(bytes_read, 0);
         assert!(buffer.is_empty());
         assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
