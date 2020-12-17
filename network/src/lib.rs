@@ -383,7 +383,7 @@ mod tests {
         assert_eq!(node.peers.number_of_connected_peers().await, 1);
     }
 
-    async fn write_message_to_stream(peer_stream: &mut TcpStream, message_name: MessageName, message: impl Message) {
+    async fn write_message_to_stream(message_name: MessageName, message: impl Message, peer_stream: &mut TcpStream) {
         let serialized = message.serialize().unwrap();
         let header = MessageHeader::new(message_name, serialized.len() as u32)
             .serialize()
@@ -421,7 +421,7 @@ mod tests {
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
 
         // send a GetPeers message without a prior handshake established
-        write_message_to_stream(&mut peer_stream, GetPeers::name(), GetPeers).await;
+        write_message_to_stream(GetPeers::name(), GetPeers, &mut peer_stream).await;
 
         // verify the node rejected the message, the response to the peer is empty and the node's
         // state is unaltered
@@ -429,61 +429,61 @@ mod tests {
 
         // GetMemoryPool
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        write_message_to_stream(&mut peer_stream, GetMemoryPool::name(), GetMemoryPool).await;
+        write_message_to_stream(GetMemoryPool::name(), GetMemoryPool, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // GetBlock
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        write_message_to_stream(&mut peer_stream, GetBlock::name(), GetBlock::new(block_hash)).await;
+        write_message_to_stream(GetBlock::name(), GetBlock::new(block_hash), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // GetSync
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        write_message_to_stream(&mut peer_stream, GetSync::name(), GetSync::new(vec![block_hash])).await;
+        write_message_to_stream(GetSync::name(), GetSync::new(vec![block_hash]), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Peers
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let peers = Peers::new(vec![("127.0.0.1:0".parse().unwrap(), Utc::now())]);
-        write_message_to_stream(&mut peer_stream, Peers::name(), peers).await;
+        write_message_to_stream(Peers::name(), peers, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // MemoryPool
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let memory_pool = MemoryPool::new(vec![[0u8, 10].to_vec()]);
-        write_message_to_stream(&mut peer_stream, MemoryPool::name(), memory_pool).await;
+        write_message_to_stream(MemoryPool::name(), memory_pool, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Block
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let block = Block::new([0u8, 10].to_vec());
-        write_message_to_stream(&mut peer_stream, Block::name(), block).await;
+        write_message_to_stream(Block::name(), block, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // SyncBlock
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let sync_block = SyncBlock::new([0u8, 10].to_vec());
-        write_message_to_stream(&mut peer_stream, SyncBlock::name(), sync_block).await;
+        write_message_to_stream(SyncBlock::name(), sync_block, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Sync
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        write_message_to_stream(&mut peer_stream, Sync::name(), Sync::new(vec![block_hash])).await;
+        write_message_to_stream(Sync::name(), Sync::new(vec![block_hash]), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Transaction
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let transaction = Transaction::new([0u8, 10].to_vec());
-        write_message_to_stream(&mut peer_stream, Transaction::name(), transaction).await;
+        write_message_to_stream(Transaction::name(), transaction, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Verack
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let verack = Verack::new(1u64, peer_stream.local_addr().unwrap(), node.local_address().unwrap());
-        write_message_to_stream(&mut peer_stream, Verack::name(), verack).await;
+        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
     }
 }
