@@ -211,6 +211,7 @@ mod tests {
     use super::*;
     use crate::external::{
         message::{read_header, read_message, Message, MessageHeader},
+        GetBlock,
         GetMemoryPool,
         GetPeers,
         Verack,
@@ -218,6 +219,7 @@ mod tests {
     };
 
     use snarkos_consensus::MemoryPool;
+    use snarkos_objects::block_header_hash::BlockHeaderHash;
     use snarkos_testing::{
         consensus::{FIXTURE_VK, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
@@ -428,7 +430,39 @@ mod tests {
         let mut buffer = String::new();
         let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
 
-        // check the node's state hasn'te been altered by the GetMemoryPool message
+        // check the node's state hasn't been altered by the GetMemoryPool message
+        assert_eq!(bytes_read, 0);
+        assert!(buffer.is_empty());
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+    }
+
+    #[tokio::test]
+    async fn reject_get_block_before_handshake() {
+        // start the node
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+
+        // start the fake node (peer) which is just a socket
+        let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
+
+        // send a GetBlock message without a prior handshake established
+        let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
+        let get_block = GetBlock::new(block_hash);
+        let serialized = get_block.serialize().unwrap();
+        let header = MessageHeader::new(GetBlock::name(), serialized.len() as u32)
+            .serialize()
+            .unwrap();
+        peer_stream.write_all(&header).await.unwrap();
+        peer_stream.write_all(&serialized).await.unwrap();
+        peer_stream.flush().await.unwrap();
+
+        // check the response is empty
+        sleep(Duration::from_millis(200)).await;
+        let mut buffer = String::new();
+        let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
+
+        // check the node's state hasn'te been altered by the GetBlock message
         assert_eq!(bytes_read, 0);
         assert!(buffer.is_empty());
         assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
