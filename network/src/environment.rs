@@ -22,8 +22,10 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_objects::Network;
 
-use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex, RwLock},
+};
 
 /// TODO (howardwu): Remove pub from each field and add getters only.
 /// A core data structure containing the networking parameters for this node.
@@ -209,18 +211,6 @@ impl Environment {
     /// Returns the current block height of the ledger from storage.
     #[inline]
     pub async fn current_block_height(&self) -> u32 {
-        self.storage.read().await.get_current_block_height()
-    }
-
-    /// Attempts to acquire a read lock for storage.
-    #[inline]
-    pub async fn storage_read(&self) -> RwLockReadGuard<'_, MerkleTreeLedger> {
-        self.storage.read().await
-    }
-
-    /// Attempts to acquire the write lock for storage.
-    #[inline]
-    pub async fn storage_mut(&self) -> RwLockWriteGuard<'_, MerkleTreeLedger> {
-        self.storage.write().await
+        self.storage.read().unwrap().get_current_block_height()
     }
 }

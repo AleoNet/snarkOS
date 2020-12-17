@@ -50,7 +50,7 @@ snarkos-models = { path = "./models", version = "1.1.4"}
 snarkos-network = { path = "./network", version = "1.1.4"}
 snarkos-objects = { path = "./objects", version = "1.1.4"}
 snarkos-posw = { path = "./posw", version = "1.1.4"}
-#snarkos-rpc = { path = "./rpc", version = "1.1.4"}
+snarkos-rpc = { path = "./rpc", version = "1.1.4"}
 snarkos-storage = { path = "./storage", version = "1.1.4"}
 snarkos-utilities = { path = "./utilities", version = "1.1.4"}
 

@@ -15,11 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{
-        message_types::{GetBlock, GetSync},
-        Channel,
-        GetMemoryPool,
-    },
+    external::message_types::{GetBlock, GetSync},
     outbound::Request,
     peers::peers::Peers,
     Environment,
@@ -27,9 +23,7 @@ use crate::{
     Outbound,
 };
 use snarkos_errors::network::SendError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::BlockHeaderHash;
-use snarkos_storage::Ledger;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
@@ -99,7 +93,7 @@ impl SyncManager {
     /// Remove the blocks that are now included in the chain.
     pub async fn clear_pending(&mut self) {
         for block_hash in self.pending_blocks.clone().keys() {
-            if !self.environment.storage_read().await.block_hash_exists(block_hash) {
+            if !self.environment.storage().read().unwrap().block_hash_exists(block_hash) {
                 self.pending_blocks.remove(block_hash);
             }
         }
@@ -163,8 +157,9 @@ impl SyncManager {
                     }
                     None => !self
                         .environment
-                        .storage_read()
-                        .await
+                        .storage()
+                        .read()
+                        .unwrap()
                         .block_hash_exists(&block_header_hash),
                 };
 
@@ -187,7 +182,8 @@ impl SyncManager {
             if self.pending_blocks.is_empty() {
                 sleep(Duration::from_millis(500)).await;
 
-                if let Ok(block_locator_hashes) = self.environment.storage_read().await.get_block_locator_hashes() {
+                if let Ok(block_locator_hashes) = self.environment.storage().read().unwrap().get_block_locator_hashes()
+                {
                     // Broadcast a `GetSync` message to the connected peer.
                     self.outbound
                         .write()

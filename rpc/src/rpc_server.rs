@@ -26,11 +26,14 @@ use snarkos_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_network::{Environment, SyncManager};
+use snarkos_network::{Environment, Server as NodeServer};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::sync::{Mutex, RwLock};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{Arc, Mutex, RwLock},
+};
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.
@@ -43,12 +46,12 @@ pub async fn start_rpc_server(
     parameters: PublicParameters<Components>,
     environment: Environment,
     consensus: ConsensusParameters,
-    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    sync_handler_lock: Arc<Mutex<SyncManager>>,
+    memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
+    node_server: NodeServer,
     username: Option<String>,
     password: Option<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let rpc_server: SocketAddr = format!("127.0.0.1:{}", rpc_port).parse()?;
+) {
+    let rpc_server: SocketAddr = format!("127.0.0.1:{}", rpc_port).parse().unwrap();
 
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
@@ -61,9 +64,9 @@ pub async fn start_rpc_server(
         parameters,
         environment,
         consensus,
-        memory_pool_lock,
-        sync_handler_lock,
+        memory_pool,
         credentials,
+        node_server,
     );
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
@@ -81,11 +84,10 @@ pub async fn start_rpc_server(
             Meta { auth }
         })
         .threads(1)
-        .start_http(&rpc_server)?;
+        .start_http(&rpc_server)
+        .expect("couldn't start the RPC server!");
 
     tokio::task::spawn(async move {
         server.wait();
     });
-
-    Ok(())
 }

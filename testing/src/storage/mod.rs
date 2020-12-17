@@ -69,7 +69,7 @@ pub fn kill_storage_async<T: Transaction, P: LoadableMerkleParameters>(path: Pat
     Ledger::<T, P>::destroy_storage(path).unwrap();
 }
 
-pub fn kill_storage_sync<T: Transaction, P: LoadableMerkleParameters>(ledger: Arc<Ledger<T, P>>) {
+pub fn kill_storage_sync<T: Transaction, P: LoadableMerkleParameters>(ledger: Ledger<T, P>) {
     let path = ledger.storage.db.path().to_owned();
 
     drop(ledger);

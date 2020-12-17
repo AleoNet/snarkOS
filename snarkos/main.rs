@@ -29,14 +29,16 @@ use snarkos_models::algorithms::{CRH, SNARK};
 use snarkos_network::{environment::Environment, Server};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
-// use snarkos_rpc::start_rpc_server;
+use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::{to_bytes, ToBytes};
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex, RwLock},
+};
 use tokio::{
     runtime::Builder,
     stream::{self, StreamExt},
-    sync::{Mutex, RwLock},
 };
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
@@ -92,8 +94,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let storage = MerkleTreeLedger::open_at_path(path.clone())?;
     // let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
 
-    let memory_pool = MemoryPool::from_storage(&storage)?;
-    let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
+    let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
     info!("Loading Aleo parameters...");
     let parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
@@ -119,9 +120,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         authorized_inner_snark_ids,
     };
 
-    let environment = Environment::new(
+    let mut environment = Environment::new(
         Arc::new(RwLock::new(storage)),
-        memory_pool_lock.clone(),
+        memory_pool.clone(),
         Arc::new(consensus.clone()),
         Arc::new(parameters.clone()),
         Some(socket_address),
@@ -169,34 +170,36 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // }
 
     // Construct the server instance. Note this does not start the server.
-    let mut server = Server::new(environment).await?;
-
-    // // Start RPC thread, if the RPC configuration is enabled.
-    // if config.rpc.json_rpc {
-    //     info!("Loading Aleo parameters for RPC...");
-    //     let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
-    //     info!("Loading complete.");
-    //
-    //     // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-    //     let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
-    //
-    //     start_rpc_server(
-    //         config.rpc.port,
-    //         secondary_storage.clone(),
-    //         path.to_path_buf(),
-    //         proving_parameters,
-    //         environment,
-    //         consensus.clone(),
-    //         memory_pool_lock.clone(),
-    //         sync_manager.clone(),
-    //         config.rpc.username,
-    //         config.rpc.password,
-    //     )
-    //     .await?;
-    // }
+    let mut server = Server::new(environment.clone()).await?;
 
     // Start the main server thread.
     server.start().instrument(debug_span!("server")).await?;
+
+    environment.set_local_address(server.local_address().unwrap());
+
+    // Start RPC thread, if the RPC configuration is enabled.
+    if config.rpc.json_rpc {
+        info!("Loading Aleo parameters for RPC...");
+        let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
+        info!("Loading complete.");
+
+        // Open a secondary storage instance to prevent resource sharing and bottle-necking.
+        let secondary_storage = Arc::new(RwLock::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?));
+
+        start_rpc_server(
+            config.rpc.port,
+            secondary_storage,
+            path.to_path_buf(),
+            proving_parameters,
+            environment,
+            consensus,
+            memory_pool,
+            server.clone(),
+            config.rpc.username,
+            config.rpc.password,
+        )
+        .await;
+    }
 
     stream::pending::<()>().next().await;
 

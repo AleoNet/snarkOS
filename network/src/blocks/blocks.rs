@@ -14,15 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::message_types::*,
-    outbound::Request,
-    peers::PeerInfo,
-    sync::SyncState,
-    Environment,
-    NetworkError,
-    Outbound,
-};
+use crate::{external::message_types::*, outbound::Request, peers::PeerInfo, Environment, NetworkError, Outbound};
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_dpc::base_dpc::instantiated::Tx;
 use snarkos_objects::{Block as BlockStruct, BlockHeaderHash};
@@ -32,7 +24,6 @@ use snarkos_utilities::{
 };
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
 
 /// A stateful component for managing the blocks for the ledger on this node server.
 #[derive(Clone)]
@@ -134,12 +125,11 @@ impl Blocks {
         connected_peers: HashMap<SocketAddr, PeerInfo>,
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&transaction.bytes[..]) {
-            let mut memory_pool = self.environment.memory_pool().lock().await;
             let parameters = self.environment.dpc_parameters();
             let storage = self.environment.storage();
             let consensus = self.environment.consensus_parameters();
 
-            if !consensus.verify_transaction(parameters, &tx, &*storage.read().await)? {
+            if !consensus.verify_transaction(parameters, &tx, &*storage.read().unwrap())? {
                 error!("Received a transaction that was invalid");
                 return Ok(());
             }
@@ -154,7 +144,14 @@ impl Blocks {
                 transaction: tx,
             };
 
-            if let Ok(inserted) = memory_pool.insert(&*storage.read().await, entry) {
+            let insertion = self
+                .environment
+                .memory_pool()
+                .lock()
+                .unwrap()
+                .insert(&storage.read().unwrap(), entry);
+
+            if let Ok(inserted) = insertion {
                 if inserted.is_some() {
                     info!("Transaction added to memory pool.");
                     self.propagate_transaction(transaction.bytes, source, &connected_peers)
@@ -184,8 +181,9 @@ impl Blocks {
         // Verify the block and insert it into the storage.
         if !self
             .environment
-            .storage_read()
-            .await
+            .storage()
+            .read()
+            .unwrap()
             .block_hash_exists(&block_struct.header.get_hash())
         {
             let is_new_block = self
@@ -193,8 +191,8 @@ impl Blocks {
                 .consensus_parameters()
                 .receive_block(
                     self.environment.dpc_parameters(),
-                    &*self.environment.storage_read().await,
-                    &mut *self.environment.memory_pool().lock().await,
+                    &self.environment.storage().read().unwrap(),
+                    &mut self.environment.memory_pool().lock().unwrap(),
                     &block_struct,
                 )
                 .is_ok();
@@ -228,7 +226,14 @@ impl Blocks {
         remote_address: SocketAddr,
         message: GetBlock,
     ) -> Result<(), NetworkError> {
-        if let Ok(block) = self.environment.storage_read().await.get_block(&message.block_hash) {
+        let block = self
+            .environment
+            .storage()
+            .read()
+            .unwrap()
+            .get_block(&message.block_hash);
+
+        if let Ok(block) = block {
             // Broadcast a `SyncBlock` message to the connected peer.
             self.outbound
                 .broadcast(&Request::SyncBlock(remote_address, SyncBlock::new(block.serialize()?)))
@@ -240,13 +245,18 @@ impl Blocks {
     /// A peer has requested our memory pool transactions.
     pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // TODO (howardwu): This should have been written with Rayon - it is easily parallelizable.
-        let mut transactions = vec![];
-        let memory_pool = self.environment.memory_pool().lock().await;
-        for (_tx_id, entry) in &memory_pool.transactions {
-            if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
-                transactions.push(transaction_bytes);
+        let transactions = {
+            let mut txs = vec![];
+
+            let memory_pool = self.environment.memory_pool().lock().unwrap();
+            for (_tx_id, entry) in &memory_pool.transactions {
+                if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
+                    txs.push(transaction_bytes);
+                }
             }
-        }
+
+            txs
+        };
 
         if !transactions.is_empty() {
             // Broadcast a `MemoryPool` message to the connected peer.
@@ -260,7 +270,7 @@ impl Blocks {
 
     /// A peer has sent us their memory pool transactions.
     pub(crate) async fn received_memory_pool(&self, message: MemoryPool) -> Result<(), NetworkError> {
-        let mut memory_pool = self.environment.memory_pool().lock().await;
+        let mut memory_pool = self.environment.memory_pool().lock().unwrap();
 
         for transaction_bytes in message.transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;
@@ -269,7 +279,7 @@ impl Blocks {
                 transaction,
             };
 
-            if let Ok(inserted) = memory_pool.insert(&*self.environment.storage_read().await, entry) {
+            if let Ok(inserted) = memory_pool.insert(&*self.environment.storage().read().unwrap(), entry) {
                 if let Some(txid) = inserted {
                     debug!(
                         "Transaction added to memory pool with txid: {:?}",
@@ -290,15 +300,17 @@ impl Blocks {
     ) -> Result<(), NetworkError> {
         let latest_shared_hash = self
             .environment
-            .storage_read()
-            .await
+            .storage()
+            .read()
+            .unwrap()
             .get_latest_shared_hash(message.block_locator_hashes)?;
-        let current_height = self.environment.storage_read().await.get_current_block_height();
+        let current_height = self.environment.storage().read().unwrap().get_current_block_height();
 
         let sync = if let Ok(height) = self
             .environment
-            .storage_read()
-            .await
+            .storage()
+            .read()
+            .unwrap()
             .get_block_number(&latest_shared_hash)
         {
             if height < current_height {
@@ -313,7 +325,7 @@ impl Blocks {
                 let mut block_hashes: Vec<BlockHeaderHash> = vec![];
 
                 for block_num in height + 1..=max_height {
-                    block_hashes.push(self.environment.storage_read().await.get_block_hash(block_num)?);
+                    block_hashes.push(self.environment.storage().read().unwrap().get_block_hash(block_num)?);
                 }
 
                 // send block hashes to requester
@@ -333,7 +345,7 @@ impl Blocks {
 
     /// A peer has sent us their chain state.
     pub(crate) async fn received_sync(&self, message: Sync) -> Result<(), NetworkError> {
-        let height = self.environment.storage_read().await.get_current_block_height();
+        let height = self.environment.storage().read().unwrap().get_current_block_height();
 
         /* TODO: implement
         sync_handler.receive_hashes(message.block_hashes, height);

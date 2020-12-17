@@ -2896,6 +2896,7 @@ dependencies = [
  "snarkos-network",
  "snarkos-objects",
  "snarkos-posw",
+ "snarkos-rpc",
  "snarkos-storage",
  "snarkos-utilities",
  "tokio 0.3.2",
@@ -3258,7 +3259,8 @@ dependencies = [
  "snarkos-storage",
  "snarkos-testing",
  "snarkos-utilities",
- "tokio 0.2.22",
+ "tokio 0.3.2",
+ "tracing",
 ]
 
 [[package]]

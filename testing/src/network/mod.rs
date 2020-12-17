@@ -22,11 +22,11 @@ use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{environment::Environment, external::Channel, Server};
 
-use std::{net::SocketAddr, sync::Arc};
-use tokio::{
-    net::TcpListener,
-    sync::{Mutex, RwLock},
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex, RwLock},
 };
+use tokio::net::TcpListener;
 
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
@@ -40,10 +40,9 @@ pub async fn sleep(time: u64) {
 /// Returns an `Environment` struct with given arguments
 pub fn initialize_test_environment(
     server_address: Option<SocketAddr>,
-    bootnode_address: SocketAddr,
+    bootnodes: Vec<String>,
     storage: Arc<RwLock<MerkleTreeLedger>>,
     parameters: PublicParameters<Components>,
-    connection_frequency: u64,
 ) -> anyhow::Result<Environment> {
     let consensus = Arc::new(TEST_CONSENSUS.clone());
     let memory_pool = MemoryPool::new();
@@ -59,7 +58,7 @@ pub fn initialize_test_environment(
         5,
         100,
         10,
-        vec![],
+        bootnodes,
         true,
         false,
     )?)
@@ -68,19 +67,11 @@ pub fn initialize_test_environment(
 /// Returns a server struct with given arguments
 pub async fn initialize_test_server(
     server_address: Option<SocketAddr>,
-    bootnode_address: SocketAddr,
+    bootnodes: Vec<String>,
     storage: Arc<RwLock<MerkleTreeLedger>>,
     parameters: PublicParameters<Components>,
-    connection_frequency: u64,
 ) -> Server {
-    let mut environment = initialize_test_environment(
-        server_address,
-        bootnode_address,
-        storage,
-        parameters,
-        connection_frequency,
-    )
-    .unwrap();
+    let environment = initialize_test_environment(server_address, bootnodes, storage, parameters).unwrap();
 
     // let sync_handler = SyncManager::new(bootnode_address);
     // let sync_handler_lock = Arc::new(Mutex::new(sync_handler));

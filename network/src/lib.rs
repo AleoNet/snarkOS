@@ -60,15 +60,14 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Response>;
 #[derive(Clone)]
 pub struct Server {
     /// The parameters and settings of this node server.
-    environment: Environment,
+    pub environment: Environment,
     /// The inbound handler of this node server.
     inbound: Arc<Inbound>,
     /// The outbound handler of this node server.
     outbound: Arc<Outbound>,
 
-    peers: Peers,
+    pub peers: Peers,
     blocks: Blocks,
-    // sync_manager: Arc<Mutex<SyncManager>>,
 }
 
 impl Server {
@@ -162,14 +161,14 @@ impl Server {
                 self.peers.verack(&remote_address, &verack).await?;
             }
             Response::Transaction(source, transaction) => {
-                let connected_peers = self.peers.connected_peers().await;
+                let connected_peers = self.peers.connected_peers();
                 self.blocks
                     .received_transaction(source, transaction, connected_peers)
                     .await?;
             }
             Response::Block(remote_address, block, propagate) => {
                 let connected_peers = match propagate {
-                    true => Some(self.peers.connected_peers().await),
+                    true => Some(self.peers.connected_peers()),
                     false => None,
                 };
                 self.blocks
@@ -188,7 +187,7 @@ impl Server {
             Response::GetSync(remote_address, getsync) => {
                 self.blocks.received_get_sync(remote_address, getsync).await?;
             }
-            Response::Sync(remote_address, sync) => {
+            Response::Sync(_remote_address, sync) => {
                 self.blocks.received_sync(sync).await?;
             }
             Response::DisconnectFrom(remote_address) => {
@@ -232,13 +231,15 @@ mod tests {
         dpc::load_verifying_parameters,
     };
 
-    use std::{sync::Arc, time::Duration};
+    use std::{
+        sync::{Arc, Mutex, RwLock},
+        time::Duration,
+    };
 
     use chrono::{DateTime, Utc};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
-        sync::{Mutex, RwLock},
     };
 
     async fn test_node(bootnodes: Vec<String>) -> Server {
@@ -289,7 +290,7 @@ mod tests {
         let mut server = test_node(vec![]).await;
 
         assert!(server.start().await.is_ok());
-        assert_eq!(server.peers.number_of_connected_peers().await, 0);
+        assert_eq!(server.peers.number_of_connected_peers(), 0);
     }
 
     #[tokio::test]
@@ -331,7 +332,7 @@ mod tests {
         // the node should now have register the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connected(&peer_address).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 1);
+        assert_eq!(node.peers.number_of_connected_peers(), 1);
     }
 
     #[tokio::test]
@@ -366,7 +367,7 @@ mod tests {
         // the node should now have registered the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connected(&peer_address).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 1);
+        assert_eq!(node.peers.number_of_connected_peers(), 1);
     }
 
     async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream) {
@@ -383,7 +384,7 @@ mod tests {
 
         // check the node's state hasn't been altered by the message
         assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
-        assert_eq!(node.peers.number_of_connected_peers().await, 0);
+        assert_eq!(node.peers.number_of_connected_peers(), 0);
     }
 
     #[tokio::test]

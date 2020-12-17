@@ -29,9 +29,13 @@ use crate::{
     Outbound,
 };
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+};
 
-use tokio::{net::TcpStream, sync::RwLock};
+use tokio::net::TcpStream;
 
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
@@ -85,7 +89,7 @@ impl Peers {
     #[inline]
     pub async fn update(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
-        let number_of_connected_peers = self.number_of_connected_peers().await;
+        let number_of_connected_peers = self.number_of_connected_peers();
         trace!(
             "Connected to {} peer{}",
             number_of_connected_peers,
@@ -140,7 +144,7 @@ impl Peers {
     #[inline]
     pub async fn is_connecting(&self, address: &SocketAddr) -> bool {
         // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
+        let peer_book = self.peer_book.read().unwrap();
         // Fetch if the given address is connecting in the peer book.
         peer_book.is_connecting(address)
     }
@@ -151,7 +155,7 @@ impl Peers {
     #[inline]
     pub async fn is_connected(&self, address: &SocketAddr) -> bool {
         // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
+        let peer_book = self.peer_book.read().unwrap();
         // Fetch if the given address is connected in the peer book.
         peer_book.is_connected(address)
     }
@@ -162,7 +166,7 @@ impl Peers {
     #[inline]
     pub async fn is_disconnected(&self, address: &SocketAddr) -> bool {
         // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
+        let peer_book = self.peer_book.read().unwrap();
         // Fetch if the given address is disconnected in the peer book.
         peer_book.is_disconnected(address)
     }
@@ -171,9 +175,9 @@ impl Peers {
     /// Returns the number of peers connected to this node.
     ///
     #[inline]
-    pub async fn number_of_connected_peers(&self) -> u16 {
+    pub fn number_of_connected_peers(&self) -> u16 {
         // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
+        let peer_book = self.peer_book.read().unwrap();
         // Fetch the number of connected peers.
         peer_book.number_of_connected_peers()
     }
@@ -182,9 +186,9 @@ impl Peers {
     /// Returns a map of all connected peers with their peer-specific information.
     ///
     #[inline]
-    pub async fn connected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
+    pub fn connected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
         // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
+        let peer_book = self.peer_book.read().unwrap();
         // Fetch the connected peers of this node.
         peer_book.connected_peers().clone()
     }
@@ -195,7 +199,7 @@ impl Peers {
     #[inline]
     pub async fn disconnected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
         // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
+        let peer_book = self.peer_book.read().unwrap();
         // Fetch the disconnected peers of this node.
         peer_book.disconnected_peers().clone()
     }
@@ -206,7 +210,7 @@ impl Peers {
     #[inline]
     pub async fn add_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
+        let mut peer_book = self.peer_book.write().unwrap();
         // Add the given address to the peer book.
         peer_book.add_peer(address)
     }
@@ -231,7 +235,7 @@ impl Peers {
     #[inline]
     async fn nonce(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
         // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().await;
+        let peer_book = self.peer_book.read().unwrap();
         // Fetch the handshake nonce of connected peer.
         peer_book.handshake_nonce(remote_address)
     }
@@ -309,7 +313,7 @@ impl Peers {
         trace!("Connecting to default bootnodes");
 
         // Fetch the current connected peers of this node.
-        let connected_peers = self.connected_peers().await;
+        let connected_peers = self.connected_peers();
 
         // Iterate through each bootnode address and attempt a connection request.
         for bootnode_address in self
@@ -347,7 +351,7 @@ impl Peers {
 
         // Broadcast a `Version` message to each connected peer of this node server.
         trace!("Broadcasting Version messages");
-        for (remote_address, _) in self.connected_peers().await {
+        for (remote_address, _) in self.connected_peers() {
             // Get the handshake nonce.
             if let Ok(nonce) = self.nonce(&remote_address).await {
                 // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
@@ -380,7 +384,7 @@ impl Peers {
     async fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
         trace!("Sending GetPeers requests to connected peers");
 
-        for (remote_address, _) in self.connected_peers().await {
+        for (remote_address, _) in self.connected_peers() {
             self.outbound
                 .broadcast(&Request::GetPeers(remote_address, GetPeers))
                 .await;
@@ -411,10 +415,11 @@ impl Peers {
     ///
     #[inline]
     async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let peer_book = self.peer_book.write().await;
         // Acquire the storage write lock.
-        let storage = self.environment.storage_mut().await;
+        let storage = self.environment.storage().write().unwrap();
+
+        // Acquire the peer book write lock.
+        let peer_book = self.peer_book.write().unwrap();
 
         // Serialize the peer book.
         let serialized_peer_book = bincode::serialize(&*peer_book)?;
@@ -436,7 +441,7 @@ impl Peers {
         self.outbound.initialize_state(remote_address).await;
 
         // Set the peer as connecting with this node server.
-        self.peer_book.write().await.set_connecting(&remote_address, nonce)
+        self.peer_book.write().unwrap().set_connecting(&remote_address, nonce)
     }
 
     ///
@@ -446,7 +451,7 @@ impl Peers {
     pub(crate) async fn connected_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         debug!("Connected to {}", remote_address);
         // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
+        let mut peer_book = self.peer_book.write().unwrap();
         // Set the peer as connected with this node server.
         peer_book.set_connected(remote_address, nonce)
     }
@@ -458,7 +463,7 @@ impl Peers {
     #[inline]
     pub(crate) async fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
         // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().await;
+        let mut peer_book = self.peer_book.write().unwrap();
         // Set the peer as disconnected with this node server.
         peer_book.set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
@@ -470,7 +475,7 @@ impl Peers {
         remote_address: SocketAddr,
         remote_version: &Version,
     ) -> Result<(), NetworkError> {
-        if self.number_of_connected_peers().await < self.environment.maximum_number_of_connected_peers() {
+        if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
             self.outbound
                 .broadcast(&Request::Verack(Verack::new(
                     remote_version.nonce,
@@ -479,7 +484,7 @@ impl Peers {
                 )))
                 .await;
 
-            if !self.connected_peers().await.contains_key(&remote_address) {
+            if !self.connected_peers().contains_key(&remote_address) {
                 self.connecting_to_peer(remote_address, remote_version.nonce).await?;
             }
         }
@@ -501,7 +506,7 @@ impl Peers {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
-        for (peer_address, peer_info) in self.connected_peers().await {
+        for (peer_address, peer_info) in self.connected_peers() {
             // Skip the iteration if the requesting peer that we're sending the response to
             // appears in the list of peers.
             if peer_address == remote_address {
