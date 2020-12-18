@@ -58,6 +58,7 @@ impl MinerInstance {
             let local_address = self.environment.local_address().unwrap();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
             let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
+            info!("Miner instantiated; starting to mine blocks");
 
             let mut mining_failure_count = 0;
             let mining_failure_threshold = 10;

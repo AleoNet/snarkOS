@@ -270,7 +270,7 @@ impl RpcFunctions for RpcImpl {
             return Ok("Transaction did not verify".into());
         }
 
-        match !storage.transcation_conflicts(&transaction) {
+        match !storage.transaction_conflicts(&transaction) {
             true => {
                 let mut memory_pool = self.memory_pool.lock().unwrap();
                 let storage = self.storage.read().unwrap();

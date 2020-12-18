@@ -143,7 +143,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let mut server = Server::new(environment.clone()).await?;
 
     // Start the main server thread.
-    server.start().instrument(debug_span!("server")).await?;
+    server.start().await?;
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {

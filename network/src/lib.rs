@@ -108,6 +108,7 @@ impl Server {
         let blocks = self.blocks.clone();
         task::spawn(async move {
             loop {
+                sleep(Duration::from_secs(10)).await;
                 info!("Updating peers and blocks");
                 if let Err(e) = peers.update().await {
                     error!("Peer update error: {}", e);
@@ -115,7 +116,6 @@ impl Server {
                 if let Err(e) = blocks.update().await {
                     error!("Block update error: {}", e);
                 }
-                sleep(Duration::from_secs(10)).await;
             }
         });
 

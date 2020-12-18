@@ -216,9 +216,9 @@ impl<T: Transaction> MemoryPool<T> {
         let mut transactions = DPCTransactions::new();
 
         // TODO Change naive transaction selection
-        for (_transaction_id, entry) in self.transactions.clone() {
+        for (_transaction_id, entry) in self.transactions.iter() {
             if block_size + entry.size_in_bytes <= max_size {
-                if storage.transcation_conflicts(&entry.transaction) || transactions.conflicts(&entry.transaction) {
+                if storage.transaction_conflicts(&entry.transaction) || transactions.conflicts(&entry.transaction) {
                     continue;
                 }
 

@@ -56,12 +56,12 @@ impl Miner {
 
     /// Fetches new transactions from the memory pool.
     pub async fn fetch_memory_pool_transactions<T: Transaction, P: LoadableMerkleParameters>(
-        storage: &Arc<RwLock<Ledger<T, P>>>,
-        memory_pool: &Arc<Mutex<MemoryPool<T>>>,
+        storage: &RwLock<Ledger<T, P>>,
+        memory_pool: &Mutex<MemoryPool<T>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
         let memory_pool = memory_pool.lock().unwrap();
-        Ok(memory_pool.get_candidates(&*storage.read().unwrap(), max_size)?)
+        Ok(memory_pool.get_candidates(&storage.read().unwrap(), max_size)?)
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
