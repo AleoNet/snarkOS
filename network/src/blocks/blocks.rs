@@ -40,7 +40,7 @@ impl Blocks {
     ///
     #[inline]
     pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
-        trace!("Instantiating block service");
+        trace!("Instantiating the block service");
         Ok(Self { environment, outbound })
     }
 

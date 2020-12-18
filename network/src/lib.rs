@@ -91,19 +91,18 @@ impl Server {
         })
     }
 
-    #[inline]
-    pub async fn start(&mut self) -> Result<(), NetworkError> {
-        debug!("Initializing server");
+    pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
         self.inbound.listen(&mut self.environment).await?;
+        let address = self.environment.local_address().unwrap();
 
         // update the local address for Blocks and Peers
-        self.peers
-            .environment
-            .set_local_address(self.environment.local_address().unwrap());
-        self.blocks
-            .environment
-            .set_local_address(self.environment.local_address().unwrap());
+        self.peers.environment.set_local_address(address);
+        self.blocks.environment.set_local_address(address);
 
+        Ok(())
+    }
+
+    pub async fn start_services(&self) -> Result<(), NetworkError> {
         let peers = self.peers.clone();
         let blocks = self.blocks.clone();
         task::spawn(async move {
@@ -119,16 +118,24 @@ impl Server {
             }
         });
 
-        let server_clone = self.clone();
+        let server = self.clone();
         task::spawn(async move {
             loop {
-                if let Err(e) = server_clone.receive_response().await {
+                if let Err(e) = server.receive_response().await {
                     error!("Server error: {}", e);
                 }
             }
         });
 
-        debug!("Initialized server");
+        Ok(())
+    }
+
+    pub async fn start(&mut self) -> Result<(), NetworkError> {
+        debug!("Initializing the connection server");
+        self.establish_address().await?;
+        self.start_services().await?;
+        debug!("Connection server initialized");
+
         Ok(())
     }
 
@@ -288,8 +295,10 @@ mod tests {
     #[tokio::test]
     async fn starts_server() {
         let mut server = test_node(vec![]).await;
-
         assert!(server.start().await.is_ok());
+        let address = server.local_address().unwrap();
+
+        assert!(TcpListener::bind(address).await.is_err());
         assert_eq!(server.peers.number_of_connected_peers(), 0);
     }
 

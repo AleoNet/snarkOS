@@ -142,8 +142,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // before any other object (miner, RPC) needs to use it.
     let mut server = Server::new(environment.clone()).await?;
 
-    // Start the main server thread.
-    server.start().await?;
+    // Establish the address of the server.
+    server.establish_address().await?;
+    environment.set_local_address(server.local_address().unwrap());
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {
@@ -163,8 +164,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             ),
         }
     }
-
-    environment.set_local_address(server.local_address().unwrap());
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
@@ -189,6 +188,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         )
         .await;
     }
+
+    // Start the server
+    server.start_services().await?;
 
     stream::pending::<()>().next().await;
 

@@ -56,7 +56,7 @@ impl Peers {
     ///
     #[inline]
     pub fn new(environment: Environment, inbound: Arc<Inbound>, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
-        trace!("Instantiating peer manager");
+        trace!("Instantiating the peer manager");
 
         // Load the peer book from storage, or create a new peer book.
         let peer_book = PeerBook::default();
@@ -79,7 +79,6 @@ impl Peers {
         // Save the peer book to storage.
         // peers.save_peer_book_to_storage().await?;
 
-        trace!("Instantiated peer manager");
         Ok(peers)
     }
 
