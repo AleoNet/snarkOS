@@ -21,6 +21,7 @@ use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
     display::render_welcome,
+    miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
@@ -34,6 +35,7 @@ use snarkos_utilities::{to_bytes, ToBytes};
 
 use std::{
     net::SocketAddr,
+    str::FromStr,
     sync::{Arc, Mutex, RwLock},
 };
 use tokio::{
@@ -135,45 +137,32 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.miner.is_miner,
     )?;
 
-    // let mut environment = Arc::new(Environment::new(
-    //     socket_address,
-    //     config.p2p.mempool_interval,
-    //     config.p2p.min_peers,
-    //     config.p2p.max_peers,
-    //     config.node.is_bootnode,
-    //     config.p2p.bootnodes.clone(),
-    //     false,
-    // ));
-
-    // Start the miner task, if the mining configuration is enabled.
-    // if config.miner.is_miner {
-    //     match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
-    //         Ok(miner_address) => {
-    //             if let Some(mutable_context) = Arc::get_mut(&mut environment) {
-    //                 mutable_context.is_miner = true;
-    //             }
-    //
-    //             MinerInstance::new(
-    //                 miner_address,
-    //                 consensus.clone(),
-    //                 parameters.clone(),
-    //                 storage.clone(),
-    //                 memory_pool_lock.clone(),
-    //                 environment.clone(),
-    //             )
-    //             .spawn();
-    //         }
-    //         Err(_) => info!(
-    //             "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
-    //         ),
-    //     }
-    // }
-
     // Construct the server instance. Note this does not start the server.
+    // This is done early on, so that the local address can be discovered
+    // before any other object (miner, RPC) needs to use it.
     let mut server = Server::new(environment.clone()).await?;
 
     // Start the main server thread.
     server.start().instrument(debug_span!("server")).await?;
+
+    // Start the miner task if mining configuration is enabled.
+    if config.miner.is_miner {
+        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+            Ok(miner_address) => {
+                MinerInstance::new(
+                    miner_address,
+                    consensus.clone(),
+                    parameters.clone(),
+                    environment.clone(),
+                    server.clone(),
+                )
+                .spawn();
+            }
+            Err(_) => info!(
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
+            ),
+        }
+    }
 
     environment.set_local_address(server.local_address().unwrap());
 

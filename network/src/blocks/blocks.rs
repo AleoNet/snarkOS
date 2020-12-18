@@ -70,7 +70,7 @@ impl Blocks {
     }
 
     /// Broadcast block to connected peers
-    pub(crate) async fn propagate_block(
+    pub async fn propagate_block(
         &self,
         block_bytes: Vec<u8>,
         block_miner: SocketAddr,

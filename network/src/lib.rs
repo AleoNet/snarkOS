@@ -67,7 +67,7 @@ pub struct Server {
     outbound: Arc<Outbound>,
 
     pub peers: Peers,
-    blocks: Blocks,
+    pub blocks: Blocks,
 }
 
 impl Server {
