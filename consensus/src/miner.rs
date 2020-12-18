@@ -28,8 +28,9 @@ use snarkos_storage::Ledger;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
+use parking_lot::{Mutex, RwLock};
 use rand::{thread_rng, Rng};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.
@@ -60,8 +61,8 @@ impl Miner {
         memory_pool: &Mutex<MemoryPool<T>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
-        let memory_pool = memory_pool.lock().unwrap();
-        Ok(memory_pool.get_candidates(&storage.read().unwrap(), max_size)?)
+        let memory_pool = memory_pool.lock();
+        Ok(memory_pool.get_candidates(&storage.read(), max_size)?)
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
@@ -179,7 +180,7 @@ impl Miner {
         println!("Miner creating block");
 
         let (previous_block_header, transactions, coinbase_records) =
-            self.establish_block(parameters, &storage.read().unwrap(), &candidate_transactions)?;
+            self.establish_block(parameters, &storage.read(), &candidate_transactions)?;
 
         println!("Miner generated coinbase transaction");
 
@@ -194,10 +195,8 @@ impl Miner {
 
         let block = Block { header, transactions };
 
-        let mut memory_pool = memory_pool.lock().unwrap();
-
         self.consensus_parameters
-            .receive_block(parameters, &storage.read().unwrap(), &mut memory_pool, &block)?;
+            .receive_block(parameters, &storage.read(), &mut memory_pool.lock(), &block)?;
 
         // Store the non-dummy coinbase records.
         let mut records_to_store = vec![];
@@ -206,7 +205,7 @@ impl Miner {
                 records_to_store.push(record.clone());
             }
         }
-        storage.read().unwrap().store_records(&records_to_store)?;
+        storage.read().store_records(&records_to_store)?;
 
         Ok((block.serialize()?, coinbase_records))
     }

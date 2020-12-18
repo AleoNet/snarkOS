@@ -29,12 +29,9 @@ use crate::{
     Outbound,
 };
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
+use parking_lot::RwLock;
 use tokio::net::TcpStream;
 
 /// A stateful component for managing the peer connections of this node server.
@@ -141,33 +138,24 @@ impl Peers {
     /// Returns `true` if the given address is connecting with this node.
     ///
     #[inline]
-    pub async fn is_connecting(&self, address: &SocketAddr) -> bool {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().unwrap();
-        // Fetch if the given address is connecting in the peer book.
-        peer_book.is_connecting(address)
+    pub fn is_connecting(&self, address: &SocketAddr) -> bool {
+        self.peer_book.read().is_connecting(address)
     }
 
     ///
     /// Returns `true` if the given address is connected with this node.
     ///
     #[inline]
-    pub async fn is_connected(&self, address: &SocketAddr) -> bool {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().unwrap();
-        // Fetch if the given address is connected in the peer book.
-        peer_book.is_connected(address)
+    pub fn is_connected(&self, address: &SocketAddr) -> bool {
+        self.peer_book.read().is_connected(address)
     }
 
     ///
     /// Returns `true` if the given address is a disconnected peer of this node.
     ///
     #[inline]
-    pub async fn is_disconnected(&self, address: &SocketAddr) -> bool {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().unwrap();
-        // Fetch if the given address is disconnected in the peer book.
-        peer_book.is_disconnected(address)
+    pub fn is_disconnected(&self, address: &SocketAddr) -> bool {
+        self.peer_book.read().is_disconnected(address)
     }
 
     ///
@@ -175,10 +163,7 @@ impl Peers {
     ///
     #[inline]
     pub fn number_of_connected_peers(&self) -> u16 {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().unwrap();
-        // Fetch the number of connected peers.
-        peer_book.number_of_connected_peers()
+        self.peer_book.read().number_of_connected_peers()
     }
 
     ///
@@ -186,32 +171,23 @@ impl Peers {
     ///
     #[inline]
     pub fn connected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().unwrap();
-        // Fetch the connected peers of this node.
-        peer_book.connected_peers().clone()
+        self.peer_book.read().connected_peers().clone()
     }
 
     ///
     /// Returns a map of all disconnected peers with their peer-specific information.
     ///
     #[inline]
-    pub async fn disconnected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().unwrap();
-        // Fetch the disconnected peers of this node.
-        peer_book.disconnected_peers().clone()
+    pub fn disconnected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
+        self.peer_book.read().disconnected_peers().clone()
     }
 
     ///
     /// Adds the given address to the disconnected peers in this peer book.
     ///
     #[inline]
-    pub async fn add_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().unwrap();
-        // Add the given address to the peer book.
-        peer_book.add_peer(address)
+    pub fn add_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
+        self.peer_book.write().add_peer(address)
     }
 
     ///
@@ -232,11 +208,8 @@ impl Peers {
     /// Returns the current handshake nonce for the given connected peer.
     ///
     #[inline]
-    async fn nonce(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
-        // Acquire a peer book read lock.
-        let peer_book = self.peer_book.read().unwrap();
-        // Fetch the handshake nonce of connected peer.
-        peer_book.handshake_nonce(remote_address)
+    fn nonce(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
+        self.peer_book.read().handshake_nonce(remote_address)
     }
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
@@ -244,10 +217,10 @@ impl Peers {
         if remote_address == own_address {
             return Err(NetworkError::SelfConnectAttempt);
         }
-        if self.is_connecting(&remote_address).await {
+        if self.is_connecting(&remote_address) {
             return Err(NetworkError::PeerAlreadyConnecting);
         }
-        if self.is_connected(&remote_address).await {
+        if self.is_connected(&remote_address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
@@ -287,7 +260,7 @@ impl Peers {
                 });
 
                 // save the outbound channel
-                self.outbound.channels.write().await.insert(remote_address, channel);
+                self.outbound.channels.write().insert(remote_address, channel);
 
                 self.connected_to_peer(remote_address, version.nonce).await
             } else {
@@ -333,7 +306,7 @@ impl Peers {
         trace!("Connecting to disconnected peers");
 
         // Iterate through each connected peer and attempts a connection request.
-        for (remote_address, _) in self.disconnected_peers().await {
+        for (remote_address, _) in self.disconnected_peers() {
             self.initiate_connection(remote_address).await?;
         }
 
@@ -352,7 +325,7 @@ impl Peers {
         trace!("Broadcasting Version messages");
         for (remote_address, _) in self.connected_peers() {
             // Get the handshake nonce.
-            if let Ok(nonce) = self.nonce(&remote_address).await {
+            if let Ok(nonce) = self.nonce(&remote_address) {
                 // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
 
                 // TODO (raychu86): Establish a formal node version.
@@ -414,17 +387,14 @@ impl Peers {
     ///
     #[inline]
     async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
-        // Acquire the storage write lock.
-        let storage = self.environment.storage().write().unwrap();
-
-        // Acquire the peer book write lock.
-        let peer_book = self.peer_book.write().unwrap();
-
         // Serialize the peer book.
-        let serialized_peer_book = bincode::serialize(&*peer_book)?;
+        let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
         // Save the serialized peer book to storage.
-        storage.save_peer_book_to_storage(serialized_peer_book)?;
+        self.environment
+            .storage()
+            .write()
+            .save_peer_book_to_storage(serialized_peer_book)?;
 
         Ok(())
     }
@@ -436,11 +406,11 @@ impl Peers {
     ///
     #[inline]
     pub(crate) async fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        // Initialize the peer's outbound channel and state
+        // Initialize the peer's outbound state
         self.outbound.initialize_state(remote_address).await;
 
         // Set the peer as connecting with this node server.
-        self.peer_book.write().unwrap().set_connecting(&remote_address, nonce)
+        self.peer_book.write().set_connecting(&remote_address, nonce)
     }
 
     ///
@@ -448,11 +418,7 @@ impl Peers {
     ///
     #[inline]
     pub(crate) async fn connected_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        debug!("Connected to {}", remote_address);
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().unwrap();
-        // Set the peer as connected with this node server.
-        peer_book.set_connected(remote_address, nonce)
+        self.peer_book.write().set_connected(remote_address, nonce)
     }
 
     /// TODO (howardwu): Add logic to remove the active channels
@@ -461,10 +427,7 @@ impl Peers {
     ///
     #[inline]
     pub(crate) async fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
-        // Acquire the peer book write lock.
-        let mut peer_book = self.peer_book.write().unwrap();
-        // Set the peer as disconnected with this node server.
-        peer_book.set_disconnected(remote_address)
+        self.peer_book.write().set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
@@ -524,7 +487,7 @@ impl Peers {
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
     #[inline]
-    pub(crate) async fn process_inbound_peers(&self, peers: PeersMessage) -> Result<(), NetworkError> {
+    pub(crate) fn process_inbound_peers(&self, peers: PeersMessage) -> Result<(), NetworkError> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
@@ -539,8 +502,8 @@ impl Peers {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            if !self.is_connecting(peer_address).await && !self.is_connected(peer_address).await {
-                self.add_peer(peer_address).await?;
+            if !self.is_connecting(peer_address) && !self.is_connected(peer_address) {
+                self.add_peer(peer_address)?;
             }
         }
 

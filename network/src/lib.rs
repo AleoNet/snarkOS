@@ -49,8 +49,9 @@ pub use peers::*;
 
 use crate::{external::Channel, peers::peers::Peers};
 
+use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{sync::RwLock, task, time::sleep};
+use tokio::{task, time::sleep};
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Response>;
 
@@ -189,7 +190,7 @@ impl Server {
                 self.blocks.received_get_memory_pool(remote_address).await?;
             }
             Response::MemoryPool(mempool) => {
-                self.blocks.received_memory_pool(mempool).await?;
+                self.blocks.received_memory_pool(mempool)?;
             }
             Response::GetSync(remote_address, getsync) => {
                 self.blocks.received_get_sync(remote_address, getsync).await?;
@@ -204,7 +205,7 @@ impl Server {
                 self.peers.send_get_peers(remote_address).await?;
             }
             Response::Peers(_, peers) => {
-                self.peers.process_inbound_peers(peers).await?;
+                self.peers.process_inbound_peers(peers)?;
             }
         }
 
@@ -238,12 +239,10 @@ mod tests {
         dpc::load_verifying_parameters,
     };
 
-    use std::{
-        sync::{Arc, Mutex, RwLock},
-        time::Duration,
-    };
+    use std::{sync::Arc, time::Duration};
 
     use chrono::{DateTime, Utc};
+    use parking_lot::{Mutex, RwLock};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
@@ -322,7 +321,7 @@ mod tests {
 
         // at this point the node should have marked the peer as 'connecting'
         sleep(Duration::from_millis(200)).await;
-        assert!(node.peers.is_connecting(&peer_address).await);
+        assert!(node.peers.is_connecting(&peer_address));
 
         // check if the peer has received the Verack message from the node
         let header = read_header(&mut peer_stream).await.unwrap();
@@ -340,7 +339,7 @@ mod tests {
 
         // the node should now have register the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
-        assert!(node.peers.is_connected(&peer_address).await);
+        assert!(node.peers.is_connected(&peer_address));
         assert_eq!(node.peers.number_of_connected_peers(), 1);
     }
 
@@ -363,7 +362,7 @@ mod tests {
         let version = Version::deserialize(&message).unwrap();
 
         // at this point the node should have marked the peer as 'connecting'
-        assert!(node.peers.is_connecting(&peer_address).await);
+        assert!(node.peers.is_connecting(&peer_address));
 
         // the peer responds with a Verack acknowledging the Version message
         let verack = Verack::new(version.nonce, peer_address, node_address);
@@ -375,7 +374,7 @@ mod tests {
 
         // the node should now have registered the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
-        assert!(node.peers.is_connected(&peer_address).await);
+        assert!(node.peers.is_connected(&peer_address));
         assert_eq!(node.peers.number_of_connected_peers(), 1);
     }
 
@@ -392,7 +391,7 @@ mod tests {
         assert!(buffer.is_empty());
 
         // check the node's state hasn't been altered by the message
-        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()).await);
+        assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()));
         assert_eq!(node.peers.number_of_connected_peers(), 0);
     }
 

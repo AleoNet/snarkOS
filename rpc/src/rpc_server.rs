@@ -29,11 +29,9 @@ use snarkos_dpc::base_dpc::{
 use snarkos_network::{Environment, Server as NodeServer};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
-use std::{
-    net::SocketAddr,
-    path::PathBuf,
-    sync::{Arc, Mutex, RwLock},
-};
+use parking_lot::{Mutex, RwLock};
+
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.

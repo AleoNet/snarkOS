@@ -25,7 +25,9 @@ use std::{
         Arc,
     },
 };
-use tokio::{sync::RwLock, task, task::JoinHandle};
+
+use parking_lot::RwLock;
+use tokio::{task, task::JoinHandle};
 
 /// The map of remote addresses to their active write channels.
 type Channels = HashMap<SocketAddr, Channel>;
@@ -78,11 +80,9 @@ impl Outbound {
     /// Returns `true` if the given request is a pending request.
     ///
     #[inline]
-    pub async fn is_pending(&self, request: &Request) -> bool {
-        // Acquire the pending read lock.
-        let pending = self.pending.read().await;
+    pub fn is_pending(&self, request: &Request) -> bool {
         // Fetch the pending requests of the given receiver.
-        match pending.get(&request.receiver()) {
+        match self.pending.read().get(&request.receiver()) {
             // Check if the set of pending requests contains the given request.
             Some(requests) => requests.contains(&request),
             // Return `false` as the receiver does not exist in this map.
@@ -94,11 +94,9 @@ impl Outbound {
     /// Returns `true` if the given request was a successful request.
     ///
     #[inline]
-    pub async fn is_success(&self, request: &Request) -> bool {
-        // Acquire the success read lock.
-        let success = self.success.read().await;
+    pub fn is_success(&self, request: &Request) -> bool {
         // Fetch the successful requests of the given receiver.
-        match success.get(&request.receiver()) {
+        match self.success.read().get(&request.receiver()) {
             // Check if the set of successful requests contains the given request.
             Some(requests) => requests.contains(&request),
             // Return `false` as the receiver does not exist in this map.
@@ -110,11 +108,9 @@ impl Outbound {
     /// Returns `true` if the given request was a failed request.
     ///
     #[inline]
-    pub async fn is_failure(&self, request: &Request) -> bool {
-        // Acquire the failure read lock.
-        let failure = self.failure.read().await;
+    pub fn is_failure(&self, request: &Request) -> bool {
         // Fetch the failed requests of the given receiver.
-        match failure.get(&request.receiver()) {
+        match self.failure.read().get(&request.receiver()) {
             // Check if the set of failed requests contains the given request.
             Some(requests) => requests.contains(&request),
             // Return `false` as the receiver does not exist in this map.
@@ -151,9 +147,9 @@ impl Outbound {
     #[inline]
     pub async fn initialize_state(&self, remote_address: SocketAddr) {
         debug!("Initializing Outbound state for {}", remote_address);
-        self.pending.write().await.insert(remote_address, Default::default());
-        self.success.write().await.insert(remote_address, Default::default());
-        self.failure.write().await.insert(remote_address, Default::default());
+        self.pending.write().insert(remote_address, Default::default());
+        self.success.write().insert(remote_address, Default::default());
+        self.failure.write().insert(remote_address, Default::default());
     }
 
     ///
@@ -164,7 +160,6 @@ impl Outbound {
         Ok(self
             .channels
             .read()
-            .await
             .get(&remote_address)
             .ok_or(NetworkError::OutboundChannelMissing)?
             .clone())
@@ -175,11 +170,8 @@ impl Outbound {
     ///
     #[inline]
     async fn authorize(&self, request: &Request) {
-        // Acquire the pending requests write lock.
-        let mut pending = self.pending.write().await;
-
         // Store the request to the pending requests.
-        match pending.get_mut(&request.receiver()) {
+        match self.pending.write().get_mut(&request.receiver()) {
             Some(requests) => {
                 requests.insert(request.clone());
 
@@ -220,19 +212,13 @@ impl Outbound {
 
     #[inline]
     async fn success(&self, request: &Request) {
-        // Acquire the pending requests write lock.
-        let mut pending = self.pending.write().await;
-
         // Remove the request from the pending requests.
-        if let Some(requests) = pending.get_mut(&request.receiver()) {
+        if let Some(requests) = self.pending.write().get_mut(&request.receiver()) {
             requests.remove(&request);
         };
 
-        // Acquire the success requests write lock.
-        let mut success = self.success.write().await;
-
         // Store the request in the successful requests.
-        if let Some(requests) = success.get_mut(&request.receiver()) {
+        if let Some(requests) = self.success.write().get_mut(&request.receiver()) {
             requests.insert(request.clone());
 
             // Increment the success counter.
@@ -249,19 +235,13 @@ impl Outbound {
             error
         );
 
-        // Acquire the pending requests write lock.
-        let mut pending = self.pending.write().await;
-
         // Remove the request from the pending requests.
-        if let Some(requests) = pending.get_mut(&request.receiver()) {
+        if let Some(requests) = self.pending.write().get_mut(&request.receiver()) {
             requests.remove(&request);
         };
 
-        // Acquire the failed requests write lock.
-        let mut failure = self.failure.write().await;
-
         // Store the request in the failed requests.
-        if let Some(requests) = failure.get_mut(&request.receiver()) {
+        if let Some(requests) = self.failure.write().get_mut(&request.receiver()) {
             requests.insert(request.clone());
 
             // Increment the failure counter.
@@ -322,17 +302,17 @@ mod tests {
         let outbound = Outbound::new(Default::default());
         outbound.initialize_state(remote_address).await;
 
-        assert!(!outbound.is_pending(&request).await);
-        assert!(!outbound.is_success(&request).await);
-        assert!(!outbound.is_failure(&request).await);
+        assert!(!outbound.is_pending(&request));
+        assert!(!outbound.is_success(&request));
+        assert!(!outbound.is_failure(&request));
 
         // Authorize the request only.
         outbound.authorize(&request).await;
 
         // Check that the request is only pending.
-        assert!(outbound.is_pending(&request).await);
-        assert!(!outbound.is_success(&request).await);
-        assert!(!outbound.is_failure(&request).await);
+        assert!(outbound.is_pending(&request));
+        assert!(!outbound.is_success(&request));
+        assert!(!outbound.is_failure(&request));
     }
 
     #[tokio::test]
@@ -346,20 +326,20 @@ mod tests {
         // Create a new instance.
         let outbound = Outbound::new(Default::default());
         let channel = Channel::new(remote_address, stream);
-        outbound.channels.write().await.insert(remote_address, channel);
+        outbound.channels.write().insert(remote_address, channel);
         outbound.initialize_state(remote_address).await;
 
-        assert!(!outbound.is_pending(&request).await);
-        assert!(!outbound.is_success(&request).await);
-        assert!(!outbound.is_failure(&request).await);
+        assert!(!outbound.is_pending(&request));
+        assert!(!outbound.is_success(&request));
+        assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
         outbound.broadcast(&request).await.await.unwrap();
 
         // Check that the request succeeded.
-        assert!(!outbound.is_pending(&request).await);
-        assert!(outbound.is_success(&request).await);
-        assert!(!outbound.is_failure(&request).await);
+        assert!(!outbound.is_pending(&request));
+        assert!(outbound.is_success(&request));
+        assert!(!outbound.is_failure(&request));
     }
 
     #[tokio::test]
@@ -374,16 +354,16 @@ mod tests {
         let outbound = Outbound::new(Default::default());
         outbound.initialize_state(remote_address).await;
 
-        assert!(!outbound.is_pending(&request).await);
-        assert!(!outbound.is_success(&request).await);
-        assert!(!outbound.is_failure(&request).await);
+        assert!(!outbound.is_pending(&request));
+        assert!(!outbound.is_success(&request));
+        assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
         outbound.broadcast(&request).await.await.unwrap();
 
         // Check that the request succeeded.
-        assert!(!outbound.is_pending(&request).await);
-        assert!(!outbound.is_success(&request).await);
-        assert!(outbound.is_failure(&request).await);
+        assert!(!outbound.is_pending(&request));
+        assert!(!outbound.is_success(&request));
+        assert!(outbound.is_failure(&request));
     }
 }

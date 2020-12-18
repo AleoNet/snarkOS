@@ -33,11 +33,9 @@ use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 use snarkos_utilities::{to_bytes, ToBytes};
 
-use std::{
-    net::SocketAddr,
-    str::FromStr,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
+
+use parking_lot::{Mutex, RwLock};
 use tokio::{
     runtime::Builder,
     stream::{self, StreamExt},

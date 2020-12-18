@@ -22,10 +22,8 @@ use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{environment::Environment, external::Channel, Server};
 
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex, RwLock},
-};
+use parking_lot::{Mutex, RwLock};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
@@ -45,12 +43,11 @@ pub fn initialize_test_environment(
     parameters: PublicParameters<Components>,
 ) -> anyhow::Result<Environment> {
     let consensus = Arc::new(TEST_CONSENSUS.clone());
-    let memory_pool = MemoryPool::new();
-    let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
+    let memory_pool = Arc::new(Mutex::new(MemoryPool::new()));
 
     Ok(Environment::new(
         storage,
-        memory_pool_lock,
+        memory_pool,
         consensus,
         Arc::new(parameters),
         server_address,

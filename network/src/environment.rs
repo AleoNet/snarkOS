@@ -22,10 +22,8 @@ use snarkos_dpc::base_dpc::{
 };
 use snarkos_objects::Network;
 
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex, RwLock},
-};
+use parking_lot::{Mutex, RwLock};
+use std::{net::SocketAddr, sync::Arc};
 
 /// TODO (howardwu): Remove pub from each field and add getters only.
 /// A core data structure containing the networking parameters for this node.
@@ -211,6 +209,6 @@ impl Environment {
     /// Returns the current block height of the ledger from storage.
     #[inline]
     pub async fn current_block_height(&self) -> u32 {
-        self.storage.read().unwrap().get_current_block_height()
+        self.storage.read().get_current_block_height()
     }
 }

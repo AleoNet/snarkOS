@@ -376,7 +376,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
         storage.catch_up_secondary(false)?;
         let record_commitments = storage.get_record_commitments(None)?;
 
@@ -385,7 +385,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns a list of record commitments that are stored on the full node.
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
         storage.catch_up_secondary(false)?;
         let record_commitments = storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(hex::encode).collect();
@@ -398,7 +398,6 @@ impl ProtectedRpcFunctions for RpcImpl {
         match self
             .storage
             .read()
-            .unwrap()
             .get_record::<DPCRecord<Components>>(&hex::decode(record_commitment)?)?
         {
             Some(record) => {

@@ -69,8 +69,8 @@ impl MinerInstance {
                 let (block_serialized, _coinbase_records) = match miner
                     .mine_block(
                         &self.parameters,
-                        &self.environment.storage(),
-                        &self.environment.memory_pool(),
+                        self.environment.storage(),
+                        self.environment.memory_pool(),
                     )
                     .await
                 {

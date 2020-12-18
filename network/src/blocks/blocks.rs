@@ -129,7 +129,7 @@ impl Blocks {
             let storage = self.environment.storage();
             let consensus = self.environment.consensus_parameters();
 
-            if !consensus.verify_transaction(parameters, &tx, &*storage.read().unwrap())? {
+            if !consensus.verify_transaction(parameters, &tx, &*storage.read())? {
                 error!("Received a transaction that was invalid");
                 return Ok(());
             }
@@ -144,12 +144,7 @@ impl Blocks {
                 transaction: tx,
             };
 
-            let insertion = self
-                .environment
-                .memory_pool()
-                .lock()
-                .unwrap()
-                .insert(&storage.read().unwrap(), entry);
+            let insertion = self.environment.memory_pool().lock().insert(&storage.read(), entry);
 
             if let Ok(inserted) = insertion {
                 if inserted.is_some() {
@@ -183,7 +178,6 @@ impl Blocks {
             .environment
             .storage()
             .read()
-            .unwrap()
             .block_hash_exists(&block_struct.header.get_hash())
         {
             let is_new_block = self
@@ -191,8 +185,8 @@ impl Blocks {
                 .consensus_parameters()
                 .receive_block(
                     self.environment.dpc_parameters(),
-                    &self.environment.storage().read().unwrap(),
-                    &mut self.environment.memory_pool().lock().unwrap(),
+                    &self.environment.storage().read(),
+                    &mut self.environment.memory_pool().lock(),
                     &block_struct,
                 )
                 .is_ok();
@@ -226,12 +220,7 @@ impl Blocks {
         remote_address: SocketAddr,
         message: GetBlock,
     ) -> Result<(), NetworkError> {
-        let block = self
-            .environment
-            .storage()
-            .read()
-            .unwrap()
-            .get_block(&message.block_hash);
+        let block = self.environment.storage().read().get_block(&message.block_hash);
 
         if let Ok(block) = block {
             // Broadcast a `SyncBlock` message to the connected peer.
@@ -248,7 +237,7 @@ impl Blocks {
         let transactions = {
             let mut txs = vec![];
 
-            let memory_pool = self.environment.memory_pool().lock().unwrap();
+            let memory_pool = self.environment.memory_pool().lock();
             for (_tx_id, entry) in &memory_pool.transactions {
                 if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                     txs.push(transaction_bytes);
@@ -269,8 +258,8 @@ impl Blocks {
     }
 
     /// A peer has sent us their memory pool transactions.
-    pub(crate) async fn received_memory_pool(&self, message: MemoryPool) -> Result<(), NetworkError> {
-        let mut memory_pool = self.environment.memory_pool().lock().unwrap();
+    pub(crate) fn received_memory_pool(&self, message: MemoryPool) -> Result<(), NetworkError> {
+        let mut memory_pool = self.environment.memory_pool().lock();
 
         for transaction_bytes in message.transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;
@@ -279,7 +268,7 @@ impl Blocks {
                 transaction,
             };
 
-            if let Ok(inserted) = memory_pool.insert(&*self.environment.storage().read().unwrap(), entry) {
+            if let Ok(inserted) = memory_pool.insert(&*self.environment.storage().read(), entry) {
                 if let Some(txid) = inserted {
                     debug!(
                         "Transaction added to memory pool with txid: {:?}",
@@ -298,43 +287,36 @@ impl Blocks {
         remote_address: SocketAddr,
         message: GetSync,
     ) -> Result<(), NetworkError> {
-        let latest_shared_hash = self
-            .environment
-            .storage()
-            .read()
-            .unwrap()
-            .get_latest_shared_hash(message.block_locator_hashes)?;
-        let current_height = self.environment.storage().read().unwrap().get_current_block_height();
+        let sync = {
+            let storage_lock = self.environment.storage().read();
 
-        let sync = if let Ok(height) = self
-            .environment
-            .storage()
-            .read()
-            .unwrap()
-            .get_block_number(&latest_shared_hash)
-        {
-            if height < current_height {
-                let mut max_height = current_height;
+            let latest_shared_hash = storage_lock.get_latest_shared_hash(message.block_locator_hashes)?;
+            let current_height = self.environment.storage().read().get_current_block_height();
 
-                // if the requester is behind more than 4000 blocks
-                if height + 4000 < current_height {
-                    // send the max 4000 blocks
-                    max_height = height + 4000;
+            if let Ok(height) = storage_lock.get_block_number(&latest_shared_hash) {
+                if height < current_height {
+                    let mut max_height = current_height;
+
+                    // if the requester is behind more than 4000 blocks
+                    if height + 4000 < current_height {
+                        // send the max 4000 blocks
+                        max_height = height + 4000;
+                    }
+
+                    let mut block_hashes: Vec<BlockHeaderHash> = vec![];
+
+                    for block_num in height + 1..=max_height {
+                        block_hashes.push(storage_lock.get_block_hash(block_num)?);
+                    }
+
+                    // send block hashes to requester
+                    Sync::new(block_hashes)
+                } else {
+                    Sync::new(vec![])
                 }
-
-                let mut block_hashes: Vec<BlockHeaderHash> = vec![];
-
-                for block_num in height + 1..=max_height {
-                    block_hashes.push(self.environment.storage().read().unwrap().get_block_hash(block_num)?);
-                }
-
-                // send block hashes to requester
-                Sync::new(block_hashes)
             } else {
                 Sync::new(vec![])
             }
-        } else {
-            Sync::new(vec![])
         };
 
         // Broadcast a `Sync` message to the connected peer.
@@ -345,7 +327,7 @@ impl Blocks {
 
     /// A peer has sent us their chain state.
     pub(crate) async fn received_sync(&self, message: Sync) -> Result<(), NetworkError> {
-        let height = self.environment.storage().read().unwrap().get_current_block_height();
+        let height = self.environment.storage().read().get_current_block_height();
 
         /* TODO: implement
         sync_handler.receive_hashes(message.block_hashes, height);

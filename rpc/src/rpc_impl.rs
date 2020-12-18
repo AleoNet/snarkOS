@@ -35,10 +35,9 @@ use snarkos_utilities::{
 };
 
 use chrono::Utc;
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex, RwLock},
-};
+use parking_lot::{Mutex, RwLock};
+
+use std::{path::PathBuf, sync::Arc};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -106,7 +105,7 @@ impl RpcFunctions for RpcImpl {
         let block_hash = hex::decode(&block_hash_string)?;
         assert_eq!(block_hash.len(), 32);
 
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
 
         storage.catch_up_secondary(false)?;
 
@@ -152,14 +151,14 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the number of blocks in the canonical chain.
     fn get_block_count(&self) -> Result<u32, RpcError> {
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
         storage.catch_up_secondary(false)?;
         Ok(storage.get_block_count())
     }
 
     /// Returns the block hash of the head of the canonical chain.
     fn get_best_block_hash(&self) -> Result<String, RpcError> {
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
         storage.catch_up_secondary(false)?;
         let best_block_hash = storage.get_block_hash(storage.get_current_block_height())?;
 
@@ -168,7 +167,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the block hash of the index specified if it exists in the canonical chain.
     fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError> {
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
         storage.catch_up_secondary(false)?;
         let block_hash = storage.get_block_hash(block_height)?;
 
@@ -177,7 +176,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
         storage.catch_up_secondary(false)?;
         Ok(hex::encode(
             &storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
@@ -192,8 +191,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns information about a transaction from serialized transaction bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
-        let storage = self.storage.read().unwrap();
-        storage.catch_up_secondary(false)?;
+        self.storage.read().catch_up_secondary(false)?;
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
@@ -225,6 +223,7 @@ impl RpcFunctions for RpcImpl {
         }
 
         let transaction_id = transaction.transaction_id()?;
+        let storage = self.storage.read();
         let block_number = match storage.get_transaction_location(&transaction_id.to_vec())? {
             Some(block_location) => Some(storage.get_block_number(&BlockHeaderHash(block_location.block_hash))?),
             None => None,
@@ -258,7 +257,7 @@ impl RpcFunctions for RpcImpl {
         let transaction = Tx::read(&transaction_bytes[..])?;
         let transaction_hex_id = hex::encode(transaction.transaction_id()?);
 
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
 
         storage.catch_up_secondary(false)?;
 
@@ -272,15 +271,12 @@ impl RpcFunctions for RpcImpl {
 
         match !storage.transaction_conflicts(&transaction) {
             true => {
-                let mut memory_pool = self.memory_pool.lock().unwrap();
-                let storage = self.storage.read().unwrap();
-
                 let entry = Entry::<Tx> {
                     size_in_bytes: transaction_bytes.len(),
                     transaction,
                 };
 
-                if let Ok(inserted) = memory_pool.insert(&storage, entry) {
+                if let Ok(inserted) = self.memory_pool.lock().insert(&storage, entry) {
                     if inserted.is_some() {
                         info!("Transaction added to the memory pool.");
                         // TODO(ljedrz): checks if needs to be propagated to the network; if need be, this could
@@ -299,7 +295,7 @@ impl RpcFunctions for RpcImpl {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
 
         storage.catch_up_secondary(false)?;
 
@@ -338,7 +334,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the current mempool and consensus information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
-        let storage = self.storage.read().unwrap();
+        let storage = self.storage.read();
         storage.catch_up_secondary(false)?;
 
         let block_height = storage.get_current_block_height();
@@ -349,7 +345,6 @@ impl RpcFunctions for RpcImpl {
         let full_transactions = self
             .memory_pool
             .lock()
-            .unwrap()
             .get_candidates(&storage, self.consensus.max_block_size)?;
 
         let transaction_strings = full_transactions.serialize_as_str()?;

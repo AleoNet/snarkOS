@@ -26,8 +26,9 @@ use snarkos_errors::network::SendError;
 use snarkos_objects::BlockHeaderHash;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
+use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{sync::RwLock, time::sleep};
+use tokio::time::sleep;
 
 #[derive(Clone, PartialEq)]
 pub enum SyncState {
@@ -91,9 +92,9 @@ impl SyncManager {
     }
 
     /// Remove the blocks that are now included in the chain.
-    pub async fn clear_pending(&mut self) {
+    pub fn clear_pending(&mut self) {
         for block_hash in self.pending_blocks.clone().keys() {
-            if !self.environment.storage().read().unwrap().block_hash_exists(block_hash) {
+            if !self.environment.storage().read().block_hash_exists(block_hash) {
                 self.pending_blocks.remove(block_hash);
             }
         }
@@ -141,79 +142,71 @@ impl SyncManager {
                 self.update_syncing(current_block_height);
             }
 
-            // Sync up to 3 blocks at once
-            for _ in 0..3 {
-                if self.block_headers.is_empty() {
-                    break;
-                }
+            {
+                let outbound_lock = self.outbound.write();
 
-                let block_header_hash = self.block_headers.remove(0);
-
-                // If block is not pending, then ask the sync node for the block.
-                let should_request = match self.pending_blocks.get(&block_header_hash) {
-                    Some(request_time) => {
-                        // Request the block again if the block was not downloaded in 5 seconds
-                        Utc::now() - *request_time > ChronoDuration::seconds(5)
+                // Sync up to 3 blocks at once
+                for _ in 0..3 {
+                    if self.block_headers.is_empty() {
+                        break;
                     }
-                    None => !self
-                        .environment
-                        .storage()
-                        .read()
-                        .unwrap()
-                        .block_hash_exists(&block_header_hash),
-                };
 
-                if should_request {
-                    // Broadcast a `GetBlock` message to the connected peer.
-                    self.outbound
-                        .write()
-                        .await
-                        .broadcast(&Request::GetBlock(
-                            self.sync_node_address,
-                            GetBlock::new(block_header_hash.clone()),
-                        ))
-                        .await;
-                    self.pending_blocks.insert(block_header_hash, Utc::now());
-                }
-            }
+                    let block_header_hash = self.block_headers.remove(0);
 
-            // Request more block headers
+                    // If block is not pending, then ask the sync node for the block.
+                    let should_request = match self.pending_blocks.get(&block_header_hash) {
+                        Some(request_time) => {
+                            // Request the block again if the block was not downloaded in 5 seconds
+                            Utc::now() - *request_time > ChronoDuration::seconds(5)
+                        }
+                        None => !self.environment.storage().read().block_hash_exists(&block_header_hash),
+                    };
 
-            if self.pending_blocks.is_empty() {
-                sleep(Duration::from_millis(500)).await;
-
-                if let Ok(block_locator_hashes) = self.environment.storage().read().unwrap().get_block_locator_hashes()
-                {
-                    // Broadcast a `GetSync` message to the connected peer.
-                    self.outbound
-                        .write()
-                        .await
-                        .broadcast(&Request::GetSync(
-                            self.sync_node_address,
-                            GetSync::new(block_locator_hashes),
-                        ))
-                        .await;
-                }
-            } else {
-                for (block_header_hash, request_time) in &self.pending_blocks.clone() {
-                    if Utc::now() - *request_time > ChronoDuration::seconds(5) {
+                    if should_request {
                         // Broadcast a `GetBlock` message to the connected peer.
-                        self.outbound
-                            .write()
-                            .await
+                        outbound_lock
                             .broadcast(&Request::GetBlock(
                                 self.sync_node_address,
                                 GetBlock::new(block_header_hash.clone()),
                             ))
                             .await;
-                        self.pending_blocks.insert(block_header_hash.clone(), Utc::now());
+                        self.pending_blocks.insert(block_header_hash, Utc::now());
+                    }
+                }
+
+                // Request more block headers
+
+                if self.pending_blocks.is_empty() {
+                    sleep(Duration::from_millis(500)).await;
+
+                    if let Ok(block_locator_hashes) = self.environment.storage().read().get_block_locator_hashes() {
+                        // Broadcast a `GetSync` message to the connected peer.
+                        outbound_lock
+                            .broadcast(&Request::GetSync(
+                                self.sync_node_address,
+                                GetSync::new(block_locator_hashes),
+                            ))
+                            .await;
+                    }
+                } else {
+                    for (block_header_hash, request_time) in &self.pending_blocks.clone() {
+                        if Utc::now() - *request_time > ChronoDuration::seconds(5) {
+                            // Broadcast a `GetBlock` message to the connected peer.
+                            outbound_lock
+                                .broadcast(&Request::GetBlock(
+                                    self.sync_node_address,
+                                    GetBlock::new(block_header_hash.clone()),
+                                ))
+                                .await;
+                            self.pending_blocks.insert(block_header_hash.clone(), Utc::now());
+                        }
                     }
                 }
             }
 
-            self.clear_pending().await;
+            self.clear_pending();
         } else {
-            self.clear_pending().await;
+            self.clear_pending();
         }
 
         Ok(())

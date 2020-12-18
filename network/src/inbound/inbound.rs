@@ -29,9 +29,11 @@ use std::{
     net::SocketAddr,
     sync::{atomic::AtomicU64, Arc},
 };
+
+use parking_lot::RwLock;
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::{Mutex, RwLock},
+    sync::Mutex as AsyncMutex,
     task,
 };
 
@@ -44,7 +46,7 @@ pub struct Inbound {
     /// The producer for sending inbound messages to the server.
     sender: Sender,
     /// The consumer for receiving inbound messages to the server.
-    receiver: Arc<Mutex<Receiver>>,
+    receiver: Arc<AsyncMutex<Receiver>>,
     /// The map of remote addresses to their active read channels.
     channels: Arc<RwLock<Channels>>,
     /// A counter for the number of received responses the handler processes.
@@ -62,7 +64,7 @@ impl Inbound {
 
         Self {
             sender,
-            receiver: Arc::new(Mutex::new(receiver)),
+            receiver: Arc::new(AsyncMutex::new(receiver)),
             channels,
             receive_response_count: Default::default(),
             receive_success_count: Default::default(),
@@ -249,7 +251,7 @@ impl Inbound {
     }
 
     #[inline]
-    pub(crate) fn receiver(&self) -> &Mutex<Receiver> {
+    pub(crate) fn receiver(&self) -> &AsyncMutex<Receiver> {
         &self.receiver
     }
 
@@ -351,7 +353,7 @@ impl Inbound {
             let channel = channel.update_writer(remote_address).await?;
 
             // Save the channel under the provided remote address
-            self.channels.write().await.insert(remote_address, channel.clone());
+            self.channels.write().insert(remote_address, channel.clone());
 
             // TODO (raychu86): Establish a formal node version.
             let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
