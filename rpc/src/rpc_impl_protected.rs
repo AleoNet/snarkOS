@@ -19,6 +19,7 @@
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
+use snarkos_consensus::ConsensusParameters;
 use snarkos_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
@@ -30,7 +31,7 @@ use snarkos_dpc::base_dpc::{
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::{
     algorithms::CRH,
-    dpc::{DPCComponents, Record as RecordModel},
+    dpc::{DPCComponents, DPCScheme, Record as RecordModel},
     objects::AccountScheme,
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
@@ -83,6 +84,49 @@ impl RpcImpl {
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
         match self.create_raw_transaction(val) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Wrap authentication around `create_transaction_kernel`
+    pub fn create_transaction_kernel_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        let val: TransactionInputs = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.create_transaction_kernel(val) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction kernel serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Wrap authentication around `create_transaction`
+    pub fn create_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        if value.len() != 1 {
+            return Err(JsonRPCError::invalid_params(format!(
+                "invalid length {}, expected 1 element",
+                value.len()
+            )));
+        }
+
+        let transaction_kernel: String = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.create_transaction(transaction_kernel) {
             Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -197,6 +241,8 @@ impl RpcImpl {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
         d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
+        d.add_method_with_meta("createtransactionkernel", Self::create_transaction_kernel_protected);
+        d.add_method_with_meta("createtransaction", Self::create_transaction_protected);
         d.add_method_with_meta("decoderecord", Self::decode_record_protected);
         d.add_method_with_meta("decryptrecord", Self::decrypt_record_protected);
         d.add_method_with_meta("getrecordcommitmentcount", Self::get_record_commitment_count_protected);
@@ -381,6 +427,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
+    /// Generates and returns a new transaction kernel.
     fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError> {
         let rng = &mut thread_rng();
 
@@ -437,11 +484,42 @@ impl ProtectedRpcFunctions for RpcImpl {
         Ok(hex::encode(transaction_kernel.to_bytes()))
     }
 
+    /// Create a new transaction for a given transaction kernel.
     fn create_transaction(&self, transaction_kernel: String) -> Result<CreateRawTransactionOuput, RpcError> {
+        let rng = &mut thread_rng();
+
+        // Decode the transaction kernel
         let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
         let transaction_kernel = TransactionKernel::<Components>::read(&transaction_kernel_bytes[..])?;
 
-        unimplemented!()
+        // Construct the program proofs
+        let (old_death_program_proofs, new_birth_program_proofs) =
+            ConsensusParameters::generate_program_proofs(&self.parameters, &transaction_kernel, rng)?;
+
+        // Because this is a computationally heavy endpoint, we open a
+        // new secondary storage instance to prevent storage bottle-necking.
+        let storage = self.new_secondary_storage_instance()?;
+
+        // Online execution to generate a DPC transaction
+        let (records, transaction) = InstantiatedDPC::execute_online(
+            &self.parameters,
+            transaction_kernel,
+            old_death_program_proofs,
+            new_birth_program_proofs,
+            &storage,
+            rng,
+        )?;
+
+        let encoded_transaction = hex::encode(to_bytes![transaction]?);
+        let mut encoded_records = Vec::with_capacity(records.len());
+        for record in records {
+            encoded_records.push(hex::encode(to_bytes![record]?));
+        }
+
+        Ok(CreateRawTransactionOuput {
+            encoded_transaction,
+            encoded_records,
+        })
     }
 
     /// Returns the number of record commitments that are stored on the full node.
