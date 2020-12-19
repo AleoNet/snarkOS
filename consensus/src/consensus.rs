@@ -484,7 +484,35 @@ impl ConsensusParameters {
         )?;
 
         // Construct the program proofs
+        let (old_death_program_proofs, new_birth_program_proofs) =
+            Self::generate_program_proofs(&parameters, &transaction_kernel, rng)?;
 
+        // Online execution to generate a DPC transaction
+        let (new_records, transaction) = InstantiatedDPC::execute_online(
+            &parameters,
+            transaction_kernel,
+            old_death_program_proofs,
+            new_birth_program_proofs,
+            ledger,
+            rng,
+        )?;
+
+        Ok((new_records, transaction))
+    }
+
+    // TODO (raychu86): Genericize this model to allow for generic programs.
+    /// Generate the birth and death program proofs for a transaction for a given transaction kernel
+    pub fn generate_program_proofs<R: Rng>(
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::TransactionKernel,
+        rng: &mut R,
+    ) -> Result<
+        (
+            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::PrivateProgramInput>,
+            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::PrivateProgramInput>,
+        ),
+        ConsensusError,
+    > {
         let local_data = transaction_kernel.into_local_data();
 
         let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
@@ -521,17 +549,7 @@ impl ConsensusParameters {
             new_birth_program_proofs.push(private_input);
         }
 
-        // Online execution to generate a DPC transaction
-        let (new_records, transaction) = InstantiatedDPC::execute_online(
-            &parameters,
-            transaction_kernel,
-            old_death_program_proofs,
-            new_birth_program_proofs,
-            ledger,
-            rng,
-        )?;
-
-        Ok((new_records, transaction))
+        Ok((old_death_program_proofs, new_birth_program_proofs))
     }
 }
 
