@@ -36,7 +36,7 @@ digest = { version = "0.7" }
 rand = { version = "0.7" }
 rayon = { version = "1" }
 sha2 = { version = "0.9" }
-smallvec = { version = "1.4" }
+smallvec = { version = "1.5" }
 criterion = "0.3.3"
 
 [dev-dependencies]
