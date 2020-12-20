@@ -42,7 +42,7 @@ pub trait ConstraintSystem<F: Field>: Sized {
     where
         FN: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>;
+        AR: AsRef<str>;
 
     /// Allocate a public variable in the constraint system. The provided
     /// function is used to determine the assignment of the variable.
@@ -50,7 +50,7 @@ pub trait ConstraintSystem<F: Field>: Sized {
     where
         FN: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>;
+        AR: AsRef<str>;
 
     /// Enforce that `A` * `B` = `C`. The `annotation` function is invoked in
     /// testing contexts in order to derive a unique name for the constraint
@@ -58,7 +58,7 @@ pub trait ConstraintSystem<F: Field>: Sized {
     fn enforce<A, AR, LA, LB, LC>(&mut self, annotation: A, a: LA, b: LB, c: LC)
     where
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
         LA: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LB: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>;
@@ -67,7 +67,7 @@ pub trait ConstraintSystem<F: Field>: Sized {
     /// for downstream use; use `namespace` instead.
     fn push_namespace<NR, N>(&mut self, name_fn: N)
     where
-        NR: Into<String>,
+        NR: AsRef<str>,
         N: FnOnce() -> NR;
 
     /// Exit out of the existing namespace. Not intended for
@@ -81,7 +81,7 @@ pub trait ConstraintSystem<F: Field>: Sized {
     /// Begin a namespace for this constraint system.
     fn ns<NR, N>(&mut self, name_fn: N) -> Namespace<'_, F, Self::Root>
     where
-        NR: Into<String>,
+        NR: AsRef<str>,
         N: FnOnce() -> NR,
     {
         self.get_root().push_namespace(name_fn);
@@ -119,7 +119,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for Namespace<'_, F,
     where
         FN: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         self.0.alloc(annotation, f)
     }
@@ -129,7 +129,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for Namespace<'_, F,
     where
         FN: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         self.0.alloc_input(annotation, f)
     }
@@ -138,7 +138,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for Namespace<'_, F,
     fn enforce<A, AR, LA, LB, LC>(&mut self, annotation: A, a: LA, b: LB, c: LC)
     where
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
         LA: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LB: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
@@ -153,7 +153,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for Namespace<'_, F,
     #[inline]
     fn push_namespace<NR, N>(&mut self, _: N)
     where
-        NR: Into<String>,
+        NR: AsRef<str>,
         N: FnOnce() -> NR,
     {
         panic!("only the root's push_namespace should be called");
@@ -197,7 +197,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for &mut CS {
     where
         FN: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         (**self).alloc(annotation, f)
     }
@@ -207,7 +207,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for &mut CS {
     where
         FN: FnOnce() -> Result<F, SynthesisError>,
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
     {
         (**self).alloc_input(annotation, f)
     }
@@ -216,7 +216,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for &mut CS {
     fn enforce<A, AR, LA, LB, LC>(&mut self, annotation: A, a: LA, b: LB, c: LC)
     where
         A: FnOnce() -> AR,
-        AR: Into<String>,
+        AR: AsRef<str>,
         LA: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LB: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
         LC: FnOnce(LinearCombination<F>) -> LinearCombination<F>,
@@ -227,7 +227,7 @@ impl<F: Field, CS: ConstraintSystem<F>> ConstraintSystem<F> for &mut CS {
     #[inline]
     fn push_namespace<NR, N>(&mut self, name_fn: N)
     where
-        NR: Into<String>,
+        NR: AsRef<str>,
         N: FnOnce() -> NR,
     {
         (**self).push_namespace(name_fn)
