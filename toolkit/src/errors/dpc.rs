@@ -64,3 +64,9 @@ impl From<std::io::Error> for DPCError {
         DPCError::Crate("std::io", format!("{:?}", error))
     }
 }
+
+impl From<DPCError> for snarkos_errors::rpc::RpcError {
+    fn from(error: DPCError) -> Self {
+        snarkos_errors::rpc::RpcError::Crate("snarkos_toolkit::errors::dpc", format!("{:?}", error))
+    }
+}

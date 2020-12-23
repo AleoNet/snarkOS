@@ -446,17 +446,17 @@ impl ProtectedRpcFunctions for RpcImpl {
             .iter()
             .zip_eq(&transaction_input.old_account_private_keys)
         {
-            let record = Record::from_str(&record_string).unwrap();
-            let private_key = PrivateKey::from_str(&private_key_string).unwrap();
+            let record = Record::from_str(&record_string)?;
+            let private_key = PrivateKey::from_str(&private_key_string)?;
 
-            builder = builder.add_input(private_key, record).unwrap();
+            builder = builder.add_input(private_key, record)?;
         }
 
         // Add individual transaction outputs to the transaction kernel builder.
         for recipient in &transaction_input.recipients {
-            let address = Address::from_str(&recipient.address).unwrap();
+            let address = Address::from_str(&recipient.address)?;
 
-            builder = builder.add_output(address, recipient.amount).unwrap();
+            builder = builder.add_output(address, recipient.amount)?;
         }
 
         // Decode memo
@@ -479,7 +479,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         builder = builder.network_id(transaction_input.network_id);
 
         // Construct the transaction kernel
-        let transaction_kernel = builder.build(rng).unwrap();
+        let transaction_kernel = builder.build(rng)?;
 
         Ok(hex::encode(transaction_kernel.to_bytes()))
     }
