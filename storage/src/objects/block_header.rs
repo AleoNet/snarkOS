@@ -26,10 +26,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             return false;
         }
 
-        match self.get_block_header(block_hash) {
-            Ok(_block_header) => true,
-            Err(_) => false,
-        }
+        self.get_block_header(block_hash).is_ok()
     }
 
     /// Get a block header given the block hash.
