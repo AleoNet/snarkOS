@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme};
 use snarkos_errors::objects::AccountError;
+use snarkvm_models::algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme};
 
 use rand::Rng;
 

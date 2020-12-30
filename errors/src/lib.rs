@@ -23,7 +23,6 @@ pub mod consensus;
 pub mod network;
 pub mod node;
 pub mod objects;
-pub mod parameters;
 pub mod posw;
 pub mod rpc;
 pub mod serialization;

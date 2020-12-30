@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::algorithms::{CRHError, CommitmentError, EncryptionError, PRFError, SignatureError};
+use snarkvm_errors::algorithms::{CRHError, CommitmentError, EncryptionError, PRFError, SignatureError};
 
 #[derive(Debug, Error)]
 pub enum AccountError {

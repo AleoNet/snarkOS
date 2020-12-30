@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{algorithms::SNARKError, curves::constraint_field::ConstraintFieldError, parameters::ParametersError};
+use snarkvm_errors::{
+    algorithms::SNARKError,
+    curves::constraint_field::ConstraintFieldError,
+    parameters::ParametersError,
+};
 
 use std::io::Error as IoError;
 use thiserror::Error;

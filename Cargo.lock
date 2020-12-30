@@ -2601,6 +2601,7 @@ dependencies = [
  "hex",
  "jsonrpc-core",
  "rocksdb",
+ "snarkvm-errors",
  "thiserror",
  "toml",
 ]
@@ -2640,6 +2641,8 @@ dependencies = [
  "serde",
  "snarkos-errors",
  "snarkos-utilities",
+ "snarkvm-errors",
+ "snarkvm-models",
 ]
 
 [[package]]

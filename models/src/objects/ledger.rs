@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::objects::{BlockScheme, Transaction};
-use snarkos_errors::dpc::LedgerError;
+use snarkvm_errors::dpc::LedgerError;
 
 use std::path::PathBuf;
 

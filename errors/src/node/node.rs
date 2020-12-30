@@ -15,13 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    algorithms::CRHError,
     consensus::ConsensusError,
     network::ServerError,
     node::CliError,
     objects::AccountError,
     storage::StorageError,
 };
+use snarkvm_errors::algorithms::CRHError;
 
 #[derive(Debug, Error)]
 pub enum NodeError {
