@@ -2877,7 +2877,6 @@ dependencies = [
  "rocksdb",
  "serde",
  "snarkos-algorithms",
- "snarkos-consensus",
  "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",

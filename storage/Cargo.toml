@@ -27,6 +27,5 @@ rocksdb = { version = "0.15.0" }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-snarkos-consensus = { path = "../consensus" }
 snarkos-curves = { path = "../curves" }
 snarkos-testing = { path = "../testing" }
