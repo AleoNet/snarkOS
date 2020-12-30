@@ -15,11 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Vec;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
+
 use core::marker::PhantomData;
 use digest::{generic_array::GenericArray, Digest};
 use rand_chacha::ChaChaRng;
 use rand_core::{RngCore, SeedableRng};
-use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 /// A `SeedableRng` that refreshes its seed by hashing together the previous seed
 /// and the new seed material.

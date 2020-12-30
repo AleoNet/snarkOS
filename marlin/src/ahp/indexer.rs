@@ -24,7 +24,6 @@ use crate::{
     },
     Vec,
 };
-use derivative::Derivative;
 use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{curves::PrimeField, gadgets::r1cs::ConstraintSynthesizer};
 use snarkos_utilities::serialize::*;
@@ -32,6 +31,7 @@ use snarkvm_algorithms::fft::EvaluationDomain;
 use snarkvm_polycommit::LabeledPolynomial;
 
 use core::marker::PhantomData;
+use derivative::Derivative;
 
 /// Information about the index, including the field of definition, the number of
 /// variables, the number of constraints, and the maximum number of non-zero

@@ -17,11 +17,11 @@
 #![allow(non_snake_case)]
 
 use crate::ahp::{indexer::IndexInfo, *};
-use rand_core::RngCore;
-
 use snarkos_models::{curves::PrimeField, gadgets::r1cs::ConstraintSynthesizer};
 use snarkvm_algorithms::fft::EvaluationDomain;
 use snarkvm_polycommit::QuerySet;
+
+use rand_core::RngCore;
 
 /// State of the AHP verifier
 pub struct VerifierState<F: PrimeField, C> {

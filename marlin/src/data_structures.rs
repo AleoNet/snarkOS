@@ -18,8 +18,6 @@ use crate::{
     ahp::{indexer::*, prover::ProverMsg},
     Vec,
 };
-use core::marker::PhantomData;
-use derivative::Derivative;
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::{curves::PrimeField, gadgets::r1cs::ConstraintSynthesizer};
 use snarkos_utilities::{
@@ -28,6 +26,9 @@ use snarkos_utilities::{
     serialize::*,
 };
 use snarkvm_polycommit::{BatchLCProof, PolynomialCommitment};
+
+use core::marker::PhantomData;
+use derivative::Derivative;
 use std::io::{self, Read, Write};
 
 /* ************************************************************************* */

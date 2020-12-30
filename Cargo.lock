@@ -2724,7 +2724,6 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "snarkos-errors",
- "snarkos-marlin",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-parameters",
@@ -2733,6 +2732,7 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-gadgets",
+ "snarkvm-marlin",
  "snarkvm-polycommit",
  "thiserror",
 ]
@@ -2847,7 +2847,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-algorithms"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "blake2",
  "derivative",
@@ -2867,7 +2867,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-curves"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "derivative",
  "rand",
@@ -2882,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-derives"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2892,7 +2892,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-dpc"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "blake2",
  "derivative",
@@ -2913,7 +2913,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-errors"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "base58",
  "bech32",
@@ -2929,7 +2929,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-gadgets"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "derivative",
  "digest 0.8.1",
@@ -2942,9 +2942,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkvm-marlin"
+version = "0.0.1"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
+dependencies = [
+ "blake2",
+ "derivative",
+ "digest 0.8.1",
+ "rand_chacha",
+ "rand_core",
+ "rayon",
+ "snarkvm-algorithms",
+ "snarkvm-errors",
+ "snarkvm-models",
+ "snarkvm-polycommit",
+ "snarkvm-profiler",
+ "snarkvm-utilities",
+]
+
+[[package]]
 name = "snarkvm-models"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "bincode",
  "cfg-if 0.1.10",
@@ -2962,7 +2981,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-objects"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "base58",
  "bech32",
@@ -2983,7 +3002,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-parameters"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "curl",
  "hex",
@@ -2996,7 +3015,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-polycommit"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "derivative",
  "digest 0.8.1",
@@ -3011,12 +3030,12 @@ dependencies = [
 [[package]]
 name = "snarkvm-profiler"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 
 [[package]]
 name = "snarkvm-utilities"
 version = "0.0.1"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=fc971b1#fc971b16a572315576590a5d1a1553ee2f2f6fe7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=e33cfef#e33cfef66e767950353655aaef17837089db2602"
 dependencies = [
  "bincode",
  "rand",

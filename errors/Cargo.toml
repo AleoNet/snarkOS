@@ -19,7 +19,7 @@ curl = { version = "0.4.34", optional = true }
 hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.2.0" }
 rocksdb = { version = "0.15.0", optional = true }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1" }
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e33cfef", version = "0.0.1" }
 thiserror = { version = "1.0" }
 toml = { version = "0.5.6" }
 

@@ -22,16 +22,16 @@ use crate::{
     Cow,
     ToString,
 };
-use derivative::Derivative;
 use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
     gadgets::r1cs::{ConstraintSystem, Index as VarIndex, LinearCombination, Variable},
 };
+use snarkos_utilities::serialize::*;
 use snarkvm_algorithms::{cfg_iter_mut, fft::Evaluations as EvaluationsOnDomain};
 use snarkvm_polycommit::LabeledPolynomial;
 
-use snarkos_utilities::serialize::*;
+use derivative::Derivative;
 
 // #[cfg(feature = "parallel")]
 // use rayon::prelude::*;

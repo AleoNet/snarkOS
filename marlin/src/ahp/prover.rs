@@ -16,11 +16,11 @@
 
 #![allow(non_snake_case)]
 
-use crate::ahp::{constraint_systems::ProverConstraintSystem, indexer::*, verifier::*, *};
-
-use crate::{ToString, Vec};
-use core::marker::PhantomData;
-use rand_core::RngCore;
+use crate::{
+    ahp::{constraint_systems::ProverConstraintSystem, indexer::*, verifier::*, *},
+    ToString,
+    Vec,
+};
 use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
@@ -34,6 +34,9 @@ use snarkvm_algorithms::{
     fft::{EvaluationDomain, Evaluations as EvaluationsOnDomain},
 };
 use snarkvm_polycommit::{LabeledPolynomial, Polynomial};
+
+use core::marker::PhantomData;
+use rand_core::RngCore;
 use std::io::Write;
 
 /// State for the AHP prover.
