@@ -2670,6 +2670,7 @@ dependencies = [
  "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-curves",
+ "snarkvm-errors",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-parameters",
