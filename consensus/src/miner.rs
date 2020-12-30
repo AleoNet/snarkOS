@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{LoadableMerkleParameters, CRH},
@@ -26,6 +25,7 @@ use snarkos_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
 use snarkos_posw::{txids_to_roots, PoswMarlin};
 use snarkos_storage::Ledger;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};

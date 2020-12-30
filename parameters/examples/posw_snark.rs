@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_errors::dpc::DPCError;
 use snarkos_marlin::snark;
 use snarkos_posw::PoswMarlin;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use snarkvm_algorithms::crh::sha256;
+use snarkvm_curves::bls12_377::Bls12_377;
 
 use rand::thread_rng;
 use std::path::PathBuf;

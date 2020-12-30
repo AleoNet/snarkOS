@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord};
 use snarkos_models::genesis::Genesis;
 use snarkos_objects::{Block, BlockHeader};
 use snarkos_parameters::GenesisBlock;
@@ -22,6 +21,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
+use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord};
 
 use once_cell::sync::Lazy;
 use std::io::{Read, Result as IoResult, Write};

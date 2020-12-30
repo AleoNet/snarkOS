@@ -21,8 +21,8 @@ use crate::curves::templates::bls12::{
     G2Gadget as Bls12G2Gadget,
     G2PreparedGadget as Bls12G2PreparedGadget,
 };
-use snarkos_curves::bls12_377::{Bls12_377Parameters, Fq, Fq12Parameters, Fq2Parameters, Fq6Parameters};
 use snarkos_models::gadgets::curves::{Fp12Gadget, Fp2Gadget, Fp6Gadget, FpGadget};
+use snarkvm_curves::bls12_377::{Bls12_377Parameters, Fq, Fq12Parameters, Fq2Parameters, Fq6Parameters};
 
 pub type FqGadget = FpGadget<Fq>;
 pub type Fq2Gadget = Fp2Gadget<Fq2Parameters, Fq>;
@@ -37,7 +37,6 @@ pub type PairingGadget = Bls12PairingGadget<Bls12_377Parameters>;
 #[cfg(test)]
 mod test {
     use super::*;
-    use snarkos_curves::bls12_377::{Fq, Fr, G1Projective as G1, G2Projective as G2};
     use snarkos_models::{
         curves::{AffineCurve, PrimeField, ProjectiveCurve},
         gadgets::{
@@ -52,6 +51,7 @@ mod test {
         },
     };
     use snarkos_utilities::{bititerator::BitIterator, rand::UniformRand};
+    use snarkvm_curves::bls12_377::{Fq, Fr, G1Projective as G1, G2Projective as G2};
 
     use rand::{self, SeedableRng};
     use rand_xorshift::XorShiftRng;

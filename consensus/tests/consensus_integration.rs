@@ -16,10 +16,10 @@
 
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
-    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
     use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;
+    use snarkvm_dpc::base_dpc::instantiated::Tx;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever

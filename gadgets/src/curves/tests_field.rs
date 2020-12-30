@@ -221,7 +221,7 @@ fn random_frobenius_tests<NativeF: Field, F: Field, FG: FieldGadget<NativeF, F>,
 #[test]
 fn bls12_377_field_gadgets_test() {
     use crate::curves::bls12_377::{Fq12Gadget, Fq2Gadget, Fq6Gadget, FqGadget};
-    use snarkos_curves::bls12_377::{Fq, Fq12, Fq2, Fq6};
+    use snarkvm_curves::bls12_377::{Fq, Fq12, Fq2, Fq6};
 
     let mut cs = TestConstraintSystem::<Fq>::new();
 
@@ -264,7 +264,7 @@ fn bls12_377_field_gadgets_test() {
 #[test]
 fn edwards_field_gadgets_test() {
     use crate::curves::edwards_bls12::FqGadget;
-    use snarkos_curves::edwards_bls12::Fq;
+    use snarkvm_curves::edwards_bls12::Fq;
 
     let mut cs = TestConstraintSystem::<Fq>::new();
 

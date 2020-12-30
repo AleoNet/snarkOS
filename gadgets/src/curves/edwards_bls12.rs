@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::curves::templates::twisted_edwards::AffineGadget;
-use snarkos_curves::edwards_bls12::{EdwardsParameters, Fq};
 use snarkos_models::gadgets::curves::FpGadget;
+use snarkvm_curves::edwards_bls12::{EdwardsParameters, Fq};
 
 pub type FqGadget = FpGadget<Fq>;
 pub type EdwardsBlsGadget = AffineGadget<EdwardsParameters, Fq, FqGadget>;
@@ -25,8 +25,8 @@ pub type EdwardsBlsGadget = AffineGadget<EdwardsParameters, Fq, FqGadget>;
 mod test {
     use super::EdwardsBlsGadget;
     use crate::curves::templates::twisted_edwards::test::{edwards_constraint_costs, edwards_test};
-    use snarkos_curves::edwards_bls12::{EdwardsParameters, Fq};
     use snarkos_models::gadgets::r1cs::TestConstraintSystem;
+    use snarkvm_curves::edwards_bls12::{EdwardsParameters, Fq};
 
     #[test]
     fn edwards_constraint_costs_test() {

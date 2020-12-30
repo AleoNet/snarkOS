@@ -21,10 +21,6 @@ use crate::{
     },
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use snarkos_curves::{
-    bls12_377::Fr,
-    edwards_bls12::{EdwardsAffine, EdwardsProjective},
-};
 use snarkos_models::{
     algorithms::{MaskedMerkleParameters, MerkleParameters, CRH},
     curves::PrimeField,
@@ -39,6 +35,10 @@ use snarkvm_algorithms::{
     crh::{BoweHopwoodPedersenCompressedCRH, PedersenCRH, PedersenCompressedCRH, PedersenSize},
     define_masked_merkle_tree_parameters,
     merkle_tree::MerkleTree,
+};
+use snarkvm_curves::{
+    bls12_377::Fr,
+    edwards_bls12::{EdwardsAffine, EdwardsProjective},
 };
 
 use blake2::{digest::Digest, Blake2s};

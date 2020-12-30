@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
 use snarkos_errors::dpc::{DPCError, LedgerError};
 use snarkos_models::{
     algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
@@ -32,6 +31,7 @@ use snarkos_utilities::{
     to_bytes,
 };
 use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
 
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};

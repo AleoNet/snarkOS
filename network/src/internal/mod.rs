@@ -29,12 +29,12 @@ use snarkos_consensus::{
     ConsensusParameters,
     MerkleTreeLedger,
 };
-use snarkos_dpc::base_dpc::{
+use snarkos_errors::network::SendError;
+use snarkos_utilities::bytes::FromBytes;
+use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_errors::network::SendError;
-use snarkos_utilities::bytes::FromBytes;
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;

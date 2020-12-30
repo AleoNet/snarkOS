@@ -13,9 +13,9 @@ edition = "2018"
 
 [dependencies]
 snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
-snarkos-consensus = { path = "../consensus", version = "1.1.4"}
-snarkos-curves = { path = "../curves", version = "1.1.4"}
-snarkos-dpc = { path = "../dpc", version = "1.1.4"}
+snarkos-consensus = { path = "../consensus", version = "1.1.4" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
 snarkos-errors = { path = "../errors", version = "1.1.4"}
 snarkos-models = { path = "../models", version = "1.1.4"}
 snarkos-network = { path = "../network", version = "1.1.4"}

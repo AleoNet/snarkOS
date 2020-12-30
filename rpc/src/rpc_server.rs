@@ -22,11 +22,11 @@ use crate::{
     RpcImpl,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
+use snarkos_network::{external::SyncHandler, internal::context::Context};
+use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_network::{external::SyncHandler, internal::context::Context};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};

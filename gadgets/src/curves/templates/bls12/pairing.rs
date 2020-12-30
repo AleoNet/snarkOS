@@ -15,7 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::curves::templates::bls12::{G1Gadget, G1PreparedGadget, G2Gadget, G2PreparedGadget};
-use snarkos_curves::templates::bls12::{
+use snarkos_errors::gadgets::SynthesisError;
+use snarkos_models::{
+    curves::{Fp12, ModelParameters, PairingCurve},
+    gadgets::{
+        curves::{FieldGadget, Fp12Gadget, Fp2Gadget, FpGadget, PairingGadget},
+        r1cs::ConstraintSystem,
+    },
+};
+use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_curves::templates::bls12::{
     Bls12,
     Bls12Parameters,
     G1Affine,
@@ -26,15 +35,6 @@ use snarkos_curves::templates::bls12::{
     G2Projective,
     TwistType,
 };
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_models::{
-    curves::{Fp12, ModelParameters, PairingCurve},
-    gadgets::{
-        curves::{FieldGadget, Fp12Gadget, Fp2Gadget, FpGadget, PairingGadget},
-        r1cs::ConstraintSystem,
-    },
-};
-use snarkos_utilities::bititerator::BitIterator;
 
 use std::marker::PhantomData;
 

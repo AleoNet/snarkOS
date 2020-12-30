@@ -15,8 +15,6 @@ edition = "2018"
 members = [
     "benchmarks",
     "consensus",
-    "curves",
-    "dpc",
     "errors",
     "gadgets",
     "models",
@@ -41,7 +39,7 @@ path = "snarkos/main.rs"
 
 [dependencies]
 snarkos-consensus = { path = "./consensus", version = "1.1.4"}
-snarkos-dpc = { path = "./dpc", version = "1.1.4"}
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
 snarkos-errors = { path = "./errors", version = "1.1.4"}
 snarkos-models = { path = "./models", version = "1.1.4"}
 snarkos-network = { path = "./network", version = "1.1.4"}

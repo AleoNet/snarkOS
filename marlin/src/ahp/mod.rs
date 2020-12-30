@@ -355,10 +355,10 @@ impl<F: PrimeField> UnnormalizedBivariateLagrangePoly<F> for EvaluationDomain<F>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_curves::bls12_377::fr::Fr;
     use snarkos_models::curves::{One, Zero};
     use snarkos_utilities::rand::{test_rng, UniformRand};
     use snarkvm_algorithms::fft::{DenseOrSparsePolynomial, DensePolynomial};
+    use snarkvm_curves::bls12_377::fr::Fr;
 
     #[test]
     fn domain_unnormalized_bivariate_lagrange_poly() {

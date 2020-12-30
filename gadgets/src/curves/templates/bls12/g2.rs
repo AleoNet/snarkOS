@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::curves::templates::bls12::AffineGadget;
-use snarkos_curves::templates::bls12::{Bls12Parameters, TwistType};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, One},
@@ -26,6 +25,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_curves::templates::bls12::{Bls12Parameters, TwistType};
 
 use std::fmt::Debug;
 

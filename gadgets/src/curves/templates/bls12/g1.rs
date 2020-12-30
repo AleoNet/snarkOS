@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::curves::templates::bls12::AffineGadget;
-use snarkos_curves::templates::bls12::{Bls12Parameters, G1Prepared};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::ProjectiveCurve,
@@ -25,6 +24,7 @@ use snarkos_models::{
         utilities::{uint::UInt8, ToBytesGadget},
     },
 };
+use snarkvm_curves::templates::bls12::{Bls12Parameters, G1Prepared};
 
 use std::fmt::Debug;
 

@@ -628,7 +628,7 @@ mod tests {
     #![allow(non_camel_case_types)]
 
     use super::SonicKZG10;
-    use snarkos_curves::bls12_377::Bls12_377;
+    use snarkvm_curves::bls12_377::Bls12_377;
 
     type PC<E> = SonicKZG10<E>;
     type PC_Bls12_377 = PC<Bls12_377>;

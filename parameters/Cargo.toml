@@ -23,8 +23,8 @@ hex = { version = "0.4.2" }
 [dev-dependencies]
 snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
 snarkos-consensus = { path = "../consensus" }
-snarkos-curves = { path = "../curves" }
-snarkos-dpc = { path = "../dpc" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425" }
 snarkos-marlin = { path = "../marlin" }
 snarkos-objects = { path = "../objects" }
 snarkos-posw = { path = "../posw", features = ["test-helpers"] }

@@ -16,12 +16,12 @@
 
 use crate::{account::PrivateKey, errors::SignatureError};
 
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
+use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 
 use std::{fmt, str::FromStr};
 

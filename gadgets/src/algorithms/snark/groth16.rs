@@ -425,7 +425,6 @@ where
 mod test {
     use super::*;
     use crate::curves::bls12_377::PairingGadget as Bls12_377PairingGadget;
-    use snarkos_curves::bls12_377::{Bls12_377, Fq, Fr};
     use snarkos_models::{
         curves::PrimeField,
         gadgets::{
@@ -435,6 +434,7 @@ mod test {
     };
     use snarkos_utilities::{test_rng, to_bytes, BitIterator, ToBytes};
     use snarkvm_algorithms::snark::groth16::*;
+    use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr};
 
     use rand::Rng;
 

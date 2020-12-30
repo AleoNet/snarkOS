@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_curves::templates::twisted_edwards_extended::GroupAffine as TEAffine;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, MontgomeryModelParameters, TEModelParameters},
@@ -33,6 +32,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_curves::templates::twisted_edwards_extended::GroupAffine as TEAffine;
 
 use std::{borrow::Borrow, marker::PhantomData};
 
@@ -54,11 +54,11 @@ pub struct MontgomeryAffineGadget<P: TEModelParameters, F: Field, FG: FieldGadge
 
 mod montgomery_affine_impl {
     use super::*;
-    use snarkos_curves::templates::twisted_edwards_extended::GroupAffine;
     use snarkos_models::{
         curves::{Field, One, Zero},
         gadgets::r1cs::Assignment,
     };
+    use snarkvm_curves::templates::twisted_edwards_extended::GroupAffine;
     use std::ops::{AddAssign, MulAssign, SubAssign};
 
     impl<P: TEModelParameters, F: Field, FG: FieldGadget<P::BaseField, F>> MontgomeryAffineGadget<P, F, FG> {
@@ -607,11 +607,11 @@ mod affine_impl {
 
 mod projective_impl {
     use super::*;
-    use snarkos_curves::templates::twisted_edwards_extended::GroupProjective as TEProjective;
     use snarkos_models::{
         curves::{AffineCurve, Field, One, PrimeField, ProjectiveCurve, Zero},
         gadgets::r1cs::Assignment,
     };
+    use snarkvm_curves::templates::twisted_edwards_extended::GroupProjective as TEProjective;
     use std::ops::Neg;
 
     /// Based on 2 input bits, output on a group element from a 4 element table.

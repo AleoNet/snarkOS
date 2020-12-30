@@ -17,7 +17,6 @@
 #[macro_use]
 extern crate criterion;
 
-use snarkos_curves::bls12_377::{Bls12_377, Fr};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::SNARK,
@@ -25,6 +24,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 use snarkvm_algorithms::snark::gm17::GM17;
+use snarkvm_curves::bls12_377::{Bls12_377, Fr};
 
 use criterion::Criterion;
 use rand::{self, thread_rng, Rng};

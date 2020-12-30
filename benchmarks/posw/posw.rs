@@ -17,10 +17,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
-use snarkos_curves::bls12_377::Bls12_377;
 use snarkos_models::algorithms::snark::SNARK;
 use snarkos_posw::{txids_to_roots, Marlin, Posw, PoswMarlin, GM17};
 use snarkos_utilities::bytes::FromBytes;
+use snarkvm_curves::bls12_377::Bls12_377;
 
 fn gm17_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("Proof of Succinct Work: GM17");

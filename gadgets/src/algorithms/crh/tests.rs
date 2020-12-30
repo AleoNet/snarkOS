@@ -23,10 +23,6 @@ use crate::{
     },
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use snarkos_curves::{
-    bls12_377::Fr,
-    edwards_bls12::{EdwardsAffine, EdwardsProjective},
-};
 use snarkos_models::{
     algorithms::{CRHParameters, CRH},
     curves::{Field, PrimeField},
@@ -42,6 +38,10 @@ use snarkvm_algorithms::crh::{
     PedersenCRH,
     PedersenCompressedCRH,
     PedersenSize,
+};
+use snarkvm_curves::{
+    bls12_377::Fr,
+    edwards_bls12::{EdwardsAffine, EdwardsProjective},
 };
 
 use rand::{thread_rng, Rng};

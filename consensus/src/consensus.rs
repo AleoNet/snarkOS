@@ -15,15 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{difficulty::bitcoin_retarget, memory_pool::MemoryPool, MerkleTreeLedger};
-use snarkos_curves::bls12_377::Bls12_377;
-use snarkos_dpc::base_dpc::{
-    instantiated::*,
-    parameters::PublicParameters,
-    program::NoopProgram,
-    record::DPCRecord,
-    record_payload::RecordPayload,
-    BaseDPCComponents,
-};
 use snarkos_errors::consensus::ConsensusError;
 use snarkos_models::{
     algorithms::{CRH, SNARK},
@@ -47,6 +38,15 @@ use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
 use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_curves::bls12_377::Bls12_377;
+use snarkvm_dpc::base_dpc::{
+    instantiated::*,
+    parameters::PublicParameters,
+    program::NoopProgram,
+    record::DPCRecord,
+    record_payload::RecordPayload,
+    BaseDPCComponents,
+};
 
 use chrono::Utc;
 use rand::Rng;

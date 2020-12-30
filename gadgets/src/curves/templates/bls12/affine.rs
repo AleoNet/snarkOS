@@ -14,10 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_curves::templates::short_weierstrass::short_weierstrass_jacobian::{
-    GroupAffine as SWAffine,
-    GroupProjective as SWProjective,
-};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{AffineCurve, Field, One, PrimeField, ProjectiveCurve, SWModelParameters, Zero},
@@ -36,6 +32,10 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_curves::templates::short_weierstrass::short_weierstrass_jacobian::{
+    GroupAffine as SWAffine,
+    GroupProjective as SWProjective,
+};
 
 use std::{borrow::Borrow, marker::PhantomData, ops::Neg};
 

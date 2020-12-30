@@ -450,8 +450,8 @@ mod tests {
     #![allow(non_camel_case_types)]
     use crate::{kzg10::*, *};
 
-    use snarkos_curves::bls12_377::{Bls12_377, Fr};
     use snarkos_utilities::rand::test_rng;
+    use snarkvm_curves::bls12_377::{Bls12_377, Fr};
 
     type KZG_Bls12_377 = KZG10<Bls12_377>;
 

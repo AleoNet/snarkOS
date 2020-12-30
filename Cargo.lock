@@ -2515,7 +2515,6 @@ dependencies = [
  "self_update",
  "serde",
  "snarkos-consensus",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-network",
@@ -2524,6 +2523,7 @@ dependencies = [
  "snarkos-rpc",
  "snarkos-storage",
  "snarkos-utilities",
+ "snarkvm-dpc",
  "tokio 0.2.22",
  "toml",
  "tracing",
@@ -2544,7 +2544,6 @@ dependencies = [
  "rayon",
  "sha2",
  "smallvec 1.4.2",
- "snarkos-curves",
  "snarkos-errors",
  "snarkos-marlin",
  "snarkos-models",
@@ -2552,6 +2551,7 @@ dependencies = [
  "snarkos-profiler",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
 ]
 
 [[package]]
@@ -2566,8 +2566,6 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "serde",
- "snarkos-curves",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-objects",
@@ -2577,23 +2575,10 @@ dependencies = [
  "snarkos-testing",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-dpc",
  "tokio 0.2.22",
  "tracing",
-]
-
-[[package]]
-name = "snarkos-curves"
-version = "1.1.4"
-dependencies = [
- "criterion",
- "derivative",
- "rand",
- "rand_xorshift",
- "rustc_version",
- "serde",
- "snarkos-errors",
- "snarkos-models",
- "snarkos-utilities",
 ]
 
 [[package]]
@@ -2603,29 +2588,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "snarkos-dpc"
-version = "1.1.4"
-dependencies = [
- "blake2",
- "criterion",
- "derivative",
- "hex",
- "itertools",
- "rand",
- "rand_xorshift",
- "snarkos-curves",
- "snarkos-errors",
- "snarkos-gadgets",
- "snarkos-models",
- "snarkos-objects",
- "snarkos-parameters",
- "snarkos-profiler",
- "snarkos-testing",
- "snarkos-utilities",
- "snarkvm-algorithms",
 ]
 
 [[package]]
@@ -2653,11 +2615,11 @@ dependencies = [
  "itertools",
  "rand",
  "rand_xorshift",
- "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
 ]
 
 [[package]]
@@ -2670,7 +2632,6 @@ dependencies = [
  "rand_chacha",
  "rand_core",
  "rayon",
- "snarkos-curves",
  "snarkos-errors",
  "snarkos-gadgets",
  "snarkos-models",
@@ -2678,6 +2639,7 @@ dependencies = [
  "snarkos-profiler",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
 ]
 
 [[package]]
@@ -2711,7 +2673,6 @@ dependencies = [
  "serde",
  "serial_test",
  "snarkos-consensus",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-objects",
@@ -2719,6 +2680,7 @@ dependencies = [
  "snarkos-testing",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-dpc",
  "tokio 0.2.22",
  "tokio-test",
  "tracing",
@@ -2739,12 +2701,12 @@ dependencies = [
  "rand",
  "serde",
  "sha2",
- "snarkos-curves",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-dpc",
 ]
 
 [[package]]
@@ -2757,8 +2719,6 @@ dependencies = [
  "parking_lot 0.11.1",
  "rand",
  "snarkos-consensus",
- "snarkos-curves",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-marlin",
  "snarkos-models",
@@ -2767,6 +2727,8 @@ dependencies = [
  "snarkos-storage",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-dpc",
 ]
 
 [[package]]
@@ -2779,12 +2741,12 @@ dependencies = [
  "rand",
  "rand_core",
  "rayon",
- "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-profiler",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
 ]
 
 [[package]]
@@ -2794,7 +2756,6 @@ dependencies = [
  "blake2",
  "rand",
  "rand_xorshift",
- "snarkos-curves",
  "snarkos-errors",
  "snarkos-gadgets",
  "snarkos-marlin",
@@ -2805,6 +2766,7 @@ dependencies = [
  "snarkos-profiler",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
  "thiserror",
 ]
 
@@ -2832,7 +2794,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snarkos-consensus",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-network",
@@ -2840,6 +2801,7 @@ dependencies = [
  "snarkos-storage",
  "snarkos-testing",
  "snarkos-utilities",
+ "snarkvm-dpc",
  "tokio 0.2.22",
 ]
 
@@ -2854,7 +2816,6 @@ dependencies = [
  "rocksdb",
  "serde",
  "snarkos-consensus",
- "snarkos-curves",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-objects",
@@ -2862,6 +2823,7 @@ dependencies = [
  "snarkos-testing",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
 ]
 
 [[package]]
@@ -2872,8 +2834,6 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "snarkos-consensus",
- "snarkos-curves",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-network",
@@ -2883,6 +2843,8 @@ dependencies = [
  "snarkos-storage",
  "snarkos-utilities",
  "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-dpc",
  "tokio 0.2.22",
 ]
 
@@ -2894,11 +2856,11 @@ dependencies = [
  "hex",
  "rand",
  "rand_chacha",
- "snarkos-dpc",
  "snarkos-errors",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-utilities",
+ "snarkvm-dpc",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -2936,6 +2898,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkvm-curves"
+version = "0.0.1"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=0282425#02824253dd22e565eacd60516f0cf542c936741a"
+dependencies = [
+ "derivative",
+ "rand",
+ "rand_xorshift",
+ "rustc_version",
+ "serde",
+ "snarkvm-errors",
+ "snarkvm-models",
+ "snarkvm-utilities",
+]
+
+[[package]]
 name = "snarkvm-derives"
 version = "0.0.1"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=0282425#02824253dd22e565eacd60516f0cf542c936741a"
@@ -2943,6 +2920,27 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "snarkvm-dpc"
+version = "0.0.1"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=0282425#02824253dd22e565eacd60516f0cf542c936741a"
+dependencies = [
+ "blake2",
+ "derivative",
+ "hex",
+ "itertools",
+ "rand",
+ "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-errors",
+ "snarkvm-gadgets",
+ "snarkvm-models",
+ "snarkvm-objects",
+ "snarkvm-parameters",
+ "snarkvm-profiler",
+ "snarkvm-utilities",
 ]
 
 [[package]]
@@ -2962,6 +2960,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkvm-gadgets"
+version = "0.0.1"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=0282425#02824253dd22e565eacd60516f0cf542c936741a"
+dependencies = [
+ "derivative",
+ "digest 0.8.1",
+ "itertools",
+ "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-errors",
+ "snarkvm-models",
+ "snarkvm-utilities",
+]
+
+[[package]]
 name = "snarkvm-models"
 version = "0.0.1"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=0282425#02824253dd22e565eacd60516f0cf542c936741a"
@@ -2976,6 +2989,40 @@ dependencies = [
  "rand_xorshift",
  "serde",
  "snarkvm-errors",
+ "snarkvm-utilities",
+]
+
+[[package]]
+name = "snarkvm-objects"
+version = "0.0.1"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=0282425#02824253dd22e565eacd60516f0cf542c936741a"
+dependencies = [
+ "base58",
+ "bech32",
+ "chrono",
+ "derivative",
+ "hex",
+ "once_cell",
+ "rand",
+ "serde",
+ "sha2",
+ "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-errors",
+ "snarkvm-models",
+ "snarkvm-utilities",
+]
+
+[[package]]
+name = "snarkvm-parameters"
+version = "0.0.1"
+source = "git+https://github.com/AleoHQ/snarkVM.git?rev=0282425#02824253dd22e565eacd60516f0cf542c936741a"
+dependencies = [
+ "curl",
+ "hex",
+ "snarkvm-algorithms",
+ "snarkvm-errors",
+ "snarkvm-models",
  "snarkvm-utilities",
 ]
 

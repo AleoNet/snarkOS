@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::curves::tests_group::group_test;
-use snarkos_curves::templates::twisted_edwards_extended::GroupAffine as TEAffine;
 use snarkos_models::{
     curves::{Field, Group, PrimeField, TEModelParameters},
     gadgets::{
@@ -29,6 +28,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::{bititerator::BitIterator, rand::UniformRand};
+use snarkvm_curves::templates::twisted_edwards_extended::GroupAffine as TEAffine;
 
 use rand::thread_rng;
 

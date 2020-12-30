@@ -27,13 +27,13 @@ use crate::{
     Server,
 };
 use snarkos_consensus::memory_pool::Entry;
-use snarkos_dpc::base_dpc::instantiated::Tx;
 use snarkos_errors::network::ServerError;
 use snarkos_objects::Block as BlockStruct;
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
+use snarkvm_dpc::base_dpc::instantiated::Tx;
 
 use chrono::Utc;
 use std::{net::SocketAddr, sync::Arc};

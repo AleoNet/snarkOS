@@ -14,14 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_dpc::base_dpc::{
-    inner_circuit::InnerCircuit,
-    instantiated::Components,
-    outer_circuit::OuterCircuit,
-    parameters::{NoopProgramSNARKParameters, SystemParameters},
-    program::{NoopCircuit, PrivateProgramInput},
-    BaseDPCComponents,
-};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{MerkleParameters, SNARK},
@@ -33,6 +25,14 @@ use snarkos_utilities::{
     to_bytes,
 };
 use snarkvm_algorithms::crh::sha256::sha256;
+use snarkvm_dpc::base_dpc::{
+    inner_circuit::InnerCircuit,
+    instantiated::Components,
+    outer_circuit::OuterCircuit,
+    parameters::{NoopProgramSNARKParameters, SystemParameters},
+    program::{NoopCircuit, PrivateProgramInput},
+    BaseDPCComponents,
+};
 
 use rand::thread_rng;
 use std::path::PathBuf;

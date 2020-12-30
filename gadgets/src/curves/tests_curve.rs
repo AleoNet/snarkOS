@@ -18,7 +18,6 @@ use crate::curves::{
     bls12_377::{G1Gadget, G1PreparedGadget, G2Gadget, G2PreparedGadget},
     templates::bls12::Bls12PairingGadget,
 };
-use snarkos_curves::bls12_377::{Bls12_377, Fq, Fr, G1Projective, G2Projective};
 use snarkos_models::{
     curves::{Field, One, PairingEngine, PrimeField, ProjectiveCurve},
     gadgets::{
@@ -28,6 +27,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::bititerator::BitIterator;
+use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr, G1Projective, G2Projective};
 
 use std::ops::Mul;
 

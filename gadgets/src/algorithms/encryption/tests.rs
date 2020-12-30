@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{algorithms::encryption::*, curves::edwards_bls12::EdwardsBlsGadget};
-use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective};
 use snarkos_models::{
     algorithms::EncryptionScheme,
     curves::{Group, ProjectiveCurve},
@@ -26,6 +25,7 @@ use snarkos_models::{
     },
 };
 use snarkvm_algorithms::encryption::GroupEncryption;
+use snarkvm_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;

@@ -22,7 +22,6 @@ use crate::{
     },
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
     curves::Field,
@@ -38,6 +37,7 @@ use snarkvm_algorithms::{
     commitment_tree::*,
     crh::{BoweHopwoodPedersenCompressedCRH, PedersenSize},
 };
+use snarkvm_curves::{bls12_377::Fr, edwards_bls12::EdwardsProjective as EdwardsBls};
 
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;

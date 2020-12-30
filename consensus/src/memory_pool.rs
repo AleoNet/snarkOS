@@ -240,9 +240,9 @@ impl<T: Transaction> Default for MemoryPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_dpc::base_dpc::instantiated::Tx;
     use snarkos_objects::Block;
     use snarkos_testing::{consensus::*, storage::*};
+    use snarkvm_dpc::base_dpc::instantiated::Tx;
 
     use std::sync::Arc;
 

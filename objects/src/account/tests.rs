@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::account::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 use snarkos_models::objects::account::AccountScheme;
+use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 
 use rand::thread_rng;
 use std::str::FromStr;

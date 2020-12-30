@@ -20,10 +20,6 @@
 
 use crate::{rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
-};
 use snarkos_errors::rpc::RpcError;
 use snarkos_models::objects::Transaction;
 use snarkos_network::{
@@ -35,6 +31,10 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
     CanonicalSerialize,
+};
+use snarkvm_dpc::base_dpc::{
+    instantiated::{Components, Tx},
+    parameters::PublicParameters,
 };
 
 use chrono::Utc;

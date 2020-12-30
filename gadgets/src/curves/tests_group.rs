@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::curves::edwards_bls12::EdwardsBlsGadget;
-use snarkos_curves::edwards_bls12::{EdwardsProjective, Fq};
 use snarkos_models::{
     curves::{Field, Group},
     gadgets::{
@@ -24,6 +23,7 @@ use snarkos_models::{
         utilities::alloc::AllocGadget,
     },
 };
+use snarkvm_curves::edwards_bls12::{EdwardsProjective, Fq};
 
 pub fn group_test<F: Field, G: Group, GG: GroupGadget<G, F>, CS: ConstraintSystem<F>>(cs: &mut CS, a: GG, b: GG) {
     let zero = GG::zero(cs.ns(|| "Zero")).unwrap();

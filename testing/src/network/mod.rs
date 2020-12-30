@@ -16,12 +16,12 @@
 
 use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{
     external::{Channel, SyncHandler},
     internal::context::Context,
     Server,
 };
+use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};

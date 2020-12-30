@@ -20,7 +20,7 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies]
-snarkos-dpc = { path = "../dpc", version = "1.1.4", default-features = false }
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1", default-features = false }
 snarkos-errors = { path = "../errors", version = "1.1.4", default-features = false }
 snarkos-models = { path = "../models", version = "1.1.4", default-features = false }
 snarkos-objects = { path = "../objects", version = "1.1.4", default-features = false }
