@@ -12,17 +12,17 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" } # needed to instantiate with BLS12-377
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
-snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
-snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
-snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" } # needed to instantiate with BLS12-377
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" } # needed to instantiate with BLS12-377
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
+snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
+snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
+snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" } # needed to instantiate with BLS12-377
+snarkvm-parameters = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "3c1b4a3", version = "0.0.1" }
 
-snarkos-parameters = { path = "../parameters", version = "1.1.4"}
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
 
 blake2 = { version = "0.8.1" }
