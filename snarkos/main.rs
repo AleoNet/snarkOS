@@ -17,7 +17,7 @@
 #[macro_use]
 extern crate tracing;
 
-use crate::{
+use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
     display::render_init,
