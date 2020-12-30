@@ -16,13 +16,13 @@
 
 use crate::{String, ToString, Vec};
 use core::{borrow::Borrow, marker::PhantomData};
-use snarkos_algorithms::{cfg_iter_mut, fft::EvaluationDomain};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
     gadgets::r1cs::ConstraintSynthesizer,
 };
 use snarkos_polycommit::{LCTerm, LabeledPolynomial, LinearCombination};
+use snarkvm_algorithms::{cfg_iter_mut, fft::EvaluationDomain};
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -355,10 +355,10 @@ impl<F: PrimeField> UnnormalizedBivariateLagrangePoly<F> for EvaluationDomain<F>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_algorithms::fft::{DenseOrSparsePolynomial, DensePolynomial};
     use snarkos_curves::bls12_377::fr::Fr;
     use snarkos_models::curves::{One, Zero};
     use snarkos_utilities::rand::{test_rng, UniformRand};
+    use snarkvm_algorithms::fft::{DenseOrSparsePolynomial, DensePolynomial};
 
     #[test]
     fn domain_unnormalized_bivariate_lagrange_poly() {
@@ -411,7 +411,7 @@ mod tests {
 
     #[test]
     fn test_alternator_polynomial() {
-        use snarkos_algorithms::fft::Evaluations;
+        use snarkvm_algorithms::fft::Evaluations;
         let domain_k = EvaluationDomain::<Fr>::new(1 << 4).unwrap();
         let domain_h = EvaluationDomain::<Fr>::new(1 << 3).unwrap();
         let domain_h_elems = domain_h.elements().collect::<std::collections::HashSet<_>>();

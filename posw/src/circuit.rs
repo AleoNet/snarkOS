@@ -116,11 +116,6 @@ impl<F: PrimeField, M: MaskedMerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP:
 #[cfg(test)]
 mod test {
     use super::{POSWCircuit, POSWCircuitParameters};
-    use snarkos_algorithms::{
-        crh::{PedersenCompressedCRH, PedersenSize},
-        define_masked_merkle_tree_parameters,
-        snark::gm17::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof},
-    };
     use snarkos_curves::{
         bls12_377::{Bls12_377, Fr},
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
@@ -128,6 +123,11 @@ mod test {
     use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
     use snarkos_models::curves::to_field_vec::ToConstraintField;
     use snarkos_utilities::bytes::ToBytes;
+    use snarkvm_algorithms::{
+        crh::{PedersenCompressedCRH, PedersenSize},
+        define_masked_merkle_tree_parameters,
+        snark::gm17::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof},
+    };
 
     use blake2::{digest::Digest, Blake2s};
     use rand::thread_rng;

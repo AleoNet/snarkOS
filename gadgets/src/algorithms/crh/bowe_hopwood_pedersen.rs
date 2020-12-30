@@ -15,12 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::algorithms::crh::pedersen::PedersenCRHParametersGadget;
-use snarkos_algorithms::crh::{
-    BoweHopwoodPedersenCRH,
-    BoweHopwoodPedersenCompressedCRH,
-    PedersenSize,
-    BOWE_HOPWOOD_CHUNK_SIZE,
-};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group, ProjectiveCurve},
@@ -33,6 +27,12 @@ use snarkos_models::{
             uint::unsigned_integer::{UInt, UInt8},
         },
     },
+};
+use snarkvm_algorithms::crh::{
+    BoweHopwoodPedersenCRH,
+    BoweHopwoodPedersenCompressedCRH,
+    PedersenSize,
+    BOWE_HOPWOOD_CHUNK_SIZE,
 };
 
 use std::marker::PhantomData;

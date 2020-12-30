@@ -21,7 +21,6 @@ use core::{
     ops::{AddAssign, MulAssign, SubAssign},
 };
 use rand_core::RngCore;
-pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::Field;
 use snarkos_utilities::{
@@ -29,6 +28,7 @@ use snarkos_utilities::{
     error as error_fn,
     serialize::*,
 };
+pub use snarkvm_algorithms::fft::DensePolynomial as Polynomial;
 
 /// Labels a `LabeledPolynomial` or a `LabeledCommitment`.
 pub type PolynomialLabel = String;

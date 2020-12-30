@@ -21,13 +21,13 @@ use crate::base_dpc::{
     record_encryption::RecordEncryptionGadgetComponents,
     BaseDPCComponents,
 };
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, CRH},
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 use snarkos_objects::{AccountPrivateKey, AleoAmount};
+use snarkvm_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]

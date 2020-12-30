@@ -15,13 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::account_format;
-use snarkos_algorithms::prf::Blake2s;
 use snarkos_errors::objects::AccountError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, PRF},
     dpc::DPCComponents,
 };
 use snarkos_utilities::{bytes_to_bits, to_bytes, FromBytes, ToBytes};
+use snarkvm_algorithms::prf::Blake2s;
 
 use base58::{FromBase58, ToBase58};
 use rand::Rng;

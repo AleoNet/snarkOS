@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.1.4"}
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
 snarkos-curves = { path = "../curves", version = "1.1.4"} # needed to instantiate with BLS12-377
 snarkos-errors = { path = "../errors", version = "1.1.4"}
 snarkos-gadgets = { path = "../gadgets", version = "1.1.4"}

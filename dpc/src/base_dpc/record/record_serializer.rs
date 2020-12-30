@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::base_dpc::{record::DPCRecord, record_payload::RecordPayload, BaseDPCComponents};
-use snarkos_algorithms::encoding::Elligator2;
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, CRH},
@@ -23,6 +22,7 @@ use snarkos_models::{
     dpc::{DPCComponents, Record, RecordSerializerScheme},
 };
 use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, BigInteger, FromBytes, ToBytes};
+use snarkvm_algorithms::encoding::Elligator2;
 
 use itertools::Itertools;
 use std::marker::PhantomData;

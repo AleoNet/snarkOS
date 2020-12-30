@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{BlockHeaderHash, MerkleRootHash, PedersenMerkleRootHash, ProofOfSuccinctWork};
-use snarkos_algorithms::crh::{double_sha256, sha256d_to_u64};
 use snarkos_utilities::bytes::{FromBytes, ToBytes};
+use snarkvm_algorithms::crh::{double_sha256, sha256d_to_u64};
 
 use serde::{Deserialize, Serialize};
 use std::{

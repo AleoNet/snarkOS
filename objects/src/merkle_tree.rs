@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::crh::double_sha256;
+use snarkvm_algorithms::crh::double_sha256;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MerkleTreeRootHash([u8; 32]);

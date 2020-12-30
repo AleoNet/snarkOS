@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkos_algorithms::merkle_tree::*;
 use snarkos_errors::dpc::LedgerError;
 use snarkos_models::{
     algorithms::LoadableMerkleParameters,
@@ -26,6 +25,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
+use snarkvm_algorithms::merkle_tree::*;
 
 use parking_lot::RwLock;
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};

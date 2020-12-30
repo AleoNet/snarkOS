@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::algorithms::prf::*;
-use snarkos_algorithms::prf::blake2s::Blake2s as B2SPRF;
 use snarkos_curves::bls12_377::Fr;
 use snarkos_models::{
     algorithms::PRF,
@@ -30,6 +29,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkvm_algorithms::prf::blake2s::Blake2s as B2SPRF;
 
 use blake2::VarBlake2s;
 use digest::{Input, VariableOutput};

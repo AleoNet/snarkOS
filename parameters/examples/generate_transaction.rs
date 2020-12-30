@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
 use snarkos_errors::dpc::{DPCError, LedgerError};
@@ -32,6 +31,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
+use snarkvm_algorithms::merkle_tree::MerkleTree;
 
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};

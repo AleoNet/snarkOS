@@ -18,7 +18,6 @@ use crate::{
     algorithms::signature::{SchnorrParametersGadget, SchnorrPublicKeyGadget, SchnorrPublicKeyRandomizationGadget},
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use snarkos_algorithms::signature::SchnorrSignature;
 use snarkos_curves::{bls12_377::Fr, edwards_bls12::EdwardsAffine};
 use snarkos_models::{
     algorithms::SignatureScheme,
@@ -30,6 +29,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkvm_algorithms::signature::SchnorrSignature;
 
 use blake2::Blake2s;
 use rand::{thread_rng, Rng};

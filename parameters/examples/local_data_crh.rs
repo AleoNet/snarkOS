@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_dpc::base_dpc::instantiated::Components;
 use snarkos_errors::algorithms::CRHError;
 use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_algorithms::crh::sha256::sha256;
 
 use rand::thread_rng;
 use std::{

@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::signature::{SchnorrParameters, SchnorrPublicKey, SchnorrSignature};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, Group},
@@ -32,6 +31,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::serialize::{CanonicalDeserialize, CanonicalSerialize};
+use snarkvm_algorithms::signature::{SchnorrParameters, SchnorrPublicKey, SchnorrSignature};
 
 use digest::Digest;
 use itertools::Itertools;

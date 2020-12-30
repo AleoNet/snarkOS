@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::algorithms::prf::{blake2s_gadget, Blake2sOutputGadget};
-use snarkos_algorithms::commitment::Blake2sCommitment;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{Field, PrimeField},
@@ -29,6 +28,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkvm_algorithms::commitment::Blake2sCommitment;
 
 use std::borrow::Borrow;
 

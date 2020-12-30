@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::crh::sha256::sha256;
 use snarkos_errors::parameters::ParametersError;
 use snarkos_models::parameters::Parameters;
+use snarkvm_algorithms::crh::sha256::sha256;
 
 use std::{
     fs::{self, File},

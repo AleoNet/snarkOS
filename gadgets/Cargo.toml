@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.1.4", default-features = false }
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1", default-features = false }
 snarkos-curves = { path = "../curves", version = "1.1.4", default-features = false }
 snarkos-errors = { path = "../errors", version = "1.1.4", default-features = false }
 snarkos-models = { path = "../models", version = "1.1.4", default-features = false }
@@ -29,7 +29,7 @@ rand_xorshift = { version = "0.2" }
 
 [features]
 default = [
-    "snarkos-algorithms/default",
+    "snarkvm-algorithms/default",
     "snarkos-curves/default",
     "snarkos-errors/default",
     "snarkos-models/default",

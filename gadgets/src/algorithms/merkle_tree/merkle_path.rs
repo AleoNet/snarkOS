@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::merkle_tree::MerklePath;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH},
@@ -30,6 +29,7 @@ use snarkos_models::{
         },
     },
 };
+use snarkvm_algorithms::merkle_tree::MerklePath;
 
 use std::borrow::Borrow;
 

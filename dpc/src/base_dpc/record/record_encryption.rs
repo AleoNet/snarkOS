@@ -20,7 +20,6 @@ use crate::base_dpc::{
     record_payload::RecordPayload,
     BaseDPCComponents,
 };
-use snarkos_algorithms::encoding::Elligator2;
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, CRH},
@@ -29,6 +28,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{AccountAddress, AccountViewKey};
 use snarkos_utilities::{bits_to_bytes, bytes_to_bits, to_bytes, FromBytes, ToBytes};
+use snarkvm_algorithms::encoding::Elligator2;
 
 use itertools::Itertools;
 use rand::Rng;

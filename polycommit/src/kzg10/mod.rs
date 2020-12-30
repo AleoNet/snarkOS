@@ -25,12 +25,12 @@ use crate::{Error, LabeledPolynomial, PCRandomness, Polynomial, ToString, Vec};
 use rand_core::RngCore;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
-use snarkos_algorithms::{
+use snarkos_models::curves::{AffineCurve, Group, One, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero};
+use snarkos_utilities::rand::UniformRand;
+use snarkvm_algorithms::{
     cfg_iter,
     msm::{FixedBaseMSM, VariableBaseMSM},
 };
-use snarkos_models::curves::{AffineCurve, Group, One, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero};
-use snarkos_utilities::rand::UniformRand;
 
 use core::marker::PhantomData;
 

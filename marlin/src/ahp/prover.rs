@@ -21,12 +21,6 @@ use crate::ahp::{constraint_systems::ProverConstraintSystem, indexer::*, verifie
 use crate::{ToString, Vec};
 use core::marker::PhantomData;
 use rand_core::RngCore;
-use snarkos_algorithms::{
-    cfg_into_iter,
-    cfg_iter,
-    cfg_iter_mut,
-    fft::{EvaluationDomain, Evaluations as EvaluationsOnDomain},
-};
 use snarkos_errors::{gadgets::SynthesisError, serialization::SerializationError};
 use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
@@ -34,6 +28,12 @@ use snarkos_models::{
 };
 use snarkos_polycommit::{LabeledPolynomial, Polynomial};
 use snarkos_utilities::{bytes::ToBytes, error, serialize::*};
+use snarkvm_algorithms::{
+    cfg_into_iter,
+    cfg_iter,
+    cfg_iter_mut,
+    fft::{EvaluationDomain, Evaluations as EvaluationsOnDomain},
+};
 use std::io::Write;
 
 /// State for the AHP prover.

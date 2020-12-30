@@ -19,9 +19,9 @@
 use crate::ahp::{indexer::IndexInfo, *};
 use rand_core::RngCore;
 
-use snarkos_algorithms::fft::EvaluationDomain;
 use snarkos_models::{curves::PrimeField, gadgets::r1cs::ConstraintSynthesizer};
 use snarkos_polycommit::QuerySet;
+use snarkvm_algorithms::fft::EvaluationDomain;
 
 /// State of the AHP verifier
 pub struct VerifierState<F: PrimeField, C> {

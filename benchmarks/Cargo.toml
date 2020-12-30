@@ -22,7 +22,7 @@ path = "posw/posw.rs"
 harness = false
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.1.4"}
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
 snarkos-curves = { path = "../curves", version = "1.1.4"}
 snarkos-errors = { path = "../errors", version = "1.1.4"}
 snarkos-marlin = { path = "../marlin", version = "1.1.4"}

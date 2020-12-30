@@ -16,10 +16,6 @@
 
 use super::*;
 use crate::curves::edwards_bls12::EdwardsBlsGadget;
-use snarkos_algorithms::{
-    commitment::{Blake2sCommitment, PedersenCommitment},
-    crh::PedersenSize,
-};
 use snarkos_curves::edwards_bls12::{EdwardsProjective, Fq, Fr};
 use snarkos_models::{
     algorithms::CommitmentScheme,
@@ -31,6 +27,10 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::rand::UniformRand;
+use snarkvm_algorithms::{
+    commitment::{Blake2sCommitment, PedersenCommitment},
+    crh::PedersenSize,
+};
 
 use rand::{thread_rng, Rng};
 

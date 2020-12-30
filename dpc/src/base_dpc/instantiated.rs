@@ -25,15 +25,6 @@ use crate::base_dpc::{
     LocalData as DPCLocalData,
     DPC,
 };
-use snarkos_algorithms::{
-    commitment::{Blake2sCommitment, PedersenCompressedCommitment},
-    crh::{BoweHopwoodPedersenCompressedCRH, PedersenSize},
-    define_merkle_tree_parameters,
-    encryption::GroupEncryption,
-    prf::Blake2s,
-    signature::SchnorrSignature,
-    snark::{gm17::GM17, groth16::Groth16},
-};
 use snarkos_curves::{
     bls12_377::{fq::Fq as Bls12_377Fq, fr::Fr as Bls12_377Fr, Bls12_377},
     bw6_761::BW6_761,
@@ -52,6 +43,15 @@ use snarkos_gadgets::{
     curves::{bls12_377::PairingGadget, edwards_bls12::EdwardsBlsGadget, edwards_sw6::EdwardsSWGadget},
 };
 use snarkos_models::dpc::DPCComponents;
+use snarkvm_algorithms::{
+    commitment::{Blake2sCommitment, PedersenCompressedCommitment},
+    crh::{BoweHopwoodPedersenCompressedCRH, PedersenSize},
+    define_merkle_tree_parameters,
+    encryption::GroupEncryption,
+    prf::Blake2s,
+    signature::SchnorrSignature,
+    snark::{gm17::GM17, groth16::Groth16},
+};
 
 use blake2::Blake2s as Blake2sHash;
 

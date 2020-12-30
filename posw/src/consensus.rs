@@ -17,7 +17,6 @@
 //! Generic PoSW Miner and Verifier, compatible with any implementer of the SNARK trait.
 
 use crate::circuit::{POSWCircuit, POSWCircuitParameters};
-use snarkos_algorithms::crh::sha256d_to_u64;
 use snarkos_curves::{
     bls12_377::Fr,
     edwards_bls12::{EdwardsProjective, Fq},
@@ -42,6 +41,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
+use snarkvm_algorithms::crh::sha256d_to_u64;
 
 use blake2::{digest::Digest, Blake2s};
 use rand::{rngs::OsRng, Rng};

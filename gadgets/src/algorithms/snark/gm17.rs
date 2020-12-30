@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::snark::gm17::{Proof, VerifyingKey, GM17};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, PairingEngine},
@@ -32,6 +31,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::bytes::FromBytes;
+use snarkvm_algorithms::snark::gm17::{Proof, VerifyingKey, GM17};
 
 use std::{borrow::Borrow, marker::PhantomData};
 

@@ -20,7 +20,6 @@ use crate::base_dpc::{
     record_encryption::RecordEncryptionGadgetComponents,
     BaseDPCComponents,
 };
-use snarkos_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_gadgets::algorithms::{encoding::Elligator2FieldGadget, merkle_tree::merkle_path::MerklePathGadget};
 use snarkos_models::{
@@ -58,6 +57,7 @@ use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
+use snarkvm_algorithms::merkle_tree::{MerklePath, MerkleTreeDigest};
 
 use snarkos_models::gadgets::utilities::eq::NEqGadget;
 use std::ops::Mul;

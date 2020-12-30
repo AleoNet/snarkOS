@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::base_dpc::{record::encrypted_record::*, BaseDPCComponents};
-use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::objects::TransactionError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, SignatureScheme, CRH, SNARK},
@@ -27,6 +26,7 @@ use snarkos_utilities::{
     serialize::{CanonicalDeserialize, CanonicalSerialize},
     to_bytes,
 };
+use snarkvm_algorithms::merkle_tree::MerkleTreeDigest;
 
 use blake2::{digest::Digest, Blake2s as b2s};
 use std::{

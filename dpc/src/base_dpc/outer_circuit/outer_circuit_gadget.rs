@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::base_dpc::{parameters::SystemParameters, program::PrivateProgramInput, BaseDPCComponents};
-use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
@@ -33,6 +32,7 @@ use snarkos_models::{
 };
 use snarkos_objects::AleoAmount;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_algorithms::merkle_tree::MerkleTreeDigest;
 
 use itertools::Itertools;
 

@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_errors::storage::StorageError;
 use snarkos_models::{
     algorithms::LoadableMerkleParameters,
@@ -26,6 +25,7 @@ use snarkos_models::{
 use snarkos_objects::Block;
 use snarkos_parameters::{GenesisBlock, LedgerMerkleTreeParameters};
 use snarkos_utilities::bytes::FromBytes;
+use snarkvm_algorithms::merkle_tree::MerkleTree;
 
 use parking_lot::RwLock;
 use std::{

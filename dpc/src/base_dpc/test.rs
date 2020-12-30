@@ -26,7 +26,6 @@ use crate::base_dpc::{
     ExecuteContext,
     DPC,
 };
-use snarkos_algorithms::merkle_tree::MerklePath;
 use snarkos_curves::bls12_377::{Fq, Fr};
 use snarkos_models::{
     algorithms::{MerkleParameters, CRH, SNARK},
@@ -46,6 +45,7 @@ use snarkos_objects::{
 };
 use snarkos_testing::storage::*;
 use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_algorithms::merkle_tree::MerklePath;
 
 use itertools::Itertools;
 use rand::SeedableRng;

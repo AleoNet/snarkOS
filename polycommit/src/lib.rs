@@ -32,7 +32,6 @@ extern crate derivative;
 #[macro_use]
 extern crate snarkos_profiler;
 
-pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::Field;
 use snarkos_utilities::{
@@ -40,6 +39,7 @@ use snarkos_utilities::{
     error as error_fn,
     serialize::*,
 };
+pub use snarkvm_algorithms::fft::DensePolynomial as Polynomial;
 
 use core::{fmt::Debug, iter::FromIterator};
 use rand_core::RngCore;

@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::snark::groth16::{Groth16, Proof, VerifyingKey};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     curves::{to_field_vec::ToConstraintField, AffineCurve, Field, PairingEngine},
@@ -32,6 +31,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::bytes::FromBytes;
+use snarkvm_algorithms::snark::groth16::{Groth16, Proof, VerifyingKey};
 
 use std::{borrow::Borrow, marker::PhantomData};
 
@@ -425,7 +425,6 @@ where
 mod test {
     use super::*;
     use crate::curves::bls12_377::PairingGadget as Bls12_377PairingGadget;
-    use snarkos_algorithms::snark::groth16::*;
     use snarkos_curves::bls12_377::{Bls12_377, Fq, Fr};
     use snarkos_models::{
         curves::PrimeField,
@@ -435,6 +434,7 @@ mod test {
         },
     };
     use snarkos_utilities::{test_rng, to_bytes, BitIterator, ToBytes};
+    use snarkvm_algorithms::snark::groth16::*;
 
     use rand::Rng;
 

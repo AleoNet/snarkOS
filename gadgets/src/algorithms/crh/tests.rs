@@ -23,13 +23,6 @@ use crate::{
     },
     curves::edwards_bls12::EdwardsBlsGadget,
 };
-use snarkos_algorithms::crh::{
-    BoweHopwoodPedersenCRH,
-    BoweHopwoodPedersenCompressedCRH,
-    PedersenCRH,
-    PedersenCompressedCRH,
-    PedersenSize,
-};
 use snarkos_curves::{
     bls12_377::Fr,
     edwards_bls12::{EdwardsAffine, EdwardsProjective},
@@ -42,6 +35,13 @@ use snarkos_models::{
         r1cs::{ConstraintSystem, TestConstraintSystem},
         utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
     },
+};
+use snarkvm_algorithms::crh::{
+    BoweHopwoodPedersenCRH,
+    BoweHopwoodPedersenCompressedCRH,
+    PedersenCRH,
+    PedersenCompressedCRH,
+    PedersenSize,
 };
 
 use rand::{thread_rng, Rng};

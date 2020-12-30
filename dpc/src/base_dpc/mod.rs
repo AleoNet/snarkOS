@@ -15,10 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::base_dpc::record_payload::RecordPayload;
-use snarkos_algorithms::{
-    commitment_tree::CommitmentMerkleTree,
-    merkle_tree::{MerklePath, MerkleTreeDigest},
-};
 use snarkos_errors::dpc::DPCError;
 use snarkos_models::{
     algorithms::{
@@ -42,6 +38,10 @@ use snarkos_utilities::{
     has_duplicates,
     rand::UniformRand,
     to_bytes,
+};
+use snarkvm_algorithms::{
+    commitment_tree::CommitmentMerkleTree,
+    merkle_tree::{MerklePath, MerkleTreeDigest},
 };
 
 use itertools::{izip, Itertools};

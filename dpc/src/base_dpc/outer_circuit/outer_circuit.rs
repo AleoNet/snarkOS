@@ -20,7 +20,6 @@ use crate::base_dpc::{
     program::PrivateProgramInput,
     BaseDPCComponents,
 };
-use snarkos_algorithms::merkle_tree::MerkleTreeDigest;
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, MerkleParameters, SignatureScheme, CRH, SNARK},
@@ -28,6 +27,7 @@ use snarkos_models::{
     gadgets::r1cs::{ConstraintSynthesizer, ConstraintSystem},
 };
 use snarkos_objects::AleoAmount;
+use snarkvm_algorithms::merkle_tree::MerkleTreeDigest;
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "C: BaseDPCComponents"))]

@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{algorithms::snark::*, curves::bls12_377::PairingGadget as Bls12_377PairingGadget};
-use snarkos_algorithms::snark::gm17::{create_random_proof, generate_random_parameters, GM17};
 use snarkos_curves::bls12_377::{Bls12_377, Fq, Fr};
 use snarkos_errors::gadgets::SynthesisError;
 use snarkos_models::{
@@ -30,6 +29,7 @@ use snarkos_models::{
     },
 };
 use snarkos_utilities::{bititerator::BitIterator, to_bytes, ToBytes};
+use snarkvm_algorithms::snark::gm17::{create_random_proof, generate_random_parameters, GM17};
 
 use rand::{thread_rng, Rng};
 
