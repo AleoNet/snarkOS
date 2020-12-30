@@ -22,8 +22,8 @@ mod consensus_dpc {
     };
     use snarkos_objects::{dpc::DPCTransactions, Block};
     use snarkos_testing::{consensus::*, storage::kill_storage};
-    use snarkos_utilities::{bytes::ToBytes, to_bytes};
     use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
+    use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
     #[test]
     fn base_dpc_multiple_transactions() {

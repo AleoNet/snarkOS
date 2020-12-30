@@ -16,7 +16,7 @@
 
 use crate::{block_header::GenesisBlockHeader, transaction_1::Transaction1};
 use snarkos_models::genesis::Genesis;
-use snarkos_utilities::variable_length_integer::variable_length_integer;
+use snarkvm_utilities::variable_length_integer::variable_length_integer;
 
 pub struct GenesisBlock;
 

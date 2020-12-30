@@ -12,25 +12,24 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e33cfef", version = "0.0.1" }
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e33cfef", version = "0.0.1" } # needed to instantiate with BLS12-377
-snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e33cfef", version = "0.0.1" }
-snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e33cfef", version = "0.0.1" }
-snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e33cfef", version = "0.0.1" }
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" } # needed to instantiate with BLS12-377
+snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
+snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
+snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 
 snarkos-errors = { path = "../errors", version = "1.1.4"}
 snarkos-models = { path = "../models", version = "1.1.4"}
 snarkos-objects = { path = "../objects", version = "1.1.4"} # needed to instantiate with BLS12-377
 snarkos-parameters = { path = "../parameters", version = "1.1.4"}
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
 blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }
 thiserror = "1.0.22"
 
 [dev-dependencies]
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 rand_xorshift = { version = "0.2" }
 
 [features]

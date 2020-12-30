@@ -1,7 +1,7 @@
-use snarkos_errors::algorithms::CRHError;
-use snarkos_models::{algorithms::CRH, dpc::DPCComponents};
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use snarkvm_dpc::base_dpc::instantiated::Components;
+use snarkvm_errors::algorithms::CRHError;
+use snarkvm_models::{algorithms::CRH, dpc::DPCComponents};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::thread_rng;
 use std::path::PathBuf;

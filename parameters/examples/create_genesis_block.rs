@@ -25,8 +25,8 @@ use snarkos_objects::{
     ProofOfSuccinctWork,
 };
 use snarkos_parameters::Transaction1;
-use snarkos_utilities::bytes::FromBytes;
 use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
+use snarkvm_utilities::bytes::FromBytes;
 
 use chrono::Utc;
 use std::{

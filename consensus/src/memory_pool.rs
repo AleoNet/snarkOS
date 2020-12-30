@@ -25,7 +25,7 @@ use snarkos_models::{
 };
 use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
 use snarkos_storage::Ledger;
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
     to_bytes,

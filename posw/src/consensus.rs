@@ -30,10 +30,6 @@ use snarkos_objects::{
 };
 use snarkos_parameters::{PoswSNARKPKParameters, PoswSNARKVKParameters};
 use snarkos_profiler::{end_timer, start_timer};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
 use snarkvm_algorithms::crh::sha256d_to_u64;
 use snarkvm_curves::{
     bls12_377::Fr,
@@ -42,6 +38,10 @@ use snarkvm_curves::{
 use snarkvm_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
 use snarkvm_marlin::snark::SRS;
 use snarkvm_polycommit::optional_rng::OptionalRng;
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use blake2::{digest::Digest, Blake2s};
 use rand::{rngs::OsRng, Rng};

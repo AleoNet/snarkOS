@@ -37,7 +37,6 @@ use snarkos_objects::{
 use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
-use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::base_dpc::{
     instantiated::*,
@@ -47,6 +46,7 @@ use snarkvm_dpc::base_dpc::{
     record_payload::RecordPayload,
     BaseDPCComponents,
 };
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use chrono::Utc;
 use rand::Rng;

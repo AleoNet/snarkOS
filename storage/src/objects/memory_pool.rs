@@ -16,7 +16,7 @@
 
 use crate::{DatabaseTransaction, Ledger, Op, COL_META, KEY_MEMORY_POOL};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the stored memory pool transactions.

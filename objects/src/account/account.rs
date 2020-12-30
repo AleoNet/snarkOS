@@ -16,7 +16,8 @@
 
 use crate::{AccountAddress, AccountPrivateKey};
 use snarkos_errors::objects::AccountError;
-use snarkos_models::{dpc::DPCComponents, objects::AccountScheme};
+use snarkos_models::objects::AccountScheme;
+use snarkvm_models::dpc::DPCComponents;
 
 use rand::Rng;
 use std::fmt;

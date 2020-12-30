@@ -24,8 +24,8 @@ use snarkos_models::{
 use snarkos_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
 use snarkos_posw::{txids_to_roots, PoswMarlin};
 use snarkos_storage::Ledger;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};

@@ -16,12 +16,12 @@
 
 use crate::{account::PrivateKey, errors::SignatureError, signature::SignaturePublicKey};
 
-use snarkos_models::{algorithms::SignatureScheme, dpc::DPCComponents};
-use snarkos_utilities::{
+use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
+use snarkvm_models::{algorithms::SignatureScheme, dpc::DPCComponents};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};

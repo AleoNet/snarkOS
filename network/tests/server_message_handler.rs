@@ -19,11 +19,11 @@ mod server_message_handler {
     use snarkos_network::external::{message::Message, message_types::*, Channel, PingState};
     use snarkos_objects::{block::Block as BlockStruct, BlockHeaderHash};
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
-    use snarkos_utilities::{
+    use snarkvm_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
+    use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,
     };
-    use snarkvm_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;

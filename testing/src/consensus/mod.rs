@@ -16,12 +16,12 @@
 
 use snarkos_consensus::ConsensusParameters;
 use snarkos_errors::objects::TransactionError;
-use snarkos_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameters};
 use snarkos_objects::Network;
 use snarkos_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters};
 use snarkos_posw::PoswMarlin;
-use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
 use snarkvm_dpc::instantiated::Components;
+use snarkvm_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameters};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
 use std::io::{Read, Result as IoResult, Write};

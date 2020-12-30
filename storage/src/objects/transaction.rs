@@ -21,7 +21,7 @@ use snarkos_models::{
     objects::{LedgerScheme, Transaction},
 };
 use snarkos_objects::BlockHeaderHash;
-use snarkos_utilities::{
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
     to_bytes,

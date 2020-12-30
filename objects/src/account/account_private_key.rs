@@ -16,12 +16,12 @@
 
 use crate::account_format;
 use snarkos_errors::objects::AccountError;
-use snarkos_models::{
+use snarkvm_algorithms::prf::Blake2s;
+use snarkvm_models::{
     algorithms::{CommitmentScheme, EncryptionScheme, SignatureScheme, PRF},
     dpc::DPCComponents,
 };
-use snarkos_utilities::{bytes_to_bits, to_bytes, FromBytes, ToBytes};
-use snarkvm_algorithms::prf::Blake2s;
+use snarkvm_utilities::{bytes_to_bits, to_bytes, FromBytes, ToBytes};
 
 use base58::{FromBase58, ToBase58};
 use rand::Rng;

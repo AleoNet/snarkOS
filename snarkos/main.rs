@@ -25,13 +25,13 @@ use snarkos::{
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_errors::node::NodeError;
-use snarkos_models::algorithms::{CRH, SNARK};
 use snarkos_network::{external::protocol::SyncHandler, internal::context::Context, Server};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
-use snarkos_utilities::{to_bytes, ToBytes};
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
+use snarkvm_models::algorithms::{CRH, SNARK};
+use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::{runtime::Builder, sync::Mutex};

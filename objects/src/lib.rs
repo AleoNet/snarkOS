@@ -16,6 +16,7 @@
 
 #[macro_use]
 extern crate derivative;
+
 #[macro_use]
 extern crate snarkvm_algorithms;
 

@@ -16,9 +16,9 @@
 
 use crate::{Ledger, COL_BLOCK_HEADER};
 use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
-use snarkos_utilities::FromBytes;
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_utilities::FromBytes;
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Returns true if the block for the given block header hash exists.

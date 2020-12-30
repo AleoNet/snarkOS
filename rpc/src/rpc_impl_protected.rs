@@ -26,16 +26,16 @@ use snarkos_models::{
     objects::AccountScheme,
 };
 use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
 use snarkvm_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
     record::DPCRecord,
     record_encryption::RecordEncryption,
     record_payload::RecordPayload,
+};
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
 };
 
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};

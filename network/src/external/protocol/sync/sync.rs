@@ -19,9 +19,9 @@ use crate::external::{
     Channel,
 };
 use snarkos_errors::network::SendError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::BlockHeaderHash;
 use snarkos_storage::Ledger;
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};

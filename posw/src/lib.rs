@@ -75,8 +75,8 @@ mod tests {
     use super::*;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
-    use snarkos_models::algorithms::SNARK;
-    use snarkos_utilities::bytes::FromBytes;
+    use snarkvm_models::algorithms::SNARK;
+    use snarkvm_utilities::bytes::FromBytes;
 
     #[test]
     fn load_params_verify() {

@@ -16,11 +16,11 @@
 
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::dpc::{DPCScheme, Program, Record};
 use snarkos_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkos_testing::consensus::*;
-use snarkos_utilities::bytes::ToBytes;
 use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
+use snarkvm_models::dpc::{DPCScheme, Program, Record};
+use snarkvm_utilities::bytes::ToBytes;
 
 use rand::Rng;
 use std::{fs::File, path::PathBuf};

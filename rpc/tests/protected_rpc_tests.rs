@@ -17,19 +17,19 @@
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
-    use snarkos_models::dpc::Record;
     use snarkos_network::{external::SyncHandler, internal::context::Context};
     use snarkos_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
-    use snarkos_utilities::{
-        bytes::{FromBytes, ToBytes},
-        to_bytes,
-    };
     use snarkvm_dpc::base_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
         record::DPCRecord,
+    };
+    use snarkvm_models::dpc::Record;
+    use snarkvm_utilities::{
+        bytes::{FromBytes, ToBytes},
+        to_bytes,
     };
 
     use jsonrpc_core::MetaIoHandler;

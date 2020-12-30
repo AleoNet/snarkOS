@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_errors::dpc::DPCError;
-use snarkos_models::algorithms::SNARK;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters, BaseDPCComponents, DPC};
+use snarkvm_errors::dpc::DPCError;
+use snarkvm_models::algorithms::SNARK;
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::thread_rng;
 use std::path::PathBuf;

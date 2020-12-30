@@ -16,8 +16,8 @@
 
 use crate::internal::address_book::AddressBook;
 use snarkos_errors::network::ServerError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 
 use chrono::{DateTime, Utc};
 use std::{collections::HashMap, net::SocketAddr};

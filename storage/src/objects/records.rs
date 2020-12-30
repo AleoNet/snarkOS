@@ -16,8 +16,8 @@
 
 use crate::*;
 use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, dpc::Record, objects::Transaction};
-use snarkos_utilities::{
+use snarkvm_models::{algorithms::LoadableMerkleParameters, dpc::Record, objects::Transaction};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

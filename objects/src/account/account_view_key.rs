@@ -16,8 +16,8 @@
 
 use crate::{account_format, AccountPrivateKey};
 use snarkos_errors::objects::AccountError;
-use snarkos_models::{algorithms::EncryptionScheme, dpc::DPCComponents};
-use snarkos_utilities::{FromBytes, ToBytes};
+use snarkvm_models::{algorithms::EncryptionScheme, dpc::DPCComponents};
+use snarkvm_utilities::{FromBytes, ToBytes};
 
 use base58::{FromBase58, ToBase58};
 use std::{

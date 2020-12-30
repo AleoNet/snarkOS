@@ -16,9 +16,9 @@
 
 use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_objects::{Block, BlockHeaderHash, DPCTransactions};
-use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the latest block in the chain.

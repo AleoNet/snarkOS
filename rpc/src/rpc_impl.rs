@@ -27,14 +27,14 @@ use snarkos_network::{
     internal::{context::Context, process_transaction_internal},
 };
 use snarkos_objects::BlockHeaderHash;
-use snarkos_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-    CanonicalSerialize,
-};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
+};
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+    CanonicalSerialize,
 };
 
 use chrono::Utc;

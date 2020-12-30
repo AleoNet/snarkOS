@@ -17,11 +17,11 @@
 use snarkos_models::genesis::Genesis;
 use snarkos_objects::{Block, BlockHeader};
 use snarkos_parameters::GenesisBlock;
-use snarkos_utilities::{
+use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
-use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord};
 
 use once_cell::sync::Lazy;
 use std::io::{Read, Result as IoResult, Write};

@@ -23,8 +23,8 @@ use snarkos_models::{
 };
 use snarkos_objects::Account;
 use snarkos_parameters::LedgerMerkleTreeParameters;
-use snarkos_utilities::bytes::FromBytes;
 use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkvm_utilities::bytes::FromBytes;
 
 use rand::Rng;
 

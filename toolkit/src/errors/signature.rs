@@ -32,9 +32,9 @@ impl From<snarkos_errors::objects::account::AccountError> for SignatureError {
     }
 }
 
-impl From<snarkos_errors::algorithms::signature::SignatureError> for SignatureError {
-    fn from(error: snarkos_errors::algorithms::signature::SignatureError) -> Self {
-        SignatureError::Crate("snarkos_errors::algorithms::signature", format!("{:?}", error))
+impl From<snarkvm_errors::algorithms::signature::SignatureError> for SignatureError {
+    fn from(error: snarkvm_errors::algorithms::signature::SignatureError) -> Self {
+        SignatureError::Crate("snarkvm_errors::algorithms::signature", format!("{:?}", error))
     }
 }
 

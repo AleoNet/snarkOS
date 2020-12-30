@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_errors::dpc::{DPCError, LedgerError};
 use snarkos_models::{
     algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
     dpc::{DPCComponents, DPCScheme},
@@ -26,12 +25,13 @@ use snarkos_objects::{Account, AccountAddress, Network};
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkos_posw::PoswMarlin;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
-use snarkos_utilities::{
+use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
+use snarkvm_errors::dpc::{DPCError, LedgerError};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
-use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
 
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};

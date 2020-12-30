@@ -24,8 +24,8 @@ use snarkos_models::{
 };
 use snarkos_objects::Block;
 use snarkos_parameters::{GenesisBlock, LedgerMerkleTreeParameters};
-use snarkos_utilities::bytes::FromBytes;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
 use std::{

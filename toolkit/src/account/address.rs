@@ -17,8 +17,8 @@
 use crate::{account::PrivateKey, errors::AddressError};
 
 use snarkos_objects::AccountAddress;
-use snarkos_utilities::bytes::ToBytes;
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
+use snarkvm_utilities::bytes::ToBytes;
 
 use std::{fmt, str::FromStr};
 
