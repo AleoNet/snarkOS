@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    network::SendError,
-    objects::{AccountError, BlockError, TransactionError},
-    storage::StorageError,
-};
 use snarkos_consensus::error::ConsensusError;
-use snarkvm_errors::{algorithms::CRHError, dpc::DPCError};
+use snarkos_network::errors::SendError;
+use snarkos_storage::error::StorageError;
+use snarkvm_errors::{
+    algorithms::CRHError,
+    dpc::DPCError,
+    objects::{AccountError, BlockError, TransactionError},
+};
 
 use std::fmt::Debug;
 

@@ -1,5 +1,5 @@
 use crate::{
-    errors::network::SendError,
+    errors::SendError,
     external::{Block, Transaction},
     internal::context::Context,
 };

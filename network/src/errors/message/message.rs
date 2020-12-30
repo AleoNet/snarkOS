@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::network::message::{MessageHeaderError, StreamReadError};
+use crate::errors::message::{MessageHeaderError, StreamReadError};
 
 #[derive(Debug, Error)]
 pub enum MessageError {

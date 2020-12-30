@@ -18,7 +18,7 @@
 //!
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
-use crate::{rpc_trait::RpcFunctions, rpc_types::*};
+use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_network::{
     external::SyncHandler,
@@ -28,7 +28,6 @@ use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkvm_errors::rpc::RpcError;
 use snarkvm_models::objects::Transaction;
 use snarkvm_objects::BlockHeaderHash;
 use snarkvm_utilities::{

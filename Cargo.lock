@@ -2559,6 +2559,7 @@ dependencies = [
 name = "snarkos-consensus"
 version = "1.1.4"
 dependencies = [
+ "anyhow",
  "bincode",
  "chrono",
  "criterion",
@@ -2600,6 +2601,7 @@ dependencies = [
  "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-dpc",
+ "snarkvm-errors",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
@@ -2659,6 +2661,7 @@ dependencies = [
  "snarkos-storage",
  "snarkos-testing",
  "snarkvm-dpc",
+ "snarkvm-errors",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
@@ -2703,6 +2706,7 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
+ "snarkvm-errors",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-parameters",

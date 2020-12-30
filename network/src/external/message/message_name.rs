@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::network::message::MessageNameError, external::message::hash::HASH96};
+use crate::{errors::message::MessageNameError, external::message::hash::HASH96};
 
 use std::{fmt, str};
 

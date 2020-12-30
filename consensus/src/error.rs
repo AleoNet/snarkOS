@@ -136,6 +136,12 @@ impl From<TransactionError> for ConsensusError {
     }
 }
 
+impl From<anyhow::Error> for ConsensusError {
+    fn from(error: anyhow::Error) -> Self {
+        ConsensusError::Crate("anyhow", format!("{:?}", error))
+    }
+}
+
 impl From<bincode::Error> for ConsensusError {
     fn from(error: bincode::Error) -> Self {
         ConsensusError::Crate("bincode", format!("{:?}", error))

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    errors::network::ConnectError,
+    errors::ConnectError,
     external::message::{
         read::{read_header, read_message},
         Message,

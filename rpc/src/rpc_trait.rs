@@ -16,8 +16,7 @@
 
 //! Definition of the public and private RPC endpoints.
 
-use crate::rpc_types::*;
-use snarkvm_errors::rpc::RpcError;
+use crate::{error::RpcError, rpc_types::*};
 
 use jsonrpc_derive::rpc;
 

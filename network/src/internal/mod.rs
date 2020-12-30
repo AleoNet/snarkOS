@@ -23,7 +23,7 @@ pub use context::*;
 pub mod message_handler;
 pub use message_handler::*;
 
-use crate::{external::propagate_transaction, internal::Context};
+use crate::{errors::SendError, external::propagate_transaction, internal::Context};
 use snarkos_consensus::{
     memory_pool::{Entry, MemoryPool},
     ConsensusParameters,
@@ -33,7 +33,6 @@ use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkvm_errors::network::SendError;
 use snarkvm_utilities::bytes::FromBytes;
 
 use std::{net::SocketAddr, sync::Arc};

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    errors::network::SendError,
+    errors::SendError,
     external::{
         message_types::{GetBlock, GetSync},
         Channel,

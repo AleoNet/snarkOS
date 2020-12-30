@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    errors::network::message::MessageError,
+    errors::message::MessageError,
     external::message::{Message, MessageName},
 };
 use snarkvm_objects::BlockHeaderHash;

@@ -18,7 +18,7 @@
 //!
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
-use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
+use crate::{error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkvm_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
@@ -26,7 +26,6 @@ use snarkvm_dpc::base_dpc::{
     record_encryption::RecordEncryption,
     record_payload::RecordPayload,
 };
-use snarkvm_errors::rpc::RpcError;
 use snarkvm_models::{
     algorithms::CRH,
     dpc::{DPCComponents, Record},

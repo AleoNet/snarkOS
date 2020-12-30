@@ -14,11 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    consensus::ConsensusError,
-    network::{message::MessageError, ConnectError},
-    objects::BlockError,
-};
+use crate::errors::{message::MessageError, ConnectError};
+use snarkos_consensus::error::ConsensusError;
+use snarkvm_errors::objects::BlockError;
 
 #[derive(Debug, Error)]
 pub enum SendError {
