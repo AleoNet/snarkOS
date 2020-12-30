@@ -2543,7 +2543,6 @@ dependencies = [
  "rayon",
  "sha2",
  "smallvec 1.4.2",
- "snarkos-errors",
  "snarkos-models",
  "snarkos-posw",
  "snarkos-profiler",
@@ -2565,7 +2564,6 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "serde",
- "snarkos-errors",
  "snarkos-models",
  "snarkos-posw",
  "snarkos-profiler",
@@ -2578,22 +2576,6 @@ dependencies = [
  "snarkvm-utilities",
  "tokio 0.2.22",
  "tracing",
-]
-
-[[package]]
-name = "snarkos-errors"
-version = "1.1.4"
-dependencies = [
- "base58",
- "bech32",
- "bincode",
- "curl",
- "hex",
- "jsonrpc-core",
- "rocksdb",
- "snarkvm-errors",
- "thiserror",
- "toml",
 ]
 
 [[package]]
@@ -2651,7 +2633,6 @@ dependencies = [
  "parking_lot 0.11.1",
  "rand",
  "snarkos-consensus",
- "snarkos-errors",
  "snarkos-models",
  "snarkos-posw",
  "snarkos-storage",
@@ -2671,7 +2652,6 @@ dependencies = [
  "blake2",
  "rand",
  "rand_xorshift",
- "snarkos-errors",
  "snarkos-parameters",
  "snarkos-profiler",
  "snarkvm-algorithms",
@@ -2710,7 +2690,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snarkos-consensus",
- "snarkos-errors",
  "snarkos-models",
  "snarkos-network",
  "snarkos-storage",
@@ -2732,7 +2711,6 @@ dependencies = [
  "rocksdb",
  "serde",
  "snarkos-consensus",
- "snarkos-errors",
  "snarkos-models",
  "snarkos-parameters",
  "snarkos-testing",
@@ -2750,7 +2728,6 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "snarkos-consensus",
- "snarkos-errors",
  "snarkos-models",
  "snarkos-network",
  "snarkos-parameters",
@@ -2772,7 +2749,6 @@ dependencies = [
  "hex",
  "rand",
  "rand_chacha",
- "snarkos-errors",
  "snarkos-models",
  "snarkvm-dpc",
  "snarkvm-errors",

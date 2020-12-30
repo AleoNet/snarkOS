@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{DatabaseTransaction, Op};
-use snarkos_errors::storage::StorageError;
+use crate::{error::StorageError, DatabaseTransaction, Op};
 
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DBIterator, IteratorMode, Options, WriteBatch, DB};
 use std::{

@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
-use snarkos_errors::storage::StorageError;
+use crate::{error::StorageError, *};
 use snarkvm_models::{algorithms::LoadableMerkleParameters, dpc::Record, objects::Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
