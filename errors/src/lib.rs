@@ -19,5 +19,4 @@
 #[macro_use]
 extern crate thiserror;
 
-pub mod serialization;
 pub mod storage;
