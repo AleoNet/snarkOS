@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::message::MessageHeader;
-use snarkos_errors::network::message::{MessageError, MessageHeaderError, StreamReadError};
+use crate::{
+    errors::network::message::{MessageError, MessageHeaderError, StreamReadError},
+    external::message::MessageHeader,
+};
 
 use tokio::{io::AsyncRead, prelude::*};
 

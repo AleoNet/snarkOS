@@ -19,11 +19,6 @@
 #[macro_use]
 extern crate thiserror;
 
-pub mod consensus;
-pub mod network;
-pub mod node;
 pub mod objects;
-pub mod posw;
-pub mod rpc;
 pub mod serialization;
 pub mod storage;

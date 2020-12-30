@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    errors::network::ServerError,
     external::{
         message::{Message, MessageName},
         message_types::*,
@@ -27,7 +28,6 @@ use crate::{
     Server,
 };
 use snarkos_consensus::memory_pool::Entry;
-use snarkos_errors::network::ServerError;
 use snarkos_objects::Block as BlockStruct;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_utilities::{

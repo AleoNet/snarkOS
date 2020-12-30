@@ -14,14 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{
-    message_types::{GetPeers, Verack, Version},
-    Channel,
-    Handshake,
-    HandshakeState,
-    Message,
+use crate::{
+    errors::network::HandshakeError,
+    external::{
+        message_types::{GetPeers, Verack, Version},
+        Channel,
+        Handshake,
+        HandshakeState,
+        Message,
+    },
 };
-use snarkos_errors::network::HandshakeError;
 
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::TcpStream;

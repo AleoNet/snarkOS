@@ -43,6 +43,8 @@ pub use consensus::*;
 pub mod difficulty;
 pub use difficulty::*;
 
+pub mod error;
+
 pub mod miner;
 pub use miner::Miner;
 

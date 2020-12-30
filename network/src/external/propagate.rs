@@ -1,8 +1,8 @@
 use crate::{
+    errors::network::SendError,
     external::{Block, Transaction},
     internal::context::Context,
 };
-use snarkos_errors::network::SendError;
 
 use std::{net::SocketAddr, sync::Arc};
 

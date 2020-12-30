@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{
-    message_types::{Ping, Pong},
-    Channel,
-    PingProtocol,
-    PingState,
+use crate::{
+    errors::network::PingProtocolError,
+    external::{
+        message_types::{Ping, Pong},
+        Channel,
+        PingProtocol,
+        PingState,
+    },
 };
-use snarkos_errors::network::PingProtocolError;
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 

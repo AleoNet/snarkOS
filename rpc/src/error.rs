@@ -15,11 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    consensus::ConsensusError,
     network::SendError,
     objects::{AccountError, BlockError, TransactionError},
     storage::StorageError,
 };
+use snarkos_consensus::error::ConsensusError;
 use snarkvm_errors::{algorithms::CRHError, dpc::DPCError};
 
 use std::fmt::Debug;

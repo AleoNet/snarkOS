@@ -16,10 +16,10 @@
 
 use crate::{
     cli::CLI,
+    errors::node::CliError,
     parameters::{flag, option, subcommand, types::*},
     update::UpdateCLI,
 };
-use snarkos_errors::node::CliError;
 
 use clap::ArgMatches;
 use dirs::home_dir;

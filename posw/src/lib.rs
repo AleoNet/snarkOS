@@ -19,9 +19,11 @@ pub mod circuit;
 mod consensus;
 use consensus::{HG, M};
 
-use snarkos_models::curves::PairingEngine;
+pub mod error;
+
 use snarkvm_algorithms::snark;
 use snarkvm_curves::bls12_377::Bls12_377;
+use snarkvm_models::curves::PairingEngine;
 
 use snarkos_objects::{
     merkle_root_with_subroots,

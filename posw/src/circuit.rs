@@ -17,8 +17,9 @@
 //! Implements a Proof of Succinct work circuit. The inputs are opaque leaves,
 //! which are then used to build a tree instantiated with a masked Pedersen hash. The prover
 //! inputs a mask computed as Blake2s(nonce || root), which the verifier also checks.
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_models::{
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_gadgets::algorithms::merkle_tree::compute_root;
+use snarkvm_models::{
     algorithms::{MaskedMerkleParameters, CRH},
     curves::PrimeField,
     gadgets::{
@@ -27,7 +28,6 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
     },
 };
-use snarkvm_gadgets::algorithms::merkle_tree::compute_root;
 
 use std::marker::PhantomData;
 

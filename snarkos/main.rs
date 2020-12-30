@@ -17,6 +17,7 @@
 #[macro_use]
 extern crate tracing;
 
+use crate::errors::node::NodeError;
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
@@ -24,7 +25,6 @@ use snarkos::{
     miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_errors::node::NodeError;
 use snarkos_network::{external::protocol::SyncHandler, internal::context::Context, Server};
 use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
