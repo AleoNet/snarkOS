@@ -18,7 +18,6 @@
 //! which are then used to build a tree instantiated with a masked Pedersen hash. The prover
 //! inputs a mask computed as Blake2s(nonce || root), which the verifier also checks.
 use snarkos_errors::gadgets::SynthesisError;
-use snarkos_gadgets::algorithms::merkle_tree::compute_root;
 use snarkos_models::{
     algorithms::{MaskedMerkleParameters, CRH},
     curves::PrimeField,
@@ -28,6 +27,7 @@ use snarkos_models::{
         utilities::{alloc::AllocGadget, eq::EqGadget, uint::UInt8},
     },
 };
+use snarkvm_gadgets::algorithms::merkle_tree::compute_root;
 
 use std::marker::PhantomData;
 
@@ -116,7 +116,6 @@ impl<F: PrimeField, M: MaskedMerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP:
 #[cfg(test)]
 mod test {
     use super::{POSWCircuit, POSWCircuitParameters};
-    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
     use snarkos_models::curves::to_field_vec::ToConstraintField;
     use snarkos_utilities::bytes::ToBytes;
     use snarkvm_algorithms::{
@@ -128,6 +127,7 @@ mod test {
         bls12_377::{Bls12_377, Fr},
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
     };
+    use snarkvm_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
 
     use blake2::{digest::Digest, Blake2s};
     use rand::thread_rng;

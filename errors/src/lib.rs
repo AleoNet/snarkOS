@@ -20,7 +20,6 @@
 extern crate thiserror;
 
 pub mod consensus;
-pub mod gadgets;
 pub mod network;
 pub mod node;
 pub mod objects;

@@ -15,7 +15,7 @@ edition = "2018"
 snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
 snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" } # needed to instantiate with BLS12-377
 snarkos-errors = { path = "../errors", version = "1.1.4"}
-snarkos-gadgets = { path = "../gadgets", version = "1.1.4"}
+snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
 snarkos-marlin = { path = "../marlin", version = "1.1.4"}
 snarkos-models = { path = "../models", version = "1.1.4"}
 snarkos-objects = { path = "../objects", version = "1.1.4"} # needed to instantiate with BLS12-377

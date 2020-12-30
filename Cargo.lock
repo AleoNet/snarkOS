@@ -2606,23 +2606,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-gadgets"
-version = "1.1.4"
-dependencies = [
- "blake2",
- "derivative",
- "digest 0.8.1",
- "itertools",
- "rand",
- "rand_xorshift",
- "snarkos-errors",
- "snarkos-models",
- "snarkos-utilities",
- "snarkvm-algorithms",
- "snarkvm-curves",
-]
-
-[[package]]
 name = "snarkos-marlin"
 version = "1.1.4"
 dependencies = [
@@ -2633,7 +2616,6 @@ dependencies = [
  "rand_core",
  "rayon",
  "snarkos-errors",
- "snarkos-gadgets",
  "snarkos-models",
  "snarkos-polycommit",
  "snarkos-profiler",
@@ -2757,7 +2739,6 @@ dependencies = [
  "rand",
  "rand_xorshift",
  "snarkos-errors",
- "snarkos-gadgets",
  "snarkos-marlin",
  "snarkos-models",
  "snarkos-objects",
@@ -2767,6 +2748,7 @@ dependencies = [
  "snarkos-utilities",
  "snarkvm-algorithms",
  "snarkvm-curves",
+ "snarkvm-gadgets",
  "thiserror",
 ]
 

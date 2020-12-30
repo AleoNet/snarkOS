@@ -16,7 +16,6 @@ members = [
     "benchmarks",
     "consensus",
     "errors",
-    "gadgets",
     "models",
     "network",
     "objects",
