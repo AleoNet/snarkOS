@@ -22,12 +22,12 @@ use core::marker::PhantomData;
 use derivative::Derivative;
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::{curves::PrimeField, gadgets::r1cs::ConstraintSynthesizer};
-use snarkos_polycommit::{BatchLCProof, PolynomialCommitment};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
     error,
     serialize::*,
 };
+use snarkvm_polycommit::{BatchLCProof, PolynomialCommitment};
 use std::io::{self, Read, Write};
 
 /* ************************************************************************* */
@@ -145,7 +145,7 @@ impl<F: PrimeField, PC: PolynomialCommitment<F>, C: ConstraintSynthesizer<F>> Pr
 
     /// Prints information about the size of the proof.
     pub fn print_size_info(&self) {
-        use snarkos_polycommit::PCCommitment;
+        use snarkvm_polycommit::PCCommitment;
 
         let size_of_fe_in_bytes = F::zero().into_repr().as_ref().len() * 8;
         let mut num_comms_without_degree_bounds = 0;

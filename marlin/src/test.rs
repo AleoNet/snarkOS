@@ -63,9 +63,9 @@ mod marlin {
 
     use blake2::Blake2s;
     use core::ops::MulAssign;
-    use snarkos_polycommit::{marlin_pc::MarlinKZG10, sonic_pc::SonicKZG10};
     use snarkos_utilities::rand::{test_rng, UniformRand};
     use snarkvm_curves::bls12_377::{Bls12_377, Fr};
+    use snarkvm_polycommit::{marlin_pc::MarlinKZG10, sonic_pc::SonicKZG10};
 
     type MultiPC = MarlinKZG10<Bls12_377>;
     type MarlinInst = Marlin<Fr, MultiPC, Blake2s>;

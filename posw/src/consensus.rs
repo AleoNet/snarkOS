@@ -30,7 +30,6 @@ use snarkos_objects::{
     MaskedMerkleTreeParameters,
 };
 use snarkos_parameters::{PoswSNARKPKParameters, PoswSNARKVKParameters};
-use snarkos_polycommit::optional_rng::OptionalRng;
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -42,6 +41,7 @@ use snarkvm_curves::{
     edwards_bls12::{EdwardsProjective, Fq},
 };
 use snarkvm_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
+use snarkvm_polycommit::optional_rng::OptionalRng;
 
 use blake2::{digest::Digest, Blake2s};
 use rand::{rngs::OsRng, Rng};

@@ -28,8 +28,8 @@ use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
     gadgets::r1cs::{ConstraintSystem, Index as VarIndex, LinearCombination, Variable},
 };
-use snarkos_polycommit::LabeledPolynomial;
 use snarkvm_algorithms::{cfg_iter_mut, fft::Evaluations as EvaluationsOnDomain};
+use snarkvm_polycommit::LabeledPolynomial;
 
 use snarkos_utilities::serialize::*;
 

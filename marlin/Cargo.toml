@@ -19,10 +19,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1"}
+snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1", default-features = false }
+
 snarkos-errors = { path = "../errors", version = "1.1.4"}
 snarkos-models = { path = "../models", version = "1.1.4"}
-snarkos-polycommit = { path = "../polycommit", version = "1.1.4", default-features = false }
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
 snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
@@ -34,10 +35,10 @@ rand_core = { version = "0.5" }
 rayon = { version = "1", optional = true }
 
 [dev-dependencies]
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1" }
 
 [features]
 default = [ "std", "parallel" ]
-std = [ "snarkos-polycommit/std" ]
+std = [ "snarkvm-polycommit/std" ]
 print-trace = [ "snarkos-profiler/print-trace" ]
 parallel = [ "std", "rayon" ]

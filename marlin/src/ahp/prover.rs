@@ -26,7 +26,6 @@ use snarkos_models::{
     curves::{batch_inversion, Field, PrimeField},
     gadgets::r1cs::ConstraintSynthesizer,
 };
-use snarkos_polycommit::{LabeledPolynomial, Polynomial};
 use snarkos_utilities::{bytes::ToBytes, error, serialize::*};
 use snarkvm_algorithms::{
     cfg_into_iter,
@@ -34,6 +33,7 @@ use snarkvm_algorithms::{
     cfg_iter_mut,
     fft::{EvaluationDomain, Evaluations as EvaluationsOnDomain},
 };
+use snarkvm_polycommit::{LabeledPolynomial, Polynomial};
 use std::io::Write;
 
 /// State for the AHP prover.

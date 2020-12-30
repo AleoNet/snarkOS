@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", default-features = false }
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", default-features = false }
 snarkos-errors = { path = "../errors", version = "1.1.4", default-features = false }
 snarkos-models = { path = "../models", version = "1.1.4", default-features = false }
 snarkos-utilities = { path = "../utilities", version = "1.1.4", default-features = false }
@@ -21,10 +21,10 @@ curl = { version = "0.4.34", optional = true }
 hex = { version = "0.4.2" }
 
 [dev-dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1"}
 snarkos-consensus = { path = "../consensus" }
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
-snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1" }
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1" }
 snarkos-marlin = { path = "../marlin" }
 snarkos-objects = { path = "../objects" }
 snarkos-posw = { path = "../posw", features = ["test-helpers"] }

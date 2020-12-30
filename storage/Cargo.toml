@@ -12,7 +12,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1"}
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1"}
 snarkos-errors = { path = "../errors", version = "1.1.4"}
 snarkos-models = { path = "../models", version = "1.1.4"}
 snarkos-objects = { path = "../objects", version = "1.1.4"}
@@ -28,5 +28,5 @@ serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 snarkos-consensus = { path = "../consensus" }
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "0282425", version = "0.0.1" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fc971b1", version = "0.0.1" }
 snarkos-testing = { path = "../testing" }

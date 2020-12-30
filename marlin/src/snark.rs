@@ -29,7 +29,7 @@ use snarkos_utilities::{
     serialize::*,
 };
 
-pub use snarkos_polycommit::{marlin_pc::MarlinKZG10 as MultiPC, PCCommitment};
+pub use snarkvm_polycommit::{marlin_pc::MarlinKZG10 as MultiPC, PCCommitment};
 
 use blake2::Blake2s;
 use derivative::Derivative;
