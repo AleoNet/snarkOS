@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_posw::{txids_to_roots, PoswMarlin};
 use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
-use snarkvm_errors::consensus::ConsensusError;
 use snarkvm_models::{
     algorithms::{LoadableMerkleParameters, CRH},
     dpc::{DPCScheme, Record},

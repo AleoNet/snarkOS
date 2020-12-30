@@ -20,11 +20,11 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies]
-snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "cd99a47", version = "0.0.1", default-features = false }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "cd99a47", version = "0.0.1" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "cd99a47", version = "0.0.1", default-features = false }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "cd99a47", version = "0.0.1" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "cd99a47", version = "0.0.1" }
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1", default-features = false }
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1", default-features = false }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
 
 hex = { version = "0.4.2" }
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }

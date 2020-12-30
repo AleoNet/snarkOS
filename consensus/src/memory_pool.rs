@@ -18,8 +18,8 @@
 //!
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
+use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
-use snarkvm_errors::consensus::ConsensusError;
 use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
