@@ -14,8 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::objects::{BlockError, TransactionError};
-use snarkvm_errors::{algorithms::MerkleError, parameters::ParametersError};
+use snarkvm_errors::{
+    algorithms::MerkleError,
+    objects::{BlockError, TransactionError},
+    parameters::ParametersError,
+};
 
 use std::fmt::Debug;
 
