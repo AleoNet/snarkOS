@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use criterion::{criterion_group, criterion_main, Criterion};
-use rand::SeedableRng;
-use rand_xorshift::XorShiftRng;
 use snarkos_posw::{txids_to_roots, Marlin, Posw, PoswMarlin, GM17};
+
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_models::algorithms::snark::SNARK;
 use snarkvm_utilities::bytes::FromBytes;
+
+use criterion::{criterion_group, criterion_main, Criterion};
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 fn gm17_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("Proof of Succinct Work: GM17");

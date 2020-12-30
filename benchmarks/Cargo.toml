@@ -12,17 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [[bench]]
-name = "snark"
-path = "algorithms/snark/snark.rs"
-harness = false
-
-[[bench]]
 name = "posw"
 path = "posw/posw.rs"
 harness = false
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
@@ -35,7 +29,6 @@ derivative = { version = "2" }
 digest = { version = "0.7" }
 rand = { version = "0.7" }
 rayon = { version = "1" }
-sha2 = { version = "0.9" }
 smallvec = { version = "1.4" }
 criterion = "0.3.3"
 
