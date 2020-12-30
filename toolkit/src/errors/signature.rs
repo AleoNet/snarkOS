@@ -26,8 +26,8 @@ impl From<hex::FromHexError> for SignatureError {
     }
 }
 
-impl From<snarkos_errors::objects::account::AccountError> for SignatureError {
-    fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
+impl From<snarkvm_errors::objects::account::AccountError> for SignatureError {
+    fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
         SignatureError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
     }
 }
