@@ -17,10 +17,10 @@
 /// Tests for public RPC endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
-    use snarkos_models::objects::Transaction;
     use snarkos_rpc::*;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
     use snarkvm_dpc::base_dpc::instantiated::Tx;
+    use snarkvm_models::objects::Transaction;
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,

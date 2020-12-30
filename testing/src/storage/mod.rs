@@ -15,12 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::consensus::TestTx;
-use snarkos_models::{
+pub use snarkos_storage::Ledger;
+use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
+use snarkvm_models::{
     algorithms::merkle_tree::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-pub use snarkos_storage::Ledger;
-use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
 use snarkvm_objects::Block;
 
 use rand::{thread_rng, Rng};

@@ -15,14 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_models::{
+use snarkos_parameters::LedgerMerkleTreeParameters;
+use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkvm_models::{
     algorithms::{MerkleParameters, CRH},
     dpc::DPCScheme,
     objects::AccountScheme,
     parameters::Parameters,
 };
-use snarkos_parameters::LedgerMerkleTreeParameters;
-use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkvm_objects::Account;
 use snarkvm_utilities::bytes::FromBytes;
 

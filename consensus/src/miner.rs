@@ -15,15 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::{
+use snarkos_posw::{txids_to_roots, PoswMarlin};
+use snarkos_storage::Ledger;
+use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
+use snarkvm_errors::consensus::ConsensusError;
+use snarkvm_models::{
     algorithms::{LoadableMerkleParameters, CRH},
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_posw::{txids_to_roots, PoswMarlin};
-use snarkos_storage::Ledger;
-use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
 use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 

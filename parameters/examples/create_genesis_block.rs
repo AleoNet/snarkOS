@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_errors::objects::TransactionError;
-use snarkos_models::genesis::Genesis;
 use snarkos_parameters::Transaction1;
 use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
+use snarkvm_errors::objects::TransactionError;
+use snarkvm_models::genesis::Genesis;
 use snarkvm_objects::{
     BlockHeader,
     BlockHeaderHash,

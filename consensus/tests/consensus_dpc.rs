@@ -16,12 +16,12 @@
 
 mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, MemoryPool, Miner};
-    use snarkos_models::{
+    use snarkos_testing::{consensus::*, storage::kill_storage};
+    use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
+    use snarkvm_models::{
         dpc::{DPCScheme, Program, Record},
         objects::LedgerScheme,
     };
-    use snarkos_testing::{consensus::*, storage::kill_storage};
-    use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
     use snarkvm_objects::{dpc::DPCTransactions, Block};
     use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 

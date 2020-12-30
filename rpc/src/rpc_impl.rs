@@ -20,8 +20,6 @@
 
 use crate::{rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_errors::rpc::RpcError;
-use snarkos_models::objects::Transaction;
 use snarkos_network::{
     external::SyncHandler,
     internal::{context::Context, process_transaction_internal},
@@ -30,6 +28,8 @@ use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
+use snarkvm_errors::rpc::RpcError;
+use snarkvm_models::objects::Transaction;
 use snarkvm_objects::BlockHeaderHash;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::block_header::GenesisBlockHeader;
-use snarkos_models::genesis::Genesis;
+use snarkvm_models::genesis::Genesis;
 
 #[test]
 fn test_genesis_block_header() {

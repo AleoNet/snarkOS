@@ -19,11 +19,11 @@ use crate::{
     internal::context::Context,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_errors::network::ServerError;
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
+use snarkvm_errors::network::ServerError;
 
 use chrono::{DateTime, Utc};
 use std::{

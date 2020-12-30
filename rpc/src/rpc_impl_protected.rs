@@ -19,18 +19,18 @@
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
 use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
-use snarkos_errors::rpc::RpcError;
-use snarkos_models::{
-    algorithms::CRH,
-    dpc::{DPCComponents, Record},
-    objects::AccountScheme,
-};
 use snarkvm_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
     record::DPCRecord,
     record_encryption::RecordEncryption,
     record_payload::RecordPayload,
+};
+use snarkvm_errors::rpc::RpcError;
+use snarkvm_models::{
+    algorithms::CRH,
+    dpc::{DPCComponents, Record},
+    objects::AccountScheme,
 };
 use snarkvm_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
 use snarkvm_utilities::{

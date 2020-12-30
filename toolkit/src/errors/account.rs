@@ -22,7 +22,7 @@ pub enum PrivateKeyError {
 
 impl From<snarkvm_errors::objects::account::AccountError> for PrivateKeyError {
     fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        PrivateKeyError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+        PrivateKeyError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
     }
 }
 
@@ -40,7 +40,7 @@ pub enum ViewKeyError {
 
 impl From<snarkvm_errors::objects::account::AccountError> for ViewKeyError {
     fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        ViewKeyError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+        ViewKeyError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
     }
 }
 
@@ -58,7 +58,7 @@ pub enum AddressError {
 
 impl From<snarkvm_errors::objects::account::AccountError> for AddressError {
     fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        AddressError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+        AddressError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
     }
 }
 
