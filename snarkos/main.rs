@@ -26,11 +26,11 @@ use snarkos::{
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_network::{external::protocol::SyncHandler, internal::context::Context, Server};
-use snarkos_objects::{AccountAddress, Network};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
 use snarkvm_models::algorithms::{CRH, SNARK};
+use snarkvm_objects::{AccountAddress, Network};
 use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};

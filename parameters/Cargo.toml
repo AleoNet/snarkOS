@@ -27,9 +27,9 @@ snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949
 snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 
 snarkos-consensus = { path = "../consensus" }
-snarkos-objects = { path = "../objects" }
 snarkos-posw = { path = "../posw", features = ["test-helpers"] }
 snarkos-storage = { path = "../storage" }
 

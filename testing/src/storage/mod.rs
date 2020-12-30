@@ -19,9 +19,9 @@ use snarkos_models::{
     algorithms::merkle_tree::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::Block;
 pub use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
+use snarkvm_objects::Block;
 
 use rand::{thread_rng, Rng};
 use std::{path::PathBuf, sync::Arc};

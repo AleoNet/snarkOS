@@ -25,7 +25,6 @@ use snarkos_models::{
     dpc::{DPCComponents, Record},
     objects::AccountScheme,
 };
-use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
 use snarkvm_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
@@ -33,6 +32,7 @@ use snarkvm_dpc::base_dpc::{
     record_encryption::RecordEncryption,
     record_payload::RecordPayload,
 };
+use snarkvm_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

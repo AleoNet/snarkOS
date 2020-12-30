@@ -22,9 +22,9 @@ use snarkos_models::{
     objects::{LedgerScheme, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::Block;
 use snarkos_parameters::{GenesisBlock, LedgerMerkleTreeParameters};
 use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_objects::Block;
 use snarkvm_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;

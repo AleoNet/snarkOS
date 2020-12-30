@@ -16,10 +16,10 @@
 
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_errors::consensus::ConsensusError;
-use snarkos_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkos_testing::consensus::*;
 use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
 use snarkvm_models::dpc::{DPCScheme, Program, Record};
+use snarkvm_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkvm_utilities::bytes::ToBytes;
 
 use rand::Rng;

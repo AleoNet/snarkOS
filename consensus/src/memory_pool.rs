@@ -23,8 +23,8 @@ use snarkos_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
 use snarkos_storage::Ledger;
+use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -240,9 +240,9 @@ impl<T: Transaction> Default for MemoryPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_objects::Block;
     use snarkos_testing::{consensus::*, storage::*};
     use snarkvm_dpc::base_dpc::instantiated::Tx;
+    use snarkvm_objects::Block;
 
     use std::sync::Arc;
 

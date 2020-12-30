@@ -26,11 +26,11 @@ use snarkos_network::{
     external::SyncHandler,
     internal::{context::Context, process_transaction_internal},
 };
-use snarkos_objects::BlockHeaderHash;
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
+use snarkvm_objects::BlockHeaderHash;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

@@ -21,10 +21,10 @@ use snarkos_models::{
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
 use snarkos_posw::{txids_to_roots, PoswMarlin};
 use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
+use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;

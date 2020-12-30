@@ -21,9 +21,9 @@ use snarkos_models::{
     objects::AccountScheme,
     parameters::Parameters,
 };
-use snarkos_objects::Account;
 use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkvm_objects::Account;
 use snarkvm_utilities::bytes::FromBytes;
 
 use rand::Rng;

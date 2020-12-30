@@ -28,8 +28,8 @@ use crate::{
     Server,
 };
 use snarkos_consensus::memory_pool::Entry;
-use snarkos_objects::Block as BlockStruct;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
+use snarkvm_objects::Block as BlockStruct;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

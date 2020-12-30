@@ -21,19 +21,6 @@ use snarkos_models::{
     dpc::{DPCComponents, DPCScheme, Program},
     objects::{AccountScheme, LedgerScheme},
 };
-use snarkos_objects::{
-    dpc::DPCTransactions,
-    Account,
-    AccountAddress,
-    AccountPrivateKey,
-    AleoAmount,
-    Block,
-    BlockHeader,
-    BlockHeaderHash,
-    MerkleRootHash,
-    Network,
-    PedersenMerkleRootHash,
-};
 use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
@@ -45,6 +32,19 @@ use snarkvm_dpc::base_dpc::{
     record::DPCRecord,
     record_payload::RecordPayload,
     BaseDPCComponents,
+};
+use snarkvm_objects::{
+    dpc::DPCTransactions,
+    Account,
+    AccountAddress,
+    AccountPrivateKey,
+    AleoAmount,
+    Block,
+    BlockHeader,
+    BlockHeaderHash,
+    MerkleRootHash,
+    Network,
+    PedersenMerkleRootHash,
 };
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
@@ -539,8 +539,8 @@ impl ConsensusParameters {
 mod tests {
     use super::*;
     use rand::{thread_rng, Rng};
-    use snarkos_objects::PedersenMerkleRootHash;
     use snarkos_testing::consensus::DATA;
+    use snarkvm_objects::PedersenMerkleRootHash;
 
     #[test]
     fn test_block_rewards() {

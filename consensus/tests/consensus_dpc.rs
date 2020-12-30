@@ -20,9 +20,9 @@ mod consensus_dpc {
         dpc::{DPCScheme, Program, Record},
         objects::LedgerScheme,
     };
-    use snarkos_objects::{dpc::DPCTransactions, Block};
     use snarkos_testing::{consensus::*, storage::kill_storage};
     use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
+    use snarkvm_objects::{dpc::DPCTransactions, Block};
     use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
     #[test]

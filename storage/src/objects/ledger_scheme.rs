@@ -19,9 +19,9 @@ use snarkos_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::Block;
 use snarkvm_algorithms::merkle_tree::*;
 use snarkvm_errors::dpc::LedgerError;
+use snarkvm_objects::Block;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

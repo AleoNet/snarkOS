@@ -25,7 +25,7 @@ use snarkvm_algorithms::snark;
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_models::curves::PairingEngine;
 
-use snarkos_objects::{
+use snarkvm_objects::{
     merkle_root_with_subroots,
     pedersen_merkle_root,
     MerkleRootHash,

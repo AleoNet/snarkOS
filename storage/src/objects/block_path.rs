@@ -16,8 +16,8 @@
 
 use crate::Ledger;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{BlockHeader, BlockHeaderHash};
 use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_objects::{BlockHeader, BlockHeaderHash};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
 

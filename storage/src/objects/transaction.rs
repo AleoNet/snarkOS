@@ -20,7 +20,7 @@ use snarkos_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::BlockHeaderHash;
+use snarkvm_objects::BlockHeaderHash;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,

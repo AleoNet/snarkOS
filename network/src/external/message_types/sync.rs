@@ -18,7 +18,7 @@ use crate::{
     errors::network::message::MessageError,
     external::message::{Message, MessageName},
 };
-use snarkos_objects::BlockHeaderHash;
+use snarkvm_objects::BlockHeaderHash;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync.md"))]
 #[derive(Debug, PartialEq, Clone)]

@@ -20,9 +20,9 @@ mod miner {
         algorithms::{commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme},
         dpc::DPCComponents,
     };
-    use snarkos_objects::{dpc::DPCTransactions, AccountAddress, AccountPrivateKey, BlockHeader};
     use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;
+    use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, AccountPrivateKey, BlockHeader};
 
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;

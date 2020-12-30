@@ -16,8 +16,8 @@
 
 use crate::*;
 use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_objects::{Block, BlockHeaderHash, DPCTransactions};
 use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_objects::{Block, BlockHeaderHash, DPCTransactions};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
