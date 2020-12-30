@@ -20,9 +20,6 @@ extern crate derivative;
 #[macro_use]
 extern crate snarkvm_algorithms;
 
-pub mod account;
-pub use account::*;
-
 pub mod amount;
 pub use amount::*;
 
