@@ -15,7 +15,6 @@ edition = "2018"
 members = [
     "benchmarks",
     "consensus",
-    "models",
     "network",
     "parameters",
     "posw",
@@ -39,7 +38,6 @@ snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce0494
 snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1" }
 
 snarkos-consensus = { path = "./consensus", version = "1.1.4"}
-snarkos-models = { path = "./models", version = "1.1.4"}
 snarkos-network = { path = "./network", version = "1.1.4"}
 snarkos-posw = { path = "./posw", version = "1.1.4"}
 snarkos-rpc = { path = "./rpc", version = "1.1.4"}

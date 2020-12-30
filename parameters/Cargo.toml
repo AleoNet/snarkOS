@@ -13,9 +13,8 @@ edition = "2018"
 
 [dependencies]
 snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1", default-features = false }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1", default-features = false }
 snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ce04949", version = "0.0.1", default-features = false }
-
-snarkos-models = { path = "../models", version = "1.1.4", default-features = false }
 
 curl = { version = "0.4.34", optional = true }
 hex = { version = "0.4.2" }
@@ -39,5 +38,5 @@ parking_lot = { version = "0.11.1" }
 rand = { version = "0.7" }
 
 [features]
-default = [ "remote", "snarkvm-algorithms/default", "snarkos-models/default" ]
+default = [ "remote", "snarkvm-algorithms/default", "snarkvm-models/default" ]
 remote = [ "curl" ]

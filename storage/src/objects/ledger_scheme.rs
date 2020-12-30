@@ -15,12 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkos_models::{
+use snarkvm_algorithms::merkle_tree::*;
+use snarkvm_errors::dpc::LedgerError;
+use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkvm_algorithms::merkle_tree::*;
-use snarkvm_errors::dpc::LedgerError;
 use snarkvm_objects::Block;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
