@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::node::CliError;
+use crate::errors::CliError;
 use snarkos_consensus::error::ConsensusError;
 use snarkos_network::errors::ServerError;
 use snarkos_storage::error::StorageError;

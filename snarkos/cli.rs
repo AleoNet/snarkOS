@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::node::CliError, parameters::types::*};
+use crate::{errors::CliError, parameters::types::*};
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 

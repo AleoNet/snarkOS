@@ -16,7 +16,7 @@
 
 use crate::{
     cli::CLI,
-    errors::node::CliError,
+    errors::CliError,
     parameters::{flag, option, subcommand, types::*},
     update::UpdateCLI,
 };

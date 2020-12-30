@@ -17,11 +17,11 @@
 #[macro_use]
 extern crate tracing;
 
-use crate::errors::node::NodeError;
-use snarkos::{
+use crate::{
     cli::CLI,
     config::{Config, ConfigCli},
     display::render_init,
+    errors::NodeError,
     miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
