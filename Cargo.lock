@@ -2545,13 +2545,13 @@ dependencies = [
  "sha2",
  "smallvec 1.4.2",
  "snarkos-errors",
- "snarkos-marlin",
  "snarkos-models",
  "snarkos-posw",
  "snarkos-profiler",
  "snarkos-utilities",
  "snarkvm-algorithms",
  "snarkvm-curves",
+ "snarkvm-marlin",
 ]
 
 [[package]]
@@ -2604,25 +2604,6 @@ dependencies = [
  "snarkvm-errors",
  "thiserror",
  "toml",
-]
-
-[[package]]
-name = "snarkos-marlin"
-version = "1.1.4"
-dependencies = [
- "blake2",
- "derivative",
- "digest 0.8.1",
- "rand_chacha",
- "rand_core",
- "rayon",
- "snarkos-errors",
- "snarkos-models",
- "snarkos-profiler",
- "snarkos-utilities",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-polycommit",
 ]
 
 [[package]]
@@ -2705,7 +2686,6 @@ dependencies = [
  "rand",
  "snarkos-consensus",
  "snarkos-errors",
- "snarkos-marlin",
  "snarkos-models",
  "snarkos-objects",
  "snarkos-posw",
@@ -2714,6 +2694,7 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
+ "snarkvm-marlin",
 ]
 
 [[package]]

@@ -18,7 +18,6 @@
 
 use crate::circuit::{POSWCircuit, POSWCircuitParameters};
 use snarkos_errors::posw::PoswError;
-use snarkos_marlin::snark::SRS;
 use snarkos_models::{
     algorithms::{MaskedMerkleParameters, SNARK},
     curves::{to_field_vec::ToConstraintField, PairingEngine, PrimeField},
@@ -41,6 +40,7 @@ use snarkvm_curves::{
     edwards_bls12::{EdwardsProjective, Fq},
 };
 use snarkvm_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
+use snarkvm_marlin::snark::SRS;
 use snarkvm_polycommit::optional_rng::OptionalRng;
 
 use blake2::{digest::Digest, Blake2s};
