@@ -145,7 +145,6 @@ impl From<hex::FromHexError> for StorageError {
     }
 }
 
-#[cfg(feature = "librocksdb")]
 impl From<rocksdb::Error> for StorageError {
     fn from(error: rocksdb::Error) -> Self {
         StorageError::Crate("rocksdb", format!("{:?}", error))

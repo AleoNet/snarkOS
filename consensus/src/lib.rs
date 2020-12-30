@@ -35,6 +35,9 @@
 #![forbid(unsafe_code)]
 
 #[macro_use]
+extern crate thiserror;
+
+#[macro_use]
 extern crate tracing;
 
 pub mod consensus;

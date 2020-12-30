@@ -2571,6 +2571,7 @@ dependencies = [
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
+ "thiserror",
  "tokio 0.2.22",
  "tracing",
 ]
@@ -2595,6 +2596,7 @@ dependencies = [
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
+ "thiserror",
  "tokio 0.2.22",
  "tokio-test",
  "tracing",
@@ -2653,6 +2655,7 @@ dependencies = [
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
+ "thiserror",
  "tokio 0.2.22",
 ]
 
@@ -2675,6 +2678,7 @@ dependencies = [
  "snarkvm-objects",
  "snarkvm-parameters",
  "snarkvm-utilities",
+ "thiserror",
 ]
 
 [[package]]

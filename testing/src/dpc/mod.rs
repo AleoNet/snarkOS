@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_parameters::LedgerMerkleTreeParameters;
 use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkvm_models::{
     algorithms::{MerkleParameters, CRH},
@@ -24,6 +23,7 @@ use snarkvm_models::{
     parameters::Parameters,
 };
 use snarkvm_objects::Account;
+use snarkvm_parameters::LedgerMerkleTreeParameters;
 use snarkvm_utilities::bytes::FromBytes;
 
 use rand::Rng;
