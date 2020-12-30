@@ -14,14 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    consensus::ConsensusError,
-    network::ServerError,
-    node::CliError,
-    objects::AccountError,
-    storage::StorageError,
-};
-use snarkvm_errors::algorithms::CRHError;
+use crate::errors::node::CliError;
+use snarkos_consensus::error::ConsensusError;
+use snarkos_network::errors::ServerError;
+use snarkos_storage::error::StorageError;
+use snarkvm_errors::{algorithms::CRHError, objects::AccountError};
 
 #[derive(Debug, Error)]
 pub enum NodeError {
