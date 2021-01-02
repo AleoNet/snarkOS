@@ -12,13 +12,13 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1"}
-snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1"}
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
 
 snarkos-posw = { path = "../posw", version = "1.1.4"}
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}

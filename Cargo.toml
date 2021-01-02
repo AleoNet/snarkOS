@@ -32,11 +32,11 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [dependencies]
-snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "81d225a", version = "0.0.1" }
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "61b6147", version = "0.0.1" }
 
 snarkos-consensus = { path = "./consensus", version = "1.1.4" }
 snarkos-network = { path = "./network", version = "1.1.4" }
