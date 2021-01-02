@@ -329,7 +329,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "validate
 
 
 ## createaccount
-Generate a new account private key and its corresponding account address.
+Create a new account private key and its corresponding account address.
 
 ### Protected Endpoint
 
