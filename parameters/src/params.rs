@@ -1,22 +1,22 @@
 // Copyright (C) 2019-2020 Aleo Systems Inc.
-// This file is part of the snarkOS library.
+// This file is part of the snarkVM library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
+// The snarkVM library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkOS library is distributed in the hope that it will be useful,
+// The snarkVM library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::crh::sha256::sha256;
-use snarkos_errors::parameters::ParametersError;
-use snarkos_models::parameters::Parameters;
+use snarkvm_algorithms::crh::sha256::sha256;
+use snarkvm_errors::parameters::ParametersError;
+use snarkvm_models::parameters::Parameters;
 
 use std::{
     fs::{self, File},
@@ -75,8 +75,12 @@ macro_rules! impl_params_remote {
                 file_path.push("params/");
                 file_path.push(&filename);
 
-                // Compute the relative path.
-                let relative_path = file_path.strip_prefix("parameters")?;
+                 // Compute the relative path.
+                let relative_path = if file_path.strip_prefix("parameters").is_ok() {
+                    file_path.strip_prefix("parameters")?
+                } else {
+                    &file_path
+                };
 
                 // Compute the absolute path.
                 let mut absolute_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -91,7 +95,7 @@ macro_rules! impl_params_remote {
                 } else {
                     // Downloads the missing parameters and stores it in the local directory for use.
                     eprintln!(
-                        "\nWARNING - \"{}\" does not exist. snarkOS will download this file remotely and store it locally. Please ensure \"{}\" is stored in {:?}.\n",
+                        "\nWARNING - \"{}\" does not exist. snarkVM will download this file remotely and store it locally. Please ensure \"{}\" is stored in {:?}.\n",
                         filename, filename, file_path
                     );
                     let output = Self::load_remote()?;

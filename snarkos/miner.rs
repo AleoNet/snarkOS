@@ -15,9 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_network::{external::propagate_block, internal::context::Context};
-use snarkos_objects::{AccountAddress, Block};
+use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkvm_objects::{AccountAddress, Block};
 
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};

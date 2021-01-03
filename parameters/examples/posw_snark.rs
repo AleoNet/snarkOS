@@ -1,25 +1,25 @@
 // Copyright (C) 2019-2020 Aleo Systems Inc.
-// This file is part of the snarkOS library.
+// This file is part of the snarkVM library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
+// The snarkVM library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkOS library is distributed in the hope that it will be useful,
+// The snarkVM library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::crh::sha256;
-use snarkos_curves::bls12_377::Bls12_377;
-use snarkos_errors::dpc::DPCError;
-use snarkos_marlin::snark;
 use snarkos_posw::PoswMarlin;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_algorithms::crh::sha256;
+use snarkvm_curves::bls12_377::Bls12_377;
+use snarkvm_errors::dpc::DPCError;
+use snarkvm_marlin::snark;
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use rand::thread_rng;
 use std::path::PathBuf;

@@ -15,15 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    errors::ServerError,
     external::{message::MessageName, message_types::GetSync, protocol::*, Channel, Version},
     internal::context::Context,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
+use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_errors::network::ServerError;
 
 use chrono::{DateTime, Utc};
 use std::{

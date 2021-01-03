@@ -16,10 +16,6 @@
 
 mod server_listen {
     use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
-    use snarkos_dpc::base_dpc::{
-        instantiated::{CommitmentMerkleParameters, Components, Tx},
-        parameters::PublicParameters,
-    };
     use snarkos_network::{
         external::{
             message::Message,
@@ -31,6 +27,10 @@ mod server_listen {
         server::Server,
     };
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
+    use snarkvm_dpc::base_dpc::{
+        instantiated::{CommitmentMerkleParameters, Components, Tx},
+        parameters::PublicParameters,
+    };
 
     use chrono::{DateTime, Utc};
     use serial_test::serial;

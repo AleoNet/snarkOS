@@ -14,18 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
-use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::{
+use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_posw::{txids_to_roots, PoswMarlin};
+use snarkos_storage::Ledger;
+use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
+use snarkvm_models::{
     algorithms::{LoadableMerkleParameters, CRH},
     dpc::{DPCScheme, Record},
     objects::Transaction,
 };
-use snarkos_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
-use snarkos_posw::{txids_to_roots, PoswMarlin};
-use snarkos_storage::Ledger;
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
 use rand::{thread_rng, Rng};

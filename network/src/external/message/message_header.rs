@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::message::MessageName;
-use snarkos_errors::network::message::MessageHeaderError;
+use crate::{errors::message::MessageHeaderError, external::message::MessageName};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;

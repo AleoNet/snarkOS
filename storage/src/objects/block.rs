@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
-use snarkos_errors::{objects::BlockError, storage::StorageError};
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkos_objects::{Block, BlockHeaderHash, DPCTransactions};
-use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
+use crate::{error::StorageError, *};
+use snarkvm_errors::objects::BlockError;
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_objects::{Block, BlockHeaderHash, DPCTransactions};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the latest block in the chain.

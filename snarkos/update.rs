@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_errors::node::CliError;
+use crate::errors::CliError;
 
 use clap::ArgMatches;
 use self_update::{backends::github, cargo_crate_version};

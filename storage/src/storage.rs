@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{DatabaseTransaction, Op};
-use snarkos_errors::storage::StorageError;
+use crate::{error::StorageError, DatabaseTransaction, Op};
 
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DBIterator, IteratorMode, Options, WriteBatch, DB};
 use std::{
@@ -33,7 +32,7 @@ pub struct Storage {
 impl Storage {
     /// Opens storage from the given path with its given names. If storage does not exists,
     /// it creates a new storage file at the given path with its given names, and opens it.
-    /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
+    /// If RocksDB fails to open, returns [StorageError](snarkvm_errors::storage::StorageError).
     pub fn open_cf<P: AsRef<Path>>(path: P, num_cfs: u32) -> Result<Self, StorageError> {
         let mut cfs = Vec::with_capacity(num_cfs as usize);
         let mut cf_names: Vec<String> = Vec::with_capacity(cfs.len());
@@ -59,7 +58,7 @@ impl Storage {
     }
 
     /// Opens a secondary storage instance from the given path with its given names.
-    /// If RocksDB fails to open, returns [StorageError](snarkos_errors::storage::StorageError).
+    /// If RocksDB fails to open, returns [StorageError](snarkvm_errors::storage::StorageError).
     pub fn open_secondary_cf<P: AsRef<Path> + Clone>(
         primary_path: P,
         secondary_path: P,
@@ -97,19 +96,19 @@ impl Storage {
     }
 
     /// Returns the value from a given key and col.
-    /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
+    /// If the given key does not exist, returns [StorageError](snarkvm_errors::storage::StorageError).
     pub(crate) fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
         Ok(self.db.get_cf(self.get_cf_ref(col), key)?)
     }
 
     /// Returns the iterator from a given col.
-    /// If the given key does not exist, returns [StorageError](snarkos_errors::storage::StorageError).
+    /// If the given key does not exist, returns [StorageError](snarkvm_errors::storage::StorageError).
     pub(crate) fn get_iter(&self, col: u32) -> Result<DBIterator, StorageError> {
         Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start))
     }
 
     /// Returns `Ok(())` after executing a database transaction
-    /// If the any of the operations fail, returns [StorageError](snarkos_errors::storage::StorageError).
+    /// If the any of the operations fail, returns [StorageError](snarkvm_errors::storage::StorageError).
     pub(crate) fn write(&self, transaction: DatabaseTransaction) -> Result<(), StorageError> {
         let mut batch = WriteBatch::default();
 
@@ -140,7 +139,7 @@ impl Storage {
     }
 
     /// Returns `Ok(())` after destroying the storage
-    /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
+    /// If RocksDB fails to destroy storage, returns [StorageError](snarkvm_errors::storage::StorageError).
     pub fn destroy(&self) -> Result<(), StorageError> {
         let path = self.db.path();
         // drop(&self.db); FIXME: this didn't actually drop self.db
@@ -148,7 +147,7 @@ impl Storage {
     }
 
     /// Returns `Ok(())` after destroying the storage of the given path.
-    /// If RocksDB fails to destroy storage, returns [StorageError](snarkos_errors::storage::StorageError).
+    /// If RocksDB fails to destroy storage, returns [StorageError](snarkvm_errors::storage::StorageError).
     pub(crate) fn destroy_storage(path: PathBuf) -> Result<(), StorageError> {
         let mut storage_opts = Options::default();
         storage_opts.create_missing_column_families(true);

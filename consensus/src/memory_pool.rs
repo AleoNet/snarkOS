@@ -18,14 +18,14 @@
 //!
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
-use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::{
+use crate::error::ConsensusError;
+use snarkos_storage::Ledger;
+use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::{dpc::DPCTransactions, BlockHeader};
-use snarkos_storage::Ledger;
-use snarkos_utilities::{
+use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
     to_bytes,
@@ -240,9 +240,9 @@ impl<T: Transaction> Default for MemoryPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_dpc::base_dpc::instantiated::Tx;
-    use snarkos_objects::Block;
     use snarkos_testing::{consensus::*, storage::*};
+    use snarkvm_dpc::base_dpc::instantiated::Tx;
+    use snarkvm_objects::Block;
 
     use std::sync::Arc;
 
