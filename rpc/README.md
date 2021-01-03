@@ -9,21 +9,21 @@
 [![Authors](https://img.shields.io/badge/authors-Aleo-orange.svg)](../AUTHORS)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
 
-In Aleo, full nodes run a [JSON-RPC](https://www.jsonrpc.org/specification) server
+On Aleo, full nodes run a [JSON-RPC](https://www.jsonrpc.org/specification) server
 to enable API calls for fetching data and interacting with peers connected to the network.
 
 ## RPC Port
 
 ```ignore
--rpc-port 3030
+snarkos --rpc-port 3030
 ```
 
-The default RPC port is 3030. This can be specified with the `-rpc-port` flag when starting a full node.
+The default RPC port is `3030`. A custom RPC port may be specified using the `--rpc-port` flag when starting a node.
 
 ## Authentication for Private RPC Endpoints
 
 ```ignore
--rpc-username {USERNAME} -rpc-password {PASSWORD}
+snarkos --rpc-username {USERNAME} --rpc-password {PASSWORD}
 ```
 
 The RPC server exposes protected RPC endpoints for account specific operations, such as creating an account,
@@ -31,7 +31,7 @@ creating a transaction, and fetching record commitments.
 RPC requests to protected RPC endpoints can be optionally guarded with an authentication header.
 
 To enable this authentication layer, provide the authentication credentials to
-the `-rpc-username` and `-rpc-password` flags when booting up a full node.
+the `--rpc-username` and `--rpc-password` flags when booting up a full node.
 
 
 
@@ -352,7 +352,7 @@ curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentat
 ```
 
 ## createrawtransaction
-Creates a new transaction and returns the encoded transaction and the new records.
+Creates a new transaction and returns the encoded transaction along with the encoded records.
 
 ### Protected Endpoint
 
