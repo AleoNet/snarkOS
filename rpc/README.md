@@ -352,7 +352,7 @@ curl --user username:password --data-binary '{"jsonrpc": "2.0", "id":"documentat
 ```
 
 ## createrawtransaction
-Create a new transaction, returning the encoded transaction and the new records.
+Creates a new transaction and returns the encoded transaction and the new records.
 
 ### Protected Endpoint
 
