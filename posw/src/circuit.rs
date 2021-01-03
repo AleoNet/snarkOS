@@ -17,9 +17,9 @@
 //! Implements a Proof of Succinct work circuit. The inputs are opaque leaves,
 //! which are then used to build a tree instantiated with a masked Pedersen hash. The prover
 //! inputs a mask computed as Blake2s(nonce || root), which the verifier also checks.
-use snarkos_errors::gadgets::SynthesisError;
-use snarkos_gadgets::algorithms::merkle_tree::compute_root;
-use snarkos_models::{
+use snarkvm_errors::gadgets::SynthesisError;
+use snarkvm_gadgets::algorithms::merkle_tree::compute_root;
+use snarkvm_models::{
     algorithms::{MaskedMerkleParameters, CRH},
     curves::PrimeField,
     gadgets::{
@@ -116,18 +116,18 @@ impl<F: PrimeField, M: MaskedMerkleParameters, HG: MaskedCRHGadget<M::H, F>, CP:
 #[cfg(test)]
 mod test {
     use super::{POSWCircuit, POSWCircuitParameters};
-    use snarkos_algorithms::{
+    use snarkvm_algorithms::{
         crh::{PedersenCompressedCRH, PedersenSize},
         define_masked_merkle_tree_parameters,
         snark::gm17::{create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof},
     };
-    use snarkos_curves::{
+    use snarkvm_curves::{
         bls12_377::{Bls12_377, Fr},
         edwards_bls12::{EdwardsProjective as Edwards, Fq},
     };
-    use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
-    use snarkos_models::curves::to_field_vec::ToConstraintField;
-    use snarkos_utilities::bytes::ToBytes;
+    use snarkvm_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
+    use snarkvm_models::curves::to_field_vec::ToConstraintField;
+    use snarkvm_utilities::bytes::ToBytes;
 
     use blake2::{digest::Digest, Blake2s};
     use rand::thread_rng;

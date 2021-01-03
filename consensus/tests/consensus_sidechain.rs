@@ -16,10 +16,10 @@
 
 mod consensus_sidechain {
     use snarkos_consensus::MemoryPool;
-    use snarkos_dpc::base_dpc::instantiated::Tx;
-    use snarkos_objects::Block;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
-    use snarkos_utilities::bytes::FromBytes;
+    use snarkvm_dpc::base_dpc::instantiated::Tx;
+    use snarkvm_objects::Block;
+    use snarkvm_utilities::bytes::FromBytes;
 
     use std::sync::Arc;
 
@@ -59,7 +59,7 @@ mod consensus_sidechain {
         let new_block_height = blockchain.get_current_block_height();
         assert_eq!(old_block_height + 2, new_block_height);
 
-        kill_storage_sync(blockchain);
+        kill_storage_sync(blockchain.into());
     }
 
     // Receive two blocks that reference the same parent.

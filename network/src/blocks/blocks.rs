@@ -16,9 +16,9 @@
 
 use crate::{external::message_types::*, outbound::Request, peers::PeerInfo, Environment, NetworkError, Outbound};
 use snarkos_consensus::memory_pool::Entry;
-use snarkos_dpc::base_dpc::instantiated::Tx;
-use snarkos_objects::{Block as BlockStruct, BlockHeaderHash};
-use snarkos_utilities::{
+use snarkvm_dpc::base_dpc::instantiated::Tx;
+use snarkvm_objects::{Block as BlockStruct, BlockHeaderHash};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

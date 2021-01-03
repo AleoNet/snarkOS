@@ -14,9 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{difficulty::bitcoin_retarget, memory_pool::MemoryPool, MerkleTreeLedger};
-use snarkos_curves::bls12_377::Bls12_377;
-use snarkos_dpc::base_dpc::{
+use crate::{difficulty::bitcoin_retarget, error::ConsensusError, memory_pool::MemoryPool, MerkleTreeLedger};
+use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
+use snarkos_profiler::{end_timer, start_timer};
+use snarkos_storage::BlockPath;
+use snarkvm_curves::bls12_377::Bls12_377;
+use snarkvm_dpc::base_dpc::{
     instantiated::*,
     parameters::PublicParameters,
     program::NoopProgram,
@@ -24,13 +27,12 @@ use snarkos_dpc::base_dpc::{
     record_payload::RecordPayload,
     BaseDPCComponents,
 };
-use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::{
+use snarkvm_models::{
     algorithms::{CRH, SNARK},
     dpc::{DPCComponents, DPCScheme, Program},
     objects::{AccountScheme, LedgerScheme},
 };
-use snarkos_objects::{
+use snarkvm_objects::{
     dpc::DPCTransactions,
     Account,
     AccountAddress,
@@ -43,10 +45,7 @@ use snarkos_objects::{
     Network,
     PedersenMerkleRootHash,
 };
-use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
-use snarkos_profiler::{end_timer, start_timer};
-use snarkos_storage::BlockPath;
-use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use chrono::Utc;
 use rand::Rng;
@@ -534,8 +533,8 @@ impl ConsensusParameters {
 mod tests {
     use super::*;
     use rand::{thread_rng, Rng};
-    use snarkos_objects::PedersenMerkleRootHash;
     use snarkos_testing::consensus::DATA;
+    use snarkvm_objects::PedersenMerkleRootHash;
 
     #[test]
     fn test_block_rewards() {

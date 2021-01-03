@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::message::{Message, MessageName};
-use snarkos_errors::network::message::MessageError;
-use snarkos_objects::BlockHeaderHash;
+use crate::{
+    errors::message::MessageError,
+    external::message::{Message, MessageName},
+};
+use snarkvm_objects::BlockHeaderHash;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_sync.md"))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

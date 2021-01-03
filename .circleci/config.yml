@@ -44,7 +44,7 @@ jobs:
   rust_stable:
     docker:
       - image: cimg/rust:1.46.0
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -63,7 +63,7 @@ jobs:
     machine:
       image: ubuntu-1604:202004-01
       docker_layer_caching: true
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - attach_workspace:
           at: /home/circleci/project/
@@ -77,7 +77,7 @@ jobs:
   rust_nightly:
     docker:
       - image: howardwu/snarkos-ci:2020-08-27
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:

@@ -22,11 +22,11 @@ use crate::{
     RpcImpl,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
+use snarkos_network::{Environment, Server as NodeServer};
+use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_network::{Environment, Server as NodeServer};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use parking_lot::{Mutex, RwLock};

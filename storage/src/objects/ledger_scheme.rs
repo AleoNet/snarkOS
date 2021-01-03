@@ -15,14 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkos_algorithms::merkle_tree::*;
-use snarkos_errors::dpc::LedgerError;
-use snarkos_models::{
+use snarkvm_algorithms::merkle_tree::*;
+use snarkvm_errors::dpc::LedgerError;
+use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::Block;
-use snarkos_utilities::{
+use snarkvm_objects::Block;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
@@ -40,20 +40,16 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
     type Transaction = T;
 
     /// Instantiates a new ledger with a genesis block.
-    fn new(
-        path: &PathBuf,
-        parameters: Self::MerkleParameters,
-        genesis_block: Self::Block,
-    ) -> Result<Self, LedgerError> {
+    fn new(path: &PathBuf, parameters: Self::MerkleParameters, genesis_block: Self::Block) -> anyhow::Result<Self> {
         fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
         let storage = match Storage::open_cf(path, NUM_COLS) {
             Ok(storage) => storage,
-            Err(err) => return Err(LedgerError::StorageError(err)),
+            Err(err) => return Err(err.into()),
         };
 
         if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())? {
             if bytes_to_u32(block_num) != 0 {
-                return Err(LedgerError::ExistingDatabase);
+                return Err(LedgerError::ExistingDatabase.into());
             }
         }
 
@@ -111,7 +107,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
 
     /// Returns the Merkle path to the latest ledger digest
     /// for a given commitment, if it exists in the ledger.
-    fn prove_cm(&self, cm: &Self::Commitment) -> Result<Self::MerklePath, LedgerError> {
+    fn prove_cm(&self, cm: &Self::Commitment) -> anyhow::Result<Self::MerklePath> {
         let cm_index = self.get_cm_index(&to_bytes![cm]?)?.ok_or(LedgerError::InvalidCmIndex)?;
         let result = self.cm_merkle_tree.read().generate_proof(cm_index, cm)?;
 

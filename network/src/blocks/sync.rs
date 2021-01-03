@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    errors::send::SendError,
     external::message_types::{GetBlock, GetSync},
     outbound::Request,
     peers::peers::Peers,
@@ -22,8 +23,7 @@ use crate::{
     NetworkError,
     Outbound,
 };
-use snarkos_errors::network::SendError;
-use snarkos_objects::BlockHeaderHash;
+use snarkvm_objects::BlockHeaderHash;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use parking_lot::RwLock;

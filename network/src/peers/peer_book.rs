@@ -16,8 +16,8 @@
 
 use crate::{peers::PeerInfo, NetworkError};
 use snarkos_metrics::Metrics;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkos_storage::Ledger;
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};

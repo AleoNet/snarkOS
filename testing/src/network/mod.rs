@@ -19,8 +19,8 @@ pub use tcp::*;
 
 use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 use snarkos_network::{environment::Environment, external::Channel, Server};
+use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc};

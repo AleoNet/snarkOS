@@ -18,17 +18,16 @@
 //!
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
-use crate::{rpc_trait::RpcFunctions, rpc_types::*};
+use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
+use snarkos_network::{Environment, Server};
+use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_errors::rpc::RpcError;
-use snarkos_models::objects::Transaction;
-use snarkos_network::{Environment, Server};
-use snarkos_objects::BlockHeaderHash;
-use snarkos_utilities::{
+use snarkvm_models::objects::Transaction;
+use snarkvm_objects::BlockHeaderHash;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
     CanonicalSerialize,

@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_objects::{dpc::DPCTransactions, merkle_root};
 use snarkos_posw::txids_to_roots;
 use snarkos_testing::consensus::*;
+use snarkvm_objects::{dpc::DPCTransactions, merkle_root};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 

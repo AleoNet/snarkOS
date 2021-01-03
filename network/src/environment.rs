@@ -16,11 +16,11 @@
 
 use crate::NetworkError;
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
+use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkos_objects::Network;
+use snarkvm_objects::Network;
 
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc};

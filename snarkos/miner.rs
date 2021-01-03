@@ -15,9 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, Miner};
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
 use snarkos_network::{environment::Environment, Server as NodeServer};
-use snarkos_objects::{AccountAddress, Block};
+use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkvm_objects::{AccountAddress, Block};
 
 use tokio::task;
 use tracing::*;

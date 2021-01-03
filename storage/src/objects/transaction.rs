@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
-use snarkos_errors::storage::StorageError;
-use snarkos_models::{
+use crate::{error::StorageError, Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
+use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::BlockHeaderHash;
-use snarkos_utilities::{
+use snarkvm_objects::BlockHeaderHash;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
     to_bytes,

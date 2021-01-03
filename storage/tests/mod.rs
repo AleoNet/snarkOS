@@ -15,7 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod test_storage {
-    use snarkos_objects::{
+    use snarkos_testing::storage::*;
+    use snarkvm_objects::{
         Block,
         BlockHeader,
         BlockHeaderHash,
@@ -24,7 +25,6 @@ mod test_storage {
         PedersenMerkleRootHash,
         ProofOfSuccinctWork,
     };
-    use snarkos_testing::storage::*;
 
     use std::sync::Arc;
 

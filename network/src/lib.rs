@@ -23,6 +23,9 @@
 #![cfg_attr(nightly, doc(include = "../documentation/concepts/network_server.md"))]
 
 #[macro_use]
+extern crate thiserror;
+
+#[macro_use]
 extern crate tracing;
 #[macro_use]
 extern crate snarkos_metrics;
@@ -232,12 +235,11 @@ mod tests {
         Verack,
         Version,
     };
-
-    use snarkos_objects::block_header_hash::BlockHeaderHash;
     use snarkos_testing::{
         consensus::{FIXTURE_VK, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
     };
+    use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
     use std::{sync::Arc, time::Duration};
 
