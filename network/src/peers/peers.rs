@@ -523,9 +523,16 @@ impl Peers {
         // by informing the peer book of that we found peers.
         let local_address = self.environment.local_address().unwrap(); // the address must be known by now
 
+        let number_of_connected_peers = self.number_of_connected_peers();
+        let number_to_connect = self
+            .environment
+            .maximum_number_of_connected_peers()
+            .saturating_sub(number_of_connected_peers);
+
         for peer_address in peers
             .addresses
             .iter()
+            .take(number_to_connect as usize)
             .map(|(addr, _)| addr)
             .filter(|&peer_addr| *peer_addr != local_address)
         {
