@@ -175,6 +175,21 @@ impl Peers {
     }
 
     ///
+    /// Returns the `SocketAddr` of the last seen peer to be used as a sync node, or `None`.
+    ///
+    pub fn last_seen(&self) -> Option<SocketAddr> {
+        if let Some((&socket_address, _)) = self
+            .connected_peers()
+            .iter()
+            .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
+        {
+            Some(socket_address)
+        } else {
+            None
+        }
+    }
+
+    ///
     /// Returns a map of all disconnected peers with their peer-specific information.
     ///
     #[inline]
