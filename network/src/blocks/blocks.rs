@@ -14,7 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::message_types::*, outbound::Request, peers::PeerInfo, Environment, NetworkError, Outbound};
+use crate::{
+    blocks::sync::SyncManager,
+    external::message_types::*,
+    outbound::Request,
+    peers::PeerInfo,
+    Environment,
+    NetworkError,
+    Outbound,
+};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_objects::{Block as BlockStruct, BlockHeaderHash};
@@ -48,9 +56,26 @@ impl Blocks {
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
     #[inline]
-    pub async fn update(&self) -> Result<(), NetworkError> {
+    pub async fn update(&self, sync_node: Option<SocketAddr>) -> Result<(), NetworkError> {
         // Check that this node is not a bootnode.
-        if !self.environment.is_bootnode() {}
+        if !self.environment.is_bootnode() {
+            let block_locator_hashes = dbg!(self.environment.storage().read().get_block_locator_hashes());
+
+            if let (Some(sync_node), Ok(block_locator_hashes)) = (sync_node, block_locator_hashes) {
+                // Send a GetSync to the selected sync node.
+                self.outbound
+                    .broadcast(&Request::GetSync(sync_node, GetSync::new(block_locator_hashes)))
+                    .await;
+            } else {
+                // If no sync node is available, wait until peers have been established.
+                info!("No sync node is registered, blocks could not be synced");
+            }
+
+            // 2. get block headers from said node
+            // 3. Download blocks
+            // 4. update memory pool with transactions
+            // 5. probably more things...
+        }
 
         Ok(())
     }
@@ -328,6 +353,10 @@ impl Blocks {
     /// A peer has sent us their chain state.
     pub(crate) async fn received_sync(&self, message: Sync) -> Result<(), NetworkError> {
         let height = self.environment.storage().read().get_current_block_height();
+        let block_hashes = message.block_hashes;
+
+        dbg!(height);
+        dbg!(block_hashes);
 
         /* TODO: implement
         sync_handler.receive_hashes(message.block_hashes, height);

@@ -39,6 +39,7 @@ tracing-futures = { version = "0.2" }
 
 [dev-dependencies]
 snarkos-testing = { path = "../testing" }
+futures = "0.3.8"
 
 serial_test = { version = "0.5.0" }
 tokio-test = { version = "0.2.0" }

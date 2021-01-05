@@ -56,22 +56,21 @@ pub struct SyncManager {
     pub pending_blocks: HashMap<BlockHeaderHash, DateTime<Utc>>,
 
     /// The outbound service of this node server.
-    outbound: Arc<RwLock<Outbound>>,
+    outbound: Arc<Outbound>,
 }
 
 impl SyncManager {
     ///
     /// Creates a new instance of `SyncHandler`.
     ///
-    pub fn new(environment: Environment, sync_node_address: SocketAddr, outbound: Arc<RwLock<Outbound>>) -> Self {
+    // TODO (nkls): Default
+    pub fn new(environment: Environment, sync_node_address: SocketAddr, outbound: Arc<Outbound>) -> Self {
         Self {
             environment,
-
             block_headers: vec![],
             pending_blocks: HashMap::new(),
             sync_node_address,
             sync_state: SyncState::Idle,
-
             outbound,
         }
     }
@@ -86,7 +85,7 @@ impl SyncManager {
         }
     }
 
-    /// Returns if the time of the block request, or None if the block was not requested.
+    /// Returns the time of the block request, or None if the block was not requested.
     pub fn is_pending(&self, block_header_hash: &BlockHeaderHash) -> Option<DateTime<Utc>> {
         self.pending_blocks.get(block_header_hash).copied()
     }
@@ -130,87 +129,87 @@ impl SyncManager {
     }
 
     /// Finish syncing or ask for the next block from the sync node.
-    pub async fn increment(&mut self) -> Result<(), SendError> {
-        if let SyncState::Syncing(date_time, height) = self.sync_state {
-            let current_block_height = self.environment.current_block_height().await;
-            if current_block_height > height {
-                debug!(
-                    "Synced {} Block(s) in {:.2} seconds",
-                    current_block_height - height,
-                    (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
-                );
-                self.update_syncing(current_block_height);
-            }
+    //   pub async fn increment(&mut self) -> Result<(), SendError> {
+    //       if let SyncState::Syncing(date_time, height) = self.sync_state {
+    //           let current_block_height = self.environment.current_block_height().await;
+    //           if current_block_height > height {
+    //               debug!(
+    //                   "Synced {} Block(s) in {:.2} seconds",
+    //                   current_block_height - height,
+    //                   (Utc::now() - date_time).num_milliseconds() as f64 / 1000.
+    //               );
+    //               self.update_syncing(current_block_height);
+    //           }
 
-            {
-                let outbound_lock = self.outbound.write();
+    //           {
+    //               let outbound_lock = self.outbound.write();
 
-                // Sync up to 3 blocks at once
-                for _ in 0..3 {
-                    if self.block_headers.is_empty() {
-                        break;
-                    }
+    //               // Sync up to 3 blocks at once
+    //               for _ in 0..3 {
+    //                   if self.block_headers.is_empty() {
+    //                       break;
+    //                   }
 
-                    let block_header_hash = self.block_headers.remove(0);
+    //                   let block_header_hash = self.block_headers.remove(0);
 
-                    // If block is not pending, then ask the sync node for the block.
-                    let should_request = match self.pending_blocks.get(&block_header_hash) {
-                        Some(request_time) => {
-                            // Request the block again if the block was not downloaded in 5 seconds
-                            Utc::now() - *request_time > ChronoDuration::seconds(5)
-                        }
-                        None => !self.environment.storage().read().block_hash_exists(&block_header_hash),
-                    };
+    //                   // If block is not pending, then ask the sync node for the block.
+    //                   let should_request = match self.pending_blocks.get(&block_header_hash) {
+    //                       Some(request_time) => {
+    //                           // Request the block again if the block was not downloaded in 5 seconds
+    //                           Utc::now() - *request_time > ChronoDuration::seconds(5)
+    //                       }
+    //                       None => !self.environment.storage().read().block_hash_exists(&block_header_hash),
+    //                   };
 
-                    if should_request {
-                        // Broadcast a `GetBlock` message to the connected peer.
-                        outbound_lock
-                            .broadcast(&Request::GetBlock(
-                                self.sync_node_address,
-                                GetBlock::new(block_header_hash.clone()),
-                            ))
-                            .await;
-                        self.pending_blocks.insert(block_header_hash, Utc::now());
-                    }
-                }
+    //                   if should_request {
+    //                       // Broadcast a `GetBlock` message to the connected peer.
+    //                       outbound_lock
+    //                           .broadcast(&Request::GetBlock(
+    //                               self.sync_node_address,
+    //                               GetBlock::new(block_header_hash.clone()),
+    //                           ))
+    //                           .await;
+    //                       self.pending_blocks.insert(block_header_hash, Utc::now());
+    //                   }
+    //               }
 
-                // Request more block headers
+    //               // Request more block headers
 
-                if self.pending_blocks.is_empty() {
-                    sleep(Duration::from_millis(500)).await;
+    //               if self.pending_blocks.is_empty() {
+    //                   sleep(Duration::from_millis(500)).await;
 
-                    if let Ok(block_locator_hashes) = self.environment.storage().read().get_block_locator_hashes() {
-                        // Broadcast a `GetSync` message to the connected peer.
-                        outbound_lock
-                            .broadcast(&Request::GetSync(
-                                self.sync_node_address,
-                                GetSync::new(block_locator_hashes),
-                            ))
-                            .await;
-                    }
-                } else {
-                    for (block_header_hash, request_time) in &self.pending_blocks.clone() {
-                        if Utc::now() - *request_time > ChronoDuration::seconds(5) {
-                            // Broadcast a `GetBlock` message to the connected peer.
-                            outbound_lock
-                                .broadcast(&Request::GetBlock(
-                                    self.sync_node_address,
-                                    GetBlock::new(block_header_hash.clone()),
-                                ))
-                                .await;
-                            self.pending_blocks.insert(block_header_hash.clone(), Utc::now());
-                        }
-                    }
-                }
-            }
+    //                   if let Ok(block_locator_hashes) = self.environment.storage().read().get_block_locator_hashes() {
+    //                       // Broadcast a `GetSync` message to the connected peer.
+    //                       outbound_lock
+    //                           .broadcast(&Request::GetSync(
+    //                               self.sync_node_address,
+    //                               GetSync::new(block_locator_hashes),
+    //                           ))
+    //                           .await;
+    //                   }
+    //               } else {
+    //                   for (block_header_hash, request_time) in &self.pending_blocks.clone() {
+    //                       if Utc::now() - *request_time > ChronoDuration::seconds(5) {
+    //                           // Broadcast a `GetBlock` message to the connected peer.
+    //                           outbound_lock
+    //                               .broadcast(&Request::GetBlock(
+    //                                   self.sync_node_address,
+    //                                   GetBlock::new(block_header_hash.clone()),
+    //                               ))
+    //                               .await;
+    //                           self.pending_blocks.insert(block_header_hash.clone(), Utc::now());
+    //                       }
+    //                   }
+    //               }
+    //           }
 
-            self.clear_pending();
-        } else {
-            self.clear_pending();
-        }
+    //           self.clear_pending();
+    //       } else {
+    //           self.clear_pending();
+    //       }
 
-        Ok(())
-    }
+    //       Ok(())
+    //   }
 
     // TODO (howardwu): Untangle this and find its components new homes.
     /// Manages the number of active connections according to the connection frequency.

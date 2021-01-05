@@ -72,6 +72,8 @@ pub struct Server {
 
     pub peers: Peers,
     pub blocks: Blocks,
+    // TODO (nkls): sync state should be stored on the server to avoid starting
+    // multiple concurrent syncs.
 }
 
 impl Server {
@@ -113,10 +115,15 @@ impl Server {
             loop {
                 sleep(Duration::from_secs(10)).await;
                 info!("Updating peers and blocks");
+                let sync_node = peers.last_seen();
                 if let Err(e) = peers.update().await {
                     error!("Peer update error: {}", e);
                 }
-                if let Err(e) = blocks.update().await {
+                // TODO (nkls): passing in the peer here to get sync working on
+                // the main sync interval set above, in future when needing more
+                // fine control over the interval, this might need to be thought
+                // out differently.
+                if let Err(e) = blocks.update(sync_node).await {
                     error!("Block update error: {}", e);
                 }
             }
@@ -236,7 +243,7 @@ mod tests {
         Version,
     };
     use snarkos_testing::{
-        consensus::{FIXTURE_VK, TEST_CONSENSUS},
+        consensus::{DATA, FIXTURE_VK, GENESIS_BLOCK_HEADER_HASH, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
     };
     use snarkvm_objects::block_header_hash::BlockHeaderHash;
@@ -321,7 +328,7 @@ mod tests {
         let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
         write_message_to_stream(Version::name(), version, &mut peer_stream).await;
 
-        // at this point the node should have marked the peer as 'connecting'
+        // at this point the node should have marked the peer as ' connecting'
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connecting(&peer_address));
 
@@ -472,5 +479,107 @@ mod tests {
         let verack = Verack::new(1u64, peer_stream.local_addr().unwrap(), node.local_address().unwrap());
         write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
+    }
+
+    // Unit test for block syncing?
+    //
+    // Tests:
+    //
+    // 1. Sync initiator side
+    // 2. Sync responder side
+
+    async fn post_handshake_setup() -> (Server, TcpStream) {
+        // start a test node and listen for incoming connections
+        let mut node = test_node(vec![]).await;
+        node.start().await.unwrap();
+        let node_listener = node.local_address().unwrap();
+
+        // set up a fake node (peer), which is just a socket
+        let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
+
+        // register the addresses bound to the connection between the node and the peer
+        let peer_address = peer_stream.local_addr().unwrap();
+        let node_address = peer_stream.peer_addr().unwrap();
+
+        // the peer initiates a handshake by sending a Version message
+        let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
+        write_message_to_stream(Version::name(), version, &mut peer_stream).await;
+
+        // at this point the node should have marked the peer as ' connecting'
+        sleep(Duration::from_millis(200)).await;
+        assert!(node.peers.is_connecting(&peer_address));
+
+        // check if the peer has received the Verack message from the node
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let _verack = Verack::deserialize(&message).unwrap();
+
+        // check if it was followed by a Version message
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let version = Version::deserialize(&message).unwrap();
+
+        // in response to the Version, the peer sends a Verack message to finish the handshake
+        let verack = Verack::new(version.nonce, peer_address, node_address);
+        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
+
+        // the node should now have register the peer as 'connected'
+        sleep(Duration::from_millis(200)).await;
+        assert!(node.peers.is_connected(&peer_address));
+
+        (node, peer_stream)
+    }
+
+    #[tokio::test]
+    async fn sync_initiator_side() {
+        // 1. Start server
+        // 2. Start fake node
+        // 3. Handshake (untested) maybe this should be setup code?
+        //
+        // 4. Expect GetSync
+        // 5. Respond with Sync
+        //
+        // 6. Expect GetBlock
+        // 7. Respond with Block
+        //
+        // 8. Somehow inspect state change? Environment.storage() and Environment.memory_pool()
+
+        let (mut node, mut peer_stream) = post_handshake_setup().await;
+
+        // wait for sync to start
+        sleep(Duration::new(10, 0)).await;
+
+        // check Sync message was received
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let get_sync = GetSync::deserialize(&message).unwrap();
+
+        // TODO: check block locator hashes
+        // The node should have a block height of 0 here, i.e. only the genesis block is stored in
+        // the ledger. The block locator hash should reflect this and means the fake node should
+        // respond with the blocks following the genesis block.
+        //
+        // The genesis block is not being included in get_block_locator_hashes when it's the only
+        // block in the ledger.
+        // assert_eq!(
+        //     get_sync.block_locator_hashes.first().unwrap().0,
+        //     *GENESIS_BLOCK_HEADER_HASH
+        // );
+
+        let block_header_hashes = vec![
+            BlockHeaderHash::new(DATA.block_1.header.get_hash().0.to_vec()),
+            BlockHeaderHash::new(DATA.block_2.header.get_hash().0.to_vec()),
+        ];
+
+        // TODO: include fixture blocks here
+        let sync = Sync::new(block_header_hashes);
+        write_message_to_stream(Sync::name(), sync, &mut peer_stream).await;
+
+        sleep(Duration::new(5, 0)).await;
+    }
+
+    #[tokio::test]
+    async fn sync_responder_side() {
+        unimplemented!()
     }
 }
