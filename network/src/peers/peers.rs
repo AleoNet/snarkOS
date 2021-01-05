@@ -27,6 +27,7 @@ use crate::{
     Inbound,
     NetworkError,
     Outbound,
+    Response,
 };
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -109,12 +110,26 @@ impl Peers {
 
         // Check if this node server is above the permitted number of connected peers.
         if number_of_connected_peers > self.environment.maximum_number_of_connected_peers() {
-            // Attempt to connect to the default bootnodes of the network.
-            trace!("Disconnect from connected peers to maintain the permitted number");
-            // TODO (howardwu): Implement channel closure in the inbound handler,
-            //  send channel disconnect messages to those peers from outbound handler,
-            //  and close the channels in outbound handler.
-            // self.disconnect_from_connected_peers(number_of_connected_peers).await?;
+            let number_to_disconnect = number_of_connected_peers - self.environment.maximum_number_of_connected_peers();
+            trace!(
+                "Disconnecting from the most recent {} peers to maintain their permitted number",
+                number_to_disconnect
+            );
+
+            let mut connected = self
+                .connected_peers()
+                .into_iter()
+                .map(|(_, peer_info)| peer_info)
+                .collect::<Vec<_>>();
+            connected.sort_unstable_by_key(|info| *info.last_connected());
+
+            for _ in 0..number_to_disconnect {
+                if let Some(peer_info) = connected.pop() {
+                    let addr = *peer_info.address();
+                    debug!("Disconnecting from {}", addr);
+                    self.inbound.route(Response::DisconnectFrom(addr)).await;
+                }
+            }
 
             // v LOGIC TO IMPLEMENT v
             // // Check that the maximum number of peers has not been reached.

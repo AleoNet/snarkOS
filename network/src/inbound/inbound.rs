@@ -244,7 +244,7 @@ impl Inbound {
     }
 
     #[inline]
-    async fn route(&self, response: Response) {
+    pub(crate) async fn route(&self, response: Response) {
         if let Err(err) = self.sender.send(response).await {
             error!("Failed to route a response for a message: {}", err);
         }
