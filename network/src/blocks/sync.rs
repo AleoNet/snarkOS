@@ -30,11 +30,23 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::time::sleep;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum SyncState {
     Idle,
     /// (timestamp, block_height)
     Syncing(DateTime<Utc>, u32),
+}
+
+impl SyncState {
+    pub fn set_idle(&mut self) {
+        info!("Block sync completed");
+        *self = SyncState::Idle;
+    }
+
+    pub fn set_syncing(&mut self, block_height: u32) {
+        info!("Syncing blocks");
+        *self = SyncState::Syncing(Utc::now(), block_height);
+    }
 }
 
 /// Manages syncing chain state with a sync node.

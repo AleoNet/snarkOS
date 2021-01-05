@@ -72,8 +72,9 @@ pub struct Server {
 
     pub peers: Peers,
     pub blocks: Blocks,
-    // TODO (nkls): sync state should be stored on the server to avoid starting
-    // multiple concurrent syncs.
+
+    /// The current sync state, shared reference to allow updating from withing blocks.
+    sync_state: Arc<RwLock<SyncState>>,
 }
 
 impl Server {
@@ -85,8 +86,9 @@ impl Server {
         let outbound = Arc::new(Outbound::new(channels));
 
         // Initialize the peer and block services.
+        let sync_state = Arc::new(RwLock::new(SyncState::Idle));
         let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
-        let blocks = Blocks::new(environment.clone(), outbound.clone())?;
+        let blocks = Blocks::new(environment.clone(), outbound.clone(), sync_state.clone())?;
 
         Ok(Self {
             environment,
@@ -94,6 +96,7 @@ impl Server {
             outbound,
             peers,
             blocks,
+            sync_state,
         })
     }
 
@@ -205,8 +208,8 @@ impl Server {
             Response::GetSync(remote_address, getsync) => {
                 self.blocks.received_get_sync(remote_address, getsync).await?;
             }
-            Response::Sync(_remote_address, sync) => {
-                self.blocks.received_sync(sync).await?;
+            Response::Sync(remote_address, sync) => {
+                self.blocks.received_sync(remote_address, sync).await?;
             }
             Response::DisconnectFrom(remote_address) => {
                 self.peers.disconnected_from_peer(&remote_address).await?;
@@ -243,7 +246,7 @@ mod tests {
         Version,
     };
     use snarkos_testing::{
-        consensus::{DATA, FIXTURE_VK, GENESIS_BLOCK_HEADER_HASH, TEST_CONSENSUS},
+        consensus::{BLOCK_1, DATA, FIXTURE_VK, GENESIS_BLOCK_HEADER_HASH, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
     };
     use snarkvm_objects::block_header_hash::BlockHeaderHash;
@@ -488,7 +491,7 @@ mod tests {
     // 1. Sync initiator side
     // 2. Sync responder side
 
-    async fn post_handshake_setup() -> (Server, TcpStream) {
+    async fn handshake() -> (Server, TcpStream) {
         // start a test node and listen for incoming connections
         let mut node = test_node(vec![]).await;
         node.start().await.unwrap();
@@ -544,12 +547,21 @@ mod tests {
         //
         // 8. Somehow inspect state change? Environment.storage() and Environment.memory_pool()
 
-        let (mut node, mut peer_stream) = post_handshake_setup().await;
+        let filter =
+            tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_target(false)
+            .init();
 
-        // wait for sync to start
-        sleep(Duration::new(10, 0)).await;
+        let (mut node, mut peer_stream) = handshake().await;
 
-        // check Sync message was received
+        // check Version from peer update is received
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let version = Version::deserialize(&message).unwrap();
+
+        // check GetSync message was received
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
         let get_sync = GetSync::deserialize(&message).unwrap();
@@ -566,16 +578,34 @@ mod tests {
         //     *GENESIS_BLOCK_HEADER_HASH
         // );
 
-        let block_header_hashes = vec![
-            BlockHeaderHash::new(DATA.block_1.header.get_hash().0.to_vec()),
-            BlockHeaderHash::new(DATA.block_2.header.get_hash().0.to_vec()),
-        ];
+        let block_1_header_hash = BlockHeaderHash::new(DATA.block_1.header.get_hash().0.to_vec());
+        // let block_2_header_hash = BlockHeaderHash::new(DATA.block_2.header.get_hash().0.to_vec());
 
-        // TODO: include fixture blocks here
+        let block_header_hashes = vec![block_1_header_hash.clone()];
+
         let sync = Sync::new(block_header_hashes);
         write_message_to_stream(Sync::name(), sync, &mut peer_stream).await;
 
+        // make sure both GetBlock messages make it, order is unimportant
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let get_block = GetBlock::deserialize(&message).unwrap();
+
+        assert_eq!(get_block.block_hash, block_1_header_hash);
+
+        // respond with the Block
+        let block = Block::new(BLOCK_1.to_vec());
+        write_message_to_stream(Block::name(), block, &mut peer_stream).await;
+
         sleep(Duration::new(5, 0)).await;
+
+        // Check block is stored correctly
+        assert!(
+            node.environment
+                .storage()
+                .read()
+                .block_hash_exists(&block_1_header_hash)
+        );
     }
 
     #[tokio::test]

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    blocks::sync::SyncManager,
+    blocks::sync::SyncState,
     external::message_types::*,
     outbound::Request,
     peers::PeerInfo,
@@ -33,6 +33,8 @@ use snarkvm_utilities::{
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
+use parking_lot::RwLock;
+
 /// A stateful component for managing the blocks for the ledger on this node server.
 #[derive(Clone)]
 pub struct Blocks {
@@ -40,6 +42,7 @@ pub struct Blocks {
     pub(crate) environment: Environment,
     /// The outbound handler of this node server.
     outbound: Arc<Outbound>,
+    sync_state: Arc<RwLock<SyncState>>,
 }
 
 impl Blocks {
@@ -47,9 +50,17 @@ impl Blocks {
     /// Creates a new instance of `Blocks`.
     ///
     #[inline]
-    pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
+    pub fn new(
+        environment: Environment,
+        outbound: Arc<Outbound>,
+        sync_state: Arc<RwLock<SyncState>>,
+    ) -> Result<Self, NetworkError> {
         trace!("Instantiating the block service");
-        Ok(Self { environment, outbound })
+        Ok(Self {
+            environment,
+            outbound,
+            sync_state,
+        })
     }
 
     ///
@@ -59,7 +70,7 @@ impl Blocks {
     pub async fn update(&self, sync_node: Option<SocketAddr>) -> Result<(), NetworkError> {
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {
-            let block_locator_hashes = dbg!(self.environment.storage().read().get_block_locator_hashes());
+            let block_locator_hashes = self.environment.storage().read().get_block_locator_hashes();
 
             if let (Some(sync_node), Ok(block_locator_hashes)) = (sync_node, block_locator_hashes) {
                 // Send a GetSync to the selected sync node.
@@ -70,11 +81,6 @@ impl Blocks {
                 // If no sync node is available, wait until peers have been established.
                 info!("No sync node is registered, blocks could not be synced");
             }
-
-            // 2. get block headers from said node
-            // 3. Download blocks
-            // 4. update memory pool with transactions
-            // 5. probably more things...
         }
 
         Ok(())
@@ -351,12 +357,34 @@ impl Blocks {
     }
 
     /// A peer has sent us their chain state.
-    pub(crate) async fn received_sync(&self, message: Sync) -> Result<(), NetworkError> {
+    pub(crate) async fn received_sync(&self, remote_address: SocketAddr, message: Sync) -> Result<(), NetworkError> {
+        // For an update to occure, we need to:
+        //
+        // 1. receive the hashes and fire off GetBlock(s) for those
+        // 2. set sync state to syncing with current block height and timestamp
+        // 3. receieve Blocks and store
+        // 4. repeat process until peer returns an empty list of hashes
+
         let height = self.environment.storage().read().get_current_block_height();
         let block_hashes = message.block_hashes;
 
-        dbg!(height);
-        dbg!(block_hashes);
+        // handle the hashes
+        if block_hashes.is_empty() {
+            let mut sync_state = self.sync_state.write();
+            sync_state.set_idle();
+        } else {
+            {
+                let mut sync_state = self.sync_state.write();
+                sync_state.set_syncing(height);
+            }
+            // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
+            // detect missing blocks.
+            for hash in block_hashes {
+                self.outbound
+                    .broadcast(&Request::GetBlock(remote_address, GetBlock::new(hash)))
+                    .await;
+            }
+        }
 
         /* TODO: implement
         sync_handler.receive_hashes(message.block_hashes, height);
