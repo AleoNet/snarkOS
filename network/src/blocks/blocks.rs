@@ -371,11 +371,11 @@ impl Blocks {
         // handle the hashes
         if block_hashes.is_empty() {
             let mut sync_state = self.sync_state.write();
-            sync_state.set_idle();
+            // sync_state.set_idle();
         } else {
             {
                 let mut sync_state = self.sync_state.write();
-                sync_state.set_syncing(height);
+                // sync_state.set_syncing(height);
             }
             // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
             // detect missing blocks.

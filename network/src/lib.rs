@@ -114,6 +114,9 @@ impl Server {
     pub async fn start_services(&self) -> Result<(), NetworkError> {
         let peers = self.peers.clone();
         let blocks = self.blocks.clone();
+        let server = self.clone();
+        let server_clone = self.clone();
+
         task::spawn(async move {
             loop {
                 sleep(Duration::from_secs(10)).await;
@@ -122,20 +125,17 @@ impl Server {
                 if let Err(e) = peers.update().await {
                     error!("Peer update error: {}", e);
                 }
-                // TODO (nkls): passing in the peer here to get sync working on
-                // the main sync interval set above, in future when needing more
-                // fine control over the interval, this might need to be thought
-                // out differently.
+
+                // sync only if sync isn't already in progress
                 if let Err(e) = blocks.update(sync_node).await {
                     error!("Block update error: {}", e);
                 }
             }
         });
 
-        let server = self.clone();
         task::spawn(async move {
             loop {
-                if let Err(e) = server.receive_response().await {
+                if let Err(e) = server_clone.receive_response().await {
                     error!("Server error: {}", e);
                 }
             }
@@ -246,7 +246,7 @@ mod tests {
         Version,
     };
     use snarkos_testing::{
-        consensus::{BLOCK_1, DATA, FIXTURE_VK, GENESIS_BLOCK_HEADER_HASH, TEST_CONSENSUS},
+        consensus::{BLOCK_1, BLOCK_2, DATA, FIXTURE_VK, GENESIS_BLOCK_HEADER_HASH, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
     };
     use snarkvm_objects::block_header_hash::BlockHeaderHash;
@@ -579,32 +579,48 @@ mod tests {
         // );
 
         let block_1_header_hash = BlockHeaderHash::new(DATA.block_1.header.get_hash().0.to_vec());
-        // let block_2_header_hash = BlockHeaderHash::new(DATA.block_2.header.get_hash().0.to_vec());
+        let block_2_header_hash = BlockHeaderHash::new(DATA.block_2.header.get_hash().0.to_vec());
 
-        let block_header_hashes = vec![block_1_header_hash.clone()];
+        let block_header_hashes = vec![block_1_header_hash.clone(), block_2_header_hash.clone()];
 
         let sync = Sync::new(block_header_hashes);
         write_message_to_stream(Sync::name(), sync, &mut peer_stream).await;
 
-        // make sure both GetBlock messages make it, order is unimportant
+        // make sure both GetBlock messages are received
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
         let get_block = GetBlock::deserialize(&message).unwrap();
 
         assert_eq!(get_block.block_hash, block_1_header_hash);
 
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let get_block = GetBlock::deserialize(&message).unwrap();
+
+        assert_eq!(get_block.block_hash, block_2_header_hash);
+
         // respond with the Block
-        let block = Block::new(BLOCK_1.to_vec());
-        write_message_to_stream(Block::name(), block, &mut peer_stream).await;
+        let block_1 = Block::new(BLOCK_1.to_vec());
+        write_message_to_stream(Block::name(), block_1, &mut peer_stream).await;
 
-        sleep(Duration::new(5, 0)).await;
+        let block_2 = Block::new(BLOCK_2.to_vec());
+        write_message_to_stream(Block::name(), block_2, &mut peer_stream).await;
 
-        // Check block is stored correctly
+        sleep(Duration::from_millis(200)).await;
+
+        // Check blocks are stored correctly
         assert!(
             node.environment
                 .storage()
                 .read()
                 .block_hash_exists(&block_1_header_hash)
+        );
+
+        assert!(
+            node.environment
+                .storage()
+                .read()
+                .block_hash_exists(&block_2_header_hash)
         );
     }
 

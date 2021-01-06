@@ -38,6 +38,10 @@ pub enum SyncState {
 }
 
 impl SyncState {
+    pub fn is_idle(&self) -> bool {
+        matches!(self, SyncState::Idle)
+    }
+
     pub fn set_idle(&mut self) {
         info!("Block sync completed");
         *self = SyncState::Idle;
