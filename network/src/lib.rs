@@ -72,9 +72,6 @@ pub struct Server {
 
     pub peers: Peers,
     pub blocks: Blocks,
-
-    /// The current sync state, shared reference to allow updating from withing blocks.
-    sync_state: Arc<RwLock<SyncState>>,
 }
 
 impl Server {
@@ -86,9 +83,8 @@ impl Server {
         let outbound = Arc::new(Outbound::new(channels));
 
         // Initialize the peer and block services.
-        let sync_state = Arc::new(RwLock::new(SyncState::Idle));
         let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
-        let blocks = Blocks::new(environment.clone(), outbound.clone(), sync_state.clone())?;
+        let blocks = Blocks::new(environment.clone(), outbound.clone())?;
 
         Ok(Self {
             environment,
@@ -96,7 +92,6 @@ impl Server {
             outbound,
             peers,
             blocks,
-            sync_state,
         })
     }
 
@@ -114,28 +109,28 @@ impl Server {
     pub async fn start_services(&self) -> Result<(), NetworkError> {
         let peers = self.peers.clone();
         let blocks = self.blocks.clone();
-        let server = self.clone();
-        let server_clone = self.clone();
 
         task::spawn(async move {
             loop {
                 sleep(Duration::from_secs(10)).await;
                 info!("Updating peers and blocks");
+
+                // select last seen node as block sync node
                 let sync_node = peers.last_seen();
                 if let Err(e) = peers.update().await {
                     error!("Peer update error: {}", e);
                 }
 
-                // sync only if sync isn't already in progress
                 if let Err(e) = blocks.update(sync_node).await {
                     error!("Block update error: {}", e);
                 }
             }
         });
 
+        let server = self.clone();
         task::spawn(async move {
             loop {
-                if let Err(e) = server_clone.receive_response().await {
+                if let Err(e) = server.receive_response().await {
                     error!("Server error: {}", e);
                 }
             }
@@ -246,14 +241,14 @@ mod tests {
         Version,
     };
     use snarkos_testing::{
-        consensus::{BLOCK_1, BLOCK_2, DATA, FIXTURE_VK, GENESIS_BLOCK_HEADER_HASH, TEST_CONSENSUS},
+        consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, FIXTURE_VK, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
     };
     use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
     use std::{sync::Arc, time::Duration};
 
-    use chrono::{DateTime, Utc};
+    use chrono::Utc;
     use parking_lot::{Mutex, RwLock};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
@@ -484,13 +479,6 @@ mod tests {
         assert_node_rejected_message(&node, &mut peer_stream).await;
     }
 
-    // Unit test for block syncing?
-    //
-    // Tests:
-    //
-    // 1. Sync initiator side
-    // 2. Sync responder side
-
     async fn handshake() -> (Server, TcpStream) {
         // start a test node and listen for incoming connections
         let mut node = test_node(vec![]).await;
@@ -535,54 +523,26 @@ mod tests {
 
     #[tokio::test]
     async fn sync_initiator_side() {
-        // 1. Start server
-        // 2. Start fake node
-        // 3. Handshake (untested) maybe this should be setup code?
-        //
-        // 4. Expect GetSync
-        // 5. Respond with Sync
-        //
-        // 6. Expect GetBlock
-        // 7. Respond with Block
-        //
-        // 8. Somehow inspect state change? Environment.storage() and Environment.memory_pool()
-
-        let filter =
-            tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-        tracing_subscriber::fmt()
-            .with_env_filter(filter)
-            .with_target(false)
-            .init();
-
-        let (mut node, mut peer_stream) = handshake().await;
+        // handshake between the fake node and full node
+        let (node, mut peer_stream) = handshake().await;
 
         // check Version from peer update is received
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let version = Version::deserialize(&message).unwrap();
+        let _version = Version::deserialize(&message).unwrap();
 
         // check GetSync message was received
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let get_sync = GetSync::deserialize(&message).unwrap();
+        let _get_sync = GetSync::deserialize(&message).unwrap();
 
-        // TODO: check block locator hashes
-        // The node should have a block height of 0 here, i.e. only the genesis block is stored in
-        // the ledger. The block locator hash should reflect this and means the fake node should
-        // respond with the blocks following the genesis block.
-        //
-        // The genesis block is not being included in get_block_locator_hashes when it's the only
-        // block in the ledger.
-        // assert_eq!(
-        //     get_sync.block_locator_hashes.first().unwrap().0,
-        //     *GENESIS_BLOCK_HEADER_HASH
-        // );
-
-        let block_1_header_hash = BlockHeaderHash::new(DATA.block_1.header.get_hash().0.to_vec());
-        let block_2_header_hash = BlockHeaderHash::new(DATA.block_2.header.get_hash().0.to_vec());
+        let block_1_header_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
+        let block_2_header_hash = BlockHeaderHash::new(BLOCK_2_HEADER_HASH.to_vec());
 
         let block_header_hashes = vec![block_1_header_hash.clone(), block_2_header_hash.clone()];
 
+        // respond to GetSync with Sync message containing the block header hashes of the missing
+        // blocks
         let sync = Sync::new(block_header_hashes);
         write_message_to_stream(Sync::name(), sync, &mut peer_stream).await;
 
@@ -599,7 +559,7 @@ mod tests {
 
         assert_eq!(get_block.block_hash, block_2_header_hash);
 
-        // respond with the Block
+        // respond with the full blocks
         let block_1 = Block::new(BLOCK_1.to_vec());
         write_message_to_stream(Block::name(), block_1, &mut peer_stream).await;
 
@@ -608,7 +568,7 @@ mod tests {
 
         sleep(Duration::from_millis(200)).await;
 
-        // Check blocks are stored correctly
+        // check the blocks have been added to the node's chain
         assert!(
             node.environment
                 .storage()

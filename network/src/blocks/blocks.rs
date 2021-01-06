@@ -14,15 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    blocks::sync::SyncState,
-    external::message_types::*,
-    outbound::Request,
-    peers::PeerInfo,
-    Environment,
-    NetworkError,
-    Outbound,
-};
+use crate::{external::message_types::*, outbound::Request, peers::PeerInfo, Environment, NetworkError, Outbound};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_objects::{Block as BlockStruct, BlockHeaderHash};
@@ -33,8 +25,6 @@ use snarkvm_utilities::{
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use parking_lot::RwLock;
-
 /// A stateful component for managing the blocks for the ledger on this node server.
 #[derive(Clone)]
 pub struct Blocks {
@@ -42,7 +32,6 @@ pub struct Blocks {
     pub(crate) environment: Environment,
     /// The outbound handler of this node server.
     outbound: Arc<Outbound>,
-    sync_state: Arc<RwLock<SyncState>>,
 }
 
 impl Blocks {
@@ -50,17 +39,9 @@ impl Blocks {
     /// Creates a new instance of `Blocks`.
     ///
     #[inline]
-    pub fn new(
-        environment: Environment,
-        outbound: Arc<Outbound>,
-        sync_state: Arc<RwLock<SyncState>>,
-    ) -> Result<Self, NetworkError> {
+    pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
         trace!("Instantiating the block service");
-        Ok(Self {
-            environment,
-            outbound,
-            sync_state,
-        })
+        Ok(Self { environment, outbound })
     }
 
     ///
@@ -358,27 +339,12 @@ impl Blocks {
 
     /// A peer has sent us their chain state.
     pub(crate) async fn received_sync(&self, remote_address: SocketAddr, message: Sync) -> Result<(), NetworkError> {
-        // For an update to occure, we need to:
-        //
-        // 1. receive the hashes and fire off GetBlock(s) for those
-        // 2. set sync state to syncing with current block height and timestamp
-        // 3. receieve Blocks and store
-        // 4. repeat process until peer returns an empty list of hashes
-
-        let height = self.environment.storage().read().get_current_block_height();
         let block_hashes = message.block_hashes;
 
-        // handle the hashes
-        if block_hashes.is_empty() {
-            let mut sync_state = self.sync_state.write();
-            // sync_state.set_idle();
-        } else {
-            {
-                let mut sync_state = self.sync_state.write();
-                // sync_state.set_syncing(height);
-            }
+        // If empty sync is no-op as chain states match
+        if !block_hashes.is_empty() {
             // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
-            // detect missing blocks.
+            // detect missing blocks and divergence in chain for now.
             for hash in block_hashes {
                 self.outbound
                     .broadcast(&Request::GetBlock(remote_address, GetBlock::new(hash)))
@@ -386,14 +352,6 @@ impl Blocks {
             }
         }
 
-        /* TODO: implement
-        sync_handler.receive_hashes(message.block_hashes, height);
-
-        {
-            // Received block headers
-            sync_handler.increment().await?;
-        }
-        */
         Ok(())
     }
 }
