@@ -62,7 +62,7 @@ impl Channel {
     }
 
     /// Returns a new channel with the specified address and new writer stream.
-    pub async fn update_writer(self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
+    pub async fn update_address(self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
         Ok(Self {
             remote_address,
             reader: self.reader,

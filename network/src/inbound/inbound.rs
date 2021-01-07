@@ -340,8 +340,7 @@ impl Inbound {
             // Create the remote address from the given peer address, and specified port from the version message.
             let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
 
-            // TODO: rename update_writer to update_address
-            let channel = channel.update_writer(remote_address).await?;
+            let channel = channel.update_address(remote_address).await?;
 
             // Save the channel under the provided remote address
             self.channels.write().insert(remote_address, channel.clone());
