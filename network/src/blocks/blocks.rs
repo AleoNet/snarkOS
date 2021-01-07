@@ -72,12 +72,6 @@ impl Blocks {
     ///
     #[inline]
     pub fn local_address(&self) -> SocketAddr {
-        // TODO (howardwu): Check that env addr and peer book addr match.
-        // // Acquire the peer book reader.
-        // let peer_book = self.peer_book.read().await;
-        // // Fetch the local address of this node.
-        // peer_book.local_address()
-
         self.environment.local_address().unwrap() // the address must be known by now
     }
 

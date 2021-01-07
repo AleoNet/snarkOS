@@ -129,7 +129,6 @@ impl Outbound {
         let outbound = self.clone();
         let request = request.clone();
 
-        // TODO(ljedrz): check if spawning a task for the ops below makes sense
         task::spawn(async move {
             // Wait for authorization.
             outbound.authorize(&request).await;
@@ -202,12 +201,6 @@ impl Outbound {
             Ok(_) => self.success(&request).await,
             Err(error) => self.failure(&request, error).await,
         };
-
-        // TODO (howardwu): Add logic to determine whether to proceed with a disconnect.
-        // // Disconnect from the peer if the version request fails to send.
-        // if let Err(_) = channel.write(&version).await {
-        //     self.disconnect_from_peer(&remote_address).await?;
-        // }
     }
 
     #[inline]

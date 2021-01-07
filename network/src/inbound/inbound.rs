@@ -173,17 +173,14 @@ impl Inbound {
                 let message = Self::parse(&bytes)?;
                 self.route(Response::Transaction(channel.remote_address, message)).await;
             } else if name == GetPeers::name() {
-                let _message = Self::parse::<GetPeers>(&bytes)?; // TODO(ljedrz): does a GetPeers request require any body?
                 self.route(Response::GetPeers(channel.remote_address)).await;
             } else if name == Peers::name() {
                 let message = Self::parse::<Peers>(&bytes)?;
                 self.route(Response::Peers(channel.remote_address, message)).await;
             } else if name == Version::name() {
                 let message = Self::parse::<Version>(&bytes)?;
-                // TODO (raychu86) Does `receive_version` need to return a channel?
-                match self.receive_version(message, channel.clone()).await {
-                    Ok(returned_channel) => channel = returned_channel,
-                    Err(err) => error!("Failed to route response for a message\n{}", err),
+                if let Err(err) = self.receive_version(message, channel.clone()).await {
+                    error!("Failed to route response for a message\n{}", err);
                 }
             } else if name == Verack::name() {
                 let message = Self::parse::<Verack>(&bytes)?;
@@ -193,7 +190,6 @@ impl Inbound {
 
                 // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
                 // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
-                // Break out of the loop if the peer disconnects.
                 warn!("Disconnecting from an unreliable peer");
                 break;
             } else {
@@ -256,12 +252,11 @@ impl Inbound {
     }
 
     /// A connected peer has sent handshake request.
-    /// Update peer's channel.
     /// If peer's block height is greater than ours, send a sync request.
     ///
     /// This method may seem redundant to handshake protocol functions but a peer can send additional
     /// Version messages if they want to update their ip address/port or want to share their chain height.
-    async fn receive_version(&self, version: Version, channel: Channel) -> Result<Channel, NetworkError> {
+    async fn receive_version(&self, version: Version, channel: Channel) -> Result<(), NetworkError> {
         let remote_address = SocketAddr::new(channel.remote_address.ip(), version.sender.port());
 
         // Route version message to peer manager.
@@ -299,7 +294,7 @@ impl Inbound {
             //     }
             // }
         }
-        Ok(channel)
+        Ok(())
     }
 
     ///
@@ -318,8 +313,6 @@ impl Inbound {
     ///     2. Mark the handshake as accepted.
     ///     3. Send a request for peers.
     ///     4. Return the accepted handshake and your address as seen by sender.
-    ///
-    /// TODO (howardwu): Fix the return type so it does not return Result<Option<T>>.
     pub async fn connection_request(
         &self,
         block_height: u32,
@@ -341,7 +334,7 @@ impl Inbound {
             // Deserialize the message bytes into a version message.
             let remote_version = Version::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
 
-            // FIXME(ljedrz): we should obtain our actual local address here instead of trusting the sender
+            // This is the node's address as seen by the peer.
             let local_address = remote_version.receiver;
 
             // Create the remote address from the given peer address, and specified port from the version message.

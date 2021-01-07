@@ -25,7 +25,6 @@ use snarkvm_objects::Network;
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc};
 
-/// TODO (howardwu): Remove pub from each field and add getters only.
 /// A core data structure containing the networking parameters for this node.
 #[derive(Clone)]
 pub struct Environment {
