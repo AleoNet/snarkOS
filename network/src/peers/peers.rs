@@ -461,6 +461,7 @@ impl Peers {
         remote_address: SocketAddr,
         remote_version: &Version,
     ) -> Result<(), NetworkError> {
+        // FIXME(ljedrz): it appears that Verack is not sent back in a 1:1 fashion
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
             self.outbound
                 .broadcast(&Request::Verack(Verack::new(
