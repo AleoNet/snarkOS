@@ -122,7 +122,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
                 let mut cm_and_indices = vec![];
 
-                for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT)? {
+                for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT) {
                     let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
                     let index = bytes_to_u32(index_value.to_vec()) as usize;
 

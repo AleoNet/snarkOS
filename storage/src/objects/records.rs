@@ -28,7 +28,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     pub fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut record_commitments = vec![];
 
-        for (commitment_key, _record) in self.storage.get_iter(COL_RECORDS)? {
+        for (commitment_key, _record) in self.storage.get_iter(COL_RECORDS) {
             if let Some(limit) = limit {
                 if record_commitments.len() >= limit {
                     break;
