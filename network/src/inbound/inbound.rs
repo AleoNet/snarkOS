@@ -308,14 +308,12 @@ impl Inbound {
     /// Listens for the first message request from a remote peer.
     ///
     /// If the message is a Version:
-    ///
     ///     1. Create a new handshake.
     ///     2. Send a handshake response.
     ///     3. If the response is sent successfully, store the handshake.
     ///     4. Return the handshake, your address as seen by sender, and the version message.
     ///
     /// If the message is a Verack:
-    ///
     ///     1. Get the existing handshake.
     ///     2. Mark the handshake as accepted.
     ///     3. Send a request for peers.
