@@ -70,16 +70,6 @@ impl Channel {
         })
     }
 
-    pub async fn update_reader(self, stream: TcpStream) -> Result<Self, ConnectError> {
-        let reader = stream.into_split().0;
-
-        Ok(Self {
-            remote_address: self.remote_address,
-            reader: Arc::new(Mutex::new(reader)),
-            writer: self.writer,
-        })
-    }
-
     /// Writes a message header + message.
     pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
         let serialized = message.serialize()?;
