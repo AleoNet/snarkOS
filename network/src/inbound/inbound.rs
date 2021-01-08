@@ -120,13 +120,6 @@ impl Inbound {
             // Reset the failure indicator.
             failure = false;
 
-            // warn!(
-            //     "LISTENING AT {} {:?} {:?}",
-            //     channel.remote_address,
-            //     channel.reader.lock().await,
-            //     channel.writer.lock().await
-            // );
-
             // Read the next message from the channel. This is a blocking operation.
             let (message_name, message_bytes) = match channel.read().await {
                 Ok((message_name, message_bytes)) => (message_name, message_bytes),
