@@ -47,13 +47,13 @@ pub fn initialize_test_blockchain<T: Transaction, P: LoadableMerkleParameters>(
 }
 
 // Open a test blockchain from stored genesis attributes
-pub fn open_test_blockchain<T: Transaction, P: LoadableMerkleParameters>() -> (Arc<Ledger<T, P>>, PathBuf) {
+pub fn open_test_blockchain<T: Transaction, P: LoadableMerkleParameters>() -> (Ledger<T, P>, PathBuf) {
     let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
     Ledger::<T, P>::destroy_storage(path.clone()).unwrap();
 
-    let storage = Arc::new(Ledger::<T, P>::open_at_path(path.clone()).unwrap());
+    let storage = Ledger::<T, P>::open_at_path(path.clone()).unwrap();
 
     (storage, path)
 }
