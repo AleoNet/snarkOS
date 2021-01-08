@@ -35,7 +35,7 @@ impl GetBlock {
 
 impl Message for GetBlock {
     fn name() -> MessageName {
-        MessageName::from("getblock")
+        MessageName::GetBlock
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

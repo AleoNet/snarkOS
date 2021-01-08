@@ -37,7 +37,7 @@ impl Peers {
 
 impl Message for Peers {
     fn name() -> MessageName {
-        MessageName::from("peers")
+        MessageName::Peers
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

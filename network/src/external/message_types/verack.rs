@@ -44,7 +44,7 @@ impl Verack {
 
 impl Message for Verack {
     fn name() -> MessageName {
-        MessageName::from("verack")
+        MessageName::Verack
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

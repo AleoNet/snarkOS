@@ -34,7 +34,7 @@ impl Block {
 
 impl Message for Block {
     fn name() -> MessageName {
-        MessageName::from("block")
+        MessageName::Block
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

@@ -25,7 +25,7 @@ pub struct GetPeers;
 
 impl Message for GetPeers {
     fn name() -> MessageName {
-        MessageName::from("getpeers")
+        MessageName::GetPeers
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

@@ -34,7 +34,7 @@ impl MemoryPool {
 
 impl Message for MemoryPool {
     fn name() -> MessageName {
-        MessageName::from("memorypool")
+        MessageName::MemoryPool
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

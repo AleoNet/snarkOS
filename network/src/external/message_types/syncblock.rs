@@ -34,7 +34,7 @@ impl SyncBlock {
 
 impl Message for SyncBlock {
     fn name() -> MessageName {
-        MessageName::from("syncblock")
+        MessageName::SyncBlock
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

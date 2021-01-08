@@ -35,7 +35,7 @@ impl GetSync {
 
 impl Message for GetSync {
     fn name() -> MessageName {
-        MessageName::from("getsync")
+        MessageName::GetSync
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

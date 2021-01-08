@@ -127,7 +127,14 @@ impl Inbound {
                     Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
-                        true => (MessageName::from("disconnect"), vec![]),
+                        true => {
+                            self.route(Response::DisconnectFrom(channel.remote_address)).await;
+
+                            // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
+                            // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
+                            warn!("Disconnecting from an unreliable peer");
+                            break Ok(()); // the error has already been handled and reported
+                        }
                         false => continue,
                     }
                 }
@@ -140,56 +147,58 @@ impl Inbound {
             let name = message_name;
             let bytes = message_bytes;
 
-            if name == Block::name() {
-                let message = Self::parse(&bytes)?;
-                self.route(Response::Block(channel.remote_address, message, true)).await;
-            } else if name == SyncBlock::name() {
-                let message = Self::parse(&bytes)?;
-                self.route(Response::Block(channel.remote_address, message, false))
-                    .await;
-            } else if name == GetBlock::name() {
-                let message = Self::parse(&bytes)?;
-                self.route(Response::GetBlock(channel.remote_address, message)).await;
-            } else if name == GetMemoryPool::name() && Self::parse::<GetMemoryPool>(&bytes).is_ok() {
-                self.route(Response::GetMemoryPool(channel.remote_address)).await;
-            } else if name == MemoryPool::name() {
-                let message = Self::parse(&bytes)?;
-                self.route(Response::MemoryPool(message)).await;
-            } else if name == GetSync::name() {
-                let message = Self::parse(&bytes)?;
-                self.route(Response::GetSync(channel.remote_address, message)).await;
-            } else if name == Sync::name() {
-                let message = Self::parse(&bytes)?;
-                self.route(Response::Sync(channel.remote_address, message)).await;
-            } else if name == Transaction::name() {
-                let message = Self::parse(&bytes)?;
-                self.route(Response::Transaction(channel.remote_address, message)).await;
-            } else if name == GetPeers::name() {
-                self.route(Response::GetPeers(channel.remote_address)).await;
-            } else if name == Peers::name() {
-                let message = Self::parse::<Peers>(&bytes)?;
-                self.route(Response::Peers(channel.remote_address, message)).await;
-            } else if name == Version::name() {
-                let message = Self::parse::<Version>(&bytes)?;
-                if let Err(err) = self.receive_version(message, channel.clone()).await {
-                    error!("Failed to route response for a message\n{}", err);
+            match name {
+                MessageName::Block => {
+                    let message = Self::parse(&bytes)?;
+                    self.route(Response::Block(channel.remote_address, message, true)).await;
                 }
-            } else if name == Verack::name() {
-                let message = Self::parse::<Verack>(&bytes)?;
-                self.route(Response::Verack(channel.remote_address, message)).await;
-            } else if name == MessageName::from("disconnect") {
-                self.route(Response::DisconnectFrom(channel.remote_address)).await;
-
-                // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
-                // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
-                warn!("Disconnecting from an unreliable peer");
-                break;
-            } else {
-                debug!("Message name not recognized {:?}", name.to_string());
+                MessageName::GetBlock => {
+                    let message = Self::parse(&bytes)?;
+                    self.route(Response::GetBlock(channel.remote_address, message)).await;
+                }
+                MessageName::GetMemoryPool => {
+                    self.route(Response::GetMemoryPool(channel.remote_address)).await;
+                }
+                MessageName::GetPeers => {
+                    self.route(Response::GetPeers(channel.remote_address)).await;
+                }
+                MessageName::GetSync => {
+                    let message = Self::parse(&bytes)?;
+                    self.route(Response::GetSync(channel.remote_address, message)).await;
+                }
+                MessageName::MemoryPool => {
+                    let message = Self::parse(&bytes)?;
+                    self.route(Response::MemoryPool(message)).await;
+                }
+                MessageName::Peers => {
+                    let message = Self::parse::<Peers>(&bytes)?;
+                    self.route(Response::Peers(channel.remote_address, message)).await;
+                }
+                MessageName::Sync => {
+                    let message = Self::parse(&bytes)?;
+                    self.route(Response::Sync(channel.remote_address, message)).await;
+                }
+                MessageName::SyncBlock => {
+                    let message = Self::parse(&bytes)?;
+                    self.route(Response::Block(channel.remote_address, message, false))
+                        .await;
+                }
+                MessageName::Transaction => {
+                    let message = Self::parse(&bytes)?;
+                    self.route(Response::Transaction(channel.remote_address, message)).await;
+                }
+                MessageName::Verack => {
+                    let message = Self::parse::<Verack>(&bytes)?;
+                    self.route(Response::Verack(channel.remote_address, message)).await;
+                }
+                MessageName::Version => {
+                    let message = Self::parse::<Version>(&bytes)?;
+                    if let Err(err) = self.receive_version(message, channel.clone()).await {
+                        error!("Failed to route response for a message\n{}", err);
+                    }
+                }
             }
         }
-
-        Ok(())
     }
 
     /// Logs the failure and determines whether to disconnect from a peer.

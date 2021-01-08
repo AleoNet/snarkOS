@@ -26,7 +26,7 @@ pub struct GetMemoryPool;
 impl Message for GetMemoryPool {
     #[inline]
     fn name() -> MessageName {
-        MessageName::from("getmempool")
+        MessageName::GetMemoryPool
     }
 
     #[inline]

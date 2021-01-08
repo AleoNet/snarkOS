@@ -32,7 +32,7 @@ pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) 
 
 /// Returns a message header read from an input stream.
 pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
-    let mut buffer = [0u8; 16];
+    let mut buffer = [0u8; 5];
 
     stream_read(&mut stream, &mut buffer).await?;
 
@@ -62,29 +62,23 @@ mod tests {
         let (address, listener) = random_bound_address().await;
 
         tokio::spawn(async move {
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
+            let header = MessageHeader::from([0, 0, 0, 0, 4]);
             let mut stream = TcpStream::connect(address).await.unwrap();
             stream.write_all(&header.serialize().unwrap()).await.unwrap();
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8]);
+            let header = MessageHeader::from([0, 0, 0, 0, 8]);
             stream.write_all(&header.serialize().unwrap()).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
-        let mut buf = [0u8; 16];
+        let mut buf = [0u8; 5];
         stream_read(&mut stream, &mut buf).await.unwrap();
 
-        assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
-            MessageHeader::from(buf)
-        );
+        assert_eq!(MessageHeader::from([0, 0, 0, 0, 4]), MessageHeader::from(buf));
 
-        let mut buf = [0u8; 16];
+        let mut buf = [0u8; 5];
         stream_read(&mut stream, &mut buf).await.unwrap();
 
-        assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8]),
-            MessageHeader::from(buf)
-        );
+        assert_eq!(MessageHeader::from([0, 0, 0, 0, 8]), MessageHeader::from(buf));
     }
 
     #[tokio::test]
@@ -92,17 +86,14 @@ mod tests {
         let (address, listener) = random_bound_address().await;
 
         tokio::spawn(async move {
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
+            let header = MessageHeader::from([0, 0, 0, 0, 4]);
             let mut stream = TcpStream::connect(address).await.unwrap();
             stream.write_all(&header.serialize().unwrap()).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
         let header = read_header(&mut stream).await.unwrap();
-        assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
-            header
-        );
+        assert_eq!(MessageHeader::from([0, 0, 0, 0, 4]), header);
     }
 
     #[tokio::test]

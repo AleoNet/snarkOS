@@ -34,7 +34,7 @@ impl Transaction {
 
 impl Message for Transaction {
     fn name() -> MessageName {
-        MessageName::from("transaction")
+        MessageName::Transaction
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {

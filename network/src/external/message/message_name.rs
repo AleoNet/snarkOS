@@ -14,36 +14,48 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::message::MessageNameError, external::message::hash::HASH96};
+use crate::errors::message::MessageNameError;
 
-use std::{fmt, str};
+use std::{convert::TryFrom, fmt, str};
 
-/// A fixed size message name.
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct MessageName(HASH96);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum MessageName {
+    Block = 0,
+    GetBlock,
+    GetMemoryPool,
+    GetPeers,
+    GetSync,
+    MemoryPool,
+    Peers,
+    Sync,
+    SyncBlock,
+    Transaction,
+    Verack,
+    Version,
+}
 
-impl MessageName {
-    #[inline]
-    pub fn len(&self) -> usize {
-        let trailing_zeros = self.0.iter().rev().take_while(|&x| x == &0).count();
-        self.0.len() - trailing_zeros
-    }
+impl TryFrom<u8> for MessageName {
+    type Error = MessageNameError;
 
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_zero()
-    }
+    fn try_from(byte: u8) -> Result<Self, Self::Error> {
+        let msg_type = match byte {
+            0 => Self::Block,
+            1 => Self::GetBlock,
+            2 => Self::GetMemoryPool,
+            3 => Self::GetPeers,
+            4 => Self::GetSync,
+            5 => Self::MemoryPool,
+            6 => Self::Peers,
+            7 => Self::Sync,
+            8 => Self::SyncBlock,
+            9 => Self::Transaction,
+            10 => Self::Verack,
+            11 => Self::Version,
+            _ => return Err(MessageNameError::Message("unknown MessageName".into())),
+        };
 
-    #[inline]
-    pub fn as_bytes(&self) -> [u8; 12] {
-        let mut result = [0u8; 12];
-        result[..12].copy_from_slice(&self.0[..12]);
-        result
-    }
-
-    #[inline]
-    fn as_string(&self) -> String {
-        String::from_utf8_lossy(&self.0[..self.len()]).to_ascii_lowercase()
+        Ok(msg_type)
     }
 }
 
@@ -52,65 +64,44 @@ impl str::FromStr for MessageName {
 
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if !s.is_ascii() || s.len() > 12 {
-            return Err(MessageNameError::InvalidLength(s.len()));
-        }
+        let msg_type = match s {
+            "block" => Self::Block,
+            "getblock" => Self::GetBlock,
+            "getmempool" => Self::GetMemoryPool,
+            "getpeers" => Self::GetPeers,
+            "getsync" => Self::GetSync,
+            "memorypool" => Self::MemoryPool,
+            "peers" => Self::Peers,
+            "sync" => Self::Sync,
+            "syncblock" => Self::SyncBlock,
+            "transaction" => Self::Transaction,
+            "verack" => Self::Verack,
+            "version" => Self::Version,
+            _ => return Err(MessageNameError::Message("unknown MessageName".into())),
+        };
 
-        let mut result = HASH96::default();
-        result[..s.len()].copy_from_slice(s.as_ref());
-        Ok(MessageName(result))
-    }
-}
-
-impl From<&'static str> for MessageName {
-    #[inline]
-    fn from(s: &'static str) -> Self {
-        s.parse().unwrap()
-    }
-}
-
-impl From<MessageName> for String {
-    #[inline]
-    fn from(c: MessageName) -> Self {
-        c.as_string()
-    }
-}
-
-impl From<[u8; 12]> for MessageName {
-    #[inline]
-    fn from(bytes: [u8; 12]) -> Self {
-        Self { 0: HASH96::from(bytes) }
+        Ok(msg_type)
     }
 }
 
 impl fmt::Display for MessageName {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.as_string())
-    }
-}
+        let str = match self {
+            Self::Block => "block",
+            Self::GetBlock => "getblock",
+            Self::GetMemoryPool => "getmempool",
+            Self::GetPeers => "getpeers",
+            Self::GetSync => "getsync",
+            Self::MemoryPool => "memorypool",
+            Self::Peers => "peers",
+            Self::Sync => "sync",
+            Self::SyncBlock => "syncblock",
+            Self::Transaction => "transaction",
+            Self::Verack => "verack",
+            Self::Version => "version",
+        };
 
-impl<'a> PartialEq<&'a str> for MessageName {
-    #[inline]
-    fn eq(&self, other: &&'a str) -> bool {
-        self.len() == other.len() && &self.0[..other.len()] == other.as_ref() as &[u8]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_command_parse() {
-        let command: MessageName = "ping".into();
-        assert_eq!(MessageName("70696e670000000000000000".into()), command);
-    }
-
-    #[test]
-    fn test_command_to_string() {
-        let command: MessageName = "ping".into();
-        let expected: String = "ping".into();
-        assert_eq!(expected, String::from(command))
+        f.write_str(str)
     }
 }

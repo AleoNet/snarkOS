@@ -69,7 +69,7 @@ impl Version {
 
 impl Message for Version {
     fn name() -> MessageName {
-        MessageName::from("version")
+        MessageName::Version
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
