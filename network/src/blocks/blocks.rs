@@ -85,7 +85,7 @@ impl Blocks {
         debug!("Propagating a block to peers");
 
         let local_address = self.local_address();
-        for (remote_address, _) in connected_peers {
+        for remote_address in connected_peers.keys() {
             if *remote_address != block_miner && *remote_address != local_address {
                 // Broadcast a `Block` message to the connected peer.
                 self.outbound
@@ -108,7 +108,7 @@ impl Blocks {
 
         let local_address = self.local_address();
 
-        for (remote_address, _) in connected_peers {
+        for remote_address in connected_peers.keys() {
             if *remote_address != transaction_sender && *remote_address != local_address {
                 // Broadcast a `Transaction` message to the connected peer.
                 self.outbound
@@ -244,7 +244,7 @@ impl Blocks {
             let mut txs = vec![];
 
             let memory_pool = self.environment.memory_pool().lock();
-            for (_tx_id, entry) in &memory_pool.transactions {
+            for entry in memory_pool.transactions.values() {
                 if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                     txs.push(transaction_bytes);
                 }
@@ -274,13 +274,11 @@ impl Blocks {
                 transaction,
             };
 
-            if let Ok(inserted) = memory_pool.insert(&*self.environment.storage().read(), entry) {
-                if let Some(txid) = inserted {
-                    debug!(
-                        "Transaction added to memory pool with txid: {:?}",
-                        hex::encode(txid.clone())
-                    );
-                }
+            if let Ok(Some(txid)) = memory_pool.insert(&*self.environment.storage().read(), entry) {
+                debug!(
+                    "Transaction added to memory pool with txid: {:?}",
+                    hex::encode(txid.clone())
+                );
             }
         }
 

@@ -33,7 +33,7 @@ impl Message for GetMemoryPool {
     fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         match bytes.is_empty() {
             true => Ok(Self),
-            false => return Err(MessageError::InvalidLength(bytes.len(), 0)),
+            false => Err(MessageError::InvalidLength(bytes.len(), 0)),
         }
     }
 

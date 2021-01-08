@@ -305,7 +305,11 @@ impl PeerBook {
         }
 
         // Add the given address to the map of disconnected peers.
-        if let Some(_) = self.disconnected_peers.insert(*address, PeerInfo::new(*address)) {
+        if self
+            .disconnected_peers
+            .insert(*address, PeerInfo::new(*address))
+            .is_some()
+        {
             error!("{} already exists in the peer book", address);
             return Err(NetworkError::PeerAlreadyExists);
         }
@@ -362,7 +366,7 @@ impl PeerBook {
         self.connecting_peers.remove(address);
 
         // Remove the given address from the connected peers, if it exists.
-        if let Some(_) = self.connected_peers.remove(address) {
+        if self.connected_peers.remove(address).is_some() {
             // Decrement the connected_peer metric as the peer was not yet disconnected.
             connected_peers_dec!()
         }

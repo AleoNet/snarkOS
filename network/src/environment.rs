@@ -67,6 +67,7 @@ pub struct Environment {
 impl Environment {
     /// Creates a new instance of `Environment`.
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         storage: Arc<RwLock<MerkleTreeLedger>>,
         memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
@@ -90,7 +91,7 @@ impl Environment {
         }
 
         // Check that the sync interval is a reasonable number of seconds.
-        if sync_interval < 2 || sync_interval > 300 {
+        if !(2..=300).contains(&sync_interval) {
             return Err(NetworkError::SyncIntervalInvalid);
         }
 

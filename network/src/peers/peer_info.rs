@@ -164,7 +164,10 @@ impl PeerInfo {
         // Fetch the current connection status with this peer.
         match self.status() {
             // Case 1 - The node server is connected to this peer, updates the last seen timestamp.
-            PeerStatus::Connected | PeerStatus::Connecting => Ok(self.last_seen = Utc::now()),
+            PeerStatus::Connected | PeerStatus::Connecting => {
+                self.last_seen = Utc::now();
+                Ok(())
+            }
             // Case 2 - The node server is not connected to this peer, returns a `NetworkError`.
             PeerStatus::Disconnected | PeerStatus::NeverConnected => {
                 error!("Attempting to update state of a disconnected peer - {}", self.address);
@@ -243,7 +246,7 @@ impl PeerInfo {
                 // Set the state of this peer to connected.
                 self.status = PeerStatus::Connected;
 
-                self.last_seen = now.clone();
+                self.last_seen = now;
                 self.last_connected = now;
                 self.connected_count += 1;
 
@@ -279,7 +282,7 @@ impl PeerInfo {
                 self.status = PeerStatus::Disconnected;
 
                 self.nonce = None;
-                self.last_seen = now.clone();
+                self.last_seen = now;
                 self.last_disconnected = now;
                 self.disconnected_count += 1;
 
