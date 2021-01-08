@@ -244,7 +244,7 @@ mod tests {
         consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, FIXTURE_VK, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
     };
-    use snarkvm_objects::block_header_hash::BlockHeaderHash;
+    use snarkvm_objects::{block::Block as BlockStruct, block_header_hash::BlockHeaderHash};
 
     use std::{sync::Arc, time::Duration};
 
@@ -586,6 +586,46 @@ mod tests {
 
     #[tokio::test]
     async fn sync_responder_side() {
-        unimplemented!()
+        // handshake between the fake and full node
+        let (node, mut peer_stream) = handshake().await;
+
+        // insert block into node_alice
+        let block_1 = Block::new(BLOCK_1.to_vec());
+        let block_struct_1 = BlockStruct::deserialize(&block_1.data).unwrap();
+        node.environment
+            .consensus_parameters()
+            .receive_block(
+                node.environment.dpc_parameters(),
+                &node.environment.storage().read(),
+                &mut node.environment.memory_pool().lock(),
+                &block_struct_1,
+            )
+            .unwrap();
+
+        // send a GetSync with an empty vec as only the genesis block is in the ledger
+        let get_sync = GetSync::new(vec![]);
+        write_message_to_stream(GetSync::name(), get_sync, &mut peer_stream).await;
+
+        // receive a Sync message from the node with the block header
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let sync = Sync::deserialize(&message).unwrap();
+
+        let block_header_hash = sync.block_hashes.first().unwrap();
+
+        // check it matches the block inserted into the node's ledger
+        assert_eq!(*block_header_hash, block_struct_1.header.get_hash());
+
+        // request the block from the node
+        let get_block = GetBlock::new(block_header_hash.clone());
+        write_message_to_stream(GetBlock::name(), get_block, &mut peer_stream).await;
+
+        // receive a SyncBlock message with the requested block
+        let header = read_header(&mut peer_stream).await.unwrap();
+        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
+        let sync_block = SyncBlock::deserialize(&message).unwrap();
+        let block = BlockStruct::deserialize(&sync_block.data).unwrap();
+
+        assert_eq!(block, block_struct_1);
     }
 }
