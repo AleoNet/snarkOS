@@ -29,15 +29,13 @@ mod rpc_tests {
     };
 
     use jsonrpc_test::Rpc;
+    use parking_lot::RwLock;
     use serde_json::Value;
-    use std::{
-        net::SocketAddr,
-        sync::{Arc, RwLock},
-    };
+    use std::{net::SocketAddr, sync::Arc};
 
     fn unwrap_arc_rwlock<T>(x: Arc<RwLock<T>>) -> T {
         if let Ok(lock) = Arc::try_unwrap(x) {
-            lock.into_inner().unwrap()
+            lock.into_inner()
         } else {
             panic!("can't unwrap the Arc, there are strong refs left!");
         }
@@ -52,7 +50,7 @@ mod rpc_tests {
 
         let consensus = TEST_CONSENSUS.clone();
 
-        let storage_path = storage.read().unwrap().storage.db.path().to_path_buf();
+        let storage_path = storage.read().storage.db.path().to_path_buf();
 
         Rpc::new(
             RpcImpl::new(
@@ -367,7 +365,7 @@ mod rpc_tests {
         let expected_transactions: Vec<String> = vec![];
 
         {
-            let storage = storage.read().unwrap();
+            let storage = storage.read();
             let new_height = storage.get_current_block_height() + 1;
             let block_reward = get_block_reward(new_height);
             let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);

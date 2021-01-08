@@ -33,11 +33,9 @@ mod protected_rpc_tests {
     };
 
     use jsonrpc_core::MetaIoHandler;
+    use parking_lot::{Mutex, RwLock};
     use serde_json::Value;
-    use std::{
-        str::FromStr,
-        sync::{Arc, Mutex, RwLock},
-    };
+    use std::{str::FromStr, sync::Arc};
 
     const TEST_USERNAME: &str = "TEST_USERNAME";
     const TEST_PASSWORD: &str = "TEST_PASSWORD";
@@ -66,7 +64,7 @@ mod protected_rpc_tests {
 
     fn unwrap_arc_rwlock<T>(x: Arc<RwLock<T>>) -> T {
         if let Ok(lock) = Arc::try_unwrap(x) {
-            lock.into_inner().unwrap()
+            lock.into_inner()
         } else {
             panic!("can't unwrap the Arc, there are strong refs left!");
         }
@@ -88,7 +86,7 @@ mod protected_rpc_tests {
         let environment = initialize_test_environment(None, vec![], storage.clone(), parameters.clone()).unwrap();
         let server = Server::new(environment.clone()).await.unwrap();
 
-        let storage_path = storage.read().unwrap().storage.db.path().to_path_buf();
+        let storage_path = storage.read().storage.db.path().to_path_buf();
 
         let rpc_impl = RpcImpl::new(
             storage,
@@ -134,7 +132,7 @@ mod protected_rpc_tests {
         let meta = authentication();
         let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
-        storage.write().unwrap().store_record(&DATA.records_1[0]).unwrap();
+        storage.write().store_record(&DATA.records_1[0]).unwrap();
 
         let method = "getrecordcommitmentcount".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -155,7 +153,7 @@ mod protected_rpc_tests {
         let meta = authentication();
         let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
-        storage.write().unwrap().store_record(&DATA.records_1[0]).unwrap();
+        storage.write().store_record(&DATA.records_1[0]).unwrap();
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -180,7 +178,7 @@ mod protected_rpc_tests {
         let meta = authentication();
         let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
-        storage.write().unwrap().store_record(&DATA.records_1[0]).unwrap();
+        storage.write().store_record(&DATA.records_1[0]).unwrap();
 
         let method = "getrawrecord".to_string();
         let params = hex::encode(to_bytes![DATA.records_1[0].commitment()].unwrap());
@@ -302,12 +300,7 @@ mod protected_rpc_tests {
         let consensus = TEST_CONSENSUS.clone();
 
         consensus
-            .receive_block(
-                &parameters,
-                &storage.read().unwrap(),
-                &mut MemoryPool::new(),
-                &DATA.block_1,
-            )
+            .receive_block(&parameters, &storage.read(), &mut MemoryPool::new(), &DATA.block_1)
             .unwrap();
 
         let io = initialize_test_rpc(storage.clone(), parameters).await;
