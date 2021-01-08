@@ -115,7 +115,6 @@ impl Inbound {
     pub async fn listen_for_messages(&self, channel: Channel) -> Result<(), NetworkError> {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
-        let mut channel = channel;
         let mut failure;
         loop {
             // Reset the failure indicator.
