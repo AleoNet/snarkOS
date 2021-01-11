@@ -165,16 +165,16 @@ impl Server {
 
         match response {
             Response::ConnectingTo(remote_address, nonce) => {
-                self.peers.connecting_to_peer(remote_address, nonce).await?;
+                self.peers.connecting_to_peer(remote_address, nonce)?;
             }
             Response::ConnectedTo(remote_address, nonce) => {
-                self.peers.connected_to_peer(remote_address, nonce).await?;
+                self.peers.connected_to_peer(remote_address, nonce)?;
             }
             Response::VersionToVerack(remote_address, remote_version) => {
-                self.peers.version_to_verack(remote_address, &remote_version).await?;
+                self.peers.version_to_verack(remote_address, &remote_version)?;
             }
             Response::Verack(remote_address, verack) => {
-                self.peers.verack(&remote_address, &verack).await?;
+                self.peers.verack(&remote_address, &verack)?;
             }
             Response::Transaction(source, transaction) => {
                 let connected_peers = self.peers.connected_peers();
@@ -207,10 +207,10 @@ impl Server {
                 self.blocks.received_sync(remote_address, sync).await?;
             }
             Response::DisconnectFrom(remote_address) => {
-                self.peers.disconnected_from_peer(&remote_address).await?;
+                self.peers.disconnected_from_peer(&remote_address)?;
             }
             Response::GetPeers(remote_address) => {
-                self.peers.send_get_peers(remote_address).await?;
+                self.peers.send_get_peers(remote_address)?;
             }
             Response::Peers(_, peers) => {
                 self.peers.process_inbound_peers(peers)?;

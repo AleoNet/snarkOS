@@ -132,7 +132,7 @@ impl Outbound {
         // handled within that method
         tokio::spawn(async move {
             // Wait for authorization.
-            outbound.authorize(&request).await;
+            outbound.authorize(&request);
             // Send the request.
             outbound.send(&request).await;
         });
@@ -143,7 +143,7 @@ impl Outbound {
     /// if it does not exist.
     ///
     #[inline]
-    pub async fn initialize_state(&self, remote_address: SocketAddr) {
+    pub fn initialize_state(&self, remote_address: SocketAddr) {
         debug!("Initializing Outbound state for {}", remote_address);
         self.pending.write().insert(remote_address, Default::default());
         self.success.write().insert(remote_address, Default::default());
@@ -154,7 +154,7 @@ impl Outbound {
     /// Establishes an outbound channel to the given remote address, if it does not exist.
     ///
     #[inline]
-    async fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Channel, NetworkError> {
+    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Channel, NetworkError> {
         Ok(self
             .channels
             .read()
@@ -167,7 +167,7 @@ impl Outbound {
     /// Authorizes the given request to be sent to the corresponding outbound channel.
     ///
     #[inline]
-    async fn authorize(&self, request: &Request) {
+    fn authorize(&self, request: &Request) {
         // Store the request to the pending requests.
         match self.pending.write().get_mut(&request.receiver()) {
             Some(requests) => {
@@ -187,23 +187,23 @@ impl Outbound {
     #[inline]
     async fn send(&self, request: &Request) {
         // Fetch the outbound channel.
-        let channel = match self.outbound_channel(request.receiver()).await {
+        let channel = match self.outbound_channel(request.receiver()) {
             Ok(channel) => channel,
             Err(error) => {
-                self.failure(&request, error).await;
+                self.failure(&request, error);
                 return;
             }
         };
 
         // Write the request to the outbound channel.
         match request.write_to_channel(&channel).await {
-            Ok(_) => self.success(&request).await,
-            Err(error) => self.failure(&request, error).await,
+            Ok(_) => self.success(&request),
+            Err(error) => self.failure(&request, error),
         };
     }
 
     #[inline]
-    async fn success(&self, request: &Request) {
+    fn success(&self, request: &Request) {
         // Remove the request from the pending requests.
         if let Some(requests) = self.pending.write().get_mut(&request.receiver()) {
             requests.remove(&request);
@@ -219,7 +219,7 @@ impl Outbound {
     }
 
     #[inline]
-    async fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Request, error: E) {
+    fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Request, error: E) {
         warn!(
             "Failed to send a {} to {}: {}",
             request.name(),
@@ -292,14 +292,14 @@ mod tests {
 
         // Create a new instance.
         let outbound = Outbound::new(Default::default());
-        outbound.initialize_state(remote_address).await;
+        outbound.initialize_state(remote_address);
 
         assert!(!outbound.is_pending(&request));
         assert!(!outbound.is_success(&request));
         assert!(!outbound.is_failure(&request));
 
         // Authorize the request only.
-        outbound.authorize(&request).await;
+        outbound.authorize(&request);
 
         // Check that the request is only pending.
         assert!(outbound.is_pending(&request));
@@ -319,7 +319,7 @@ mod tests {
         let outbound = Outbound::new(Default::default());
         let channel = Channel::new(remote_address, stream);
         outbound.channels.write().insert(remote_address, channel);
-        outbound.initialize_state(remote_address).await;
+        outbound.initialize_state(remote_address);
 
         assert!(!outbound.is_pending(&request));
         assert!(!outbound.is_success(&request));
@@ -345,7 +345,7 @@ mod tests {
 
         // Create a new instance.
         let outbound = Outbound::new(Default::default());
-        outbound.initialize_state(remote_address).await;
+        outbound.initialize_state(remote_address);
 
         assert!(!outbound.is_pending(&request));
         assert!(!outbound.is_success(&request));

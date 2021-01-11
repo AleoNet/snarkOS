@@ -92,7 +92,7 @@ impl Inbound {
                     Ok((channel, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
-                        let height = environment.current_block_height().await;
+                        let height = environment.current_block_height();
                         match inbound.connection_request(height, remote_address, channel).await {
                             Ok(channel) => {
                                 let inbound = inbound.clone();
@@ -124,7 +124,8 @@ impl Inbound {
             let (message_name, message_bytes) = match channel.read().await {
                 Ok((message_name, message_bytes)) => (message_name, message_bytes),
                 Err(error) => {
-                    Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error).await;
+                    Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
@@ -135,7 +136,11 @@ impl Inbound {
                             warn!("Disconnecting from an unreliable peer");
                             break Ok(()); // the error has already been handled and reported
                         }
-                        false => continue,
+                        false => {
+                            // Sleep for 10 seconds
+                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                            continue;
+                        }
                     }
                 }
             };
@@ -202,7 +207,7 @@ impl Inbound {
     }
 
     /// Logs the failure and determines whether to disconnect from a peer.
-    async fn handle_failure(
+    fn handle_failure(
         failure: &mut bool,
         failure_count: &mut u8,
         disconnect_from_peer: &mut bool,
@@ -224,9 +229,6 @@ impl Inbound {
         } else {
             debug!("Connection errored again in the same loop (error message: {})", error);
         }
-
-        // Sleep for 10 seconds
-        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     }
 
     #[inline]

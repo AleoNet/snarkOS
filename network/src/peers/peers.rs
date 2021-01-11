@@ -104,7 +104,7 @@ impl Peers {
                 self.connect_to_disconnected_peers().await?;
 
                 // Broadcast a `GetPeers` message to request for more peers.
-                self.broadcast_getpeers_requests().await?;
+                self.broadcast_getpeers_requests()?;
             }
         }
 
@@ -134,10 +134,10 @@ impl Peers {
 
         if number_of_connected_peers != 0 {
             // Broadcast a `Version` request to each connected peer.
-            self.broadcast_version_requests().await?;
+            self.broadcast_version_requests()?;
 
             // Store the peer book to storage.
-            self.save_peer_book_to_storage().await?;
+            self.save_peer_book_to_storage()?;
         }
 
         Ok(())
@@ -245,12 +245,12 @@ impl Peers {
         // open the connection
         let channel = Channel::new(remote_address, TcpStream::connect(remote_address).await?);
 
-        let block_height = self.environment.current_block_height().await;
+        let block_height = self.environment.current_block_height();
         // TODO (raychu86): Establish a formal node version.
         let version = Version::new_with_rng(1u64, block_height, own_address, remote_address);
 
         // Set the peer as a connecting peer in the peer book.
-        self.connecting_to_peer(remote_address, version.nonce).await?;
+        self.connecting_to_peer(remote_address, version.nonce)?;
 
         // Send a connection request with the outbound handler.
         channel.write(&version).await?;
@@ -286,13 +286,13 @@ impl Peers {
                 // save the outbound channel
                 self.outbound.channels.write().insert(remote_address, channel);
 
-                self.connected_to_peer(remote_address, version.nonce).await
+                self.connected_to_peer(remote_address, version.nonce)
             } else {
                 Err(NetworkError::InvalidHandshake)
             }
         } else {
             error!("{} didn't respond with a Verack during the handshake", remote_address);
-            self.disconnected_from_peer(&remote_address);
+            self.disconnected_from_peer(&remote_address)?;
             Err(NetworkError::InvalidHandshake)
         }
     }
@@ -340,11 +340,11 @@ impl Peers {
 
     /// Broadcasts a `Version` message to all connected peers.
     #[inline]
-    async fn broadcast_version_requests(&self) -> Result<(), NetworkError> {
+    fn broadcast_version_requests(&self) -> Result<(), NetworkError> {
         // Get the local address of this node.
         let local_address = self.local_address().unwrap(); // must be known by now
         // Fetch the current block height of this node.
-        let block_height = self.environment.current_block_height().await;
+        let block_height = self.environment.current_block_height();
 
         // Broadcast a `Version` message to each connected peer of this node server.
         trace!("Broadcasting Version messages");
@@ -367,7 +367,7 @@ impl Peers {
 
                 // Disconnect from the peer if there is no active connection channel
                 // TODO (howardwu): Inform Outbound to also disconnect, by dropping any channels held with this peer.
-                self.disconnected_from_peer(&remote_address).await?;
+                self.disconnected_from_peer(&remote_address)?;
             };
         }
 
@@ -376,7 +376,7 @@ impl Peers {
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     #[inline]
-    async fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
+    fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
         trace!("Sending GetPeers requests to connected peers");
 
         for (remote_address, _) in self.connected_peers() {
@@ -407,7 +407,7 @@ impl Peers {
     /// and proceeds to serialize the peer book into a byte vector for storage.
     ///
     #[inline]
-    async fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
+    fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
         // Serialize the peer book.
         let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
@@ -426,9 +426,9 @@ impl Peers {
     /// Sets the given remote address and nonce in the peer book as connecting to this node server.
     ///
     #[inline]
-    pub(crate) async fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+    pub(crate) fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Initialize the peer's outbound state
-        self.outbound.initialize_state(remote_address).await;
+        self.outbound.initialize_state(remote_address);
 
         // Set the peer as connecting with this node server.
         self.peer_book.write().set_connecting(&remote_address, nonce)
@@ -438,7 +438,7 @@ impl Peers {
     /// Sets the given remote address in the peer book as connected to this node server.
     ///
     #[inline]
-    pub(crate) async fn connected_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+    pub(crate) fn connected_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         self.peer_book.write().set_connected(remote_address, nonce)
     }
 
@@ -447,13 +447,13 @@ impl Peers {
     /// Sets the given remote address in the peer book as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) async fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
         self.peer_book.write().set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
     #[inline]
-    pub(crate) async fn version_to_verack(
+    pub(crate) fn version_to_verack(
         &self,
         remote_address: SocketAddr,
         remote_version: &Version,
@@ -467,7 +467,7 @@ impl Peers {
             )));
 
             if !self.connected_peers().contains_key(&remote_address) {
-                self.connecting_to_peer(remote_address, remote_version.nonce).await?;
+                self.connecting_to_peer(remote_address, remote_version.nonce)?;
             }
         }
 
@@ -475,16 +475,12 @@ impl Peers {
     }
 
     #[inline]
-    pub(crate) async fn verack(
-        &self,
-        _remote_address: &SocketAddr,
-        _remote_verack: &Verack,
-    ) -> Result<(), NetworkError> {
+    pub(crate) fn verack(&self, _remote_address: &SocketAddr, _remote_verack: &Verack) -> Result<(), NetworkError> {
         Ok(())
     }
 
     #[inline]
-    pub(crate) async fn send_get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();

@@ -208,7 +208,7 @@ impl Environment {
 
     /// Returns the current block height of the ledger from storage.
     #[inline]
-    pub async fn current_block_height(&self) -> u32 {
+    pub fn current_block_height(&self) -> u32 {
         self.storage.read().get_current_block_height()
     }
 }
