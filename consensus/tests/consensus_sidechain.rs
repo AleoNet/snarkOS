@@ -21,15 +21,13 @@ mod consensus_sidechain {
     use snarkvm_objects::Block;
     use snarkvm_utilities::bytes::FromBytes;
 
-    use std::sync::Arc;
-
     // Receive two new blocks out of order.
     // Like the test above, except block 2 is received first as an orphan with no parent.
     // The consensus mechanism should push the orphan into storage until block 1 is received.
     // After block 1 is received, block 2 should be fetched from storage and added to the chain.
     #[test]
     fn new_out_of_order() {
-        let blockchain = Arc::new(FIXTURE_VK.ledger());
+        let blockchain = FIXTURE_VK.ledger();
         let parameters = load_verifying_parameters();
 
         let mut memory_pool = MemoryPool::new();
@@ -59,14 +57,14 @@ mod consensus_sidechain {
         let new_block_height = blockchain.get_current_block_height();
         assert_eq!(old_block_height + 2, new_block_height);
 
-        kill_storage_sync(blockchain.into());
+        kill_storage_sync(blockchain);
     }
 
     // Receive two blocks that reference the same parent.
     // Treat the first block received as the canonical chain but store and keep the rejected sidechain block in storage.
     #[test]
     fn reject() {
-        let blockchain = Arc::new(FIXTURE_VK.ledger());
+        let blockchain = FIXTURE_VK.ledger();
         let parameters = load_verifying_parameters();
 
         let mut memory_pool = MemoryPool::new();
@@ -106,7 +104,7 @@ mod consensus_sidechain {
     // Receive blocks from a sidechain that overtakes our current canonical chain.
     #[test]
     fn accept() {
-        let blockchain = Arc::new(FIXTURE_VK.ledger());
+        let blockchain = FIXTURE_VK.ledger();
         let parameters = load_verifying_parameters();
 
         let mut memory_pool = MemoryPool::new();
@@ -151,7 +149,7 @@ mod consensus_sidechain {
     // Receive blocks from a sidechain (out of order) that overtakes our current canonical chain.
     #[test]
     fn fork_out_of_order() {
-        let blockchain = Arc::new(FIXTURE_VK.ledger());
+        let blockchain = FIXTURE_VK.ledger();
         let parameters = load_verifying_parameters();
 
         let mut memory_pool = MemoryPool::new();
