@@ -130,12 +130,6 @@ impl Peers {
                     self.inbound.route(Response::DisconnectFrom(addr)).await;
                 }
             }
-
-            // v LOGIC TO IMPLEMENT v
-            // // Check that the maximum number of peers has not been reached.
-            //     warn!("Maximum number of peers is reached, this connection request is being dropped");
-            //     match channel.shutdown(Shutdown::Write) {
-            // }
         }
 
         if number_of_connected_peers != 0 {
