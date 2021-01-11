@@ -151,16 +151,6 @@ impl PeerInfo {
     ///
     #[inline]
     pub(crate) fn set_last_seen(&mut self) -> Result<(), NetworkError> {
-        // Check that the peer has interacted with this node server before.
-        if self.status == PeerStatus::NeverConnected {
-            return Err(NetworkError::PeerHasNeverConnected);
-        }
-
-        // Check that the handshake nonce is already set.
-        if self.nonce.is_none() {
-            return Err(NetworkError::PeerIsMissingNonce);
-        }
-
         // Fetch the current connection status with this peer.
         match self.status() {
             // Case 1 - The node server is connected to this peer, updates the last seen timestamp.
