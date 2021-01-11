@@ -119,26 +119,24 @@ impl Outbound {
     }
 
     ///
-    /// Broadcasts the given request.
+    /// Sends the given request to the address associated with it.
     ///
     /// Creates or fetches an existing channel with the remote address,
     /// and attempts to send the given request to them.
     ///
     #[inline]
-    pub async fn broadcast(&self, request: &Request) -> JoinHandle<()> {
+    pub async fn send_request(&self, request: &Request) -> JoinHandle<()> {
         let outbound = self.clone();
         let request = request.clone();
 
-        task::spawn(async move {
+        tokio::spawn(async move {
             // Wait for authorization.
             outbound.authorize(&request).await;
             // Send the request.
             outbound.send(&request).await;
         })
     }
-}
 
-impl Outbound {
     ///
     /// Adds a new requests map for the given remote address to each state map,
     /// if it does not exist.
@@ -165,7 +163,7 @@ impl Outbound {
     }
 
     ///
-    /// Authorizes the given request for broadcast to the corresponding outbound channel.
+    /// Authorizes the given request to be sent to the corresponding outbound channel.
     ///
     #[inline]
     async fn authorize(&self, request: &Request) {
@@ -327,7 +325,7 @@ mod tests {
         assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
-        outbound.broadcast(&request).await.await.unwrap();
+        outbound.send_request(&request).await.await.unwrap();
 
         // Check that the request succeeded.
         assert!(!outbound.is_pending(&request));
@@ -352,7 +350,7 @@ mod tests {
         assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
-        outbound.broadcast(&request).await.await.unwrap();
+        outbound.send_request(&request).await.await.unwrap();
 
         // Check that the request succeeded.
         assert!(!outbound.is_pending(&request));
