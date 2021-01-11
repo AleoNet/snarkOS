@@ -16,8 +16,8 @@
 
 use crate::{errors::message::MessageHeaderError, external::message::MessageName};
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use std::{convert::TryFrom, io::Cursor};
+use byteorder::{BigEndian, WriteBytesExt};
+use std::convert::TryFrom;
 
 /// A fixed size message corresponding to a variable sized message.
 #[derive(Debug, PartialEq, Eq)]

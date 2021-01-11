@@ -52,7 +52,8 @@ impl Version {
         }
     }
 
-    #[deprecated]
+    // currently used for the handshakes, but it's a stop-gap; TODO(ljedrz): replace with a solution that
+    // is bound to a setup that also encrypts the post-handshake communication
     pub fn new_with_rng(version: u64, height: u32, sender: SocketAddr, receiver: SocketAddr) -> Self {
         let mut rng = rand::thread_rng();
 
