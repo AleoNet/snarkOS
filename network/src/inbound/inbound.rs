@@ -143,7 +143,7 @@ impl Inbound {
             // Messages are received by a single tokio MPSC receiver with
             // the message name, bytes, and associated channel.
             //
-            // The oneshot sender lets the connection thread know when the message is handled.
+            // The oneshot sender lets the connection task know when the message is handled.
             let name = message_name;
             let bytes = message_bytes;
 

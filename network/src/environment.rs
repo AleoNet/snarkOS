@@ -60,7 +60,7 @@ pub struct Environment {
     /// If `true`, initializes this node as a bootnode and forgoes connecting
     /// to the default bootnodes or saved peers in the peer book.
     is_bootnode: bool,
-    /// If `true`, initializes a mining thread on this node.
+    /// If `true`, initializes a mining task on this node.
     is_miner: bool,
 }
 
