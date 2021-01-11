@@ -124,9 +124,8 @@ impl Outbound {
     /// and attempts to send the given request to them.
     ///
     #[inline]
-    pub fn send_request(&self, request: &Request) {
+    pub fn send_request(&self, request: Request) {
         let outbound = self.clone();
-        let request = request.clone();
 
         // issues related to spawning this task are unlikely and not interesting;
         // it's the failures with `Outbound::send` that are important, and the're
@@ -327,7 +326,7 @@ mod tests {
         assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
-        outbound.send_request(&request);
+        outbound.send_request(request.clone());
         sleep(Duration::from_millis(10)).await;
 
         // Check that the request succeeded.
@@ -353,7 +352,7 @@ mod tests {
         assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
-        outbound.send_request(&request);
+        outbound.send_request(request.clone());
         sleep(Duration::from_millis(10)).await;
 
         // Check that the request succeeded.

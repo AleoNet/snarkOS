@@ -355,7 +355,7 @@ impl Peers {
 
                 // TODO (raychu86): Establish a formal node version.
                 // Broadcast a `Version` message to the connected peer.
-                self.outbound.send_request(&Request::Version(Version::new(
+                self.outbound.send_request(Request::Version(Version::new(
                     1u64,
                     block_height,
                     nonce,
@@ -380,7 +380,7 @@ impl Peers {
         trace!("Sending GetPeers requests to connected peers");
 
         for (remote_address, _) in self.connected_peers() {
-            self.outbound.send_request(&Request::GetPeers(remote_address, GetPeers));
+            self.outbound.send_request(Request::GetPeers(remote_address, GetPeers));
 
             // // Fetch the connection channel.
             // if let Some(channel) = self.get_channel(&remote_address) {
@@ -460,7 +460,7 @@ impl Peers {
     ) -> Result<(), NetworkError> {
         // FIXME(ljedrz): it appears that Verack is not sent back in a 1:1 fashion
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
-            self.outbound.send_request(&Request::Verack(Verack::new(
+            self.outbound.send_request(Request::Verack(Verack::new(
                 remote_version.nonce,
                 remote_version.receiver, /* local_address */
                 remote_address,
@@ -497,7 +497,7 @@ impl Peers {
             peers.push((peer_address, *peer_info.last_seen()));
         }
         self.outbound
-            .send_request(&Request::Peers(remote_address, PeersMessage::new(peers)));
+            .send_request(Request::Peers(remote_address, PeersMessage::new(peers)));
 
         Ok(())
     }
