@@ -327,7 +327,10 @@ impl Inbound {
         // Note: this is a blocking operation.
         let (message_name, message_bytes) = match channel.read().await {
             Ok(inbound_message) => inbound_message,
-            _ => return Err(NetworkError::InvalidHandshake),
+            Err(e) => {
+                error!("An error occurred while handshaking with {}: {}", remote_address, e);
+                return Err(NetworkError::InvalidHandshake);
+            }
         };
 
         // Create and store a new handshake in the manager.
@@ -392,7 +395,10 @@ impl Inbound {
             let (_, message_bytes) = channel.read().await?;
 
             // Deserialize the message bytes into a verack message.
-            let _verack = Verack::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
+            let _verack = Verack::deserialize(&message_bytes).map_err(|_| {
+                error!("{} didn't respond with a Verack during the handshake", remote_address);
+                NetworkError::InvalidHandshake
+            })?;
 
             self.sender
                 .send(Response::ConnectedTo(remote_address, local_version.nonce))
@@ -400,6 +406,7 @@ impl Inbound {
 
             Ok(channel)
         } else {
+            error!("{} didn't send their Version during the handshake", remote_address);
             Err(NetworkError::InvalidHandshake)
         }
     }

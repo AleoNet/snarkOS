@@ -257,13 +257,19 @@ impl Peers {
 
         let (message_name, _) = match channel.read().await {
             Ok(inbound_message) => inbound_message,
-            _ => return Err(NetworkError::InvalidHandshake),
+            Err(e) => {
+                error!("An error occurred while handshaking with {}: {}", remote_address, e);
+                return Err(NetworkError::InvalidHandshake);
+            }
         };
 
         if message_name == Verack::name() {
             let (message_name, _) = match channel.read().await {
                 Ok(inbound_message) => inbound_message,
-                _ => return Err(NetworkError::InvalidHandshake),
+                Err(e) => {
+                    error!("An error occurred while handshaking with {}: {}", remote_address, e);
+                    return Err(NetworkError::InvalidHandshake);
+                }
             };
 
             if message_name == Version::name() {
@@ -285,7 +291,8 @@ impl Peers {
                 Err(NetworkError::InvalidHandshake)
             }
         } else {
-            // TODO(ljedrz): remove the peer from connecting
+            error!("{} didn't respond with a Verack during the handshake", remote_address);
+            self.disconnected_from_peer(&remote_address);
             Err(NetworkError::InvalidHandshake)
         }
     }
