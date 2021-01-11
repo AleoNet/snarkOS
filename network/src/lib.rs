@@ -174,7 +174,7 @@ impl Server {
                 self.peers.version_to_verack(remote_address, &remote_version)?;
             }
             Response::Verack(remote_address, verack) => {
-                self.peers.verack(&remote_address, &verack)?;
+                self.peers.verack(&remote_address, &verack);
             }
             Response::Transaction(source, transaction) => {
                 let connected_peers = self.peers.connected_peers();
@@ -210,7 +210,7 @@ impl Server {
                 self.peers.disconnected_from_peer(&remote_address)?;
             }
             Response::GetPeers(remote_address) => {
-                self.peers.send_get_peers(remote_address)?;
+                self.peers.send_get_peers(remote_address);
             }
             Response::Peers(_, peers) => {
                 self.peers.process_inbound_peers(peers)?;

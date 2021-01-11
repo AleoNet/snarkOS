@@ -104,7 +104,7 @@ impl Peers {
                 self.connect_to_disconnected_peers().await?;
 
                 // Broadcast a `GetPeers` message to request for more peers.
-                self.broadcast_getpeers_requests()?;
+                self.broadcast_getpeers_requests();
             }
         }
 
@@ -376,7 +376,7 @@ impl Peers {
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     #[inline]
-    fn broadcast_getpeers_requests(&self) -> Result<(), NetworkError> {
+    fn broadcast_getpeers_requests(&self) {
         trace!("Sending GetPeers requests to connected peers");
 
         for (remote_address, _) in self.connected_peers() {
@@ -394,8 +394,6 @@ impl Peers {
             //     self.disconnected_from_peer(&remote_address).await?;
             // }
         }
-
-        Ok(())
     }
 
     /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
@@ -475,12 +473,10 @@ impl Peers {
     }
 
     #[inline]
-    pub(crate) fn verack(&self, _remote_address: &SocketAddr, _remote_verack: &Verack) -> Result<(), NetworkError> {
-        Ok(())
-    }
+    pub(crate) fn verack(&self, _remote_address: &SocketAddr, _remote_verack: &Verack) {}
 
     #[inline]
-    pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
@@ -494,8 +490,6 @@ impl Peers {
         }
         self.outbound
             .send_request(Request::Peers(remote_address, PeersMessage::new(peers)));
-
-        Ok(())
     }
 
     /// A miner has sent their list of peer addresses.
