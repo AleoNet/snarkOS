@@ -27,7 +27,6 @@ use std::{
 };
 
 use parking_lot::RwLock;
-use tokio::{task, task::JoinHandle};
 
 /// The map of remote addresses to their active write channels.
 type Channels = HashMap<SocketAddr, Channel>;
@@ -125,16 +124,19 @@ impl Outbound {
     /// and attempts to send the given request to them.
     ///
     #[inline]
-    pub async fn send_request(&self, request: &Request) -> JoinHandle<()> {
+    pub fn send_request(&self, request: &Request) {
         let outbound = self.clone();
         let request = request.clone();
 
+        // issues related to spawning this task are unlikely and not interesting;
+        // it's the failures with `Outbound::send` that are important, and the're
+        // handled within that method
         tokio::spawn(async move {
             // Wait for authorization.
             outbound.authorize(&request).await;
             // Send the request.
             outbound.send(&request).await;
-        })
+        });
     }
 
     ///
@@ -246,8 +248,8 @@ mod tests {
     use crate::{external::GetPeers, outbound::*, Channel};
     use snarkos_testing::network::TcpServer;
 
-    use std::net::SocketAddr;
-    use tokio::net::TcpStream;
+    use std::{net::SocketAddr, time::Duration};
+    use tokio::{net::TcpStream, time::sleep};
 
     ///
     /// Returns a `Request` for testing.
@@ -325,7 +327,8 @@ mod tests {
         assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
-        outbound.send_request(&request).await.await.unwrap();
+        outbound.send_request(&request);
+        sleep(Duration::from_millis(10)).await;
 
         // Check that the request succeeded.
         assert!(!outbound.is_pending(&request));
@@ -350,7 +353,8 @@ mod tests {
         assert!(!outbound.is_failure(&request));
 
         // Send the request to the server.
-        outbound.send_request(&request).await.await.unwrap();
+        outbound.send_request(&request);
+        sleep(Duration::from_millis(10)).await;
 
         // Check that the request succeeded.
         assert!(!outbound.is_pending(&request));

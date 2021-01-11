@@ -56,8 +56,7 @@ impl Blocks {
             if let (Some(sync_node), Ok(block_locator_hashes)) = (sync_node, block_locator_hashes) {
                 // Send a GetSync to the selected sync node.
                 self.outbound
-                    .send_request(&Request::GetSync(sync_node, GetSync::new(block_locator_hashes)))
-                    .await;
+                    .send_request(&Request::GetSync(sync_node, GetSync::new(block_locator_hashes)));
             } else {
                 // If no sync node is available, wait until peers have been established.
                 info!("No sync node is registered, blocks could not be synced");
@@ -89,8 +88,7 @@ impl Blocks {
             if *remote_address != block_miner && *remote_address != local_address {
                 // Send a `Block` message to the connected peer.
                 self.outbound
-                    .send_request(&Request::Block(*remote_address, Block::new(block_bytes.clone())))
-                    .await;
+                    .send_request(&Request::Block(*remote_address, Block::new(block_bytes.clone())));
             }
         }
 
@@ -111,12 +109,10 @@ impl Blocks {
         for remote_address in connected_peers.keys() {
             if *remote_address != transaction_sender && *remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
-                self.outbound
-                    .send_request(&Request::Transaction(
-                        *remote_address,
-                        Transaction::new(transaction_bytes.clone()),
-                    ))
-                    .await;
+                self.outbound.send_request(&Request::Transaction(
+                    *remote_address,
+                    Transaction::new(transaction_bytes.clone()),
+                ));
             }
         }
 
@@ -231,8 +227,7 @@ impl Blocks {
         if let Ok(block) = block {
             // Send a `SyncBlock` message to the connected peer.
             self.outbound
-                .send_request(&Request::SyncBlock(remote_address, SyncBlock::new(block.serialize()?)))
-                .await;
+                .send_request(&Request::SyncBlock(remote_address, SyncBlock::new(block.serialize()?)));
         }
         Ok(())
     }
@@ -256,8 +251,7 @@ impl Blocks {
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
             self.outbound
-                .send_request(&Request::MemoryPool(remote_address, MemoryPool::new(transactions)))
-                .await;
+                .send_request(&Request::MemoryPool(remote_address, MemoryPool::new(transactions)));
         }
 
         Ok(())
@@ -324,7 +318,7 @@ impl Blocks {
         };
 
         // send a `Sync` message to the connected peer.
-        self.outbound.send_request(&Request::Sync(remote_address, sync)).await;
+        self.outbound.send_request(&Request::Sync(remote_address, sync));
 
         Ok(())
     }
@@ -339,8 +333,7 @@ impl Blocks {
             // detect missing blocks and divergence in chain for now.
             for hash in block_hashes {
                 self.outbound
-                    .send_request(&Request::GetBlock(remote_address, GetBlock::new(hash)))
-                    .await;
+                    .send_request(&Request::GetBlock(remote_address, GetBlock::new(hash)));
             }
         }
 

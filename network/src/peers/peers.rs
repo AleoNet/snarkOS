@@ -354,15 +354,13 @@ impl Peers {
 
                 // TODO (raychu86): Establish a formal node version.
                 // Broadcast a `Version` message to the connected peer.
-                self.outbound
-                    .send_request(&Request::Version(Version::new(
-                        1u64,
-                        block_height,
-                        nonce,
-                        local_address,
-                        remote_address,
-                    )))
-                    .await;
+                self.outbound.send_request(&Request::Version(Version::new(
+                    1u64,
+                    block_height,
+                    nonce,
+                    local_address,
+                    remote_address,
+                )));
             } else {
                 // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
 
@@ -381,9 +379,7 @@ impl Peers {
         trace!("Sending GetPeers requests to connected peers");
 
         for (remote_address, _) in self.connected_peers() {
-            self.outbound
-                .send_request(&Request::GetPeers(remote_address, GetPeers))
-                .await;
+            self.outbound.send_request(&Request::GetPeers(remote_address, GetPeers));
 
             // // Fetch the connection channel.
             // if let Some(channel) = self.get_channel(&remote_address) {
@@ -463,13 +459,11 @@ impl Peers {
     ) -> Result<(), NetworkError> {
         // FIXME(ljedrz): it appears that Verack is not sent back in a 1:1 fashion
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
-            self.outbound
-                .send_request(&Request::Verack(Verack::new(
-                    remote_version.nonce,
-                    remote_version.receiver, /* local_address */
-                    remote_address,
-                )))
-                .await;
+            self.outbound.send_request(&Request::Verack(Verack::new(
+                remote_version.nonce,
+                remote_version.receiver, /* local_address */
+                remote_address,
+            )));
 
             if !self.connected_peers().contains_key(&remote_address) {
                 self.connecting_to_peer(remote_address, remote_version.nonce).await?;
@@ -502,8 +496,7 @@ impl Peers {
             peers.push((peer_address, *peer_info.last_seen()));
         }
         self.outbound
-            .send_request(&Request::Peers(remote_address, PeersMessage::new(peers)))
-            .await;
+            .send_request(&Request::Peers(remote_address, PeersMessage::new(peers)));
 
         Ok(())
     }
