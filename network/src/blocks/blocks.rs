@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::message_types::*, outbound::Request, peers::PeerInfo, Environment, NetworkError, Outbound};
+use crate::{external::message::*, peers::PeerInfo, Environment, NetworkError, Outbound};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
-use snarkvm_objects::{Block as BlockStruct, BlockHeaderHash};
+use snarkvm_objects::{Block, BlockHeaderHash};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -55,8 +55,10 @@ impl Blocks {
 
             if let (Some(sync_node), Ok(block_locator_hashes)) = (sync_node, block_locator_hashes) {
                 // Send a GetSync to the selected sync node.
-                self.outbound
-                    .send_request(Request::GetSync(sync_node, GetSync::new(block_locator_hashes)));
+                self.outbound.send_request(Message::new(
+                    Direction::Outbound(sync_node),
+                    Payload::GetSync(block_locator_hashes),
+                ));
             } else {
                 // If no sync node is available, wait until peers have been established.
                 info!("No sync node is registered, blocks could not be synced");
@@ -87,8 +89,10 @@ impl Blocks {
         for remote_address in connected_peers.keys() {
             if *remote_address != block_miner && *remote_address != local_address {
                 // Send a `Block` message to the connected peer.
-                self.outbound
-                    .send_request(Request::Block(*remote_address, Block::new(block_bytes.clone())));
+                self.outbound.send_request(Message::new(
+                    Direction::Outbound(*remote_address),
+                    Payload::Block(block_bytes.clone()),
+                ));
             }
         }
 
@@ -109,9 +113,9 @@ impl Blocks {
         for remote_address in connected_peers.keys() {
             if *remote_address != transaction_sender && *remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
-                self.outbound.send_request(Request::Transaction(
-                    *remote_address,
-                    Transaction::new(transaction_bytes.clone()),
+                self.outbound.send_request(Message::new(
+                    Direction::Outbound(*remote_address),
+                    Payload::Transaction(transaction_bytes.clone()),
                 ));
             }
         }
@@ -123,10 +127,10 @@ impl Blocks {
     pub(crate) async fn received_transaction(
         &self,
         source: SocketAddr,
-        transaction: Transaction,
+        transaction: Vec<u8>,
         connected_peers: HashMap<SocketAddr, PeerInfo>,
     ) -> Result<(), NetworkError> {
-        if let Ok(tx) = Tx::read(&transaction.bytes[..]) {
+        if let Ok(tx) = Tx::read(&*transaction) {
             let parameters = self.environment.dpc_parameters();
             let storage = self.environment.storage();
             let consensus = self.environment.consensus_parameters();
@@ -142,7 +146,7 @@ impl Blocks {
             }
 
             let entry = Entry::<Tx> {
-                size_in_bytes: transaction.bytes.len(),
+                size_in_bytes: transaction.len(),
                 transaction: tx,
             };
 
@@ -151,7 +155,7 @@ impl Blocks {
             if let Ok(inserted) = insertion {
                 if inserted.is_some() {
                     info!("Transaction added to memory pool.");
-                    self.propagate_transaction(transaction.bytes, source, &connected_peers)
+                    self.propagate_transaction(transaction, source, &connected_peers)
                         .await?;
                 }
             }
@@ -165,10 +169,10 @@ impl Blocks {
     pub(crate) async fn received_block(
         &self,
         remote_address: SocketAddr,
-        block: Block,
+        block: Vec<u8>,
         connected_peers: Option<HashMap<SocketAddr, PeerInfo>>,
     ) -> Result<(), NetworkError> {
-        let block_struct = BlockStruct::deserialize(&block.data)?;
+        let block_struct = Block::deserialize(&block)?;
         info!(
             "Received block from epoch {} with hash {:?}",
             block_struct.header.time,
@@ -196,8 +200,7 @@ impl Blocks {
             // This is a new block, send it to our peers.
             if let Some(connected_peers) = connected_peers {
                 if is_new_block {
-                    self.propagate_block(block.data, remote_address, &connected_peers)
-                        .await?;
+                    self.propagate_block(block, remote_address, &connected_peers).await?;
                 }
             } else {
                 /* TODO (howardwu): Implement this.
@@ -220,14 +223,16 @@ impl Blocks {
     pub(crate) async fn received_get_block(
         &self,
         remote_address: SocketAddr,
-        message: GetBlock,
+        header_hash: BlockHeaderHash,
     ) -> Result<(), NetworkError> {
-        let block = self.environment.storage().read().get_block(&message.block_hash);
+        let block = self.environment.storage().read().get_block(&header_hash);
 
         if let Ok(block) = block {
             // Send a `SyncBlock` message to the connected peer.
-            self.outbound
-                .send_request(Request::SyncBlock(remote_address, SyncBlock::new(block.serialize()?)));
+            self.outbound.send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::SyncBlock(block.serialize()?),
+            ));
         }
         Ok(())
     }
@@ -250,18 +255,20 @@ impl Blocks {
 
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
-            self.outbound
-                .send_request(Request::MemoryPool(remote_address, MemoryPool::new(transactions)));
+            self.outbound.send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::MemoryPool(transactions),
+            ));
         }
 
         Ok(())
     }
 
     /// A peer has sent us their memory pool transactions.
-    pub(crate) fn received_memory_pool(&self, message: MemoryPool) -> Result<(), NetworkError> {
+    pub(crate) fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
         let mut memory_pool = self.environment.memory_pool().lock();
 
-        for transaction_bytes in message.transactions {
+        for transaction_bytes in transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;
             let entry = Entry::<Tx> {
                 size_in_bytes: transaction_bytes.len(),
@@ -283,12 +290,12 @@ impl Blocks {
     pub(crate) async fn received_get_sync(
         &self,
         remote_address: SocketAddr,
-        message: GetSync,
+        block_locator_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         let sync = {
             let storage_lock = self.environment.storage().read();
 
-            let latest_shared_hash = storage_lock.get_latest_shared_hash(message.block_locator_hashes)?;
+            let latest_shared_hash = storage_lock.get_latest_shared_hash(block_locator_hashes)?;
             let current_height = self.environment.storage().read().get_current_block_height();
 
             if let Ok(height) = storage_lock.get_block_number(&latest_shared_hash) {
@@ -308,32 +315,37 @@ impl Blocks {
                     }
 
                     // send block hashes to requester
-                    Sync::new(block_hashes)
+                    block_hashes
                 } else {
-                    Sync::new(vec![])
+                    vec![]
                 }
             } else {
-                Sync::new(vec![])
+                vec![]
             }
         };
 
         // send a `Sync` message to the connected peer.
-        self.outbound.send_request(Request::Sync(remote_address, sync));
+        self.outbound
+            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)));
 
         Ok(())
     }
 
     /// A peer has sent us their chain state.
-    pub(crate) async fn received_sync(&self, remote_address: SocketAddr, message: Sync) -> Result<(), NetworkError> {
-        let block_hashes = message.block_hashes;
-
+    pub(crate) async fn received_sync(
+        &self,
+        remote_address: SocketAddr,
+        block_hashes: Vec<BlockHeaderHash>,
+    ) -> Result<(), NetworkError> {
         // If empty sync is no-op as chain states match
         if !block_hashes.is_empty() {
             // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
             // detect missing blocks and divergence in chain for now.
             for hash in block_hashes {
-                self.outbound
-                    .send_request(Request::GetBlock(remote_address, GetBlock::new(hash)));
+                self.outbound.send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::GetBlock(hash),
+                ));
             }
         }
 

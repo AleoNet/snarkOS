@@ -14,17 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::ConnectError,
-    external::message::{
-        read::{read_header, read_message},
-        Message,
-        MessageHeader,
-        MessageName,
-    },
-};
+use crate::{errors::ConnectError, external::message::*};
 
-use std::{net::SocketAddr, sync::Arc};
+use bincode;
 use tokio::{
     io::AsyncWriteExt,
     net::{
@@ -33,6 +25,8 @@ use tokio::{
     },
     sync::Mutex,
 };
+
+use std::{net::SocketAddr, sync::Arc};
 
 /// A channel for reading and writing messages to a peer.
 /// The channel manages two streams to allow for simultaneous reading and writing.
@@ -70,40 +64,38 @@ impl Channel {
         })
     }
 
-    /// Writes a message header + message.
-    pub async fn write<M: Message>(&self, message: &M) -> Result<(), ConnectError> {
-        let serialized = message.serialize()?;
-        let header = MessageHeader::new(M::name(), serialized.len() as u32);
+    /// Writes a message header + payload.
+    pub async fn write(&self, payload: &Payload) -> Result<(), ConnectError> {
+        let serialized_payload = bincode::serialize(payload).map_err(|e| ConnectError::MessageError(e.into()))?;
+        let header = MessageHeader {
+            len: serialized_payload.len() as u32,
+        };
 
         let mut writer = self.writer.lock().await;
-        writer.write_all(&header.serialize()?).await?;
-        writer.write_all(&serialized).await?;
+        writer.write_all(&header.as_bytes()[..]).await?;
+        writer.write_all(&serialized_payload).await?;
 
-        debug!("Sent a {} to {}", M::name(), self.remote_address);
+        debug!("Sent a {} to {}", payload, self.remote_address);
 
         Ok(())
     }
 
-    /// Reads a message header + message.
-    pub async fn read(&self) -> Result<(MessageName, Vec<u8>), ConnectError> {
+    /// Reads a message header + payload.
+    pub async fn read(&self) -> Result<Message, ConnectError> {
         let header = read_header(&mut *self.reader.lock().await).await?;
+        let payload = read_message(&mut *self.reader.lock().await, header.len as usize).await?;
+        let payload = bincode::deserialize(&payload).map_err(|e| ConnectError::MessageError(e.into()))?;
 
-        debug!("Received a '{}' message from {}", header.name, self.remote_address);
+        debug!("Received a '{}' message from {}", payload, self.remote_address);
 
-        Ok((
-            header.name,
-            read_message(&mut *self.reader.lock().await, header.len as usize).await?,
-        ))
+        Ok(Message::new(Direction::Inbound(self.remote_address), payload))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::message_types::GetPeers;
     use snarkos_testing::network::{random_bound_address, simulate_active_node};
-
-    use serial_test::serial;
 
     #[tokio::test]
     async fn channel_write() {
@@ -114,7 +106,7 @@ mod tests {
         let server_channel = Channel::from_addr(remote_address).await.unwrap();
 
         // 3. Server write message to peer
-        server_channel.write(&GetPeers).await.unwrap();
+        server_channel.write(&Payload::GetPeers).await.unwrap();
     }
 
     #[tokio::test]
@@ -126,7 +118,7 @@ mod tests {
             let server_channel = Channel::from_addr(remote_address).await.unwrap();
 
             // 2. Server writes GetPeers message.
-            server_channel.write(&GetPeers).await.unwrap();
+            server_channel.write(&Payload::GetPeers).await.unwrap();
         });
 
         // 2. Peer accepts server connection.
@@ -134,9 +126,8 @@ mod tests {
         let peer_channel = Channel::new(address, stream);
 
         // 4. Peer reads GetPeers message.
-        let (name, buffer) = peer_channel.read().await.unwrap();
+        let message = peer_channel.read().await.unwrap();
 
-        assert_eq!(GetPeers::name(), name);
-        assert!(GetPeers::deserialize(&buffer).is_ok());
+        assert!(matches!(message.payload, Payload::GetPeers));
     }
 }

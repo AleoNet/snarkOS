@@ -32,7 +32,7 @@ pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) 
 
 /// Returns a message header read from an input stream.
 pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
-    let mut buffer = [0u8; 5];
+    let mut buffer = [0u8; 4];
 
     stream_read(&mut stream, &mut buffer).await?;
 
@@ -48,37 +48,33 @@ async fn stream_read<'a, T: AsyncRead + Unpin>(stream: &'a mut T, buffer: &'a mu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::{
-        message::{message::Message, MessageHeader},
-        message_types::Version,
-    };
+    use crate::external::{message::*, message_types::Version};
     use snarkos_testing::network::random_bound_address;
 
-    use serial_test::serial;
-    use tokio::net::{TcpListener, TcpStream};
+    use tokio::net::TcpStream;
 
     #[tokio::test]
     async fn read_multiple_headers() {
         let (address, listener) = random_bound_address().await;
 
         tokio::spawn(async move {
-            let header = MessageHeader::from([0, 0, 0, 0, 4]);
+            let header = MessageHeader::from([0, 0, 0, 4]);
             let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&header.serialize().unwrap()).await.unwrap();
-            let header = MessageHeader::from([0, 0, 0, 0, 8]);
-            stream.write_all(&header.serialize().unwrap()).await.unwrap();
+            stream.write_all(&header.as_bytes()[..]).await.unwrap();
+            let header = MessageHeader::from([0, 0, 0, 8]);
+            stream.write_all(&header.as_bytes()[..]).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; 4];
         stream_read(&mut stream, &mut buf).await.unwrap();
 
-        assert_eq!(MessageHeader::from([0, 0, 0, 0, 4]), MessageHeader::from(buf));
+        assert_eq!(MessageHeader::from([0, 0, 0, 4]), MessageHeader::from(buf));
 
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; 4];
         stream_read(&mut stream, &mut buf).await.unwrap();
 
-        assert_eq!(MessageHeader::from([0, 0, 0, 0, 8]), MessageHeader::from(buf));
+        assert_eq!(MessageHeader::from([0, 0, 0, 8]), MessageHeader::from(buf));
     }
 
     #[tokio::test]
@@ -86,38 +82,38 @@ mod tests {
         let (address, listener) = random_bound_address().await;
 
         tokio::spawn(async move {
-            let header = MessageHeader::from([0, 0, 0, 0, 4]);
+            let header = MessageHeader::from([0, 0, 0, 4]);
             let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&header.serialize().unwrap()).await.unwrap();
+            stream.write_all(&header.as_bytes()[..]).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
         let header = read_header(&mut stream).await.unwrap();
-        assert_eq!(MessageHeader::from([0, 0, 0, 0, 4]), header);
+        assert_eq!(MessageHeader::from([0, 0, 0, 4]), header);
     }
 
     #[tokio::test]
     async fn test_read_message() {
         let (address, listener) = random_bound_address().await;
 
-        let expected = Version::new(
+        let expected = Payload::Version(Version::new(
             1u64,
             0u32,
             1u64,
             "127.0.0.1:4131".parse().unwrap(),
             "127.0.0.1:4141".parse().unwrap(),
-        );
+        ));
         let version = expected.clone();
 
         tokio::spawn(async move {
             let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&version.serialize().unwrap()).await.unwrap();
+            stream.write_all(&bincode::serialize(&version).unwrap()).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
 
-        let buffer = read_message(&mut stream, 48usize).await.unwrap();
-        let candidate = Version::deserialize(&buffer).unwrap();
+        let buffer = read_message(&mut stream, 52usize).await.unwrap();
+        let candidate = bincode::deserialize(&buffer).unwrap();
         assert_eq!(expected, candidate);
     }
 }

@@ -44,9 +44,11 @@ impl TcpServer {
 
         if !should_reject {
             tokio::spawn(async move {
+                let mut conns = Vec::with_capacity(1);
+
                 loop {
                     let inbound = listener.accept().await;
-                    println!("{:?}", inbound);
+                    conns.push(inbound);
                 }
             });
         }

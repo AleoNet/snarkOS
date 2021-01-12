@@ -14,17 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::message::MessageError,
-    external::message::{Message, MessageName},
-};
-
 use chrono::Utc;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+
 use std::net::SocketAddr;
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Version {
     /// The version number of the sender's node server.
     pub version: u64,
@@ -65,57 +62,5 @@ impl Version {
             receiver,
             timestamp: Utc::now().timestamp(),
         }
-    }
-}
-
-impl Message for Version {
-    fn name() -> MessageName {
-        MessageName::Version
-    }
-
-    fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
-        if bytes.len() != 48 {
-            return Err(MessageError::InvalidLength(bytes.len(), 48));
-        }
-
-        Ok(Version {
-            version: bincode::deserialize(&bytes[..8])?,
-            height: bincode::deserialize(&bytes[8..12])?,
-            nonce: bincode::deserialize(&bytes[12..20])?,
-            sender: bincode::deserialize(&bytes[20..30])?,
-            receiver: bincode::deserialize(&bytes[30..40])?,
-            timestamp: bincode::deserialize(&bytes[40..48])?,
-        })
-    }
-
-    fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        let mut writer = Vec::with_capacity(48);
-        writer.extend_from_slice(&bincode::serialize(&self.version)?);
-        writer.extend_from_slice(&bincode::serialize(&self.height)?);
-        writer.extend_from_slice(&bincode::serialize(&self.nonce)?);
-        writer.extend_from_slice(&bincode::serialize(&self.sender)?);
-        writer.extend_from_slice(&bincode::serialize(&self.receiver)?);
-        writer.extend_from_slice(&bincode::serialize(&self.timestamp)?);
-        Ok(writer)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_version() {
-        let version = Version::new_with_rng(
-            1u64,
-            1u32,
-            "127.0.0.1:4130".parse::<SocketAddr>().unwrap(),
-            "127.0.0.1:4130".parse::<SocketAddr>().unwrap(),
-        );
-
-        let serialized = version.serialize().unwrap();
-        let deserialized = Version::deserialize(&serialized).unwrap();
-
-        assert_eq!(version, deserialized);
     }
 }

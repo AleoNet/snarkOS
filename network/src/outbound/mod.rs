@@ -16,6 +16,3 @@
 
 pub mod outbound;
 pub use outbound::*;
-
-pub(crate) mod request;
-pub(crate) use request::*;

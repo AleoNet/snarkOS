@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::Channel, outbound::Request, NetworkError};
+use crate::{
+    external::{Channel, Message},
+    NetworkError,
+};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -32,7 +35,7 @@ use parking_lot::RwLock;
 type Channels = HashMap<SocketAddr, Channel>;
 
 /// The set of requests for a single remote address.
-type Requests = HashSet<Request>;
+type Requests = HashSet<Message>;
 
 /// The map of remote addresses to their pending requests.
 type Pending = HashMap<SocketAddr, Requests>;
@@ -79,7 +82,7 @@ impl Outbound {
     /// Returns `true` if the given request is a pending request.
     ///
     #[inline]
-    pub fn is_pending(&self, request: &Request) -> bool {
+    pub fn is_pending(&self, request: &Message) -> bool {
         // Fetch the pending requests of the given receiver.
         match self.pending.read().get(&request.receiver()) {
             // Check if the set of pending requests contains the given request.
@@ -93,7 +96,7 @@ impl Outbound {
     /// Returns `true` if the given request was a successful request.
     ///
     #[inline]
-    pub fn is_success(&self, request: &Request) -> bool {
+    pub fn is_success(&self, request: &Message) -> bool {
         // Fetch the successful requests of the given receiver.
         match self.success.read().get(&request.receiver()) {
             // Check if the set of successful requests contains the given request.
@@ -107,7 +110,7 @@ impl Outbound {
     /// Returns `true` if the given request was a failed request.
     ///
     #[inline]
-    pub fn is_failure(&self, request: &Request) -> bool {
+    pub fn is_failure(&self, request: &Message) -> bool {
         // Fetch the failed requests of the given receiver.
         match self.failure.read().get(&request.receiver()) {
             // Check if the set of failed requests contains the given request.
@@ -124,7 +127,7 @@ impl Outbound {
     /// and attempts to send the given request to them.
     ///
     #[inline]
-    pub fn send_request(&self, request: Request) {
+    pub fn send_request(&self, request: Message) {
         let outbound = self.clone();
 
         // issues related to spawning this task are unlikely and not interesting;
@@ -167,7 +170,7 @@ impl Outbound {
     /// Authorizes the given request to be sent to the corresponding outbound channel.
     ///
     #[inline]
-    fn authorize(&self, request: &Request) {
+    fn authorize(&self, request: &Message) {
         // Store the request to the pending requests.
         match self.pending.write().get_mut(&request.receiver()) {
             Some(requests) => {
@@ -176,16 +179,12 @@ impl Outbound {
                 // Increment the request counter.
                 self.send_pending_count.fetch_add(1, Ordering::SeqCst);
             }
-            None => warn!(
-                "Failed to authorize `{}` request to {}",
-                request.name(),
-                request.receiver()
-            ),
+            None => warn!("Failed to authorize a {}", request),
         };
     }
 
     #[inline]
-    async fn send(&self, request: &Request) {
+    async fn send(&self, request: &Message) {
         // Fetch the outbound channel.
         let channel = match self.outbound_channel(request.receiver()) {
             Ok(channel) => channel,
@@ -196,14 +195,14 @@ impl Outbound {
         };
 
         // Write the request to the outbound channel.
-        match request.write_to_channel(&channel).await {
+        match channel.write(&request.payload).await {
             Ok(_) => self.success(&request),
             Err(error) => self.failure(&request, error),
         };
     }
 
     #[inline]
-    fn success(&self, request: &Request) {
+    fn success(&self, request: &Message) {
         // Remove the request from the pending requests.
         if let Some(requests) = self.pending.write().get_mut(&request.receiver()) {
             requests.remove(&request);
@@ -219,13 +218,8 @@ impl Outbound {
     }
 
     #[inline]
-    fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Request, error: E) {
-        warn!(
-            "Failed to send a {} to {}: {}",
-            request.name(),
-            request.receiver(),
-            error
-        );
+    fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Message, error: E) {
+        warn!("Failed to send a {}: {}", request, error);
 
         // Remove the request from the pending requests.
         if let Some(requests) = self.pending.write().get_mut(&request.receiver()) {
@@ -244,18 +238,18 @@ impl Outbound {
 
 #[cfg(test)]
 mod tests {
-    use crate::{external::GetPeers, outbound::*, Channel};
+    use crate::{external::message::*, outbound::*, Channel};
     use snarkos_testing::network::TcpServer;
 
     use std::{net::SocketAddr, time::Duration};
     use tokio::{net::TcpStream, time::sleep};
 
     ///
-    /// Returns a `Request` for testing.
+    /// Returns a `Message` for testing.
     ///
     #[inline]
-    fn request(remote_address: SocketAddr) -> Request {
-        Request::GetPeers(remote_address, GetPeers)
+    fn request(remote_address: SocketAddr) -> Message {
+        Message::new(Direction::Outbound(remote_address), Payload::GetPeers)
     }
 
     ///

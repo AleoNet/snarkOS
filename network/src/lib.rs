@@ -50,15 +50,18 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
-use crate::{external::Channel, peers::peers::Peers};
+use crate::{
+    external::{message::*, Channel},
+    peers::peers::Peers,
+};
 
 use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{task, time::sleep};
 
-pub(crate) type Sender = tokio::sync::mpsc::Sender<Response>;
+pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
-pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Response>;
+pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 
 /// A core data structure for operating the networking stack of this node.
 #[derive(Clone)]
@@ -154,7 +157,7 @@ impl Server {
     }
 
     async fn receive_response(&self) -> Result<(), NetworkError> {
-        let response = self
+        let Message { direction, payload } = self
             .inbound
             .receiver()
             .lock()
@@ -163,56 +166,61 @@ impl Server {
             .await
             .ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        match response {
-            Response::ConnectingTo(remote_address, nonce) => {
+        let source = if let Direction::Inbound(addr) = direction {
+            Some(addr)
+        } else {
+            None
+        };
+
+        match payload {
+            Payload::ConnectingTo(remote_address, nonce) => {
                 self.peers.connecting_to_peer(remote_address, nonce)?;
             }
-            Response::ConnectedTo(remote_address, nonce) => {
+            Payload::ConnectedTo(remote_address, nonce) => {
                 self.peers.connected_to_peer(remote_address, nonce)?;
             }
-            Response::VersionToVerack(remote_address, remote_version) => {
-                self.peers.version_to_verack(remote_address, &remote_version)?;
+            Payload::Version(version) => {
+                self.peers.version_to_verack(&version)?;
             }
-            Response::Verack(remote_address, verack) => {
-                self.peers.verack(&remote_address, &verack);
+            Payload::Verack(verack) => {
+                self.peers.verack(&verack);
             }
-            Response::Transaction(source, transaction) => {
+            Payload::Transaction(transaction) => {
                 let connected_peers = self.peers.connected_peers();
                 self.blocks
-                    .received_transaction(source, transaction, connected_peers)
+                    .received_transaction(source.unwrap(), transaction, connected_peers)
                     .await?;
             }
-            Response::Block(remote_address, block, propagate) => {
-                let connected_peers = match propagate {
-                    true => Some(self.peers.connected_peers()),
-                    false => None,
-                };
+            Payload::Block(block) => {
                 self.blocks
-                    .received_block(remote_address, block, connected_peers)
+                    .received_block(source.unwrap(), block, Some(self.peers.connected_peers()))
                     .await?;
             }
-            Response::GetBlock(remote_address, getblock) => {
-                self.blocks.received_get_block(remote_address, getblock).await?;
+            Payload::SyncBlock(block) => {
+                self.blocks.received_block(source.unwrap(), block, None).await?;
             }
-            Response::GetMemoryPool(remote_address) => {
-                self.blocks.received_get_memory_pool(remote_address).await?;
+            Payload::GetBlock(hash) => {
+                self.blocks.received_get_block(source.unwrap(), hash).await?;
             }
-            Response::MemoryPool(mempool) => {
+            Payload::GetMemoryPool => {
+                self.blocks.received_get_memory_pool(source.unwrap()).await?;
+            }
+            Payload::MemoryPool(mempool) => {
                 self.blocks.received_memory_pool(mempool)?;
             }
-            Response::GetSync(remote_address, getsync) => {
-                self.blocks.received_get_sync(remote_address, getsync).await?;
+            Payload::GetSync(getsync) => {
+                self.blocks.received_get_sync(source.unwrap(), getsync).await?;
             }
-            Response::Sync(remote_address, sync) => {
-                self.blocks.received_sync(remote_address, sync).await?;
+            Payload::Sync(sync) => {
+                self.blocks.received_sync(source.unwrap(), sync).await?;
             }
-            Response::DisconnectFrom(remote_address) => {
-                self.peers.disconnected_from_peer(&remote_address)?;
+            Payload::Disconnect(addr) => {
+                self.peers.disconnected_from_peer(&addr)?;
             }
-            Response::GetPeers(remote_address) => {
-                self.peers.send_get_peers(remote_address);
+            Payload::GetPeers => {
+                self.peers.send_get_peers(source.unwrap());
             }
-            Response::Peers(_, peers) => {
+            Payload::Peers(peers) => {
                 self.peers.process_inbound_peers(peers)?;
             }
         }
@@ -224,27 +232,12 @@ impl Server {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::{
-        message::{read_header, read_message, Message, MessageHeader},
-        message_name::MessageName,
-        Block,
-        GetBlock,
-        GetMemoryPool,
-        GetPeers,
-        GetSync,
-        MemoryPool,
-        Peers,
-        Sync,
-        SyncBlock,
-        Transaction,
-        Verack,
-        Version,
-    };
+    use crate::external::message_types::*;
     use snarkos_testing::{
         consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, FIXTURE_VK, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
     };
-    use snarkvm_objects::{block::Block as BlockStruct, block_header_hash::BlockHeaderHash};
+    use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
     use std::{sync::Arc, time::Duration};
 
@@ -288,13 +281,14 @@ mod tests {
         Server::new(environment).await.unwrap()
     }
 
-    async fn write_message_to_stream(message_name: MessageName, message: impl Message, peer_stream: &mut TcpStream) {
-        let serialized = message.serialize().unwrap();
-        let header = MessageHeader::new(message_name, serialized.len() as u32)
-            .serialize()
-            .unwrap();
-        peer_stream.write_all(&header).await.unwrap();
-        peer_stream.write_all(&serialized).await.unwrap();
+    async fn write_message_to_stream(payload: Payload, peer_stream: &mut TcpStream) {
+        let payload = bincode::serialize(&payload).unwrap();
+        let header = MessageHeader {
+            len: payload.len() as u32,
+        }
+        .as_bytes();
+        peer_stream.write_all(&header[..]).await.unwrap();
+        peer_stream.write_all(&payload).await.unwrap();
         peer_stream.flush().await.unwrap();
     }
 
@@ -323,8 +317,8 @@ mod tests {
         let node_address = peer_stream.peer_addr().unwrap();
 
         // the peer initiates a handshake by sending a Version message
-        let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
-        write_message_to_stream(Version::name(), version, &mut peer_stream).await;
+        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address, node_address));
+        write_message_to_stream(version, &mut peer_stream).await;
 
         // at this point the node should have marked the peer as ' connecting'
         sleep(Duration::from_millis(200)).await;
@@ -333,16 +327,21 @@ mod tests {
         // check if the peer has received the Verack message from the node
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let _verack = Verack::deserialize(&message).unwrap();
+        assert!(matches!(bincode::deserialize(&message).unwrap(), Payload::Verack(..)));
 
         // check if it was followed by a Version message
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let version = Version::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        let version = if let Payload::Version(version) = message {
+            version
+        } else {
+            unreachable!();
+        };
 
         // in response to the Version, the peer sends a Verack message to finish the handshake
-        let verack = Verack::new(version.nonce, peer_address, node_address);
-        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
+        let verack = Payload::Verack(Verack::new(version.nonce, peer_address, node_address));
+        write_message_to_stream(verack, &mut peer_stream).await;
 
         // the node should now have register the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
@@ -366,18 +365,22 @@ mod tests {
         // the peer should receive a Version message from the node (initiator of the handshake)
         let header = read_header(&mut peer_stream).await.unwrap();
         let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let version = Version::deserialize(&message).unwrap();
+        let version = if let Payload::Version(version) = bincode::deserialize(&message).unwrap() {
+            version
+        } else {
+            unreachable!();
+        };
 
         // at this point the node should have marked the peer as 'connecting'
         assert!(node.peers.is_connecting(&peer_address));
 
         // the peer responds with a Verack acknowledging the Version message
-        let verack = Verack::new(version.nonce, peer_address, node_address);
-        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
+        let verack = Payload::Verack(Verack::new(version.nonce, peer_address, node_address));
+        write_message_to_stream(verack, &mut peer_stream).await;
 
         // the peer then follows up with a Version message
-        let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
-        write_message_to_stream(Version::name(), version, &mut peer_stream).await;
+        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address, node_address));
+        write_message_to_stream(version, &mut peer_stream).await;
 
         // the node should now have registered the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
@@ -413,7 +416,7 @@ mod tests {
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
 
         // send a GetPeers message without a prior handshake established
-        write_message_to_stream(GetPeers::name(), GetPeers, &mut peer_stream).await;
+        write_message_to_stream(Payload::GetPeers, &mut peer_stream).await;
 
         // verify the node rejected the message, the response to the peer is empty and the node's
         // state is unaltered
@@ -421,61 +424,61 @@ mod tests {
 
         // GetMemoryPool
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        write_message_to_stream(GetMemoryPool::name(), GetMemoryPool, &mut peer_stream).await;
+        write_message_to_stream(Payload::GetMemoryPool, &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // GetBlock
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        write_message_to_stream(GetBlock::name(), GetBlock::new(block_hash), &mut peer_stream).await;
+        write_message_to_stream(Payload::GetBlock(block_hash), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // GetSync
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        write_message_to_stream(GetSync::name(), GetSync::new(vec![block_hash]), &mut peer_stream).await;
+        write_message_to_stream(Payload::GetSync(vec![block_hash]), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Peers
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        let peers = Peers::new(vec![("127.0.0.1:0".parse().unwrap(), Utc::now())]);
-        write_message_to_stream(Peers::name(), peers, &mut peer_stream).await;
+        let peers = vec![("127.0.0.1:0".parse().unwrap(), Utc::now())];
+        write_message_to_stream(Payload::Peers(peers), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // MemoryPool
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        let memory_pool = MemoryPool::new(vec![[0u8, 10].to_vec()]);
-        write_message_to_stream(MemoryPool::name(), memory_pool, &mut peer_stream).await;
+        let memory_pool = vec![vec![0u8, 10]];
+        write_message_to_stream(Payload::MemoryPool(memory_pool), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Block
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        let block = Block::new([0u8, 10].to_vec());
-        write_message_to_stream(Block::name(), block, &mut peer_stream).await;
+        let block = vec![0u8, 10];
+        write_message_to_stream(Payload::Block(block), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // SyncBlock
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        let sync_block = SyncBlock::new([0u8, 10].to_vec());
-        write_message_to_stream(SyncBlock::name(), sync_block, &mut peer_stream).await;
+        let sync_block = vec![0u8, 10];
+        write_message_to_stream(Payload::SyncBlock(sync_block), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Sync
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-        write_message_to_stream(Sync::name(), Sync::new(vec![block_hash]), &mut peer_stream).await;
+        let block_hash = BlockHeaderHash::new(vec![0u8; 32]);
+        write_message_to_stream(Payload::Sync(vec![block_hash]), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Transaction
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        let transaction = Transaction::new([0u8, 10].to_vec());
-        write_message_to_stream(Transaction::name(), transaction, &mut peer_stream).await;
+        let transaction = vec![0u8, 10];
+        write_message_to_stream(Payload::Transaction(transaction), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
 
         // Verack
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
         let verack = Verack::new(1u64, peer_stream.local_addr().unwrap(), node.local_address().unwrap());
-        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
+        write_message_to_stream(Payload::Verack(verack), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
     }
 
@@ -493,8 +496,8 @@ mod tests {
         let node_address = peer_stream.peer_addr().unwrap();
 
         // the peer initiates a handshake by sending a Version message
-        let version = Version::new(1u64, 1u32, 1u64, peer_address, node_address);
-        write_message_to_stream(Version::name(), version, &mut peer_stream).await;
+        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address, node_address));
+        write_message_to_stream(version, &mut peer_stream).await;
 
         // at this point the node should have marked the peer as ' connecting'
         sleep(Duration::from_millis(200)).await;
@@ -502,17 +505,23 @@ mod tests {
 
         // check if the peer has received the Verack message from the node
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let _verack = Verack::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        assert!(matches!(message, Payload::Verack(_)));
 
         // check if it was followed by a Version message
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let version = Version::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        let version = if let Payload::Version(version) = message {
+            version
+        } else {
+            unreachable!();
+        };
 
         // in response to the Version, the peer sends a Verack message to finish the handshake
-        let verack = Verack::new(version.nonce, peer_address, node_address);
-        write_message_to_stream(Verack::name(), verack, &mut peer_stream).await;
+        let verack = Payload::Verack(Verack::new(version.nonce, peer_address, node_address));
+        write_message_to_stream(verack, &mut peer_stream).await;
 
         // the node should now have register the peer as 'connected'
         sleep(Duration::from_millis(200)).await;
@@ -528,13 +537,15 @@ mod tests {
 
         // check Version from peer update is received
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let _version = Version::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        assert!(matches!(message, Payload::Version(..)));
 
         // check GetSync message was received
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let _get_sync = GetSync::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        assert!(matches!(message, Payload::GetSync(..)));
 
         let block_1_header_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
         let block_2_header_hash = BlockHeaderHash::new(BLOCK_2_HEADER_HASH.to_vec());
@@ -543,28 +554,38 @@ mod tests {
 
         // respond to GetSync with Sync message containing the block header hashes of the missing
         // blocks
-        let sync = Sync::new(block_header_hashes);
-        write_message_to_stream(Sync::name(), sync, &mut peer_stream).await;
+        let sync = Payload::Sync(block_header_hashes);
+        write_message_to_stream(sync, &mut peer_stream).await;
 
         // make sure both GetBlock messages are received
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let get_block = GetBlock::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        let block_hash = if let Payload::GetBlock(block_hash) = message {
+            block_hash
+        } else {
+            unreachable!();
+        };
 
-        assert_eq!(get_block.block_hash, block_1_header_hash);
+        assert_eq!(block_hash, block_1_header_hash);
 
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let get_block = GetBlock::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        let block_hash = if let Payload::GetBlock(block_hash) = message {
+            block_hash
+        } else {
+            unreachable!();
+        };
 
-        assert_eq!(get_block.block_hash, block_2_header_hash);
+        assert_eq!(block_hash, block_2_header_hash);
 
         // respond with the full blocks
-        let block_1 = Block::new(BLOCK_1.to_vec());
-        write_message_to_stream(Block::name(), block_1, &mut peer_stream).await;
+        let block_1 = Payload::Block(BLOCK_1.to_vec());
+        write_message_to_stream(block_1, &mut peer_stream).await;
 
-        let block_2 = Block::new(BLOCK_2.to_vec());
-        write_message_to_stream(Block::name(), block_2, &mut peer_stream).await;
+        let block_2 = Payload::Block(BLOCK_2.to_vec());
+        write_message_to_stream(block_2, &mut peer_stream).await;
 
         sleep(Duration::from_millis(200)).await;
 
@@ -590,8 +611,7 @@ mod tests {
         let (node, mut peer_stream) = handshake().await;
 
         // insert block into node_alice
-        let block_1 = Block::new(BLOCK_1.to_vec());
-        let block_struct_1 = BlockStruct::deserialize(&block_1.data).unwrap();
+        let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
         node.environment
             .consensus_parameters()
             .receive_block(
@@ -603,28 +623,38 @@ mod tests {
             .unwrap();
 
         // send a GetSync with an empty vec as only the genesis block is in the ledger
-        let get_sync = GetSync::new(vec![]);
-        write_message_to_stream(GetSync::name(), get_sync, &mut peer_stream).await;
+        let get_sync = Payload::GetSync(vec![]);
+        write_message_to_stream(get_sync, &mut peer_stream).await;
 
         // receive a Sync message from the node with the block header
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let sync = Sync::deserialize(&message).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        let sync = if let Payload::Sync(sync) = message {
+            sync
+        } else {
+            unreachable!();
+        };
 
-        let block_header_hash = sync.block_hashes.first().unwrap();
+        let block_header_hash = sync.first().unwrap();
 
         // check it matches the block inserted into the node's ledger
         assert_eq!(*block_header_hash, block_struct_1.header.get_hash());
 
         // request the block from the node
-        let get_block = GetBlock::new(block_header_hash.clone());
-        write_message_to_stream(GetBlock::name(), get_block, &mut peer_stream).await;
+        let get_block = Payload::GetBlock(block_header_hash.clone());
+        write_message_to_stream(get_block, &mut peer_stream).await;
 
         // receive a SyncBlock message with the requested block
         let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let sync_block = SyncBlock::deserialize(&message).unwrap();
-        let block = BlockStruct::deserialize(&sync_block.data).unwrap();
+        let message =
+            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
+        let block = if let Payload::SyncBlock(block) = message {
+            block
+        } else {
+            unreachable!();
+        };
+        let block = snarkvm_objects::Block::deserialize(&block).unwrap();
 
         assert_eq!(block, block_struct_1);
     }

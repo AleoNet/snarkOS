@@ -14,15 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::send::SendError,
-    external::message_types::{GetBlock, GetSync},
-    outbound::Request,
-    peers::peers::Peers,
-    Environment,
-    NetworkError,
-    Outbound,
-};
+use crate::{errors::send::SendError, peers::peers::Peers, Environment, NetworkError, Outbound};
 use snarkvm_objects::BlockHeaderHash;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};

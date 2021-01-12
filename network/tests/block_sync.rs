@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::{external::Block, Environment, Server};
+use snarkos_network::{Environment, Server};
 use snarkos_testing::{
     consensus::{BLOCK_1, BLOCK_2, FIXTURE_VK, TEST_CONSENSUS},
     dpc::load_verifying_parameters,
 };
-use snarkvm_objects::block::Block as BlockStruct;
+use snarkvm_objects::block::Block;
 
 use std::{sync::Arc, time::Duration};
 
@@ -75,8 +75,8 @@ async fn simple_block_sync() {
     let alice_address = node_alice.local_address().unwrap();
 
     // insert blocks into node_alice
-    let block_1 = Block::new(BLOCK_1.to_vec());
-    let block_struct_1 = BlockStruct::deserialize(&block_1.data).unwrap();
+    let block_1 = BLOCK_1.to_vec();
+    let block_struct_1 = Block::deserialize(&block_1).unwrap();
     node_alice
         .environment
         .consensus_parameters()
@@ -88,8 +88,8 @@ async fn simple_block_sync() {
         )
         .unwrap();
 
-    let block_2 = Block::new(BLOCK_2.to_vec());
-    let block_struct_2 = BlockStruct::deserialize(&block_2.data).unwrap();
+    let block_2 = BLOCK_2.to_vec();
+    let block_struct_2 = Block::deserialize(&block_2).unwrap();
     node_alice
         .environment
         .consensus_parameters()

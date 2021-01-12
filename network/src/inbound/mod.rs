@@ -16,6 +16,3 @@
 
 pub mod inbound;
 pub use inbound::*;
-
-pub(crate) mod response;
-pub(crate) use response::*;

@@ -16,8 +16,7 @@
 
 use crate::{
     errors::ConnectError,
-    external::{message::Message, message_types::*, Channel, MessageName},
-    inbound::Response,
+    external::{message::*, message_types::*, Channel},
     Environment,
     NetworkError,
     Receiver,
@@ -121,15 +120,19 @@ impl Inbound {
             failure = false;
 
             // Read the next message from the channel. This is a blocking operation.
-            let (message_name, message_bytes) = match channel.read().await {
-                Ok((message_name, message_bytes)) => (message_name, message_bytes),
+            let message = match channel.read().await {
+                Ok(message) => message,
                 Err(error) => {
                     Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
 
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
-                            self.route(Response::DisconnectFrom(channel.remote_address)).await;
+                            self.route(Message::new(
+                                Direction::Internal,
+                                Payload::Disconnect(channel.remote_address),
+                            ))
+                            .await;
 
                             // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
                             // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
@@ -149,59 +152,92 @@ impl Inbound {
             // the message name, bytes, and associated channel.
             //
             // The oneshot sender lets the connection task know when the message is handled.
-            let name = message_name;
-            let bytes = message_bytes;
 
-            match name {
-                MessageName::Block => {
-                    let message = Self::parse(&bytes)?;
-                    self.route(Response::Block(channel.remote_address, message, true)).await;
+            // TODO(ljedrz): in most cases the whole message can be routed; compact this
+            match message.payload {
+                Payload::Block(block) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::Block(block),
+                    ))
+                    .await;
                 }
-                MessageName::GetBlock => {
-                    let message = Self::parse(&bytes)?;
-                    self.route(Response::GetBlock(channel.remote_address, message)).await;
+                Payload::GetBlock(hash) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::GetBlock(hash),
+                    ))
+                    .await;
                 }
-                MessageName::GetMemoryPool => {
-                    self.route(Response::GetMemoryPool(channel.remote_address)).await;
+                Payload::GetMemoryPool => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::GetMemoryPool,
+                    ))
+                    .await;
                 }
-                MessageName::GetPeers => {
-                    self.route(Response::GetPeers(channel.remote_address)).await;
+                Payload::GetPeers => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::GetPeers,
+                    ))
+                    .await;
                 }
-                MessageName::GetSync => {
-                    let message = Self::parse(&bytes)?;
-                    self.route(Response::GetSync(channel.remote_address, message)).await;
+                Payload::GetSync(hashes) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::GetSync(hashes),
+                    ))
+                    .await;
                 }
-                MessageName::MemoryPool => {
-                    let message = Self::parse(&bytes)?;
-                    self.route(Response::MemoryPool(message)).await;
+                Payload::MemoryPool(txs) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::MemoryPool(txs),
+                    ))
+                    .await;
                 }
-                MessageName::Peers => {
-                    let message = Self::parse::<Peers>(&bytes)?;
-                    self.route(Response::Peers(channel.remote_address, message)).await;
+                Payload::Peers(peers) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::Peers(peers),
+                    ))
+                    .await;
                 }
-                MessageName::Sync => {
-                    let message = Self::parse(&bytes)?;
-                    self.route(Response::Sync(channel.remote_address, message)).await;
+                Payload::Sync(hashes) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::Sync(hashes),
+                    ))
+                    .await;
                 }
-                MessageName::SyncBlock => {
-                    let message = Self::parse(&bytes)?;
-                    self.route(Response::Block(channel.remote_address, message, false))
-                        .await;
+                Payload::SyncBlock(block) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::SyncBlock(block),
+                    ))
+                    .await;
                 }
-                MessageName::Transaction => {
-                    let message = Self::parse(&bytes)?;
-                    self.route(Response::Transaction(channel.remote_address, message)).await;
+                Payload::Transaction(tx) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::Transaction(tx),
+                    ))
+                    .await;
                 }
-                MessageName::Verack => {
-                    let message = Self::parse::<Verack>(&bytes)?;
-                    self.route(Response::Verack(channel.remote_address, message)).await;
+                Payload::Verack(verack) => {
+                    self.route(Message::new(
+                        Direction::Inbound(channel.remote_address),
+                        Payload::Verack(verack),
+                    ))
+                    .await;
                 }
-                MessageName::Version => {
-                    let message = Self::parse::<Version>(&bytes)?;
-                    if let Err(err) = self.receive_version(message, channel.clone()).await {
+                Payload::Version(version) => {
+                    if let Err(err) = self.receive_version(version, channel.clone()).await {
                         error!("Failed to route response for a message\n{}", err);
                     }
                 }
+                _ => {}
             }
         }
     }
@@ -232,18 +268,7 @@ impl Inbound {
     }
 
     #[inline]
-    fn parse<M: Message>(buffer: &[u8]) -> Result<M, NetworkError> {
-        match M::deserialize(buffer) {
-            Ok(message) => Ok(message),
-            Err(error) => {
-                error!("Failed to deserialize a message or {}B: {}", buffer.len(), error);
-                Err(NetworkError::InboundDeserializationFailed)
-            }
-        }
-    }
-
-    #[inline]
-    pub(crate) async fn route(&self, response: Response) {
+    pub(crate) async fn route(&self, response: Message) {
         if let Err(err) = self.sender.send(response).await {
             error!("Failed to route a response for a message: {}", err);
         }
@@ -260,11 +285,12 @@ impl Inbound {
     /// This method may seem redundant to handshake protocol functions but a peer can send additional
     /// Version messages if they want to update their ip address/port or want to share their chain height.
     async fn receive_version(&self, version: Version, channel: Channel) -> Result<(), NetworkError> {
-        let remote_address = SocketAddr::new(channel.remote_address.ip(), version.sender.port());
-
         // Route version message to peer manager.
-        self.route(Response::VersionToVerack(remote_address, version.clone()))
-            .await;
+        self.route(Message::new(
+            Direction::Inbound(channel.remote_address),
+            Payload::Version(version.clone()),
+        ))
+        .await;
 
         // TODO (howardwu): Implement this.
         {
@@ -327,8 +353,8 @@ impl Inbound {
 
         // Read the next message from the channel.
         // Note: this is a blocking operation.
-        let (message_name, message_bytes) = match channel.read().await {
-            Ok(inbound_message) => inbound_message,
+        let message = match channel.read().await {
+            Ok(message) => message,
             Err(e) => {
                 error!("An error occurred while handshaking with {}: {}", remote_address, e);
                 return Err(NetworkError::InvalidHandshake);
@@ -336,10 +362,7 @@ impl Inbound {
         };
 
         // Create and store a new handshake in the manager.
-        if message_name == Version::name() {
-            // Deserialize the message bytes into a version message.
-            let remote_version = Version::deserialize(&message_bytes).map_err(|_| NetworkError::InvalidHandshake)?;
-
+        if let Payload::Version(remote_version) = message.payload {
             // This is the node's address as seen by the peer.
             let local_address = remote_version.receiver;
 
@@ -356,7 +379,10 @@ impl Inbound {
 
             // notify the server that the peer is being connected to
             self.sender
-                .send(Response::ConnectingTo(remote_address, local_version.nonce))
+                .send(Message::new(
+                    Direction::Internal,
+                    Payload::ConnectingTo(remote_address, local_version.nonce),
+                ))
                 .await?;
 
             // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
@@ -387,23 +413,30 @@ impl Inbound {
 
             // Write a verack response to the remote peer.
             channel
-                .write(&Verack::new(remote_version.nonce, local_address, remote_address))
+                .write(&Payload::Verack(Verack::new(
+                    remote_version.nonce,
+                    local_address,
+                    remote_address,
+                )))
                 .await?;
 
             // Write a version request to the remote peer.
-            channel.write(&local_version).await?;
+            channel.write(&Payload::Version(local_version.clone())).await?;
 
             // Parse the inbound message into the message name and message bytes.
-            let (_, message_bytes) = channel.read().await?;
+            let message = channel.read().await?;
 
             // Deserialize the message bytes into a verack message.
-            let _verack = Verack::deserialize(&message_bytes).map_err(|_| {
+            if !matches!(message.payload, Payload::Verack(..)) {
                 error!("{} didn't respond with a Verack during the handshake", remote_address);
-                NetworkError::InvalidHandshake
-            })?;
+                return Err(NetworkError::InvalidHandshake);
+            }
 
             self.sender
-                .send(Response::ConnectedTo(remote_address, local_version.nonce))
+                .send(Message::new(
+                    Direction::Internal,
+                    Payload::ConnectedTo(remote_address, local_version.nonce),
+                ))
                 .await?;
 
             Ok(channel)

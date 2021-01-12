@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::{connect::ConnectError, send::SendError};
+use crate::{
+    errors::{connect::ConnectError, send::SendError},
+    external::Message,
+};
 use snarkos_consensus::error::ConsensusError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::objects::BlockError;
@@ -50,7 +53,7 @@ pub enum NetworkError {
     PeerWasNotSetToConnecting,
     SelfConnectAttempt,
     SendError(SendError),
-    SenderError(tokio::sync::mpsc::error::SendError<crate::inbound::Response>),
+    SenderError(tokio::sync::mpsc::error::SendError<Message>),
     OutboundChannelMissing,
     OutboundPendingRequestsMissing,
     ReceiverFailedToParse,
@@ -120,8 +123,8 @@ impl From<tokio::sync::TryLockError> for NetworkError {
     }
 }
 
-impl From<tokio::sync::mpsc::error::SendError<crate::inbound::Response>> for NetworkError {
-    fn from(error: tokio::sync::mpsc::error::SendError<crate::inbound::Response>) -> Self {
+impl From<tokio::sync::mpsc::error::SendError<Message>> for NetworkError {
+    fn from(error: tokio::sync::mpsc::error::SendError<Message>) -> Self {
         NetworkError::SenderError(error)
     }
 }

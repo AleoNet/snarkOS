@@ -15,19 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{
-        message_types::{Peers as PeersMessage, *},
-        Channel,
-        Message,
-        Verack,
-    },
-    outbound::Request,
+    external::{message::*, Channel, Peer, Verack, Version},
     peers::{PeerBook, PeerInfo},
     Environment,
     Inbound,
     NetworkError,
     Outbound,
-    Response,
 };
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -127,7 +120,9 @@ impl Peers {
                 if let Some(peer_info) = connected.pop() {
                     let addr = *peer_info.address();
                     debug!("Disconnecting from {}", addr);
-                    self.inbound.route(Response::DisconnectFrom(addr)).await;
+                    self.inbound
+                        .route(Message::new(Direction::Internal, Payload::Disconnect(addr)))
+                        .await;
                 }
             }
         }
@@ -253,9 +248,9 @@ impl Peers {
         self.connecting_to_peer(remote_address, version.nonce)?;
 
         // Send a connection request with the outbound handler.
-        channel.write(&version).await?;
+        channel.write(&Payload::Version(version.clone())).await?;
 
-        let (message_name, _) = match channel.read().await {
+        let message = match channel.read().await {
             Ok(inbound_message) => inbound_message,
             Err(e) => {
                 error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -263,8 +258,8 @@ impl Peers {
             }
         };
 
-        if message_name == Verack::name() {
-            let (message_name, _) = match channel.read().await {
+        if let Payload::Verack(_) = message.payload {
+            let message = match channel.read().await {
                 Ok(inbound_message) => inbound_message,
                 Err(e) => {
                     error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -272,9 +267,9 @@ impl Peers {
                 }
             };
 
-            if message_name == Version::name() {
+            if let Payload::Version(_) = message.payload {
                 let verack = Verack::new(version.nonce, own_address, remote_address);
-                channel.write(&verack).await?;
+                channel.write(&Payload::Verack(verack)).await?;
 
                 // spawn the inbound loop
                 let inbound = self.inbound.clone();
@@ -355,13 +350,10 @@ impl Peers {
 
                 // TODO (raychu86): Establish a formal node version.
                 // Broadcast a `Version` message to the connected peer.
-                self.outbound.send_request(Request::Version(Version::new(
-                    1u64,
-                    block_height,
-                    nonce,
-                    local_address,
-                    remote_address,
-                )));
+                self.outbound.send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::Version(Version::new(1u64, block_height, nonce, local_address, remote_address)),
+                ));
             } else {
                 // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
 
@@ -380,7 +372,8 @@ impl Peers {
         trace!("Sending GetPeers requests to connected peers");
 
         for (remote_address, _) in self.connected_peers() {
-            self.outbound.send_request(Request::GetPeers(remote_address, GetPeers));
+            self.outbound
+                .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers));
 
             // // Fetch the connection channel.
             // if let Some(channel) = self.get_channel(&remote_address) {
@@ -451,21 +444,20 @@ impl Peers {
     }
 
     #[inline]
-    pub(crate) fn version_to_verack(
-        &self,
-        remote_address: SocketAddr,
-        remote_version: &Version,
-    ) -> Result<(), NetworkError> {
+    pub(crate) fn version_to_verack(&self, remote_version: &Version) -> Result<(), NetworkError> {
         // FIXME(ljedrz): it appears that Verack is not sent back in a 1:1 fashion
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
-            self.outbound.send_request(Request::Verack(Verack::new(
-                remote_version.nonce,
-                remote_version.receiver, /* local_address */
-                remote_address,
-            )));
+            self.outbound.send_request(Message::new(
+                Direction::Outbound(remote_version.sender),
+                Payload::Verack(Verack::new(
+                    remote_version.nonce,
+                    remote_version.receiver, /* local_address */
+                    remote_version.sender,
+                )),
+            ));
 
-            if !self.connected_peers().contains_key(&remote_address) {
-                self.connecting_to_peer(remote_address, remote_version.nonce)?;
+            if !self.connected_peers().contains_key(&remote_version.sender) {
+                self.connecting_to_peer(remote_version.sender, remote_version.nonce)?;
             }
         }
 
@@ -473,7 +465,7 @@ impl Peers {
     }
 
     #[inline]
-    pub(crate) fn verack(&self, _remote_address: &SocketAddr, _remote_verack: &Verack) {}
+    pub(crate) fn verack(&self, _remote_verack: &Verack) {}
 
     #[inline]
     pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) {
@@ -489,14 +481,14 @@ impl Peers {
             peers.push((peer_address, *peer_info.last_seen()));
         }
         self.outbound
-            .send_request(Request::Peers(remote_address, PeersMessage::new(peers)));
+            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)));
     }
 
     /// A miner has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
     #[inline]
-    pub(crate) fn process_inbound_peers(&self, peers: PeersMessage) -> Result<(), NetworkError> {
+    pub(crate) fn process_inbound_peers(&self, peers: Vec<Peer>) -> Result<(), NetworkError> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
@@ -509,7 +501,6 @@ impl Peers {
             .saturating_sub(number_of_connected_peers);
 
         for peer_address in peers
-            .addresses
             .iter()
             .take(number_to_connect as usize)
             .map(|(addr, _)| addr)
