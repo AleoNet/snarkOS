@@ -18,7 +18,6 @@ use snarkos_network::{external::Block, Environment, Server};
 use snarkos_testing::{
     consensus::{BLOCK_1, BLOCK_2, FIXTURE_VK, TEST_CONSENSUS},
     dpc::load_verifying_parameters,
-    network::blocks::TestBlocks,
 };
 use snarkvm_objects::block::Block as BlockStruct;
 
@@ -125,12 +124,4 @@ async fn simple_block_sync() {
             .read()
             .block_hash_exists(&block_struct_2.header.get_hash())
     );
-}
-
-#[tokio::test]
-async fn more_blocks() {
-    let blocks = TestBlocks::load();
-
-    assert_eq!(blocks.inner().len(), 10);
-    dbg!(blocks.inner());
 }
