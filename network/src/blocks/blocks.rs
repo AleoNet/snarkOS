@@ -33,9 +33,9 @@ impl Blocks {
     /// Creates a new instance of `Blocks`.
     ///
     #[inline]
-    pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
+    pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Self {
         trace!("Instantiating the block service");
-        Ok(Self { environment, outbound })
+        Self { environment, outbound }
     }
 
     ///

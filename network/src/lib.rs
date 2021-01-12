@@ -91,7 +91,7 @@ impl Server {
 
         // Initialize the peer and block services.
         let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
-        let blocks = Blocks::new(environment.clone(), outbound.clone())?;
+        let blocks = Blocks::new(environment.clone(), outbound.clone());
         let transactions = Transactions::new(environment.clone(), outbound.clone());
 
         Ok(Self {
