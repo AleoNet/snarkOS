@@ -17,6 +17,9 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 
+#[macro_use]
+extern crate tracing;
+
 pub mod consensus;
 pub mod dpc;
 pub mod network;

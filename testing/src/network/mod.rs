@@ -17,6 +17,9 @@
 pub mod tcp;
 pub use tcp::*;
 
+pub mod blocks;
+pub use blocks::*;
+
 use crate::consensus::*;
 use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
 use snarkos_network::{environment::Environment, external::Channel, Server};

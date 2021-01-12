@@ -3147,6 +3147,8 @@ dependencies = [
  "tokio 0.3.6",
  "tokio-test",
  "tracing",
+ "tracing-futures",
+ "tracing-subscriber",
 ]
 
 [[package]]

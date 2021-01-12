@@ -32,7 +32,9 @@ parking_lot = { version = "0.11.1" }
 rand = { version = "0.7.0" }
 rand_xorshift = { version = "0.2.0" }
 tokio = { version = "0.3", features = ["full"] }
-tracing = { version = "0.1" }
+tracing = { default-features = false, features = ["log"], version = "0.1" }
+tracing-futures = { version = "0.2" }
+tracing-subscriber = { version = "0.2" }
 
 [dev-dependencies]
 tokio-test = { version = "0.2.0" }
