@@ -55,7 +55,7 @@ impl FromBytes for TestBlocks {
         let mut blocks = vec![];
 
         // Hardcoded for now as the trait doesn't allow for an N.
-        for i in 0..10 {
+        for _i in 0..10 {
             let block: Block<Tx> = FromBytes::read(&mut reader)?;
             blocks.push(block);
         }

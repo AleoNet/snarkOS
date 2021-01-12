@@ -23,7 +23,6 @@ use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::
 use snarkvm_models::dpc::{DPCScheme, Program, Record};
 use snarkvm_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkvm_utilities::bytes::ToBytes;
-use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
 use rand::Rng;

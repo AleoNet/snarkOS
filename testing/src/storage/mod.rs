@@ -24,7 +24,7 @@ use snarkvm_models::{
 use snarkvm_objects::Block;
 
 use rand::{thread_rng, Rng};
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 pub type Store = Ledger<TestTx, CommitmentMerkleParameters>;
 
