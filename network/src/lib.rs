@@ -50,6 +50,9 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
+pub mod transactions;
+pub use transactions::*;
+
 use crate::{
     external::{message::*, Channel},
     peers::peers::Peers,
@@ -75,6 +78,7 @@ pub struct Server {
 
     pub peers: Peers,
     pub blocks: Blocks,
+    pub transactions: Transactions,
 }
 
 impl Server {
@@ -88,6 +92,7 @@ impl Server {
         // Initialize the peer and block services.
         let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
         let blocks = Blocks::new(environment.clone(), outbound.clone())?;
+        let transactions = Transactions::new(environment.clone(), outbound.clone());
 
         Ok(Self {
             environment,
@@ -95,6 +100,7 @@ impl Server {
             outbound,
             peers,
             blocks,
+            transactions,
         })
     }
 
@@ -127,6 +133,10 @@ impl Server {
                 if let Err(e) = blocks.update(sync_node).await {
                     error!("Block update error: {}", e);
                 }
+
+                //  if let Err(e) = transactions.update(sync_node).await {
+                //      error!("Transaction update error: {}", e);
+                //  }
             }
         });
 
@@ -187,7 +197,7 @@ impl Server {
             }
             Payload::Transaction(transaction) => {
                 let connected_peers = self.peers.connected_peers();
-                self.blocks
+                self.transactions
                     .received_transaction(source.unwrap(), transaction, connected_peers)
                     .await?;
             }
@@ -203,10 +213,10 @@ impl Server {
                 self.blocks.received_get_block(source.unwrap(), hash).await?;
             }
             Payload::GetMemoryPool => {
-                self.blocks.received_get_memory_pool(source.unwrap()).await?;
+                self.transactions.received_get_memory_pool(source.unwrap()).await?;
             }
             Payload::MemoryPool(mempool) => {
-                self.blocks.received_memory_pool(mempool)?;
+                self.transactions.received_memory_pool(mempool)?;
             }
             Payload::GetSync(getsync) => {
                 self.blocks.received_get_sync(source.unwrap(), getsync).await?;

@@ -15,13 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{external::message::*, peers::PeerInfo, Environment, NetworkError, Outbound};
-use snarkos_consensus::memory_pool::Entry;
-use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_objects::{Block, BlockHeaderHash};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -99,71 +93,6 @@ impl Blocks {
         Ok(())
     }
 
-    /// Broadcast transaction to connected peers
-    pub(crate) async fn propagate_transaction(
-        &self,
-        transaction_bytes: Vec<u8>,
-        transaction_sender: SocketAddr,
-        connected_peers: &HashMap<SocketAddr, PeerInfo>,
-    ) -> Result<(), NetworkError> {
-        debug!("Propagating a transaction to peers");
-
-        let local_address = self.local_address();
-
-        for remote_address in connected_peers.keys() {
-            if *remote_address != transaction_sender && *remote_address != local_address {
-                // Send a `Transaction` message to the connected peer.
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(*remote_address),
-                    Payload::Transaction(transaction_bytes.clone()),
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Verify a transaction, add it to the memory pool, propagate it to peers.
-    pub(crate) async fn received_transaction(
-        &self,
-        source: SocketAddr,
-        transaction: Vec<u8>,
-        connected_peers: HashMap<SocketAddr, PeerInfo>,
-    ) -> Result<(), NetworkError> {
-        if let Ok(tx) = Tx::read(&*transaction) {
-            let parameters = self.environment.dpc_parameters();
-            let storage = self.environment.storage();
-            let consensus = self.environment.consensus_parameters();
-
-            if !consensus.verify_transaction(parameters, &tx, &*storage.read())? {
-                error!("Received a transaction that was invalid");
-                return Ok(());
-            }
-
-            if tx.value_balance.is_negative() {
-                error!("Received a transaction that was a coinbase transaction");
-                return Ok(());
-            }
-
-            let entry = Entry::<Tx> {
-                size_in_bytes: transaction.len(),
-                transaction: tx,
-            };
-
-            let insertion = self.environment.memory_pool().lock().insert(&storage.read(), entry);
-
-            if let Ok(inserted) = insertion {
-                if inserted.is_some() {
-                    info!("Transaction added to memory pool.");
-                    self.propagate_transaction(transaction, source, &connected_peers)
-                        .await?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// A peer has sent us a new block to process.
     #[inline]
     pub(crate) async fn received_block(
@@ -234,55 +163,6 @@ impl Blocks {
                 Payload::SyncBlock(block.serialize()?),
             ));
         }
-        Ok(())
-    }
-
-    /// A peer has requested our memory pool transactions.
-    pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        // TODO (howardwu): This should have been written with Rayon - it is easily parallelizable.
-        let transactions = {
-            let mut txs = vec![];
-
-            let memory_pool = self.environment.memory_pool().lock();
-            for entry in memory_pool.transactions.values() {
-                if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
-                    txs.push(transaction_bytes);
-                }
-            }
-
-            txs
-        };
-
-        if !transactions.is_empty() {
-            // Send a `MemoryPool` message to the connected peer.
-            self.outbound.send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::MemoryPool(transactions),
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// A peer has sent us their memory pool transactions.
-    pub(crate) fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
-        let mut memory_pool = self.environment.memory_pool().lock();
-
-        for transaction_bytes in transactions {
-            let transaction: Tx = Tx::read(&transaction_bytes[..])?;
-            let entry = Entry::<Tx> {
-                size_in_bytes: transaction_bytes.len(),
-                transaction,
-            };
-
-            if let Ok(Some(txid)) = memory_pool.insert(&*self.environment.storage().read(), entry) {
-                debug!(
-                    "Transaction added to memory pool with txid: {:?}",
-                    hex::encode(txid.clone())
-                );
-            }
-        }
-
         Ok(())
     }
 
