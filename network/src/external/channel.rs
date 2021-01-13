@@ -68,9 +68,11 @@ impl Channel {
             len: serialized_payload.len() as u32,
         };
 
-        let mut writer = self.writer.lock().await;
-        writer.write_all(&header.as_bytes()[..]).await?;
-        writer.write_all(&serialized_payload).await?;
+        {
+            let mut writer = self.writer.lock().await;
+            writer.write_all(&header.as_bytes()[..]).await?;
+            writer.write_all(&serialized_payload).await?;
+        }
 
         debug!("Sent a {} to {}", payload, self.remote_address);
 
