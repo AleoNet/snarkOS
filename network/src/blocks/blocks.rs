@@ -32,7 +32,6 @@ impl Blocks {
     ///
     /// Creates a new instance of `Blocks`.
     ///
-    #[inline]
     pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Self {
         trace!("Instantiating the block service");
         Self { environment, outbound }
@@ -41,7 +40,6 @@ impl Blocks {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    #[inline]
     pub async fn update(&self, sync_node: Option<SocketAddr>) -> Result<(), NetworkError> {
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {
@@ -94,7 +92,6 @@ impl Blocks {
     }
 
     /// A peer has sent us a new block to process.
-    #[inline]
     pub(crate) async fn received_block(
         &self,
         remote_address: SocketAddr,

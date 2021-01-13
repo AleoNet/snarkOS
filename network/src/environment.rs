@@ -66,7 +66,6 @@ pub struct Environment {
 
 impl Environment {
     /// Creates a new instance of `Environment`.
-    #[inline]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         storage: Arc<RwLock<MerkleTreeLedger>>,
