@@ -16,7 +16,6 @@
 
 use crate::{errors::ConnectError, external::message::*};
 
-use bincode;
 use tokio::{
     io::AsyncWriteExt,
     net::{
