@@ -20,8 +20,7 @@ use crate::{
 };
 
 use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
+    collections::HashMap,
     net::SocketAddr,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -34,31 +33,11 @@ use parking_lot::RwLock;
 /// The map of remote addresses to their active write channels.
 type Channels = HashMap<SocketAddr, Channel>;
 
-/// The set of requests for a single remote address.
-type Requests = HashSet<Message>;
-
-/// The map of remote addresses to their pending requests.
-type Pending = HashMap<SocketAddr, Requests>;
-
-/// The map of remote addresses to their successful requests.
-type Success = HashMap<SocketAddr, Requests>;
-
-/// The map of remote addresses to their failed requests.
-type Failure = HashMap<SocketAddr, Requests>;
-
 /// A core data structure for handling outbound network traffic.
 #[derive(Debug, Clone)]
 pub struct Outbound {
     /// The map of remote addresses to their active write channels.
     pub(crate) channels: Arc<RwLock<Channels>>,
-    /// The map of remote addresses to their pending requests.
-    pending: Arc<RwLock<Pending>>,
-    /// The map of remote addresses to their successful requests.
-    success: Arc<RwLock<Success>>,
-    /// The map of remote addresses to their failed requests.
-    failure: Arc<RwLock<Failure>>,
-    /// The monotonic counter for the number of send requests the handler processes.
-    send_pending_count: Arc<AtomicU64>,
     /// The monotonic counter for the number of send requests that succeeded.
     send_success_count: Arc<AtomicU64>,
     /// The monotonic counter for the number of send requests that failed.
@@ -69,54 +48,8 @@ impl Outbound {
     pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
         Self {
             channels,
-            pending: Default::default(),
-            success: Default::default(),
-            failure: Default::default(),
-            send_pending_count: Default::default(),
             send_success_count: Default::default(),
             send_failure_count: Default::default(),
-        }
-    }
-
-    ///
-    /// Returns `true` if the given request is a pending request.
-    ///
-    #[inline]
-    pub fn is_pending(&self, request: &Message) -> bool {
-        // Fetch the pending requests of the given receiver.
-        match self.pending.read().get(&request.receiver()) {
-            // Check if the set of pending requests contains the given request.
-            Some(requests) => requests.contains(&request),
-            // Return `false` as the receiver does not exist in this map.
-            None => false,
-        }
-    }
-
-    ///
-    /// Returns `true` if the given request was a successful request.
-    ///
-    #[inline]
-    pub fn is_success(&self, request: &Message) -> bool {
-        // Fetch the successful requests of the given receiver.
-        match self.success.read().get(&request.receiver()) {
-            // Check if the set of successful requests contains the given request.
-            Some(requests) => requests.contains(&request),
-            // Return `false` as the receiver does not exist in this map.
-            None => false,
-        }
-    }
-
-    ///
-    /// Returns `true` if the given request was a failed request.
-    ///
-    #[inline]
-    pub fn is_failure(&self, request: &Message) -> bool {
-        // Fetch the failed requests of the given receiver.
-        match self.failure.read().get(&request.receiver()) {
-            // Check if the set of failed requests contains the given request.
-            Some(requests) => requests.contains(&request),
-            // Return `false` as the receiver does not exist in this map.
-            None => false,
         }
     }
 
@@ -134,23 +67,9 @@ impl Outbound {
         // it's the failures with `Outbound::send` that are important, and the're
         // handled within that method
         tokio::spawn(async move {
-            // Wait for authorization.
-            outbound.authorize(&request);
             // Send the request.
             outbound.send(&request).await;
         });
-    }
-
-    ///
-    /// Adds a new requests map for the given remote address to each state map,
-    /// if it does not exist.
-    ///
-    #[inline]
-    pub fn initialize_state(&self, remote_address: SocketAddr) {
-        debug!("Initializing Outbound state for {}", remote_address);
-        self.pending.write().insert(remote_address, Default::default());
-        self.success.write().insert(remote_address, Default::default());
-        self.failure.write().insert(remote_address, Default::default());
     }
 
     ///
@@ -166,192 +85,26 @@ impl Outbound {
             .clone())
     }
 
-    ///
-    /// Authorizes the given request to be sent to the corresponding outbound channel.
-    ///
-    #[inline]
-    fn authorize(&self, request: &Message) {
-        // Store the request to the pending requests.
-        match self.pending.write().get_mut(&request.receiver()) {
-            Some(requests) => {
-                requests.insert(request.clone());
-
-                // Increment the request counter.
-                self.send_pending_count.fetch_add(1, Ordering::SeqCst);
-            }
-            None => warn!("Failed to authorize a {}", request),
-        };
-    }
-
     #[inline]
     async fn send(&self, request: &Message) {
         // Fetch the outbound channel.
         let channel = match self.outbound_channel(request.receiver()) {
             Ok(channel) => channel,
             Err(error) => {
-                self.failure(&request, error);
+                warn!("Failed to send a {}: {}", request, error);
                 return;
             }
         };
 
         // Write the request to the outbound channel.
         match channel.write(&request.payload).await {
-            Ok(_) => self.success(&request),
-            Err(error) => self.failure(&request, error),
-        };
-    }
-
-    #[inline]
-    fn success(&self, request: &Message) {
-        // Remove the request from the pending requests.
-        if let Some(requests) = self.pending.write().get_mut(&request.receiver()) {
-            requests.remove(&request);
-        };
-
-        // Store the request in the successful requests.
-        if let Some(requests) = self.success.write().get_mut(&request.receiver()) {
-            requests.insert(request.clone());
-
-            // Increment the success counter.
-            self.send_success_count.fetch_add(1, Ordering::SeqCst);
+            Ok(_) => {
+                self.send_success_count.fetch_add(1, Ordering::SeqCst);
+            }
+            Err(error) => {
+                warn!("Failed to send a {}: {}", request, error);
+                self.send_failure_count.fetch_add(1, Ordering::SeqCst);
+            }
         }
-    }
-
-    #[inline]
-    fn failure<E: Into<anyhow::Error> + Display>(&self, request: &Message, error: E) {
-        warn!("Failed to send a {}: {}", request, error);
-
-        // Remove the request from the pending requests.
-        if let Some(requests) = self.pending.write().get_mut(&request.receiver()) {
-            requests.remove(&request);
-        };
-
-        // Store the request in the failed requests.
-        if let Some(requests) = self.failure.write().get_mut(&request.receiver()) {
-            requests.insert(request.clone());
-
-            // Increment the failure counter.
-            self.send_failure_count.fetch_add(1, Ordering::SeqCst);
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{external::message::*, outbound::*, Channel};
-    use snarkos_testing::network::TcpServer;
-
-    use std::{net::SocketAddr, time::Duration};
-    use tokio::{net::TcpStream, time::sleep};
-
-    ///
-    /// Returns a `Message` for testing.
-    ///
-    #[inline]
-    fn request(remote_address: SocketAddr) -> Message {
-        Message::new(Direction::Outbound(remote_address), Payload::GetPeers)
-    }
-
-    ///
-    /// Creates a new `TcpServer` and rejects requests if the given reject boolean is set to `true`.
-    ///
-    #[inline]
-    async fn test_server_with_behavior(should_reject: bool) -> anyhow::Result<TcpServer> {
-        let mut server = TcpServer::new().await;
-        server.listen(should_reject).await.unwrap();
-
-        Ok(server)
-    }
-
-    ///
-    /// Creates a new `TcpServer`.
-    ///
-    #[inline]
-    pub async fn test_server() -> anyhow::Result<TcpServer> {
-        test_server_with_behavior(false).await
-    }
-
-    ///
-    /// Creates a new `TcpServer` that rejects all requests.
-    ///
-    #[inline]
-    pub async fn test_server_that_rejects() -> anyhow::Result<TcpServer> {
-        test_server_with_behavior(true).await
-    }
-
-    #[tokio::test]
-    async fn test_is_pending() {
-        let remote_address = "127.0.0.1:7777".parse::<SocketAddr>().unwrap();
-        let request = request(remote_address);
-
-        // Create a new instance.
-        let outbound = Outbound::new(Default::default());
-        outbound.initialize_state(remote_address);
-
-        assert!(!outbound.is_pending(&request));
-        assert!(!outbound.is_success(&request));
-        assert!(!outbound.is_failure(&request));
-
-        // Authorize the request only.
-        outbound.authorize(&request);
-
-        // Check that the request is only pending.
-        assert!(outbound.is_pending(&request));
-        assert!(!outbound.is_success(&request));
-        assert!(!outbound.is_failure(&request));
-    }
-
-    #[tokio::test]
-    async fn test_is_success() {
-        // Create a test server.
-        let server = test_server().await.unwrap();
-        let stream = TcpStream::connect(server.address).await.unwrap();
-        let remote_address = stream.peer_addr().unwrap();
-        let request = request(remote_address);
-
-        // Create a new instance.
-        let outbound = Outbound::new(Default::default());
-        let (channel, _reader) = Channel::new(remote_address, stream);
-        outbound.channels.write().insert(remote_address, channel);
-        outbound.initialize_state(remote_address);
-
-        assert!(!outbound.is_pending(&request));
-        assert!(!outbound.is_success(&request));
-        assert!(!outbound.is_failure(&request));
-
-        // Send the request to the server.
-        outbound.send_request(request.clone());
-        sleep(Duration::from_millis(10)).await;
-
-        // Check that the request succeeded.
-        assert!(!outbound.is_pending(&request));
-        assert!(outbound.is_success(&request));
-        assert!(!outbound.is_failure(&request));
-    }
-
-    #[tokio::test]
-    async fn test_is_failure() {
-        // Create a test server that refuses connections.
-        let server = test_server_that_rejects().await.unwrap();
-        let remote_address = server.address;
-
-        let request = request(remote_address);
-
-        // Create a new instance.
-        let outbound = Outbound::new(Default::default());
-        outbound.initialize_state(remote_address);
-
-        assert!(!outbound.is_pending(&request));
-        assert!(!outbound.is_success(&request));
-        assert!(!outbound.is_failure(&request));
-
-        // Send the request to the server.
-        outbound.send_request(request.clone());
-        sleep(Duration::from_millis(10)).await;
-
-        // Check that the request succeeded.
-        assert!(!outbound.is_pending(&request));
-        assert!(!outbound.is_success(&request));
-        assert!(outbound.is_failure(&request));
     }
 }

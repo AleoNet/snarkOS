@@ -417,9 +417,6 @@ impl Peers {
     ///
     #[inline]
     pub(crate) fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        // Initialize the peer's outbound state
-        self.outbound.initialize_state(remote_address);
-
         // Set the peer as connecting with this node server.
         self.peer_book.write().set_connecting(&remote_address, nonce)
     }
