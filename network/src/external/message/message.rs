@@ -95,9 +95,13 @@ pub enum Payload {
     Version(Version),
 
     /* internal messages */
+    #[doc(hide)]
     ConnectedTo(SocketAddr, u64),
+    #[doc(hide)]
     ConnectingTo(SocketAddr, u64),
-    // TODO: add a doc; can be used internally, but also to allow a clean disconnect for connected peers on shutdown
+    // TODO: used internally, but can also be used to allow a clean disconnect for connected peers on shutdown
+    // add a doc if this is introduced
+    #[doc(hide)]
     Disconnect(SocketAddr),
 }
 
