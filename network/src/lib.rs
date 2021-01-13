@@ -141,9 +141,10 @@ impl Server {
         });
 
         let server = self.clone();
+        let mut receiver = self.inbound.take_receiver();
         task::spawn(async move {
             loop {
-                if let Err(e) = server.receive_response().await {
+                if let Err(e) = server.receive_response(&mut receiver).await {
                     error!("Server error: {}", e);
                 }
             }
@@ -166,15 +167,8 @@ impl Server {
         self.environment.local_address()
     }
 
-    async fn receive_response(&self) -> Result<(), NetworkError> {
-        let Message { direction, payload } = self
-            .inbound
-            .receiver()
-            .lock()
-            .await
-            .recv()
-            .await
-            .ok_or(NetworkError::ReceiverFailedToParse)?;
+    async fn receive_response(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
+        let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         let source = if let Direction::Inbound(addr) = direction {
             Some(addr)

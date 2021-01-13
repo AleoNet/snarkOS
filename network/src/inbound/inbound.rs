@@ -29,10 +29,9 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
 };
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::Mutex as AsyncMutex,
     task,
 };
 
@@ -45,7 +44,7 @@ pub struct Inbound {
     /// The producer for sending inbound messages to the server.
     sender: Sender,
     /// The consumer for receiving inbound messages to the server.
-    receiver: Arc<AsyncMutex<Receiver>>,
+    receiver: Arc<Mutex<Option<Receiver>>>,
     /// The map of remote addresses to their active read channels.
     channels: Arc<RwLock<Channels>>,
     /// A counter for the number of received responses the handler processes.
@@ -63,7 +62,7 @@ impl Inbound {
 
         Self {
             sender,
-            receiver: Arc::new(AsyncMutex::new(receiver)),
+            receiver: Arc::new(Mutex::new(Some(receiver))),
             channels,
             receive_response_count: Default::default(),
             receive_success_count: Default::default(),
@@ -275,8 +274,11 @@ impl Inbound {
     }
 
     #[inline]
-    pub(crate) fn receiver(&self) -> &AsyncMutex<Receiver> {
-        &self.receiver
+    pub(crate) fn take_receiver(&self) -> Receiver {
+        self.receiver
+            .lock()
+            .take()
+            .expect("The Inbound Receiver had already been taken!")
     }
 
     /// A connected peer has sent handshake request.
