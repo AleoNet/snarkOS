@@ -184,10 +184,14 @@ impl Server {
 
         match payload {
             Payload::ConnectingTo(remote_address, nonce) => {
-                self.peers.connecting_to_peer(remote_address, nonce)?;
+                if direction == Direction::Internal {
+                    self.peers.connecting_to_peer(remote_address, nonce)?;
+                }
             }
             Payload::ConnectedTo(remote_address, nonce) => {
-                self.peers.connected_to_peer(remote_address, nonce)?;
+                if direction == Direction::Internal {
+                    self.peers.connected_to_peer(remote_address, nonce)?;
+                }
             }
             Payload::Version(version) => {
                 self.peers.version_to_verack(&version)?;
@@ -225,7 +229,9 @@ impl Server {
                 self.blocks.received_sync(source.unwrap(), sync).await?;
             }
             Payload::Disconnect(addr) => {
-                self.peers.disconnected_from_peer(&addr)?;
+                if direction == Direction::Internal {
+                    self.peers.disconnected_from_peer(&addr)?;
+                }
             }
             Payload::GetPeers => {
                 self.peers.send_get_peers(source.unwrap());
