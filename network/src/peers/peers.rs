@@ -45,7 +45,6 @@ impl Peers {
     ///
     /// Creates a new instance of `Peers`.
     ///
-    #[inline]
     pub fn new(environment: Environment, inbound: Arc<Inbound>, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
         trace!("Instantiating the peer manager");
 
@@ -76,7 +75,6 @@ impl Peers {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    #[inline]
     pub async fn update(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
         let number_of_connected_peers = self.number_of_connected_peers();
@@ -299,7 +297,6 @@ impl Peers {
     ///
     /// This function filters out any bootnode peers the node server is already connected to.
     ///
-    #[inline]
     async fn connect_to_bootnodes(&self) -> Result<(), NetworkError> {
         trace!("Connecting to default bootnodes");
 
@@ -320,7 +317,6 @@ impl Peers {
     }
 
     /// Broadcasts a connection request to all disconnected peers.
-    #[inline]
     async fn connect_to_disconnected_peers(&self) -> Result<(), NetworkError> {
         trace!("Connecting to disconnected peers");
 
@@ -333,7 +329,6 @@ impl Peers {
     }
 
     /// Broadcasts a `Version` message to all connected peers.
-    #[inline]
     fn broadcast_version_requests(&self) -> Result<(), NetworkError> {
         // Get the local address of this node.
         let local_address = self.local_address().unwrap(); // must be known by now
@@ -366,7 +361,6 @@ impl Peers {
     }
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
-    #[inline]
     fn broadcast_getpeers_requests(&self) {
         trace!("Sending GetPeers requests to connected peers");
 
@@ -439,7 +433,6 @@ impl Peers {
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
-    #[inline]
     pub(crate) fn version_to_verack(&self, remote_version: &Version) -> Result<(), NetworkError> {
         // FIXME(ljedrz): it appears that Verack is not sent back in a 1:1 fashion
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
@@ -463,7 +456,6 @@ impl Peers {
     #[inline]
     pub(crate) fn verack(&self, _remote_verack: &Verack) {}
 
-    #[inline]
     pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
@@ -483,7 +475,6 @@ impl Peers {
     /// A miner has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
-    #[inline]
     pub(crate) fn process_inbound_peers(&self, peers: Vec<Peer>) -> Result<(), NetworkError> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,

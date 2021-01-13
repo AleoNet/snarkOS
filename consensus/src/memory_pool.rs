@@ -61,7 +61,6 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     /// Load the memory pool from previously stored state in storage
-    #[inline]
     pub fn from_storage<P: LoadableMerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
 
@@ -98,7 +97,6 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     /// Adds entry to memory pool if valid in the current ledger.
-    #[inline]
     pub fn insert<P: LoadableMerkleParameters>(
         &mut self,
         storage: &Ledger<T, P>,
@@ -204,7 +202,6 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     /// Get candidate transactions for a new block.
-    #[inline]
     pub fn get_candidates<P: LoadableMerkleParameters>(
         &self,
         storage: &Ledger<T, P>,

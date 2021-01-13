@@ -85,7 +85,6 @@ impl Outbound {
             .clone())
     }
 
-    #[inline]
     async fn send(&self, request: &Message) {
         // Fetch the outbound channel.
         let channel = match self.outbound_channel(request.receiver()) {

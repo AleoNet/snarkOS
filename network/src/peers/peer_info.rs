@@ -57,7 +57,6 @@ impl PeerInfo {
     ///
     /// Creates a new instance of `PeerInfo`.
     ///
-    #[inline]
     pub fn new(address: SocketAddr) -> Self {
         let now = Utc::now();
         Self {
@@ -177,7 +176,6 @@ impl PeerInfo {
     ///
     /// If the given handshake nonce has been used before, returns a `NetworkError`.
     ///
-    #[inline]
     pub fn set_connecting(&mut self, nonce: u64) -> Result<(), NetworkError> {
         // Check that the handshake is not already set.
         if self.nonce.is_some() {
@@ -220,7 +218,6 @@ impl PeerInfo {
     /// If the peer is not transitioning from `PeerStatus::Connecting`,
     /// this function returns a `NetworkError`.
     ///
-    #[inline]
     pub(crate) fn set_connected(&mut self, nonce: u64) -> Result<(), NetworkError> {
         // Check that the handshake nonce is already set and matches the given nonce.
         if nonce != self.nonce.ok_or(NetworkError::PeerIsMissingNonce)? {
@@ -256,7 +253,6 @@ impl PeerInfo {
     /// If the peer is not transitioning from `PeerStatus::Connecting` or `PeerStatus::Connected`,
     /// this function returns a `NetworkError`.
     ///
-    #[inline]
     pub(crate) fn set_disconnected(&mut self) -> Result<(), NetworkError> {
         // Check that the handshake nonce is already set.
         if self.nonce.is_none() {

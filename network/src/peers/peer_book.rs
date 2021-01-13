@@ -132,7 +132,6 @@ impl PeerBook {
     ///
     /// Returns the handshake nonce if the given address is a connecting or connected peer.
     ///
-    #[inline]
     pub fn handshake_nonce(&self, address: &SocketAddr) -> Result<u64, NetworkError> {
         // Check if the address is a connecting peer.
         if self.is_connecting(address) {
@@ -168,7 +167,6 @@ impl PeerBook {
     ///
     /// Adds the given address to the connecting peers for the given nonce in the `PeerBook`.
     ///
-    #[inline]
     pub fn set_connecting(&mut self, address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Remove the address from the disconnected peers, if it exists.
         let mut peer_info = match self.disconnected_peers.remove(address) {
@@ -191,7 +189,6 @@ impl PeerBook {
     /// Adds the given address to the connected peers in the `PeerBook`,
     /// if the given nonce matches the stored nonce from `Self::set_connecting`.
     ///
-    #[inline]
     pub fn set_connected(&mut self, address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
         // Remove the address from the connecting peers, if it exists.
         let mut peer_info = match self.connecting_peers.remove(&address) {
@@ -215,7 +212,6 @@ impl PeerBook {
     /// Removes the given address from the connecting and connected peers in this `PeerBook`,
     /// and adds the given address to the disconnected peers in this `PeerBook`.
     ///
-    #[inline]
     pub fn set_disconnected(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
         if let Some(mut peer_info) = self.connecting_peers.remove(address) {
@@ -260,7 +256,6 @@ impl PeerBook {
     /// If the given address is a connecting, connected, or disconnected peer,
     /// updates the last seen timestamp and returns a `NetworkError`.
     ///
-    #[inline]
     pub fn add_peer(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
         // Check if the peer is a connecting peer.
         if self.is_connecting(address) {
@@ -321,7 +316,6 @@ impl PeerBook {
     ///
     /// Returns a reference to the peer info of the given address, if it exists.
     ///
-    #[inline]
     pub fn get_peer(&mut self, address: &SocketAddr) -> Result<&PeerInfo, NetworkError> {
         // Check if the address is a connecting peer.
         if self.is_connecting(address) {
@@ -360,7 +354,6 @@ impl PeerBook {
     /// This function should only be used in the case that the peer
     /// should be forgotten about permanently.
     ///
-    #[inline]
     pub fn remove_peer(&mut self, address: &SocketAddr) {
         // Remove the given address from the connecting peers, if it exists.
         self.connecting_peers.remove(address);
