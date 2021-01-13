@@ -118,6 +118,7 @@ impl Server {
     pub async fn start_services(&self) -> Result<(), NetworkError> {
         let peers = self.peers.clone();
         let blocks = self.blocks.clone();
+        let transactions = self.transactions.clone();
 
         task::spawn(async move {
             loop {
@@ -134,9 +135,9 @@ impl Server {
                     error!("Block update error: {}", e);
                 }
 
-                //  if let Err(e) = transactions.update(sync_node).await {
-                //      error!("Transaction update error: {}", e);
-                //  }
+                if let Err(e) = transactions.update(sync_node) {
+                    error!("Transaction update error: {}", e);
+                }
             }
         });
 

@@ -48,7 +48,8 @@ impl Transactions {
     pub fn update(&self, sync_node: Option<SocketAddr>) -> Result<(), NetworkError> {
         if !self.environment.is_bootnode() {
             if let Some(sync_node) = sync_node {
-                // Send GetMemoryPool request
+                self.outbound
+                    .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
             } else {
                 info!("No sync node is registered, transactions could not be synced");
             }
