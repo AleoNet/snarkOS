@@ -22,33 +22,32 @@ use tokio::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
         TcpStream,
     },
-    sync::Mutex,
+    sync::Mutex as AsyncMutex,
 };
 
 use std::{net::SocketAddr, sync::Arc};
 
-/// A channel for reading and writing messages to a peer.
-/// The channel manages two streams to allow for simultaneous reading and writing.
-/// Each stream is protected by an Arc + Mutex to allow for channel cloning.
+/// A channel for writing messages to a peer.
+/// The write stream is protected by an Arc + Mutex to enable cloning.
 #[derive(Clone, Debug)]
 pub struct Channel {
     pub remote_address: SocketAddr,
-    pub reader: Arc<Mutex<OwnedReadHalf>>,
-    pub writer: Arc<Mutex<OwnedWriteHalf>>,
+    pub writer: Arc<AsyncMutex<OwnedWriteHalf>>,
 }
 
 impl Channel {
-    pub fn new(remote_address: SocketAddr, stream: TcpStream) -> Self {
+    pub fn new(remote_address: SocketAddr, stream: TcpStream) -> (Self, OwnedReadHalf) {
         let (reader, writer) = stream.into_split();
 
-        Self {
+        let channel = Self {
             remote_address,
-            reader: Arc::new(Mutex::new(reader)),
-            writer: Arc::new(Mutex::new(writer)),
-        }
+            writer: Arc::new(AsyncMutex::new(writer)),
+        };
+
+        (channel, reader)
     }
 
-    pub async fn from_addr(remote_address: SocketAddr) -> Result<Self, ConnectError> {
+    pub async fn from_addr(remote_address: SocketAddr) -> Result<(Self, OwnedReadHalf), ConnectError> {
         let stream = TcpStream::connect(remote_address).await?;
 
         Ok(Channel::new(remote_address, stream))
@@ -58,7 +57,6 @@ impl Channel {
     pub async fn update_address(self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
         Ok(Self {
             remote_address,
-            reader: self.reader,
             writer: self.writer,
         })
     }
@@ -78,35 +76,23 @@ impl Channel {
 
         Ok(())
     }
+}
 
-    /// Reads a message header + payload.
-    pub async fn read(&self) -> Result<Message, ConnectError> {
-        let header = read_header(&mut *self.reader.lock().await).await?;
-        let payload = read_message(&mut *self.reader.lock().await, header.len as usize).await?;
-        let payload = bincode::deserialize(&payload).map_err(|e| ConnectError::MessageError(e.into()))?;
+/// Reads a message header + payload.
+pub(crate) async fn read_from_stream(addr: SocketAddr, reader: &mut OwnedReadHalf) -> Result<Message, ConnectError> {
+    let header = read_header(reader).await?;
+    let payload = read_message(reader, header.len as usize).await?;
+    let payload = bincode::deserialize(&payload).map_err(|e| ConnectError::MessageError(e.into()))?;
 
-        debug!("Received a '{}' message from {}", payload, self.remote_address);
+    debug!("Received a '{}' message from {}", payload, addr);
 
-        Ok(Message::new(Direction::Inbound(self.remote_address), payload))
-    }
+    Ok(Message::new(Direction::Inbound(addr), payload))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::network::{random_bound_address, simulate_active_node};
-
-    #[tokio::test]
-    async fn channel_write() {
-        // 1. Start remote node
-        let remote_address = simulate_active_node().await;
-
-        // 2. Server connect to peer
-        let server_channel = Channel::from_addr(remote_address).await.unwrap();
-
-        // 3. Server write message to peer
-        server_channel.write(&Payload::GetPeers).await.unwrap();
-    }
+    use snarkos_testing::network::random_bound_address;
 
     #[tokio::test]
     async fn channel_read() {
@@ -114,7 +100,7 @@ mod tests {
 
         tokio::spawn(async move {
             // 1. Server connects to peer.
-            let server_channel = Channel::from_addr(remote_address).await.unwrap();
+            let (server_channel, _server_reader) = Channel::from_addr(remote_address).await.unwrap();
 
             // 2. Server writes GetPeers message.
             server_channel.write(&Payload::GetPeers).await.unwrap();
@@ -122,10 +108,10 @@ mod tests {
 
         // 2. Peer accepts server connection.
         let (stream, address) = remote_listener.accept().await.unwrap();
-        let peer_channel = Channel::new(address, stream);
+        let (_peer_channel, mut peer_reader) = Channel::new(address, stream);
 
         // 4. Peer reads GetPeers message.
-        let message = peer_channel.read().await.unwrap();
+        let message = read_from_stream(address, &mut peer_reader).await.unwrap();
 
         assert!(matches!(message.payload, Payload::GetPeers));
     }

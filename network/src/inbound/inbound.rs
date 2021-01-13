@@ -16,7 +16,7 @@
 
 use crate::{
     errors::ConnectError,
-    external::{message::*, message_types::*, Channel},
+    external::{channel::read_from_stream, message::*, message_types::*, Channel},
     Environment,
     NetworkError,
     Receiver,
@@ -31,7 +31,7 @@ use std::{
 
 use parking_lot::{Mutex, RwLock};
 use tokio::{
-    net::{TcpListener, TcpStream},
+    net::{tcp::OwnedReadHalf, TcpListener, TcpStream},
     task,
 };
 
@@ -92,10 +92,15 @@ impl Inbound {
 
                         let height = environment.current_block_height();
                         match inbound.connection_request(height, remote_address, channel).await {
-                            Ok(channel) => {
+                            Ok((channel, mut reader)) => {
+                                // update the remote address to be the peer's listening address
+                                let remote_address = channel.remote_address;
+                                // Save the channel under the provided remote address
+                                inbound.channels.write().insert(remote_address, channel);
+
                                 let inbound = inbound.clone();
                                 tokio::spawn(async move {
-                                    inbound.listen_for_messages(channel).await.unwrap();
+                                    inbound.listen_for_messages(remote_address, &mut reader).await.unwrap();
                                 });
                             }
                             Err(e) => error!("Failed to accept a connection: {}", e),
@@ -109,16 +114,17 @@ impl Inbound {
         Ok(())
     }
 
-    pub async fn listen_for_messages(&self, channel: Channel) -> Result<(), NetworkError> {
+    pub async fn listen_for_messages(&self, addr: SocketAddr, reader: &mut OwnedReadHalf) -> Result<(), NetworkError> {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut failure;
+
         loop {
             // Reset the failure indicator.
             failure = false;
 
             // Read the next message from the channel. This is a blocking operation.
-            let message = match channel.read().await {
+            let message = match read_from_stream(addr, reader).await {
                 Ok(message) => message,
                 Err(error) => {
                     Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
@@ -126,11 +132,8 @@ impl Inbound {
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
-                            self.route(Message::new(
-                                Direction::Internal,
-                                Payload::Disconnect(channel.remote_address),
-                            ))
-                            .await;
+                            self.route(Message::new(Direction::Internal, Payload::Disconnect(addr)))
+                                .await;
 
                             // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
                             // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
@@ -265,13 +268,13 @@ impl Inbound {
         block_height: u32,
         remote_address: SocketAddr,
         stream: TcpStream,
-    ) -> Result<Channel, NetworkError> {
+    ) -> Result<(Channel, OwnedReadHalf), NetworkError> {
         // Register the new channel.
-        let channel = Channel::new(remote_address, stream);
+        let (channel, mut reader) = Channel::new(remote_address, stream);
 
         // Read the next message from the channel.
         // Note: this is a blocking operation.
-        let message = match channel.read().await {
+        let message = match read_from_stream(remote_address, &mut reader).await {
             Ok(message) => message,
             Err(e) => {
                 error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -288,9 +291,6 @@ impl Inbound {
             let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
 
             let channel = channel.update_address(remote_address).await?;
-
-            // Save the channel under the provided remote address
-            self.channels.write().insert(remote_address, channel.clone());
 
             // TODO (raychu86): Establish a formal node version.
             let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
@@ -342,7 +342,7 @@ impl Inbound {
             channel.write(&Payload::Version(local_version.clone())).await?;
 
             // Parse the inbound message into the message name and message bytes.
-            let message = channel.read().await?;
+            let message = read_from_stream(remote_address, &mut reader).await?;
 
             // Deserialize the message bytes into a verack message.
             if !matches!(message.payload, Payload::Verack(..)) {
@@ -357,7 +357,7 @@ impl Inbound {
                 ))
                 .await?;
 
-            Ok(channel)
+            Ok((channel, reader))
         } else {
             error!("{} didn't send their Version during the handshake", remote_address);
             Err(NetworkError::InvalidHandshake)

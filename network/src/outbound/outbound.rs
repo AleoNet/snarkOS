@@ -311,7 +311,7 @@ mod tests {
 
         // Create a new instance.
         let outbound = Outbound::new(Default::default());
-        let channel = Channel::new(remote_address, stream);
+        let (channel, _reader) = Channel::new(remote_address, stream);
         outbound.channels.write().insert(remote_address, channel);
         outbound.initialize_state(remote_address);
 

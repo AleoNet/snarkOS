@@ -27,7 +27,7 @@ use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParamete
 
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc};
-use tokio::net::TcpListener;
+use tokio::net::{tcp::OwnedReadHalf, TcpListener};
 
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
 pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
@@ -94,7 +94,7 @@ pub fn start_test_server(mut server: Server) {
 }
 
 /// Returns the next tcp channel connected to the listener
-pub async fn accept_channel(listener: &mut TcpListener) -> Channel {
+pub async fn accept_channel(listener: &mut TcpListener) -> (Channel, OwnedReadHalf) {
     let (stream, address) = listener.accept().await.unwrap();
     Channel::new(address, stream)
 }

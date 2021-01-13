@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::*, Channel, Peer, Verack, Version},
+    external::{message::*, read_from_stream, Channel, Peer, Verack, Version},
     peers::{PeerBook, PeerInfo},
     Environment,
     Inbound,
@@ -238,7 +238,7 @@ impl Peers {
         }
 
         // open the connection
-        let channel = Channel::new(remote_address, TcpStream::connect(remote_address).await?);
+        let (channel, mut reader) = Channel::new(remote_address, TcpStream::connect(remote_address).await?);
 
         let block_height = self.environment.current_block_height();
         // TODO (raychu86): Establish a formal node version.
@@ -250,7 +250,7 @@ impl Peers {
         // Send a connection request with the outbound handler.
         channel.write(&Payload::Version(version.clone())).await?;
 
-        let message = match channel.read().await {
+        let message = match read_from_stream(remote_address, &mut reader).await {
             Ok(inbound_message) => inbound_message,
             Err(e) => {
                 error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -259,7 +259,7 @@ impl Peers {
         };
 
         if let Payload::Verack(_) = message.payload {
-            let message = match channel.read().await {
+            let message = match read_from_stream(remote_address, &mut reader).await {
                 Ok(inbound_message) => inbound_message,
                 Err(e) => {
                     error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -273,9 +273,8 @@ impl Peers {
 
                 // spawn the inbound loop
                 let inbound = self.inbound.clone();
-                let channel_clone = channel.clone();
                 tokio::spawn(async move {
-                    inbound.listen_for_messages(channel_clone).await.unwrap();
+                    inbound.listen_for_messages(remote_address, &mut reader).await.unwrap();
                 });
 
                 // save the outbound channel
