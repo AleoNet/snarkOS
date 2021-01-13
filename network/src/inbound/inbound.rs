@@ -94,7 +94,6 @@ impl Inbound {
                         match inbound.connection_request(height, remote_address, channel).await {
                             Ok(channel) => {
                                 let inbound = inbound.clone();
-                                let channel = channel.clone();
                                 tokio::spawn(async move {
                                     inbound.listen_for_messages(channel).await.unwrap();
                                 });
@@ -147,97 +146,20 @@ impl Inbound {
                 }
             };
 
+            /* TODO: enable again when Inbound::receive_version does something
+            if let Payload::Version(version) = message.payload {
+                if let Err(e) = self.receive_version(version, channel).await {
+                    error!("Failed to process an inbound Version: {}", e);
+                }
+            }
+            */
+
             // Messages are received by a single tokio MPSC receiver with
             // the message name, bytes, and associated channel.
             //
             // The oneshot sender lets the connection task know when the message is handled.
 
-            // TODO(ljedrz): in most cases the whole message can be routed; compact this
-            match message.payload {
-                Payload::Block(block) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::Block(block),
-                    ))
-                    .await;
-                }
-                Payload::GetBlock(hash) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::GetBlock(hash),
-                    ))
-                    .await;
-                }
-                Payload::GetMemoryPool => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::GetMemoryPool,
-                    ))
-                    .await;
-                }
-                Payload::GetPeers => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::GetPeers,
-                    ))
-                    .await;
-                }
-                Payload::GetSync(hashes) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::GetSync(hashes),
-                    ))
-                    .await;
-                }
-                Payload::MemoryPool(txs) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::MemoryPool(txs),
-                    ))
-                    .await;
-                }
-                Payload::Peers(peers) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::Peers(peers),
-                    ))
-                    .await;
-                }
-                Payload::Sync(hashes) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::Sync(hashes),
-                    ))
-                    .await;
-                }
-                Payload::SyncBlock(block) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::SyncBlock(block),
-                    ))
-                    .await;
-                }
-                Payload::Transaction(tx) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::Transaction(tx),
-                    ))
-                    .await;
-                }
-                Payload::Verack(verack) => {
-                    self.route(Message::new(
-                        Direction::Inbound(channel.remote_address),
-                        Payload::Verack(verack),
-                    ))
-                    .await;
-                }
-                Payload::Version(version) => {
-                    if let Err(err) = self.receive_version(version, channel.clone()).await {
-                        error!("Failed to route response for a message\n{}", err);
-                    }
-                }
-                _ => {}
-            }
+            self.route(message).await
         }
     }
 
@@ -286,14 +208,8 @@ impl Inbound {
     ///
     /// This method may seem redundant to handshake protocol functions but a peer can send additional
     /// Version messages if they want to update their ip address/port or want to share their chain height.
-    async fn receive_version(&self, version: Version, channel: Channel) -> Result<(), NetworkError> {
-        // Route version message to peer manager.
-        self.route(Message::new(
-            Direction::Inbound(channel.remote_address),
-            Payload::Version(version.clone()),
-        ))
-        .await;
-
+    #[allow(dead_code)]
+    async fn receive_version(&self, _version: Version, _channel: Channel) -> Result<(), NetworkError> {
         // TODO (howardwu): Implement this.
         {
             // // If our peer has a longer chain, send a sync message
