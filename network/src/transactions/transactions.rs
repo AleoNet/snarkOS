@@ -24,6 +24,7 @@ use snarkvm_utilities::{
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
+/// A stateful component for managing the transactions for the ledger on this node server.
 #[derive(Clone)]
 pub struct Transactions {
     /// The parameters and settings of this node server.
@@ -33,10 +34,17 @@ pub struct Transactions {
 }
 
 impl Transactions {
+    ///
+    /// Creates a new instance of `Transactions`.
+    ///
     pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Self {
+        trace!("Instantiating the transaction service");
         Self { environment, outbound }
     }
 
+    ///
+    /// Triggers the transaction sync with a selected peer.
+    ///
     pub fn update(&self, sync_node: Option<SocketAddr>) -> Result<(), NetworkError> {
         if !self.environment.is_bootnode() {
             if let Some(sync_node) = sync_node {
