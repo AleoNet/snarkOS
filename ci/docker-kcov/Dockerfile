@@ -31,5 +31,4 @@ RUN curl -LO https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&  \
 RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-
 CMD ["/usr/local/bin/kcov"]
