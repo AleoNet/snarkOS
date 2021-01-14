@@ -50,6 +50,8 @@ impl Transactions {
             if let Some(sync_node) = sync_node {
                 self.outbound
                     .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
+
+                trace!("Send from update to {:?}", sync_node);
             } else {
                 info!("No sync node is registered, transactions could not be synced");
             }
@@ -169,15 +171,15 @@ impl Transactions {
             }
         }
 
-        // Cleanse and store transactions once batch has been received.
-        if let Some(mut memory_pool) = self.environment.memory_pool().try_lock() {
-            memory_pool
-                .cleanse(&self.environment.storage().read())
-                .unwrap_or_else(|error| debug!("Failed to cleanse memory pool transactions in database {}", error));
-            memory_pool
-                .store(&self.environment.storage().read())
-                .unwrap_or_else(|error| debug!("Failed to store memory pool transaction in database {}", error));
-        }
+        //  Cleanse and store transactions once batch has been received.
+        debug!("Cleansing memory pool transactions in database");
+        memory_pool
+            .cleanse(&self.environment.storage().read())
+            .unwrap_or_else(|error| debug!("Failed to cleanse memory pool transactions in database {}", error));
+        debug!("Storing memory pool transactions in database");
+        memory_pool
+            .store(&self.environment.storage().read())
+            .unwrap_or_else(|error| debug!("Failed to store memory pool transaction in database {}", error));
 
         Ok(())
     }

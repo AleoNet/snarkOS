@@ -13,64 +13,18 @@
 
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+mod common;
+use common::start_node;
 
-use snarkos_network::{Environment, Server};
-use snarkos_testing::{
-    consensus::{BLOCK_1, BLOCK_2, FIXTURE_VK, TEST_CONSENSUS},
-    dpc::load_verifying_parameters,
-};
+use snarkos_testing::consensus::{BLOCK_1, BLOCK_2};
 use snarkvm_objects::block::Block;
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use parking_lot::lock_api::{Mutex, RwLock};
 use tokio::time::sleep;
-
-/// Starts a node with the specified bootnodes.
-async fn start_node(bootnodes: Vec<String>) -> Server {
-    let storage = FIXTURE_VK.ledger();
-    let memory_pool = snarkos_consensus::MemoryPool::new();
-    let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
-    let consensus = TEST_CONSENSUS.clone();
-    let parameters = load_verifying_parameters();
-    let socket_address = None;
-    let min_peers = 2;
-    let max_peers = 50;
-    let sync_interval = 10;
-    let mempool_interval = 5;
-    let is_bootnode = false;
-    let is_miner = false;
-
-    let environment = Environment::new(
-        Arc::new(RwLock::new(storage)),
-        memory_pool_lock,
-        Arc::new(consensus),
-        Arc::new(parameters),
-        socket_address,
-        min_peers,
-        max_peers,
-        sync_interval,
-        mempool_interval,
-        // TODO: these should probably be a 'Vec<SocketAddr>'.
-        bootnodes,
-        is_bootnode,
-        is_miner,
-    )
-    .unwrap();
-
-    let mut node = Server::new(environment).await.unwrap();
-    node.start().await.unwrap();
-    node
-}
 
 #[tokio::test]
 async fn simple_block_sync() {
-    let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .init();
-
     let node_alice = start_node(vec![]).await;
     let alice_address = node_alice.local_address().unwrap();
 

@@ -123,18 +123,21 @@ impl Server {
         task::spawn(async move {
             loop {
                 sleep(Duration::from_secs(10)).await;
-                info!("Updating peers and blocks");
 
                 // select last seen node as block sync node
                 let sync_node = peers.last_seen();
+
+                info!("Updating peers");
                 if let Err(e) = peers.update().await {
                     error!("Peer update error: {}", e);
                 }
 
+                info!("Updating blocks");
                 if let Err(e) = blocks.update(sync_node).await {
                     error!("Block update error: {}", e);
                 }
 
+                info!("Updating transactions");
                 if let Err(e) = transactions.update(sync_node) {
                     error!("Transaction update error: {}", e);
                 }
@@ -624,7 +627,7 @@ mod tests {
         // handshake between the fake and full node
         let (node, mut peer_stream) = handshake().await;
 
-        // insert block into node_alice
+        // insert block into node
         let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
         node.environment
             .consensus_parameters()
