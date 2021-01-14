@@ -16,10 +16,10 @@
 
 mod consensus_sidechain {
     use snarkos_consensus::MemoryPool;
-    use snarkos_dpc::base_dpc::instantiated::Tx;
-    use snarkos_objects::Block;
     use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
-    use snarkos_utilities::bytes::FromBytes;
+    use snarkvm_dpc::base_dpc::instantiated::Tx;
+    use snarkvm_objects::Block;
+    use snarkvm_utilities::bytes::FromBytes;
 
     use std::sync::Arc;
 

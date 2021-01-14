@@ -18,9 +18,13 @@
 //!
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
-use crate::{rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
+use crate::{error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
 use snarkos_consensus::ConsensusParameters;
-use snarkos_dpc::base_dpc::{
+use snarkos_toolkit::{
+    account::{Address, PrivateKey},
+    dpc::{Record, TransactionKernelBuilder},
+};
+use snarkvm_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
     record::DPCRecord,
@@ -28,18 +32,13 @@ use snarkos_dpc::base_dpc::{
     record_payload::RecordPayload,
     TransactionKernel,
 };
-use snarkos_errors::rpc::RpcError;
-use snarkos_models::{
+use snarkvm_models::{
     algorithms::CRH,
     dpc::{DPCComponents, DPCScheme, Record as RecordModel},
     objects::AccountScheme,
 };
-use snarkos_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
-use snarkos_toolkit::{
-    account::{Address, PrivateKey},
-    dpc::{Record, TransactionKernelBuilder},
-};
-use snarkos_utilities::{
+use snarkvm_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

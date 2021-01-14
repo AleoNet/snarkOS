@@ -14,14 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{
-    message_types::{GetBlock, GetSync},
-    Channel,
+use crate::{
+    errors::SendError,
+    external::{
+        message_types::{GetBlock, GetSync},
+        Channel,
+    },
 };
-use snarkos_errors::network::SendError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkos_objects::BlockHeaderHash;
 use snarkos_storage::Ledger;
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_objects::BlockHeaderHash;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};

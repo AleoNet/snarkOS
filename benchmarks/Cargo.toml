@@ -12,36 +12,28 @@ license = "GPL-3.0"
 edition = "2018"
 
 [[bench]]
-name = "snark"
-path = "algorithms/snark/snark.rs"
-harness = false
-
-[[bench]]
 name = "posw"
 path = "posw/posw.rs"
 harness = false
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.1.4"}
-snarkos-curves = { path = "../curves", version = "1.1.4"}
-snarkos-errors = { path = "../errors", version = "1.1.4"}
-snarkos-marlin = { path = "../marlin", version = "1.1.4"}
-snarkos-models = { path = "../models", version = "1.1.4"}
-snarkos-profiler = { path = "../profiler", version = "1.1.4"}
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+
+snarkos-profiler = { path = "../profiler", version = "1.1.4" }
 snarkos-posw = { path = "../posw", version = "1.1.4", features = ["test-helpers"] }
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
 derivative = { version = "2" }
 digest = { version = "0.7" }
 rand = { version = "0.7" }
 rayon = { version = "1" }
-sha2 = { version = "0.9" }
-smallvec = { version = "1.4" }
+smallvec = { version = "1.6" }
 criterion = "0.3.3"
 
 [dev-dependencies]
-snarkos-curves = { path = "../curves", version = "1.1.4"}
-
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2"}
 criterion = "0.3.3"
 csv = { version = "1" }
 rand_xorshift = { version = "0.2" }

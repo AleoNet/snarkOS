@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::message::{
-    read::{read_header, read_message},
-    Message,
-    MessageHeader,
-    MessageName,
+use crate::{
+    errors::ConnectError,
+    external::message::{
+        read::{read_header, read_message},
+        Message,
+        MessageHeader,
+        MessageName,
+    },
 };
-use snarkos_errors::network::ConnectError;
 
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};

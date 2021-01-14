@@ -19,18 +19,18 @@ use crate::{
     dpc::{EmptyLedger, Record},
     errors::DPCError,
 };
-use snarkos_dpc::base_dpc::{
+use snarkvm_dpc::base_dpc::{
     instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
     parameters::{NoopProgramSNARKParameters, SystemParameters},
     record_payload::RecordPayload,
     TransactionKernel as TransactionKernelNative,
 };
-use snarkos_models::{
+use snarkvm_models::{
     algorithms::CRH,
     dpc::{DPCComponents, DPCScheme, Record as RecordScheme},
 };
-use snarkos_objects::account::*;
-use snarkos_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_objects::account::*;
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{fmt, str::FromStr};

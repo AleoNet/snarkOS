@@ -1,21 +1,21 @@
 // Copyright (C) 2019-2020 Aleo Systems Inc.
-// This file is part of the snarkOS library.
+// This file is part of the snarkVM library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
+// The snarkVM library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkOS library is distributed in the hope that it will be useful,
+// The snarkVM library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::crh::sha256::sha256;
-use snarkos_dpc::base_dpc::{
+use snarkvm_algorithms::crh::sha256::sha256;
+use snarkvm_dpc::base_dpc::{
     inner_circuit::InnerCircuit,
     instantiated::Components,
     outer_circuit::OuterCircuit,
@@ -23,13 +23,15 @@ use snarkos_dpc::base_dpc::{
     program::{NoopCircuit, PrivateProgramInput},
     BaseDPCComponents,
 };
-use snarkos_errors::dpc::DPCError;
-use snarkos_models::{
+use snarkvm_errors::dpc::DPCError;
+use snarkvm_models::{
     algorithms::{MerkleParameters, SNARK},
     parameters::Parameters,
 };
-use snarkos_parameters::{InnerSNARKPKParameters, InnerSNARKVKParameters, LedgerMerkleTreeParameters};
-use snarkos_utilities::{
+use snarkvm_parameters::{
+    InnerSNARKPKParameters, InnerSNARKVKParameters, LedgerMerkleTreeParameters,
+};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
@@ -44,15 +46,20 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     let rng = &mut thread_rng();
     let system_parameters = SystemParameters::<C>::load()?;
 
-    let merkle_tree_hash_parameters: <C::MerkleParameters as MerkleParameters>::H =
-        From::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
+    let merkle_tree_hash_parameters: <C::MerkleParameters as MerkleParameters>::H = From::from(
+        FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?,
+    );
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
     let inner_snark_pk: <C::InnerSNARK as SNARK>::ProvingParameters =
-        <C::InnerSNARK as SNARK>::ProvingParameters::read(InnerSNARKPKParameters::load_bytes()?.as_slice())?;
+        <C::InnerSNARK as SNARK>::ProvingParameters::read(
+            InnerSNARKPKParameters::load_bytes()?.as_slice(),
+        )?;
 
     let inner_snark_vk: <C::InnerSNARK as SNARK>::VerificationParameters =
-        <C::InnerSNARK as SNARK>::VerificationParameters::read(InnerSNARKVKParameters::load_bytes()?.as_slice())?;
+        <C::InnerSNARK as SNARK>::VerificationParameters::read(
+            InnerSNARKVKParameters::load_bytes()?.as_slice(),
+        )?;
 
     let inner_snark_proof = C::InnerSNARK::prove(
         &inner_snark_pk,
@@ -85,7 +92,8 @@ pub fn setup<C: BaseDPCComponents>() -> Result<(Vec<u8>, Vec<u8>), DPCError> {
     )?;
 
     let outer_snark_pk = to_bytes![outer_snark_parameters.0]?;
-    let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters = outer_snark_parameters.1.into();
+    let outer_snark_vk: <C::OuterSNARK as SNARK>::VerificationParameters =
+        outer_snark_parameters.1.into();
     let outer_snark_vk = to_bytes![outer_snark_vk]?;
 
     println!("outer_snark_pk.params\n\tsize - {}", outer_snark_pk.len());

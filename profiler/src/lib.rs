@@ -132,7 +132,7 @@ pub mod inner {
     pub fn compute_indent_whitespace(indent_amount: usize) -> String {
         let mut indent = String::new();
         for _ in 0..indent_amount {
-            indent.push_str(" ");
+            indent.push(' ');
         }
         indent
     }

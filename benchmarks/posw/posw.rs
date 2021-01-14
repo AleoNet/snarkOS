@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_posw::{txids_to_roots, Marlin, Posw, PoswMarlin, GM17};
+
+use snarkvm_curves::bls12_377::Bls12_377;
+use snarkvm_models::algorithms::snark::SNARK;
+use snarkvm_utilities::bytes::FromBytes;
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
-use snarkos_curves::bls12_377::Bls12_377;
-use snarkos_models::algorithms::snark::SNARK;
-use snarkos_posw::{txids_to_roots, Marlin, Posw, PoswMarlin, GM17};
-use snarkos_utilities::bytes::FromBytes;
 
 fn gm17_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("Proof of Succinct Work: GM17");
@@ -59,7 +61,7 @@ fn marlin_bench(c: &mut Criterion) {
     group.sample_size(10);
     let rng = &mut XorShiftRng::seed_from_u64(1234567);
 
-    let universal_srs = snarkos_marlin::snark::Marlin::<Bls12_377>::universal_setup(10000, 10000, 100000, rng).unwrap();
+    let universal_srs = snarkvm_marlin::snark::Marlin::<Bls12_377>::universal_setup(10000, 10000, 100000, rng).unwrap();
     let posw = PoswMarlin::index(universal_srs).unwrap();
 
     let difficulty_target = 0xFFFF_FFFF_FFFF_FFFF_u64;

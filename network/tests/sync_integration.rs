@@ -15,10 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod sync_integration {
-    use snarkos_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
     use snarkos_network::external::{message::Message, message_types::*, protocol::sync::*, Channel};
-    use snarkos_objects::BlockHeaderHash;
     use snarkos_testing::{consensus::*, network::*, storage::*};
+    use snarkvm_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
+    use snarkvm_objects::BlockHeaderHash;
 
     use serial_test::serial;
     use std::sync::Arc;

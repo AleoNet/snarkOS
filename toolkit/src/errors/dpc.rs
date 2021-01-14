@@ -29,44 +29,44 @@ pub enum DPCError {
     MissingOutputs,
 }
 
+impl From<anyhow::Error> for DPCError {
+    fn from(error: anyhow::Error) -> Self {
+        DPCError::Crate("anyhow", format!("{:?}", error))
+    }
+}
+
 impl From<hex::FromHexError> for DPCError {
     fn from(error: hex::FromHexError) -> Self {
         DPCError::Crate("hex", format!("{:?}", error))
     }
 }
 
-impl From<snarkos_errors::objects::account::AccountError> for DPCError {
-    fn from(error: snarkos_errors::objects::account::AccountError) -> Self {
-        DPCError::Crate("snarkos_errors::objects::account", format!("{:?}", error))
+impl From<snarkvm_errors::objects::account::AccountError> for DPCError {
+    fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
+        DPCError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
     }
 }
 
-impl From<snarkos_errors::algorithms::signature::SignatureError> for DPCError {
-    fn from(error: snarkos_errors::algorithms::signature::SignatureError) -> Self {
-        DPCError::Crate("snarkos_errors::algorithms::signature", format!("{:?}", error))
+impl From<snarkvm_errors::algorithms::signature::SignatureError> for DPCError {
+    fn from(error: snarkvm_errors::algorithms::signature::SignatureError) -> Self {
+        DPCError::Crate("snarkvm_errors::algorithms::signature", format!("{:?}", error))
     }
 }
 
-impl From<snarkos_errors::algorithms::crh::CRHError> for DPCError {
-    fn from(error: snarkos_errors::algorithms::crh::CRHError) -> Self {
-        DPCError::Crate("snarkos_errors::algorithms::crh", format!("{:?}", error))
+impl From<snarkvm_errors::algorithms::crh::CRHError> for DPCError {
+    fn from(error: snarkvm_errors::algorithms::crh::CRHError) -> Self {
+        DPCError::Crate("snarkvm_errors::algorithms::crh", format!("{:?}", error))
     }
 }
 
-impl From<snarkos_errors::dpc::DPCError> for DPCError {
-    fn from(error: snarkos_errors::dpc::DPCError) -> Self {
-        DPCError::Crate("snarkos_errors::dpc", format!("{:?}", error))
+impl From<snarkvm_errors::dpc::DPCError> for DPCError {
+    fn from(error: snarkvm_errors::dpc::DPCError) -> Self {
+        DPCError::Crate("snarkvm_errors::dpc", format!("{:?}", error))
     }
 }
 
 impl From<std::io::Error> for DPCError {
     fn from(error: std::io::Error) -> Self {
         DPCError::Crate("std::io", format!("{:?}", error))
-    }
-}
-
-impl From<DPCError> for snarkos_errors::rpc::RpcError {
-    fn from(error: DPCError) -> Self {
-        snarkos_errors::rpc::RpcError::Crate("snarkos_toolkit::errors::dpc", format!("{:?}", error))
     }
 }

@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::message::MessageName;
-use snarkos_errors::network::message::MessageError;
+use crate::{errors::message::MessageError, external::message::MessageName};
 
 /// A trait used to abstract over network messages.
 pub trait Message: Send + 'static {

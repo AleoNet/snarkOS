@@ -20,13 +20,14 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.1.4", default-features = false }
-snarkos-dpc = { path = "../dpc", version = "1.1.4", default-features = false }
-snarkos-errors = { path = "../errors", version = "1.1.4", default-features = false }
-snarkos-models = { path = "../models", version = "1.1.4", default-features = false }
-snarkos-objects = { path = "../objects", version = "1.1.4", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2", default-features = false }
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2", default-features = false }
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2", default-features = false }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2", default-features = false }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2", default-features = false }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2", default-features = false }
 
+anyhow = { version = "1.0.37" }
 hex = { version = "0.4.2" }
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
 thiserror = { version = "1.0" }

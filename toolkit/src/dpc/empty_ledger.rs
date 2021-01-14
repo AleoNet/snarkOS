@@ -14,13 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::merkle_tree::*;
-use snarkos_errors::dpc::LedgerError;
-use snarkos_models::{
+use snarkvm_algorithms::merkle_tree::*;
+use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::Block;
+use snarkvm_objects::Block;
 
 use std::{marker::PhantomData, path::PathBuf};
 
@@ -39,11 +38,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T
     type Transaction = T;
 
     /// Instantiates a new ledger with a genesis block.
-    fn new(
-        _path: &PathBuf,
-        parameters: Self::MerkleParameters,
-        _genesis_block: Self::Block,
-    ) -> Result<Self, LedgerError> {
+    fn new(_path: &PathBuf, parameters: Self::MerkleParameters, _genesis_block: Self::Block) -> anyhow::Result<Self> {
         Ok(Self {
             parameters,
             _transaction: PhantomData,
@@ -87,7 +82,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T
 
     /// Returns the Merkle path to the latest ledger digest
     /// for a given commitment, if it exists in the ledger.
-    fn prove_cm(&self, _cm: &Self::Commitment) -> Result<Self::MerklePath, LedgerError> {
+    fn prove_cm(&self, _cm: &Self::Commitment) -> anyhow::Result<Self::MerklePath> {
         unimplemented!()
     }
 

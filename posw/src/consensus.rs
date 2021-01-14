@@ -16,29 +16,31 @@
 
 //! Generic PoSW Miner and Verifier, compatible with any implementer of the SNARK trait.
 
-use crate::circuit::{POSWCircuit, POSWCircuitParameters};
-use snarkos_algorithms::crh::sha256d_to_u64;
-use snarkos_curves::{
+use crate::{
+    circuit::{POSWCircuit, POSWCircuitParameters},
+    error::PoswError,
+};
+use snarkos_profiler::{end_timer, start_timer};
+use snarkvm_algorithms::crh::sha256d_to_u64;
+use snarkvm_curves::{
     bls12_377::Fr,
     edwards_bls12::{EdwardsProjective, Fq},
 };
-use snarkos_errors::posw::PoswError;
-use snarkos_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
-use snarkos_marlin::snark::SRS;
-use snarkos_models::{
+use snarkvm_gadgets::{algorithms::crh::PedersenCompressedCRHGadget, curves::edwards_bls12::EdwardsBlsGadget};
+use snarkvm_marlin::snark::SRS;
+use snarkvm_models::{
     algorithms::{MaskedMerkleParameters, SNARK},
     curves::{to_field_vec::ToConstraintField, PairingEngine, PrimeField},
     gadgets::algorithms::MaskedCRHGadget,
     parameters::Parameters,
 };
-use snarkos_objects::{
+use snarkvm_objects::{
     pedersen_merkle_tree::{pedersen_merkle_root_hash_with_leaves, PedersenMerkleRootHash, PARAMS},
     MaskedMerkleTreeParameters,
 };
-use snarkos_parameters::{PoswSNARKPKParameters, PoswSNARKVKParameters};
-use snarkos_polycommit::optional_rng::OptionalRng;
-use snarkos_profiler::{end_timer, start_timer};
-use snarkos_utilities::{
+use snarkvm_parameters::{PoswSNARKPKParameters, PoswSNARKVKParameters};
+use snarkvm_polycommit::optional_rng::OptionalRng;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

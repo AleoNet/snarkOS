@@ -12,24 +12,24 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.1.4"}
-snarkos-curves = { path = "../curves", version = "1.1.4"} # needed to instantiate with BLS12-377
-snarkos-errors = { path = "../errors", version = "1.1.4"}
-snarkos-gadgets = { path = "../gadgets", version = "1.1.4"}
-snarkos-marlin = { path = "../marlin", version = "1.1.4"}
-snarkos-models = { path = "../models", version = "1.1.4"}
-snarkos-objects = { path = "../objects", version = "1.1.4"} # needed to instantiate with BLS12-377
-snarkos-parameters = { path = "../parameters", version = "1.1.4"}
-snarkos-polycommit = { path = "../polycommit", version = "1.1.4"}
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" } # needed to instantiate with BLS12-377
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" } # needed to instantiate with BLS12-377
+snarkvm-parameters = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 
 blake2 = { version = "0.8.1" }
 rand = { version = "0.7" }
 thiserror = "1.0.22"
 
 [dev-dependencies]
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
 rand_xorshift = { version = "0.2" }
 
 [features]

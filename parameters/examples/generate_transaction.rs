@@ -1,34 +1,34 @@
 // Copyright (C) 2019-2020 Aleo Systems Inc.
-// This file is part of the snarkOS library.
+// This file is part of the snarkVM library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
+// The snarkVM library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkOS library is distributed in the hope that it will be useful,
+// The snarkVM library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
-use snarkos_errors::dpc::{DPCError, LedgerError};
-use snarkos_models::{
+use snarkos_posw::PoswMarlin;
+use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
+use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
+use snarkvm_errors::dpc::{DPCError, LedgerError};
+use snarkvm_models::{
     algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
     dpc::{DPCComponents, DPCScheme},
     objects::{account::AccountScheme, Transaction},
     parameters::Parameters,
 };
-use snarkos_objects::{Account, AccountAddress, Network};
-use snarkos_parameters::LedgerMerkleTreeParameters;
-use snarkos_posw::PoswMarlin;
-use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
-use snarkos_utilities::{
+use snarkvm_objects::{Account, AccountAddress, Network};
+use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

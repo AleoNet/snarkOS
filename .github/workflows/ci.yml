@@ -1,0 +1,154 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  style:
+    name: Check Style
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: rustfmt
+
+      - name: cargo fmt --check
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+#  clippy:
+#    name: Clippy
+#    runs-on: ubuntu-latest
+#    env:
+#      RUSTFLAGS: -Dwarnings
+#    strategy:
+#      matrix:
+#        rust:
+#          - stable
+#          - nightly
+#
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#
+#      - name: Install Rust (${{ matrix.rust }})
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: ${{ matrix.rust }}
+#          override: true
+#          components: clippy
+#
+#      - name: Check examples
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: clippy
+#          args: --examples --all
+#
+#      - name: Check examples with all features on stable
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: clippy
+#          args: --examples --all-features --all
+#        if: matrix.rust == 'stable'
+#
+#      - name: Check benchmarks on nightly
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: clippy
+#          args: --all-features --examples --all --benches
+#        if: matrix.rust == 'nightly'
+
+  test:
+    name: Check Tests (Simple)
+    runs-on: [self-hosted, snarkos-ci1]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly-2020-07-13
+          override: true
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all --lib
+
+#  test-ga:
+#    name: Check Tests (Simple)
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#
+#      - name: Install Rust (nightly)
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: nightly
+#          override: true
+#
+#      - uses: actions/cache@v2
+#        with:
+#          path: |
+#            ~/.cargo/registry
+#            ~/.cargo/git
+#            target
+#          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+#
+#      - name: Test
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: test
+#          args: --all --lib
+
+  test-wasm:
+    name: Check Tests (Wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: wasm32-unknown-unknown
+          override: true
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: 'latest'
+
+      - name: Test
+        run: |
+          cd toolkit
+          wasm-pack test --node
+#          cargo test --target wasm32-unknown-unknown --features wasm

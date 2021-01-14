@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord};
-use snarkos_models::genesis::Genesis;
-use snarkos_objects::{Block, BlockHeader};
-use snarkos_parameters::GenesisBlock;
-use snarkos_utilities::{
+use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord};
+use snarkvm_models::genesis::Genesis;
+use snarkvm_objects::{Block, BlockHeader};
+use snarkvm_parameters::GenesisBlock;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

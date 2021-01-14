@@ -16,8 +16,8 @@
 
 use crate::errors::DPCError;
 
-use snarkos_dpc::base_dpc::{instantiated::Components, DPCRecord};
-use snarkos_utilities::{
+use snarkvm_dpc::base_dpc::{instantiated::Components, DPCRecord};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

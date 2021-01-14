@@ -1,32 +1,30 @@
 // Copyright (C) 2019-2020 Aleo Systems Inc.
-// This file is part of the snarkOS library.
+// This file is part of the snarkVM library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
+// The snarkVM library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkOS library is distributed in the hope that it will be useful,
+// The snarkVM library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
-use snarkos_errors::objects::TransactionError;
-use snarkos_models::genesis::Genesis;
-use snarkos_objects::{
-    BlockHeader,
-    BlockHeaderHash,
-    DPCTransactions,
-    MerkleRootHash,
-    PedersenMerkleRootHash,
+use snarkvm_dpc::base_dpc::{
+    instantiated::Components, transaction::DPCTransaction, BaseDPCComponents,
+};
+use snarkvm_errors::objects::TransactionError;
+use snarkvm_models::genesis::Genesis;
+use snarkvm_objects::{
+    BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash, PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
-use snarkos_parameters::Transaction1;
-use snarkos_utilities::bytes::FromBytes;
+use snarkvm_parameters::Transaction1;
+use snarkvm_utilities::bytes::FromBytes;
 
 use chrono::Utc;
 use std::{
