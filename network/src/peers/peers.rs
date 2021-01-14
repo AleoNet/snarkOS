@@ -268,7 +268,7 @@ impl Peers {
             };
 
             if let Payload::Version(_) = message.payload {
-                let verack = Verack::new(version.nonce, own_address, remote_address);
+                let verack = Verack::new(version.nonce);
                 channel.write(&Payload::Verack(verack)).await?;
 
                 // spawn the inbound loop
@@ -440,11 +440,7 @@ impl Peers {
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
             self.outbound.send_request(Message::new(
                 Direction::Outbound(remote_version.sender),
-                Payload::Verack(Verack::new(
-                    remote_version.nonce,
-                    remote_version.receiver, /* local_address */
-                    remote_version.sender,
-                )),
+                Payload::Verack(Verack::new(remote_version.nonce)),
             ));
 
             if !self.connected_peers().contains_key(&remote_version.sender) {

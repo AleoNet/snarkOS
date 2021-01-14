@@ -334,11 +334,7 @@ impl Inbound {
 
             // Write a verack response to the remote peer.
             channel
-                .write(&Payload::Verack(Verack::new(
-                    remote_version.nonce,
-                    local_address,
-                    remote_address,
-                )))
+                .write(&Payload::Verack(Verack::new(remote_version.nonce)))
                 .await?;
 
             // Write a version request to the remote peer.

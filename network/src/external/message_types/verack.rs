@@ -16,25 +16,15 @@
 
 use serde::{Deserialize, Serialize};
 
-use std::net::SocketAddr;
-
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/verack.md"))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Verack {
     /// The random nonce of the connection request.
     pub nonce: u64,
-    /// The IP address of the sender.
-    pub sender: SocketAddr,
-    /// The IP address of the recipient.
-    pub receiver: SocketAddr,
 }
 
 impl Verack {
-    pub fn new(nonce: u64, sender: SocketAddr, receiver: SocketAddr) -> Self {
-        Self {
-            nonce,
-            sender,
-            receiver,
-        }
+    pub fn new(nonce: u64) -> Self {
+        Self { nonce }
     }
 }

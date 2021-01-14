@@ -352,7 +352,7 @@ mod tests {
         };
 
         // in response to the Version, the peer sends a Verack message to finish the handshake
-        let verack = Payload::Verack(Verack::new(version.nonce, peer_address, node_address));
+        let verack = Payload::Verack(Verack::new(version.nonce));
         write_message_to_stream(verack, &mut peer_stream).await;
 
         // the node should now have register the peer as 'connected'
@@ -390,7 +390,7 @@ mod tests {
         assert!(node.peers.is_connecting(&peer_address));
 
         // the peer responds with a Verack acknowledging the Version message
-        let verack = Payload::Verack(Verack::new(version.nonce, peer_address, node_address));
+        let verack = Payload::Verack(Verack::new(version.nonce));
         write_message_to_stream(verack, &mut peer_stream).await;
 
         // the peer then follows up with a Version message
@@ -492,7 +492,7 @@ mod tests {
 
         // Verack
         let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-        let verack = Verack::new(1u64, peer_stream.local_addr().unwrap(), node.local_address().unwrap());
+        let verack = Verack::new(1u64);
         write_message_to_stream(Payload::Verack(verack), &mut peer_stream).await;
         assert_node_rejected_message(&node, &mut peer_stream).await;
     }
@@ -536,7 +536,7 @@ mod tests {
         };
 
         // in response to the Version, the peer sends a Verack message to finish the handshake
-        let verack = Payload::Verack(Verack::new(version.nonce, peer_address, node_address));
+        let verack = Payload::Verack(Verack::new(version.nonce));
         write_message_to_stream(verack, &mut peer_stream).await;
 
         // the node should now have register the peer as 'connected'
