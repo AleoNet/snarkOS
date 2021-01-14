@@ -147,10 +147,9 @@ impl Handshakes {
 
     /// Returns the state of the handshake at a peer address.
     pub fn get_state(&self, address: SocketAddr) -> Option<HandshakeState> {
-        match self.handshakes.get(&address) {
-            Some(stored_handshake) => Some(stored_handshake.get_state()),
-            None => None,
-        }
+        self.handshakes
+            .get(&address)
+            .map(|stored_handshake| stored_handshake.get_state())
     }
 
     /// Returns a reference to the handshake at a peer address.

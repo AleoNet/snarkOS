@@ -61,9 +61,6 @@ impl Pings {
 
     /// Returns ping state for current peer.
     pub fn get_state(&self, address: SocketAddr) -> Option<PingState> {
-        match self.addresses.get(&address) {
-            Some(stored_ping) => Some(stored_ping.get_state()),
-            None => None,
-        }
+        self.addresses.get(&address).map(|stored_ping| stored_ping.get_state())
     }
 }
