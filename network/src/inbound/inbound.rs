@@ -100,7 +100,7 @@ impl Inbound {
 
                                 let inbound = inbound.clone();
                                 tokio::spawn(async move {
-                                    inbound.listen_for_messages(remote_address, &mut reader).await.unwrap();
+                                    inbound.listen_for_messages(remote_address, &mut reader).await;
                                 });
                             }
                             Err(e) => error!("Failed to accept a connection: {}", e),
@@ -114,7 +114,7 @@ impl Inbound {
         Ok(())
     }
 
-    pub async fn listen_for_messages(&self, addr: SocketAddr, reader: &mut OwnedReadHalf) -> Result<(), NetworkError> {
+    pub async fn listen_for_messages(&self, addr: SocketAddr, reader: &mut OwnedReadHalf) {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut failure;
@@ -139,7 +139,7 @@ impl Inbound {
                             // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
                             // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
                             warn!("Disconnecting from an unreliable peer");
-                            break Ok(()); // the error has already been handled and reported
+                            break; // the error has already been handled and reported
                         }
                         false => {
                             // Sleep for 10 seconds

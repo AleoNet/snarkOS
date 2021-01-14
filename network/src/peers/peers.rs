@@ -274,7 +274,7 @@ impl Peers {
                 // spawn the inbound loop
                 let inbound = self.inbound.clone();
                 tokio::spawn(async move {
-                    inbound.listen_for_messages(remote_address, &mut reader).await.unwrap();
+                    inbound.listen_for_messages(remote_address, &mut reader).await;
                 });
 
                 // save the outbound channel
