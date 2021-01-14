@@ -20,74 +20,58 @@ pub use tcp::*;
 pub mod blocks;
 pub use blocks::*;
 
-use crate::consensus::*;
-use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
-use snarkos_network::{environment::Environment, external::Channel, Server};
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
+pub mod sync;
+
+use crate::{
+    consensus::{FIXTURE_VK, TEST_CONSENSUS},
+    dpc::load_verifying_parameters,
+};
+
+use snarkos_network::{external::Channel, Environment, Server};
 
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::net::{tcp::OwnedReadHalf, TcpListener};
 
-pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
-pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
-pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
+/// Starts a node with the specified bootnodes.
+pub async fn start_node(bootnodes: Vec<String>) -> Server {
+    let storage = FIXTURE_VK.ledger();
+    let memory_pool = snarkos_consensus::MemoryPool::new();
+    let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
+    let consensus = TEST_CONSENSUS.clone();
+    let parameters = load_verifying_parameters();
+    let socket_address = None;
+    let min_peers = 1;
+    let max_peers = 10;
+    let is_bootnode = false;
+    let is_miner = false;
+
+    let environment = Environment::new(
+        Arc::new(RwLock::new(storage)),
+        memory_pool_lock,
+        Arc::new(consensus),
+        Arc::new(parameters),
+        socket_address,
+        min_peers,
+        max_peers,
+        bootnodes,
+        is_bootnode,
+        is_miner,
+        Duration::from_secs(2),
+        Duration::from_secs(2),
+        Duration::from_secs(2),
+    )
+    .unwrap();
+
+    let mut node = Server::new(environment).await.unwrap();
+    node.start().await.unwrap();
+
+    node
+}
 
 /// Puts the current tokio thread to sleep for given milliseconds
 pub async fn sleep(time: u64) {
     tokio::time::sleep(std::time::Duration::from_millis(time)).await;
-}
-
-/// Returns an `Environment` struct with given arguments
-pub fn initialize_test_environment(
-    server_address: Option<SocketAddr>,
-    bootnodes: Vec<String>,
-    storage: Arc<RwLock<MerkleTreeLedger>>,
-    parameters: PublicParameters<Components>,
-) -> anyhow::Result<Environment> {
-    let consensus = Arc::new(TEST_CONSENSUS.clone());
-    let memory_pool = Arc::new(Mutex::new(MemoryPool::new()));
-
-    Ok(Environment::new(
-        storage,
-        memory_pool,
-        consensus,
-        Arc::new(parameters),
-        server_address,
-        1,
-        5,
-        bootnodes,
-        true,
-        false,
-        // Set all sync durations to a generic 10s duration
-        Duration::new(10, 0),
-        Duration::new(10, 0),
-        Duration::new(10, 0),
-    )?)
-}
-
-/// Returns a server struct with given arguments
-pub async fn initialize_test_server(
-    server_address: Option<SocketAddr>,
-    bootnodes: Vec<String>,
-    storage: Arc<RwLock<MerkleTreeLedger>>,
-    parameters: PublicParameters<Components>,
-) -> Server {
-    let environment = initialize_test_environment(server_address, bootnodes, storage, parameters).unwrap();
-
-    // let sync_handler = SyncManager::new(bootnode_address);
-    // let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
-
-    Server::new(environment
-        // consensus,
-        // storage,
-        // parameters,
-        // memory_pool_lock,
-        // sync_handler_lock,
-        // connection_frequency,
-    )
-    .await
-    .unwrap()
 }
 
 /// Starts a server on a new thread. Takes full ownership of server.
