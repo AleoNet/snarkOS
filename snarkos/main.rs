@@ -33,7 +33,7 @@ use snarkvm_models::algorithms::{CRH, SNARK};
 use snarkvm_objects::{AccountAddress, Network};
 use snarkvm_utilities::{to_bytes, ToBytes};
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::{Mutex, RwLock};
 use tokio::{
@@ -133,6 +133,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.p2p.bootnodes.clone(),
         config.node.is_bootnode,
         config.miner.is_miner,
+        // Set sync intervals for peers, blocks and transactions (memory pool).
+        Duration::from_millis(100),
+        Duration::from_millis(100),
+        Duration::from_secs(config.p2p.mempool_interval.into()),
     )?;
 
     // Construct the server instance. Note this does not start the server.

@@ -26,7 +26,7 @@ use snarkos_network::{environment::Environment, external::Channel, Server};
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 
 use parking_lot::{Mutex, RwLock};
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::net::{tcp::OwnedReadHalf, TcpListener};
 
 pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
@@ -61,6 +61,10 @@ pub fn initialize_test_environment(
         bootnodes,
         true,
         false,
+        // Set all sync durations to a generic 10s duration
+        Duration::new(10, 0),
+        Duration::new(10, 0),
+        Duration::new(10, 0),
     )?)
 }
 

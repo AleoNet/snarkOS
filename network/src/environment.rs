@@ -23,7 +23,7 @@ use snarkvm_dpc::base_dpc::{
 use snarkvm_objects::Network;
 
 use parking_lot::{Mutex, RwLock};
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 /// A core data structure containing the networking parameters for this node.
 #[derive(Clone)]
@@ -62,6 +62,12 @@ pub struct Environment {
     is_bootnode: bool,
     /// If `true`, initializes a mining task on this node.
     is_miner: bool,
+    /// The interval between each peer sync.
+    peer_sync_interval: Duration,
+    /// The interval between each block sync.
+    block_sync_interval: Duration,
+    /// The interval between each transaction (memory pool) sync.
+    transaction_sync_interval: Duration,
 }
 
 impl Environment {
@@ -83,6 +89,9 @@ impl Environment {
         bootnodes_addresses: Vec<String>,
         is_bootnode: bool,
         is_miner: bool,
+        peer_sync_interval: Duration,
+        block_sync_interval: Duration,
+        transaction_sync_interval: Duration,
     ) -> Result<Self, NetworkError> {
         // Check that the minimum and maximum number of peers is valid.
         if minimum_number_of_connected_peers == 0 || maximum_number_of_connected_peers == 0 {
@@ -124,6 +133,9 @@ impl Environment {
             bootnodes,
             is_bootnode,
             is_miner,
+            peer_sync_interval,
+            block_sync_interval,
+            transaction_sync_interval,
         })
     }
 
@@ -209,5 +221,20 @@ impl Environment {
     #[inline]
     pub fn current_block_height(&self) -> u32 {
         self.storage.read().get_current_block_height()
+    }
+
+    /// Returns the interval between each peer sync.
+    pub fn peer_sync_interval(&self) -> Duration {
+        self.peer_sync_interval
+    }
+
+    /// Returns the interval between each block sync.
+    pub fn block_sync_interval(&self) -> Duration {
+        self.block_sync_interval
+    }
+
+    /// Returns the interval between each transaction (memory pool) sync.
+    pub fn transaction_sync_interval(&self) -> Duration {
+        self.transaction_sync_interval
     }
 }

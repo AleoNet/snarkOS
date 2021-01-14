@@ -57,10 +57,10 @@ async fn simple_block_sync() {
 
     let node_bob = start_node(vec![alice_address.to_string()]).await;
 
-    // T 0-10s: not much happens
-    // T 11s: first sync occures, a peer isn't yet connected to sync with
-    // T 21s: second sync occures, this time a peer is selected for the block sync
-    sleep(Duration::new(22, 0)).await;
+    // T 0-1s: not much happens
+    // T 1s: first sync occures, a peer isn't yet connected to sync with
+    // T 2s: second sync occures, this time a peer is selected for the block sync
+    sleep(Duration::new(3, 0)).await;
 
     // check blocks present in alice's chain were synced to bob's
     assert!(

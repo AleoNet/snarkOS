@@ -59,7 +59,7 @@ use crate::{
 };
 
 use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
@@ -116,28 +116,50 @@ impl Server {
     }
 
     pub async fn start_services(&self) -> Result<(), NetworkError> {
+        let peer_sync_interval = self.environment.peer_sync_interval();
         let peers = self.peers.clone();
+
+        let block_sync_interval = self.environment.block_sync_interval();
         let blocks = self.blocks.clone();
+
+        let transaction_sync_interval = self.environment.transaction_sync_interval();
         let transactions = self.transactions.clone();
 
         task::spawn(async move {
             loop {
-                sleep(Duration::from_secs(10)).await;
+                sleep(peer_sync_interval).await;
+                info!("Updating peers");
+
+                if let Err(e) = peers.update().await {
+                    error!("Peer update error: {}", e);
+                }
+            }
+        });
+
+        let peers = self.peers.clone();
+        task::spawn(async move {
+            loop {
+                sleep(block_sync_interval).await;
+                info!("Updating blocks");
 
                 // select last seen node as block sync node
                 let sync_node = peers.last_seen();
 
-                info!("Updating peers");
-                if let Err(e) = peers.update().await {
-                    error!("Peer update error: {}", e);
-                }
-
-                info!("Updating blocks");
                 if let Err(e) = blocks.update(sync_node).await {
                     error!("Block update error: {}", e);
                 }
+            }
+        });
 
+        let peers = self.peers.clone();
+        task::spawn(async move {
+            loop {
+                sleep(transaction_sync_interval).await;
                 info!("Updating transactions");
+
+                // select last seen node as block sync node
+                let sync_node = peers.last_seen();
+
                 if let Err(e) = transactions.update(sync_node) {
                     error!("Transaction update error: {}", e);
                 }
@@ -262,7 +284,12 @@ mod tests {
         net::{TcpListener, TcpStream},
     };
 
-    async fn test_node(bootnodes: Vec<String>) -> Server {
+    async fn test_node(
+        bootnodes: Vec<String>,
+        peer_sync_interval: Duration,
+        block_sync_interval: Duration,
+        transaction_sync_interval: Duration,
+    ) -> Server {
         let storage = FIXTURE_VK.ledger();
         let memory_pool = snarkos_consensus::MemoryPool::new();
         let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
@@ -289,6 +316,9 @@ mod tests {
             bootnodes,
             is_bootnode,
             is_miner,
+            peer_sync_interval,
+            block_sync_interval,
+            transaction_sync_interval,
         )
         .unwrap();
 
@@ -308,7 +338,7 @@ mod tests {
 
     #[tokio::test]
     async fn starts_server() {
-        let mut server = test_node(vec![]).await;
+        let mut server = test_node(vec![], Duration::new(10, 0), Duration::new(10, 0), Duration::new(10, 0)).await;
         assert!(server.start().await.is_ok());
         let address = server.local_address().unwrap();
 
@@ -319,7 +349,7 @@ mod tests {
     #[tokio::test]
     async fn handshake_responder_side() {
         // start a test node and listen for incoming connections
-        let mut node = test_node(vec![]).await;
+        let mut node = test_node(vec![], Duration::new(10, 0), Duration::new(10, 0), Duration::new(10, 0)).await;
         node.start().await.unwrap();
         let node_listener = node.local_address().unwrap();
 
@@ -371,7 +401,13 @@ mod tests {
         let peer_address = peer_listener.local_addr().unwrap();
 
         // start node with the peer as a bootnode; that way it will get connected to
-        let mut node = test_node(vec![peer_address.to_string()]).await;
+        let mut node = test_node(
+            vec![peer_address.to_string()],
+            Duration::new(10, 0),
+            Duration::new(10, 0),
+            Duration::new(10, 0),
+        )
+        .await;
         node.start().await.unwrap();
 
         // accept the node's connection on peer side
@@ -426,7 +462,7 @@ mod tests {
     #[tokio::test]
     async fn reject_non_version_messages_before_handshake() {
         // start the node
-        let mut node = test_node(vec![]).await;
+        let mut node = test_node(vec![], Duration::new(10, 0), Duration::new(10, 0), Duration::new(10, 0)).await;
         node.start().await.unwrap();
 
         // start the fake node (peer) which is just a socket
@@ -500,9 +536,19 @@ mod tests {
         assert_node_rejected_message(&node, &mut peer_stream).await;
     }
 
-    async fn handshake() -> (Server, TcpStream) {
+    async fn handshake(
+        peer_sync_interval: Duration,
+        block_sync_interval: Duration,
+        transaction_sync_interval: Duration,
+    ) -> (Server, TcpStream) {
         // start a test node and listen for incoming connections
-        let mut node = test_node(vec![]).await;
+        let mut node = test_node(
+            vec![],
+            peer_sync_interval,
+            block_sync_interval,
+            transaction_sync_interval,
+        )
+        .await;
         node.start().await.unwrap();
         let node_listener = node.local_address().unwrap();
 
@@ -551,15 +597,8 @@ mod tests {
     #[tokio::test]
     async fn sync_initiator_side() {
         // handshake between the fake node and full node
-        let (node, mut peer_stream) = handshake().await;
-
-        // the buffer for peer's reads
-        let mut peer_buf = [0u8; 64];
-
-        // check Version from peer update is received
-        let len = read_header(&mut peer_stream).await.unwrap().len();
-        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-        assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Version(..)));
+        let (node, mut peer_stream) =
+            handshake(Duration::new(100, 0), Duration::new(10, 0), Duration::new(100, 0)).await;
 
         // check GetSync message was received
         let len = read_header(&mut peer_stream).await.unwrap().len();
@@ -625,7 +664,8 @@ mod tests {
     #[tokio::test]
     async fn sync_responder_side() {
         // handshake between the fake and full node
-        let (node, mut peer_stream) = handshake().await;
+        let (node, mut peer_stream) =
+            handshake(Duration::new(100, 0), Duration::new(10, 0), Duration::new(100, 0)).await;
 
         // insert block into node
         let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();

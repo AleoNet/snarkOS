@@ -20,11 +20,12 @@ use snarkos_testing::{
     dpc::load_verifying_parameters,
 };
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use parking_lot::lock_api::{Mutex, RwLock};
 
 /// Starts a node with the specified bootnodes.
+/// TODO (nkls): dedup with testing/network/mod.rs?
 pub async fn start_node(bootnodes: Vec<String>) -> Server {
     let storage = FIXTURE_VK.ledger();
     let memory_pool = snarkos_consensus::MemoryPool::new();
@@ -53,6 +54,9 @@ pub async fn start_node(bootnodes: Vec<String>) -> Server {
         bootnodes,
         is_bootnode,
         is_miner,
+        Duration::new(1, 0),
+        Duration::new(1, 0),
+        Duration::new(1, 0),
     )
     .unwrap();
 
