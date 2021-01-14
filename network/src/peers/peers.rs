@@ -242,7 +242,7 @@ impl Peers {
 
         let block_height = self.environment.current_block_height();
         // TODO (raychu86): Establish a formal node version.
-        let version = Version::new_with_rng(1u64, block_height, own_address, remote_address);
+        let version = Version::new_with_rng(1u64, block_height, own_address.port());
 
         // Set the peer as a connecting peer in the peer book.
         self.connecting_to_peer(remote_address, version.nonce)?;
@@ -348,7 +348,7 @@ impl Peers {
                 // Broadcast a `Version` message to the connected peer.
                 self.outbound.send_request(Message::new(
                     Direction::Outbound(remote_address),
-                    Payload::Version(Version::new(1u64, block_height, nonce, local_address, remote_address)),
+                    Payload::Version(Version::new(1u64, block_height, nonce, local_address.port())),
                 ));
             } else {
                 // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
@@ -435,16 +435,20 @@ impl Peers {
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
-    pub(crate) fn version_to_verack(&self, remote_version: &Version) -> Result<(), NetworkError> {
+    pub(crate) fn version_to_verack(
+        &self,
+        remote_address: SocketAddr,
+        remote_version: &Version,
+    ) -> Result<(), NetworkError> {
         // FIXME(ljedrz): it appears that Verack is not sent back in a 1:1 fashion
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
             self.outbound.send_request(Message::new(
-                Direction::Outbound(remote_version.sender),
+                Direction::Outbound(remote_address),
                 Payload::Verack(Verack::new(remote_version.nonce)),
             ));
 
-            if !self.connected_peers().contains_key(&remote_version.sender) {
-                self.connecting_to_peer(remote_version.sender, remote_version.nonce)?;
+            if !self.connected_peers().contains_key(&remote_address) {
+                self.connecting_to_peer(remote_address, remote_version.nonce)?;
             }
         }
 

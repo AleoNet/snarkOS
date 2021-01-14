@@ -91,7 +91,10 @@ impl Inbound {
                         info!("Got a connection request from {}", remote_address);
 
                         let height = environment.current_block_height();
-                        match inbound.connection_request(height, remote_address, channel).await {
+                        match inbound
+                            .connection_request(height, listener_address, remote_address, channel)
+                            .await
+                        {
                             Ok((channel, mut reader)) => {
                                 // update the remote address to be the peer's listening address
                                 let remote_address = channel.remote_address;
@@ -267,6 +270,7 @@ impl Inbound {
     pub async fn connection_request(
         &self,
         block_height: u32,
+        listener_address: SocketAddr,
         remote_address: SocketAddr,
         stream: TcpStream,
     ) -> Result<(Channel, OwnedReadHalf), NetworkError> {
@@ -287,16 +291,13 @@ impl Inbound {
 
         // Create and store a new handshake in the manager.
         if let Payload::Version(remote_version) = message.payload {
-            // This is the node's address as seen by the peer.
-            let local_address = remote_version.receiver;
-
             // Create the remote address from the given peer address, and specified port from the version message.
-            let remote_address = SocketAddr::new(remote_address.ip(), remote_version.sender.port());
+            let remote_address = SocketAddr::new(remote_address.ip(), remote_version.listening_port);
 
             let channel = channel.update_address(remote_address).await?;
 
             // TODO (raychu86): Establish a formal node version.
-            let local_version = Version::new_with_rng(1u64, block_height, local_address, remote_address);
+            let local_version = Version::new_with_rng(1u64, block_height, listener_address.port());
 
             // notify the server that the peer is being connected to
             self.sender

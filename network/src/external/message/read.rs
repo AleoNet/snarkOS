@@ -59,13 +59,7 @@ mod tests {
     async fn test_write_read_message() {
         let (address, listener) = random_bound_address().await;
 
-        let expected = Payload::Version(Version::new(
-            1u64,
-            0u32,
-            1u64,
-            "127.0.0.1:4131".parse().unwrap(),
-            "127.0.0.1:4141".parse().unwrap(),
-        ));
+        let expected = Payload::Version(Version::new(1, 0, 1, 4131));
         let version = expected.clone();
 
         tokio::spawn(async move {

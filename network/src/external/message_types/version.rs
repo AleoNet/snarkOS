@@ -18,8 +18,6 @@ use chrono::Utc;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use std::net::SocketAddr;
-
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Version {
@@ -29,37 +27,33 @@ pub struct Version {
     pub height: u32,
     /// The random nonce of the connection request.
     pub nonce: u64,
-    /// The IP address of the sender.
-    pub sender: SocketAddr,
-    /// The IP address of the recipient.
-    pub receiver: SocketAddr,
+    /// The listening port of the sender.
+    pub listening_port: u16,
     /// The timestamp of this message.
     pub timestamp: i64,
 }
 
 impl Version {
-    pub fn new(version: u64, height: u32, nonce: u64, sender: SocketAddr, receiver: SocketAddr) -> Self {
+    pub fn new(version: u64, height: u32, nonce: u64, listening_port: u16) -> Self {
         Self {
             version,
             height,
             nonce,
-            sender,
-            receiver,
+            listening_port,
             timestamp: Utc::now().timestamp(),
         }
     }
 
     // currently used for the handshakes, but it's a stop-gap; TODO(ljedrz): replace with a solution that
     // is bound to a setup that also encrypts the post-handshake communication
-    pub fn new_with_rng(version: u64, height: u32, sender: SocketAddr, receiver: SocketAddr) -> Self {
+    pub fn new_with_rng(version: u64, height: u32, listening_port: u16) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             version,
             height,
             nonce: rng.gen::<u64>(),
-            sender,
-            receiver,
+            listening_port,
             timestamp: Utc::now().timestamp(),
         }
     }

@@ -188,7 +188,7 @@ impl Server {
                 }
             }
             Payload::Version(version) => {
-                self.peers.version_to_verack(&version)?;
+                self.peers.version_to_verack(source.unwrap(), &version)?;
             }
             Payload::Verack(verack) => {
                 self.peers.verack(&verack);
@@ -324,10 +324,9 @@ mod tests {
 
         // register the addresses bound to the connection between the node and the peer
         let peer_address = peer_stream.local_addr().unwrap();
-        let node_address = peer_stream.peer_addr().unwrap();
 
         // the peer initiates a handshake by sending a Version message
-        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address, node_address));
+        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address.port()));
         write_message_to_stream(version, &mut peer_stream).await;
 
         // at this point the node should have marked the peer as ' connecting'
@@ -372,7 +371,7 @@ mod tests {
         node.start().await.unwrap();
 
         // accept the node's connection on peer side
-        let (mut peer_stream, node_address) = peer_listener.accept().await.unwrap();
+        let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
 
         // the buffer for peer's reads
         let mut peer_buf = [0u8; 64];
@@ -394,7 +393,7 @@ mod tests {
         write_message_to_stream(verack, &mut peer_stream).await;
 
         // the peer then follows up with a Version message
-        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address, node_address));
+        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address.port()));
         write_message_to_stream(version, &mut peer_stream).await;
 
         // the node should now have registered the peer as 'connected'
@@ -508,10 +507,9 @@ mod tests {
 
         // register the addresses bound to the connection between the node and the peer
         let peer_address = peer_stream.local_addr().unwrap();
-        let node_address = peer_stream.peer_addr().unwrap();
 
         // the peer initiates a handshake by sending a Version message
-        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address, node_address));
+        let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address.port()));
         write_message_to_stream(version, &mut peer_stream).await;
 
         // at this point the node should have marked the peer as ' connecting'
