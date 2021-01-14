@@ -81,40 +81,16 @@ impl Channel {
 }
 
 /// Reads a message header + payload.
-pub(crate) async fn read_from_stream(addr: SocketAddr, reader: &mut OwnedReadHalf) -> Result<Message, ConnectError> {
+pub(crate) async fn read_from_stream(
+    addr: SocketAddr,
+    reader: &mut OwnedReadHalf,
+    buffer: &mut [u8],
+) -> Result<Message, ConnectError> {
     let header = read_header(reader).await?;
-    let payload = read_message(reader, header.len as usize).await?;
+    let payload = read_payload(reader, &mut buffer[..header.len()]).await?;
     let payload = bincode::deserialize(&payload).map_err(|e| ConnectError::MessageError(e.into()))?;
 
     debug!("Received a '{}' message from {}", payload, addr);
 
     Ok(Message::new(Direction::Inbound(addr), payload))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use snarkos_testing::network::random_bound_address;
-
-    #[tokio::test]
-    async fn channel_read() {
-        let (remote_address, remote_listener) = random_bound_address().await;
-
-        tokio::spawn(async move {
-            // 1. Server connects to peer.
-            let (server_channel, _server_reader) = Channel::from_addr(remote_address).await.unwrap();
-
-            // 2. Server writes GetPeers message.
-            server_channel.write(&Payload::GetPeers).await.unwrap();
-        });
-
-        // 2. Peer accepts server connection.
-        let (stream, address) = remote_listener.accept().await.unwrap();
-        let (_peer_channel, mut peer_reader) = Channel::new(address, stream);
-
-        // 4. Peer reads GetPeers message.
-        let message = read_from_stream(address, &mut peer_reader).await.unwrap();
-
-        assert!(matches!(message.payload, Payload::GetPeers));
-    }
 }

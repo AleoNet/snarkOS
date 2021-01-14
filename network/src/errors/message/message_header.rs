@@ -27,8 +27,8 @@ pub enum MessageHeaderError {
     #[error("{}", _0)]
     Message(String),
 
-    #[error("Invalid message header length {}. Expected length of 16", _0)]
-    InvalidLength(usize),
+    #[error("The message is too big ({}B). Maximum size: {}", _0, _1)]
+    TooBig(usize, usize),
 
     #[error("{}", _0)]
     StreamReadError(StreamReadError),

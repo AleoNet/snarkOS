@@ -118,13 +118,14 @@ impl Inbound {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut failure;
+        let mut buffer = vec![0u8; MAX_MESSAGE_SIZE];
 
         loop {
             // Reset the failure indicator.
             failure = false;
 
             // Read the next message from the channel. This is a blocking operation.
-            let message = match read_from_stream(addr, reader).await {
+            let message = match read_from_stream(addr, reader, &mut buffer).await {
                 Ok(message) => message,
                 Err(error) => {
                     Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
@@ -272,9 +273,11 @@ impl Inbound {
         // Register the new channel.
         let (channel, mut reader) = Channel::new(remote_address, stream);
 
+        let mut handshake_buffer = [0u8; 64];
+
         // Read the next message from the channel.
         // Note: this is a blocking operation.
-        let message = match read_from_stream(remote_address, &mut reader).await {
+        let message = match read_from_stream(remote_address, &mut reader, &mut handshake_buffer).await {
             Ok(message) => message,
             Err(e) => {
                 error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -342,7 +345,7 @@ impl Inbound {
             channel.write(&Payload::Version(local_version.clone())).await?;
 
             // Parse the inbound message into the message name and message bytes.
-            let message = read_from_stream(remote_address, &mut reader).await?;
+            let message = read_from_stream(remote_address, &mut reader, &mut handshake_buffer).await?;
 
             // Deserialize the message bytes into a verack message.
             if !matches!(message.payload, Payload::Verack(..)) {

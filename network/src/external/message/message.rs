@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 
 use std::{fmt, net::SocketAddr};
 
+pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {
     Inbound(SocketAddr),

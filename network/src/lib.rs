@@ -334,16 +334,18 @@ mod tests {
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connecting(&peer_address));
 
+        // the buffer for peer's reads
+        let mut peer_buf = [0u8; 64];
+
         // check if the peer has received the Verack message from the node
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        assert!(matches!(bincode::deserialize(&message).unwrap(), Payload::Verack(..)));
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Verack(..)));
 
         // check if it was followed by a Version message
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        let version = if let Payload::Version(version) = message {
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
             version
         } else {
             unreachable!();
@@ -372,10 +374,13 @@ mod tests {
         // accept the node's connection on peer side
         let (mut peer_stream, node_address) = peer_listener.accept().await.unwrap();
 
+        // the buffer for peer's reads
+        let mut peer_buf = [0u8; 64];
+
         // the peer should receive a Version message from the node (initiator of the handshake)
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message = read_message(&mut peer_stream, header.len as usize).await.unwrap();
-        let version = if let Payload::Version(version) = bincode::deserialize(&message).unwrap() {
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
             version
         } else {
             unreachable!();
@@ -513,17 +518,18 @@ mod tests {
         sleep(Duration::from_millis(200)).await;
         assert!(node.peers.is_connecting(&peer_address));
 
+        // the buffer for peer's reads
+        let mut peer_buf = [0u8; 64];
+
         // check if the peer has received the Verack message from the node
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        assert!(matches!(message, Payload::Verack(_)));
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Verack(_)));
 
         // check if it was followed by a Version message
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        let version = if let Payload::Version(version) = message {
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
             version
         } else {
             unreachable!();
@@ -545,17 +551,18 @@ mod tests {
         // handshake between the fake node and full node
         let (node, mut peer_stream) = handshake().await;
 
+        // the buffer for peer's reads
+        let mut peer_buf = [0u8; 64];
+
         // check Version from peer update is received
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        assert!(matches!(message, Payload::Version(..)));
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Version(..)));
 
         // check GetSync message was received
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        assert!(matches!(message, Payload::GetSync(..)));
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::GetSync(..)));
 
         let block_1_header_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
         let block_2_header_hash = BlockHeaderHash::new(BLOCK_2_HEADER_HASH.to_vec());
@@ -568,10 +575,9 @@ mod tests {
         write_message_to_stream(sync, &mut peer_stream).await;
 
         // make sure both GetBlock messages are received
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        let block_hash = if let Payload::GetBlock(block_hash) = message {
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        let block_hash = if let Payload::GetBlock(block_hash) = bincode::deserialize(&payload).unwrap() {
             block_hash
         } else {
             unreachable!();
@@ -579,10 +585,9 @@ mod tests {
 
         assert_eq!(block_hash, block_1_header_hash);
 
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        let block_hash = if let Payload::GetBlock(block_hash) = message {
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        let block_hash = if let Payload::GetBlock(block_hash) = bincode::deserialize(&payload).unwrap() {
             block_hash
         } else {
             unreachable!();
@@ -636,11 +641,13 @@ mod tests {
         let get_sync = Payload::GetSync(vec![]);
         write_message_to_stream(get_sync, &mut peer_stream).await;
 
+        // the buffer for peer's reads
+        let mut peer_buf = [0u8; 4096];
+
         // receive a Sync message from the node with the block header
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        let sync = if let Payload::Sync(sync) = message {
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        let sync = if let Payload::Sync(sync) = bincode::deserialize(&payload).unwrap() {
             sync
         } else {
             unreachable!();
@@ -656,10 +663,9 @@ mod tests {
         write_message_to_stream(get_block, &mut peer_stream).await;
 
         // receive a SyncBlock message with the requested block
-        let header = read_header(&mut peer_stream).await.unwrap();
-        let message =
-            bincode::deserialize(&read_message(&mut peer_stream, header.len as usize).await.unwrap()).unwrap();
-        let block = if let Payload::SyncBlock(block) = message {
+        let len = read_header(&mut peer_stream).await.unwrap().len();
+        let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+        let block = if let Payload::SyncBlock(block) = bincode::deserialize(&payload).unwrap() {
             block
         } else {
             unreachable!();

@@ -14,29 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::message::{MessageError, MessageHeaderError, StreamReadError},
-    external::message::MessageHeader,
-};
+use crate::{errors::message::*, external::message::*};
 
 use tokio::{io::AsyncRead, prelude::*};
 
 /// Returns message bytes read from an input stream.
-pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) -> Result<Vec<u8>, MessageError> {
-    let mut buffer: Vec<u8> = vec![0; len];
-
-    stream_read(&mut stream, &mut buffer).await?;
+pub async fn read_payload<'a, T: AsyncRead + Unpin>(
+    mut stream: &mut T,
+    buffer: &'a mut [u8],
+) -> Result<&'a [u8], MessageError> {
+    stream_read(&mut stream, buffer).await?;
 
     Ok(buffer)
 }
 
 /// Returns a message header read from an input stream.
 pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
-    let mut buffer = [0u8; 4];
+    let mut header_arr = [0u8; 4];
+    stream_read(&mut stream, &mut header_arr).await?;
+    let header = MessageHeader::from(header_arr);
 
-    stream_read(&mut stream, &mut buffer).await?;
-
-    Ok(MessageHeader::from(buffer))
+    if header.len as usize > MAX_MESSAGE_SIZE {
+        return Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE));
+    } else {
+        Ok(header)
+    }
 }
 
 /// Reads bytes from an input stream to fill the buffer.
@@ -48,52 +50,13 @@ async fn stream_read<'a, T: AsyncRead + Unpin>(stream: &'a mut T, buffer: &'a mu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::{message::*, message_types::Version};
+    use crate::external::message_types::Version;
     use snarkos_testing::network::random_bound_address;
 
     use tokio::net::TcpStream;
 
     #[tokio::test]
-    async fn read_multiple_headers() {
-        let (address, listener) = random_bound_address().await;
-
-        tokio::spawn(async move {
-            let header = MessageHeader::from([0, 0, 0, 4]);
-            let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&header.as_bytes()[..]).await.unwrap();
-            let header = MessageHeader::from([0, 0, 0, 8]);
-            stream.write_all(&header.as_bytes()[..]).await.unwrap();
-        });
-
-        let (mut stream, _socket) = listener.accept().await.unwrap();
-        let mut buf = [0u8; 4];
-        stream_read(&mut stream, &mut buf).await.unwrap();
-
-        assert_eq!(MessageHeader::from([0, 0, 0, 4]), MessageHeader::from(buf));
-
-        let mut buf = [0u8; 4];
-        stream_read(&mut stream, &mut buf).await.unwrap();
-
-        assert_eq!(MessageHeader::from([0, 0, 0, 8]), MessageHeader::from(buf));
-    }
-
-    #[tokio::test]
-    async fn test_read_header() {
-        let (address, listener) = random_bound_address().await;
-
-        tokio::spawn(async move {
-            let header = MessageHeader::from([0, 0, 0, 4]);
-            let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&header.as_bytes()[..]).await.unwrap();
-        });
-
-        let (mut stream, _socket) = listener.accept().await.unwrap();
-        let header = read_header(&mut stream).await.unwrap();
-        assert_eq!(MessageHeader::from([0, 0, 0, 4]), header);
-    }
-
-    #[tokio::test]
-    async fn test_read_message() {
+    async fn test_write_read_message() {
         let (address, listener) = random_bound_address().await;
 
         let expected = Payload::Version(Version::new(
@@ -107,13 +70,20 @@ mod tests {
 
         tokio::spawn(async move {
             let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&bincode::serialize(&version).unwrap()).await.unwrap();
+            let payload_bytes = bincode::serialize(&version).unwrap();
+            let header = MessageHeader::from(payload_bytes.len());
+
+            stream.write_all(&header.as_bytes()).await.unwrap();
+            stream.write_all(&payload_bytes).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
 
-        let buffer = read_message(&mut stream, 52usize).await.unwrap();
-        let candidate = bincode::deserialize(&buffer).unwrap();
+        let mut buffer = [0u8; 52];
+        let header = read_header(&mut stream).await.unwrap();
+        let payload_bytes = read_payload(&mut stream, &mut buffer[..header.len()]).await.unwrap();
+        let candidate = bincode::deserialize(&payload_bytes).unwrap();
+
         assert_eq!(expected, candidate);
     }
 }

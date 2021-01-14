@@ -22,9 +22,24 @@ pub struct MessageHeader {
     pub len: u32,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl MessageHeader {
     pub fn as_bytes(&self) -> [u8; 4] {
         self.len.to_be_bytes()
+    }
+
+    pub fn len(&self) -> usize {
+        self.len as usize
+    }
+}
+
+impl From<usize> for MessageHeader {
+    fn from(len: usize) -> Self {
+        assert!(len < u32::max as usize);
+
+        let len = len as u32;
+
+        Self { len }
     }
 }
 
