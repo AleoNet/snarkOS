@@ -596,6 +596,9 @@ mod tests {
         let (node, mut peer_stream) =
             handshake(Duration::new(100, 0), Duration::new(10, 0), Duration::new(100, 0)).await;
 
+        // the buffer for peer's reads
+        let mut peer_buf = [0u8; 64];
+
         // check GetSync message was received
         let len = read_header(&mut peer_stream).await.unwrap().len();
         let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
