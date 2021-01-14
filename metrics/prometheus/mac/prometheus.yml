@@ -1,0 +1,13 @@
+global:
+  scrape_interval:     5s
+  evaluation_interval: 5s
+
+scrape_configs:
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:9090'] # Only works on Docker Desktop for Mac
+
+  - job_name: 'service-collector'
+    static_configs:
+      - targets: ['docker.for.mac.host.internal:8080']
