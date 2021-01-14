@@ -28,7 +28,7 @@ pub trait CLI {
     const SUBCOMMANDS: &'static [SubCommandType];
 
     #[cfg_attr(tarpaulin, skip)]
-    fn new<'a>() -> ArgMatches<'a> {
+    fn args<'a>() -> ArgMatches<'a> {
         let flags = &Self::FLAGS
             .iter()
             .map(|a| Arg::from_usage(a))

@@ -282,10 +282,8 @@ impl Server {
                 transaction,
             };
 
-            if let Ok(inserted) = memory_pool.insert(&self.storage, entry) {
-                if let Some(txid) = inserted {
-                    debug!("Transaction added to memory pool with txid: {:?}", hex::encode(&txid));
-                }
+            if let Ok(Some(txid)) = memory_pool.insert(&self.storage, entry) {
+                debug!("Transaction added to memory pool with txid: {:?}", hex::encode(&txid));
             }
         }
 

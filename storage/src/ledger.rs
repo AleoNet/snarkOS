@@ -122,7 +122,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
                 let mut cm_and_indices = vec![];
 
-                for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT)? {
+                for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT) {
                     let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
                     let index = bytes_to_u32(index_value.to_vec()) as usize;
 
@@ -190,9 +190,8 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Retrieve a value given a key.
     pub(crate) fn get(&self, col: u32, key: &[u8]) -> Result<Vec<u8>, StorageError> {
-        match self.storage.get(col, key)? {
-            Some(data) => Ok(data),
-            None => Err(StorageError::MissingValue(hex::encode(key))),
-        }
+        self.storage
+            .get(col, key)?
+            .ok_or_else(|| StorageError::MissingValue(hex::encode(key)))
     }
 }

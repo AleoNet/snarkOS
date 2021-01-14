@@ -50,10 +50,7 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     path: &PathBuf,
 ) -> Result<Ledger<T, P>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-    let storage = match Storage::open_cf(path, NUM_COLS) {
-        Ok(storage) => storage,
-        Err(err) => return Err(LedgerError::StorageError(err)),
-    };
+    let storage = Storage::open_cf(path, NUM_COLS).map(|storage| {storage}).map_err(|err| { LedgerError::StorageError(err) })?;
 
     let leaves: Vec<[u8; 32]> = vec![];
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
