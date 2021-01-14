@@ -298,8 +298,6 @@ mod tests {
         let socket_address = None;
         let min_peers = 1;
         let max_peers = 10;
-        let sync_interval = 100;
-        let mempool_interval = 5;
         let is_bootnode = false;
         let is_miner = false;
 
@@ -311,8 +309,6 @@ mod tests {
             socket_address,
             min_peers,
             max_peers,
-            sync_interval,
-            mempool_interval,
             bootnodes,
             is_bootnode,
             is_miner,

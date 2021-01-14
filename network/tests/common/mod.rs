@@ -35,8 +35,6 @@ pub async fn start_node(bootnodes: Vec<String>) -> Server {
     let socket_address = None;
     let min_peers = 2;
     let max_peers = 50;
-    let sync_interval = 10;
-    let mempool_interval = 5;
     let is_bootnode = false;
     let is_miner = false;
 
@@ -48,15 +46,14 @@ pub async fn start_node(bootnodes: Vec<String>) -> Server {
         socket_address,
         min_peers,
         max_peers,
-        sync_interval,
-        mempool_interval,
         // TODO: these should probably be a 'Vec<SocketAddr>'.
         bootnodes,
         is_bootnode,
         is_miner,
-        Duration::new(1, 0),
-        Duration::new(1, 0),
-        Duration::new(1, 0),
+        // Set sync intervals to minimum allowed durations.
+        Duration::new(2, 0),
+        Duration::new(2, 0),
+        Duration::new(2, 0),
     )
     .unwrap();
 

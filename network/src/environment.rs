@@ -48,13 +48,6 @@ pub struct Environment {
     /// The maximum number of peers permitted to maintain connections with.
     maximum_number_of_connected_peers: u16,
 
-    /// TODO (howardwu): Rename CONNECTION_FREQUENCY to this.
-    /// The number of milliseconds this node waits to perform a periodic sync with its peers.
-    sync_interval: u64,
-    /// TODO (howardwu): this is not in seconds. deprecate this and rearchitect it.
-    /// The number of seconds this node waits to request memory pool transactions from its peers.
-    memory_pool_interval: u8,
-
     /// The default bootnodes of the network.
     bootnodes: Vec<SocketAddr>,
     /// If `true`, initializes this node as a bootnode and forgoes connecting
@@ -62,6 +55,7 @@ pub struct Environment {
     is_bootnode: bool,
     /// If `true`, initializes a mining task on this node.
     is_miner: bool,
+
     /// The interval between each peer sync.
     peer_sync_interval: Duration,
     /// The interval between each block sync.
@@ -83,12 +77,11 @@ impl Environment {
 
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
-        sync_interval: u64,
-        memory_pool_interval: u8,
 
         bootnodes_addresses: Vec<String>,
         is_bootnode: bool,
         is_miner: bool,
+
         peer_sync_interval: Duration,
         block_sync_interval: Duration,
         transaction_sync_interval: Duration,
@@ -99,7 +92,7 @@ impl Environment {
         }
 
         // Check that the sync interval is a reasonable number of seconds.
-        if !(2..=300).contains(&sync_interval) {
+        if !(2..=300).contains(&peer_sync_interval.as_secs()) && !(2..=300).contains(&block_sync_interval.as_secs()) {
             return Err(NetworkError::SyncIntervalInvalid);
         }
 
@@ -127,8 +120,6 @@ impl Environment {
 
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
-            sync_interval,
-            memory_pool_interval,
 
             bootnodes,
             is_bootnode,
@@ -203,18 +194,6 @@ impl Environment {
     #[inline]
     pub fn maximum_number_of_connected_peers(&self) -> u16 {
         self.maximum_number_of_connected_peers
-    }
-
-    /// Returns the sync interval of this node.
-    #[inline]
-    pub fn sync_interval(&self) -> u64 {
-        self.sync_interval
-    }
-
-    /// Returns the memory pool interval of this node.
-    #[inline]
-    pub fn memory_pool_interval(&self) -> u8 {
-        self.memory_pool_interval
     }
 
     /// Returns the current block height of the ledger from storage.

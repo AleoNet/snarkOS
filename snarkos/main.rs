@@ -128,8 +128,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Some(socket_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
-        100,
-        config.p2p.mempool_interval,
         config.p2p.bootnodes.clone(),
         config.node.is_bootnode,
         config.miner.is_miner,

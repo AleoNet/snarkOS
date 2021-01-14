@@ -56,8 +56,6 @@ pub fn initialize_test_environment(
         server_address,
         1,
         5,
-        100,
-        10,
         bootnodes,
         true,
         false,
