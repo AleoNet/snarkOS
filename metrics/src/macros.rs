@@ -52,7 +52,7 @@ macro_rules! connected_peers_dec {
 #[cfg(test)]
 mod tests {
     use crate::Metrics;
-    use snarkos_derives::test_with_metrics;
+    use snarkvm_derives::test_with_metrics;
 
     use serial_test::serial;
 

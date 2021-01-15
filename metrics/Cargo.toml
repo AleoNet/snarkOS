@@ -19,6 +19,6 @@ tokio = { version = "0.2.22", features = ["full"] }
 warp = { version = "0.2" }
 
 [dev-dependencies]
-snarkos-derives = { path = "../derives" }
+snarkvm-derives = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
 
 serial_test = { version = "0.5.0" }
