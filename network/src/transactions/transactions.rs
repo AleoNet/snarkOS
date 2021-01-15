@@ -92,26 +92,28 @@ impl Transactions {
         connected_peers: HashMap<SocketAddr, PeerInfo>,
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&*transaction) {
-            let parameters = self.environment.dpc_parameters();
-            let storage = self.environment.storage();
-            let consensus = self.environment.consensus_parameters();
+            let insertion = {
+                let parameters = self.environment.dpc_parameters();
+                let storage = self.environment.storage().read();
+                let consensus = self.environment.consensus_parameters();
 
-            if !consensus.verify_transaction(parameters, &tx, &*storage.read())? {
-                error!("Received a transaction that was invalid");
-                return Ok(());
-            }
+                if !consensus.verify_transaction(parameters, &tx, &storage)? {
+                    error!("Received a transaction that was invalid");
+                    return Ok(());
+                }
 
-            if tx.value_balance.is_negative() {
-                error!("Received a transaction that was a coinbase transaction");
-                return Ok(());
-            }
+                if tx.value_balance.is_negative() {
+                    error!("Received a transaction that was a coinbase transaction");
+                    return Ok(());
+                }
 
-            let entry = Entry::<Tx> {
-                size_in_bytes: transaction.len(),
-                transaction: tx,
+                let entry = Entry::<Tx> {
+                    size_in_bytes: transaction.len(),
+                    transaction: tx,
+                };
+
+                self.environment.memory_pool().lock().insert(&storage, entry)
             };
-
-            let insertion = self.environment.memory_pool().lock().insert(&storage.read(), entry);
 
             if let Ok(inserted) = insertion {
                 if inserted.is_some() {
@@ -155,6 +157,7 @@ impl Transactions {
     /// A peer has sent us their memory pool transactions.
     pub(crate) fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
         let mut memory_pool = self.environment.memory_pool().lock();
+        let storage = self.environment.storage().read();
 
         for transaction_bytes in transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;
@@ -163,7 +166,7 @@ impl Transactions {
                 transaction,
             };
 
-            if let Ok(Some(txid)) = memory_pool.insert(&*self.environment.storage().read(), entry) {
+            if let Ok(Some(txid)) = memory_pool.insert(&storage, entry) {
                 debug!(
                     "Transaction added to memory pool with txid: {:?}",
                     hex::encode(txid.clone())
@@ -174,11 +177,11 @@ impl Transactions {
         //  Cleanse and store transactions once batch has been received.
         debug!("Cleansing memory pool transactions in database");
         memory_pool
-            .cleanse(&self.environment.storage().read())
+            .cleanse(&storage)
             .unwrap_or_else(|error| debug!("Failed to cleanse memory pool transactions in database {}", error));
         debug!("Storing memory pool transactions in database");
         memory_pool
-            .store(&self.environment.storage().read())
+            .store(&storage)
             .unwrap_or_else(|error| debug!("Failed to store memory pool transaction in database {}", error));
 
         Ok(())
