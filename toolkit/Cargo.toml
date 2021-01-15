@@ -29,7 +29,7 @@ snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1
 hex = { version = "0.4.2" }
 rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
 thiserror = { version = "1.0" }
-wasm-bindgen = { version = "0.2.68" }
+wasm-bindgen = { version = "0.2.69" }
 
 [dev-dependencies]
 criterion = { version = "0.3.1" }
