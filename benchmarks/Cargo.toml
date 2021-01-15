@@ -29,7 +29,7 @@ derivative = { version = "2" }
 digest = { version = "0.7" }
 rand = { version = "0.7" }
 rayon = { version = "1" }
-smallvec = { version = "1.4" }
+smallvec = { version = "1.6" }
 criterion = "0.3.3"
 
 [dev-dependencies]

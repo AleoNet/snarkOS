@@ -103,8 +103,8 @@ impl Storage {
 
     /// Returns the iterator from a given col.
     /// If the given key does not exist, returns [StorageError](snarkvm_errors::storage::StorageError).
-    pub(crate) fn get_iter(&self, col: u32) -> Result<DBIterator, StorageError> {
-        Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start))
+    pub(crate) fn get_iter(&self, col: u32) -> DBIterator {
+        self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start)
     }
 
     /// Returns `Ok(())` after executing a database transaction

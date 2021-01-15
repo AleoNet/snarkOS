@@ -60,7 +60,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the set of past ledger digests
     pub fn past_digests(&self) -> Result<HashSet<Vec<u8>>, StorageError> {
         let mut digests = HashSet::new();
-        for (key, _value) in self.storage.get_iter(COL_DIGEST)? {
+        for (key, _value) in self.storage.get_iter(COL_DIGEST) {
             digests.insert(key.to_vec());
         }
 
@@ -114,7 +114,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         // TODO (raychu86) make this more efficient
         let mut cm_and_indices = additional_cms;
 
-        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT)? {
+        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT) {
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
             let index = bytes_to_u32(index_value.to_vec()) as usize;
 

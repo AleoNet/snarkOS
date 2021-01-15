@@ -42,10 +42,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
     /// Instantiates a new ledger with a genesis block.
     fn new(path: &PathBuf, parameters: Self::MerkleParameters, genesis_block: Self::Block) -> anyhow::Result<Self> {
         fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-        let storage = match Storage::open_cf(path, NUM_COLS) {
-            Ok(storage) => storage,
-            Err(err) => return Err(err.into()),
-        };
+        let storage = Storage::open_cf(path, NUM_COLS)?;
 
         if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())? {
             if bytes_to_u32(block_num) != 0 {

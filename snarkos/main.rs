@@ -198,7 +198,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 }
 
 fn main() -> Result<(), NodeError> {
-    let arguments = ConfigCli::new();
+    let arguments = ConfigCli::args();
+
     let config: Config = ConfigCli::parse(&arguments)?;
     let node_span = debug_span!("node");
 
