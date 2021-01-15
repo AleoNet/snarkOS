@@ -128,17 +128,6 @@ impl Blocks {
                 if is_new_block {
                     self.propagate_block(block, remote_address, &connected_peers).await?;
                 }
-            } else {
-                /* TODO (howardwu): Implement this.
-                {
-                    sync_manager.clear_pending().await;
-
-                    if sync_manager.sync_state != SyncState::Idle {
-                        // We are currently syncing with a node, ask for the next block.
-                        sync_manager.increment().await?;
-                    }
-                }
-                */
             }
         }
 

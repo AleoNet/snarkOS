@@ -153,14 +153,6 @@ impl Inbound {
                 }
             };
 
-            /* TODO: enable again when Inbound::receive_version does something
-            if let Payload::Version(version) = message.payload {
-                if let Err(e) = self.receive_version(version, channel).await {
-                    error!("Failed to process an inbound Version: {}", e);
-                }
-            }
-            */
-
             // Messages are received by a single tokio MPSC receiver with
             // the message name, bytes, and associated channel.
             //
@@ -208,47 +200,6 @@ impl Inbound {
             .lock()
             .take()
             .expect("The Inbound Receiver had already been taken!")
-    }
-
-    /// A connected peer has sent handshake request.
-    /// If peer's block height is greater than ours, send a sync request.
-    ///
-    /// This method may seem redundant to handshake protocol functions but a peer can send additional
-    /// Version messages if they want to update their ip address/port or want to share their chain height.
-    #[allow(dead_code)]
-    async fn receive_version(&self, _version: Version, _channel: Channel) -> Result<(), NetworkError> {
-        // TODO (howardwu): Implement this.
-        {
-            // // If our peer has a longer chain, send a sync message
-            // if version.height > environment.storage_read().await.get_current_block_height() {
-            //     debug!("Received a version message with a greater height {}", version.height);
-            //     // Update the sync node if the sync_handler is idle and there are no requested block headers
-            //     if let Ok(mut sync_handler) = environment.sync_manager().await.try_lock() {
-            //         if !sync_handler.is_syncing()
-            //             && (sync_handler.block_headers.len() == 0 && sync_handler.pending_blocks.is_empty())
-            //         {
-            //             debug!("Attempting to sync with peer {}", remote_address);
-            //             sync_handler.sync_node_address = remote_address;
-            //
-            //             if let Ok(block_locator_hashes) = environment.storage_read().await.get_block_locator_hashes() {
-            //                 channel.write(&GetSync::new(block_locator_hashes)).await?;
-            //             }
-            //         } else {
-            //             // TODO (howardwu): Implement this.
-            //             {
-            //                 // if let Some(channel) = environment
-            //                 //     .peers_read()
-            //                 //     .await
-            //                 //     .get_channel(&sync_handler.sync_node_address)
-            //                 // {
-            //                 //     sync_handler.increment(channel.clone()).await?;
-            //                 // }
-            //             }
-            //         }
-            //     }
-            // }
-        }
-        Ok(())
     }
 
     ///
@@ -306,32 +257,6 @@ impl Inbound {
                     Payload::ConnectingTo(remote_address, local_version.nonce),
                 ))
                 .await?;
-
-            // TODO (howardwu): Enable this sync logic if block height is lower than peer again.
-            // if let Some(version) = version_message {
-            //     // If our peer has a longer chain, send a sync message
-            //     if version.height > environment.current_block_height().await {
-            //         // Update the sync node if the sync_handler is Idle
-            //         if let Ok(mut sync_handler) = sync_manager.try_lock() {
-            //             if !sync_handler.is_syncing() {
-            //                 sync_handler.sync_node_address = handshake.channel.address;
-            //
-            //                 if let Ok(block_locator_hashes) =
-            //                     environment.storage_read().await.get_block_locator_hashes()
-            //                 {
-            //                     if let Err(err) =
-            //                         handshake.channel.write(&GetSync::new(block_locator_hashes)).await
-            //                     {
-            //                         error!(
-            //                             "Error sending GetSync message to {}, {}",
-            //                             handshake.channel.address, err
-            //                         );
-            //                     }
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
 
             // Write a verack response to the remote peer.
             channel
