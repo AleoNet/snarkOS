@@ -226,7 +226,7 @@ impl Inbound {
         stream: TcpStream,
     ) -> Result<(Channel, OwnedReadHalf), NetworkError> {
         // Register the new channel.
-        let (channel, mut reader) = Channel::new(remote_address, stream);
+        let (mut channel, mut reader) = Channel::new(remote_address, stream);
 
         let mut handshake_buffer = [0u8; 64];
 
@@ -245,7 +245,7 @@ impl Inbound {
             // Create the remote address from the given peer address, and specified port from the version message.
             let remote_address = SocketAddr::new(remote_address.ip(), remote_version.listening_port);
 
-            let channel = channel.update_address(remote_address).await?;
+            channel.update_address(remote_address).await;
 
             // TODO (raychu86): Establish a formal node version.
             let local_version = Version::new_with_rng(1u64, block_height, listener_address.port());

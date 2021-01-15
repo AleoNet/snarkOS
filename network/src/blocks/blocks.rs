@@ -40,7 +40,7 @@ impl Blocks {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    pub async fn update(&self, sync_node: Option<SocketAddr>) -> Result<(), NetworkError> {
+    pub async fn update(&self, sync_node: Option<SocketAddr>) {
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {
             let block_locator_hashes = self.environment.storage().read().get_block_locator_hashes();
@@ -56,8 +56,6 @@ impl Blocks {
                 info!("No sync node is registered, blocks could not be synced");
             }
         }
-
-        Ok(())
     }
 
     ///
@@ -74,7 +72,7 @@ impl Blocks {
         block_bytes: Vec<u8>,
         block_miner: SocketAddr,
         connected_peers: &HashMap<SocketAddr, PeerInfo>,
-    ) -> Result<(), NetworkError> {
+    ) {
         debug!("Propagating a block to peers");
 
         let local_address = self.local_address();
@@ -87,8 +85,6 @@ impl Blocks {
                 ));
             }
         }
-
-        Ok(())
     }
 
     /// A peer has sent us a new block to process.
@@ -126,7 +122,7 @@ impl Blocks {
             // This is a new block, send it to our peers.
             if let Some(connected_peers) = connected_peers {
                 if is_new_block {
-                    self.propagate_block(block, remote_address, &connected_peers).await?;
+                    self.propagate_block(block, remote_address, &connected_peers).await;
                 }
             }
         }
@@ -198,11 +194,7 @@ impl Blocks {
     }
 
     /// A peer has sent us their chain state.
-    pub(crate) async fn received_sync(
-        &self,
-        remote_address: SocketAddr,
-        block_hashes: Vec<BlockHeaderHash>,
-    ) -> Result<(), NetworkError> {
+    pub(crate) async fn received_sync(&self, remote_address: SocketAddr, block_hashes: Vec<BlockHeaderHash>) {
         // If empty sync is no-op as chain states match
         if !block_hashes.is_empty() {
             // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
@@ -214,7 +206,5 @@ impl Blocks {
                 ));
             }
         }
-
-        Ok(())
     }
 }

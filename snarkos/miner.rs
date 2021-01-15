@@ -99,14 +99,10 @@ impl MinerInstance {
                         info!("Mined a new block!\t{:?}", hex::encode(block.header.get_hash().0));
                         let peers = self.node_server.peers.connected_peers();
 
-                        if let Err(err) = self
-                            .node_server
+                        self.node_server
                             .blocks
                             .propagate_block(block_serialized, local_address, &peers)
-                            .await
-                        {
-                            error!("Error propagating block to peers: {:?}", err);
-                        }
+                            .await;
                     }
                     Err(_) => continue,
                 }

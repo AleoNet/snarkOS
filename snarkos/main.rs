@@ -190,7 +190,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     // Start the server
-    server.start_services().await?;
+    server.start_services().await;
 
     stream::pending::<()>().next().await;
 

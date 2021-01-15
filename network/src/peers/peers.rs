@@ -89,10 +89,10 @@ impl Peers {
             // Check if this node server is below the permitted number of connected peers.
             if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
                 // Attempt to connect to the default bootnodes of the network.
-                self.connect_to_bootnodes().await?;
+                self.connect_to_bootnodes().await;
 
                 // Attempt to connect to each disconnected peer saved in the peer book.
-                self.connect_to_disconnected_peers().await?;
+                self.connect_to_disconnected_peers().await;
 
                 // Broadcast a `GetPeers` message to request for more peers.
                 self.broadcast_getpeers_requests();
@@ -127,7 +127,7 @@ impl Peers {
 
         if number_of_connected_peers != 0 {
             // Broadcast a `Version` request to each connected peer.
-            self.broadcast_version_requests()?;
+            self.broadcast_version_requests();
 
             // Store the peer book to storage.
             self.save_peer_book_to_storage()?;
@@ -299,7 +299,7 @@ impl Peers {
     ///
     /// This function filters out any bootnode peers the node server is already connected to.
     ///
-    async fn connect_to_bootnodes(&self) -> Result<(), NetworkError> {
+    async fn connect_to_bootnodes(&self) {
         trace!("Connecting to default bootnodes");
 
         // Fetch the current connected peers of this node.
@@ -312,26 +312,26 @@ impl Peers {
             .iter()
             .filter(|addr| !connected_peers.contains_key(addr))
         {
-            self.initiate_connection(*bootnode_address).await?;
+            if let Err(e) = self.initiate_connection(*bootnode_address).await {
+                warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+            }
         }
-
-        Ok(())
     }
 
     /// Broadcasts a connection request to all disconnected peers.
-    async fn connect_to_disconnected_peers(&self) -> Result<(), NetworkError> {
+    async fn connect_to_disconnected_peers(&self) {
         trace!("Connecting to disconnected peers");
 
         // Iterate through each connected peer and attempts a connection request.
         for (remote_address, _) in self.disconnected_peers() {
-            self.initiate_connection(remote_address).await?;
+            if let Err(e) = self.initiate_connection(remote_address).await {
+                warn!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+            }
         }
-
-        Ok(())
     }
 
     /// Broadcasts a `Version` message to all connected peers.
-    fn broadcast_version_requests(&self) -> Result<(), NetworkError> {
+    fn broadcast_version_requests(&self) {
         // Get the local address of this node.
         let local_address = self.local_address().unwrap(); // must be known by now
         // Fetch the current block height of this node.
@@ -355,11 +355,11 @@ impl Peers {
 
                 // Disconnect from the peer if there is no active connection channel
                 // TODO (howardwu): Inform Outbound to also disconnect, by dropping any channels held with this peer.
-                self.disconnected_from_peer(&remote_address)?;
+                if let Err(e) = self.disconnected_from_peer(&remote_address) {
+                    warn!("Couldn't mark {} as disconnected: {}", remote_address, e);
+                }
             };
         }
-
-        Ok(())
     }
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.

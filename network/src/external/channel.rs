@@ -53,20 +53,15 @@ impl Channel {
         Ok(Channel::new(remote_address, stream))
     }
 
-    /// Returns a new channel with the specified address and new writer stream.
-    pub async fn update_address(self, remote_address: SocketAddr) -> Result<Self, ConnectError> {
-        Ok(Self {
-            remote_address,
-            writer: self.writer,
-        })
+    /// Updates the address associated with the given channel.
+    pub async fn update_address(&mut self, remote_address: SocketAddr) {
+        self.remote_address = remote_address;
     }
 
     /// Writes a message header + payload.
     pub async fn write(&self, payload: &Payload) -> Result<(), ConnectError> {
         let serialized_payload = bincode::serialize(payload).map_err(|e| ConnectError::MessageError(e.into()))?;
-        let header = MessageHeader {
-            len: serialized_payload.len() as u32,
-        };
+        let header = MessageHeader::from(serialized_payload.len());
 
         {
             let mut writer = self.writer.lock().await;

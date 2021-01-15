@@ -115,7 +115,7 @@ impl Server {
         Ok(())
     }
 
-    pub async fn start_services(&self) -> Result<(), NetworkError> {
+    pub async fn start_services(&self) {
         let peer_sync_interval = self.environment.peer_sync_interval();
         let peers = self.peers.clone();
 
@@ -145,9 +145,7 @@ impl Server {
                 // select last seen node as block sync node
                 let sync_node = peers.last_seen();
 
-                if let Err(e) = blocks.update(sync_node).await {
-                    error!("Block update error: {}", e);
-                }
+                blocks.update(sync_node).await;
             }
         });
 
@@ -175,14 +173,12 @@ impl Server {
                 }
             }
         });
-
-        Ok(())
     }
 
     pub async fn start(&mut self) -> Result<(), NetworkError> {
         debug!("Initializing the connection server");
         self.establish_address().await?;
-        self.start_services().await?;
+        self.start_services().await;
         debug!("Connection server initialized");
 
         Ok(())
@@ -246,7 +242,7 @@ impl Server {
                 self.blocks.received_get_sync(source.unwrap(), getsync).await?;
             }
             Payload::Sync(sync) => {
-                self.blocks.received_sync(source.unwrap(), sync).await?;
+                self.blocks.received_sync(source.unwrap(), sync).await;
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {

@@ -35,7 +35,7 @@ pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<Mes
     let header = MessageHeader::from(header_arr);
 
     if header.len as usize > MAX_MESSAGE_SIZE {
-        return Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE));
+        Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE))
     } else {
         Ok(header)
     }
