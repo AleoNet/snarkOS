@@ -19,7 +19,7 @@ mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
     use snarkos_network::Server;
     use snarkos_rpc::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::test_environment, storage::*};
     use snarkvm_dpc::base_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
@@ -83,7 +83,7 @@ mod protected_rpc_tests {
 
         let memory_pool = Arc::new(Mutex::new(MemoryPool::new()));
 
-        let environment = initialize_test_environment(None, vec![], storage.clone(), parameters.clone()).unwrap();
+        let environment = test_environment(None, vec![], storage.clone(), parameters.clone());
         let server = Server::new(environment.clone()).await.unwrap();
 
         let storage_path = storage.read().storage.db.path().to_path_buf();

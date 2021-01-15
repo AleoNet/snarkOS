@@ -19,7 +19,7 @@ mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
     use snarkos_network::Server;
     use snarkos_rpc::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::test_environment, storage::*};
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_models::objects::Transaction;
     use snarkvm_utilities::{
@@ -44,7 +44,7 @@ mod rpc_tests {
     async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> Rpc {
         let parameters = load_verifying_parameters();
 
-        let environment = initialize_test_environment(None, vec![], storage.clone(), parameters.clone()).unwrap();
+        let environment = test_environment(None, vec![], storage.clone(), parameters.clone());
         let memory_pool = environment.memory_pool().clone();
         let server = Server::new(environment.clone()).await.unwrap();
 
