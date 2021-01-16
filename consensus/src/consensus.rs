@@ -401,7 +401,7 @@ impl ConsensusParameters {
                 SerialNumberNonce::hash(&parameters.system_parameters.serial_number_nonce, &sn_nonce_input)?;
 
             let old_record = InstantiatedDPC::generate_record(
-                parameters.system_parameters.clone(),
+                &parameters.system_parameters,
                 old_sn_nonce,
                 new_account.address.clone(),
                 true, // The input record is dummy
