@@ -694,6 +694,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "0.99.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41cb0e6161ad61ed084a36ba71fbba9e3ac5aee3606fb607fe08da6acbcf3d8c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "digest"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -903,6 +914,7 @@ checksum = "9b3b0c040a1fe6529d30b3c5944b280c7f0dcb2930d2c3062bca967b602583d0"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -965,6 +977,7 @@ dependencies = [
  "futures-core",
  "futures-task",
  "futures-util",
+ "num_cpus",
 ]
 
 [[package]]
@@ -972,6 +985,18 @@ name = "futures-io"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "611834ce18aaa1bd13c4b374f5d653e1027cf99b6b502584ff8c9a64413b30bb"
+
+[[package]]
+name = "futures-macro"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77408a692f1f97bcc61dc001d752e00643408fbc922e4d634c655df50d595556"
+dependencies = [
+ "proc-macro-hack",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "futures-sink"
@@ -994,13 +1019,18 @@ version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d304cff4a7b99cfb7986f7d43fbe93d175e72e704a8860787cc95e9ffd85cbd2"
 dependencies = [
+ "futures 0.1.30",
+ "futures-channel",
  "futures-core",
  "futures-io",
+ "futures-macro",
  "futures-sink",
  "futures-task",
  "memchr",
  "pin-project 1.0.2",
  "pin-utils",
+ "proc-macro-hack",
+ "proc-macro-nested",
  "slab",
 ]
 
@@ -1458,8 +1488,24 @@ checksum = "2773fa94a2a1fd51efb89a8f45b8861023dbb415d18d3c9235ae9388d780f9ec"
 dependencies = [
  "failure",
  "futures 0.1.30",
- "jsonrpc-core",
- "jsonrpc-pubsub",
+ "jsonrpc-core 14.2.0",
+ "jsonrpc-pubsub 14.2.0",
+ "log",
+ "serde",
+ "serde_json",
+ "url 1.7.2",
+]
+
+[[package]]
+name = "jsonrpc-client-transports"
+version = "16.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "320acafbc911d7ef8cc056fee6affbed348dc8aaf76709bfda83d3665d092ad4"
+dependencies = [
+ "derive_more",
+ "futures 0.3.8",
+ "jsonrpc-core 16.0.0",
+ "jsonrpc-pubsub 16.0.0",
  "log",
  "serde",
  "serde_json",
@@ -1480,12 +1526,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonrpc-core"
+version = "16.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a47c4c3ac843f9a4238943f97620619033dadef4b378cd1e8addd170de396b3"
+dependencies = [
+ "futures 0.3.8",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "jsonrpc-core-client"
 version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34221123bc79b66279a3fde2d3363553835b43092d629b34f2e760c44dc94713"
 dependencies = [
- "jsonrpc-client-transports",
+ "jsonrpc-client-transports 14.2.1",
+]
+
+[[package]]
+name = "jsonrpc-core-client"
+version = "16.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "289d049ac6a6c69e8d2023ad420934d236badda8375f1fd9960a2f67beedb42e"
+dependencies = [
+ "futures 0.3.8",
+ "jsonrpc-client-transports 16.0.0",
 ]
 
 [[package]]
@@ -1507,7 +1576,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0da906d682799df05754480dac1b9e70ec92e12c19ebafd2662a5ea1c9fd6522"
 dependencies = [
  "hyper 0.12.35",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-server-utils",
  "log",
  "net2",
@@ -1521,9 +1590,24 @@ version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d44f5602a11d657946aac09357956d2841299ed422035edf140c552cb057986"
 dependencies = [
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "log",
  "parking_lot 0.10.2",
+ "rand 0.7.3",
+ "serde",
+]
+
+[[package]]
+name = "jsonrpc-pubsub"
+version = "16.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a1132f6d03de286dd21bde88191af63b5189214574f7b9cbac8e0027c732394"
+dependencies = [
+ "futures 0.3.8",
+ "jsonrpc-core 16.0.0",
+ "lazy_static",
+ "log",
+ "parking_lot 0.11.1",
  "rand 0.7.3",
  "serde",
 ]
@@ -1536,7 +1620,7 @@ checksum = "56cbfb462e7f902e21121d9f0d1c2b77b2c5b642e1a4e8f4ebfa2e15b94402bb"
 dependencies = [
  "bytes 0.4.12",
  "globset",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "lazy_static",
  "log",
  "tokio 0.1.22",
@@ -1546,13 +1630,13 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-test"
-version = "14.2.0"
+version = "16.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fdbfe280021d220b3392e38b34781647f8268eef6d71564074a870a08404899"
+checksum = "65adfdbf54073d1d3c0f73310f579b2686a23ddb3a75857c0bcab894d38be99c"
 dependencies = [
- "jsonrpc-core",
- "jsonrpc-core-client",
- "jsonrpc-pubsub",
+ "jsonrpc-core 16.0.0",
+ "jsonrpc-core-client 16.0.0",
+ "jsonrpc-pubsub 16.0.0",
  "log",
  "serde",
  "serde_json",
@@ -2217,6 +2301,18 @@ dependencies = [
  "quote",
  "version_check",
 ]
+
+[[package]]
+name = "proc-macro-hack"
+version = "0.5.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf0c48bc1d91375ae5c3cd81e3722dff1abcf81a30960240640d223f59fe0e5"
+
+[[package]]
+name = "proc-macro-nested"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc881b2c22681370c6a780e47af9840ef841837bc98118431d4e1868bd0c1086"
 
 [[package]]
 name = "proc-macro2"
@@ -3076,8 +3172,8 @@ dependencies = [
  "base64 0.13.0",
  "chrono",
  "hex",
- "jsonrpc-core",
- "jsonrpc-core-client",
+ "jsonrpc-core 14.2.0",
+ "jsonrpc-core-client 14.2.0",
  "jsonrpc-derive",
  "jsonrpc-http-server",
  "jsonrpc-test",
@@ -3248,7 +3344,7 @@ dependencies = [
  "bincode",
  "curl",
  "hex",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "rocksdb",
  "thiserror",
  "toml",
