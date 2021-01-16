@@ -56,6 +56,7 @@ mod tests {
 
     use serial_test::serial;
 
+    #[allow(clippy::if_same_then_else)]
     fn macro_connected_peers_boolean_test(boolean: bool) {
         // Increment by 1.
         connected_peers_inc!(boolean);
