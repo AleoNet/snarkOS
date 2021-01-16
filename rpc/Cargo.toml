@@ -26,7 +26,7 @@ base64 = { version = "0.13.0" }
 chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
 jsonrpc-core = { version = "14.2.0" }
-jsonrpc-core-client = { version = "14.0.5" }
+jsonrpc-core-client = { version = "16.0.0" }
 jsonrpc-derive = { version = "14.2.2" }
 jsonrpc-http-server = { version = "14.2.0" }
 parking_lot = { version = "0.11.1" }
