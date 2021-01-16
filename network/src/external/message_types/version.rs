@@ -14,118 +14,47 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::message::MessageError,
-    external::message::{Message, MessageName},
-};
-
 use chrono::Utc;
 use rand::Rng;
-use std::net::SocketAddr;
+use serde::{Deserialize, Serialize};
 
 #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Version {
-    /// The network version number
+    /// The version number of the sender's node server.
     pub version: u64,
-
-    /// Latest block number of node sending this message
+    /// The block height of the sender's node server.
     pub height: u32,
-
-    /// Random nonce sequence number
+    /// The random nonce of the connection request.
     pub nonce: u64,
-
-    /// Message timestamp
+    /// The listening port of the sender.
+    pub listening_port: u16,
+    /// The timestamp of this message.
     pub timestamp: i64,
-
-    /// Network address of message recipient
-    pub address_receiver: SocketAddr,
-
-    /// Network address of message sender
-    pub address_sender: SocketAddr,
 }
 
 impl Version {
-    pub fn new(version: u64, height: u32, address_receiver: SocketAddr, address_sender: SocketAddr) -> Self {
+    pub fn new(version: u64, height: u32, nonce: u64, listening_port: u16) -> Self {
+        Self {
+            version,
+            height,
+            nonce,
+            listening_port,
+            timestamp: Utc::now().timestamp(),
+        }
+    }
+
+    // currently used for the handshakes, but it's a stop-gap; TODO(ljedrz): replace with a solution that
+    // is bound to a setup that also encrypts the post-handshake communication
+    pub fn new_with_rng(version: u64, height: u32, listening_port: u16) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             version,
             height,
             nonce: rng.gen::<u64>(),
+            listening_port,
             timestamp: Utc::now().timestamp(),
-            address_receiver,
-            address_sender,
         }
-    }
-
-    pub fn from(
-        version: u64,
-        height: u32,
-        address_receiver: SocketAddr,
-        address_sender: SocketAddr,
-        nonce: u64,
-    ) -> Self {
-        Self {
-            version,
-            height,
-            nonce,
-            timestamp: Utc::now().timestamp(),
-            address_receiver,
-            address_sender,
-        }
-    }
-}
-
-impl Message for Version {
-    fn name() -> MessageName {
-        MessageName::from("version")
-    }
-
-    fn deserialize(vec: Vec<u8>) -> Result<Self, MessageError> {
-        if vec.len() != 48 {
-            return Err(MessageError::InvalidLength(vec.len(), 48));
-        }
-
-        Ok(Version {
-            version: bincode::deserialize(&vec[..8])?,
-            height: bincode::deserialize(&vec[8..12])?,
-            nonce: bincode::deserialize(&vec[12..20])?,
-            timestamp: bincode::deserialize(&vec[20..28])?,
-            address_receiver: bincode::deserialize(&vec[28..38])?,
-            address_sender: bincode::deserialize(&vec[38..48])?,
-        })
-    }
-
-    fn serialize(&self) -> Result<Vec<u8>, MessageError> {
-        let mut writer = vec![];
-        writer.extend_from_slice(&bincode::serialize(&self.version)?);
-        writer.extend_from_slice(&bincode::serialize(&self.height)?);
-        writer.extend_from_slice(&bincode::serialize(&self.nonce)?);
-        writer.extend_from_slice(&bincode::serialize(&self.timestamp)?);
-        writer.extend_from_slice(&bincode::serialize(&self.address_receiver)?);
-        writer.extend_from_slice(&bincode::serialize(&self.address_sender)?);
-        Ok(writer)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_version() {
-        let version = Version::new(
-            1u64,
-            1u32,
-            "127.0.0.1:4130".parse::<SocketAddr>().unwrap(),
-            "127.0.0.1:4130".parse::<SocketAddr>().unwrap(),
-        );
-
-        let serialized = version.serialize().unwrap();
-
-        let deserialized = Version::deserialize(serialized).unwrap();
-
-        assert_eq!(version, deserialized);
     }
 }

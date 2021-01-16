@@ -12,11 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
+snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
 
 snarkos-consensus = { path = "../consensus", version = "1.1.4" }
 snarkos-network = { path = "../network", version = "1.1.4"}
@@ -29,11 +29,13 @@ jsonrpc-core = { version = "14.2.0" }
 jsonrpc-core-client = { version = "14.0.5" }
 jsonrpc-derive = { version = "14.2.2" }
 jsonrpc-http-server = { version = "14.2.0" }
+parking_lot = { version = "0.11.1" }
 rand = { version = "0.7" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.61" }
 thiserror = { version = "1.0" }
-tokio = { version = "0.2.22", features = ["full"] }
+tokio = { version = "0.3", features = ["full"] }
+tracing = { default-features = false, features = ["log"], version = "0.1" }
 
 [dev-dependencies]
 snarkos-testing = { path = "../testing" }

@@ -30,7 +30,7 @@ pub enum MessageError {
     #[error("{}", _0)]
     MessageHeaderError(MessageHeaderError),
 
-    #[error("{}", 0)]
+    #[error("Stream error: {}", _0)]
     SteamReadError(StreamReadError),
 }
 

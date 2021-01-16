@@ -17,8 +17,8 @@
 pub mod connect;
 pub use connect::*;
 
-pub mod protocol;
-pub use protocol::*;
+pub mod network;
+pub use network::*;
 
 pub mod send;
 pub use send::*;

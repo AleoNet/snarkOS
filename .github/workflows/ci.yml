@@ -32,8 +32,8 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: -Dwarnings
+#    env:
+#      RUSTFLAGS: -Dwarnings
     strategy:
       matrix:
         rust:

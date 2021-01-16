@@ -14,13 +14,119 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::message::MessageError, external::message::MessageName};
+use crate::external::{Verack, Version};
+use snarkvm_objects::BlockHeaderHash;
 
-/// A trait used to abstract over network messages.
-pub trait Message: Send + 'static {
-    fn name() -> MessageName;
-    fn deserialize(bytes: Vec<u8>) -> Result<Self, MessageError>
-    where
-        Self: Sized;
-    fn serialize(&self) -> Result<Vec<u8>, MessageError>;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+use std::{fmt, net::SocketAddr};
+
+pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Direction {
+    Inbound(SocketAddr),
+    Outbound(SocketAddr),
+    Internal,
+}
+
+impl fmt::Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Inbound(addr) => write!(f, "from {}", addr),
+            Self::Outbound(addr) => write!(f, "to {}", addr),
+            Self::Internal => write!(f, "<internal>"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Message {
+    pub direction: Direction,
+    pub payload: Payload,
+}
+
+impl Message {
+    pub fn new(direction: Direction, payload: Payload) -> Self {
+        Self { direction, payload }
+    }
+
+    pub fn receiver(&self) -> SocketAddr {
+        match self.direction {
+            Direction::Outbound(addr) => addr,
+            _ => unreachable!("Message::receiver used on a non-outbound Message!"),
+        }
+    }
+}
+
+impl fmt::Display for Message {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}", self.payload, self.direction)
+    }
+}
+
+pub type Peer = (SocketAddr, DateTime<Utc>);
+
+/// The actual message transmitted over the network.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum Payload {
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/block.md"))]
+    Block(Vec<u8>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_block.md"))]
+    GetBlock(BlockHeaderHash),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_memory_pool.md"))]
+    GetMemoryPool,
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_peers.md"))]
+    GetPeers,
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_sync.md"))]
+    GetSync(Vec<BlockHeaderHash>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/memory_pool.md"))]
+    MemoryPool(Vec<Vec<u8>>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
+    Peers(Vec<Peer>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync.md"))]
+    Sync(Vec<BlockHeaderHash>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync_block.md"))]
+    SyncBlock(Vec<u8>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/transaction.md"))]
+    Transaction(Vec<u8>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/verack.md"))]
+    Verack(Verack),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
+    Version(Version),
+
+    /* internal messages */
+    #[doc(hide)]
+    ConnectedTo(SocketAddr, u64),
+    #[doc(hide)]
+    ConnectingTo(SocketAddr, u64),
+    // TODO: used internally, but can also be used to allow a clean disconnect for connected peers on shutdown
+    // add a doc if this is introduced
+    #[doc(hide)]
+    Disconnect(SocketAddr),
+}
+
+impl fmt::Display for Payload {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let str = match self {
+            Self::Block(..) => "block",
+            Self::GetBlock(..) => "getblock",
+            Self::GetMemoryPool => "getmempool",
+            Self::GetPeers => "getpeers",
+            Self::GetSync(..) => "getsync",
+            Self::MemoryPool(..) => "memorypool",
+            Self::Peers(..) => "peers",
+            Self::Sync(..) => "sync",
+            Self::SyncBlock(..) => "syncblock",
+            Self::Transaction(..) => "transaction",
+            Self::Verack(..) => "verack",
+            Self::Version(..) => "version",
+            Self::ConnectedTo(..) => "connectedto",
+            Self::ConnectingTo(..) => "connectingto",
+            Self::Disconnect(..) => "disconnect",
+        };
+
+        f.write_str(str)
+    }
 }

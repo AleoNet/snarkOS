@@ -20,12 +20,12 @@ extern crate tracing;
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
-    display::render_init,
+    display::render_welcome,
     errors::NodeError,
     miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{external::protocol::SyncHandler, internal::context::Context, Server};
+use snarkos_network::{environment::Environment, Server};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
@@ -33,12 +33,46 @@ use snarkvm_models::algorithms::{CRH, SNARK};
 use snarkvm_objects::{AccountAddress, Network};
 use snarkvm_utilities::{to_bytes, ToBytes};
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
-use tokio::{runtime::Builder, sync::Mutex};
+use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+
+use parking_lot::{Mutex, RwLock};
+use tokio::{
+    runtime::Builder,
+    stream::{self, StreamExt},
+};
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
+fn initialize_logger(config: &Config) {
+    match config.node.verbose {
+        0 => {}
+        verbosity => {
+            match verbosity {
+                1 => std::env::set_var("RUST_LOG", "trace"),
+                2 => std::env::set_var("RUST_LOG", "debug"),
+                3 => std::env::set_var("RUST_LOG", "trace"),
+                _ => std::env::set_var("RUST_LOG", "info"),
+            };
+
+            // disable undesirable logs
+            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+
+            // initialize tracing
+            tracing_subscriber::fmt()
+                .with_env_filter(filter)
+                .with_target(false)
+                .init();
+        }
+    }
+}
+
+fn print_welcome(config: &Config) {
+    println!("{}", render_welcome(config));
+}
+
+///
 /// Builds a node from configuration parameters.
+///
 /// 1. Creates new storage database or uses existing.
 /// 2. Creates new memory pool or uses existing from storage.
 /// 3. Creates consensus parameters.
@@ -46,30 +80,27 @@ use tracing_subscriber::EnvFilter;
 /// 5. Starts rpc server thread.
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
-async fn start_server(config: Config) -> Result<(), NodeError> {
+///
+async fn start_server(config: Config) -> anyhow::Result<()> {
+    initialize_logger(&config);
+
+    print_welcome(&config);
+
     let address = format! {"{}:{}", config.node.ip, config.node.port};
     let socket_address = address.parse::<SocketAddr>()?;
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
-    let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
+    let storage = MerkleTreeLedger::open_at_path(path.clone())?;
+    // let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
 
-    let memory_pool = MemoryPool::from_storage(&storage.clone())?;
-    let memory_pool_lock = Arc::new(Mutex::new(memory_pool.clone()));
-
-    let bootnode = match config.p2p.bootnodes.len() {
-        0 => socket_address,
-        _ => config.p2p.bootnodes[0].parse::<SocketAddr>()?,
-    };
-
-    let sync_handler = SyncHandler::new(bootnode);
-    let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
+    let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
     info!("Loading Aleo parameters...");
     let parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
     info!("Loading complete.");
 
-    // Fetch the valid inner snark ids
+    // Fetch the set of valid inner circuit IDs.
     let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
         parameters.inner_snark_parameters.1.clone().into();
     let inner_snark_id = parameters
@@ -84,36 +115,47 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network: Network::from_network_id(config.aleo.network_id),
+        network_id: Network::from_network_id(config.aleo.network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids,
     };
 
-    let mut context = Arc::new(Context::new(
-        socket_address,
-        config.p2p.mempool_interval,
+    let mut environment = Environment::new(
+        Arc::new(RwLock::new(storage)),
+        memory_pool.clone(),
+        Arc::new(consensus.clone()),
+        Arc::new(parameters.clone()),
+        Some(socket_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
-        config.node.is_bootnode,
         config.p2p.bootnodes.clone(),
-        false,
-    ));
+        config.node.is_bootnode,
+        config.miner.is_miner,
+        // Set sync intervals for peers, blocks and transactions (memory pool).
+        Duration::from_millis(100),
+        Duration::from_millis(100),
+        Duration::from_secs(config.p2p.mempool_interval.into()),
+    )?;
 
-    // Start the miner task, if the mining configuration is enabled.
+    // Construct the server instance. Note this does not start the server.
+    // This is done early on, so that the local address can be discovered
+    // before any other object (miner, RPC) needs to use it.
+    let mut server = Server::new(environment.clone()).await?;
+
+    // Establish the address of the server.
+    server.establish_address().await?;
+    environment.set_local_address(server.local_address().unwrap());
+
+    // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                if let Some(mutable_context) = Arc::get_mut(&mut context) {
-                    mutable_context.is_miner = true;
-                }
-
                 MinerInstance::new(
                     miner_address,
                     consensus.clone(),
                     parameters.clone(),
-                    storage.clone(),
-                    memory_pool_lock.clone(),
-                    context.clone(),
+                    environment.clone(),
+                    server.clone(),
                 )
                 .spawn();
             }
@@ -123,17 +165,6 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         }
     }
 
-    // Construct the server instance. Note this does not start the server.
-    let server = Server::new(
-        context,
-        consensus.clone(),
-        storage.clone(),
-        parameters,
-        memory_pool_lock.clone(),
-        sync_handler_lock.clone(),
-        15000, // 15 seconds
-    );
-
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
         info!("Loading Aleo parameters for RPC...");
@@ -141,25 +172,27 @@ async fn start_server(config: Config) -> Result<(), NodeError> {
         info!("Loading complete.");
 
         // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
+        let secondary_storage = Arc::new(RwLock::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?));
 
         start_rpc_server(
             config.rpc.port,
-            secondary_storage.clone(),
-            path,
+            secondary_storage,
+            path.to_path_buf(),
             proving_parameters,
-            server.context.clone(),
-            consensus.clone(),
-            memory_pool_lock.clone(),
-            sync_handler_lock.clone(),
+            environment,
+            consensus,
+            memory_pool,
+            server.clone(),
             config.rpc.username,
             config.rpc.password,
         )
-        .await?;
+        .await;
     }
 
-    // Start the main server thread.
-    server.listen().instrument(debug_span!("server")).await?;
+    // Start the server
+    server.start_services().await;
+
+    stream::pending::<()>().next().await;
 
     Ok(())
 }
@@ -168,34 +201,9 @@ fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::args();
 
     let config: Config = ConfigCli::parse(&arguments)?;
-
-    match config.node.verbose {
-        0 => {}
-        verbosity => {
-            match verbosity {
-                1 => std::env::set_var("RUST_LOG", "info"),
-                2 => std::env::set_var("RUST_LOG", "debug"),
-                _ => std::env::set_var("RUST_LOG", "info"),
-            };
-
-            // disable undesirable logs
-            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-
-            // initialize tracing
-            tracing_subscriber::fmt()
-                .with_env_filter(filter)
-                .with_target(false)
-                .init();
-
-            println!("{}", render_init(&config));
-        }
-    }
-
-    // create a tracing span dedicated to the entire node
     let node_span = debug_span!("node");
 
-    Builder::new()
-        .threaded_scheduler()
+    Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?

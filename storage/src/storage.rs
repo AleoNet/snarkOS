@@ -108,7 +108,7 @@ impl Storage {
     }
 
     /// Returns `Ok(())` after executing a database transaction
-    /// If the any of the operations fail, returns [StorageError](snarkvm_errors::storage::StorageError).
+    /// If any of the operations fail, returns [StorageError](snarkos_storage::error::StorageError).
     pub(crate) fn write(&self, transaction: DatabaseTransaction) -> Result<(), StorageError> {
         let mut batch = WriteBatch::default();
 

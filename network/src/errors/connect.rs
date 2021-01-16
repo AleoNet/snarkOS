@@ -14,26 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::message::{MessageError, MessageHeaderError};
+use crate::errors::message::{MessageError, MessageHeaderError, StreamReadError};
 
-use std::net::SocketAddr;
+use std::{io::ErrorKind, net::SocketAddr};
 
 #[derive(Debug, Error)]
 pub enum ConnectError {
-    #[error("{}: {}", _0, _1)]
-    Crate(&'static str, String),
+    #[error(transparent)]
+    Std(std::io::Error),
 
     #[error("{}", _0)]
     Message(String),
 
-    #[error("{}", _0)]
+    #[error(transparent)]
     MessageHeaderError(MessageHeaderError),
 
-    #[error("{}", _0)]
+    #[error(transparent)]
     MessageError(MessageError),
 
     #[error("Address {:?} not found", _0)]
     AddressNotFound(SocketAddr),
+}
+
+impl ConnectError {
+    pub fn is_fatal(&self) -> bool {
+        if let Self::MessageHeaderError(MessageHeaderError::StreamReadError(StreamReadError::Io(err))) = self {
+            [
+                ErrorKind::BrokenPipe,
+                ErrorKind::ConnectionReset,
+                ErrorKind::UnexpectedEof,
+            ]
+            .contains(&err.kind())
+        } else {
+            false
+        }
+    }
 }
 
 impl From<MessageError> for ConnectError {
@@ -50,6 +65,6 @@ impl From<MessageHeaderError> for ConnectError {
 
 impl From<std::io::Error> for ConnectError {
     fn from(error: std::io::Error) -> Self {
-        ConnectError::Crate("std::io", format!("{:?}", error))
+        ConnectError::Std(error)
     }
 }

@@ -46,3 +46,6 @@ pub use rpc_trait::*;
 pub mod rpc_types;
 #[doc(inline)]
 pub use rpc_types::*;
+
+#[macro_use]
+extern crate tracing;

@@ -14,17 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod hash;
-pub use hash::*;
-
 pub mod message;
 pub use message::*;
 
 pub mod message_header;
 pub use message_header::*;
-
-pub mod message_name;
-pub use message_name::*;
 
 pub mod read;
 pub use read::*;

@@ -286,7 +286,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                self.parameters.system_parameters.clone(),
+                &self.parameters.system_parameters,
                 old_sn_nonce,
                 address,
                 true, // The input record is dummy
@@ -375,16 +375,18 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
-        self.storage.catch_up_secondary(false)?;
-        let record_commitments = self.storage.get_record_commitments(None)?;
+        let storage = self.storage.read();
+        storage.catch_up_secondary(false)?;
+        let record_commitments = storage.get_record_commitments(None)?;
 
         Ok(record_commitments.len())
     }
 
     /// Returns a list of record commitments that are stored on the full node.
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        self.storage.catch_up_secondary(false)?;
-        let record_commitments = self.storage.get_record_commitments(Some(100))?;
+        let storage = self.storage.read();
+        storage.catch_up_secondary(false)?;
+        let record_commitments = storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(hex::encode).collect();
 
         Ok(record_commitment_strings)
@@ -394,6 +396,7 @@ impl ProtectedRpcFunctions for RpcImpl {
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         match self
             .storage
+            .read()
             .get_record::<DPCRecord<Components>>(&hex::decode(record_commitment)?)?
         {
             Some(record) => {

@@ -14,29 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::message::{MessageError, MessageHeaderError, StreamReadError},
-    external::message::MessageHeader,
-};
+use crate::{errors::message::*, external::message::*};
 
 use tokio::{io::AsyncRead, prelude::*};
 
 /// Returns message bytes read from an input stream.
-pub async fn read_message<T: AsyncRead + Unpin>(mut stream: &mut T, len: usize) -> Result<Vec<u8>, MessageError> {
-    let mut buffer: Vec<u8> = vec![0; len];
-
-    stream_read(&mut stream, &mut buffer).await?;
+pub async fn read_payload<'a, T: AsyncRead + Unpin>(
+    mut stream: &mut T,
+    buffer: &'a mut [u8],
+) -> Result<&'a [u8], MessageError> {
+    stream_read(&mut stream, buffer).await?;
 
     Ok(buffer)
 }
 
 /// Returns a message header read from an input stream.
 pub async fn read_header<T: AsyncRead + Unpin>(mut stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
-    let mut buffer = [0u8; 16];
+    let mut header_arr = [0u8; 4];
+    stream_read(&mut stream, &mut header_arr).await?;
+    let header = MessageHeader::from(header_arr);
 
-    stream_read(&mut stream, &mut buffer).await?;
-
-    Ok(MessageHeader::from(buffer))
+    if header.len as usize > MAX_MESSAGE_SIZE {
+        Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE))
+    } else {
+        Ok(header)
+    }
 }
 
 /// Reads bytes from an input stream to fill the buffer.
@@ -48,87 +50,34 @@ async fn stream_read<'a, T: AsyncRead + Unpin>(stream: &'a mut T, buffer: &'a mu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::external::{
-        message::{message::Message, MessageHeader},
-        message_types::Ping,
-    };
-    use snarkos_testing::network::random_socket_address;
+    use crate::external::message_types::Version;
+    use snarkos_testing::network::random_bound_address;
 
-    use serial_test::serial;
-    use tokio::net::{TcpListener, TcpStream};
+    use tokio::net::TcpStream;
 
     #[tokio::test]
-    #[serial]
-    async fn read_multiple_headers() {
-        let address = random_socket_address();
-        let mut listener = TcpListener::bind(address).await.unwrap();
+    async fn test_write_read_message() {
+        let (address, listener) = random_bound_address().await;
+
+        let expected = Payload::Version(Version::new(1, 0, 1, 4131));
+        let version = expected.clone();
 
         tokio::spawn(async move {
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
             let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&header.serialize().unwrap()).await.unwrap();
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8]);
-            stream.write_all(&header.serialize().unwrap()).await.unwrap();
-        });
+            let payload_bytes = bincode::serialize(&version).unwrap();
+            let header = MessageHeader::from(payload_bytes.len());
 
-        let (mut stream, _socket) = listener.accept().await.unwrap();
-        let mut buf = [0u8; 16];
-        stream_read(&mut stream, &mut buf).await.unwrap();
-
-        assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
-            MessageHeader::from(buf)
-        );
-
-        let mut buf = [0u8; 16];
-        stream_read(&mut stream, &mut buf).await.unwrap();
-
-        assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8]),
-            MessageHeader::from(buf)
-        );
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_read_header() {
-        let address = random_socket_address();
-        let mut listener = TcpListener::bind(address).await.unwrap();
-
-        tokio::spawn(async move {
-            let header = MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]);
-            let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&header.serialize().unwrap()).await.unwrap();
+            stream.write_all(&header.as_bytes()).await.unwrap();
+            stream.write_all(&payload_bytes).await.unwrap();
         });
 
         let (mut stream, _socket) = listener.accept().await.unwrap();
 
+        let mut buffer = [0u8; 52];
         let header = read_header(&mut stream).await.unwrap();
+        let payload_bytes = read_payload(&mut stream, &mut buffer[..header.len()]).await.unwrap();
+        let candidate = bincode::deserialize(&payload_bytes).unwrap();
 
-        assert_eq!(
-            MessageHeader::from([112, 105, 110, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
-            header
-        );
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn test_read_message() {
-        let address = random_socket_address();
-        let mut listener = TcpListener::bind(address).await.unwrap();
-        let message = Ping::new();
-        let message_copy = message.clone();
-
-        tokio::spawn(async move {
-            let mut stream = TcpStream::connect(address).await.unwrap();
-            stream.write_all(&message.serialize().unwrap()).await.unwrap();
-        });
-
-        let (mut stream, _socket) = listener.accept().await.unwrap();
-
-        let bytes = read_message(&mut stream, 8usize).await.unwrap();
-        let actual = Ping::deserialize(bytes).unwrap();
-
-        assert_eq!(message_copy, actual);
+        assert_eq!(expected, candidate);
     }
 }

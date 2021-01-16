@@ -240,10 +240,10 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         // Update the best block number
 
         let is_genesis = block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
-            && self.get_latest_block_height() == 0
+            && self.get_current_block_height() == 0
             && self.is_empty();
 
-        let mut height = self.latest_block_height.write();
+        let mut height = self.current_block_height.write();
         let mut new_best_block_number = 0;
         if !is_genesis {
             new_best_block_number = *height + 1;
@@ -320,11 +320,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Revert the chain to the state before the fork.
     pub fn revert_for_fork(&self, side_chain_path: &SideChainPath) -> Result<(), StorageError> {
-        let latest_block_height = self.get_latest_block_height();
+        let current_block_height = self.get_current_block_height();
 
-        if side_chain_path.new_block_number > latest_block_height {
+        if side_chain_path.new_block_number > current_block_height {
             // Decommit all blocks on canon chain up to the shared block number with the side chain.
-            for _ in (side_chain_path.shared_block_number)..latest_block_height {
+            for _ in (side_chain_path.shared_block_number)..current_block_height {
                 self.decommit_latest_block()?;
             }
         }

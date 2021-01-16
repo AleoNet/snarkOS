@@ -19,11 +19,8 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
-use snarkos_consensus::{get_block_reward, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{
-    external::SyncHandler,
-    internal::{context::Context, process_transaction_internal},
-};
+use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_network::{Environment, Server};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
@@ -37,15 +34,16 @@ use snarkvm_utilities::{
 };
 
 use chrono::Utc;
+use parking_lot::{Mutex, RwLock};
+
 use std::{path::PathBuf, sync::Arc};
-use tokio::{runtime::Runtime, sync::Mutex};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
 #[derive(Clone)]
 pub struct RpcImpl {
     /// Blockchain database storage.
-    pub(crate) storage: Arc<MerkleTreeLedger>,
+    pub(crate) storage: Arc<RwLock<MerkleTreeLedger>>,
 
     /// The path to the Blockchain database storage.
     pub(crate) storage_path: PathBuf,
@@ -54,43 +52,43 @@ pub struct RpcImpl {
     pub(crate) parameters: PublicParameters<Components>,
 
     /// Network context held by the server.
-    pub(crate) server_context: Arc<Context>,
+    pub(crate) environment: Environment,
 
     /// Consensus parameters generated from node config.
     pub(crate) consensus: ConsensusParameters,
 
     /// Handle to access the memory pool of transactions.
-    pub(crate) memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-
-    /// Handle to access the sync state of the node
-    pub(crate) sync_handler_lock: Arc<Mutex<SyncHandler>>,
+    pub(crate) memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
 
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
+
+    /// A clone of the Server
+    pub(crate) server: Server,
 }
 
 impl RpcImpl {
     /// Creates a new struct for calling public and private RPC endpoints.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        storage: Arc<MerkleTreeLedger>,
+        storage: Arc<RwLock<MerkleTreeLedger>>,
         storage_path: PathBuf,
         parameters: PublicParameters<Components>,
-        server_context: Arc<Context>,
+        environment: Environment,
         consensus: ConsensusParameters,
-        memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-        sync_handler_lock: Arc<Mutex<SyncHandler>>,
+        memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
         credentials: Option<RpcCredentials>,
+        server: Server,
     ) -> Self {
         Self {
             storage,
             storage_path,
             parameters,
-            server_context,
+            environment,
             consensus,
-            memory_pool_lock,
-            sync_handler_lock,
+            memory_pool,
             credentials,
+            server,
         }
     }
 
@@ -106,11 +104,13 @@ impl RpcFunctions for RpcImpl {
         let block_hash = hex::decode(&block_hash_string)?;
         assert_eq!(block_hash.len(), 32);
 
-        self.storage.catch_up_secondary(false)?;
+        let storage = self.storage.read();
+
+        storage.catch_up_secondary(false)?;
 
         let block_header_hash = BlockHeaderHash::new(block_hash);
-        let height = match self.storage.get_block_number(&block_header_hash) {
-            Ok(block_num) => match self.storage.is_canon(&block_header_hash) {
+        let height = match storage.get_block_number(&block_header_hash) {
+            Ok(block_num) => match storage.is_canon(&block_header_hash) {
                 true => Some(block_num),
                 false => None,
             },
@@ -118,11 +118,11 @@ impl RpcFunctions for RpcImpl {
         };
 
         let confirmations = match height {
-            Some(block_height) => self.storage.get_latest_block_height() - block_height,
+            Some(block_height) => storage.get_current_block_height() - block_height,
             None => 0,
         };
 
-        if let Ok(block) = self.storage.get_block(&block_header_hash) {
+        if let Ok(block) = storage.get_block(&block_header_hash) {
             let mut transactions = Vec::with_capacity(block.transactions.len());
 
             for transaction in block.transactions.iter() {
@@ -150,31 +150,35 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the number of blocks in the canonical chain.
     fn get_block_count(&self) -> Result<u32, RpcError> {
-        self.storage.catch_up_secondary(false)?;
-        Ok(self.storage.get_block_count())
+        let storage = self.storage.read();
+        storage.catch_up_secondary(false)?;
+        Ok(storage.get_block_count())
     }
 
     /// Returns the block hash of the head of the canonical chain.
     fn get_best_block_hash(&self) -> Result<String, RpcError> {
-        self.storage.catch_up_secondary(false)?;
-        let best_block_hash = self.storage.get_block_hash(self.storage.get_latest_block_height())?;
+        let storage = self.storage.read();
+        storage.catch_up_secondary(false)?;
+        let best_block_hash = storage.get_block_hash(storage.get_current_block_height())?;
 
         Ok(hex::encode(&best_block_hash.0))
     }
 
     /// Returns the block hash of the index specified if it exists in the canonical chain.
     fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError> {
-        self.storage.catch_up_secondary(false)?;
-        let block_hash = self.storage.get_block_hash(block_height)?;
+        let storage = self.storage.read();
+        storage.catch_up_secondary(false)?;
+        let block_hash = storage.get_block_hash(block_height)?;
 
         Ok(hex::encode(&block_hash.0))
     }
 
     /// Returns the hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
-        self.storage.catch_up_secondary(false)?;
+        let storage = self.storage.read();
+        storage.catch_up_secondary(false)?;
         Ok(hex::encode(
-            &self.storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
+            &storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
         ))
     }
 
@@ -186,7 +190,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns information about a transaction from serialized transaction bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
-        self.storage.catch_up_secondary(false)?;
+        self.storage.read().catch_up_secondary(false)?;
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
@@ -218,11 +222,9 @@ impl RpcFunctions for RpcImpl {
         }
 
         let transaction_id = transaction.transaction_id()?;
-        let block_number = match self.storage.get_transaction_location(&transaction_id.to_vec())? {
-            Some(block_location) => Some(
-                self.storage
-                    .get_block_number(&BlockHeaderHash(block_location.block_hash))?,
-            ),
+        let storage = self.storage.read();
+        let block_number = match storage.get_transaction_location(&transaction_id.to_vec())? {
+            Some(block_location) => Some(storage.get_block_number(&BlockHeaderHash(block_location.block_hash))?),
             None => None,
         };
 
@@ -252,29 +254,36 @@ impl RpcFunctions for RpcImpl {
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
-        self.storage.catch_up_secondary(false)?;
+        let transaction_hex_id = hex::encode(transaction.transaction_id()?);
+
+        let storage = self.storage.read();
+
+        storage.catch_up_secondary(false)?;
 
         if !self
             .consensus
-            .verify_transaction(&self.parameters, &transaction, &self.storage)?
+            .verify_transaction(&self.parameters, &transaction, &storage)?
         {
             // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
             return Ok("Transaction did not verify".into());
         }
 
-        match !self.storage.transcation_conflicts(&transaction) {
+        match !storage.transaction_conflicts(&transaction) {
             true => {
-                Runtime::new()?.block_on(process_transaction_internal(
-                    self.server_context.clone(),
-                    &self.consensus,
-                    &self.parameters,
-                    self.storage.clone(),
-                    self.memory_pool_lock.clone(),
-                    to_bytes![transaction]?.to_vec(),
-                    *Runtime::new()?.block_on(self.server_context.local_address.read()),
-                ))?;
+                let entry = Entry::<Tx> {
+                    size_in_bytes: transaction_bytes.len(),
+                    transaction,
+                };
 
-                Ok(hex::encode(transaction.transaction_id()?))
+                if let Ok(inserted) = self.memory_pool.lock().insert(&storage, entry) {
+                    if inserted.is_some() {
+                        info!("Transaction added to the memory pool.");
+                        // TODO(ljedrz): checks if needs to be propagated to the network; if need be, this could
+                        // be made automatic at the time when a tx from any source is added the memory pool
+                    }
+                }
+
+                Ok(transaction_hex_id)
             }
             false => Ok("Transaction contains spent records".into()),
         }
@@ -284,27 +293,28 @@ impl RpcFunctions for RpcImpl {
     fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
-        self.storage.catch_up_secondary(false)?;
+
+        let storage = self.storage.read();
+
+        storage.catch_up_secondary(false)?;
 
         Ok(self
             .consensus
-            .verify_transaction(&self.parameters, &transaction, &self.storage)?)
+            .verify_transaction(&self.parameters, &transaction, &storage)?)
     }
 
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
+        let number = self.server.peers.number_of_connected_peers();
 
-        Ok(peer_book.connected_total() as usize)
+        Ok(number as usize)
     }
 
     /// Returns this nodes connected peers.
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peer_book = Runtime::new()?.block_on(self.server_context.peer_book.read());
-
-        let peers = peer_book.get_connected().keys().cloned().collect();
+        let peers = self.server.peers.connected_peers().keys().copied().collect();
 
         Ok(PeerInfo { peers })
     }
@@ -313,27 +323,28 @@ impl RpcFunctions for RpcImpl {
     fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
         let mut is_syncing = false;
 
-        if let Ok(sync_handler) = self.sync_handler_lock.try_lock() {
-            is_syncing = sync_handler.is_syncing();
-        }
+        // FIXME(ljedrz): actually check if syncing
 
         Ok(NodeInfo {
-            is_miner: self.server_context.is_miner,
+            is_miner: self.environment.is_miner(),
             is_syncing,
         })
     }
 
     /// Returns the current mempool and consensus information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
-        self.storage.catch_up_secondary(false)?;
+        let storage = self.storage.read();
+        storage.catch_up_secondary(false)?;
 
-        let block_height = self.storage.get_latest_block_height();
-        let block = self.storage.get_block_from_block_number(block_height)?;
+        let block_height = storage.get_current_block_height();
+        let block = storage.get_block_from_block_number(block_height)?;
 
         let time = Utc::now().timestamp();
 
-        let memory_pool = Runtime::new()?.block_on(self.memory_pool_lock.lock());
-        let full_transactions = memory_pool.get_candidates(&self.storage, self.consensus.max_block_size)?;
+        let full_transactions = self
+            .memory_pool
+            .lock()
+            .get_candidates(&storage, self.consensus.max_block_size)?;
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 
