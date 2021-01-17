@@ -41,20 +41,17 @@ impl Blocks {
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
     pub async fn update(&self, sync_node: Option<SocketAddr>) {
-        // Check that this node is not a bootnode.
-        if !self.environment.is_bootnode() {
-            let block_locator_hashes = self.environment.storage().read().get_block_locator_hashes();
+        let block_locator_hashes = self.environment.storage().read().get_block_locator_hashes();
 
-            if let (Some(sync_node), Ok(block_locator_hashes)) = (sync_node, block_locator_hashes) {
-                // Send a GetSync to the selected sync node.
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(sync_node),
-                    Payload::GetSync(block_locator_hashes),
-                ));
-            } else {
-                // If no sync node is available, wait until peers have been established.
-                info!("No sync node is registered, blocks could not be synced");
-            }
+        if let (Some(sync_node), Ok(block_locator_hashes)) = (sync_node, block_locator_hashes) {
+            // Send a GetSync to the selected sync node.
+            self.outbound.send_request(Message::new(
+                Direction::Outbound(sync_node),
+                Payload::GetSync(block_locator_hashes),
+            ));
+        } else {
+            // If no sync node is available, wait until peers have been established.
+            debug!("No sync node is registered, blocks could not be synced");
         }
     }
 

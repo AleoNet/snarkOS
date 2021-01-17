@@ -132,8 +132,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.node.is_bootnode,
         config.miner.is_miner,
         // Set sync intervals for peers, blocks and transactions (memory pool).
-        Duration::from_millis(100),
-        Duration::from_millis(100),
+        Duration::from_secs(config.p2p.peer_sync_interval.into()),
+        Duration::from_secs(config.p2p.block_sync_interval.into()),
         Duration::from_secs(config.p2p.mempool_interval.into()),
     )?;
 

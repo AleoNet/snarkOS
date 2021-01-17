@@ -321,9 +321,8 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns data about the node.
     fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
-        let mut is_syncing = false;
-
         // FIXME(ljedrz): actually check if syncing
+        let is_syncing = false;
 
         Ok(NodeInfo {
             is_miner: self.environment.is_miner(),
