@@ -48,16 +48,10 @@ impl Metrics {
     }
 }
 
-impl Default for Metrics {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_derives::test_with_metrics;
+    use snarkvm_derives::test_with_metrics;
 
     use serial_test::serial;
 
