@@ -201,3 +201,55 @@ async fn transaction_sync_initiator_side() {
     assert!(node.environment.memory_pool().lock().contains(&entry_1));
     assert!(node.environment.memory_pool().lock().contains(&entry_2));
 }
+
+#[tokio::test]
+async fn transaction_sync_responder_side() {
+    // handshake between the fake node and full node
+    let (node, mut peer_stream) = handshake(
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+    )
+    .await;
+
+    // insert transaction into node
+    let mut memory_pool = node.environment.memory_pool().lock();
+    let storage = node.environment.storage().read();
+
+    let entry_1 = Entry {
+        size_in_bytes: TRANSACTION_1.len(),
+        transaction: Tx::read(&TRANSACTION_1[..]).unwrap(),
+    };
+
+    let entry_2 = Entry {
+        size_in_bytes: TRANSACTION_2.len(),
+        transaction: Tx::read(&TRANSACTION_2[..]).unwrap(),
+    };
+
+    memory_pool.insert(&storage, entry_1).unwrap().unwrap();
+    memory_pool.insert(&storage, entry_2).unwrap().unwrap();
+
+    // drop the locks to avoid deadlocks
+    drop(memory_pool);
+    drop(storage);
+
+    // send a GetMemoryPool message
+    let get_memory_pool = Payload::GetMemoryPool;
+    write_message_to_stream(get_memory_pool, &mut peer_stream).await;
+
+    // the buffer for peer's reads
+    let mut peer_buf = [0u8; 4096];
+
+    // check GetMemoryPool message was received
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    let txs = if let Payload::MemoryPool(txs) = bincode::deserialize(&payload).unwrap() {
+        txs
+    } else {
+        unreachable!();
+    };
+
+    // check transactions
+    assert!(txs.contains(&TRANSACTION_1.to_vec()));
+    assert!(txs.contains(&TRANSACTION_2.to_vec()));
+}
