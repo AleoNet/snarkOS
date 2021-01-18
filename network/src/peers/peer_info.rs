@@ -64,7 +64,7 @@ pub struct PeerInfo {
     /// The timestamp of the first seen instance of this peer.
     first_seen: DateTime<Utc>,
     /// The timestamp of the last seen instance of this peer.
-    last_seen: DateTime<Utc>,
+    pub(crate) last_seen: DateTime<Utc>,
     /// The timestamp of the last connection to this peer.
     last_connected: DateTime<Utc>,
     /// The timestamp of the last disconnect from this peer.
@@ -172,26 +172,6 @@ impl PeerInfo {
     }
 
     ///
-    /// Updates the last seen timestamp of this peer to the current time.
-    ///
-    #[inline]
-    pub(crate) fn set_last_seen(&mut self) -> Result<(), NetworkError> {
-        // Fetch the current connection status with this peer.
-        match self.status() {
-            // Case 1 - The node server is connected to this peer, updates the last seen timestamp.
-            PeerStatus::Connected | PeerStatus::Connecting => {
-                self.last_seen = Utc::now();
-                Ok(())
-            }
-            // Case 2 - The node server is not connected to this peer, returns a `NetworkError`.
-            PeerStatus::Disconnected | PeerStatus::NeverConnected => {
-                error!("Attempting to update state of a disconnected peer - {}", self.address);
-                Err(NetworkError::PeerIsDisconnected)
-            }
-        }
-    }
-
-    ///
     /// Updates the peer to connecting and sets the handshake to the given nonce.
     ///
     /// If the peer is not transitioning from `PeerStatus::Disconnected` or `PeerStatus::NeverConnected`,
@@ -225,8 +205,7 @@ impl PeerInfo {
                 // Add the given nonce to the set of all handshake nonces.
                 self.handshakes.insert(nonce);
 
-                // Set the last seen timestamp of this peer.
-                self.set_last_seen()
+                Ok(())
             }
             PeerStatus::Connecting | PeerStatus::Connected => {
                 error!(

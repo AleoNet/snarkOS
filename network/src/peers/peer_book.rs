@@ -259,43 +259,19 @@ impl PeerBook {
     pub fn add_peer(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
         // Check if the peer is a connecting peer.
         if self.is_connecting(address) {
-            // Fetch the peer info of the given address.
-            let peer_info = self
-                .connecting_peers
-                .get_mut(address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?;
-            // Update the `last_seen` timestamp in the peer info.
-            peer_info.set_last_seen()?;
-
-            error!("{} already exists in the peer book", address);
+            warn!("{} already exists in the peer book", address);
             return Err(NetworkError::PeerAlreadyExists);
         }
 
         // Check if the peer is a connected peer.
         if self.is_connected(address) {
-            // Fetch the peer info of the given address.
-            let peer_info = self
-                .connected_peers
-                .get_mut(address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?;
-            // Update the `last_seen` timestamp in the peer info.
-            peer_info.set_last_seen()?;
-
-            error!("{} already exists in the peer book", address);
+            warn!("{} already exists in the peer book", address);
             return Err(NetworkError::PeerAlreadyExists);
         }
 
         // Check if the peer is a known disconnected peer.
         if self.is_disconnected(address) {
-            // Fetch the peer info of the given address.
-            let peer_info = self
-                .disconnected_peers
-                .get_mut(address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?;
-            // Update the `last_seen` timestamp in the peer info.
-            peer_info.set_last_seen()?;
-
-            error!("{} already exists in the peer book", address);
+            warn!("{} already exists in the peer book", address);
             return Err(NetworkError::PeerAlreadyExists);
         }
 
@@ -346,6 +322,19 @@ impl PeerBook {
 
         error!("Missing {} in the peer book", address);
         Err(NetworkError::PeerBookMissingPeer)
+    }
+
+    ///
+    /// Updates the last seen timestamp of this peer to the current time.
+    ///
+    // TODO(ljedrz): use on Version reads
+    #[inline]
+    pub fn update_last_seen(&mut self, address: SocketAddr) {
+        if let Some(ref mut peer) = self.connected_peers.get_mut(&address) {
+            peer.last_seen = chrono::Utc::now();
+        } else {
+            warn!("Attempted to update state of a peer that's not connected: {}", address);
+        }
     }
 
     ///
