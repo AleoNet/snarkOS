@@ -62,7 +62,7 @@ async fn simple_block_sync() {
     // T 0-2s: not much happens
     // T 2s: first sync occures, a peer isn't yet connected to sync with
     // T 4s: second sync occures, this time a peer is selected for the block sync
-    sleep(Duration::new(5, 0)).await;
+    sleep(Duration::from_secs(5)).await;
 
     // check blocks present in alice's chain were synced to bob's
     assert!(
@@ -113,7 +113,7 @@ async fn simple_transaction_sync() {
     // T 0-2s: not much happens
     // T 2s: first sync occures, a peer isn't yet connected to sync with
     // T 4s: second sync occures, this time a peer is selected for the block sync
-    sleep(Duration::new(5, 0)).await;
+    sleep(Duration::from_secs(5)).await;
 
     // check transaction is present in bob's memory pool
     assert!(node_bob.environment.memory_pool().lock().contains(&entry));

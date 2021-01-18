@@ -34,7 +34,8 @@ use tokio::time::sleep;
 #[tokio::test]
 async fn block_sync_initiator_side() {
     // handshake between the fake node and full node
-    let (node, mut peer_stream) = handshake(Duration::new(100, 0), Duration::new(10, 0), Duration::new(100, 0)).await;
+    let (node, mut peer_stream) =
+        handshake(Duration::from_secs(10), Duration::from_secs(2), Duration::from_secs(10)).await;
 
     // the buffer for peer's reads
     let mut peer_buf = [0u8; 64];
@@ -103,7 +104,12 @@ async fn block_sync_initiator_side() {
 #[tokio::test]
 async fn block_sync_responder_side() {
     // handshake between the fake and full node
-    let (node, mut peer_stream) = handshake(Duration::new(100, 0), Duration::new(10, 0), Duration::new(100, 0)).await;
+    let (node, mut peer_stream) = handshake(
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+    )
+    .await;
 
     // insert block into node
     let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
@@ -158,7 +164,8 @@ async fn block_sync_responder_side() {
 #[tokio::test]
 async fn transaction_sync_initiator_side() {
     // handshake between the fake node and full node
-    let (node, mut peer_stream) = handshake(Duration::new(100, 0), Duration::new(100, 0), Duration::new(10, 0)).await;
+    let (node, mut peer_stream) =
+        handshake(Duration::from_secs(10), Duration::from_secs(10), Duration::from_secs(2)).await;
 
     // the buffer for peer's reads
     let mut peer_buf = [0u8; 64];

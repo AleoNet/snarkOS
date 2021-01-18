@@ -37,7 +37,13 @@ use tokio::{
 #[tokio::test]
 async fn handshake_responder_side() {
     // start a test node and listen for incoming connections
-    let mut node = test_node(vec![], Duration::new(10, 0), Duration::new(10, 0), Duration::new(10, 0)).await;
+    let mut node = test_node(
+        vec![],
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+    )
+    .await;
     node.start().await.unwrap();
     let node_listener = node.local_address().unwrap();
 
@@ -89,11 +95,12 @@ async fn handshake_initiator_side() {
     let peer_address = peer_listener.local_addr().unwrap();
 
     // start node with the peer as a bootnode; that way it will get connected to
+    // note: using the smallest allowed interval for peer sync
     let mut node = test_node(
         vec![peer_address.to_string()],
-        Duration::new(10, 0),
-        Duration::new(10, 0),
-        Duration::new(10, 0),
+        Duration::from_secs(2),
+        Duration::from_secs(10),
+        Duration::from_secs(10),
     )
     .await;
     node.start().await.unwrap();
@@ -150,7 +157,13 @@ async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream
 #[tokio::test]
 async fn reject_non_version_messages_before_handshake() {
     // start the node
-    let mut node = test_node(vec![], Duration::new(10, 0), Duration::new(10, 0), Duration::new(10, 0)).await;
+    let mut node = test_node(
+        vec![],
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+        Duration::from_secs(10),
+    )
+    .await;
     node.start().await.unwrap();
 
     // start the fake node (peer) which is just a socket
