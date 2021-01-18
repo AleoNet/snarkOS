@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::{Channel, Message},
-    NetworkError,
-};
+use crate::{external::Message, ConnWriter, NetworkError};
 
 use std::{
     collections::HashMap,
@@ -31,7 +28,7 @@ use std::{
 use parking_lot::RwLock;
 
 /// The map of remote addresses to their active write channels.
-type Channels = HashMap<SocketAddr, Channel>;
+type Channels = HashMap<SocketAddr, ConnWriter>;
 
 /// A core data structure for handling outbound network traffic.
 #[derive(Debug, Clone)]
@@ -76,7 +73,7 @@ impl Outbound {
     /// Establishes an outbound channel to the given remote address, if it does not exist.
     ///
     #[inline]
-    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Channel, NetworkError> {
+    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<ConnWriter, NetworkError> {
         Ok(self
             .channels
             .read()
@@ -96,7 +93,7 @@ impl Outbound {
         };
 
         // Write the request to the outbound channel.
-        match channel.write(&request.payload).await {
+        match channel.write_message(&request.payload).await {
             Ok(_) => {
                 self.send_success_count.fetch_add(1, Ordering::SeqCst);
             }

@@ -16,7 +16,9 @@
 
 use crate::{
     errors::ConnectError,
-    external::{channel::read_from_stream, message::*, message_types::*, Channel},
+    external::{message::*, message_types::*},
+    ConnReader,
+    ConnWriter,
     Environment,
     NetworkError,
     Receiver,
@@ -31,12 +33,12 @@ use std::{
 
 use parking_lot::{Mutex, RwLock};
 use tokio::{
-    net::{tcp::OwnedReadHalf, TcpListener, TcpStream},
+    net::{TcpListener, TcpStream},
     task,
 };
 
-/// The map of remote addresses to their active read channels.
-pub type Channels = HashMap<SocketAddr, Channel>;
+/// The map of remote addresses to their active writers.
+pub type Channels = HashMap<SocketAddr, ConnWriter>;
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug, Clone)]
@@ -87,23 +89,23 @@ impl Inbound {
         task::spawn(async move {
             loop {
                 match listener.accept().await {
-                    Ok((channel, remote_address)) => {
+                    Ok((stream, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
                         let height = environment.current_block_height();
                         match inbound
-                            .connection_request(height, listener_address, remote_address, channel)
+                            .connection_request(height, listener_address, remote_address, stream)
                             .await
                         {
                             Ok((channel, mut reader)) => {
                                 // update the remote address to be the peer's listening address
-                                let remote_address = channel.remote_address;
+                                let remote_address = channel.addr;
                                 // Save the channel under the provided remote address
                                 inbound.channels.write().insert(remote_address, channel);
 
                                 let inbound = inbound.clone();
                                 tokio::spawn(async move {
-                                    inbound.listen_for_messages(remote_address, &mut reader).await;
+                                    inbound.listen_for_messages(&mut reader).await;
                                 });
                             }
                             Err(e) => error!("Failed to accept a connection: {}", e),
@@ -117,18 +119,17 @@ impl Inbound {
         Ok(())
     }
 
-    pub async fn listen_for_messages(&self, addr: SocketAddr, reader: &mut OwnedReadHalf) {
+    pub async fn listen_for_messages(&self, reader: &mut ConnReader) {
         let mut failure_count = 0u8;
         let mut disconnect_from_peer = false;
         let mut failure;
-        let mut buffer = vec![0u8; MAX_MESSAGE_SIZE];
 
         loop {
             // Reset the failure indicator.
             failure = false;
 
             // Read the next message from the channel. This is a blocking operation.
-            let message = match read_from_stream(addr, reader, &mut buffer).await {
+            let message = match reader.read_message().await {
                 Ok(message) => message,
                 Err(error) => {
                     Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
@@ -136,7 +137,7 @@ impl Inbound {
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
-                            self.route(Message::new(Direction::Internal, Payload::Disconnect(addr)))
+                            self.route(Message::new(Direction::Internal, Payload::Disconnect(reader.addr)))
                                 .await;
 
                             // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
@@ -224,15 +225,14 @@ impl Inbound {
         listener_address: SocketAddr,
         remote_address: SocketAddr,
         stream: TcpStream,
-    ) -> Result<(Channel, OwnedReadHalf), NetworkError> {
-        // Register the new channel.
-        let (mut channel, mut reader) = Channel::new(remote_address, stream);
-
-        let mut handshake_buffer = [0u8; 64];
+    ) -> Result<(ConnWriter, ConnReader), NetworkError> {
+        let (reader, writer) = stream.into_split();
+        let mut writer = ConnWriter::new(remote_address, writer);
+        let mut reader = ConnReader::new(remote_address, reader);
 
         // Read the next message from the channel.
         // Note: this is a blocking operation.
-        let message = match read_from_stream(remote_address, &mut reader, &mut handshake_buffer).await {
+        let message = match reader.read_message().await {
             Ok(message) => message,
             Err(e) => {
                 error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -245,7 +245,8 @@ impl Inbound {
             // Create the remote address from the given peer address, and specified port from the version message.
             let remote_address = SocketAddr::new(remote_address.ip(), remote_version.listening_port);
 
-            channel.update_address(remote_address).await;
+            writer.addr = remote_address;
+            reader.addr = remote_address;
 
             // TODO (raychu86): Establish a formal node version.
             let local_version = Version::new_with_rng(1u64, block_height, listener_address.port());
@@ -259,15 +260,15 @@ impl Inbound {
                 .await?;
 
             // Write a verack response to the remote peer.
-            channel
-                .write(&Payload::Verack(Verack::new(remote_version.nonce)))
+            writer
+                .write_message(&Payload::Verack(Verack::new(remote_version.nonce)))
                 .await?;
 
             // Write a version request to the remote peer.
-            channel.write(&Payload::Version(local_version.clone())).await?;
+            writer.write_message(&Payload::Version(local_version.clone())).await?;
 
             // Parse the inbound message into the message name and message bytes.
-            let message = read_from_stream(remote_address, &mut reader, &mut handshake_buffer).await?;
+            let message = reader.read_message().await?;
 
             // Deserialize the message bytes into a verack message.
             if !matches!(message.payload, Payload::Verack(..)) {
@@ -282,7 +283,7 @@ impl Inbound {
                 ))
                 .await?;
 
-            Ok((channel, reader))
+            Ok((writer, reader))
         } else {
             error!("{} didn't send their Version during the handshake", remote_address);
             Err(NetworkError::InvalidHandshake)

@@ -53,10 +53,7 @@ pub use peers::*;
 pub mod transactions;
 pub use transactions::*;
 
-use crate::{
-    external::{message::*, Channel},
-    peers::peers::Peers,
-};
+use crate::{external::message::*, peers::peers::Peers, ConnWriter};
 
 use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -84,7 +81,7 @@ pub struct Server {
 impl Server {
     /// Creates a new instance of `Server`.
     pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
-        let channels: Arc<RwLock<HashMap<SocketAddr, Channel>>> = Default::default();
+        let channels: Arc<RwLock<HashMap<SocketAddr, ConnWriter>>> = Default::default();
         // Create the inbound and outbound handlers.
         let inbound = Arc::new(Inbound::new(channels.clone()));
         let outbound = Arc::new(Outbound::new(channels));
@@ -268,6 +265,7 @@ mod tests {
     use snarkos_testing::{
         consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, FIXTURE_VK, TEST_CONSENSUS},
         dpc::load_verifying_parameters,
+        network::{read_header, read_payload},
     };
     use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
