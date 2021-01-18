@@ -17,13 +17,15 @@
 mod common;
 use common::{handshake, write_message_to_stream};
 
+use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::external::message::*;
 use snarkos_testing::{
-    consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH},
+    consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
     network::{read_header, read_payload},
 };
 
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
+use snarkvm_utilities::bytes::FromBytes;
 
 use std::time::Duration;
 
@@ -151,4 +153,44 @@ async fn block_sync_responder_side() {
     let block = snarkvm_objects::Block::deserialize(&block).unwrap();
 
     assert_eq!(block, block_struct_1);
+}
+
+#[tokio::test]
+async fn transaction_sync_initiator_side() {
+    // handshake between the fake node and full node
+    let (node, mut peer_stream) = handshake(Duration::new(100, 0), Duration::new(100, 0), Duration::new(10, 0)).await;
+
+    // the buffer for peer's reads
+    let mut peer_buf = [0u8; 64];
+
+    // check GetMemoryPool message was received
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    assert!(matches!(
+        bincode::deserialize(&payload).unwrap(),
+        Payload::GetMemoryPool
+    ));
+
+    // Respond with MemoryPool message
+    let memory_pool = Payload::MemoryPool(vec![TRANSACTION_1.to_vec(), TRANSACTION_2.to_vec()]);
+    write_message_to_stream(memory_pool, &mut peer_stream).await;
+
+    // Create the entries to verify
+    let size = TRANSACTION_1.len();
+    let entry_1 = Entry {
+        size_in_bytes: size,
+        transaction: Tx::read(&TRANSACTION_1[..]).unwrap(),
+    };
+
+    let size = TRANSACTION_2.len();
+    let entry_2 = Entry {
+        size_in_bytes: size,
+        transaction: Tx::read(&TRANSACTION_2[..]).unwrap(),
+    };
+
+    sleep(Duration::from_millis(200)).await;
+
+    // Verify the transactions have been stored in the node's memory pool
+    assert!(node.environment.memory_pool().lock().contains(&entry_1));
+    assert!(node.environment.memory_pool().lock().contains(&entry_2));
 }
