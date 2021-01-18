@@ -16,7 +16,7 @@
 
 use crate::{
     errors::ConnectError,
-    external::{message::*, message_types::*},
+    external::message::*,
     ConnReader,
     ConnWriter,
     Environment,
@@ -85,16 +85,14 @@ impl Inbound {
         info!("Listening at {}", listener_address);
 
         let inbound = self.clone();
-        let environment = environment.clone();
         task::spawn(async move {
             loop {
                 match listener.accept().await {
                     Ok((stream, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
-                        let height = environment.current_block_height();
                         match inbound
-                            .connection_request(height, listener_address, remote_address, stream)
+                            .connection_request(listener_address, remote_address, stream)
                             .await
                         {
                             Ok((channel, mut reader)) => {
@@ -221,7 +219,6 @@ impl Inbound {
     ///     4. Return the accepted handshake and your address as seen by sender.
     pub async fn connection_request(
         &self,
-        block_height: u32,
         listener_address: SocketAddr,
         remote_address: SocketAddr,
         stream: TcpStream,
@@ -249,7 +246,7 @@ impl Inbound {
             reader.addr = remote_address;
 
             // TODO (raychu86): Establish a formal node version.
-            let local_version = Version::new_with_rng(1u64, block_height, listener_address.port());
+            let local_version = Version::new_with_rng(1u64, listener_address.port());
 
             // notify the server that the peer is being connected to
             self.sender
@@ -260,9 +257,7 @@ impl Inbound {
                 .await?;
 
             // Write a verack response to the remote peer.
-            writer
-                .write_message(&Payload::Verack(Verack::new(remote_version.nonce)))
-                .await?;
+            writer.write_message(&Payload::Verack(remote_version.nonce)).await?;
 
             // Write a version request to the remote peer.
             writer.write_message(&Payload::Version(local_version.clone())).await?;

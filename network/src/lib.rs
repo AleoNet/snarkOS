@@ -126,7 +126,7 @@ impl Server {
             }
         });
 
-        if !self.environment.is_bootnode() {
+        if self.environment.has_consensus() && !self.environment.is_bootnode() {
             let peers = self.peers.clone();
             let blocks = self.blocks.clone();
             let block_sync_interval = self.environment.block_sync_interval();
@@ -204,8 +204,8 @@ impl Server {
             Payload::Version(version) => {
                 self.peers.version_to_verack(source.unwrap(), &version)?;
             }
-            Payload::Verack(verack) => {
-                self.peers.verack(&verack);
+            Payload::Verack(_verack) => {
+                // no action required
             }
             Payload::Transaction(transaction) => {
                 let connected_peers = self.peers.connected_peers();

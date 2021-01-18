@@ -25,14 +25,13 @@ use crate::{
     dpc::load_verifying_parameters,
 };
 
-use snarkos_consensus::MerkleTreeLedger;
 use snarkos_network::{
     errors::message::*,
-    external::{message::*, Verack, Version, MAX_MESSAGE_SIZE},
+    external::{message::*, MAX_MESSAGE_SIZE},
+    Consensus,
     Environment,
     Server,
 };
-use snarkvm_dpc::{instantiated::Components, PublicParameters};
 
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -48,79 +47,136 @@ pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
     (addr, listener)
 }
 
+#[macro_export]
+macro_rules! wait_until {
+    ($limit_secs: expr, $condition: expr) => {
+        let now = std::time::Instant::now();
+        loop {
+            if $condition {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            if now.elapsed() > std::time::Duration::from_secs($limit_secs) {
+                panic!("timed out!");
+            }
+        }
+    };
+}
+
+#[derive(Clone)]
+pub struct ConsensusSetup {
+    pub is_miner: bool,
+    pub block_sync_interval: u64,
+    pub tx_sync_interval: u64,
+}
+
+impl ConsensusSetup {
+    pub fn new(is_miner: bool, block_sync_interval: u64, tx_sync_interval: u64) -> Self {
+        Self {
+            is_miner,
+            block_sync_interval,
+            tx_sync_interval,
+        }
+    }
+}
+
+impl Default for ConsensusSetup {
+    fn default() -> Self {
+        Self {
+            is_miner: false,
+            block_sync_interval: 600,
+            tx_sync_interval: 600,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TestSetup {
+    pub socket_address: Option<SocketAddr>,
+    pub consensus_setup: Option<ConsensusSetup>,
+    pub peer_sync_interval: u64,
+    pub min_peers: u16,
+    pub max_peers: u16,
+    pub is_bootnode: bool,
+    pub bootnodes: Vec<String>,
+}
+
+impl TestSetup {
+    pub fn new(
+        socket_address: Option<SocketAddr>,
+        consensus_setup: Option<ConsensusSetup>,
+        peer_sync_interval: u64,
+        min_peers: u16,
+        max_peers: u16,
+        is_bootnode: bool,
+        bootnodes: Vec<String>,
+    ) -> Self {
+        Self {
+            socket_address,
+            consensus_setup,
+            peer_sync_interval,
+            min_peers,
+            max_peers,
+            is_bootnode,
+            bootnodes,
+        }
+    }
+}
+
+impl Default for TestSetup {
+    fn default() -> Self {
+        Self {
+            socket_address: None,
+            consensus_setup: Some(Default::default()),
+            peer_sync_interval: 600,
+            min_peers: 1,
+            max_peers: 100,
+            is_bootnode: false,
+            bootnodes: vec![],
+        }
+    }
+}
+
 /// Returns an `Environment` struct with given arguments
-pub fn test_environment(
-    socket_address: Option<SocketAddr>,
-    bootnodes: Vec<String>,
-    storage: Arc<RwLock<MerkleTreeLedger>>,
-    parameters: PublicParameters<Components>,
-    peer_sync_interval: Duration,
-    block_sync_interval: Duration,
-    transaction_sync_interval: Duration,
-) -> Environment {
-    let memory_pool = snarkos_consensus::MemoryPool::new();
-    let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
-    let consensus = TEST_CONSENSUS.clone();
-    let min_peers = 1;
-    let max_peers = 10;
-    let is_bootnode = false;
-    let is_miner = false;
+pub fn test_environment(setup: TestSetup) -> Environment {
+    let consensus = if let Some(ref setup) = setup.consensus_setup {
+        Some(Consensus::new(
+            Arc::new(RwLock::new(FIXTURE_VK.ledger())),
+            Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
+            TEST_CONSENSUS.clone(),
+            load_verifying_parameters(),
+            setup.is_miner,
+            Duration::from_secs(setup.block_sync_interval),
+            Duration::from_secs(setup.tx_sync_interval),
+        ))
+    } else {
+        None
+    };
 
     Environment::new(
-        storage,
-        memory_pool_lock,
-        Arc::new(consensus),
-        Arc::new(parameters),
-        socket_address,
-        min_peers,
-        max_peers,
-        bootnodes,
-        is_bootnode,
-        is_miner,
-        peer_sync_interval,
-        block_sync_interval,
-        transaction_sync_interval,
+        consensus,
+        setup.socket_address,
+        setup.min_peers,
+        setup.max_peers,
+        setup.bootnodes,
+        setup.is_bootnode,
+        Duration::from_secs(setup.peer_sync_interval),
     )
     .unwrap()
 }
 
 /// Starts a node with the specified bootnodes.
-pub async fn test_node(
-    bootnodes: Vec<String>,
-    peer_sync_interval: Duration,
-    block_sync_interval: Duration,
-    transaction_sync_interval: Duration,
-) -> Server {
-    let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-    let environment = test_environment(
-        None,
-        bootnodes,
-        storage,
-        load_verifying_parameters(),
-        peer_sync_interval,
-        block_sync_interval,
-        transaction_sync_interval,
-    );
-
+pub async fn test_node(setup: TestSetup) -> Server {
+    let environment = test_environment(setup);
     let mut node = Server::new(environment).await.unwrap();
     node.start().await.unwrap();
 
     node
 }
 
-pub async fn handshake(
-    peer_sync_interval: Duration,
-    block_sync_interval: Duration,
-    transaction_sync_interval: Duration,
-) -> (Server, TcpStream) {
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, TcpStream) {
     // start a test node and listen for incoming connections
-    let node = test_node(
-        vec![],
-        peer_sync_interval,
-        block_sync_interval,
-        transaction_sync_interval,
-    )
-    .await;
+    let node = test_node(node_setup).await;
     let node_listener = node.local_address().unwrap();
 
     // set up a fake node (peer), which is just a socket
@@ -130,7 +186,7 @@ pub async fn handshake(
     let peer_address = peer_stream.local_addr().unwrap();
 
     // the peer initiates a handshake by sending a Version message
-    let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address.port()));
+    let version = Payload::Version(Version::new(1u64, 1u64, peer_address.port()));
     write_message_to_stream(version, &mut peer_stream).await;
 
     // the buffer for peer's reads
@@ -151,7 +207,7 @@ pub async fn handshake(
     };
 
     // in response to the Version, the peer sends a Verack message to finish the handshake
-    let verack = Payload::Verack(Verack::new(version.nonce));
+    let verack = Payload::Verack(version.nonce);
     write_message_to_stream(verack, &mut peer_stream).await;
 
     (node, peer_stream)

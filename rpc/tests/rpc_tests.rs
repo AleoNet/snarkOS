@@ -19,7 +19,11 @@ mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
     use snarkos_network::Server;
     use snarkos_rpc::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::test_environment, storage::*};
+    use snarkos_testing::{
+        consensus::*,
+        network::{test_environment, TestSetup},
+        storage::*,
+    };
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_models::objects::Transaction;
     use snarkvm_utilities::{
@@ -31,7 +35,7 @@ mod rpc_tests {
     use jsonrpc_test::Rpc;
     use parking_lot::RwLock;
     use serde_json::Value;
-    use std::{net::SocketAddr, sync::Arc, time::Duration};
+    use std::{net::SocketAddr, sync::Arc};
 
     fn unwrap_arc_rwlock<T>(x: Arc<RwLock<T>>) -> T {
         if let Ok(lock) = Arc::try_unwrap(x) {
@@ -42,18 +46,9 @@ mod rpc_tests {
     }
 
     async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> Rpc {
-        let parameters = load_verifying_parameters();
-
-        let environment = test_environment(
-            None,
-            vec![],
-            storage.clone(),
-            parameters.clone(),
-            Duration::from_secs(20),
-            Duration::from_secs(10),
-            Duration::from_secs(5),
-        );
+        let environment = test_environment(TestSetup::default());
         let memory_pool = environment.memory_pool().clone();
+        let parameters = environment.dpc_parameters().clone();
         let server = Server::new(environment.clone()).await.unwrap();
 
         let consensus = TEST_CONSENSUS.clone();

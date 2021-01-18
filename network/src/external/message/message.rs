@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::{Verack, Version};
+use crate::external::Version;
 use snarkvm_objects::BlockHeaderHash;
 
 use chrono::{DateTime, Utc};
@@ -92,7 +92,7 @@ pub enum Payload {
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/transaction.md"))]
     Transaction(Vec<u8>),
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/verack.md"))]
-    Verack(Verack),
+    Verack(u64),
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
     Version(Version),
 

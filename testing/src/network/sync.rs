@@ -16,7 +16,16 @@
 
 use crate::{
     consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
-    network::{handshake, read_header, read_payload, test_node, write_message_to_stream},
+    network::{
+        handshaken_node_and_peer,
+        read_header,
+        read_payload,
+        test_node,
+        write_message_to_stream,
+        ConsensusSetup,
+        TestSetup,
+    },
+    wait_until,
 };
 
 use snarkos_consensus::memory_pool::Entry;
@@ -26,15 +35,17 @@ use snarkvm_dpc::instantiated::Tx;
 use snarkvm_objects::{block::Block, block_header_hash::BlockHeaderHash};
 use snarkvm_utilities::bytes::FromBytes;
 
-use std::time::Duration;
-
-use tokio::time::sleep;
-
 #[tokio::test]
 async fn block_initiator_side() {
-    // handshake between the fake node and full node
-    let (node, mut peer_stream) =
-        handshake(Duration::from_secs(10), Duration::from_secs(2), Duration::from_secs(10)).await;
+    // handshake between a fake node and a full node
+    let setup = TestSetup {
+        consensus_setup: Some(ConsensusSetup {
+            block_sync_interval: 1,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let (node, mut peer_stream) = handshaken_node_and_peer(setup).await;
 
     // the buffer for peer's reads
     let mut peer_buf = [0u8; 64];
@@ -82,17 +93,16 @@ async fn block_initiator_side() {
     let block_2 = Payload::Block(BLOCK_2.to_vec());
     write_message_to_stream(block_2, &mut peer_stream).await;
 
-    sleep(Duration::from_millis(200)).await;
-
     // check the blocks have been added to the node's chain
-    assert!(
+    wait_until!(
+        1,
         node.environment
             .storage()
             .read()
             .block_hash_exists(&block_1_header_hash)
     );
-
-    assert!(
+    wait_until!(
+        1,
         node.environment
             .storage()
             .read()
@@ -102,13 +112,8 @@ async fn block_initiator_side() {
 
 #[tokio::test]
 async fn block_responder_side() {
-    // handshake between the fake and full node
-    let (node, mut peer_stream) = handshake(
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-    )
-    .await;
+    // handshake between a fake node and a full node
+    let (node, mut peer_stream) = handshaken_node_and_peer(TestSetup::default()).await;
 
     // insert block into node
     let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
@@ -162,13 +167,7 @@ async fn block_responder_side() {
 
 #[tokio::test]
 async fn block_two_node() {
-    let node_alice = test_node(
-        vec![],
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-    )
-    .await;
+    let node_alice = test_node(TestSetup::default()).await;
     let alice_address = node_alice.local_address().unwrap();
 
     // insert blocks into node_alice
@@ -198,29 +197,28 @@ async fn block_two_node() {
         )
         .unwrap();
 
-    let node_bob = test_node(
-        vec![alice_address.to_string()],
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-    )
-    .await;
-
-    // T 0-2s: not much happens
-    // T 2s: first sync occures, a peer isn't yet connected to sync with
-    // T 4s: second sync occures, this time a peer is selected for the block sync
-    sleep(Duration::from_secs(5)).await;
+    let setup = TestSetup {
+        consensus_setup: Some(ConsensusSetup {
+            block_sync_interval: 1,
+            ..Default::default()
+        }),
+        peer_sync_interval: 1,
+        bootnodes: vec![alice_address.to_string()],
+        ..Default::default()
+    };
+    let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    assert!(
+    wait_until!(
+        5,
         node_bob
             .environment
             .storage()
             .read()
             .block_hash_exists(&block_struct_1.header.get_hash())
     );
-
-    assert!(
+    wait_until!(
+        5,
         node_bob
             .environment
             .storage()
@@ -231,9 +229,15 @@ async fn block_two_node() {
 
 #[tokio::test]
 async fn transaction_initiator_side() {
-    // handshake between the fake node and full node
-    let (node, mut peer_stream) =
-        handshake(Duration::from_secs(10), Duration::from_secs(10), Duration::from_secs(2)).await;
+    // handshake between a fake node and a full node
+    let setup = TestSetup {
+        consensus_setup: Some(ConsensusSetup {
+            tx_sync_interval: 1,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let (node, mut peer_stream) = handshaken_node_and_peer(setup).await;
 
     // the buffer for peer's reads
     let mut peer_buf = [0u8; 64];
@@ -261,22 +265,15 @@ async fn transaction_initiator_side() {
         transaction: Tx::read(&TRANSACTION_2[..]).unwrap(),
     };
 
-    sleep(Duration::from_millis(200)).await;
-
     // Verify the transactions have been stored in the node's memory pool
-    assert!(node.environment.memory_pool().lock().contains(&entry_1));
-    assert!(node.environment.memory_pool().lock().contains(&entry_2));
+    wait_until!(1, node.environment.memory_pool().lock().contains(&entry_1));
+    wait_until!(1, node.environment.memory_pool().lock().contains(&entry_2));
 }
 
 #[tokio::test]
 async fn transaction_responder_side() {
-    // handshake between the fake node and full node
-    let (node, mut peer_stream) = handshake(
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-    )
-    .await;
+    // handshake between a fake node and a full node
+    let (node, mut peer_stream) = handshaken_node_and_peer(TestSetup::default()).await;
 
     // insert transaction into node
     let mut memory_pool = node.environment.memory_pool().lock();
@@ -326,13 +323,7 @@ async fn transaction_two_node() {
     use snarkvm_dpc::instantiated::Tx;
     use snarkvm_utilities::bytes::FromBytes;
 
-    let node_alice = test_node(
-        vec![],
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-    )
-    .await;
+    let node_alice = test_node(TestSetup::default()).await;
     let alice_address = node_alice.local_address().unwrap();
 
     // insert transaction into node_alice
@@ -352,19 +343,17 @@ async fn transaction_two_node() {
     drop(memory_pool);
     drop(storage);
 
-    let node_bob = test_node(
-        vec![alice_address.to_string()],
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-    )
-    .await;
-
-    // T 0-2s: not much happens
-    // T 2s: first sync occures, a peer isn't yet connected to sync with
-    // T 4s: second sync occures, this time a peer is selected for the block sync
-    sleep(Duration::from_secs(5)).await;
+    let setup = TestSetup {
+        consensus_setup: Some(ConsensusSetup {
+            tx_sync_interval: 1,
+            ..Default::default()
+        }),
+        peer_sync_interval: 1,
+        bootnodes: vec![alice_address.to_string()],
+        ..Default::default()
+    };
+    let node_bob = test_node(setup).await;
 
     // check transaction is present in bob's memory pool
-    assert!(node_bob.environment.memory_pool().lock().contains(&entry));
+    wait_until!(5, node_bob.environment.memory_pool().lock().contains(&entry));
 }

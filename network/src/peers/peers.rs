@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::*, Peer, Verack, Version},
+    external::{message::*, Peer, Version},
     peers::{PeerBook, PeerInfo},
     ConnReader,
     ConnWriter,
@@ -244,9 +244,8 @@ impl Peers {
         let writer = ConnWriter::new(remote_address, writer);
         let mut reader = ConnReader::new(remote_address, reader);
 
-        let block_height = self.environment.current_block_height();
         // TODO (raychu86): Establish a formal node version.
-        let version = Version::new_with_rng(1u64, block_height, own_address.port());
+        let version = Version::new_with_rng(1u64, own_address.port());
 
         // Set the peer as a connecting peer in the peer book.
         self.connecting_to_peer(remote_address, version.nonce)?;
@@ -272,8 +271,7 @@ impl Peers {
             };
 
             if let Payload::Version(_) = message.payload {
-                let verack = Verack::new(version.nonce);
-                writer.write_message(&Payload::Verack(verack)).await?;
+                writer.write_message(&Payload::Verack(version.nonce)).await?;
 
                 // spawn the inbound loop
                 let inbound = self.inbound.clone();
@@ -338,8 +336,6 @@ impl Peers {
     fn broadcast_version_requests(&self) {
         // Get the local address of this node.
         let local_address = self.local_address().unwrap(); // must be known by now
-        // Fetch the current block height of this node.
-        let block_height = self.environment.current_block_height();
 
         // Broadcast a `Version` message to each connected peer of this node server.
         trace!("Broadcasting Version messages");
@@ -352,7 +348,7 @@ impl Peers {
                 // Broadcast a `Version` message to the connected peer.
                 self.outbound.send_request(Message::new(
                     Direction::Outbound(remote_address),
-                    Payload::Version(Version::new(1u64, block_height, nonce, local_address.port())),
+                    Payload::Version(Version::new(1u64, nonce, local_address.port())),
                 ));
             } else {
                 // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
@@ -448,7 +444,7 @@ impl Peers {
         if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
             self.outbound.send_request(Message::new(
                 Direction::Outbound(remote_address),
-                Payload::Verack(Verack::new(remote_version.nonce)),
+                Payload::Verack(remote_version.nonce),
             ));
 
             if !self.connected_peers().contains_key(&remote_address) {
@@ -458,9 +454,6 @@ impl Peers {
 
         Ok(())
     }
-
-    #[inline]
-    pub(crate) fn verack(&self, _remote_verack: &Verack) {}
 
     pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.

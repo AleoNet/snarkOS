@@ -23,8 +23,6 @@ use serde::{Deserialize, Serialize};
 pub struct Version {
     /// The version number of the sender's node server.
     pub version: u64,
-    /// The block height of the sender's node server.
-    pub height: u32,
     /// The random nonce of the connection request.
     pub nonce: u64,
     /// The listening port of the sender.
@@ -34,10 +32,9 @@ pub struct Version {
 }
 
 impl Version {
-    pub fn new(version: u64, height: u32, nonce: u64, listening_port: u16) -> Self {
+    pub fn new(version: u64, nonce: u64, listening_port: u16) -> Self {
         Self {
             version,
-            height,
             nonce,
             listening_port,
             timestamp: Utc::now().timestamp(),
@@ -46,12 +43,11 @@ impl Version {
 
     // currently used for the handshakes, but it's a stop-gap; TODO(ljedrz): replace with a solution that
     // is bound to a setup that also encrypts the post-handshake communication
-    pub fn new_with_rng(version: u64, height: u32, listening_port: u16) -> Self {
+    pub fn new_with_rng(version: u64, listening_port: u16) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             version,
-            height,
             nonce: rng.gen::<u64>(),
             listening_port,
             timestamp: Utc::now().timestamp(),

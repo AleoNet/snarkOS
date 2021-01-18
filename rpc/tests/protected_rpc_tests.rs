@@ -19,7 +19,12 @@ mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
     use snarkos_network::Server;
     use snarkos_rpc::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::test_environment, storage::*};
+    use snarkos_testing::{
+        consensus::*,
+        dpc::load_verifying_parameters,
+        network::{test_environment, TestSetup},
+        storage::*,
+    };
     use snarkvm_dpc::base_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
@@ -35,7 +40,7 @@ mod protected_rpc_tests {
     use jsonrpc_core::MetaIoHandler;
     use parking_lot::{Mutex, RwLock};
     use serde_json::Value;
-    use std::{str::FromStr, sync::Arc, time::Duration};
+    use std::{str::FromStr, sync::Arc};
 
     const TEST_USERNAME: &str = "TEST_USERNAME";
     const TEST_PASSWORD: &str = "TEST_PASSWORD";
@@ -83,15 +88,7 @@ mod protected_rpc_tests {
 
         let memory_pool = Arc::new(Mutex::new(MemoryPool::new()));
 
-        let environment = test_environment(
-            None,
-            vec![],
-            storage.clone(),
-            parameters.clone(),
-            Duration::from_secs(20),
-            Duration::from_secs(10),
-            Duration::from_secs(5),
-        );
+        let environment = test_environment(TestSetup::default());
         let server = Server::new(environment.clone()).await.unwrap();
 
         let storage_path = storage.read().storage.db.path().to_path_buf();

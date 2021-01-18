@@ -21,6 +21,8 @@ use crate::{
     update::UpdateCLI,
 };
 
+use snarkos_network::errors::NetworkError;
+
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
@@ -90,8 +92,8 @@ pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
     pub mempool_interval: u8,
-    pub block_sync_interval: u8,
-    pub peer_sync_interval: u8,
+    pub block_sync_interval: u16,
+    pub peer_sync_interval: u16,
     pub min_peers: u16,
     pub max_peers: u16,
 }
@@ -319,6 +321,22 @@ impl Config {
         if let Some(verbose) = argument {
             self.node.verbose = verbose
         }
+    }
+
+    pub fn check(&self) -> Result<(), NetworkError> {
+        // Check that the minimum and maximum number of peers is valid.
+        if self.p2p.min_peers == 0 || self.p2p.max_peers == 0 {
+            return Err(NetworkError::PeerCountInvalid);
+        }
+
+        // Check that the sync interval is a reasonable number of seconds.
+        if !(2..=300).contains(&self.p2p.peer_sync_interval) || !(2..=300).contains(&self.p2p.block_sync_interval) {
+            return Err(NetworkError::SyncIntervalInvalid);
+        }
+
+        // TODO (howardwu): Check the memory pool interval.
+
+        Ok(())
     }
 }
 
