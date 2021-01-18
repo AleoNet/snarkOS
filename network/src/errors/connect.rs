@@ -38,15 +38,17 @@ pub enum ConnectError {
 
 impl ConnectError {
     pub fn is_fatal(&self) -> bool {
-        if let Self::MessageHeaderError(MessageHeaderError::StreamReadError(StreamReadError::Io(err))) = self {
-            [
+        match self {
+            Self::MessageError(MessageError::StreamReadError(StreamReadError::Io(err)))
+            | Self::MessageHeaderError(MessageHeaderError::StreamReadError(StreamReadError::Io(err)))
+            | Self::MessageHeaderError(MessageHeaderError::Io(err))
+            | Self::Std(err) => [
                 ErrorKind::BrokenPipe,
                 ErrorKind::ConnectionReset,
                 ErrorKind::UnexpectedEof,
             ]
-            .contains(&err.kind())
-        } else {
-            false
+            .contains(&err.kind()),
+            _ => false,
         }
     }
 }
