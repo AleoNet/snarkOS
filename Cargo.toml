@@ -15,7 +15,6 @@ edition = "2018"
 members = [
     "benchmarks",
     "consensus",
-    "derives",
     "metrics",
     "network",
     "posw",
