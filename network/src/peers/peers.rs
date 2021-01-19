@@ -279,7 +279,11 @@ impl Peers {
                 // save the outbound channel
                 self.outbound.channels.write().insert(remote_address, writer);
 
-                self.connected_to_peer(remote_address, version.nonce)
+                self.connected_to_peer(remote_address, version.nonce)?;
+
+                debug!("Successfully handshaken with {}", remote_address);
+
+                Ok(())
             } else {
                 Err(NetworkError::InvalidHandshake)
             }
