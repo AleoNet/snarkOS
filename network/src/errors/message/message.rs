@@ -31,7 +31,7 @@ pub enum MessageError {
     MessageHeaderError(MessageHeaderError),
 
     #[error("Stream error: {}", _0)]
-    SteamReadError(StreamReadError),
+    StreamReadError(StreamReadError),
 }
 
 impl From<MessageHeaderError> for MessageError {
@@ -42,7 +42,7 @@ impl From<MessageHeaderError> for MessageError {
 
 impl From<StreamReadError> for MessageError {
     fn from(error: StreamReadError) -> Self {
-        MessageError::SteamReadError(error)
+        MessageError::StreamReadError(error)
     }
 }
 
