@@ -241,7 +241,7 @@ impl ConsensusParameters {
         }
 
         // Check that all the transction proofs verify
-        Ok(self.verify_transactions(parameters, &block.transactions.0, ledger)?)
+        self.verify_transactions(parameters, &block.transactions.0, ledger)
     }
 
     /// Return whether or not the given block is valid and insert it.
