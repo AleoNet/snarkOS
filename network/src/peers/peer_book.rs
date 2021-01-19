@@ -320,28 +320,28 @@ impl PeerBook {
         // Check if the address is a connecting peer.
         if self.is_connecting(address) {
             // Fetch the peer info of the connecting peer.
-            return Ok(self
+            return self
                 .connecting_peers
                 .get(address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?);
+                .ok_or(NetworkError::PeerBookMissingPeer);
         }
 
         // Check if the address is a connected peer.
         if self.is_connected(address) {
             // Fetch the peer info of the connected peer.
-            return Ok(self
+            return self
                 .connected_peers
                 .get(address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?);
+                .ok_or(NetworkError::PeerBookMissingPeer);
         }
 
         // Check if the address is a known disconnected peer.
         if self.is_disconnected(address) {
             // Fetch the peer info of the disconnected peer.
-            return Ok(self
+            return self
                 .disconnected_peers
                 .get(address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?);
+                .ok_or(NetworkError::PeerBookMissingPeer);
         }
 
         error!("Missing {} in the peer book", address);
