@@ -3116,6 +3116,7 @@ name = "snarkos-testing"
 version = "1.1.4"
 dependencies = [
  "anyhow",
+ "bincode",
  "once_cell",
  "parking_lot 0.11.1",
  "rand 0.7.3",
