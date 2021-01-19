@@ -31,7 +31,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 #[tokio::test]
-async fn block_sync_initiator_side() {
+async fn block_initiator_side() {
     // handshake between the fake node and full node
     let (node, mut peer_stream) =
         handshake(Duration::from_secs(10), Duration::from_secs(2), Duration::from_secs(10)).await;
@@ -101,7 +101,7 @@ async fn block_sync_initiator_side() {
 }
 
 #[tokio::test]
-async fn block_sync_responder_side() {
+async fn block_responder_side() {
     // handshake between the fake and full node
     let (node, mut peer_stream) = handshake(
         Duration::from_secs(10),
@@ -161,7 +161,7 @@ async fn block_sync_responder_side() {
 }
 
 #[tokio::test]
-async fn simple_block_sync() {
+async fn block_two_node() {
     let node_alice = test_node(
         vec![],
         Duration::from_secs(2),
@@ -230,7 +230,7 @@ async fn simple_block_sync() {
 }
 
 #[tokio::test]
-async fn transaction_sync_initiator_side() {
+async fn transaction_initiator_side() {
     // handshake between the fake node and full node
     let (node, mut peer_stream) =
         handshake(Duration::from_secs(10), Duration::from_secs(10), Duration::from_secs(2)).await;
@@ -251,15 +251,13 @@ async fn transaction_sync_initiator_side() {
     write_message_to_stream(memory_pool, &mut peer_stream).await;
 
     // Create the entries to verify
-    let size = TRANSACTION_1.len();
     let entry_1 = Entry {
-        size_in_bytes: size,
+        size_in_bytes: TRANSACTION_1.len(),
         transaction: Tx::read(&TRANSACTION_1[..]).unwrap(),
     };
 
-    let size = TRANSACTION_2.len();
     let entry_2 = Entry {
-        size_in_bytes: size,
+        size_in_bytes: TRANSACTION_2.len(),
         transaction: Tx::read(&TRANSACTION_2[..]).unwrap(),
     };
 
@@ -271,7 +269,7 @@ async fn transaction_sync_initiator_side() {
 }
 
 #[tokio::test]
-async fn transaction_sync_responder_side() {
+async fn transaction_responder_side() {
     // handshake between the fake node and full node
     let (node, mut peer_stream) = handshake(
         Duration::from_secs(10),
@@ -323,7 +321,7 @@ async fn transaction_sync_responder_side() {
 }
 
 #[tokio::test]
-async fn simple_transaction_sync() {
+async fn transaction_two_node() {
     use snarkos_consensus::memory_pool::Entry;
     use snarkvm_dpc::instantiated::Tx;
     use snarkvm_utilities::bytes::FromBytes;
