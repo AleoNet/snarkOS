@@ -45,19 +45,13 @@ impl Transactions {
     ///
     /// Triggers the transaction sync with a selected peer.
     ///
-    pub fn update(&self, sync_node: Option<SocketAddr>) -> Result<(), NetworkError> {
-        if !self.environment.is_bootnode() {
-            if let Some(sync_node) = sync_node {
-                self.outbound
-                    .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
-
-                trace!("Send from update to {:?}", sync_node);
-            } else {
-                info!("No sync node is registered, transactions could not be synced");
-            }
+    pub fn update(&self, sync_node: Option<SocketAddr>) {
+        if let Some(sync_node) = sync_node {
+            self.outbound
+                .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
+        } else {
+            debug!("No sync node is registered, transactions could not be synced");
         }
-
-        Ok(())
     }
 
     /// Broadcast transaction to connected peers

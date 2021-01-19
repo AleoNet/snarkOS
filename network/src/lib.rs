@@ -118,13 +118,6 @@ impl Server {
     pub async fn start_services(&self) {
         let peer_sync_interval = self.environment.peer_sync_interval();
         let peers = self.peers.clone();
-
-        let block_sync_interval = self.environment.block_sync_interval();
-        let blocks = self.blocks.clone();
-
-        let transaction_sync_interval = self.environment.transaction_sync_interval();
-        let transactions = self.transactions.clone();
-
         task::spawn(async move {
             loop {
                 sleep(peer_sync_interval).await;
@@ -136,33 +129,35 @@ impl Server {
             }
         });
 
-        let peers = self.peers.clone();
-        task::spawn(async move {
-            loop {
-                sleep(block_sync_interval).await;
-                info!("Updating blocks");
+        if !self.environment.is_bootnode() {
+            let peers = self.peers.clone();
+            let blocks = self.blocks.clone();
+            let block_sync_interval = self.environment.block_sync_interval();
+            task::spawn(async move {
+                loop {
+                    sleep(block_sync_interval).await;
+                    info!("Updating blocks");
 
-                // select last seen node as block sync node
-                let sync_node = peers.last_seen();
-
-                blocks.update(sync_node).await;
-            }
-        });
-
-        let peers = self.peers.clone();
-        task::spawn(async move {
-            loop {
-                sleep(transaction_sync_interval).await;
-                info!("Updating transactions");
-
-                // select last seen node as block sync node
-                let sync_node = peers.last_seen();
-
-                if let Err(e) = transactions.update(sync_node) {
-                    error!("Transaction update error: {}", e);
+                    // select last seen node as block sync node
+                    let sync_node = peers.last_seen();
+                    blocks.update(sync_node).await;
                 }
-            }
-        });
+            });
+
+            let peers = self.peers.clone();
+            let transactions = self.transactions.clone();
+            let transaction_sync_interval = self.environment.transaction_sync_interval();
+            task::spawn(async move {
+                loop {
+                    sleep(transaction_sync_interval).await;
+                    info!("Updating transactions");
+
+                    // select last seen node as block sync node
+                    let sync_node = peers.last_seen();
+                    transactions.update(sync_node);
+                }
+            });
+        }
 
         let server = self.clone();
         let mut receiver = self.inbound.take_receiver();

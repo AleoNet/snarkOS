@@ -92,7 +92,7 @@ impl Environment {
         }
 
         // Check that the sync interval is a reasonable number of seconds.
-        if !(2..=300).contains(&peer_sync_interval.as_secs()) && !(2..=300).contains(&block_sync_interval.as_secs()) {
+        if !(2..=300).contains(&peer_sync_interval.as_secs()) || !(2..=300).contains(&block_sync_interval.as_secs()) {
             return Err(NetworkError::SyncIntervalInvalid);
         }
 

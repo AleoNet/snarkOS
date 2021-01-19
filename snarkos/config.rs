@@ -90,6 +90,8 @@ pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
     pub mempool_interval: u8,
+    pub block_sync_interval: u8,
+    pub peer_sync_interval: u8,
     pub min_peers: u16,
     pub max_peers: u16,
 }
@@ -123,6 +125,8 @@ impl Default for Config {
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
                 mempool_interval: 5,
+                peer_sync_interval: 20,
+                block_sync_interval: 10,
                 min_peers: 7,
                 max_peers: 25,
             },
