@@ -26,8 +26,6 @@ mod test_storage {
         ProofOfSuccinctWork,
     };
 
-    use std::sync::Arc;
-
     #[test]
     pub fn test_new_blockchain() {
         let (blockchain, _): (Store, _) = open_test_blockchain();
