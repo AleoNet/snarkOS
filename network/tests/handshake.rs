@@ -14,14 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod common;
-use common::{test_node, write_message_to_stream};
-
 use snarkos_network::{
     external::{message::*, Verack, Version},
     Server,
 };
-use snarkos_testing::network::{read_header, read_payload};
+use snarkos_testing::network::{read_header, read_payload, test_node, write_message_to_stream};
 
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
@@ -37,14 +34,13 @@ use tokio::{
 #[tokio::test]
 async fn handshake_responder_side() {
     // start a test node and listen for incoming connections
-    let mut node = test_node(
+    let node = test_node(
         vec![],
         Duration::from_secs(10),
         Duration::from_secs(10),
         Duration::from_secs(10),
     )
     .await;
-    node.start().await.unwrap();
     let node_listener = node.local_address().unwrap();
 
     // set up a fake node (peer), which is just a socket
@@ -96,14 +92,13 @@ async fn handshake_initiator_side() {
 
     // start node with the peer as a bootnode; that way it will get connected to
     // note: using the smallest allowed interval for peer sync
-    let mut node = test_node(
+    let node = test_node(
         vec![peer_address.to_string()],
         Duration::from_secs(2),
         Duration::from_secs(10),
         Duration::from_secs(10),
     )
     .await;
-    node.start().await.unwrap();
 
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
@@ -157,14 +152,13 @@ async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream
 #[tokio::test]
 async fn reject_non_version_messages_before_handshake() {
     // start the node
-    let mut node = test_node(
+    let node = test_node(
         vec![],
         Duration::from_secs(10),
         Duration::from_secs(10),
         Duration::from_secs(10),
     )
     .await;
-    node.start().await.unwrap();
 
     // start the fake node (peer) which is just a socket
     // note: the connection needs to be re-established as it is reset
