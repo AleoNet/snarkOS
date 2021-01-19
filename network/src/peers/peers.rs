@@ -15,8 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::*, read_from_stream, Channel, Peer, Verack, Version},
+    external::{message::*, Peer, Verack, Version},
     peers::{PeerBook, PeerInfo},
+    ConnReader,
+    ConnWriter,
     Environment,
     Inbound,
     NetworkError,
@@ -235,10 +237,12 @@ impl Peers {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
-        let mut handshake_buffer = [0u8; 64];
-
         // open the connection
-        let (channel, mut reader) = Channel::new(remote_address, TcpStream::connect(remote_address).await?);
+        let stream = TcpStream::connect(remote_address).await?;
+
+        let (reader, writer) = stream.into_split();
+        let writer = ConnWriter::new(remote_address, writer);
+        let mut reader = ConnReader::new(remote_address, reader);
 
         let block_height = self.environment.current_block_height();
         // TODO (raychu86): Establish a formal node version.
@@ -248,9 +252,9 @@ impl Peers {
         self.connecting_to_peer(remote_address, version.nonce)?;
 
         // Send a connection request with the outbound handler.
-        channel.write(&Payload::Version(version.clone())).await?;
+        writer.write_message(&Payload::Version(version.clone())).await?;
 
-        let message = match read_from_stream(remote_address, &mut reader, &mut handshake_buffer).await {
+        let message = match reader.read_message().await {
             Ok(inbound_message) => inbound_message,
             Err(e) => {
                 error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -259,7 +263,7 @@ impl Peers {
         };
 
         if let Payload::Verack(_) = message.payload {
-            let message = match read_from_stream(remote_address, &mut reader, &mut handshake_buffer).await {
+            let message = match reader.read_message().await {
                 Ok(inbound_message) => inbound_message,
                 Err(e) => {
                     error!("An error occurred while handshaking with {}: {}", remote_address, e);
@@ -269,16 +273,16 @@ impl Peers {
 
             if let Payload::Version(_) = message.payload {
                 let verack = Verack::new(version.nonce);
-                channel.write(&Payload::Verack(verack)).await?;
+                writer.write_message(&Payload::Verack(verack)).await?;
 
                 // spawn the inbound loop
                 let inbound = self.inbound.clone();
                 tokio::spawn(async move {
-                    inbound.listen_for_messages(remote_address, &mut reader).await;
+                    inbound.listen_for_messages(&mut reader).await;
                 });
 
                 // save the outbound channel
-                self.outbound.channels.write().insert(remote_address, channel);
+                self.outbound.channels.write().insert(remote_address, writer);
 
                 self.connected_to_peer(remote_address, version.nonce)
             } else {

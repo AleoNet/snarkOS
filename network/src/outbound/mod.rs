@@ -14,5 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod connection_writer;
+pub use connection_writer::ConnWriter;
+
 pub mod outbound;
 pub use outbound::*;

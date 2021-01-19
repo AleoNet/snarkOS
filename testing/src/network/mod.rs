@@ -26,12 +26,20 @@ use crate::{
 };
 
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_network::{Environment, Server};
+use snarkos_network::{
+    errors::message::*,
+    external::{message::*, MAX_MESSAGE_SIZE},
+    Environment,
+    Server,
+};
 use snarkvm_dpc::{instantiated::Components, PublicParameters};
 
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::net::TcpListener;
+use tokio::{
+    io::{AsyncRead, AsyncReadExt},
+    net::TcpListener,
+};
 
 /// Returns a random tcp socket address and binds it to a listener
 pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
@@ -82,4 +90,25 @@ pub async fn start_node(bootnodes: Vec<String>) -> Server {
     node.start().await.unwrap();
 
     node
+}
+
+pub async fn read_payload<'a, T: AsyncRead + Unpin>(
+    stream: &mut T,
+    buffer: &'a mut [u8],
+) -> Result<&'a [u8], MessageError> {
+    stream.read_exact(buffer).await?;
+
+    Ok(buffer)
+}
+
+pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
+    let mut header_arr = [0u8; 4];
+    stream.read_exact(&mut header_arr).await?;
+    let header = MessageHeader::from(header_arr);
+
+    if header.len as usize > MAX_MESSAGE_SIZE {
+        Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE))
+    } else {
+        Ok(header)
+    }
 }
