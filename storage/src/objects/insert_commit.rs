@@ -20,6 +20,8 @@ use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction}
 use snarkvm_objects::{Block, BlockHeader, BlockHeaderHash};
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
+use std::sync::atomic::Ordering;
+
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Commit a transaction to the canon chain
     #[allow(clippy::type_complexity)]
@@ -243,10 +245,10 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             && self.get_current_block_height() == 0
             && self.is_empty();
 
-        let mut height = self.current_block_height.write();
+        let height = self.get_current_block_height();
         let mut new_best_block_number = 0;
         if !is_genesis {
-            new_best_block_number = *height + 1;
+            new_best_block_number = height + 1;
         }
 
         database_transaction.push(Op::Insert {
@@ -289,7 +291,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         self.storage.write(database_transaction)?;
 
         if !is_genesis {
-            *height += 1;
+            self.current_block_height.fetch_add(1, Ordering::SeqCst);
         }
 
         Ok(())

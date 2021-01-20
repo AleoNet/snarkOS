@@ -31,11 +31,16 @@ use std::{
     fs,
     marker::PhantomData,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
+pub type BlockHeight = u32;
+
 pub struct Ledger<T: Transaction, P: LoadableMerkleParameters> {
-    pub current_block_height: RwLock<u32>,
+    pub current_block_height: AtomicU32,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
     pub storage: Arc<Storage>,
@@ -63,13 +68,13 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Get the latest block height of the chain.
-    pub fn get_current_block_height(&self) -> u32 {
-        *self.current_block_height.read()
+    pub fn get_current_block_height(&self) -> BlockHeight {
+        self.current_block_height.load(Ordering::SeqCst)
     }
 
     /// Get the latest number of blocks in the chain.
-    pub fn get_block_count(&self) -> u32 {
-        *self.current_block_height.read() + 1
+    pub fn get_block_count(&self) -> BlockHeight {
+        self.get_current_block_height() + 1
     }
 
     /// Get the stored old connected peers.
@@ -135,7 +140,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
                 let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
 
                 Ok(Self {
-                    current_block_height: RwLock::new(bytes_to_u32(val)),
+                    current_block_height: AtomicU32::new(bytes_to_u32(val)),
                     storage: Arc::new(storage),
                     cm_merkle_tree: RwLock::new(merkle_tree),
                     ledger_parameters,
@@ -167,13 +172,14 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         if self.storage.db.try_catch_up_with_primary().is_ok() {
             let current_block_height_bytes = self.get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?;
             let new_current_block_height = bytes_to_u32(current_block_height_bytes);
-            let mut current_block_height = self.current_block_height.write();
+            let current_block_height = self.get_current_block_height();
 
             // If the new block height is greater than the stored block height,
             // update the block height and merkle tree.
-            if new_current_block_height > *current_block_height {
+            if new_current_block_height > current_block_height {
                 // Update the latest block height of the secondary instance.
-                *current_block_height = new_current_block_height;
+                self.current_block_height
+                    .store(new_current_block_height, Ordering::SeqCst);
 
                 // Optional `cm_merkle_tree` regeneration because not all usages of
                 // the secondary instance requires it.
