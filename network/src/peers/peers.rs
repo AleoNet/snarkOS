@@ -128,8 +128,8 @@ impl Peers {
         }
 
         if number_of_connected_peers != 0 {
-            // Broadcast a `Version` request to each connected peer.
-            self.broadcast_version_requests();
+            // Send a `Ping` to every connected peer.
+            self.broadcast_pings();
 
             // Store the peer book to storage.
             self.save_peer_book_to_storage()?;
@@ -215,14 +215,6 @@ impl Peers {
     #[inline]
     pub fn local_address(&self) -> Option<SocketAddr> {
         self.environment.local_address()
-    }
-
-    ///
-    /// Returns the current handshake nonce for the given connected peer.
-    ///
-    #[inline]
-    fn nonce(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
-        self.peer_book.read().handshake_nonce(remote_address)
     }
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
@@ -332,33 +324,16 @@ impl Peers {
         }
     }
 
-    /// Broadcasts a `Version` message to all connected peers.
-    fn broadcast_version_requests(&self) {
-        // Get the local address of this node.
-        let local_address = self.local_address().unwrap(); // must be known by now
+    /// Broadcasts a `Ping` message to all connected peers.
+    fn broadcast_pings(&self) {
+        trace!("Broadcasting Ping messages");
 
-        // Broadcast a `Version` message to each connected peer of this node server.
-        trace!("Broadcasting Version messages");
+        let current_block_height = self.environment.current_block_height();
         for (remote_address, _) in self.connected_peers() {
-            // Get the handshake nonce.
-            if let Ok(nonce) = self.nonce(&remote_address) {
-                // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
-
-                // TODO (raychu86): Establish a formal node version.
-                // Broadcast a `Version` message to the connected peer.
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::Version(Version::new(1u64, nonce, local_address.port())),
-                ));
-            } else {
-                // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
-
-                // Disconnect from the peer if there is no active connection channel
-                // TODO (howardwu): Inform Outbound to also disconnect, by dropping any channels held with this peer.
-                if let Err(e) = self.disconnected_from_peer(&remote_address) {
-                    warn!("Couldn't mark {} as disconnected: {}", remote_address, e);
-                }
-            };
+            self.outbound.send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::Ping(current_block_height),
+            ));
         }
     }
 
@@ -382,6 +357,11 @@ impl Peers {
             //     self.disconnected_from_peer(&remote_address).await?;
             // }
         }
+    }
+
+    /// Broadcasts a `Ping` message to all connected peers.
+    pub fn received_pong(&self, source: SocketAddr) {
+        // TODO(ljedrz): calculate and register latency
     }
 
     /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
