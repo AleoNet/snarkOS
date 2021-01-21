@@ -328,7 +328,7 @@ impl Peers {
         // Iterate through each connected peer and attempts a connection request.
         for (remote_address, _) in self.disconnected_peers() {
             if let Err(e) = self.initiate_connection(remote_address).await {
-                warn!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+                trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
             }
         }
     }
