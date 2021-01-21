@@ -137,10 +137,7 @@ impl Peers {
 
         if number_of_connected_peers != 0 {
             // Send a `Ping` to every connected peer.
-            self.broadcast_pings().await;
-
-            // Store the peer book to storage.
-            self.save_peer_book_to_storage()?;
+            self.broadcast_pings();
         }
 
         Ok(())
@@ -447,6 +444,7 @@ impl Peers {
     /// This function checks that this node is not connected to itself,
     /// and proceeds to serialize the peer book into a byte vector for storage.
     ///
+    #[allow(dead_code)]
     #[inline]
     fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
         // Serialize the peer book.
