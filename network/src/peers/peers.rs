@@ -84,7 +84,7 @@ impl Peers {
     ///
     pub async fn update(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
-        let number_of_connected_peers = self.number_of_connected_peers();
+        let number_of_connected_peers = self.number_of_connected_peers() as usize;
         trace!(
             "Connected to {} peer{}",
             number_of_connected_peers,
@@ -94,12 +94,14 @@ impl Peers {
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
-            if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
+            let min_peers = self.environment.minimum_number_of_connected_peers() as usize;
+            if number_of_connected_peers < min_peers {
                 // Attempt to connect to the default bootnodes of the network.
                 self.connect_to_bootnodes().await;
 
                 // Attempt to connect to each disconnected peer saved in the peer book.
-                self.connect_to_disconnected_peers().await;
+                self.connect_to_disconnected_peers(min_peers - number_of_connected_peers)
+                    .await;
 
                 // Broadcast a `GetPeers` message to request for more peers.
                 self.broadcast_getpeers_requests();
@@ -107,8 +109,9 @@ impl Peers {
         }
 
         // Check if this node server is above the permitted number of connected peers.
-        if number_of_connected_peers > self.environment.maximum_number_of_connected_peers() {
-            let number_to_disconnect = number_of_connected_peers - self.environment.maximum_number_of_connected_peers();
+        let max_peers = self.environment.maximum_number_of_connected_peers() as usize;
+        if number_of_connected_peers > max_peers {
+            let number_to_disconnect = number_of_connected_peers - max_peers;
             trace!(
                 "Disconnecting from the most recent {} peers to maintain their permitted number",
                 number_to_disconnect
@@ -322,11 +325,11 @@ impl Peers {
     }
 
     /// Broadcasts a connection request to all disconnected peers.
-    async fn connect_to_disconnected_peers(&self) {
+    async fn connect_to_disconnected_peers(&self, count: usize) {
         trace!("Connecting to disconnected peers");
 
         // Iterate through each connected peer and attempts a connection request.
-        for (remote_address, _) in self.disconnected_peers() {
+        for remote_address in self.disconnected_peers().keys().take(count).copied() {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
             }
