@@ -53,3 +53,25 @@ async fn peer_initiator_side() {
     // check the address has been added to the disconnected list in the peer book
     wait_until!(5, node.peers.is_disconnected(&addr));
 }
+
+#[tokio::test]
+async fn peer_responder_side() {
+    let setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+    let (_node, mut peer_stream) = handshaken_node_and_peer(setup).await;
+
+    // send GetPeers message
+    write_message_to_stream(Payload::GetPeers, &mut peer_stream).await;
+
+    // the buffer for peer's reads
+    let mut peer_buf = [0u8; 64];
+
+    // check if the peer has received the Peers message from the node
+    // TODO(nkls): check the message contains a node, currently empty as there is no simple way to
+    // insert a node into the peer book marked as connected.
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Peers(..)));
+}
