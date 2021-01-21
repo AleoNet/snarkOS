@@ -174,6 +174,7 @@ pub async fn test_node(setup: TestSetup) -> Server {
     node
 }
 
+/// Starts a node and a fake peer (socket) and handshakes them.
 pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, TcpStream) {
     // start a test node and listen for incoming connections
     let node = test_node(node_setup).await;
@@ -213,6 +214,7 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, TcpStre
     (node, peer_stream)
 }
 
+/// Reads the message payload into the supplied buffer.
 pub async fn read_payload<'a, T: AsyncRead + Unpin>(
     stream: &mut T,
     buffer: &'a mut [u8],
@@ -222,6 +224,7 @@ pub async fn read_payload<'a, T: AsyncRead + Unpin>(
     Ok(buffer)
 }
 
+/// Reads the message header into a `MessageHeader`.
 pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
     let mut header_arr = [0u8; 4];
     stream.read_exact(&mut header_arr).await?;
@@ -234,6 +237,7 @@ pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<Message
     }
 }
 
+/// Writes a payload into the supplied `TcpStream`.
 pub async fn write_message_to_stream(payload: Payload, peer_stream: &mut TcpStream) {
     let payload = bincode::serialize(&payload).unwrap();
     let header = MessageHeader {
