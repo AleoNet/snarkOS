@@ -142,7 +142,7 @@ impl PeerBook {
                 .ok_or(NetworkError::PeerBookMissingPeer)?
                 .nonce()
             {
-                Some(nonce) => Ok(*nonce),
+                Some(nonce) => Ok(nonce),
                 None => Err(NetworkError::PeerIsDisconnected),
             };
         }
@@ -156,7 +156,7 @@ impl PeerBook {
                 .ok_or(NetworkError::PeerBookMissingPeer)?
                 .nonce()
             {
-                Some(nonce) => Ok(*nonce),
+                Some(nonce) => Ok(nonce),
                 None => Err(NetworkError::PeerIsDisconnected),
             };
         }
@@ -322,19 +322,6 @@ impl PeerBook {
 
         error!("Missing {} in the peer book", address);
         Err(NetworkError::PeerBookMissingPeer)
-    }
-
-    ///
-    /// Updates the last seen timestamp of this peer to the current time.
-    ///
-    // TODO(ljedrz): use on Version reads
-    #[inline]
-    pub fn update_last_seen(&mut self, address: SocketAddr) {
-        if let Some(ref mut peer) = self.connected_peers.get_mut(&address) {
-            peer.last_seen = chrono::Utc::now();
-        } else {
-            warn!("Attempted to update state of a peer that's not connected: {}", address);
-        }
     }
 
     ///

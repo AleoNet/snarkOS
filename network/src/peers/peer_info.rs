@@ -17,7 +17,7 @@
 use crate::NetworkError;
 
 use chrono::{DateTime, Utc};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 
 use std::{
@@ -30,7 +30,7 @@ use std::{
     time::Instant,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerStatus {
     Connecting,
     Connected,
@@ -40,6 +40,8 @@ pub enum PeerStatus {
 
 #[derive(Debug, Default)]
 pub struct PeerQuality {
+    /// The timestamp of when the peer has been seen last.
+    pub last_seen: RwLock<Option<DateTime<Utc>>>,
     /// An indicator of whether a `Pong` message is currently expected from this peer.
     pub expecting_pong: AtomicBool,
     /// The timestamp of the last `Ping` sent to the peer.
@@ -62,13 +64,11 @@ pub struct PeerInfo {
     /// The set of every handshake nonce used with this peer.
     handshakes: HashSet<u64>,
     /// The timestamp of the first seen instance of this peer.
-    first_seen: DateTime<Utc>,
+    first_seen: Option<DateTime<Utc>>,
     /// The timestamp of the last seen instance of this peer.
-    pub(crate) last_seen: DateTime<Utc>,
-    /// The timestamp of the last connection to this peer.
-    last_connected: DateTime<Utc>,
+    last_connected: Option<DateTime<Utc>>,
     /// The timestamp of the last disconnect from this peer.
-    last_disconnected: DateTime<Utc>,
+    last_disconnected: Option<DateTime<Utc>>,
     /// The number of times we have connected to this peer.
     connected_count: u64,
     /// The number of times we have disconnected from this peer.
@@ -83,16 +83,14 @@ impl PeerInfo {
     /// Creates a new instance of `PeerInfo`.
     ///
     pub fn new(address: SocketAddr) -> Self {
-        let now = Utc::now();
         Self {
             address,
             status: PeerStatus::NeverConnected,
             nonce: None,
             handshakes: Default::default(),
-            first_seen: now,
-            last_seen: now,
-            last_connected: now,
-            last_disconnected: now,
+            first_seen: None,
+            last_connected: None,
+            last_disconnected: None,
             connected_count: 0,
             disconnected_count: 0,
             quality: Default::default(),
@@ -103,56 +101,56 @@ impl PeerInfo {
     /// Returns the IP address of this peer.
     ///
     #[inline]
-    pub fn address(&self) -> &SocketAddr {
-        &self.address
+    pub fn address(&self) -> SocketAddr {
+        self.address
     }
 
     ///
     /// Returns the current status of this peer.
     ///
     #[inline]
-    pub fn status(&self) -> &PeerStatus {
-        &self.status
+    pub fn status(&self) -> PeerStatus {
+        self.status
     }
 
     ///
     /// Returns the current handshake nonce with this peer, if connected.
     ///
     #[inline]
-    pub fn nonce(&self) -> &Option<u64> {
-        &self.nonce
+    pub fn nonce(&self) -> Option<u64> {
+        self.nonce
     }
 
     ///
     /// Returns the timestamp of the first seen instance of this peer.
     ///
     #[inline]
-    pub fn first_seen(&self) -> &DateTime<Utc> {
-        &self.first_seen
+    pub fn first_seen(&self) -> Option<DateTime<Utc>> {
+        self.first_seen
     }
 
     ///
     /// Returns the timestamp of the last seen instance of this peer.
     ///
     #[inline]
-    pub fn last_seen(&self) -> &DateTime<Utc> {
-        &self.last_seen
+    pub fn last_seen(&self) -> Option<DateTime<Utc>> {
+        *self.quality.last_seen.read()
     }
 
     ///
     /// Returns the timestamp of the last connection to this peer.
     ///
     #[inline]
-    pub fn last_connected(&self) -> &DateTime<Utc> {
-        &self.last_connected
+    pub fn last_connected(&self) -> Option<DateTime<Utc>> {
+        self.last_connected
     }
 
     ///
     /// Returns the timestamp of the last disconnect from this peer.
     ///
     #[inline]
-    pub fn last_disconnected(&self) -> &DateTime<Utc> {
-        &self.last_disconnected
+    pub fn last_disconnected(&self) -> Option<DateTime<Utc>> {
+        self.last_disconnected
     }
 
     ///
@@ -199,6 +197,10 @@ impl PeerInfo {
                 // Set the status of this peer to connecting.
                 self.status = PeerStatus::Connecting;
 
+                if self.first_seen.is_none() {
+                    self.first_seen = Some(Utc::now());
+                }
+
                 // Set the given nonce as the current nonce.
                 self.nonce = Some(nonce);
 
@@ -232,14 +234,10 @@ impl PeerInfo {
         // Fetch the current status of the peer.
         match self.status() {
             PeerStatus::Connecting => {
-                // Fetch the current timestamp.
-                let now = Utc::now();
-
                 // Set the state of this peer to connected.
                 self.status = PeerStatus::Connected;
 
-                self.last_seen = now;
-                self.last_connected = now;
+                self.last_connected = Some(Utc::now());
                 self.connected_count += 1;
 
                 Ok(())
@@ -266,15 +264,11 @@ impl PeerInfo {
 
         match self.status() {
             PeerStatus::Connected | PeerStatus::Connecting => {
-                // Fetch the current timestamp.
-                let now = Utc::now();
-
                 // Set the state of this peer to disconnected.
                 self.status = PeerStatus::Disconnected;
 
                 self.nonce = None;
-                self.last_seen = now;
-                self.last_disconnected = now;
+                self.last_disconnected = Some(Utc::now());
                 self.disconnected_count += 1;
 
                 Ok(())

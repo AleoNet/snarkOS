@@ -185,6 +185,7 @@ impl Server {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         let source = if let Direction::Inbound(addr) = direction {
+            self.peers.update_last_seen(addr);
             Some(addr)
         } else {
             None

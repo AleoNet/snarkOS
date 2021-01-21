@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::*, Peer, Version},
+    external::{message::*, Version},
     peers::{PeerBook, PeerInfo, PeerQuality},
     ConnReader,
     ConnWriter,
@@ -119,11 +119,11 @@ impl Peers {
                 .into_iter()
                 .map(|(_, peer_info)| peer_info)
                 .collect::<Vec<_>>();
-            connected.sort_unstable_by_key(|info| *info.last_connected());
+            connected.sort_unstable_by_key(|info| info.last_connected());
 
             for _ in 0..number_to_disconnect {
                 if let Some(peer_info) = connected.pop() {
-                    let addr = *peer_info.address();
+                    let addr = peer_info.address();
                     debug!("Disconnecting from {}", addr);
                     self.inbound
                         .route(Message::new(Direction::Internal, Payload::Disconnect(addr)))
@@ -403,6 +403,18 @@ impl Peers {
         } else {
             // shouldn't occur, but just in case
             warn!("Received a Pong from an unknown peer: {}!", source);
+        }
+    }
+
+    ///
+    /// Updates the last seen timestamp of this peer to the current time.
+    ///
+    #[inline]
+    pub fn update_last_seen(&self, addr: SocketAddr) {
+        if let Some(ref quality) = self.peer_quality(addr) {
+            *quality.last_seen.write() = Some(chrono::Utc::now());
+        } else {
+            warn!("Attempted to update state of a peer that's not connected: {}", addr);
         }
     }
 
