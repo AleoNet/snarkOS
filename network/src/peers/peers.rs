@@ -489,11 +489,11 @@ impl Peers {
         Ok(())
     }
 
-    pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) {
+    pub(crate) fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
-        for (peer_address, peer_info) in self.connected_peers() {
+        for peer_address in self.connected_peers().keys().copied() {
             // Skip the iteration if the requesting peer that we're sending the response to
             // appears in the list of peers.
             if peer_address == remote_address {
