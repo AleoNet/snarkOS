@@ -487,7 +487,7 @@ impl Peers {
             if peer_address == remote_address {
                 continue;
             }
-            peers.push((peer_address, *peer_info.last_seen()));
+            peers.push(peer_address);
         }
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)));
@@ -496,7 +496,7 @@ impl Peers {
     /// A miner has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
-    pub(crate) fn process_inbound_peers(&self, peers: Vec<Peer>) -> Result<(), NetworkError> {
+    pub(crate) fn process_inbound_peers(&self, peers: Vec<SocketAddr>) -> Result<(), NetworkError> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
@@ -511,7 +511,6 @@ impl Peers {
         for peer_address in peers
             .iter()
             .take(number_to_connect as usize)
-            .map(|(addr, _)| addr)
             .filter(|&peer_addr| *peer_addr != local_address)
         {
             // Inform the peer book that we found a peer.
