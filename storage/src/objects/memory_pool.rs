@@ -20,7 +20,7 @@ use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction}
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the stored memory pool transactions.
     pub fn get_memory_pool(&self) -> Result<Vec<u8>, StorageError> {
-        Ok(self.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())?)
+        self.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())
     }
 
     /// Store the memory pool transactions.

@@ -244,8 +244,6 @@ mod tests {
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Block;
 
-    use std::sync::Arc;
-
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 
     #[test]

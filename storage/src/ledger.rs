@@ -74,7 +74,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Get the stored old connected peers.
     pub fn get_peer_book(&self) -> Result<Vec<u8>, StorageError> {
-        Ok(self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())?)
+        self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())
     }
 
     /// Store the connected peers.
