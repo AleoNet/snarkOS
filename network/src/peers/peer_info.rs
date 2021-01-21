@@ -17,8 +17,18 @@
 use crate::NetworkError;
 
 use chrono::{DateTime, Utc};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr};
+
+use std::{
+    collections::HashSet,
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, AtomicU8},
+        Arc,
+    },
+    time::Instant,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerStatus {
@@ -26,6 +36,18 @@ pub enum PeerStatus {
     Connected,
     Disconnected,
     NeverConnected,
+}
+
+#[derive(Debug, Default)]
+pub struct PeerQuality {
+    /// An indicator of whether a `Pong` message is currently expected from this peer.
+    pub expecting_pong: AtomicBool,
+    /// The timestamp of the last `Ping` sent to the peer.
+    pub last_ping_sent: Mutex<Option<Instant>>,
+    /// The time it took to send a `Ping` to the peer and for it to respond with a `Pong`.
+    pub rtt_ms: AtomicU64,
+    /// The number of failures associated with the peer; grounds for dismissal.
+    pub failures: AtomicU8,
 }
 
 /// A data structure containing information about a peer.
@@ -51,6 +73,9 @@ pub struct PeerInfo {
     connected_count: u64,
     /// The number of times we have disconnected from this peer.
     disconnected_count: u64,
+    /// The quality of the connection with the peer.
+    #[serde(skip)]
+    pub quality: Arc<PeerQuality>,
 }
 
 impl PeerInfo {
@@ -70,6 +95,7 @@ impl PeerInfo {
             last_disconnected: now,
             connected_count: 0,
             disconnected_count: 0,
+            quality: Default::default(),
         }
     }
 

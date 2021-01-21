@@ -16,7 +16,7 @@
 
 use crate::{
     external::{message::*, Peer, Version},
-    peers::{PeerBook, PeerInfo},
+    peers::{PeerBook, PeerInfo, PeerQuality},
     ConnReader,
     ConnWriter,
     Environment,
@@ -25,7 +25,12 @@ use crate::{
     Outbound,
 };
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+    time::Instant,
+};
 
 use parking_lot::RwLock;
 use tokio::net::TcpStream;
@@ -330,6 +335,8 @@ impl Peers {
 
         let current_block_height = self.environment.current_block_height();
         for (remote_address, _) in self.connected_peers() {
+            self.sending_ping(remote_address);
+
             self.outbound.send_request(Message::new(
                 Direction::Outbound(remote_address),
                 Payload::Ping(current_block_height),
@@ -359,9 +366,40 @@ impl Peers {
         }
     }
 
-    /// Broadcasts a `Ping` message to all connected peers.
+    fn peer_quality(&self, addr: SocketAddr) -> Option<Arc<PeerQuality>> {
+        self.peer_book
+            .read()
+            .connected_peers()
+            .get(&addr)
+            .map(|peer| Arc::clone(&peer.quality))
+    }
+
+    fn sending_ping(&self, target: SocketAddr) {
+        if let Some(quality) = self.peer_quality(target) {
+            let timestamp = Instant::now();
+            *quality.last_ping_sent.lock() = Some(timestamp);
+            quality.expecting_pong.store(true, Ordering::SeqCst);
+        } else {
+            // shouldn't occur, but just in case
+            warn!("Tried to send a Ping to an unknown peer: {}!", target);
+        }
+    }
+
+    /// Handles an incoming `Pong` message.
     pub fn received_pong(&self, source: SocketAddr) {
-        // TODO(ljedrz): calculate and register latency
+        if let Some(quality) = self.peer_quality(source) {
+            if quality.expecting_pong.load(Ordering::SeqCst) {
+                let ping_sent = quality.last_ping_sent.lock().unwrap();
+                let rtt = ping_sent.elapsed().as_millis() as u64;
+                quality.rtt_ms.store(rtt, Ordering::SeqCst);
+                quality.expecting_pong.store(false, Ordering::SeqCst);
+            } else {
+                quality.failures.fetch_add(1, Ordering::Relaxed);
+            }
+        } else {
+            // shouldn't occur, but just in case
+            warn!("Received a Pong from an unknown peer: {}!", source);
+        }
     }
 
     /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
