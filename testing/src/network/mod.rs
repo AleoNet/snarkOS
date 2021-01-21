@@ -28,7 +28,7 @@ use crate::{
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_network::{
     errors::message::*,
-    external::{message::*, MAX_MESSAGE_SIZE},
+    external::{message::*, Verack, Version, MAX_MESSAGE_SIZE},
     Environment,
     Server,
 };
@@ -37,8 +37,8 @@ use snarkvm_dpc::{instantiated::Components, PublicParameters};
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    io::{AsyncRead, AsyncReadExt},
-    net::TcpListener,
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
 };
 
 /// Returns a random tcp socket address and binds it to a listener
@@ -54,6 +54,9 @@ pub fn test_environment(
     bootnodes: Vec<String>,
     storage: Arc<RwLock<MerkleTreeLedger>>,
     parameters: PublicParameters<Components>,
+    peer_sync_interval: Duration,
+    block_sync_interval: Duration,
+    transaction_sync_interval: Duration,
 ) -> Environment {
     let memory_pool = snarkos_consensus::MemoryPool::new();
     let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
@@ -74,22 +77,84 @@ pub fn test_environment(
         bootnodes,
         is_bootnode,
         is_miner,
-        Duration::from_secs(2),
-        Duration::from_secs(2),
-        Duration::from_secs(2),
+        peer_sync_interval,
+        block_sync_interval,
+        transaction_sync_interval,
     )
     .unwrap()
 }
 
 /// Starts a node with the specified bootnodes.
-pub async fn start_node(bootnodes: Vec<String>) -> Server {
+pub async fn test_node(
+    bootnodes: Vec<String>,
+    peer_sync_interval: Duration,
+    block_sync_interval: Duration,
+    transaction_sync_interval: Duration,
+) -> Server {
     let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-    let environment = test_environment(None, bootnodes, storage, load_verifying_parameters());
+    let environment = test_environment(
+        None,
+        bootnodes,
+        storage,
+        load_verifying_parameters(),
+        peer_sync_interval,
+        block_sync_interval,
+        transaction_sync_interval,
+    );
 
     let mut node = Server::new(environment).await.unwrap();
     node.start().await.unwrap();
 
     node
+}
+
+pub async fn handshake(
+    peer_sync_interval: Duration,
+    block_sync_interval: Duration,
+    transaction_sync_interval: Duration,
+) -> (Server, TcpStream) {
+    // start a test node and listen for incoming connections
+    let node = test_node(
+        vec![],
+        peer_sync_interval,
+        block_sync_interval,
+        transaction_sync_interval,
+    )
+    .await;
+    let node_listener = node.local_address().unwrap();
+
+    // set up a fake node (peer), which is just a socket
+    let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
+
+    // register the addresses bound to the connection between the node and the peer
+    let peer_address = peer_stream.local_addr().unwrap();
+
+    // the peer initiates a handshake by sending a Version message
+    let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address.port()));
+    write_message_to_stream(version, &mut peer_stream).await;
+
+    // the buffer for peer's reads
+    let mut peer_buf = [0u8; 64];
+
+    // check if the peer has received the Verack message from the node
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Verack(_)));
+
+    // check if it was followed by a Version message
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
+        version
+    } else {
+        unreachable!();
+    };
+
+    // in response to the Version, the peer sends a Verack message to finish the handshake
+    let verack = Payload::Verack(Verack::new(version.nonce));
+    write_message_to_stream(verack, &mut peer_stream).await;
+
+    (node, peer_stream)
 }
 
 pub async fn read_payload<'a, T: AsyncRead + Unpin>(
@@ -111,4 +176,15 @@ pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<Message
     } else {
         Ok(header)
     }
+}
+
+pub async fn write_message_to_stream(payload: Payload, peer_stream: &mut TcpStream) {
+    let payload = bincode::serialize(&payload).unwrap();
+    let header = MessageHeader {
+        len: payload.len() as u32,
+    }
+    .as_bytes();
+    peer_stream.write_all(&header[..]).await.unwrap();
+    peer_stream.write_all(&payload).await.unwrap();
+    peer_stream.flush().await.unwrap();
 }

@@ -31,7 +31,7 @@ mod rpc_tests {
     use jsonrpc_test::Rpc;
     use parking_lot::RwLock;
     use serde_json::Value;
-    use std::{net::SocketAddr, sync::Arc};
+    use std::{net::SocketAddr, sync::Arc, time::Duration};
 
     fn unwrap_arc_rwlock<T>(x: Arc<RwLock<T>>) -> T {
         if let Ok(lock) = Arc::try_unwrap(x) {
@@ -44,7 +44,15 @@ mod rpc_tests {
     async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> Rpc {
         let parameters = load_verifying_parameters();
 
-        let environment = test_environment(None, vec![], storage.clone(), parameters.clone());
+        let environment = test_environment(
+            None,
+            vec![],
+            storage.clone(),
+            parameters.clone(),
+            Duration::from_secs(20),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
         let memory_pool = environment.memory_pool().clone();
         let server = Server::new(environment.clone()).await.unwrap();
 
