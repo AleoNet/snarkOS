@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::external::message::*;
-use snarkos_testing::{
-    network::{
-        handshaken_node_and_peer,
-        random_bound_address,
-        read_header,
-        read_payload,
-        write_message_to_stream,
-        TestSetup,
-    },
-    wait_until,
-};
+use snarkos_network::Server;
+use snarkos_testing::{network::star_topology, wait_until};
+
+#[tokio::test]
+async fn star() {
+    let nodes = star_topology(100).await;
+    let core = nodes.first().unwrap();
+
+    assert!(core.environment.is_bootnode());
+    let has_n_peers = |node: Server, n: u16| node.peers.number_of_connected_peers() == n;
+    wait_until!(5, has_n_peers(core.clone(), 99));
+}
