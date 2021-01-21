@@ -147,7 +147,7 @@ impl Peers {
     /// Returns `true` if the given address is connecting with this node.
     ///
     #[inline]
-    pub fn is_connecting(&self, address: &SocketAddr) -> bool {
+    pub fn is_connecting(&self, address: SocketAddr) -> bool {
         self.peer_book.read().is_connecting(address)
     }
 
@@ -155,7 +155,7 @@ impl Peers {
     /// Returns `true` if the given address is connected with this node.
     ///
     #[inline]
-    pub fn is_connected(&self, address: &SocketAddr) -> bool {
+    pub fn is_connected(&self, address: SocketAddr) -> bool {
         self.peer_book.read().is_connected(address)
     }
 
@@ -163,7 +163,7 @@ impl Peers {
     /// Returns `true` if the given address is a disconnected peer of this node.
     ///
     #[inline]
-    pub fn is_disconnected(&self, address: &SocketAddr) -> bool {
+    pub fn is_disconnected(&self, address: SocketAddr) -> bool {
         self.peer_book.read().is_disconnected(address)
     }
 
@@ -210,8 +210,8 @@ impl Peers {
     /// Adds the given address to the disconnected peers in this peer book.
     ///
     #[inline]
-    pub fn add_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
-        self.peer_book.write().add_peer(address)
+    pub fn add_peer(&self, address: SocketAddr) {
+        self.peer_book.write().add_peer(address);
     }
 
     ///
@@ -227,10 +227,10 @@ impl Peers {
         if remote_address == own_address {
             return Err(NetworkError::SelfConnectAttempt);
         }
-        if self.is_connecting(&remote_address) {
+        if self.is_connecting(remote_address) {
             return Err(NetworkError::PeerAlreadyConnecting);
         }
-        if self.is_connected(&remote_address) {
+        if self.is_connected(remote_address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
@@ -289,7 +289,7 @@ impl Peers {
             }
         } else {
             error!("{} didn't respond with a Verack during the handshake", remote_address);
-            self.disconnected_from_peer(&remote_address)?;
+            self.disconnected_from_peer(remote_address)?;
             Err(NetworkError::InvalidHandshake)
         }
     }
@@ -464,7 +464,7 @@ impl Peers {
     /// Sets the given remote address in the peer book as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn disconnected_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         self.peer_book.write().set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
@@ -508,7 +508,7 @@ impl Peers {
     /// A miner has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
-    pub(crate) fn process_inbound_peers(&self, peers: Vec<SocketAddr>) -> Result<(), NetworkError> {
+    pub(crate) fn process_inbound_peers(&self, peers: Vec<SocketAddr>) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
@@ -524,15 +524,12 @@ impl Peers {
             .iter()
             .take(number_to_connect as usize)
             .filter(|&peer_addr| *peer_addr != local_address)
+            .copied()
         {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            if !self.is_connecting(peer_address) && !self.is_connected(peer_address) {
-                self.add_peer(peer_address)?;
-            }
+            self.add_peer(peer_address);
         }
-
-        Ok(())
     }
 }

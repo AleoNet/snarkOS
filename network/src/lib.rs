@@ -239,14 +239,14 @@ impl Server {
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {
-                    self.peers.disconnected_from_peer(&addr)?;
+                    self.peers.disconnected_from_peer(addr)?;
                 }
             }
             Payload::GetPeers => {
                 self.peers.send_peers(source.unwrap());
             }
             Payload::Peers(peers) => {
-                self.peers.process_inbound_peers(peers)?;
+                self.peers.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
                 self.outbound
