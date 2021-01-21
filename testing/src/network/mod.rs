@@ -377,3 +377,34 @@ pub async fn write_message_to_stream(payload: Payload, peer_stream: &mut TcpStre
     peer_stream.write_all(&payload).await.unwrap();
     peer_stream.flush().await.unwrap();
 }
+
+/// Starts n network nodes in a star topology.
+///
+/// The bootnode is at the center and is included in the total node count. The nodes are started
+/// with out a consensus.
+pub async fn star_topology(n: u32) -> Vec<Server> {
+    // Start the bootnode at the center of the star.
+    let setup = TestSetup {
+        consensus_setup: None,
+        is_bootnode: true,
+        ..Default::default()
+    };
+    let core = test_node(setup).await;
+    let core_addr = core.local_address().unwrap();
+
+    // Start the rest of the nodes with the core node as the bootnode.
+    let mut nodes = vec![core];
+    for _ in 1..n {
+        let setup = TestSetup {
+            consensus_setup: None,
+            peer_sync_interval: 2,
+            bootnodes: vec![core_addr.to_string()],
+            ..Default::default()
+        };
+
+        let node = test_node(setup).await;
+        nodes.push(node);
+    }
+
+    nodes
+}
