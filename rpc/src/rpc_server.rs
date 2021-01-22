@@ -49,7 +49,7 @@ pub async fn start_rpc_server(
     username: Option<String>,
     password: Option<String>,
 ) {
-    let rpc_server: SocketAddr = format!("127.0.0.1:{}", rpc_port).parse().unwrap();
+    let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse().unwrap();
 
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
