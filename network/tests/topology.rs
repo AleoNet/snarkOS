@@ -18,6 +18,7 @@ use snarkos_testing::{network::star_topology, wait_until};
 
 #[tokio::test]
 async fn star() {
+    // Note: `ulimit` can be a limiting factor here.
     let nodes = star_topology(50).await;
     let core = nodes.first().unwrap();
 

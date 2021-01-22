@@ -21,6 +21,7 @@ use snarkos_testing::{
         random_bound_address,
         read_header,
         read_payload,
+        test_node,
         write_message_to_stream,
         TestSetup,
     },
@@ -75,4 +76,31 @@ async fn peer_responder_side() {
     let len = read_header(&mut peer_stream).await.unwrap().len();
     let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
     assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Peers(..)));
+}
+
+#[tokio::test]
+async fn triangle() {
+    let setup = |bootnodes| TestSetup {
+        consensus_setup: None,
+        min_peers: 2,
+        peer_sync_interval: 2,
+        bootnodes,
+        ..Default::default()
+    };
+
+    // Spin up and connect nodes A and B.
+    let node_alice = test_node(setup(vec![])).await;
+    let addr_alice = node_alice.local_address().unwrap();
+
+    let node_bob = test_node(setup(vec![addr_alice.to_string()])).await;
+    let addr_bob = node_bob.local_address().unwrap();
+
+    //  Spin up node C and connect to B.
+    let node_charlie = test_node(setup(vec![addr_bob.to_string()])).await;
+
+    // Make sure C connects to A => peer propagation works.
+    wait_until!(5, node_charlie.peers.is_connected(&addr_alice));
+    assert_eq!(node_alice.peers.number_of_connected_peers(), 2);
+    assert_eq!(node_bob.peers.number_of_connected_peers(), 2);
+    assert_eq!(node_charlie.peers.number_of_connected_peers(), 2);
 }
