@@ -28,7 +28,7 @@ use std::{
 use parking_lot::RwLock;
 
 /// The map of remote addresses to their active write channels.
-type Channels = HashMap<SocketAddr, ConnWriter>;
+type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 
 /// A core data structure for handling outbound network traffic.
 #[derive(Debug, Clone)]
@@ -65,7 +65,7 @@ impl Outbound {
     /// Establishes an outbound channel to the given remote address, if it does not exist.
     ///
     #[inline]
-    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<ConnWriter, NetworkError> {
+    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
         Ok(self
             .channels
             .read()

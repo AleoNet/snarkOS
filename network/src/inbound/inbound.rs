@@ -33,12 +33,13 @@ use std::{
 
 use parking_lot::{Mutex, RwLock};
 use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     task,
 };
 
 /// The map of remote addresses to their active writers.
-pub type Channels = HashMap<SocketAddr, ConnWriter>;
+pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug, Clone)]
@@ -99,7 +100,7 @@ impl Inbound {
                                 // update the remote address to be the peer's listening address
                                 let remote_address = channel.addr;
                                 // Save the channel under the provided remote address
-                                inbound.channels.write().insert(remote_address, channel);
+                                inbound.channels.write().insert(remote_address, Arc::new(channel));
 
                                 let inbound = inbound.clone();
                                 tokio::spawn(async move {
@@ -223,67 +224,64 @@ impl Inbound {
         remote_address: SocketAddr,
         stream: TcpStream,
     ) -> Result<(ConnWriter, ConnReader), NetworkError> {
-        let (reader, writer) = stream.into_split();
-        let mut writer = ConnWriter::new(remote_address, writer);
-        let mut reader = ConnReader::new(remote_address, reader);
+        let (mut reader, mut writer) = stream.into_split();
 
-        // Read the next message from the channel.
-        // Note: this is a blocking operation.
-        let message = match reader.read_message().await {
-            Ok(message) => message,
-            Err(e) => {
-                error!("An error occurred while handshaking with {}: {}", remote_address, e);
-                return Err(NetworkError::InvalidHandshake);
-            }
-        };
+        let builder = snow::Builder::with_resolver(
+            crate::HANDSHAKE_PATTERN
+                .parse()
+                .expect("Invalid noise handshake pattern!"),
+            Box::new(snow::resolvers::SodiumResolver),
+        );
+        let static_key = builder.generate_keypair().map_err(NetworkError::Noise)?.private;
+        let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
+        let mut noise = noise_builder.build_responder().map_err(NetworkError::Noise)?;
+        let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
+        let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-        // Create and store a new handshake in the manager.
-        if let Payload::Version(remote_version) = message.payload {
-            // Create the remote address from the given peer address, and specified port from the version message.
-            let remote_address = SocketAddr::new(remote_address.ip(), remote_version.listening_port);
+        // <- e
+        reader.read_exact(&mut buf[..1]).await?;
+        let len = buf[0] as usize;
+        let len = reader.read_exact(&mut buf[..len]).await?;
+        noise
+            .read_message(&buf[..len], &mut buffer)
+            .map_err(|_| NetworkError::InvalidHandshake)?;
+        trace!("received e (XX handshake part 1/3)");
 
-            writer.addr = remote_address;
-            reader.addr = remote_address;
+        // -> e, ee, s, es
+        let own_version = bincode::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+        let len = noise
+            .write_message(&own_version, &mut buffer)
+            .map_err(NetworkError::Noise)?;
+        writer.write_all(&[len as u8]).await?;
+        writer.write_all(&buffer[..len]).await?;
+        trace!("sent e, ee, s, es (XX handshake part 2/3)");
 
-            // TODO (raychu86): Establish a formal node version.
-            let local_version = Version::new_with_rng(1u64, listener_address.port());
+        // <- s, se, psk
+        reader.read_exact(&mut buf[..1]).await?;
+        let len = buf[0] as usize;
+        let len = reader.read_exact(&mut buf[..len]).await?;
+        let len = noise
+            .read_message(&buf[..len], &mut buffer)
+            .map_err(|_| NetworkError::InvalidHandshake)?;
+        let peer_version: Version = bincode::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
+        trace!("received s, se, psk (XX handshake part 3/3)");
 
-            // notify the server that the peer is being connected to
-            self.sender
-                .send(Message::new(
-                    Direction::Internal,
-                    Payload::ConnectingTo(remote_address, local_version.nonce),
-                ))
-                .await?;
+        let remote_address = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
 
-            // Write a verack response to the remote peer.
-            writer.write_message(&Payload::Verack(remote_version.nonce)).await?;
+        // notify the server that the peer is being connected to
+        // FIXME(ljedrz): the following is silly; improve connecting peer handling (should be based on the actual
+        // address only)
+        self.sender
+            .send(Message::new(Direction::Internal, Payload::ConnectingTo(remote_address)))
+            .await?;
+        self.sender
+            .send(Message::new(Direction::Internal, Payload::ConnectedTo(remote_address)))
+            .await?;
 
-            // Write a version request to the remote peer.
-            writer.write_message(&Payload::Version(local_version.clone())).await?;
+        let noise = Arc::new(Mutex::new(noise.into_transport_mode().map_err(NetworkError::Noise)?));
+        let reader = ConnReader::new(remote_address, reader, buffer.clone(), Arc::clone(&noise));
+        let writer = ConnWriter::new(remote_address, writer, buffer, noise);
 
-            // Parse the inbound message into the message name and message bytes.
-            let message = reader.read_message().await?;
-
-            // Deserialize the message bytes into a verack message.
-            if !matches!(message.payload, Payload::Verack(..)) {
-                error!("{} didn't respond with a Verack during the handshake", remote_address);
-                return Err(NetworkError::InvalidHandshake);
-            }
-
-            self.sender
-                .send(Message::new(
-                    Direction::Internal,
-                    Payload::ConnectedTo(remote_address, local_version.nonce),
-                ))
-                .await?;
-
-            debug!("Successfully handshaken with {}", remote_address);
-
-            Ok((writer, reader))
-        } else {
-            error!("{} didn't send their Version during the handshake", remote_address);
-            Err(NetworkError::InvalidHandshake)
-        }
+        Ok((writer, reader))
     }
 }

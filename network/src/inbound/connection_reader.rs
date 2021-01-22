@@ -16,22 +16,32 @@
 
 use crate::{errors::message::*, external::message::*, ConnectError};
 
+use parking_lot::Mutex;
 use tokio::{net::tcp::OwnedReadHalf, prelude::*};
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 pub struct ConnReader {
     pub addr: SocketAddr,
     reader: OwnedReadHalf,
     buffer: Box<[u8]>,
+    secondary_buffer: Box<[u8]>,
+    noise: Arc<Mutex<snow::TransportState>>,
 }
 
 impl ConnReader {
-    pub fn new(addr: SocketAddr, reader: OwnedReadHalf) -> Self {
+    pub fn new(
+        addr: SocketAddr,
+        reader: OwnedReadHalf,
+        buffer: Box<[u8]>,
+        noise: Arc<Mutex<snow::TransportState>>,
+    ) -> Self {
         Self {
             addr,
             reader,
-            buffer: vec![0; MAX_MESSAGE_SIZE].into_boxed_slice(),
+            secondary_buffer: buffer.clone(),
+            buffer,
+            noise,
         }
     }
 
@@ -41,8 +51,8 @@ impl ConnReader {
         self.reader.read_exact(&mut header_arr).await?;
         let header = MessageHeader::from(header_arr);
 
-        if header.len as usize > MAX_MESSAGE_SIZE {
-            Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE))
+        if header.len as usize > crate::MAX_MESSAGE_SIZE {
+            Err(MessageHeaderError::TooBig(header.len as usize, crate::MAX_MESSAGE_SIZE))
         } else {
             Ok(header)
         }
@@ -51,9 +61,15 @@ impl ConnReader {
     /// Reads a message header + payload.
     pub async fn read_message(&mut self) -> Result<Message, ConnectError> {
         let header = self.read_header().await?;
-        self.reader.read_exact(&mut self.buffer[..header.len()]).await?;
+        let len = header.len();
+        self.reader.read_exact(&mut self.buffer[..len]).await?;
+        let len = self
+            .noise
+            .lock()
+            .read_message(&self.buffer[..len], &mut self.secondary_buffer)
+            .unwrap();
         let payload =
-            bincode::deserialize(&self.buffer[..header.len()]).map_err(|e| ConnectError::MessageError(e.into()))?;
+            bincode::deserialize(&self.secondary_buffer[..len]).map_err(|e| ConnectError::MessageError(e.into()))?;
 
         debug!("Received a '{}' message from {}", payload, self.addr);
 

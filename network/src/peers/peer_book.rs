@@ -130,44 +130,9 @@ impl PeerBook {
     }
 
     ///
-    /// Returns the handshake nonce if the given address is a connecting or connected peer.
-    ///
-    pub fn handshake_nonce(&self, address: SocketAddr) -> Result<u64, NetworkError> {
-        // Check if the address is a connecting peer.
-        if self.is_connecting(address) {
-            // Fetch the handshake nonce of the connecting peer.
-            return match self
-                .connecting_peers
-                .get(&address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?
-                .nonce()
-            {
-                Some(nonce) => Ok(nonce),
-                None => Err(NetworkError::PeerIsDisconnected),
-            };
-        }
-
-        // Check if the address is a connected peer.
-        if self.is_connected(address) {
-            // Fetch the handshake nonce of the connected peer.
-            return match self
-                .connected_peers
-                .get(&address)
-                .ok_or(NetworkError::PeerBookMissingPeer)?
-                .nonce()
-            {
-                Some(nonce) => Ok(nonce),
-                None => Err(NetworkError::PeerIsDisconnected),
-            };
-        }
-
-        Err(NetworkError::PeerIsDisconnected)
-    }
-
-    ///
     /// Adds the given address to the connecting peers for the given nonce in the `PeerBook`.
     ///
-    pub fn set_connecting(&mut self, address: &SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+    pub fn set_connecting(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
         // Remove the address from the disconnected peers, if it exists.
         let mut peer_info = match self.disconnected_peers.remove(address) {
             // Case 1 - A previously known peer.
@@ -177,7 +142,7 @@ impl PeerBook {
         };
 
         // Set the peer as connecting.
-        peer_info.set_connecting(nonce)?;
+        peer_info.set_connecting()?;
 
         // Add the address into the connecting peers.
         self.connecting_peers.insert(*address, peer_info);
@@ -189,7 +154,7 @@ impl PeerBook {
     /// Adds the given address to the connected peers in the `PeerBook`,
     /// if the given nonce matches the stored nonce from `Self::set_connecting`.
     ///
-    pub fn set_connected(&mut self, address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+    pub fn set_connected(&mut self, address: SocketAddr) -> Result<(), NetworkError> {
         // Remove the address from the connecting peers, if it exists.
         let mut peer_info = match self.connecting_peers.remove(&address) {
             // Case 1 - A previously connecting peer.
@@ -198,7 +163,7 @@ impl PeerBook {
             _ => return Err(NetworkError::PeerWasNotSetToConnecting),
         };
         // Update the peer info to connected.
-        peer_info.set_connected(nonce)?;
+        peer_info.set_connected()?;
 
         // Add the address into the connected peers.
         let success = self.connected_peers.insert(address, peer_info).is_none();
