@@ -32,6 +32,7 @@ log = { version = "0.4.11" }
 parking_lot = { version = "0.11.1" }
 rand = { version = "0.7.3" }
 serde = { version = "1.0", features = ["derive"] }
+snow = { version = "0.7", default-features = false, features = ["libsodium-resolver", "chacha20poly1305", "blake2", "sha2", "x25519-dalek", "rand"] }
 thiserror = { version = "1.0" }
 tokio = { version = "0.3", features = ["full"] }
 tracing = { default-features = false, features = ["log"], version = "0.1" }

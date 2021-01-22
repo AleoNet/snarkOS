@@ -59,6 +59,11 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
 
+pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
+pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
+pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
+pub const NOISE_BUF_LEN: usize = 65535;
+
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
 pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
@@ -81,7 +86,7 @@ pub struct Server {
 impl Server {
     /// Creates a new instance of `Server`.
     pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
-        let channels: Arc<RwLock<HashMap<SocketAddr, ConnWriter>>> = Default::default();
+        let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
         let inbound = Arc::new(Inbound::new(channels.clone()));
         let outbound = Arc::new(Outbound::new(channels));
@@ -192,21 +197,15 @@ impl Server {
         };
 
         match payload {
-            Payload::ConnectingTo(remote_address, nonce) => {
+            Payload::ConnectingTo(remote_address) => {
                 if direction == Direction::Internal {
-                    self.peers.connecting_to_peer(remote_address, nonce)?;
+                    self.peers.connecting_to_peer(remote_address)?;
                 }
             }
-            Payload::ConnectedTo(remote_address, nonce) => {
+            Payload::ConnectedTo(remote_address) => {
                 if direction == Direction::Internal {
-                    self.peers.connected_to_peer(remote_address, nonce)?;
+                    self.peers.connected_to_peer(remote_address)?;
                 }
-            }
-            Payload::Version(version) => {
-                self.peers.version_to_verack(source.unwrap(), &version)?;
-            }
-            Payload::Verack(_verack) => {
-                // no action required
             }
             Payload::Transaction(transaction) => {
                 let connected_peers = self.peers.connected_peers();
@@ -243,7 +242,7 @@ impl Server {
                 }
             }
             Payload::GetPeers => {
-                self.peers.send_peers(source.unwrap());
+                self.peers.send_get_peers(source.unwrap());
             }
             Payload::Peers(peers) => {
                 self.peers.process_inbound_peers(peers);

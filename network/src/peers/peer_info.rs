@@ -21,7 +21,6 @@ use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 
 use std::{
-    collections::HashSet,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, AtomicU64, AtomicU8},
@@ -59,10 +58,6 @@ pub struct PeerInfo {
     address: SocketAddr,
     /// The current status of this peer.
     status: PeerStatus,
-    /// The current nonce used to connect with this peer.
-    nonce: Option<u64>,
-    /// The set of every handshake nonce used with this peer.
-    handshakes: HashSet<u64>,
     /// The timestamp of the first seen instance of this peer.
     first_seen: Option<DateTime<Utc>>,
     /// The timestamp of the last seen instance of this peer.
@@ -86,8 +81,6 @@ impl PeerInfo {
         Self {
             address,
             status: PeerStatus::NeverConnected,
-            nonce: None,
-            handshakes: Default::default(),
             first_seen: None,
             last_connected: None,
             last_disconnected: None,
@@ -111,14 +104,6 @@ impl PeerInfo {
     #[inline]
     pub fn status(&self) -> PeerStatus {
         self.status
-    }
-
-    ///
-    /// Returns the current handshake nonce with this peer, if connected.
-    ///
-    #[inline]
-    pub fn nonce(&self) -> Option<u64> {
-        self.nonce
     }
 
     ///
@@ -180,17 +165,7 @@ impl PeerInfo {
     ///
     /// If the given handshake nonce has been used before, returns a `NetworkError`.
     ///
-    pub fn set_connecting(&mut self, nonce: u64) -> Result<(), NetworkError> {
-        // Check that the handshake is not already set.
-        if self.nonce.is_some() {
-            return Err(NetworkError::PeerAlreadyConnected);
-        }
-
-        // Check that the nonce has not been used before.
-        if self.handshakes.contains(&nonce) || self.nonce == Some(nonce) {
-            return Err(NetworkError::PeerIsReusingNonce);
-        }
-
+    pub fn set_connecting(&mut self) -> Result<(), NetworkError> {
         // Fetch the current status of the peer.
         match self.status() {
             PeerStatus::Disconnected | PeerStatus::NeverConnected => {
@@ -200,12 +175,6 @@ impl PeerInfo {
                 if self.first_seen.is_none() {
                     self.first_seen = Some(Utc::now());
                 }
-
-                // Set the given nonce as the current nonce.
-                self.nonce = Some(nonce);
-
-                // Add the given nonce to the set of all handshake nonces.
-                self.handshakes.insert(nonce);
 
                 Ok(())
             }
@@ -225,12 +194,7 @@ impl PeerInfo {
     /// If the peer is not transitioning from `PeerStatus::Connecting`,
     /// this function returns a `NetworkError`.
     ///
-    pub(crate) fn set_connected(&mut self, nonce: u64) -> Result<(), NetworkError> {
-        // Check that the handshake nonce is already set and matches the given nonce.
-        if nonce != self.nonce.ok_or(NetworkError::PeerIsMissingNonce)? {
-            return Err(NetworkError::PeerNonceMismatch);
-        }
-
+    pub(crate) fn set_connected(&mut self) -> Result<(), NetworkError> {
         // Fetch the current status of the peer.
         match self.status() {
             PeerStatus::Connecting => {
@@ -257,17 +221,11 @@ impl PeerInfo {
     /// this function returns a `NetworkError`.
     ///
     pub(crate) fn set_disconnected(&mut self) -> Result<(), NetworkError> {
-        // Check that the handshake nonce is already set.
-        if self.nonce.is_none() {
-            return Err(NetworkError::PeerIsMissingNonce);
-        }
-
         match self.status() {
             PeerStatus::Connected | PeerStatus::Connecting => {
                 // Set the state of this peer to disconnected.
                 self.status = PeerStatus::Disconnected;
 
-                self.nonce = None;
                 self.last_disconnected = Some(Utc::now());
                 self.disconnected_count += 1;
 
