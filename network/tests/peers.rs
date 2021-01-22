@@ -70,7 +70,8 @@ async fn peer_responder_side() {
 
     // check if the peer has received the Peers message from the node
     // TODO(nkls): check the message contains a node, currently empty as there is no simple way to
-    // insert a node into the peer book marked as connected.
+    // insert a node into the peer book marked as connected other than spinning up another and
+    // connecting them.
     let len = read_header(&mut peer_stream).await.unwrap().len();
     let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
     assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Peers(..)));
