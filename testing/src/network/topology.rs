@@ -18,6 +18,8 @@ use crate::network::{test_node, TestSetup};
 
 use snarkos_network::Server;
 
+use std::net::SocketAddr;
+
 pub enum Topology {
     /// Each node - except the last one - connects to the next one in a linear fashion.
     Line,
@@ -35,14 +37,40 @@ pub async fn connect_nodes(n: u32, setup: TestSetup, topology: Topology) -> Vec<
     }
 
     match topology {
-        Topology::Line | Topology::Ring | Topology::Mesh => unimplemented!(),
+        Topology::Line => line(n, setup).await,
+        Topology::Ring | Topology::Mesh => unimplemented!(),
         Topology::Star => star_topology(n, setup).await,
     }
 }
 
+/// Starts n network nodes in a line topology.
+pub async fn line(n: u32, setup: TestSetup) -> Vec<Server> {
+    let mut nodes = vec![];
+    let mut prev_node: Option<SocketAddr> = None;
+
+    // Start each node with the previous as a bootnode.
+    for _ in 0..n {
+        let bootnodes = match prev_node {
+            Some(addr) => vec![addr.to_string()],
+            None => vec![],
+        };
+
+        let setup = TestSetup {
+            bootnodes,
+            ..setup.clone()
+        };
+        let node = test_node(setup).await;
+        prev_node = node.local_address();
+        nodes.push(node);
+    }
+
+    nodes
+}
+
 /// Starts n network nodes in a star topology.
 ///
-/// The bootnode is at the center and is included in the total node count.
+/// The bootnode is at the center and is included in the total node count. It is the first node in
+/// the returned list.
 pub async fn star_topology(n: u32, setup: TestSetup) -> Vec<Server> {
     // Start the bootnode at the center of the star.
     let core_setup = TestSetup {
