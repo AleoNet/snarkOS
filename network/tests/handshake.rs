@@ -18,7 +18,7 @@ use snarkos_network::{
     external::{message::*, Version},
     Server,
 };
-use snarkos_testing::network::{read_header, read_payload, test_node, write_message_to_stream, TestSetup};
+use snarkos_testing::network::{test_node, write_message_to_stream, TestSetup};
 
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
@@ -73,7 +73,7 @@ async fn handshake_responder_side() {
     let len = buf[0] as usize;
     let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
     let len = noise.read_message(&buf[..len], &mut buffer).unwrap();
-    let node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
+    let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk
     let peer_version = bincode::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
@@ -139,7 +139,7 @@ async fn handshake_initiator_side() {
     let len = buf[0] as usize;
     let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
     let len = noise.read_message(&buf[..len], &mut buffer).unwrap();
-    let node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
+    let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
 
     // the node should now have registered the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
