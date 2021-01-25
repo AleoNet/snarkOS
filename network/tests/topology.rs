@@ -19,9 +19,9 @@ use snarkos_testing::{network::star_topology, wait_until};
 #[tokio::test]
 async fn star() {
     // Note: `ulimit` can be a limiting factor here.
-    let nodes = star_topology(50).await;
+    let nodes = star_topology(5).await;
     let core = nodes.first().unwrap();
 
     assert!(core.environment.is_bootnode());
-    wait_until!(5, core.peers.number_of_connected_peers() == 49);
+    wait_until!(5, core.peers.number_of_connected_peers() == 4);
 }
