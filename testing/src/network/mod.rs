@@ -18,6 +18,9 @@ pub mod blocks;
 pub use blocks::*;
 
 #[cfg(test)]
+pub mod encryption;
+
+#[cfg(test)]
 pub mod sync;
 
 use crate::{
