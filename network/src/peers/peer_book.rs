@@ -269,13 +269,13 @@ impl PeerBook {
     ///
     /// Returns a reference to the peer info of the given address, if it exists.
     ///
-    pub fn get_peer(&mut self, address: &SocketAddr) -> Result<&PeerInfo, NetworkError> {
+    pub fn get_peer(&mut self, address: SocketAddr) -> Result<&PeerInfo, NetworkError> {
         // Check if the address is a connecting peer.
         if self.is_connecting(address) {
             // Fetch the peer info of the connecting peer.
             return self
                 .connecting_peers
-                .get(address)
+                .get(&address)
                 .ok_or(NetworkError::PeerBookMissingPeer);
         }
 
@@ -284,7 +284,7 @@ impl PeerBook {
             // Fetch the peer info of the connected peer.
             return self
                 .connected_peers
-                .get(address)
+                .get(&address)
                 .ok_or(NetworkError::PeerBookMissingPeer);
         }
 
@@ -293,7 +293,7 @@ impl PeerBook {
             // Fetch the peer info of the disconnected peer.
             return self
                 .disconnected_peers
-                .get(address)
+                .get(&address)
                 .ok_or(NetworkError::PeerBookMissingPeer);
         }
 

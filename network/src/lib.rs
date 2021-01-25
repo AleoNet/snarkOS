@@ -248,7 +248,7 @@ impl Server {
             Payload::Peers(peers) => {
                 self.peers.process_inbound_peers(peers);
             }
-            Payload::Ping(block_height) => {
+            Payload::Ping(_block_height) => {
                 self.outbound
                     .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong));
                 // TODO(ljedrz/niklas): perform a sync if needed

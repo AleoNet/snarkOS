@@ -24,7 +24,6 @@ use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
 use std::time::Duration;
 
-use chrono::Utc;
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, TcpStream},
@@ -53,7 +52,7 @@ async fn handshake_responder_side() {
 
     // at this point the node should have marked the peer as ' connecting'
     sleep(Duration::from_millis(200)).await;
-    assert!(node.peers.is_connecting(&peer_address));
+    assert!(node.peers.is_connecting(peer_address));
 
     // the buffer for peer's reads
     let mut peer_buf = [0u8; 64];
@@ -78,7 +77,7 @@ async fn handshake_responder_side() {
 
     // the node should now have register the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
-    assert!(node.peers.is_connected(&peer_address));
+    assert!(node.peers.is_connected(peer_address));
     assert_eq!(node.peers.number_of_connected_peers(), 1);
 }
 
@@ -114,7 +113,7 @@ async fn handshake_initiator_side() {
     };
 
     // at this point the node should have marked the peer as 'connecting'
-    assert!(node.peers.is_connecting(&peer_address));
+    assert!(node.peers.is_connecting(peer_address));
 
     // the peer responds with a Verack acknowledging the Version message
     let verack = Payload::Verack(version.nonce);
@@ -126,7 +125,7 @@ async fn handshake_initiator_side() {
 
     // the node should now have registered the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
-    assert!(node.peers.is_connected(&peer_address));
+    assert!(node.peers.is_connected(peer_address));
     assert_eq!(node.peers.number_of_connected_peers(), 1);
 }
 
@@ -143,7 +142,7 @@ async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream
     assert!(buffer.is_empty());
 
     // check the node's state hasn't been altered by the message
-    assert!(!node.peers.is_connecting(&peer_stream.local_addr().unwrap()));
+    assert!(!node.peers.is_connecting(peer_stream.local_addr().unwrap()));
     assert_eq!(node.peers.number_of_connected_peers(), 0);
 }
 
@@ -186,7 +185,7 @@ async fn reject_non_version_messages_before_handshake() {
 
     // Peers
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-    let peers = vec![("127.0.0.1:0".parse().unwrap(), Utc::now())];
+    let peers = vec!["127.0.0.1:0".parse().unwrap()];
     write_message_to_stream(Payload::Peers(peers), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
