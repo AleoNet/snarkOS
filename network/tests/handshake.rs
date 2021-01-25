@@ -15,10 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::{
-    external::{message::*, Verack, Version},
+    external::{message::*, Version},
     Server,
 };
-use snarkos_testing::network::{read_header, read_payload, test_node, write_message_to_stream};
+use snarkos_testing::network::{read_header, read_payload, test_node, write_message_to_stream, TestSetup};
 
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
@@ -34,13 +34,11 @@ use tokio::{
 #[tokio::test]
 async fn handshake_responder_side() {
     // start a test node and listen for incoming connections
-    let node = test_node(
-        vec![],
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-    )
-    .await;
+    let setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
     let node_listener = node.local_address().unwrap();
 
     // set up a fake node (peer), which is just a socket
@@ -50,7 +48,7 @@ async fn handshake_responder_side() {
     let peer_address = peer_stream.local_addr().unwrap();
 
     // the peer initiates a handshake by sending a Version message
-    let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address.port()));
+    let version = Payload::Version(Version::new(1u64, 1u64, peer_address.port()));
     write_message_to_stream(version, &mut peer_stream).await;
 
     // at this point the node should have marked the peer as ' connecting'
@@ -75,7 +73,7 @@ async fn handshake_responder_side() {
     };
 
     // in response to the Version, the peer sends a Verack message to finish the handshake
-    let verack = Payload::Verack(Verack::new(version.nonce));
+    let verack = Payload::Verack(version.nonce);
     write_message_to_stream(verack, &mut peer_stream).await;
 
     // the node should now have register the peer as 'connected'
@@ -92,13 +90,13 @@ async fn handshake_initiator_side() {
 
     // start node with the peer as a bootnode; that way it will get connected to
     // note: using the smallest allowed interval for peer sync
-    let node = test_node(
-        vec![peer_address.to_string()],
-        Duration::from_secs(2),
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-    )
-    .await;
+    let setup = TestSetup {
+        consensus_setup: None,
+        bootnodes: vec![peer_address.to_string()],
+        peer_sync_interval: 1,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
 
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
@@ -119,11 +117,11 @@ async fn handshake_initiator_side() {
     assert!(node.peers.is_connecting(&peer_address));
 
     // the peer responds with a Verack acknowledging the Version message
-    let verack = Payload::Verack(Verack::new(version.nonce));
+    let verack = Payload::Verack(version.nonce);
     write_message_to_stream(verack, &mut peer_stream).await;
 
     // the peer then follows up with a Version message
-    let version = Payload::Version(Version::new(1u64, 1u32, 1u64, peer_address.port()));
+    let version = Payload::Version(Version::new(1u64, 1u64, peer_address.port()));
     write_message_to_stream(version, &mut peer_stream).await;
 
     // the node should now have registered the peer as 'connected'
@@ -152,13 +150,11 @@ async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream
 #[tokio::test]
 async fn reject_non_version_messages_before_handshake() {
     // start the node
-    let node = test_node(
-        vec![],
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-        Duration::from_secs(10),
-    )
-    .await;
+    let setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
 
     // start the fake node (peer) which is just a socket
     // note: the connection needs to be re-established as it is reset
@@ -226,7 +222,6 @@ async fn reject_non_version_messages_before_handshake() {
 
     // Verack
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-    let verack = Verack::new(1u64);
-    write_message_to_stream(Payload::Verack(verack), &mut peer_stream).await;
+    write_message_to_stream(Payload::Verack(1u64), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 }

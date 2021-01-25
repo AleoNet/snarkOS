@@ -25,7 +25,10 @@ use snarkos::{
     miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{environment::Environment, Server};
+use snarkos_network::{
+    environment::{Consensus, Environment},
+    Server,
+};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
@@ -97,13 +100,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
     info!("Loading Aleo parameters...");
-    let parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
+    let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
     info!("Loading complete.");
 
     // Fetch the set of valid inner circuit IDs.
     let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
-        parameters.inner_snark_parameters.1.clone().into();
-    let inner_snark_id = parameters
+        dpc_parameters.inner_snark_parameters.1.clone().into();
+    let inner_snark_id = dpc_parameters
         .system_parameters
         .inner_snark_verification_key_crh
         .hash(&to_bytes![inner_snark_vk]?)?;
@@ -111,7 +114,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
 
     // Set the initial consensus parameters.
-    let consensus = ConsensusParameters {
+    let consensus_params = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
@@ -120,21 +123,25 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         authorized_inner_snark_ids,
     };
 
-    let mut environment = Environment::new(
+    let consensus = Consensus::new(
         Arc::new(RwLock::new(storage)),
         memory_pool.clone(),
-        Arc::new(consensus.clone()),
-        Arc::new(parameters.clone()),
+        consensus_params.clone(),
+        dpc_parameters.clone(),
+        config.miner.is_miner,
+        Duration::from_secs(config.p2p.block_sync_interval.into()),
+        Duration::from_secs(config.p2p.mempool_interval.into()),
+    );
+
+    let mut environment = Environment::new(
+        Some(consensus),
         Some(socket_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
         config.node.is_bootnode,
-        config.miner.is_miner,
         // Set sync intervals for peers, blocks and transactions (memory pool).
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
-        Duration::from_secs(config.p2p.block_sync_interval.into()),
-        Duration::from_secs(config.p2p.mempool_interval.into()),
     )?;
 
     // Construct the server instance. Note this does not start the server.
@@ -152,8 +159,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             Ok(miner_address) => {
                 MinerInstance::new(
                     miner_address,
-                    consensus.clone(),
-                    parameters.clone(),
+                    consensus_params.clone(),
+                    dpc_parameters.clone(),
                     environment.clone(),
                     server.clone(),
                 )
@@ -180,7 +187,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             path.to_path_buf(),
             proving_parameters,
             environment,
-            consensus,
+            consensus_params,
             memory_pool,
             server.clone(),
             config.rpc.username,
@@ -201,6 +208,7 @@ fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::args();
 
     let config: Config = ConfigCli::parse(&arguments)?;
+    config.check().map_err(|e| NodeError::Message(e.to_string()))?;
     let node_span = debug_span!("node");
 
     Builder::new_multi_thread()
