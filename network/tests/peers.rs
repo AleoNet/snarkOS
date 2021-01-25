@@ -78,7 +78,7 @@ async fn peer_responder_side() {
     assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Peers(..)));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn triangle() {
     let setup = |bootnodes| TestSetup {
         consensus_setup: None,
