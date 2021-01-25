@@ -98,9 +98,13 @@ async fn triangle() {
     //  Spin up node C and connect to B.
     let node_charlie = test_node(setup(vec![addr_bob.to_string()])).await;
 
+    let triangle_is_formed = || {
+        node_charlie.peers.is_connected(&addr_alice)
+            && node_alice.peers.number_of_connected_peers() == 2
+            && node_bob.peers.number_of_connected_peers() == 2
+            && node_charlie.peers.number_of_connected_peers() == 2
+    };
+
     // Make sure C connects to A => peer propagation works.
-    wait_until!(5, node_charlie.peers.is_connected(&addr_alice));
-    assert_eq!(node_alice.peers.number_of_connected_peers(), 2);
-    assert_eq!(node_bob.peers.number_of_connected_peers(), 2);
-    assert_eq!(node_charlie.peers.number_of_connected_peers(), 2);
+    wait_until!(5, triangle_is_formed());
 }
