@@ -52,16 +52,28 @@ impl ConnWriter {
 
         {
             let mut buffer = self.buffer.lock().await;
-            let len = self
-                .noise
-                .lock()
-                .write_message(&serialized_payload, &mut buffer)
-                .map_err(|e| ConnectError::Message(e.to_string()))?;
+            let mut encrypted_len = 0;
+            let mut processed_len = 0;
 
-            let header = MessageHeader::from(len);
+            while processed_len < serialized_payload.len() {
+                let chunk_len = std::cmp::min(
+                    crate::NOISE_BUF_LEN - crate::NOISE_TAG_LEN,
+                    serialized_payload[processed_len..].len(),
+                );
+                let chunk = &serialized_payload[processed_len..][..chunk_len];
+
+                encrypted_len += self
+                    .noise
+                    .lock()
+                    .write_message(chunk, &mut buffer[encrypted_len..])
+                    .map_err(|e| ConnectError::Message(e.to_string()))?;
+                processed_len += chunk_len;
+            }
+
+            let header = MessageHeader::from(encrypted_len);
             let mut writer = self.writer.lock().await;
             writer.write_all(&header.as_bytes()[..]).await?;
-            writer.write_all(&buffer[..len]).await?;
+            writer.write_all(&buffer[..encrypted_len]).await?;
         }
 
         debug!("Sent a {} to {}", payload, self.addr);

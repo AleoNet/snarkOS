@@ -25,7 +25,7 @@ pub struct ConnReader {
     pub addr: SocketAddr,
     reader: OwnedReadHalf,
     buffer: Box<[u8]>,
-    secondary_buffer: Box<[u8]>,
+    noise_buffer: Box<[u8]>,
     noise: Arc<Mutex<snow::TransportState>>,
 }
 
@@ -39,7 +39,7 @@ impl ConnReader {
         Self {
             addr,
             reader,
-            secondary_buffer: buffer.clone(),
+            noise_buffer: vec![0u8; crate::NOISE_BUF_LEN].into(),
             buffer,
             noise,
         }
@@ -62,14 +62,24 @@ impl ConnReader {
     pub async fn read_message(&mut self) -> Result<Message, ConnectError> {
         let header = self.read_header().await?;
         let len = header.len();
-        self.reader.read_exact(&mut self.buffer[..len]).await?;
-        let len = self
-            .noise
-            .lock()
-            .read_message(&self.buffer[..len], &mut self.secondary_buffer)
-            .unwrap();
+        let mut decrypted_len = 0;
+        let mut processed_len = 0;
+
+        {
+            while processed_len < len {
+                let chunk_len = std::cmp::min(crate::NOISE_BUF_LEN, len - processed_len);
+                self.reader.read_exact(&mut self.noise_buffer[..chunk_len]).await?;
+                processed_len += chunk_len;
+
+                decrypted_len += self
+                    .noise
+                    .lock()
+                    .read_message(&self.noise_buffer[..chunk_len], &mut self.buffer[decrypted_len..])
+                    .unwrap();
+            }
+        }
         let payload =
-            bincode::deserialize(&self.secondary_buffer[..len]).map_err(|e| ConnectError::MessageError(e.into()))?;
+            bincode::deserialize(&self.buffer[..decrypted_len]).map_err(|e| ConnectError::MessageError(e.into()))?;
 
         debug!("Received a '{}' message from {}", payload, self.addr);
 
