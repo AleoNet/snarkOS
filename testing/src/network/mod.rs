@@ -26,9 +26,10 @@ use crate::{
 };
 
 use snarkos_network::{
+    connection_reader::ConnReader,
+    connection_writer::ConnWriter,
     errors::{message::*, network::*},
     external::message::*,
-    ConnectError,
     Consensus,
     Environment,
     Server,
@@ -177,52 +178,31 @@ pub async fn test_node(setup: TestSetup) -> Server {
 }
 
 pub struct FakeNode {
-    stream: TcpStream,
-    buffer: Box<[u8]>,
-    secondary_buffer: Box<[u8]>,
-    noise: snow::TransportState,
+    reader: ConnReader,
+    writer: ConnWriter,
 }
 
 impl FakeNode {
-    pub fn new(stream: TcpStream, noise: snow::TransportState) -> Self {
+    pub fn new(stream: TcpStream, peer_addr: SocketAddr, noise: snow::TransportState) -> Self {
         let buffer = vec![0u8; snarkos_network::MAX_MESSAGE_SIZE].into_boxed_slice();
+        let noise = Arc::new(Mutex::new(noise));
+        let (reader, writer) = stream.into_split();
 
-        Self {
-            stream,
-            secondary_buffer: buffer.clone(),
-            buffer,
-            noise,
-        }
+        let reader = ConnReader::new(peer_addr, reader, buffer.clone(), noise.clone());
+
+        let writer = ConnWriter::new(peer_addr, writer, buffer, noise);
+
+        Self { reader, writer }
     }
 
     pub async fn read_payload(&mut self) -> Result<Payload, NetworkError> {
-        let header = read_header(&mut self.stream)
-            .await
-            .map_err(|e| ConnectError::MessageError(e.into()))?;
-        let len = header.len();
-        self.stream.read_exact(&mut self.buffer[..len]).await?;
-        let len = self
-            .noise
-            .read_message(&self.buffer[..len], &mut self.secondary_buffer)
-            .unwrap();
-        let payload =
-            bincode::deserialize(&self.secondary_buffer[..len]).map_err(|e| ConnectError::MessageError(e.into()))?;
+        let message = self.reader.read_message().await?;
 
-        Ok(payload)
+        Ok(message.payload)
     }
 
     pub async fn write_message(&mut self, payload: &Payload) {
-        let serialized = bincode::serialize(payload).unwrap();
-        let len = self.noise.write_message(&serialized, &mut self.buffer).unwrap();
-        let encrypted = &self.buffer[..len];
-
-        let header = MessageHeader {
-            len: encrypted.len() as u32,
-        }
-        .as_bytes();
-        self.stream.write_all(&header[..]).await.unwrap();
-        self.stream.write_all(encrypted).await.unwrap();
-        self.stream.flush().await.unwrap();
+        self.writer.write_message(payload).await.unwrap();
     }
 }
 
@@ -235,7 +215,7 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, FakeNod
     let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
 
     // register the addresses bound to the connection between the node and the peer
-    let peer_address = peer_stream.local_addr().unwrap();
+    let peer_addr = peer_stream.local_addr().unwrap();
 
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
@@ -262,14 +242,14 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, FakeNod
     let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk
-    let peer_version = bincode::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let peer_version = bincode::serialize(&Version::new(1u64, peer_addr.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
     let len = noise.write_message(&peer_version, &mut buffer).unwrap();
     peer_stream.write_all(&[len as u8]).await.unwrap();
     peer_stream.write_all(&buffer[..len]).await.unwrap();
 
     let noise = noise.into_transport_mode().unwrap();
 
-    let fake_node = FakeNode::new(peer_stream, noise);
+    let fake_node = FakeNode::new(peer_stream, peer_addr, noise);
 
     (node, fake_node)
 }
