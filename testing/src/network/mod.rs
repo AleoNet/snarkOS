@@ -50,6 +50,9 @@ pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
     (addr, listener)
 }
 
+/// Waits until an expression is true or times out.
+///
+/// Uses polling to cut down on time otherwise used by calling `sleep` in tests.
 #[macro_export]
 macro_rules! wait_until {
     ($limit_secs: expr, $condition: expr) => {
