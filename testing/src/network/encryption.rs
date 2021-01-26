@@ -136,3 +136,28 @@ async fn encrypt_and_decrypt_a_big_payload() {
         panic!("wrong payload received");
     }
 }
+
+#[tokio::test]
+async fn encrypt_and_decrypt_small_payloads() {
+    let (mut node0, mut node1) = spawn_2_fake_nodes().await;
+
+    let mut rng = thread_rng();
+
+    for _ in 0..100 {
+        // create a small block containing random data
+        let block_size: u8 = rng.gen();
+        let fake_block_bytes: Vec<u8> = (&mut rng).sample_iter(Standard).take(block_size as usize).collect();
+        let big_block = Payload::Block(fake_block_bytes.clone());
+
+        // send it from node0 to node1
+        node0.write_message(&big_block).await;
+        let payload = node1.read_payload().await.unwrap();
+
+        // check if node1 received the expected data
+        if let Payload::Block(bytes) = payload {
+            assert!(bytes == fake_block_bytes);
+        } else {
+            panic!("wrong payload received");
+        }
+    }
+}
