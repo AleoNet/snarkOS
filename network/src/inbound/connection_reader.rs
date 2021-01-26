@@ -17,7 +17,7 @@
 use crate::{errors::message::*, external::message::*, ConnectError};
 
 use parking_lot::Mutex;
-use tokio::{net::tcp::OwnedReadHalf, prelude::*};
+use tokio::{io::AsyncReadExt, net::tcp::OwnedReadHalf};
 
 use std::{net::SocketAddr, sync::Arc};
 
