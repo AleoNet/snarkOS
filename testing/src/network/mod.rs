@@ -341,6 +341,7 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, FakeNod
     (node, fake_node)
 }
 
+#[allow(clippy::needless_lifetimes)] // clippy bug: https://github.com/rust-lang/rust-clippy/issues/5787
 pub async fn read_payload<'a, T: AsyncRead + Unpin>(
     stream: &mut T,
     buffer: &'a mut [u8],
