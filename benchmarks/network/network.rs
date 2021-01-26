@@ -27,14 +27,15 @@ fn send_small_messages(c: &mut Criterion) {
     let node0 = tokio::sync::Mutex::new(node0);
     let node1 = tokio::sync::Mutex::new(node1);
 
+    let fake_block_bytes: Vec<u8> = (&mut thread_rng())
+        .sample_iter(Standard)
+        .take(u16::MAX as usize)
+        .collect();
+
     c.bench_function("send_small_messages", move |b| {
         b.to_async(&rt).iter(|| async {
             let block_size: u16 = thread_rng().gen();
-            let fake_block_bytes: Vec<u8> = (&mut thread_rng())
-                .sample_iter(Standard)
-                .take(block_size as usize)
-                .collect();
-            let big_block = Payload::Block(fake_block_bytes);
+            let big_block = Payload::Block(fake_block_bytes[..block_size as usize].to_vec());
 
             // send it from node0 to node1
             node0.lock().await.write_message(&big_block).await;
