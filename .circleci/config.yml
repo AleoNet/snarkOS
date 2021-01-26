@@ -43,7 +43,7 @@ commands:
 jobs:
   rust_stable:
     docker:
-      - image: cimg/rust:1.46.0
+      - image: cimg/rust:1.49.0
     resource_class: xlarge
     steps:
       - checkout
