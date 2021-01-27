@@ -1,4 +1,4 @@
-A ping protocol request for a `Pong`.
+A message used to check if a peer is active and calculate their RTT.
 
 ### Message Name
 
