@@ -18,7 +18,10 @@ use snarkos_network::{
     external::{message::*, Version},
     Server,
 };
-use snarkos_testing::network::{test_node, write_message_to_stream, TestSetup};
+use snarkos_testing::{
+    network::{test_node, write_message_to_stream, TestSetup},
+    wait_until,
+};
 
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
@@ -58,10 +61,7 @@ async fn handshake_responder_side() {
     let mut buffer: Box<[u8]> = vec![0u8; snarkos_network::NOISE_BUF_LEN].into();
     let mut buf = [0u8; snarkos_network::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-    // at this point the node should have marked the peer as ' connecting'
-    // FIXME(ljedrz)
-    // sleep(Duration::from_millis(200)).await;
-    // assert!(node.peers.is_connecting(&peer_address));
+    wait_until!(1, node.peers.is_connecting(peer_address));
 
     // -> e
     let len = noise.write_message(&[], &mut buffer).unwrap();
@@ -107,6 +107,8 @@ async fn handshake_initiator_side() {
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
 
+    wait_until!(1, node.peers.is_connecting(peer_address));
+
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
         Box::new(snow::resolvers::SodiumResolver),
@@ -124,10 +126,6 @@ async fn handshake_initiator_side() {
     let len = buf[0] as usize;
     let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
     noise.read_message(&buf[..len], &mut buffer).unwrap();
-
-    // by this point the node should have marked the peer as 'connecting'
-    // FIXME(ljedrz)
-    // assert!(node.peers.is_connecting(&peer_address));
 
     // -> e, ee, s, es
     let peer_version = bincode::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
@@ -150,9 +148,6 @@ async fn handshake_initiator_side() {
 }
 
 async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream) {
-    // slight delay for server to process the message
-    sleep(Duration::from_millis(200)).await;
-
     // read the response from the stream
     let mut buffer = String::new();
     let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
@@ -162,7 +157,7 @@ async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream
     assert!(buffer.is_empty());
 
     // check the node's state hasn't been altered by the message
-    assert!(!node.peers.is_connecting(peer_stream.local_addr().unwrap()));
+    wait_until!(1, !node.peers.is_connecting(peer_stream.local_addr().unwrap()));
     assert_eq!(node.peers.number_of_connected_peers(), 0);
 }
 
