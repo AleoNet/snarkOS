@@ -20,15 +20,18 @@ use snarkos_storage::Ledger;
 use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+};
 
 ///
 /// A data structure for storing the history of all peers with this node server.
 ///
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PeerBook {
-    /// The map of connecting peers to their metadata.
-    connecting_peers: HashMap<SocketAddr, PeerInfo>,
+    /// The map of the addresses currently being handshaken with.
+    connecting_peers: HashSet<SocketAddr>,
     /// The map of connected peers to their metadata.
     connected_peers: HashMap<SocketAddr, PeerInfo>,
     /// The map of disconnected peers to their metadata.
@@ -62,7 +65,7 @@ impl PeerBook {
     ///
     #[inline]
     pub fn is_connecting(&self, address: SocketAddr) -> bool {
-        self.connecting_peers.contains_key(&address)
+        self.connecting_peers.contains(&address)
     }
 
     ///
@@ -109,7 +112,7 @@ impl PeerBook {
     /// Returns a reference to the connecting peers in this peer book.
     ///
     #[inline]
-    pub fn connecting_peers(&self) -> &HashMap<SocketAddr, PeerInfo> {
+    pub fn connecting_peers(&self) -> &HashSet<SocketAddr> {
         &self.connecting_peers
     }
 
@@ -130,43 +133,40 @@ impl PeerBook {
     }
 
     ///
-    /// Adds the given address to the connecting peers for the given nonce in the `PeerBook`.
+    /// Marks the given address as "connecting".
     ///
-    pub fn set_connecting(&mut self, address: &SocketAddr) -> Result<(), NetworkError> {
-        // Remove the address from the disconnected peers, if it exists.
-        let mut peer_info = match self.disconnected_peers.remove(address) {
-            // Case 1 - A previously known peer.
-            Some(peer_info) => peer_info,
-            // Case 2 - A newly discovered peer.
-            _ => PeerInfo::new(*address),
-        };
-
-        // Set the peer as connecting.
-        peer_info.set_connecting()?;
-
-        // Add the address into the connecting peers.
-        self.connecting_peers.insert(*address, peer_info);
+    pub fn set_connecting(&mut self, address: SocketAddr) -> Result<(), NetworkError> {
+        if self.is_connected(address) {
+            return Err(NetworkError::PeerAlreadyConnected);
+        }
+        self.connecting_peers.insert(address);
 
         Ok(())
     }
 
     ///
-    /// Adds the given address to the connected peers in the `PeerBook`,
-    /// if the given nonce matches the stored nonce from `Self::set_connecting`.
+    /// Adds the given address to the connected peers in the `PeerBook`.
     ///
-    pub fn set_connected(&mut self, address: SocketAddr) -> Result<(), NetworkError> {
+    pub fn set_connected(&mut self, address: SocketAddr, listener: Option<SocketAddr>) -> Result<(), NetworkError> {
+        // If listener.is_some(), then it's different than the address; otherwise it's just the address param.
+        let listener = if let Some(addr) = listener { addr } else { address };
+
         // Remove the address from the connecting peers, if it exists.
-        let mut peer_info = match self.connecting_peers.remove(&address) {
-            // Case 1 - A previously connecting peer.
+        let mut peer_info = match self.disconnected_peers.remove(&listener) {
+            // Case 1 - A previously known peer.
             Some(peer_info) => peer_info,
-            // Case 2 - A peer that was previously not connecting or unknown.
-            _ => return Err(NetworkError::PeerWasNotSetToConnecting),
+            // Case 2 - A peer that was previously not known.
+            None => PeerInfo::new(listener),
         };
+
+        // Remove the peer's address from the list of connecting peers.
+        self.connecting_peers.remove(&address);
+
         // Update the peer info to connected.
         peer_info.set_connected()?;
 
         // Add the address into the connected peers.
-        let success = self.connected_peers.insert(address, peer_info).is_none();
+        let success = self.connected_peers.insert(listener, peer_info).is_none();
         // On success, increment the connected peer count.
         connected_peers_inc!(success);
 
@@ -179,13 +179,7 @@ impl PeerBook {
     ///
     pub fn set_disconnected(&mut self, address: SocketAddr) -> Result<(), NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
-        if let Some(mut peer_info) = self.connecting_peers.remove(&address) {
-            // Update the peer info to disconnected.
-            peer_info.set_disconnected()?;
-
-            // Add the address into the disconnected peers.
-            self.disconnected_peers.insert(address, peer_info);
-
+        if self.connecting_peers.remove(&address) {
             return Ok(());
         }
 
@@ -235,15 +229,6 @@ impl PeerBook {
     /// Returns a reference to the peer info of the given address, if it exists.
     ///
     pub fn get_peer(&mut self, address: SocketAddr) -> Result<&PeerInfo, NetworkError> {
-        // Check if the address is a connecting peer.
-        if self.is_connecting(address) {
-            // Fetch the peer info of the connecting peer.
-            return self
-                .connecting_peers
-                .get(&address)
-                .ok_or(NetworkError::PeerBookMissingPeer);
-        }
-
         // Check if the address is a connected peer.
         if self.is_connected(address) {
             // Fetch the peer info of the connected peer.
@@ -287,117 +272,97 @@ impl PeerBook {
     }
 }
 
-#[cfg(tests)]
+#[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
 
     #[test]
     fn test_set_connecting_from_never_connected() {
         let mut peer_book = PeerBook::default();
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
+        let remote_address = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 4031));
 
-        peer_book.set_connecting(&remote_address, 0).unwrap();
-        assert_eq!(true, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
-        assert_eq!(&None, peer_book.handshake_nonce(&local_address));
+        peer_book.add_peer(remote_address);
+        assert_eq!(false, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(true, peer_book.is_disconnected(remote_address));
+
+        peer_book.set_connecting(remote_address).unwrap();
+        assert_eq!(true, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(true, peer_book.is_disconnected(remote_address));
     }
 
     #[test]
     fn test_set_connected_from_connecting() {
         let mut peer_book = PeerBook::default();
-        peer_book.set_connecting(&remote_address, 0).unwrap();
-        assert_eq!(true, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
+        let remote_address = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 4031));
 
-        peer_book.set_connected(&remote_address).unwrap();
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(true, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
+        peer_book.set_connecting(remote_address).unwrap();
+        assert_eq!(true, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(false, peer_book.is_disconnected(remote_address));
+
+        peer_book.set_connected(remote_address, None).unwrap();
+        assert_eq!(false, peer_book.is_connecting(remote_address));
+        assert_eq!(true, peer_book.is_connected(remote_address));
+        assert_eq!(false, peer_book.is_disconnected(remote_address));
     }
 
     #[test]
     fn test_set_disconnected_from_connecting() {
         let mut peer_book = PeerBook::default();
-        peer_book.set_connecting(&remote_address, 0).unwrap();
-        assert_eq!(true, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
+        let remote_address = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 4031));
 
-        peer_book.set_disconnected(&remote_address).unwrap();
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
+        peer_book.add_peer(remote_address);
+
+        peer_book.set_connecting(remote_address).unwrap();
+        assert_eq!(true, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(true, peer_book.is_disconnected(remote_address));
+
+        peer_book.set_disconnected(remote_address).unwrap();
+        assert_eq!(false, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(true, peer_book.is_disconnected(remote_address));
     }
 
     #[test]
     fn test_set_disconnected_from_connected() {
         let mut peer_book = PeerBook::default();
-        peer_book.set_connecting(&remote_address, 0).unwrap();
-        assert_eq!(true, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
+        let remote_address = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 4031));
 
-        peer_book.set_connected(&remote_address).unwrap();
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(true, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&Some(0), peer_book.handshake_nonce(&remote_address));
+        peer_book.set_connecting(remote_address).unwrap();
+        assert_eq!(true, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(false, peer_book.is_disconnected(remote_address));
 
-        peer_book.set_disconnected(&remote_address).unwrap();
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
-    }
+        peer_book.set_connected(remote_address, None).unwrap();
+        assert_eq!(false, peer_book.is_connecting(remote_address));
+        assert_eq!(true, peer_book.is_connected(remote_address));
+        assert_eq!(false, peer_book.is_disconnected(remote_address));
 
-    #[test]
-    fn test_set_connected_from_never_connected() {
-        let mut peer_book = PeerBook::default();
-        assert!(peer_book.set_connected(&remote_address, 0).is_err());
-
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
-    }
-
-    #[test]
-    fn test_set_disconnected_from_never_connected() {
-        let mut peer_book = PeerBook::default();
-        assert!(peer_book.set_disconnected(&remote_address, 0).is_err());
-
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(false, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
+        peer_book.set_disconnected(remote_address).unwrap();
+        assert_eq!(false, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(true, peer_book.is_disconnected(remote_address));
     }
 
     #[test]
     fn test_set_connected_from_disconnected() {
         let mut peer_book = PeerBook::default();
-        peer_book.set_connecting(&remote_address, 0).unwrap();
-        peer_book.set_connected(&remote_address).unwrap();
-        peer_book.set_disconnected(&remote_address).unwrap();
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
+        let remote_address = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 4031));
 
-        assert!(peer_book.set_connected(&remote_address, 1).is_err());
+        peer_book.set_connecting(remote_address).unwrap();
+        peer_book.set_connected(remote_address, None).unwrap();
+        peer_book.set_disconnected(remote_address).unwrap();
+        assert_eq!(false, peer_book.is_connecting(remote_address));
+        assert_eq!(false, peer_book.is_connected(remote_address));
+        assert_eq!(true, peer_book.is_disconnected(remote_address));
 
-        assert_eq!(false, peer_book.is_connecting(&remote_address));
-        assert_eq!(false, peer_book.is_connected(&remote_address));
-        assert_eq!(true, peer_book.is_disconnected(&remote_address));
-        assert_eq!(&None, peer_book.handshake_nonce(&remote_address));
+        assert!(peer_book.set_connected(remote_address, None).is_ok());
+
+        assert_eq!(false, peer_book.is_connecting(remote_address));
+        assert_eq!(true, peer_book.is_connected(remote_address));
     }
 }

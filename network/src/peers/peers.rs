@@ -174,6 +174,14 @@ impl Peers {
     }
 
     ///
+    /// Returns the number of peers connecting to this node.
+    ///
+    #[inline]
+    pub fn number_of_connecting_peers(&self) -> u16 {
+        self.peer_book.read().number_of_connecting_peers()
+    }
+
+    ///
     /// Returns the number of peers connected to this node.
     ///
     #[inline]
@@ -240,6 +248,8 @@ impl Peers {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
+        self.connecting_to_peer(remote_address)?;
+
         // open the connection
         let stream = TcpStream::connect(remote_address).await?;
         let (mut reader, mut writer) = stream.into_split();
@@ -296,10 +306,7 @@ impl Peers {
         // save the outbound channel
         self.outbound.channels.write().insert(remote_address, Arc::new(writer));
 
-        // Set the peer as a connecting peer in the peer book.
-        // FIXME(ljedrz): same case as with the responder handshake
-        self.connecting_to_peer(remote_address)?;
-        self.connected_to_peer(remote_address)
+        self.connected_to_peer(remote_address, None)
     }
 
     ///
@@ -451,20 +458,24 @@ impl Peers {
 
 impl Peers {
     ///
-    /// Sets the given remote address and nonce in the peer book as connecting to this node server.
+    /// Sets the given remote address as connecting to this node.
     ///
     #[inline]
     pub(crate) fn connecting_to_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // Set the peer as connecting with this node server.
-        self.peer_book.write().set_connecting(&remote_address)
+        self.peer_book.write().set_connecting(remote_address)
     }
 
     ///
     /// Sets the given remote address in the peer book as connected to this node server.
     ///
     #[inline]
-    pub(crate) fn connected_to_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        self.peer_book.write().set_connected(remote_address)
+    pub(crate) fn connected_to_peer(
+        &self,
+        remote_address: SocketAddr,
+        remote_listener: Option<SocketAddr>,
+    ) -> Result<(), NetworkError> {
+        self.peer_book.write().set_connected(remote_address, remote_listener)
     }
 
     /// TODO (howardwu): Add logic to remove the active channels
