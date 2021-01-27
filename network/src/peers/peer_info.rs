@@ -31,7 +31,6 @@ use std::{
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerStatus {
-    Connecting,
     Connected,
     Disconnected,
     NeverConnected,
@@ -157,62 +156,19 @@ impl PeerInfo {
     }
 
     ///
-    /// Updates the peer to connecting and sets the handshake to the given nonce.
-    ///
-    /// If the peer is not transitioning from `PeerStatus::Disconnected` or `PeerStatus::NeverConnected`,
-    /// this function returns a `NetworkError`.
-    ///
-    /// If there is a handshake already set, then this peer is already connected
-    /// and this function returns a `NetworkError`.
-    ///
-    /// If the given handshake nonce has been used before, returns a `NetworkError`.
-    ///
-    pub fn set_connecting(&mut self) -> Result<(), NetworkError> {
-        // Fetch the current status of the peer.
-        match self.status() {
-            PeerStatus::Disconnected | PeerStatus::NeverConnected => {
-                // Set the status of this peer to connecting.
-                self.status = PeerStatus::Connecting;
-
-                if self.first_seen.is_none() {
-                    self.first_seen = Some(Utc::now());
-                }
-
-                Ok(())
-            }
-            PeerStatus::Connecting | PeerStatus::Connected => {
-                error!(
-                    "Attempting to reconnect to a connecting or connected peer - {}",
-                    self.address
-                );
-                Err(NetworkError::PeerAlreadyConnected)
-            }
-        }
-    }
-
-    ///
-    /// Updates the peer to connected, if the given nonce matches the stored nonce.
-    ///
-    /// If the peer is not transitioning from `PeerStatus::Connecting`,
-    /// this function returns a `NetworkError`.
+    /// Updates the peer to connected.
     ///
     pub(crate) fn set_connected(&mut self) -> Result<(), NetworkError> {
-        // Fetch the current status of the peer.
-        match self.status() {
-            PeerStatus::Connecting => {
-                // Set the state of this peer to connected.
-                self.status = PeerStatus::Connected;
+        if self.status() != PeerStatus::Connected {
+            // Set the state of this peer to connected.
+            self.status = PeerStatus::Connected;
 
-                self.last_connected = Some(Utc::now());
-                self.connected_count += 1;
+            self.last_connected = Some(Utc::now());
+            self.connected_count += 1;
 
-                Ok(())
-            }
-            PeerStatus::Connected => {
-                error!("Attempting to reconnect to a connected peer - {}", self.address);
-                Err(NetworkError::PeerAlreadyConnected)
-            }
-            PeerStatus::Disconnected | PeerStatus::NeverConnected => Err(NetworkError::PeerIsDisconnected),
+            Ok(())
+        } else {
+            Err(NetworkError::PeerAlreadyConnected)
         }
     }
 
@@ -224,7 +180,7 @@ impl PeerInfo {
     ///
     pub(crate) fn set_disconnected(&mut self) -> Result<(), NetworkError> {
         match self.status() {
-            PeerStatus::Connected | PeerStatus::Connecting => {
+            PeerStatus::Connected => {
                 // Set the state of this peer to disconnected.
                 self.status = PeerStatus::Disconnected;
 
@@ -241,153 +197,69 @@ impl PeerInfo {
     }
 }
 
-#[cfg(tests)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_new() {
-        let peer_info = PeerInfo::new(format!("127.0.0.1:4130").parse()?);
+        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
+        let peer_info = PeerInfo::new(address);
+
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(&None, peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
-    }
-
-    #[test]
-    fn test_set_connecting_from_never_connected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
-
-        let mut peer_info = PeerInfo::new(address);
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-
-        peer_info.set_connecting(&address, 0).unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
-    }
-
-    #[test]
-    fn test_set_connected_from_connecting() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
-
-        let mut peer_info = PeerInfo::new(address);
-        peer_info.set_connecting(&address, 0).unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
-
-        peer_info.set_connected(&address).unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Connected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(1, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
-    }
-
-    #[test]
-    fn test_set_disconnected_from_connecting() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
-
-        let mut peer_info = PeerInfo::new(address);
-        peer_info.set_connecting(&address, 0).unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
-
-        peer_info.set_disconnected(&address).unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(1, peer_info.disconnected_count().len());
+        assert_eq!(0, peer_info.connected_count());
+        assert_eq!(0, peer_info.disconnected_count());
     }
 
     #[test]
     fn test_set_disconnected_from_connected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
-
+        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
-        peer_info.set_connecting(&address, 0).unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Connecting, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
 
-        peer_info.set_connected(&address).unwrap();
+        peer_info.set_connected().unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(1, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
+        assert_eq!(1, peer_info.connected_count());
+        assert_eq!(0, peer_info.disconnected_count());
 
-        peer_info.set_disconnected(&address).unwrap();
+        peer_info.set_disconnected().unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.nonce());
-        assert_eq!(1, peer_info.connected_count().len());
-        assert_eq!(1, peer_info.disconnected_count().len());
-    }
-
-    #[test]
-    fn test_set_connected_from_never_connected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
-
-        let mut peer_info = PeerInfo::new(address);
-
-        assert!(peer_info.set_connected(&address, 0).is_err());
-
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
+        assert_eq!(1, peer_info.connected_count());
+        assert_eq!(1, peer_info.disconnected_count());
     }
 
     #[test]
     fn test_set_disconnected_from_never_connected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
-
+        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
 
-        assert!(peer_info.set_disconnected(&address).is_err());
+        assert!(peer_info.set_disconnected().is_err());
 
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(&Some(0), peer_info.nonce());
-        assert_eq!(0, peer_info.connected_count().len());
-        assert_eq!(0, peer_info.disconnected_count().len());
+        assert_eq!(0, peer_info.connected_count());
+        assert_eq!(0, peer_info.disconnected_count());
     }
 
     #[test]
     fn test_set_connected_from_disconnected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse()?;
-
+        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
-        peer_info.set_connecting(&address, 0).unwrap();
-        peer_info.set_connected(&address).unwrap();
-        peer_info.set_disconnected(&address).unwrap();
+
+        peer_info.set_connected().unwrap();
+        peer_info.set_disconnected().unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.nonce());
-        assert_eq!(1, peer_info.connected_count().len());
-        assert_eq!(1, peer_info.disconnected_count().len());
+        assert_eq!(1, peer_info.connected_count());
+        assert_eq!(1, peer_info.disconnected_count());
 
-        assert!(peer_info.set_connected(&address).is_err());
+        assert!(peer_info.set_connected().is_ok());
 
         assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(&None, peer_info.nonce());
-        assert_eq!(1, peer_info.connected_count().len());
-        assert_eq!(1, peer_info.disconnected_count().len());
+        assert_eq!(PeerStatus::Connected, peer_info.status());
+        assert_eq!(2, peer_info.connected_count());
+        assert_eq!(1, peer_info.disconnected_count());
     }
 }

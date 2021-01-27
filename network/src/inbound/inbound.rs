@@ -107,7 +107,13 @@ impl Inbound {
                                     inbound.listen_for_messages(&mut reader).await;
                                 });
                             }
-                            Err(e) => error!("Failed to accept a connection: {}", e),
+                            Err(e) => {
+                                error!("Failed to accept a connection: {}", e);
+                                let _ = inbound
+                                    .sender
+                                    .send(Message::new(Direction::Internal, Payload::Disconnect(remote_address)))
+                                    .await;
+                            }
                         }
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
@@ -203,27 +209,18 @@ impl Inbound {
     }
 
     ///
-    /// Receives a connection request with a given version message.
+    /// Handles an incoming connection request, performing a secure handshake and establishing packet encryption.
     ///
-    /// Listens for the first message request from a remote peer.
-    ///
-    /// If the message is a Version:
-    ///     1. Create a new handshake.
-    ///     2. Send a handshake response.
-    ///     3. If the response is sent successfully, store the handshake.
-    ///     4. Return the handshake, your address as seen by sender, and the version message.
-    ///
-    /// If the message is a Verack:
-    ///     1. Get the existing handshake.
-    ///     2. Mark the handshake as accepted.
-    ///     3. Send a request for peers.
-    ///     4. Return the accepted handshake and your address as seen by sender.
     pub async fn connection_request(
         &self,
         listener_address: SocketAddr,
         remote_address: SocketAddr,
         stream: TcpStream,
     ) -> Result<(ConnWriter, ConnReader), NetworkError> {
+        self.sender
+            .send(Message::new(Direction::Internal, Payload::ConnectingTo(remote_address)))
+            .await?;
+
         let (mut reader, mut writer) = stream.into_split();
 
         let builder = snow::Builder::with_resolver(
@@ -266,21 +263,19 @@ impl Inbound {
         let peer_version: Version = bincode::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
         trace!("received s, se, psk (XX handshake part 3/3)");
 
-        let remote_address = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
+        // the remote listening address
+        let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
 
-        // notify the server that the peer is being connected to
-        // FIXME(ljedrz): the following is silly; improve connecting peer handling (should be based on the actual
-        // address only)
         self.sender
-            .send(Message::new(Direction::Internal, Payload::ConnectingTo(remote_address)))
-            .await?;
-        self.sender
-            .send(Message::new(Direction::Internal, Payload::ConnectedTo(remote_address)))
+            .send(Message::new(
+                Direction::Internal,
+                Payload::ConnectedTo(remote_address, Some(remote_listener)),
+            ))
             .await?;
 
         let noise = Arc::new(Mutex::new(noise.into_transport_mode().map_err(NetworkError::Noise)?));
-        let reader = ConnReader::new(remote_address, reader, buffer.clone(), Arc::clone(&noise));
-        let writer = ConnWriter::new(remote_address, writer, buffer, noise);
+        let reader = ConnReader::new(remote_listener, reader, buffer.clone(), Arc::clone(&noise));
+        let writer = ConnWriter::new(remote_listener, writer, buffer, noise);
 
         Ok((writer, reader))
     }

@@ -84,6 +84,7 @@ async fn handshake_responder_side() {
     // the node should now have register the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
     assert!(node.peers.is_connected(peer_address));
+    assert_eq!(node.peers.number_of_connecting_peers(), 0);
     assert_eq!(node.peers.number_of_connected_peers(), 1);
 }
 
@@ -144,6 +145,7 @@ async fn handshake_initiator_side() {
     // the node should now have registered the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
     assert!(node.peers.is_connected(peer_address));
+    assert_eq!(node.peers.number_of_connecting_peers(), 0);
     assert_eq!(node.peers.number_of_connected_peers(), 1);
 }
 

@@ -93,7 +93,7 @@ pub enum Payload {
 
     /* internal messages */
     #[doc(hide)]
-    ConnectedTo(SocketAddr),
+    ConnectedTo(SocketAddr, Option<SocketAddr>),
     #[doc(hide)]
     ConnectingTo(SocketAddr),
     // TODO: used internally, but can also be used to allow a clean disconnect for connected peers on shutdown

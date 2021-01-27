@@ -194,9 +194,9 @@ impl Server {
                     self.peers.connecting_to_peer(remote_address)?;
                 }
             }
-            Payload::ConnectedTo(remote_address) => {
+            Payload::ConnectedTo(remote_address, remote_listener) => {
                 if direction == Direction::Internal {
-                    self.peers.connected_to_peer(remote_address)?;
+                    self.peers.connected_to_peer(remote_address, remote_listener)?;
                 }
             }
             Payload::Transaction(transaction) => {
