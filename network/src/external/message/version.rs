@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use chrono::Utc;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -27,8 +26,6 @@ pub struct Version {
     pub nonce: u64,
     /// The listening port of the sender.
     pub listening_port: u16,
-    /// The timestamp of this message.
-    pub timestamp: i64,
 }
 
 impl Version {
@@ -37,7 +34,6 @@ impl Version {
             version,
             nonce,
             listening_port,
-            timestamp: Utc::now().timestamp(),
         }
     }
 
@@ -50,7 +46,6 @@ impl Version {
             version,
             nonce: rng.gen::<u64>(),
             listening_port,
-            timestamp: Utc::now().timestamp(),
         }
     }
 }

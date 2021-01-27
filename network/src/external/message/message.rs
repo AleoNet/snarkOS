@@ -15,9 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::external::Version;
+use snarkos_storage::BlockHeight;
 use snarkvm_objects::BlockHeaderHash;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use std::{fmt, net::SocketAddr};
@@ -66,8 +66,6 @@ impl fmt::Display for Message {
     }
 }
 
-pub type Peer = (SocketAddr, DateTime<Utc>);
-
 /// The actual message transmitted over the network.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Payload {
@@ -84,7 +82,11 @@ pub enum Payload {
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/memory_pool.md"))]
     MemoryPool(Vec<Vec<u8>>),
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/peers.md"))]
-    Peers(Vec<Peer>),
+    Peers(Vec<SocketAddr>),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/ping.md"))]
+    Ping(BlockHeight),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/pong.md"))]
+    Pong,
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync.md"))]
     Sync(Vec<BlockHeaderHash>),
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/sync_block.md"))]
@@ -117,6 +119,8 @@ impl fmt::Display for Payload {
             Self::GetSync(..) => "getsync",
             Self::MemoryPool(..) => "memorypool",
             Self::Peers(..) => "peers",
+            Self::Ping(..) => "ping",
+            Self::Pong => "pong",
             Self::Sync(..) => "sync",
             Self::SyncBlock(..) => "syncblock",
             Self::Transaction(..) => "transaction",

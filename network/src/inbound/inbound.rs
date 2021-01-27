@@ -278,6 +278,8 @@ impl Inbound {
                 ))
                 .await?;
 
+            debug!("Successfully handshaken with {}", remote_address);
+
             Ok((writer, reader))
         } else {
             error!("{} didn't send their Version during the handshake", remote_address);

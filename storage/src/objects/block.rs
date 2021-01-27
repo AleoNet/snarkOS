@@ -20,6 +20,8 @@ use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction}
 use snarkvm_objects::{Block, BlockHeaderHash, DPCTransactions};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
+use std::sync::atomic::Ordering;
+
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the latest block in the chain.
     pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
@@ -227,8 +229,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         self.storage.write(database_transaction)?;
 
-        let mut current_block_height = self.current_block_height.write();
-        *current_block_height -= 1;
+        self.current_block_height.fetch_sub(1, Ordering::SeqCst);
 
         self.update_merkle_tree()?;
 

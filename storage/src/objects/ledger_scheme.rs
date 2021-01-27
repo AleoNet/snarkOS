@@ -54,7 +54,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
         let empty_cm_merkle_tree = MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), &leaves)?;
 
         let ledger_storage = Self {
-            current_block_height: RwLock::new(0),
+            current_block_height: Default::default(),
             storage: Arc::new(storage),
             cm_merkle_tree: RwLock::new(empty_cm_merkle_tree),
             ledger_parameters: parameters,

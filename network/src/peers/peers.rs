@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    external::{message::*, Peer, Version},
-    peers::{PeerBook, PeerInfo},
+    external::{message::*, Version},
+    peers::{PeerBook, PeerInfo, PeerQuality},
     ConnReader,
     ConnWriter,
     Environment,
@@ -25,7 +25,12 @@ use crate::{
     Outbound,
 };
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+    time::Instant,
+};
 
 use parking_lot::RwLock;
 use tokio::net::TcpStream;
@@ -79,7 +84,7 @@ impl Peers {
     ///
     pub async fn update(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
-        let number_of_connected_peers = self.number_of_connected_peers();
+        let number_of_connected_peers = self.number_of_connected_peers() as usize;
         trace!(
             "Connected to {} peer{}",
             number_of_connected_peers,
@@ -89,12 +94,14 @@ impl Peers {
         // Check that this node is not a bootnode.
         if !self.environment.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
-            if number_of_connected_peers < self.environment.minimum_number_of_connected_peers() {
+            let min_peers = self.environment.minimum_number_of_connected_peers() as usize;
+            if number_of_connected_peers < min_peers {
                 // Attempt to connect to the default bootnodes of the network.
                 self.connect_to_bootnodes().await;
 
                 // Attempt to connect to each disconnected peer saved in the peer book.
-                self.connect_to_disconnected_peers().await;
+                self.connect_to_disconnected_peers(min_peers - number_of_connected_peers)
+                    .await;
 
                 // Broadcast a `GetPeers` message to request for more peers.
                 self.broadcast_getpeers_requests();
@@ -102,8 +109,9 @@ impl Peers {
         }
 
         // Check if this node server is above the permitted number of connected peers.
-        if number_of_connected_peers > self.environment.maximum_number_of_connected_peers() {
-            let number_to_disconnect = number_of_connected_peers - self.environment.maximum_number_of_connected_peers();
+        let max_peers = self.environment.maximum_number_of_connected_peers() as usize;
+        if number_of_connected_peers > max_peers {
+            let number_to_disconnect = number_of_connected_peers - max_peers;
             trace!(
                 "Disconnecting from the most recent {} peers to maintain their permitted number",
                 number_to_disconnect
@@ -114,11 +122,11 @@ impl Peers {
                 .into_iter()
                 .map(|(_, peer_info)| peer_info)
                 .collect::<Vec<_>>();
-            connected.sort_unstable_by_key(|info| *info.last_connected());
+            connected.sort_unstable_by_key(|info| info.last_connected());
 
             for _ in 0..number_to_disconnect {
                 if let Some(peer_info) = connected.pop() {
-                    let addr = *peer_info.address();
+                    let addr = peer_info.address();
                     debug!("Disconnecting from {}", addr);
                     self.inbound
                         .route(Message::new(Direction::Internal, Payload::Disconnect(addr)))
@@ -128,8 +136,8 @@ impl Peers {
         }
 
         if number_of_connected_peers != 0 {
-            // Broadcast a `Version` request to each connected peer.
-            self.broadcast_version_requests();
+            // Send a `Ping` to every connected peer.
+            self.broadcast_pings();
 
             // Store the peer book to storage.
             self.save_peer_book_to_storage()?;
@@ -142,7 +150,7 @@ impl Peers {
     /// Returns `true` if the given address is connecting with this node.
     ///
     #[inline]
-    pub fn is_connecting(&self, address: &SocketAddr) -> bool {
+    pub fn is_connecting(&self, address: SocketAddr) -> bool {
         self.peer_book.read().is_connecting(address)
     }
 
@@ -150,7 +158,7 @@ impl Peers {
     /// Returns `true` if the given address is connected with this node.
     ///
     #[inline]
-    pub fn is_connected(&self, address: &SocketAddr) -> bool {
+    pub fn is_connected(&self, address: SocketAddr) -> bool {
         self.peer_book.read().is_connected(address)
     }
 
@@ -158,7 +166,7 @@ impl Peers {
     /// Returns `true` if the given address is a disconnected peer of this node.
     ///
     #[inline]
-    pub fn is_disconnected(&self, address: &SocketAddr) -> bool {
+    pub fn is_disconnected(&self, address: SocketAddr) -> bool {
         self.peer_book.read().is_disconnected(address)
     }
 
@@ -205,8 +213,8 @@ impl Peers {
     /// Adds the given address to the disconnected peers in this peer book.
     ///
     #[inline]
-    pub fn add_peer(&self, address: &SocketAddr) -> Result<(), NetworkError> {
-        self.peer_book.write().add_peer(address)
+    pub fn add_peer(&self, address: SocketAddr) {
+        self.peer_book.write().add_peer(address);
     }
 
     ///
@@ -217,23 +225,15 @@ impl Peers {
         self.environment.local_address()
     }
 
-    ///
-    /// Returns the current handshake nonce for the given connected peer.
-    ///
-    #[inline]
-    fn nonce(&self, remote_address: &SocketAddr) -> Result<u64, NetworkError> {
-        self.peer_book.read().handshake_nonce(remote_address)
-    }
-
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         let own_address = self.local_address().unwrap(); // must be known by now
         if remote_address == own_address {
             return Err(NetworkError::SelfConnectAttempt);
         }
-        if self.is_connecting(&remote_address) {
+        if self.is_connecting(remote_address) {
             return Err(NetworkError::PeerAlreadyConnecting);
         }
-        if self.is_connected(&remote_address) {
+        if self.is_connected(remote_address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
@@ -282,13 +282,17 @@ impl Peers {
                 // save the outbound channel
                 self.outbound.channels.write().insert(remote_address, writer);
 
-                self.connected_to_peer(remote_address, version.nonce)
+                self.connected_to_peer(remote_address, version.nonce)?;
+
+                debug!("Successfully handshaken with {}", remote_address);
+
+                Ok(())
             } else {
                 Err(NetworkError::InvalidHandshake)
             }
         } else {
             error!("{} didn't respond with a Verack during the handshake", remote_address);
-            self.disconnected_from_peer(&remote_address)?;
+            self.disconnected_from_peer(remote_address)?;
             Err(NetworkError::InvalidHandshake)
         }
     }
@@ -321,44 +325,29 @@ impl Peers {
     }
 
     /// Broadcasts a connection request to all disconnected peers.
-    async fn connect_to_disconnected_peers(&self) {
+    async fn connect_to_disconnected_peers(&self, count: usize) {
         trace!("Connecting to disconnected peers");
 
         // Iterate through each connected peer and attempts a connection request.
-        for (remote_address, _) in self.disconnected_peers() {
+        for remote_address in self.disconnected_peers().keys().take(count).copied() {
             if let Err(e) = self.initiate_connection(remote_address).await {
-                warn!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+                trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
             }
         }
     }
 
-    /// Broadcasts a `Version` message to all connected peers.
-    fn broadcast_version_requests(&self) {
-        // Get the local address of this node.
-        let local_address = self.local_address().unwrap(); // must be known by now
+    /// Broadcasts a `Ping` message to all connected peers.
+    fn broadcast_pings(&self) {
+        trace!("Broadcasting Ping messages");
 
-        // Broadcast a `Version` message to each connected peer of this node server.
-        trace!("Broadcasting Version messages");
+        let current_block_height = self.environment.current_block_height();
         for (remote_address, _) in self.connected_peers() {
-            // Get the handshake nonce.
-            if let Ok(nonce) = self.nonce(&remote_address) {
-                // Case 1 - The remote address is of a connected peer and the nonce was retrieved.
+            self.sending_ping(remote_address);
 
-                // TODO (raychu86): Establish a formal node version.
-                // Broadcast a `Version` message to the connected peer.
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::Version(Version::new(1u64, nonce, local_address.port())),
-                ));
-            } else {
-                // Case 2 - The remote address is not of a connected peer, proceed to disconnect.
-
-                // Disconnect from the peer if there is no active connection channel
-                // TODO (howardwu): Inform Outbound to also disconnect, by dropping any channels held with this peer.
-                if let Err(e) = self.disconnected_from_peer(&remote_address) {
-                    warn!("Couldn't mark {} as disconnected: {}", remote_address, e);
-                }
-            };
+            self.outbound.send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::Ping(current_block_height),
+            ));
         }
     }
 
@@ -381,6 +370,54 @@ impl Peers {
             //     // Disconnect from the peer if the channel is not active.
             //     self.disconnected_from_peer(&remote_address).await?;
             // }
+        }
+    }
+
+    fn peer_quality(&self, addr: SocketAddr) -> Option<Arc<PeerQuality>> {
+        self.peer_book
+            .read()
+            .connected_peers()
+            .get(&addr)
+            .map(|peer| Arc::clone(&peer.quality))
+    }
+
+    fn sending_ping(&self, target: SocketAddr) {
+        if let Some(quality) = self.peer_quality(target) {
+            let timestamp = Instant::now();
+            *quality.last_ping_sent.lock() = Some(timestamp);
+            quality.expecting_pong.store(true, Ordering::SeqCst);
+        } else {
+            // shouldn't occur, but just in case
+            warn!("Tried to send a Ping to an unknown peer: {}!", target);
+        }
+    }
+
+    /// Handles an incoming `Pong` message.
+    pub fn received_pong(&self, source: SocketAddr) {
+        if let Some(quality) = self.peer_quality(source) {
+            if quality.expecting_pong.load(Ordering::SeqCst) {
+                let ping_sent = quality.last_ping_sent.lock().unwrap();
+                let rtt = ping_sent.elapsed().as_millis() as u64;
+                quality.rtt_ms.store(rtt, Ordering::SeqCst);
+                quality.expecting_pong.store(false, Ordering::SeqCst);
+            } else {
+                quality.failures.fetch_add(1, Ordering::Relaxed);
+            }
+        } else {
+            // shouldn't occur, but just in case
+            warn!("Received a Pong from an unknown peer: {}!", source);
+        }
+    }
+
+    ///
+    /// Updates the last seen timestamp of this peer to the current time.
+    ///
+    #[inline]
+    pub fn update_last_seen(&self, addr: SocketAddr) {
+        if let Some(ref quality) = self.peer_quality(addr) {
+            *quality.last_seen.write() = Some(chrono::Utc::now());
+        } else {
+            warn!("Attempted to update state of a peer that's not connected: {}", addr);
         }
     }
 
@@ -430,7 +467,7 @@ impl Peers {
     /// Sets the given remote address in the peer book as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) fn disconnected_from_peer(&self, remote_address: &SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn disconnected_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         self.peer_book.write().set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
@@ -455,17 +492,17 @@ impl Peers {
         Ok(())
     }
 
-    pub(crate) fn send_get_peers(&self, remote_address: SocketAddr) {
+    pub(crate) fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
-        for (peer_address, peer_info) in self.connected_peers() {
+        for peer_address in self.connected_peers().keys().copied() {
             // Skip the iteration if the requesting peer that we're sending the response to
             // appears in the list of peers.
             if peer_address == remote_address {
                 continue;
             }
-            peers.push((peer_address, *peer_info.last_seen()));
+            peers.push(peer_address);
         }
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)));
@@ -474,7 +511,7 @@ impl Peers {
     /// A miner has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
-    pub(crate) fn process_inbound_peers(&self, peers: Vec<Peer>) -> Result<(), NetworkError> {
+    pub(crate) fn process_inbound_peers(&self, peers: Vec<SocketAddr>) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
@@ -489,17 +526,13 @@ impl Peers {
         for peer_address in peers
             .iter()
             .take(number_to_connect as usize)
-            .map(|(addr, _)| addr)
             .filter(|&peer_addr| *peer_addr != local_address)
+            .copied()
         {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            if !self.is_connecting(peer_address) && !self.is_connected(peer_address) {
-                self.add_peer(peer_address)?;
-            }
+            self.add_peer(peer_address);
         }
-
-        Ok(())
     }
 }

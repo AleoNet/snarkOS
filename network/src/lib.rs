@@ -160,7 +160,7 @@ impl Server {
         let mut receiver = self.inbound.take_receiver();
         task::spawn(async move {
             loop {
-                if let Err(e) = server.receive_response(&mut receiver).await {
+                if let Err(e) = server.process_incoming_messages(&mut receiver).await {
                     error!("Server error: {}", e);
                 }
             }
@@ -181,10 +181,11 @@ impl Server {
         self.environment.local_address()
     }
 
-    async fn receive_response(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
+    async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         let source = if let Direction::Inbound(addr) = direction {
+            self.peers.update_last_seen(addr);
             Some(addr)
         } else {
             None
@@ -238,14 +239,22 @@ impl Server {
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {
-                    self.peers.disconnected_from_peer(&addr)?;
+                    self.peers.disconnected_from_peer(addr)?;
                 }
             }
             Payload::GetPeers => {
-                self.peers.send_get_peers(source.unwrap());
+                self.peers.send_peers(source.unwrap());
             }
             Payload::Peers(peers) => {
-                self.peers.process_inbound_peers(peers)?;
+                self.peers.process_inbound_peers(peers);
+            }
+            Payload::Ping(_block_height) => {
+                self.outbound
+                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong));
+                // TODO(ljedrz/niklas): perform a sync if needed
+            }
+            Payload::Pong => {
+                self.peers.received_pong(source.unwrap());
             }
         }
 
