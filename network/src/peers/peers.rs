@@ -332,9 +332,11 @@ impl Peers {
             .bootnodes()
             .iter()
             .filter(|addr| !connected_peers.contains_key(addr))
+            .copied()
         {
-            if let Err(e) = self.initiate_connection(*bootnode_address).await {
+            if let Err(e) = self.initiate_connection(bootnode_address).await {
                 warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                let _ = self.disconnected_from_peer(bootnode_address);
             }
         }
     }
@@ -347,6 +349,7 @@ impl Peers {
         for remote_address in self.disconnected_peers().keys().take(count).copied() {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+                let _ = self.disconnected_from_peer(remote_address);
             }
         }
     }
