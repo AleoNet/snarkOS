@@ -162,13 +162,13 @@ impl Blocks {
                 if height < current_height {
                     let mut max_height = current_height;
 
-                    // if the requester is behind more than 4000 blocks
-                    if height + 4000 < current_height {
-                        // send the max 4000 blocks
-                        max_height = height + 4000;
+                    // if the requester is behind more than MAX_BLOCK_SYNC_COUNT blocks
+                    if current_height > height + crate::MAX_BLOCK_SYNC_COUNT {
+                        // send no more than MAX_BLOCK_SYNC_COUNT
+                        max_height = height + crate::MAX_BLOCK_SYNC_COUNT;
                     }
 
-                    let mut block_hashes: Vec<BlockHeaderHash> = vec![];
+                    let mut block_hashes = Vec::with_capacity((max_height - height) as usize);
 
                     for block_num in height + 1..=max_height {
                         block_hashes.push(storage_lock.get_block_hash(block_num)?);
@@ -195,12 +195,14 @@ impl Blocks {
     pub(crate) async fn received_sync(&self, remote_address: SocketAddr, block_hashes: Vec<BlockHeaderHash>) {
         // If empty sync is no-op as chain states match
         if !block_hashes.is_empty() {
-            // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
-            // detect missing blocks and divergence in chain for now.
-            self.outbound.send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::GetBlocks(block_hashes),
-            ));
+            for batch in block_hashes.chunks(crate::MAX_BLOCK_SYNC_COUNT as usize) {
+                // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
+                // detect missing blocks and divergence in chain for now.
+                self.outbound.send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::GetBlocks(batch.to_vec()),
+                ));
+            }
         }
     }
 }

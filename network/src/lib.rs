@@ -59,6 +59,9 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
 
+/// The maximum number of block hashes that can be requested or provided in a single batch.
+pub const MAX_BLOCK_SYNC_COUNT: u32 = 25;
+
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
 pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;

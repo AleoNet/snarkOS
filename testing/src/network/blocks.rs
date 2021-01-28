@@ -20,7 +20,7 @@ use snarkvm_utilities::{FromBytes, Read, ToBytes, Write};
 use std::io::Result;
 
 #[derive(Debug)]
-pub struct TestBlocks(Vec<Block<Tx>>);
+pub struct TestBlocks(pub Vec<Block<Tx>>);
 
 impl TestBlocks {
     pub fn new(blocks: Vec<Block<Tx>>) -> Self {
@@ -55,7 +55,7 @@ impl FromBytes for TestBlocks {
         let mut blocks = vec![];
 
         // Hardcoded for now as the trait doesn't allow for an N.
-        for _i in 0..10 {
+        for _i in 0..100 {
             let block: Block<Tx> = FromBytes::read(&mut reader)?;
             blocks.push(block);
         }

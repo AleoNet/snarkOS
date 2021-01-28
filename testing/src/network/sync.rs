@@ -34,7 +34,7 @@ use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::external::message::*;
 
 use snarkvm_dpc::instantiated::Tx;
-use snarkvm_objects::{block::Block, block_header_hash::BlockHeaderHash};
+use snarkvm_objects::block_header_hash::BlockHeaderHash;
 use snarkvm_utilities::bytes::FromBytes;
 
 use std::time::Duration;
@@ -172,6 +172,7 @@ async fn block_responder_side() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn block_two_node() {
     let setup = TestSetup {
         peer_sync_interval: 1,
@@ -180,61 +181,35 @@ async fn block_two_node() {
     let node_alice = test_node(setup).await;
     let alice_address = node_alice.local_address().unwrap();
 
-    // insert blocks into node_alice
-    let block_1 = BLOCK_1.to_vec();
-    let block_struct_1 = Block::deserialize(&block_1).unwrap();
-    node_alice
-        .environment
-        .consensus_parameters()
-        .receive_block(
-            node_alice.environment.dpc_parameters(),
-            &node_alice.environment.storage().read(),
-            &mut node_alice.environment.memory_pool().lock(),
-            &block_struct_1,
-        )
-        .unwrap();
+    let blocks = crate::network::TestBlocks::load().0;
+    assert_eq!(blocks.len(), 100);
 
-    let block_2 = BLOCK_2.to_vec();
-    let block_struct_2 = Block::deserialize(&block_2).unwrap();
-    node_alice
-        .environment
-        .consensus_parameters()
-        .receive_block(
-            node_alice.environment.dpc_parameters(),
-            &node_alice.environment.storage().read(),
-            &mut node_alice.environment.memory_pool().lock(),
-            &block_struct_2,
-        )
-        .unwrap();
+    for block in blocks {
+        node_alice
+            .environment
+            .consensus_parameters()
+            .receive_block(
+                node_alice.environment.dpc_parameters(),
+                &node_alice.environment.storage().read(),
+                &mut node_alice.environment.memory_pool().lock(),
+                &block,
+            )
+            .unwrap();
+    }
 
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
-            block_sync_interval: 1,
+            block_sync_interval: 5,
             ..Default::default()
         }),
-        peer_sync_interval: 1,
+        peer_sync_interval: 5,
         bootnodes: vec![alice_address.to_string()],
         ..Default::default()
     };
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(
-        5,
-        node_bob
-            .environment
-            .storage()
-            .read()
-            .block_hash_exists(&block_struct_1.header.get_hash())
-    );
-    wait_until!(
-        5,
-        node_bob
-            .environment
-            .storage()
-            .read()
-            .block_hash_exists(&block_struct_2.header.get_hash())
-    );
+    wait_until!(30, node_bob.environment.current_block_height() == 100);
 }
 
 #[tokio::test]
