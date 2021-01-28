@@ -221,10 +221,10 @@ impl TransactionKernel {
         let parameters = SystemParameters::<Components>::load().unwrap();
 
         let noop_program_snark_parameters = NoopProgramSNARKParameters::<Components>::load().unwrap();
-        assert!(spenders.len() > 0);
+        assert!(!spenders.is_empty());
         assert_eq!(spenders.len(), records_to_spend.len());
 
-        assert!(recipients.len() > 0);
+        assert!(!recipients.is_empty());
         assert_eq!(recipients.len(), recipient_amounts.len());
 
         let noop_program_id = to_bytes![
