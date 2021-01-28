@@ -115,28 +115,34 @@ impl Environment {
         })
     }
 
+    /// Returns a reference to the consensus objects.
+    #[inline]
+    pub fn consensus(&self) -> &Consensus {
+        self.consensus.as_ref().expect("no consensus!")
+    }
+
     /// Returns a reference to the storage system of this node.
     #[inline]
     pub fn storage(&self) -> &Arc<RwLock<MerkleTreeLedger>> {
-        &self.consensus.as_ref().expect("no consensus!").storage
+        &self.consensus().storage
     }
 
     /// Returns a reference to the memory pool of this node.
     #[inline]
     pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
-        &self.consensus.as_ref().expect("no consensus!").memory_pool
+        &self.consensus().memory_pool
     }
 
     /// Returns a reference to the consensus parameters of this node.
     #[inline]
     pub fn consensus_parameters(&self) -> &ConsensusParameters {
-        &self.consensus.as_ref().expect("no consensus!").consensus_parameters
+        &self.consensus().consensus_parameters
     }
 
     /// Returns a reference to the DPC parameters of this node.
     #[inline]
     pub fn dpc_parameters(&self) -> &PublicParameters<Components> {
-        &self.consensus.as_ref().expect("no consensus!").dpc_parameters
+        &self.consensus().dpc_parameters
     }
 
     /// Returns the local address of the node.
@@ -172,7 +178,7 @@ impl Environment {
     /// Returns `true` if this node is a mining node. Otherwise, returns `false`.
     #[inline]
     pub fn is_miner(&self) -> bool {
-        self.consensus.as_ref().expect("no consensus!").is_miner
+        self.consensus().is_miner
     }
 
     /// Returns the minimum number of peers this node maintains a connection with.
@@ -190,12 +196,7 @@ impl Environment {
     /// Returns the current block height of the ledger from storage.
     #[inline]
     pub fn current_block_height(&self) -> u32 {
-        self.consensus
-            .as_ref()
-            .expect("no consensus!")
-            .storage
-            .read()
-            .get_current_block_height()
+        self.consensus().storage.read().get_current_block_height()
     }
 
     /// Returns the interval between each peer sync.
@@ -205,14 +206,11 @@ impl Environment {
 
     /// Returns the interval between each block sync.
     pub fn block_sync_interval(&self) -> Duration {
-        self.consensus.as_ref().expect("no consensus!").block_sync_interval
+        self.consensus().block_sync_interval
     }
 
     /// Returns the interval between each transaction (memory pool) sync.
     pub fn transaction_sync_interval(&self) -> Duration {
-        self.consensus
-            .as_ref()
-            .expect("no consensus!")
-            .transaction_sync_interval
+        self.consensus().transaction_sync_interval
     }
 }
