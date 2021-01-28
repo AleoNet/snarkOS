@@ -52,28 +52,6 @@ use rand::Rng;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
-/// Parameters for a proof of work blockchain.
-#[derive(Clone, Debug)]
-pub struct ConsensusParameters {
-    /// Maximum block size in bytes
-    pub max_block_size: usize,
-
-    /// Maximum nonce value allowed
-    pub max_nonce: u32,
-
-    /// The amount of time it should take to find a block
-    pub target_block_time: i64,
-
-    /// Network
-    pub network: Network,
-
-    /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
-    pub verifier: PoswMarlin,
-
-    /// The authorized inner SNARK IDs
-    pub authorized_inner_snark_ids: Vec<Vec<u8>>,
-}
-
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> AleoAmount {
     let expected_blocks_per_hour: u32 = 100;
@@ -88,6 +66,23 @@ pub fn get_block_reward(block_num: u32) -> AleoAmount {
     let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
 
     AleoAmount::from_bytes(reward)
+}
+
+/// A data structure containing the consensus parameters for a specified network on this node.
+#[derive(Clone, Debug)]
+pub struct ConsensusParameters {
+    /// The network ID that these parameters correspond to.
+    pub network_id: Network,
+    /// The maximum permitted block size (in bytes).
+    pub max_block_size: usize,
+    /// The maximum permitted nonce value.
+    pub max_nonce: u32,
+    /// The anticipated number of seconds for finding a new block.
+    pub target_block_time: i64,
+    /// The PoSW consensus verifier (read-only mode, no proving key loaded).
+    pub verifier: PoswMarlin,
+    /// The authorized inner SNARK IDs.
+    pub authorized_inner_snark_ids: Vec<Vec<u8>>,
 }
 
 impl ConsensusParameters {
@@ -246,7 +241,7 @@ impl ConsensusParameters {
         }
 
         // Check that all the transaction proofs verify
-        Ok(self.verify_transactions(parameters, &block.transactions.0, ledger)?)
+        self.verify_transactions(parameters, &block.transactions.0, ledger)
     }
 
     /// Return whether or not the given block is valid and insert it.
@@ -330,10 +325,10 @@ impl ConsensusParameters {
 
                     // If the side chain is now longer than the canon chain,
                     // perform a fork to the side chain.
-                    if side_chain_path.new_block_number > storage.get_latest_block_height() {
+                    if side_chain_path.new_block_number > storage.get_current_block_height() {
                         debug!(
                             "Determined side chain is longer than canon chain by {} blocks",
-                            side_chain_path.new_block_number - storage.get_latest_block_height()
+                            side_chain_path.new_block_number - storage.get_current_block_height()
                         );
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
@@ -478,7 +473,7 @@ impl ConsensusParameters {
             new_birth_program_ids,
             new_death_program_ids,
             memo,
-            self.network.id(),
+            self.network_id.id(),
             rng,
         )?;
 
@@ -609,7 +604,7 @@ mod tests {
             max_block_size: 1_000_000usize,
             max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
-            network: Network::Mainnet,
+            network_id: Network::Mainnet,
             verifier: posw,
             authorized_inner_snark_ids: vec![],
         };

@@ -54,7 +54,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
         let empty_cm_merkle_tree = MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), &leaves)?;
 
         let ledger_storage = Self {
-            latest_block_height: RwLock::new(0),
+            current_block_height: Default::default(),
             storage: Arc::new(storage),
             cm_merkle_tree: RwLock::new(empty_cm_merkle_tree),
             ledger_parameters: parameters,
@@ -68,7 +68,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
 
     /// Returns the number of blocks including the genesis block
     fn len(&self) -> usize {
-        self.get_latest_block_height() as usize + 1
+        self.get_current_block_height() as usize + 1
     }
 
     /// Return the parameters used to construct the ledger Merkle tree.

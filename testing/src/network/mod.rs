@@ -14,93 +14,233 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::consensus::*;
-use snarkos_consensus::{MemoryPool, MerkleTreeLedger};
+pub mod blocks;
+pub use blocks::*;
+
+#[cfg(test)]
+pub mod sync;
+
+use crate::{
+    consensus::{FIXTURE_VK, TEST_CONSENSUS},
+    dpc::load_verifying_parameters,
+};
+
 use snarkos_network::{
-    external::{Channel, SyncHandler},
-    internal::context::Context,
+    errors::message::*,
+    external::{message::*, MAX_MESSAGE_SIZE},
+    Consensus,
+    Environment,
     Server,
 };
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters};
 
-use rand::Rng;
-use std::{net::SocketAddr, sync::Arc};
-use tokio::{net::TcpListener, sync::Mutex};
+use parking_lot::{Mutex, RwLock};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 
-pub const LOCALHOST: &str = "0.0.0.0:";
-pub const CONNECTION_FREQUENCY_LONG: u64 = 100000; // 100 seconds
-pub const CONNECTION_FREQUENCY_SHORT: u64 = 100; // .1 seconds
-pub const CONNECTION_FREQUENCY_SHORT_TIMEOUT: u64 = 200; // .2 seconds
-
-/// Returns a random tcp socket address
-pub fn random_socket_address() -> SocketAddr {
-    let mut rng = rand::thread_rng();
-    let string = format!("{}{}", LOCALHOST, rng.gen_range(1023, 9999));
-    string.parse::<SocketAddr>().unwrap()
+/// Returns a random tcp socket address and binds it to a listener
+pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    (addr, listener)
 }
 
-/// Puts the current tokio thread to sleep for given milliseconds
-pub async fn sleep(time: u64) {
-    tokio::time::delay_for(std::time::Duration::from_millis(time)).await;
-}
-
-/// Returns a server struct with given argumnets
-pub fn initialize_test_server(
-    server_address: SocketAddr,
-    bootnode_address: SocketAddr,
-    storage: Arc<MerkleTreeLedger>,
-    parameters: PublicParameters<Components>,
-    connection_frequency: u64,
-) -> Server {
-    let consensus = TEST_CONSENSUS.clone();
-    let memory_pool = MemoryPool::new();
-    let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
-
-    let sync_handler = SyncHandler::new(bootnode_address);
-    let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
-
-    Server::new(
-        Arc::new(Context::new(server_address, 5, 1, 10, true, vec![], false)),
-        consensus,
-        storage,
-        parameters,
-        memory_pool_lock,
-        sync_handler_lock,
-        connection_frequency,
-    )
-}
-
-/// Starts a server on a new thread. Takes full ownership of server.
-pub fn start_test_server(server: Server) {
-    tokio::spawn(async move { server.listen().await.unwrap() });
-}
-
-/// Returns a tcp channel connected to the address
-pub async fn connect_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
-    let channel = Channel::new_write_only(address).await.unwrap();
-    let (reader, _socket) = listener.accept().await.unwrap();
-
-    channel.update_reader(Arc::new(Mutex::new(reader)))
-}
-
-/// Returns the next tcp channel connected to the listener
-pub async fn accept_channel(listener: &mut TcpListener, address: SocketAddr) -> Channel {
-    let (reader, _peer) = listener.accept().await.unwrap();
-    let channel = Channel::new_read_only(reader).unwrap();
-
-    channel.update_writer(address).await.unwrap()
-}
-
-/// Starts a fake node that accepts all tcp connections at the given socket address
-pub async fn simulate_active_node(address: SocketAddr) {
-    accept_all_messages(TcpListener::bind(address).await.unwrap());
-}
-
-/// Starts a fake node that accepts all tcp connections received by the given peer listener
-pub fn accept_all_messages(mut peer_listener: TcpListener) {
-    tokio::spawn(async move {
+#[macro_export]
+macro_rules! wait_until {
+    ($limit_secs: expr, $condition: expr) => {
+        let now = std::time::Instant::now();
         loop {
-            peer_listener.accept().await.unwrap();
+            if $condition {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            if now.elapsed() > std::time::Duration::from_secs($limit_secs) {
+                panic!("timed out!");
+            }
         }
-    });
+    };
+}
+
+#[derive(Clone)]
+pub struct ConsensusSetup {
+    pub is_miner: bool,
+    pub block_sync_interval: u64,
+    pub tx_sync_interval: u64,
+}
+
+impl ConsensusSetup {
+    pub fn new(is_miner: bool, block_sync_interval: u64, tx_sync_interval: u64) -> Self {
+        Self {
+            is_miner,
+            block_sync_interval,
+            tx_sync_interval,
+        }
+    }
+}
+
+impl Default for ConsensusSetup {
+    fn default() -> Self {
+        Self {
+            is_miner: false,
+            block_sync_interval: 600,
+            tx_sync_interval: 600,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TestSetup {
+    pub socket_address: Option<SocketAddr>,
+    pub consensus_setup: Option<ConsensusSetup>,
+    pub peer_sync_interval: u64,
+    pub min_peers: u16,
+    pub max_peers: u16,
+    pub is_bootnode: bool,
+    pub bootnodes: Vec<String>,
+}
+
+impl TestSetup {
+    pub fn new(
+        socket_address: Option<SocketAddr>,
+        consensus_setup: Option<ConsensusSetup>,
+        peer_sync_interval: u64,
+        min_peers: u16,
+        max_peers: u16,
+        is_bootnode: bool,
+        bootnodes: Vec<String>,
+    ) -> Self {
+        Self {
+            socket_address,
+            consensus_setup,
+            peer_sync_interval,
+            min_peers,
+            max_peers,
+            is_bootnode,
+            bootnodes,
+        }
+    }
+}
+
+impl Default for TestSetup {
+    fn default() -> Self {
+        Self {
+            socket_address: None,
+            consensus_setup: Some(Default::default()),
+            peer_sync_interval: 600,
+            min_peers: 1,
+            max_peers: 100,
+            is_bootnode: false,
+            bootnodes: vec![],
+        }
+    }
+}
+
+/// Returns an `Environment` struct with given arguments
+pub fn test_environment(setup: TestSetup) -> Environment {
+    let consensus = if let Some(ref setup) = setup.consensus_setup {
+        Some(Consensus::new(
+            Arc::new(RwLock::new(FIXTURE_VK.ledger())),
+            Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
+            TEST_CONSENSUS.clone(),
+            load_verifying_parameters(),
+            setup.is_miner,
+            Duration::from_secs(setup.block_sync_interval),
+            Duration::from_secs(setup.tx_sync_interval),
+        ))
+    } else {
+        None
+    };
+
+    Environment::new(
+        consensus,
+        setup.socket_address,
+        setup.min_peers,
+        setup.max_peers,
+        setup.bootnodes,
+        setup.is_bootnode,
+        Duration::from_secs(setup.peer_sync_interval),
+    )
+    .unwrap()
+}
+
+/// Starts a node with the specified bootnodes.
+pub async fn test_node(setup: TestSetup) -> Server {
+    let environment = test_environment(setup);
+    let mut node = Server::new(environment).await.unwrap();
+    node.start().await.unwrap();
+
+    node
+}
+
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, TcpStream) {
+    // start a test node and listen for incoming connections
+    let node = test_node(node_setup).await;
+    let node_listener = node.local_address().unwrap();
+
+    // set up a fake node (peer), which is just a socket
+    let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
+
+    // register the addresses bound to the connection between the node and the peer
+    let peer_address = peer_stream.local_addr().unwrap();
+
+    // the peer initiates a handshake by sending a Version message
+    let version = Payload::Version(Version::new(1u64, 1u64, peer_address.port()));
+    write_message_to_stream(version, &mut peer_stream).await;
+
+    // the buffer for peer's reads
+    let mut peer_buf = [0u8; 64];
+
+    // check if the peer has received the Verack message from the node
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Verack(_)));
+
+    // check if it was followed by a Version message
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
+        version
+    } else {
+        unreachable!();
+    };
+
+    // in response to the Version, the peer sends a Verack message to finish the handshake
+    let verack = Payload::Verack(version.nonce);
+    write_message_to_stream(verack, &mut peer_stream).await;
+
+    (node, peer_stream)
+}
+
+pub async fn read_payload<'a, T: AsyncRead + Unpin>(
+    stream: &mut T,
+    buffer: &'a mut [u8],
+) -> Result<&'a [u8], MessageError> {
+    stream.read_exact(buffer).await?;
+
+    Ok(buffer)
+}
+
+pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
+    let mut header_arr = [0u8; 4];
+    stream.read_exact(&mut header_arr).await?;
+    let header = MessageHeader::from(header_arr);
+
+    if header.len as usize > MAX_MESSAGE_SIZE {
+        Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE))
+    } else {
+        Ok(header)
+    }
+}
+
+pub async fn write_message_to_stream(payload: Payload, peer_stream: &mut TcpStream) {
+    let payload = bincode::serialize(&payload).unwrap();
+    let header = MessageHeader {
+        len: payload.len() as u32,
+    }
+    .as_bytes();
+    peer_stream.write_all(&header[..]).await.unwrap();
+    peer_stream.write_all(&payload).await.unwrap();
+    peer_stream.flush().await.unwrap();
 }

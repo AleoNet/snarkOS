@@ -56,7 +56,7 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
 
     Ok(Ledger {
-        latest_block_height: RwLock::new(0),
+        current_block_height: RwLock::new(0),
         storage: Arc::new(storage),
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
         ledger_parameters: parameters,
@@ -71,7 +71,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network: Network::from_network_id(network_id),
+        network_id: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids: vec![],
     };

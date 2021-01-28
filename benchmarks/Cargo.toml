@@ -17,10 +17,10 @@ path = "posw/posw.rs"
 harness = false
 
 [dependencies]
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
-snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
 
 snarkos-profiler = { path = "../profiler", version = "1.1.4" }
 snarkos-posw = { path = "../posw", version = "1.1.4", features = ["test-helpers"] }
@@ -33,7 +33,8 @@ smallvec = { version = "1.6" }
 criterion = "0.3.3"
 
 [dev-dependencies]
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7bbb33", version = "0.0.2"}
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2"}
+
 criterion = "0.3.3"
 csv = { version = "1" }
 rand_xorshift = { version = "0.2" }

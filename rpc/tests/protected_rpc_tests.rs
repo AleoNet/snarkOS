@@ -17,9 +17,14 @@
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
-    use snarkos_network::{external::SyncHandler, internal::context::Context};
+    use snarkos_network::Server;
     use snarkos_rpc::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
+    use snarkos_testing::{
+        consensus::*,
+        dpc::load_verifying_parameters,
+        network::{test_environment, TestSetup},
+        storage::*,
+    };
     use snarkvm_dpc::base_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
@@ -34,9 +39,9 @@ mod protected_rpc_tests {
     };
 
     use jsonrpc_core::MetaIoHandler;
+    use parking_lot::{Mutex, RwLock};
     use serde_json::Value;
     use std::{str::FromStr, sync::Arc};
-    use tokio::sync::Mutex;
 
     const TEST_USERNAME: &str = "TEST_USERNAME";
     const TEST_PASSWORD: &str = "TEST_PASSWORD";
@@ -63,11 +68,18 @@ mod protected_rpc_tests {
         }
     }
 
-    fn initialize_test_rpc(
-        storage: &Arc<MerkleTreeLedger>,
+    fn unwrap_arc_rwlock<T>(x: Arc<RwLock<T>>) -> T {
+        if let Ok(lock) = Arc::try_unwrap(x) {
+            lock.into_inner()
+        } else {
+            panic!("can't unwrap the Arc, there are strong refs left!");
+        }
+    }
+
+    async fn initialize_test_rpc(
+        storage: Arc<RwLock<MerkleTreeLedger>>,
         parameters: PublicParameters<Components>,
     ) -> MetaIoHandler<Meta> {
-        let server_address = random_socket_address();
         let consensus = TEST_CONSENSUS.clone();
 
         let credentials = RpcCredentials {
@@ -75,26 +87,22 @@ mod protected_rpc_tests {
             password: TEST_PASSWORD.to_string(),
         };
 
-        let memory_pool = MemoryPool::new();
-        let memory_pool_lock = Arc::new(Mutex::new(memory_pool));
+        let memory_pool = Arc::new(Mutex::new(MemoryPool::new()));
 
-        let sync_handler = SyncHandler::new(server_address);
-        let sync_handler_lock = Arc::new(Mutex::new(sync_handler));
+        let environment = test_environment(TestSetup::default());
+        let server = Server::new(environment.clone()).await.unwrap();
 
-        let context = Context::new(server_address, 5, 1, 10, true, vec![], false);
-
-        let storage = storage.clone();
-        let storage_path = storage.storage.db.path().to_path_buf();
+        let storage_path = storage.read().storage.db.path().to_path_buf();
 
         let rpc_impl = RpcImpl::new(
             storage,
             storage_path,
             parameters,
-            Arc::new(context),
+            environment,
             consensus,
-            memory_pool_lock,
-            sync_handler_lock,
+            memory_pool,
             Some(credentials),
+            server,
         );
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
@@ -103,12 +111,12 @@ mod protected_rpc_tests {
         io
     }
 
-    #[test]
-    fn test_rpc_authentication() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+    #[tokio::test]
+    async fn test_rpc_authentication() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = load_verifying_parameters();
         let meta = invalid_authentication();
-        let rpc = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -120,17 +128,17 @@ mod protected_rpc_tests {
         assert_eq!(extracted["error"]["message"], expected_result);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_fetch_record_commitment_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+    #[tokio::test]
+    async fn test_rpc_fetch_record_commitment_count() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
-        storage.store_record(&DATA.records_1[0]).unwrap();
+        storage.write().store_record(&DATA.records_1[0]).unwrap();
 
         let method = "getrecordcommitmentcount".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -141,17 +149,17 @@ mod protected_rpc_tests {
         assert_eq!(extracted["result"], 1);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_fetch_record_commitments() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+    #[tokio::test]
+    async fn test_rpc_fetch_record_commitments() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
-        storage.store_record(&DATA.records_1[0]).unwrap();
+        storage.write().store_record(&DATA.records_1[0]).unwrap();
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -166,17 +174,17 @@ mod protected_rpc_tests {
         assert_eq!(extracted["result"], expected_result);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_raw_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+    #[tokio::test]
+    async fn test_rpc_get_raw_record() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
-        storage.store_record(&DATA.records_1[0]).unwrap();
+        storage.write().store_record(&DATA.records_1[0]).unwrap();
 
         let method = "getrawrecord".to_string();
         let params = hex::encode(to_bytes![DATA.records_1[0].commitment()].unwrap());
@@ -193,15 +201,15 @@ mod protected_rpc_tests {
         assert_eq!(extracted["result"], expected_result);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_decode_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+    #[tokio::test]
+    async fn test_rpc_decode_record() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
         let record = &DATA.records_1[0];
 
@@ -237,15 +245,15 @@ mod protected_rpc_tests {
         assert_eq!(commitment_randomness, record_info["commitment_randomness"]);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_decrypt_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+    #[tokio::test]
+    async fn test_rpc_decrypt_record() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
         let system_parameters = &FIXTURE_VK.parameters.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
@@ -286,22 +294,22 @@ mod protected_rpc_tests {
         }
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_create_raw_transaction() {
-        let storage = Arc::new(FIXTURE.ledger());
+    #[tokio::test]
+    async fn test_rpc_create_raw_transaction() {
+        let storage = Arc::new(RwLock::new(FIXTURE.ledger()));
         let parameters = FIXTURE.parameters.clone();
         let meta = authentication();
 
         let consensus = TEST_CONSENSUS.clone();
 
         consensus
-            .receive_block(&parameters, &storage, &mut MemoryPool::new(), &DATA.block_1)
+            .receive_block(&parameters, &storage.read(), &mut MemoryPool::new(), &DATA.block_1)
             .unwrap();
 
-        let io = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
         let method = "createrawtransaction".to_string();
 
@@ -330,7 +338,7 @@ mod protected_rpc_tests {
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}] }}",
             method, params
         );
-        let response = io.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request_sync(&request, meta).unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -345,23 +353,23 @@ mod protected_rpc_tests {
         let transaction_bytes = hex::decode(transaction_string).unwrap();
         let _transaction: Tx = FromBytes::read(&transaction_bytes[..]).unwrap();
 
-        drop(io);
-        kill_storage_sync(storage);
+        drop(rpc);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_create_transaction_kernel() {
-        let storage = Arc::new(FIXTURE.ledger());
+    #[tokio::test]
+    async fn test_rpc_create_transaction_kernel() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = FIXTURE.parameters.clone();
         let meta = authentication();
 
         let consensus = TEST_CONSENSUS.clone();
 
         consensus
-            .receive_block(&parameters, &storage, &mut MemoryPool::new(), &DATA.block_1)
+            .receive_block(&parameters, &storage.read(), &mut MemoryPool::new(), &DATA.block_1)
             .unwrap();
 
-        let io = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
         let method = "createtransactionkernel".to_string();
 
@@ -390,7 +398,7 @@ mod protected_rpc_tests {
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}] }}",
             method, params
         );
-        let response = io.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request_sync(&request, meta).unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -400,23 +408,23 @@ mod protected_rpc_tests {
         let _transaction_kernel: TransactionKernel<Components> =
             FromBytes::read(&transaction_kernel_bytes[..]).unwrap();
 
-        drop(io);
-        kill_storage_sync(storage);
+        drop(rpc);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_create_transaction() {
-        let storage = Arc::new(FIXTURE.ledger());
+    #[tokio::test]
+    async fn test_rpc_create_transaction() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = FIXTURE.parameters.clone();
         let meta = authentication();
 
         let consensus = TEST_CONSENSUS.clone();
 
         consensus
-            .receive_block(&parameters, &storage, &mut MemoryPool::new(), &DATA.block_1)
+            .receive_block(&parameters, &storage.read(), &mut MemoryPool::new(), &DATA.block_1)
             .unwrap();
 
-        let io = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
         let method = "createtransaction".to_string();
 
@@ -427,7 +435,7 @@ mod protected_rpc_tests {
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [\"{}\"] }}",
             method, transaction_kernel
         );
-        let response = io.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request_sync(&request, meta).unwrap();
 
         println!("extracted: {}", response);
 
@@ -446,16 +454,16 @@ mod protected_rpc_tests {
         let transaction_bytes = hex::decode(transaction_string).unwrap();
         let _transaction: Tx = FromBytes::read(&transaction_bytes[..]).unwrap();
 
-        drop(io);
-        kill_storage_sync(storage);
+        drop(rpc);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_create_account() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+    #[tokio::test]
+    async fn test_create_account() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
         let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(&storage, parameters);
+        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
 
         let method = "createaccount".to_string();
 
@@ -480,6 +488,6 @@ mod protected_rpc_tests {
         let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 }

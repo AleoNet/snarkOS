@@ -18,14 +18,17 @@ use crate::errors::message::StreamReadError;
 
 #[derive(Debug, Error)]
 pub enum MessageHeaderError {
-    #[error("{}: {}", _0, _1)]
-    Crate(&'static str, String),
+    #[error("IO error: {}", _0)]
+    Io(std::io::Error),
+
+    #[error("Serialization error: {}", _0)]
+    Serialization(bincode::Error),
 
     #[error("{}", _0)]
     Message(String),
 
-    #[error("Invalid message header length {}. Expected length of 16", _0)]
-    InvalidLength(usize),
+    #[error("The message is too big ({}B). Maximum size: {}", _0, _1)]
+    TooBig(usize, usize),
 
     #[error("{}", _0)]
     StreamReadError(StreamReadError),
@@ -39,12 +42,12 @@ impl From<StreamReadError> for MessageHeaderError {
 
 impl From<bincode::Error> for MessageHeaderError {
     fn from(error: bincode::Error) -> Self {
-        MessageHeaderError::Crate("bincode", format!("{:?}", error))
+        MessageHeaderError::Serialization(error)
     }
 }
 
 impl From<std::io::Error> for MessageHeaderError {
     fn from(error: std::io::Error) -> Self {
-        MessageHeaderError::Crate("std::io", format!("{:?}", error))
+        MessageHeaderError::Io(error)
     }
 }

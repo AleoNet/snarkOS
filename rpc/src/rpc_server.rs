@@ -22,15 +22,16 @@ use crate::{
     RpcImpl,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{external::SyncHandler, internal::context::Context};
+use snarkos_network::{Environment, Server as NodeServer};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
+use parking_lot::{Mutex, RwLock};
+
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.
@@ -38,17 +39,17 @@ use tokio::sync::Mutex;
 #[allow(clippy::too_many_arguments)]
 pub async fn start_rpc_server(
     rpc_port: u16,
-    secondary_storage: Arc<MerkleTreeLedger>,
+    secondary_storage: Arc<RwLock<MerkleTreeLedger>>,
     storage_path: PathBuf,
     parameters: PublicParameters<Components>,
-    server_context: Arc<Context>,
+    environment: Environment,
     consensus: ConsensusParameters,
-    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    sync_handler_lock: Arc<Mutex<SyncHandler>>,
+    memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
+    node_server: NodeServer,
     username: Option<String>,
     password: Option<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse()?;
+) {
+    let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse().unwrap();
 
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
@@ -59,11 +60,11 @@ pub async fn start_rpc_server(
         secondary_storage,
         storage_path,
         parameters,
-        server_context,
+        environment,
         consensus,
-        memory_pool_lock,
-        sync_handler_lock,
+        memory_pool,
         credentials,
+        node_server,
     );
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
@@ -81,11 +82,10 @@ pub async fn start_rpc_server(
             Meta { auth }
         })
         .threads(1)
-        .start_http(&rpc_server)?;
+        .start_http(&rpc_server)
+        .expect("couldn't start the RPC server!");
 
     tokio::task::spawn(async move {
         server.wait();
     });
-
-    Ok(())
 }

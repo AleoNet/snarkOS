@@ -26,13 +26,11 @@ mod test_storage {
         ProofOfSuccinctWork,
     };
 
-    use std::sync::Arc;
-
     #[test]
     pub fn test_new_blockchain() {
-        let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+        let (blockchain, _): (Store, _) = open_test_blockchain();
 
-        assert_eq!(blockchain.get_latest_block_height(), 0);
+        assert_eq!(blockchain.get_current_block_height(), 0);
 
         let _latest_block = blockchain.get_latest_block().unwrap();
 
@@ -41,9 +39,9 @@ mod test_storage {
 
     #[test]
     pub fn remove_decrements_height() {
-        let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+        let (blockchain, _): (Store, _) = open_test_blockchain();
 
-        assert_eq!(blockchain.get_latest_block_height(), 0);
+        assert_eq!(blockchain.get_current_block_height(), 0);
 
         // insert a block
         let block = Block {
@@ -60,18 +58,18 @@ mod test_storage {
         };
 
         blockchain.insert_and_commit(&block).unwrap();
-        assert_eq!(blockchain.get_latest_block_height(), 1);
+        assert_eq!(blockchain.get_current_block_height(), 1);
 
         // removing it decrements the chain's height
         blockchain.remove_latest_block().unwrap();
-        assert_eq!(blockchain.get_latest_block_height(), 0);
+        assert_eq!(blockchain.get_current_block_height(), 0);
 
         kill_storage_sync(blockchain);
     }
 
     #[test]
     pub fn test_storage() {
-        let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+        let (blockchain, _): (Store, _) = open_test_blockchain();
 
         blockchain.storage.db.put(b"my key", b"my value").unwrap();
 
@@ -88,7 +86,7 @@ mod test_storage {
 
     #[test]
     pub fn test_storage_memory_pool() {
-        let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+        let (blockchain, _): (Store, _) = open_test_blockchain();
         let transactions_serialized = vec![0u8];
 
         assert!(blockchain.store_to_memory_pool(transactions_serialized.clone()).is_ok());
@@ -100,10 +98,10 @@ mod test_storage {
 
     #[test]
     pub fn test_storage_peer_book() {
-        let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+        let (blockchain, _): (Store, _) = open_test_blockchain();
         let peers_serialized = vec![0u8];
 
-        assert!(blockchain.store_to_peer_book(peers_serialized.clone()).is_ok());
+        assert!(blockchain.save_peer_book_to_storage(peers_serialized.clone()).is_ok());
         assert!(blockchain.get_peer_book().is_ok());
         assert_eq!(peers_serialized, blockchain.get_peer_book().unwrap());
 
@@ -123,7 +121,7 @@ mod test_storage {
 
         #[test]
         pub fn test_invalid_block_addition() {
-            let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+            let (blockchain, _): (Store, _) = open_test_blockchain();
 
             let latest_block = blockchain.get_latest_block().unwrap();
 
@@ -134,7 +132,7 @@ mod test_storage {
 
         #[test]
         pub fn test_invalid_block_removal() {
-            let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+            let (blockchain, _): (Store, _) = open_test_blockchain();
 
             assert!(blockchain.remove_latest_block().is_err());
             assert!(blockchain.remove_latest_blocks(5).is_err());
@@ -144,7 +142,7 @@ mod test_storage {
 
         #[test]
         pub fn test_invalid_block_retrieval() {
-            let (blockchain, _): (Arc<Store>, _) = open_test_blockchain();
+            let (blockchain, _): (Store, _) = open_test_blockchain();
 
             assert!(blockchain.get_block_from_block_number(2).is_err());
             assert!(blockchain.get_block_from_block_number(10).is_err());

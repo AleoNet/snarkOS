@@ -17,8 +17,13 @@
 /// Tests for public RPC endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
+    use snarkos_network::Server;
     use snarkos_rpc::*;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, network::*, storage::*};
+    use snarkos_testing::{
+        consensus::*,
+        network::{test_environment, TestSetup},
+        storage::*,
+    };
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_models::objects::Transaction;
     use snarkvm_utilities::{
@@ -28,38 +33,38 @@ mod rpc_tests {
     };
 
     use jsonrpc_test::Rpc;
+    use parking_lot::RwLock;
     use serde_json::Value;
     use std::{net::SocketAddr, sync::Arc};
 
-    fn initialize_test_rpc(storage: &Arc<MerkleTreeLedger>) -> Rpc {
-        let bootnode_address = random_socket_address();
-        let server_address = random_socket_address();
+    fn unwrap_arc_rwlock<T>(x: Arc<RwLock<T>>) -> T {
+        if let Ok(lock) = Arc::try_unwrap(x) {
+            lock.into_inner()
+        } else {
+            panic!("can't unwrap the Arc, there are strong refs left!");
+        }
+    }
 
-        let parameters = load_verifying_parameters();
-
-        let server = initialize_test_server(
-            server_address,
-            bootnode_address,
-            storage.clone(),
-            parameters.clone(),
-            CONNECTION_FREQUENCY_LONG,
-        );
+    async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> Rpc {
+        let environment = test_environment(TestSetup::default());
+        let memory_pool = environment.memory_pool().clone();
+        let parameters = environment.dpc_parameters().clone();
+        let server = Server::new(environment.clone()).await.unwrap();
 
         let consensus = TEST_CONSENSUS.clone();
 
-        let storage = storage.clone();
-        let storage_path = storage.storage.db.path().to_path_buf();
+        let storage_path = storage.read().storage.db.path().to_path_buf();
 
         Rpc::new(
             RpcImpl::new(
                 storage,
                 storage_path,
                 parameters,
-                server.context.clone(),
+                environment,
                 consensus,
-                server.memory_pool_lock,
-                server.sync_handler_lock,
+                memory_pool,
                 None,
+                server,
             )
             .to_delegate(),
         )
@@ -130,10 +135,10 @@ mod rpc_tests {
         extracted["result"].clone()
     }
 
-    #[test]
-    fn test_rpc_get_block() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_block() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let response = rpc.request("getblock", &[hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]);
 
@@ -163,13 +168,13 @@ mod rpc_tests {
         assert_eq!(genesis_block.header.nonce, block_response["nonce"]);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_block_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_block_count() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "getblockcount".to_string();
 
@@ -178,13 +183,13 @@ mod rpc_tests {
         assert_eq!(result.as_u64().unwrap(), 1u64);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_best_block_hash() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_best_block_hash() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "getbestblockhash".to_string();
 
@@ -196,13 +201,13 @@ mod rpc_tests {
         );
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_block_hash() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_block_hash() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         assert_eq!(rpc.request("getblockhash", &[0u32]), format![
             r#""{}""#,
@@ -210,13 +215,13 @@ mod rpc_tests {
         ]);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_raw_transaction() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let genesis_block = genesis();
 
@@ -229,13 +234,13 @@ mod rpc_tests {
         ]);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_transaction_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_transaction_info() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let genesis_block = genesis();
         let transaction = &genesis_block.transactions.0[0];
@@ -249,13 +254,13 @@ mod rpc_tests {
         verify_transaction_info(to_bytes![transaction].unwrap(), transaction_info);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_decode_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_decode_raw_transaction() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let response = rpc.request("decoderawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]);
 
@@ -264,13 +269,13 @@ mod rpc_tests {
         verify_transaction_info(TRANSACTION_1.to_vec(), transaction_info);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_send_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_send_raw_transaction() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
 
@@ -280,13 +285,13 @@ mod rpc_tests {
         );
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_validate_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_validate_transaction() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         assert_eq!(
             rpc.request("validaterawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),
@@ -294,13 +299,13 @@ mod rpc_tests {
         );
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_connection_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_connection_count() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "getconnectioncount".to_string();
 
@@ -309,13 +314,13 @@ mod rpc_tests {
         assert_eq!(result.as_u64().unwrap(), 0u64);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_peer_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_peer_info() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "getpeerinfo".to_string();
 
@@ -328,13 +333,13 @@ mod rpc_tests {
         assert_eq!(peer_info.peers, expected_peers);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_node_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_node_info() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "getnodeinfo".to_string();
 
@@ -346,13 +351,13 @@ mod rpc_tests {
         assert_eq!(peer_info.is_syncing, false);
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 
-    #[test]
-    fn test_rpc_get_block_template() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(&storage);
+    #[tokio::test]
+    async fn test_rpc_get_block_template() {
+        let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "getblocktemplate".to_string();
 
@@ -362,16 +367,19 @@ mod rpc_tests {
 
         let expected_transactions: Vec<String> = vec![];
 
-        let new_height = storage.get_latest_block_height() + 1;
-        let block_reward = get_block_reward(new_height);
-        let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);
+        {
+            let storage = storage.read();
+            let new_height = storage.get_current_block_height() + 1;
+            let block_reward = get_block_reward(new_height);
+            let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);
 
-        assert_eq!(template.previous_block_hash, latest_block_hash);
-        assert_eq!(template.block_height, new_height);
-        assert_eq!(template.transactions, expected_transactions);
-        assert!(template.coinbase_value >= block_reward.0 as u64);
+            assert_eq!(template.previous_block_hash, latest_block_hash);
+            assert_eq!(template.block_height, new_height);
+            assert_eq!(template.transactions, expected_transactions);
+            assert!(template.coinbase_value >= block_reward.0 as u64);
+        }
 
         drop(rpc);
-        kill_storage_sync(storage);
+        kill_storage_sync(unwrap_arc_rwlock(storage));
     }
 }
