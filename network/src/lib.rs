@@ -128,20 +128,6 @@ impl Server {
 
         if self.environment.has_consensus() && !self.environment.is_bootnode() {
             let peers = self.peers.clone();
-            let blocks = self.blocks.clone();
-            let block_sync_interval = self.environment.block_sync_interval();
-            task::spawn(async move {
-                loop {
-                    sleep(block_sync_interval).await;
-                    info!("Updating blocks");
-
-                    // select last seen node as block sync node
-                    let sync_node = peers.last_seen();
-                    blocks.update(sync_node).await;
-                }
-            });
-
-            let peers = self.peers.clone();
             let transactions = self.transactions.clone();
             let transaction_sync_interval = self.environment.transaction_sync_interval();
             task::spawn(async move {
@@ -248,10 +234,14 @@ impl Server {
             Payload::Peers(peers) => {
                 self.peers.process_inbound_peers(peers);
             }
-            Payload::Ping(_block_height) => {
+            Payload::Ping(block_height) => {
                 self.outbound
                     .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong));
-                // TODO(ljedrz/niklas): perform a sync if needed
+
+                if block_height > self.environment.current_block_height() + 1 && self.environment.should_sync_blocks() {
+                    self.environment.register_block_sync_attempt();
+                    self.blocks.update(source.unwrap()).await;
+                }
             }
             Payload::Pong => {
                 self.peers.received_pong(source.unwrap());

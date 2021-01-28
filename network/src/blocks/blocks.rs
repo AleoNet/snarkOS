@@ -40,10 +40,10 @@ impl Blocks {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    pub async fn update(&self, sync_node: Option<SocketAddr>) {
+    pub async fn update(&self, sync_node: SocketAddr) {
         let block_locator_hashes = self.environment.storage().read().get_block_locator_hashes();
 
-        if let (Some(sync_node), Ok(block_locator_hashes)) = (sync_node, block_locator_hashes) {
+        if let Ok(block_locator_hashes) = block_locator_hashes {
             // Send a GetSync to the selected sync node.
             self.outbound.send_request(Message::new(
                 Direction::Outbound(sync_node),

@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use tokio::time::sleep;
+
 use crate::{
     consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
     network::{
@@ -35,6 +37,8 @@ use snarkvm_dpc::instantiated::Tx;
 use snarkvm_objects::{block::Block, block_header_hash::BlockHeaderHash};
 use snarkvm_utilities::bytes::FromBytes;
 
+use std::time::Duration;
+
 #[tokio::test]
 async fn block_initiator_side() {
     // handshake between a fake node and a full node
@@ -47,10 +51,22 @@ async fn block_initiator_side() {
     };
     let (node, mut peer_stream) = handshaken_node_and_peer(setup).await;
 
+    // wait for the block_sync_interval to "expire"
+    sleep(Duration::from_secs(1)).await;
+
+    // trigger the full node to request synchronization by sending it a higher block_height than it has
+    let ping = Payload::Ping(2u32);
+    write_message_to_stream(ping, &mut peer_stream).await;
+
     // the buffer for peer's reads
     let mut peer_buf = [0u8; 64];
 
-    // check GetSync message was received
+    // read the Pong
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Pong));
+
+    // check if a GetSync message was received
     let len = read_header(&mut peer_stream).await.unwrap().len();
     let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
     assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::GetSync(..)));
@@ -167,7 +183,11 @@ async fn block_responder_side() {
 
 #[tokio::test]
 async fn block_two_node() {
-    let node_alice = test_node(TestSetup::default()).await;
+    let setup = TestSetup {
+        peer_sync_interval: 1,
+        ..Default::default()
+    };
+    let node_alice = test_node(setup).await;
     let alice_address = node_alice.local_address().unwrap();
 
     // insert blocks into node_alice

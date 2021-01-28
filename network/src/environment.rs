@@ -22,7 +22,11 @@ use snarkvm_dpc::base_dpc::{
 };
 
 use parking_lot::{Mutex, RwLock};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[derive(Clone)]
 pub struct Consensus {
@@ -38,6 +42,8 @@ pub struct Consensus {
     is_miner: bool,
     /// The interval between each block sync.
     block_sync_interval: Duration,
+    /// The last time a block sync was initiated.
+    last_block_sync: Arc<RwLock<Instant>>,
     /// The interval between each transaction (memory pool) sync.
     transaction_sync_interval: Duration,
 }
@@ -59,6 +65,7 @@ impl Consensus {
             dpc_parameters,
             is_miner,
             block_sync_interval,
+            last_block_sync: Arc::new(RwLock::new(Instant::now())),
             transaction_sync_interval,
         }
     }
@@ -204,9 +211,21 @@ impl Environment {
         self.peer_sync_interval
     }
 
-    /// Returns the interval between each block sync.
+    /// Returns the minimum interval between block sync attempts.
     pub fn block_sync_interval(&self) -> Duration {
         self.consensus().block_sync_interval
+    }
+
+    /// Checks whether enough time has elapsed for the node to attempt another block sync.
+    pub fn should_sync_blocks(&self) -> bool {
+        let consensus = self.consensus();
+
+        consensus.last_block_sync.read().elapsed() > consensus.block_sync_interval
+    }
+
+    /// Register that the node attempted to sync blocks.
+    pub fn register_block_sync_attempt(&self) {
+        *self.consensus().last_block_sync.write() = Instant::now();
     }
 
     /// Returns the interval between each transaction (memory pool) sync.
