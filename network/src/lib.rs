@@ -208,8 +208,8 @@ impl Server {
             Payload::SyncBlock(block) => {
                 self.blocks.received_block(source.unwrap(), block, None).await?;
             }
-            Payload::GetBlock(hash) => {
-                self.blocks.received_get_block(source.unwrap(), hash).await?;
+            Payload::GetBlocks(hashes) => {
+                self.blocks.received_get_blocks(source.unwrap(), hashes).await?;
             }
             Payload::GetMemoryPool => {
                 self.transactions.received_get_memory_pool(source.unwrap()).await?;

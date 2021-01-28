@@ -59,7 +59,7 @@ async fn block_initiator_side() {
     write_message_to_stream(ping, &mut peer_stream).await;
 
     // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    let mut peer_buf = [0u8; 128];
 
     // read the Pong
     let len = read_header(&mut peer_stream).await.unwrap().len();
@@ -84,23 +84,13 @@ async fn block_initiator_side() {
     // make sure both GetBlock messages are received
     let len = read_header(&mut peer_stream).await.unwrap().len();
     let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let block_hash = if let Payload::GetBlock(block_hash) = bincode::deserialize(&payload).unwrap() {
-        block_hash
+    let block_hashes = if let Payload::GetBlocks(block_hashes) = bincode::deserialize(&payload).unwrap() {
+        block_hashes
     } else {
         unreachable!();
     };
 
-    assert_eq!(block_hash, block_1_header_hash);
-
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let block_hash = if let Payload::GetBlock(block_hash) = bincode::deserialize(&payload).unwrap() {
-        block_hash
-    } else {
-        unreachable!();
-    };
-
-    assert_eq!(block_hash, block_2_header_hash);
+    assert!(block_hashes.contains(&block_1_header_hash) && block_hashes.contains(&block_2_header_hash));
 
     // respond with the full blocks
     let block_1 = Payload::Block(BLOCK_1.to_vec());
@@ -165,7 +155,7 @@ async fn block_responder_side() {
     assert_eq!(*block_header_hash, block_struct_1.header.get_hash());
 
     // request the block from the node
-    let get_block = Payload::GetBlock(block_header_hash.clone());
+    let get_block = Payload::GetBlocks(vec![block_header_hash.clone()]);
     write_message_to_stream(get_block, &mut peer_stream).await;
 
     // receive a SyncBlock message with the requested block

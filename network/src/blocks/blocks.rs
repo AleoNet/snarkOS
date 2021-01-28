@@ -128,20 +128,21 @@ impl Blocks {
     }
 
     /// A peer has requested a block.
-    pub(crate) async fn received_get_block(
+    pub(crate) async fn received_get_blocks(
         &self,
         remote_address: SocketAddr,
-        header_hash: BlockHeaderHash,
+        header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
-        let block = self.environment.storage().read().get_block(&header_hash);
+        for hash in header_hashes {
+            let block = self.environment.storage().read().get_block(&hash)?;
 
-        if let Ok(block) = block {
             // Send a `SyncBlock` message to the connected peer.
             self.outbound.send_request(Message::new(
                 Direction::Outbound(remote_address),
                 Payload::SyncBlock(block.serialize()?),
             ));
         }
+
         Ok(())
     }
 
@@ -196,12 +197,10 @@ impl Blocks {
         if !block_hashes.is_empty() {
             // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
             // detect missing blocks and divergence in chain for now.
-            for hash in block_hashes {
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::GetBlock(hash),
-                ));
-            }
+            self.outbound.send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::GetBlocks(block_hashes),
+            ));
         }
     }
 }

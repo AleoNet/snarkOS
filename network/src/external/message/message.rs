@@ -71,8 +71,8 @@ impl fmt::Display for Message {
 pub enum Payload {
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/block.md"))]
     Block(Vec<u8>),
-    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_block.md"))]
-    GetBlock(BlockHeaderHash),
+    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_blocks.md"))]
+    GetBlocks(Vec<BlockHeaderHash>),
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_memory_pool.md"))]
     GetMemoryPool,
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/get_peers.md"))]
@@ -113,7 +113,7 @@ impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let str = match self {
             Self::Block(..) => "block",
-            Self::GetBlock(..) => "getblock",
+            Self::GetBlocks(..) => "getblocks",
             Self::GetMemoryPool => "getmempool",
             Self::GetPeers => "getpeers",
             Self::GetSync(..) => "getsync",
