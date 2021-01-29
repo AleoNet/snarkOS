@@ -74,7 +74,7 @@ jobs:
         if: matrix.rust == 'nightly'
 
   test-wasm:
-    name: Check Tests (Wasm)
+    name: WASM Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
