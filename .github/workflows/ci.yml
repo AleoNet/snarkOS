@@ -73,54 +73,6 @@ jobs:
           args: --all-features --examples --all --benches
         if: matrix.rust == 'nightly'
 
-#  test:
-#    name: Check Tests (Simple)
-#    runs-on: [self-hosted, snarkos-ci1]
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v2
-#
-#      - name: Install Rust (nightly)
-#        uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: nightly-2020-07-13
-#          override: true
-#
-#      - name: Test
-#        uses: actions-rs/cargo@v1
-#        with:
-#          command: test
-#          args: --all --lib
-
-  test:
-    name: Check Tests (Simple)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install Rust (nightly)
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
-
   test-wasm:
     name: Check Tests (Wasm)
     runs-on: ubuntu-latest
