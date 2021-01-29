@@ -35,9 +35,9 @@ impl UpdateCLI {
             .build()?
             .fetch()?;
 
-        println!("List of available snarkOS release versions");
+        println!("List of available versions");
         for release in releases {
-            println!("* {}", release.version);
+            println!("  * {}", release.version);
         }
         Ok(())
     }
