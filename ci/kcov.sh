@@ -6,7 +6,7 @@ ls target/debug
 echo "-2-"
 ls target/debug/deps
 echo "-3-"
-for file in target/debug/*-*[^\.d];
+for file in target/debug/deps/snarkos*-*[^\.d];
   do
     mkdir -p "target/cov/$(basename $file)";
     echo "Processing target/cov/$(basename $file)"
