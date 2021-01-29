@@ -82,10 +82,9 @@ jobs:
       - checkout
       - setup_environment:
           cache_key: snarkos-nightly-cache
-      - run: rustup component add rustfmt
-      - run: cargo fmt -- --check
       - run:
           name: Build and test
+          no_output_timeout: 30m
           command: RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
       - clear_environment:
           cache_key: snarkos-nightly-cache
