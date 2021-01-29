@@ -10,7 +10,7 @@ commands:
       - run: set -e
       - setup_remote_docker
       - run:
-          name: Prepare envrionment and install dependencies
+          name: Prepare environment and install dependencies
           command: |
             export SCCACHE_CACHE_SIZE=200M
             export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
@@ -51,6 +51,7 @@ jobs:
           cache_key: snarkos-stable-cache
       - run:
           name: Build and run tests
+          no_output_timeout: 30m
           command: >
             RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc
             --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
@@ -76,6 +77,7 @@ jobs:
           no_output_timeout: 1800s
       - run:
           name: Test
+          no_output_timeout: 30m
           command: |
             export PATH=~/.cargo/bin:$PATH
             export RUST_BACKTRACE=1
