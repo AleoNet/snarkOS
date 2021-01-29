@@ -53,84 +53,12 @@ jobs:
           name: Build and run tests
           no_output_timeout: 30m
           command: >
-            RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc
-            --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
+            RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
       - persist_to_workspace:
           root: ~/
           paths: project/
       - clear_environment:
           cache_key: snarkos-stable-cache
-#  codecov:
-#    docker:
-#      - image: cimg/rust:1.46.0
-#    resource_class: xlarge
-#    steps:
-#      - checkout
-#      - setup_environment:
-#          cache_key: snarkos-stable-cache
-#      - run:
-#          name: Setup build environment
-#          command: |
-#            sudo apt-get update
-#            sudo apt-get install -y cmake binutils-dev libcurl4-openssl-dev libiberty-dev libelf-dev libdw-dev zlib1g-dev
-#            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --no-modify-path --default-toolchain none -y;
-#          no_output_timeout: 1800s
-#      - run:
-#          name: Test
-#          no_output_timeout: 30m
-#          command: |
-#            export PATH=~/.cargo/bin:$PATH
-#            export RUST_BACKTRACE=1
-#            cargo test --all
-#      - run:
-#          name: Coverage
-#          command: |
-#            export PATH=~/.cargo/bin:$PATH
-#            wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
-#            tar xzf master.tar.gz
-#            cd kcov-master
-#            mkdir build && cd build
-#            cmake .. && make
-#            make install DESTDIR=../../kcov-build
-#            cd ../..
-#            rm -rf kcov-master
-#            for file in target/debug/deps/*-*; do if [[ "$file" != *\.* ]]; then mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --exclude-region='@kcov_skip(start):@kcov_skip(end)' --verify "target/cov/$(basename $file)" "$file"; fi done
-#            # Upload coverage
-#            bash <(curl -s https://codecov.io/bash)
-#            echo "Upload code coverage successfully"
-#      - clear_environment:
-#          cache_key: snarkos-stable-cache
-
-#      - name: Test
-#        uses: actions-rs/cargo@v1
-#        with:
-#          command: test
-#          args: --all --features ci_skip
-#        env:
-#          CARGO_NET_GIT_FETCH_WITH_CLI: true
-#          CARGO_INCREMENTAL: "0"
-#
-#      - name: Install dependencies for code coverage
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get -y install binutils-dev libcurl4-openssl-dev zlib1g-dev libdw-dev libiberty-dev
-#      - name: Generate coverage report
-#        run: |
-#          wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
-#          tar xzf master.tar.gz
-#          cd kcov-master
-#          mkdir build && cd build
-#          cmake .. && make
-#          make install DESTDIR=../../kcov-build
-#          cd ../..
-#          rm -rf kcov-master
-#          for file in target/debug/deps/*-*; do if [[ "$file" != *\.* ]]; then mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --exclude-region='@kcov_skip(start):@kcov_skip(end)' --verify "target/cov/$(basename $file)" "$file"; fi done
-#      - name: Upload coverage to Codecov
-#        uses: codecov/codecov-action@v1
-#        with:
-#          github-token: ${{ secrets.GITHUB_TOKEN }}
-#          token: ${{ secrets.CODECOV_TOKEN }}
-
   codecov:
     machine:
       image: ubuntu-1604:202004-01
@@ -146,21 +74,6 @@ jobs:
             docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
             howardwu/snarkos-codecov:2020-09-06 bash /home/circleci/project/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
-#  codecov:
-#    machine:
-#      image: ubuntu-1604:202004-01
-#      docker_layer_caching: true
-#    resource_class: xlarge
-#    steps:
-#      - attach_workspace:
-#          at: /home/circleci/project/
-#      - run:
-#          name: Run kcov
-#          command: >
-#            cd ~/project/project/ &&
-#            docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-#            howardwu/snarkos-codecov:2020-09-06 bash /home/circleci/project/ci/kcov.sh
-#      - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
       - image: howardwu/snarkos-ci:2020-08-27
@@ -173,7 +86,7 @@ jobs:
       - run: cargo fmt -- --check
       - run:
           name: Build and test
-          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
+          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
       - clear_environment:
           cache_key: snarkos-nightly-cache
 workflows:
