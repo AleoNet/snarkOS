@@ -52,7 +52,7 @@ dirs = { version = "3.0.1" }
 hex = { version = "0.4.1" }
 parking_lot = { version = "0.11.1" }
 rand = { version = "0.7" }
-self_update = { version = "0.20.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
+self_update = { version = "0.23.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = { version = "1.0" }
 tokio = { version = "0.3", features = ["full"] }
