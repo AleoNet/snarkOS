@@ -2,6 +2,7 @@ name: CI
 on:
   push:
     branches:
+      - staging
       - master
   pull_request:
 env:
