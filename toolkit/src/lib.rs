@@ -20,6 +20,7 @@
 extern crate thiserror;
 
 pub mod account;
+pub mod dpc;
 pub mod errors;
 pub mod record;
 pub mod signature;

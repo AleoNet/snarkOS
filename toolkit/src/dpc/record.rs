@@ -14,40 +14,47 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::PrivateKeyError;
+use crate::errors::DPCError;
 
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
-use snarkvm_objects::AccountPrivateKey;
+use snarkvm_dpc::base_dpc::{instantiated::Components, DPCRecord};
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
-use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug)]
-pub struct PrivateKey {
-    pub(crate) private_key: AccountPrivateKey<Components>,
+pub struct Record {
+    pub(crate) record: DPCRecord<Components>,
 }
 
-impl PrivateKey {
-    pub fn new<R: Rng + CryptoRng>(rng: &mut R) -> Result<Self, PrivateKeyError> {
-        let parameters = SystemParameters::<Components>::load()?;
-        let private_key =
-            AccountPrivateKey::<Components>::new(&parameters.account_signature, &parameters.account_commitment, rng)?;
-        Ok(Self { private_key })
+impl Record {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut output = vec![];
+        self.record.write(&mut output).expect("serialization to bytes failed");
+        output
     }
 }
 
-impl FromStr for PrivateKey {
-    type Err = PrivateKeyError;
+impl FromStr for Record {
+    type Err = DPCError;
 
-    fn from_str(private_key: &str) -> Result<Self, Self::Err> {
+    fn from_str(record: &str) -> Result<Self, Self::Err> {
+        let record = hex::decode(record)?;
+
         Ok(Self {
-            private_key: AccountPrivateKey::<Components>::from_str(private_key)?,
+            record: DPCRecord::<Components>::read(&record[..])?,
         })
     }
 }
 
-impl fmt::Display for PrivateKey {
+impl fmt::Display for Record {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.private_key.to_string())
+        write!(
+            f,
+            "{}",
+            hex::encode(to_bytes![self.record].expect("serialization to bytes failed"))
+        )
     }
 }

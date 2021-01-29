@@ -19,16 +19,22 @@
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
 use crate::{error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
+use snarkos_consensus::ConsensusParameters;
+use snarkos_toolkit::{
+    account::{Address, PrivateKey},
+    dpc::{Record, TransactionKernelBuilder},
+};
 use snarkvm_dpc::base_dpc::{
     encrypted_record::EncryptedRecord,
     instantiated::{Components, InstantiatedDPC},
     record::DPCRecord,
     record_encryption::RecordEncryption,
     record_payload::RecordPayload,
+    TransactionKernel,
 };
 use snarkvm_models::{
     algorithms::CRH,
-    dpc::{DPCComponents, Record},
+    dpc::{DPCComponents, DPCScheme, Record as RecordModel},
     objects::AccountScheme,
 };
 use snarkvm_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
@@ -37,6 +43,7 @@ use snarkvm_utilities::{
     to_bytes,
 };
 
+use itertools::Itertools;
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use rand::{thread_rng, Rng};
 use std::{str::FromStr, sync::Arc};
@@ -76,6 +83,49 @@ impl RpcImpl {
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
         match self.create_raw_transaction(val) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Wrap authentication around `create_transaction_kernel`
+    pub fn create_transaction_kernel_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        let val: TransactionInputs = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.create_transaction_kernel(val) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction kernel serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
+    /// Wrap authentication around `create_transaction`
+    pub fn create_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        if value.len() != 1 {
+            return Err(JsonRPCError::invalid_params(format!(
+                "invalid length {}, expected 1 element",
+                value.len()
+            )));
+        }
+
+        let transaction_kernel: String = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.create_transaction(transaction_kernel) {
             Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -190,6 +240,8 @@ impl RpcImpl {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
         d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
+        d.add_method_with_meta("createtransactionkernel", Self::create_transaction_kernel_protected);
+        d.add_method_with_meta("createtransaction", Self::create_transaction_protected);
         d.add_method_with_meta("decoderecord", Self::decode_record_protected);
         d.add_method_with_meta("decryptrecord", Self::decrypt_record_protected);
         d.add_method_with_meta("getrecordcommitmentcount", Self::get_record_commitment_count_protected);
@@ -228,6 +280,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         })
     }
 
+    // TODO (raychu86): Deprecate this rpc endpoint in favor of the more secure offline/online model.
     /// Create a new transaction, returning the encoded transaction and the new records.
     fn create_raw_transaction(
         &self,
@@ -357,6 +410,101 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_values,
             new_payloads,
             memo,
+            &storage,
+            rng,
+        )?;
+
+        let encoded_transaction = hex::encode(to_bytes![transaction]?);
+        let mut encoded_records = Vec::with_capacity(records.len());
+        for record in records {
+            encoded_records.push(hex::encode(to_bytes![record]?));
+        }
+
+        Ok(CreateRawTransactionOuput {
+            encoded_transaction,
+            encoded_records,
+        })
+    }
+
+    /// Generates and returns a new transaction kernel.
+    fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError> {
+        let rng = &mut thread_rng();
+
+        assert!(!transaction_input.old_records.is_empty());
+        assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
+        assert!(!transaction_input.old_account_private_keys.is_empty());
+        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(!transaction_input.recipients.is_empty());
+        assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
+
+        let mut builder = TransactionKernelBuilder::new();
+
+        // Add individual transaction inputs to the transaction kernel builder.
+        for (record_string, private_key_string) in transaction_input
+            .old_records
+            .iter()
+            .zip_eq(&transaction_input.old_account_private_keys)
+        {
+            let record = Record::from_str(&record_string)?;
+            let private_key = PrivateKey::from_str(&private_key_string)?;
+
+            builder = builder.add_input(private_key, record)?;
+        }
+
+        // Add individual transaction outputs to the transaction kernel builder.
+        for recipient in &transaction_input.recipients {
+            let address = Address::from_str(&recipient.address)?;
+
+            builder = builder.add_output(address, recipient.amount)?;
+        }
+
+        // Decode memo
+        let mut memo = [0u8; 32];
+        if let Some(memo_string) = transaction_input.memo {
+            if let Ok(bytes) = hex::decode(memo_string) {
+                bytes.write(&mut memo[..])?;
+            }
+        }
+
+        // If the request did not specify a valid memo, generate one from random.
+        if memo == [0u8; 32] {
+            memo = rng.gen();
+        }
+
+        // Set the memo in the transaction kernel builder.
+        builder = builder.memo(memo);
+
+        // Set the network id in the transaction kernel builder.
+        builder = builder.network_id(transaction_input.network_id);
+
+        // Construct the transaction kernel
+        let transaction_kernel = builder.build(rng)?;
+
+        Ok(hex::encode(transaction_kernel.to_bytes()))
+    }
+
+    /// Create a new transaction for a given transaction kernel.
+    fn create_transaction(&self, transaction_kernel: String) -> Result<CreateRawTransactionOuput, RpcError> {
+        let rng = &mut thread_rng();
+
+        // Decode the transaction kernel
+        let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
+        let transaction_kernel = TransactionKernel::<Components>::read(&transaction_kernel_bytes[..])?;
+
+        // Construct the program proofs
+        let (old_death_program_proofs, new_birth_program_proofs) =
+            ConsensusParameters::generate_program_proofs(&self.parameters, &transaction_kernel, rng)?;
+
+        // Because this is a computationally heavy endpoint, we open a
+        // new secondary storage instance to prevent storage bottle-necking.
+        let storage = self.new_secondary_storage_instance()?;
+
+        // Online execution to generate a DPC transaction
+        let (records, transaction) = InstantiatedDPC::execute_online(
+            &self.parameters,
+            transaction_kernel,
+            old_death_program_proofs,
+            new_birth_program_proofs,
             &storage,
             rng,
         )?;

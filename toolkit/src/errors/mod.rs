@@ -17,6 +17,9 @@
 pub mod account;
 pub use account::*;
 
+pub mod dpc;
+pub use dpc::*;
+
 pub mod record;
 pub use record::*;
 

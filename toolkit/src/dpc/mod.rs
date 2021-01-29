@@ -14,21 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::parameters::{flag, types::*};
+pub mod empty_ledger;
+pub use empty_ledger::*;
 
-use clap::AppSettings;
+pub mod transaction_kernel_builder;
+pub use transaction_kernel_builder::*;
 
-// Format
-// (name, about, options, flags, settings)
+pub mod record;
+pub use record::*;
 
-pub const UPDATE: SubCommandType = (
-    "update",
-    "Update the snarkOS to the latest version (include -h for more options)",
-    &[],
-    &[flag::LIST],
-    &[
-        AppSettings::ColoredHelp,
-        AppSettings::DisableHelpSubcommand,
-        AppSettings::DisableVersion,
-    ],
-);
+#[cfg(test)]
+pub mod tests;

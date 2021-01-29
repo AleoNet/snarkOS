@@ -18,9 +18,7 @@ use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_posw::PoswMarlin;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
 use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_dpc::base_dpc::{
-    instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC,
-};
+use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
 use snarkvm_errors::dpc::{DPCError, LedgerError};
 use snarkvm_models::{
     algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
@@ -66,12 +64,7 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     })
 }
 
-pub fn generate(
-    recipient: &str,
-    value: u64,
-    network_id: u8,
-    file_name: &str,
-) -> Result<Vec<u8>, DPCError> {
+pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
     let consensus = ConsensusParameters {
@@ -85,11 +78,9 @@ pub fn generate(
 
     let recipient = AccountAddress::<Components>::from_str(&recipient)?;
 
-    let crh_parameters =
-        <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes()?[..])
-            .expect("read bytes as hash for MerkleParameters in ledger");
-    let merkle_tree_hash_parameters =
-        <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
+    let crh_parameters = <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes()?[..])
+        .expect("read bytes as hash for MerkleParameters in ledger");
+    let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_parameters = From::from(merkle_tree_hash_parameters);
 
     let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(false)?;
@@ -97,9 +88,7 @@ pub fn generate(
     let noop_program_vk_hash = parameters
         .system_parameters
         .program_verification_key_crh
-        .hash(&to_bytes![
-            parameters.noop_program_snark_parameters.verification_key
-        ]?)?;
+        .hash(&to_bytes![parameters.noop_program_snark_parameters.verification_key]?)?;
     let noop_program_id = to_bytes![noop_program_vk_hash]?;
 
     // Generate a new account that owns the dummy input records
@@ -112,8 +101,7 @@ pub fn generate(
 
     // Generate dummy input records
 
-    let old_account_private_keys =
-        vec![dummy_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
+    let old_account_private_keys = vec![dummy_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
     let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
     for i in 0..Components::NUM_INPUT_RECORDS {
         let old_sn_nonce = parameters
@@ -121,7 +109,7 @@ pub fn generate(
             .serial_number_nonce
             .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
-            parameters.system_parameters.clone(),
+            &parameters.system_parameters,
             old_sn_nonce.clone(),
             dummy_account.address.clone(),
             true, // The input record is dummy
@@ -188,8 +176,7 @@ pub fn generate(
     }
 
     drop(ledger);
-    Ledger::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path)
-        .unwrap();
+    Ledger::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
     Ok(transaction_bytes)
 }
 
@@ -204,10 +191,7 @@ pub fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 5 {
-        println!(
-            "Invalid number of arguments.  Given: {} - Required: 4",
-            args.len() - 1
-        );
+        println!("Invalid number of arguments.  Given: {} - Required: 4", args.len() - 1);
         return;
     }
 

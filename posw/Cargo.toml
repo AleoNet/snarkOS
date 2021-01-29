@@ -12,16 +12,16 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" } # needed to instantiate with BLS12-377
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
-snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
-snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
-snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" } # needed to instantiate with BLS12-377
-snarkvm-parameters = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "f0ff4cd", version = "0.0.2" }
+snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" } # needed to instantiate with BLS12-377
+snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-gadgets = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-marlin = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-polycommit = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" } # needed to instantiate with BLS12-377
+snarkvm-parameters = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
 
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
 

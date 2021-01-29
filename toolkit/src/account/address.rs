@@ -22,7 +22,7 @@ use snarkvm_utilities::bytes::ToBytes;
 
 use std::{fmt, str::FromStr};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Address {
     pub(crate) address: AccountAddress<Components>,
 }

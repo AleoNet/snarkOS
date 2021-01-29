@@ -23,6 +23,9 @@ pub use record::*;
 pub mod signature;
 pub use signature::*;
 
+pub mod transaction;
+pub use transaction::*;
+
 pub mod view_key;
 pub use view_key::*;
 
