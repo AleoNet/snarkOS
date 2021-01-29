@@ -94,7 +94,8 @@ jobs:
             cargo kcov --all -v
             bash <(curl -s https://codecov.io/bash)
             echo "Upload code coverage successfully"
-
+      - clear_environment:
+          cache_key: snarkos-stable-cache
 
 #      - name: Test
 #        uses: actions-rs/cargo@v1
