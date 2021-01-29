@@ -27,19 +27,16 @@ impl TestBlocks {
         TestBlocks(blocks)
     }
 
-    pub fn load() -> Self {
-        TestBlocks::read(&include_bytes!("test_blocks")[..]).unwrap()
+    pub fn load(count: usize) -> Self {
+        TestBlocks::read(&include_bytes!("test_blocks")[..], count).unwrap()
     }
 
     // TODO: implement Deref?
     pub fn inner(&self) -> Vec<Block<Tx>> {
         self.0.clone()
     }
-}
 
-impl ToBytes for TestBlocks {
-    #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> Result<()> {
+    pub fn write<W: Write>(&self, mut writer: W) -> Result<()> {
         for block in &self.0 {
             // Clone is necessary here, otherwise weird things happen.
             let block = block.clone();
@@ -48,14 +45,12 @@ impl ToBytes for TestBlocks {
 
         Ok(())
     }
-}
 
-impl FromBytes for TestBlocks {
-    fn read<R: Read>(mut reader: R) -> Result<Self> {
-        let mut blocks = vec![];
+    pub fn read<R: Read>(mut reader: R, count: usize) -> Result<Self> {
+        let mut blocks = Vec::with_capacity(count);
 
         // Hardcoded for now as the trait doesn't allow for an N.
-        for _i in 0..100 {
+        for _ in 0..count {
             let block: Block<Tx> = FromBytes::read(&mut reader)?;
             blocks.push(block);
         }

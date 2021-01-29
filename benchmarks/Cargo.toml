@@ -12,6 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [[bench]]
+name = "syncing"
+path = "syncing/syncing.rs"
+harness = false
+
+[[bench]]
 name = "posw"
 path = "posw/posw.rs"
 harness = false

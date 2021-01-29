@@ -35,7 +35,8 @@ use snarkos_network::external::message::*;
 
 use snarkvm_dpc::instantiated::Tx;
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
-use snarkvm_utilities::bytes::FromBytes;
+#[cfg(test)]
+use snarkvm_utilities::FromBytes;
 
 use std::time::Duration;
 
@@ -181,8 +182,10 @@ async fn block_two_node() {
     let node_alice = test_node(setup).await;
     let alice_address = node_alice.local_address().unwrap();
 
-    let blocks = crate::network::TestBlocks::load().0;
-    assert_eq!(blocks.len(), 100);
+    const NUM_BLOCKS: usize = 100;
+
+    let blocks = crate::network::TestBlocks::load(NUM_BLOCKS).0;
+    assert_eq!(blocks.len(), NUM_BLOCKS);
 
     for block in blocks {
         node_alice
@@ -209,7 +212,7 @@ async fn block_two_node() {
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(30, node_bob.environment.current_block_height() == 100);
+    wait_until!(30, node_bob.environment.current_block_height() as usize == NUM_BLOCKS);
 }
 
 #[tokio::test]

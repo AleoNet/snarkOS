@@ -167,9 +167,14 @@ pub fn test_environment(setup: TestSetup) -> Environment {
 
 /// Starts a node with the specified bootnodes.
 pub async fn test_node(setup: TestSetup) -> Server {
+    let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let environment = test_environment(setup);
     let mut node = Server::new(environment).await.unwrap();
     node.start().await.unwrap();
+
+    if is_miner {
+        // TODO(ljedrz/nkls): spawn a miner
+    }
 
     node
 }
