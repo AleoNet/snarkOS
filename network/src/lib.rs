@@ -116,6 +116,16 @@ impl Server {
     }
 
     pub async fn start_services(&self) {
+        let server = self.clone();
+        let mut receiver = self.inbound.take_receiver();
+        task::spawn(async move {
+            loop {
+                if let Err(e) = server.process_incoming_messages(&mut receiver).await {
+                    error!("Server error: {}", e);
+                }
+            }
+        });
+
         let peer_sync_interval = self.environment.peer_sync_interval();
         let peers = self.peers.clone();
         task::spawn(async move {
@@ -144,16 +154,6 @@ impl Server {
                 }
             });
         }
-
-        let server = self.clone();
-        let mut receiver = self.inbound.take_receiver();
-        task::spawn(async move {
-            loop {
-                if let Err(e) = server.process_incoming_messages(&mut receiver).await {
-                    error!("Server error: {}", e);
-                }
-            }
-        });
     }
 
     pub async fn start(&mut self) -> Result<(), NetworkError> {
