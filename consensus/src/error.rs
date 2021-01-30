@@ -104,6 +104,9 @@ pub enum ConsensusError {
 
     #[error("Transactions are spending more funds than they have available")]
     TransactionOverspending,
+
+    #[error("The block is already known")]
+    PreExistingBlock,
 }
 
 impl From<BlockError> for ConsensusError {

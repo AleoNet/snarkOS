@@ -99,28 +99,21 @@ impl Blocks {
         );
 
         // Verify the block and insert it into the storage.
-        if !self
+        let is_valid_block = self
             .environment
-            .storage()
-            .read()
-            .block_hash_exists(&block_struct.header.get_hash())
-        {
-            let is_new_block = self
-                .environment
-                .consensus_parameters()
-                .receive_block(
-                    self.environment.dpc_parameters(),
-                    &self.environment.storage().read(),
-                    &mut self.environment.memory_pool().lock(),
-                    &block_struct,
-                )
-                .is_ok();
+            .consensus_parameters()
+            .receive_block(
+                self.environment.dpc_parameters(),
+                &self.environment.storage().read(),
+                &mut self.environment.memory_pool().lock(),
+                &block_struct,
+            )
+            .is_ok();
 
-            // This is a new block, send it to our peers.
-            if let Some(connected_peers) = connected_peers {
-                if is_new_block {
-                    self.propagate_block(block, remote_address, &connected_peers).await;
-                }
+        // This is a new block, send it to our peers.
+        if let Some(connected_peers) = connected_peers {
+            if is_valid_block {
+                self.propagate_block(block, remote_address, &connected_peers).await;
             }
         }
 

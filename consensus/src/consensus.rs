@@ -303,7 +303,10 @@ impl ConsensusParameters {
         } else {
             // If the block is not an unknown orphan, find the origin of the block
             match storage.get_block_path(&block.header)? {
-                BlockPath::ExistingBlock => {}
+                BlockPath::ExistingBlock => {
+                    debug!("Received a pre-existing block");
+                    return Err(ConsensusError::PreExistingBlock);
+                }
                 BlockPath::CanonChain(block_height) => {
                     debug!("Processing a block that is on canon chain. Height {}", block_height);
 
