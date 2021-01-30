@@ -227,7 +227,10 @@ impl Peers {
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         let own_address = self.local_address().unwrap(); // must be known by now
-        if remote_address == own_address {
+        if remote_address == own_address
+            || ((remote_address.ip().is_unspecified() || remote_address.ip().is_loopback())
+                && remote_address.port() == own_address.port())
+        {
             return Err(NetworkError::SelfConnectAttempt);
         }
         if self.is_connecting(remote_address) {
