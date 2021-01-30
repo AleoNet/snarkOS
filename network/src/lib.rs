@@ -140,17 +140,20 @@ impl Server {
         });
 
         if self.environment.has_consensus() && !self.environment.is_bootnode() {
-            let peers = self.peers.clone();
+            let self_clone = self.clone();
             let transactions = self.transactions.clone();
             let transaction_sync_interval = self.environment.transaction_sync_interval();
             task::spawn(async move {
                 loop {
                     sleep(transaction_sync_interval).await;
-                    info!("Updating transactions");
 
-                    // select last seen node as block sync node
-                    let sync_node = peers.last_seen();
-                    transactions.update(sync_node);
+                    if !self_clone.environment.is_syncing_blocks() {
+                        info!("Updating transactions");
+
+                        // select last seen node as block sync node
+                        let sync_node = self_clone.peers.last_seen();
+                        transactions.update(sync_node);
+                    }
                 }
             });
         }
