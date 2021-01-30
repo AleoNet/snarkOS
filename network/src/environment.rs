@@ -24,7 +24,10 @@ use snarkvm_dpc::base_dpc::{
 use parking_lot::{Mutex, RwLock};
 use std::{
     net::SocketAddr,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
@@ -89,6 +92,8 @@ pub struct Environment {
     is_bootnode: bool,
     /// The interval between each peer sync.
     peer_sync_interval: Duration,
+    /// Is the node currently syncing blocks?
+    is_syncing_blocks: Arc<AtomicBool>,
 }
 
 impl Environment {
@@ -119,6 +124,7 @@ impl Environment {
             bootnodes,
             is_bootnode,
             peer_sync_interval,
+            is_syncing_blocks: Default::default(),
         })
     }
 
@@ -220,16 +226,27 @@ impl Environment {
     pub fn should_sync_blocks(&self) -> bool {
         let consensus = self.consensus();
 
-        consensus.last_block_sync.read().elapsed() > consensus.block_sync_interval
+        !self.is_syncing_blocks() && consensus.last_block_sync.read().elapsed() > consensus.block_sync_interval
     }
 
     /// Register that the node attempted to sync blocks.
     pub fn register_block_sync_attempt(&self) {
         *self.consensus().last_block_sync.write() = Instant::now();
+        self.is_syncing_blocks.store(true, Ordering::SeqCst);
     }
 
     /// Returns the interval between each transaction (memory pool) sync.
     pub fn transaction_sync_interval(&self) -> Duration {
         self.consensus().transaction_sync_interval
+    }
+
+    /// Checks whether the node is currently syncing blocks.
+    pub fn is_syncing_blocks(&self) -> bool {
+        self.is_syncing_blocks.load(Ordering::SeqCst)
+    }
+
+    /// Register that the node is no longer syncing blocks.
+    pub fn finished_syncing_blocks(&self) {
+        self.is_syncing_blocks.store(false, Ordering::SeqCst);
     }
 }

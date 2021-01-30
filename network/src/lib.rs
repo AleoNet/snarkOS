@@ -60,7 +60,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
 
 /// The maximum number of block hashes that can be requested or provided in a single batch.
-pub const MAX_BLOCK_SYNC_COUNT: u32 = 25;
+pub const MAX_BLOCK_SYNC_COUNT: u32 = 250;
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
@@ -210,6 +210,9 @@ impl Server {
             }
             Payload::SyncBlock(block) => {
                 self.blocks.received_block(source.unwrap(), block, None).await?;
+                if self.peers.got_sync_block(source.unwrap()) {
+                    self.environment.finished_syncing_blocks();
+                }
             }
             Payload::GetBlocks(hashes) => {
                 self.blocks.received_get_blocks(source.unwrap(), hashes).await?;
@@ -224,10 +227,15 @@ impl Server {
                 self.blocks.received_get_sync(source.unwrap(), getsync).await?;
             }
             Payload::Sync(sync) => {
+                self.peers.expecting_sync_blocks(source.unwrap(), sync.len());
                 self.blocks.received_sync(source.unwrap(), sync).await;
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {
+                    if self.peers.is_syncing_blocks(addr) {
+                        self.environment.finished_syncing_blocks();
+                    }
+
                     self.peers.disconnected_from_peer(addr)?;
                 }
             }
@@ -241,9 +249,15 @@ impl Server {
                 self.outbound
                     .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong));
 
-                if block_height > self.environment.current_block_height() + 1 && self.environment.should_sync_blocks() {
+                if block_height > self.environment.current_block_height() + 1
+                    && self.environment.should_sync_blocks()
+                    && !self.peers.is_syncing_blocks(source.unwrap())
+                {
                     self.environment.register_block_sync_attempt();
+                    trace!("Attempting to sync with {}", source.unwrap());
                     self.blocks.update(source.unwrap()).await;
+                } else {
+                    self.environment.finished_syncing_blocks();
                 }
             }
             Payload::Pong => {

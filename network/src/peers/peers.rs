@@ -442,6 +442,35 @@ impl Peers {
 
         Ok(())
     }
+
+    /// Registers that the given number of blocks is expected as part of syncing with a peer.
+    pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) {
+        if let Some(ref pq) = self.peer_quality(addr) {
+            pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
+        } else {
+            error!("Peer for expecting_sync_blocks purposes not found!");
+        }
+    }
+
+    /// Registers the receipt of a sync block from a peer; returns `true` when finished syncing.
+    pub fn got_sync_block(&self, addr: SocketAddr) -> bool {
+        if let Some(ref pq) = self.peer_quality(addr) {
+            pq.remaining_sync_blocks.fetch_sub(1, Ordering::SeqCst) == 1
+        } else {
+            error!("Peer for got_sync_block purposes not found!");
+            true
+        }
+    }
+
+    /// Checks whether the current peer is involved in a block syncing process.
+    pub fn is_syncing_blocks(&self, addr: SocketAddr) -> bool {
+        if let Some(ref pq) = self.peer_quality(addr) {
+            pq.remaining_sync_blocks.load(Ordering::SeqCst) != 0
+        } else {
+            error!("Peer for got_sync_block purposes not found!");
+            false
+        }
+    }
 }
 
 impl Peers {
