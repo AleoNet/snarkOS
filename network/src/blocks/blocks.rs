@@ -123,7 +123,7 @@ impl Blocks {
 
         // This is a new block, send it to our peers.
         if let Some(connected_peers) = connected_peers {
-            if is_valid_block {
+            if is_valid_block && !self.environment.is_syncing_blocks() {
                 self.propagate_block(block, remote_address, &connected_peers).await;
             }
         }
