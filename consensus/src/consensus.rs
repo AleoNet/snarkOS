@@ -283,11 +283,6 @@ impl ConsensusParameters {
         memory_pool: &mut MemoryPool<Tx>,
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
-        let block_size = block.serialize()?.len();
-        if block_size > self.max_block_size {
-            return Err(ConsensusError::BlockTooLarge(block_size, self.max_block_size));
-        }
-
         // Block is an unknown orphan
         if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");

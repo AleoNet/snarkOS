@@ -249,4 +249,8 @@ impl Environment {
     pub fn finished_syncing_blocks(&self) {
         self.is_syncing_blocks.store(false, Ordering::SeqCst);
     }
+
+    pub fn max_block_size(&self) -> usize {
+        self.consensus().consensus_parameters.max_block_size
+    }
 }

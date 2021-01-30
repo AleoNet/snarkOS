@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{external::message::*, peers::PeerInfo, Environment, NetworkError, Outbound};
+use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -91,6 +92,16 @@ impl Blocks {
         block: Vec<u8>,
         connected_peers: Option<HashMap<SocketAddr, PeerInfo>>,
     ) -> Result<(), NetworkError> {
+        let block_size = block.len();
+        let max_block_size = self.environment.max_block_size();
+
+        if block_size > max_block_size {
+            return Err(NetworkError::ConsensusError(ConsensusError::BlockTooLarge(
+                block_size,
+                max_block_size,
+            )));
+        }
+
         let block_struct = Block::deserialize(&block)?;
         info!(
             "Received block from epoch {} with hash {:?}",
