@@ -218,16 +218,22 @@ impl Server {
                 }
             }
             Payload::GetBlocks(hashes) => {
-                self.blocks.received_get_blocks(source.unwrap(), hashes).await?;
+                if !self.environment.is_syncing_blocks() {
+                    self.blocks.received_get_blocks(source.unwrap(), hashes).await?;
+                }
             }
             Payload::GetMemoryPool => {
-                self.transactions.received_get_memory_pool(source.unwrap()).await?;
+                if !self.environment.is_syncing_blocks() {
+                    self.transactions.received_get_memory_pool(source.unwrap()).await?;
+                }
             }
             Payload::MemoryPool(mempool) => {
                 self.transactions.received_memory_pool(mempool)?;
             }
             Payload::GetSync(getsync) => {
-                self.blocks.received_get_sync(source.unwrap(), getsync).await?;
+                if !self.environment.is_syncing_blocks() {
+                    self.blocks.received_get_sync(source.unwrap(), getsync).await?;
+                }
             }
             Payload::Sync(sync) => {
                 self.peers.expecting_sync_blocks(source.unwrap(), sync.len());
