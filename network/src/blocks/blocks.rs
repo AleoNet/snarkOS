@@ -73,9 +73,8 @@ impl Blocks {
     ) {
         debug!("Propagating a block to peers");
 
-        let local_address = self.local_address();
         for remote_address in connected_peers.keys() {
-            if *remote_address != block_miner && *remote_address != local_address {
+            if *remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
                 self.outbound.send_request(Message::new(
                     Direction::Outbound(*remote_address),

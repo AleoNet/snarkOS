@@ -89,7 +89,7 @@ impl MinerInstance {
                     }
                 };
 
-                info!("Mined a new block!\t{:?}", hex::encode(block.header.get_hash().0));
+                info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
                 let peers = self.node_server.peers.connected_peers();
                 let serialized_block = if let Ok(block) = block.serialize() {
                     block
