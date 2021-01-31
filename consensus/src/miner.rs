@@ -38,14 +38,14 @@ pub struct Miner {
     /// The coinbase address that mining rewards are assigned to.
     address: AccountAddress<Components>,
     /// The consensus parameters for the network of this miner.
-    pub consensus_parameters: ConsensusParameters,
+    pub consensus_parameters: Arc<ConsensusParameters>,
     /// The mining instance that is initialized with a proving key.
     miner: PoswMarlin,
 }
 
 impl Miner {
     /// Creates a new instance of `Miner`.
-    pub fn new(address: AccountAddress<Components>, consensus_parameters: ConsensusParameters) -> Self {
+    pub fn new(address: AccountAddress<Components>, consensus_parameters: Arc<ConsensusParameters>) -> Self {
         Self {
             address,
             consensus_parameters,

@@ -48,17 +48,8 @@ pub struct RpcImpl {
     /// The path to the Blockchain database storage.
     pub(crate) storage_path: PathBuf,
 
-    /// Public Parameters
-    pub(crate) parameters: PublicParameters<Components>,
-
     /// Network context held by the server.
     pub(crate) environment: Environment,
-
-    /// Consensus parameters generated from node config.
-    pub(crate) consensus: ConsensusParameters,
-
-    /// Handle to access the memory pool of transactions.
-    pub(crate) memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
 
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
@@ -73,20 +64,14 @@ impl RpcImpl {
     pub fn new(
         storage: Arc<RwLock<MerkleTreeLedger>>,
         storage_path: PathBuf,
-        parameters: PublicParameters<Components>,
         environment: Environment,
-        consensus: ConsensusParameters,
-        memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
         credentials: Option<RpcCredentials>,
         server: Server,
     ) -> Self {
         Self {
             storage,
             storage_path,
-            parameters,
             environment,
-            consensus,
-            memory_pool,
             credentials,
             server,
         }
@@ -95,6 +80,18 @@ impl RpcImpl {
     /// Open a new secondary storage instance.
     pub fn new_secondary_storage_instance(&self) -> Result<MerkleTreeLedger, RpcError> {
         Ok(MerkleTreeLedger::open_secondary_at_path(self.storage_path.clone())?)
+    }
+
+    pub fn consensus(&self) -> &ConsensusParameters {
+        self.environment.consensus_parameters()
+    }
+
+    pub fn parameters(&self) -> &PublicParameters<Components> {
+        self.environment.dpc_parameters()
+    }
+
+    pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
+        self.environment.memory_pool()
     }
 }
 
@@ -261,8 +258,8 @@ impl RpcFunctions for RpcImpl {
         storage.catch_up_secondary(false)?;
 
         if !self
-            .consensus
-            .verify_transaction(&self.parameters, &transaction, &storage)?
+            .consensus()
+            .verify_transaction(&self.parameters(), &transaction, &storage)?
         {
             // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
             return Ok("Transaction did not verify".into());
@@ -275,7 +272,7 @@ impl RpcFunctions for RpcImpl {
                     transaction,
                 };
 
-                if let Ok(inserted) = self.memory_pool.lock().insert(&storage, entry) {
+                if let Ok(inserted) = self.memory_pool().lock().insert(&storage, entry) {
                     if inserted.is_some() {
                         info!("Transaction added to the memory pool.");
                         // TODO(ljedrz): checks if needs to be propagated to the network; if need be, this could
@@ -299,8 +296,8 @@ impl RpcFunctions for RpcImpl {
         storage.catch_up_secondary(false)?;
 
         Ok(self
-            .consensus
-            .verify_transaction(&self.parameters, &transaction, &storage)?)
+            .consensus()
+            .verify_transaction(&self.parameters(), &transaction, &storage)?)
     }
 
     /// Fetch the number of connected peers this node has.
@@ -341,9 +338,9 @@ impl RpcFunctions for RpcImpl {
         let time = Utc::now().timestamp();
 
         let full_transactions = self
-            .memory_pool
+            .memory_pool()
             .lock()
-            .get_candidates(&storage, self.consensus.max_block_size)?;
+            .get_candidates(&storage, self.consensus().max_block_size)?;
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 
@@ -356,7 +353,7 @@ impl RpcFunctions for RpcImpl {
             previous_block_hash: hex::encode(&block.header.get_hash().0),
             block_height: block_height + 1,
             time,
-            difficulty_target: self.consensus.get_block_difficulty(&block.header, time),
+            difficulty_target: self.consensus().get_block_difficulty(&block.header, time),
             transactions: transaction_strings,
             coinbase_value: coinbase_value.0 as u64,
         })

@@ -25,7 +25,7 @@ use snarkvm_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use tracing_subscriber::EnvFilter;
 
 use rand::Rng;
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 fn mine_block(
     miner: &Miner,
@@ -118,7 +118,7 @@ fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
     info!("Creating consensus");
-    let consensus = TEST_CONSENSUS.clone();
+    let consensus = Arc::new(TEST_CONSENSUS.clone());
 
     // setup the miner
     info!("Creating miner");

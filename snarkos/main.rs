@@ -100,7 +100,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
     info!("Loading Aleo parameters...");
-    let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
+    let dpc_parameters = Arc::new(PublicParameters::<Components>::load(!config.miner.is_miner)?);
     info!("Loading complete.");
 
     // Fetch the set of valid inner circuit IDs.
@@ -114,14 +114,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
 
     // Set the initial consensus parameters.
-    let consensus_params = ConsensusParameters {
+    let consensus_params = Arc::new(ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
         network_id: Network::from_network_id(config.aleo.network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids,
-    };
+    });
 
     let consensus = Consensus::new(
         Arc::new(RwLock::new(storage)),
@@ -157,14 +157,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(
-                    miner_address,
-                    consensus_params.clone(),
-                    dpc_parameters.clone(),
-                    environment.clone(),
-                    server.clone(),
-                )
-                .spawn();
+                MinerInstance::new(miner_address, environment.clone(), server.clone()).spawn();
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -174,10 +167,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
-        info!("Loading Aleo parameters for RPC...");
-        let proving_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
-        info!("Loading complete.");
-
         // Open a secondary storage instance to prevent resource sharing and bottle-necking.
         let secondary_storage = Arc::new(RwLock::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?));
 
@@ -185,10 +174,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             config.rpc.port,
             secondary_storage,
             path.to_path_buf(),
-            proving_parameters,
             environment,
-            consensus_params,
-            memory_pool,
             server.clone(),
             config.rpc.username,
             config.rpc.password,

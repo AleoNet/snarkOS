@@ -21,13 +21,11 @@ mod protected_rpc_tests {
     use snarkos_rpc::*;
     use snarkos_testing::{
         consensus::*,
-        dpc::load_verifying_parameters,
         network::{test_environment, TestSetup},
         storage::*,
     };
     use snarkvm_dpc::base_dpc::{
         instantiated::{Components, Tx},
-        parameters::PublicParameters,
         record::DPCRecord,
         TransactionKernel,
     };
@@ -39,7 +37,7 @@ mod protected_rpc_tests {
     };
 
     use jsonrpc_core::MetaIoHandler;
-    use parking_lot::{Mutex, RwLock};
+    use parking_lot::RwLock;
     use serde_json::Value;
     use std::{str::FromStr, sync::Arc};
 
@@ -76,34 +74,18 @@ mod protected_rpc_tests {
         }
     }
 
-    async fn initialize_test_rpc(
-        storage: Arc<RwLock<MerkleTreeLedger>>,
-        parameters: PublicParameters<Components>,
-    ) -> MetaIoHandler<Meta> {
-        let consensus = TEST_CONSENSUS.clone();
-
+    async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> MetaIoHandler<Meta> {
         let credentials = RpcCredentials {
             username: TEST_USERNAME.to_string(),
             password: TEST_PASSWORD.to_string(),
         };
-
-        let memory_pool = Arc::new(Mutex::new(MemoryPool::new()));
 
         let environment = test_environment(TestSetup::default());
         let server = Server::new(environment.clone()).await.unwrap();
 
         let storage_path = storage.read().storage.db.path().to_path_buf();
 
-        let rpc_impl = RpcImpl::new(
-            storage,
-            storage_path,
-            parameters,
-            environment,
-            consensus,
-            memory_pool,
-            Some(credentials),
-            server,
-        );
+        let rpc_impl = RpcImpl::new(storage, storage_path, environment, Some(credentials), server);
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);
@@ -114,9 +96,8 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_authentication() {
         let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
         let meta = invalid_authentication();
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -134,9 +115,8 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_fetch_record_commitment_count() {
         let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         storage.write().store_record(&DATA.records_1[0]).unwrap();
 
@@ -155,9 +135,8 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_fetch_record_commitments() {
         let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         storage.write().store_record(&DATA.records_1[0]).unwrap();
 
@@ -180,9 +159,8 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_raw_record() {
         let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         storage.write().store_record(&DATA.records_1[0]).unwrap();
 
@@ -207,9 +185,8 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_decode_record() {
         let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let record = &DATA.records_1[0];
 
@@ -251,9 +228,8 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_decrypt_record() {
         let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let system_parameters = &FIXTURE_VK.parameters.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
@@ -309,7 +285,7 @@ mod protected_rpc_tests {
             .receive_block(&parameters, &storage.read(), &mut MemoryPool::new(), &DATA.block_1)
             .unwrap();
 
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "createrawtransaction".to_string();
 
@@ -369,7 +345,7 @@ mod protected_rpc_tests {
             .receive_block(&parameters, &storage.read(), &mut MemoryPool::new(), &DATA.block_1)
             .unwrap();
 
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "createtransactionkernel".to_string();
 
@@ -424,7 +400,7 @@ mod protected_rpc_tests {
             .receive_block(&parameters, &storage.read(), &mut MemoryPool::new(), &DATA.block_1)
             .unwrap();
 
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "createtransaction".to_string();
 
@@ -461,9 +437,8 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_create_account() {
         let storage = Arc::new(RwLock::new(FIXTURE_VK.ledger()));
-        let parameters = load_verifying_parameters();
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage.clone(), parameters).await;
+        let rpc = initialize_test_rpc(storage.clone()).await;
 
         let method = "createaccount".to_string();
 

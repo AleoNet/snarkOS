@@ -38,9 +38,9 @@ pub struct Consensus {
     /// The memory pool of this node.
     memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
     /// The consensus parameters for the associated network ID.
-    consensus_parameters: ConsensusParameters,
+    consensus_parameters: Arc<ConsensusParameters>,
     /// The DPC parameters for the associated network ID.
-    dpc_parameters: PublicParameters<Components>,
+    dpc_parameters: Arc<PublicParameters<Components>>,
     /// If `true`, initializes a mining task on this node.
     is_miner: bool,
     /// The interval between each block sync.
@@ -55,8 +55,8 @@ impl Consensus {
     pub fn new(
         storage: Arc<RwLock<MerkleTreeLedger>>,
         memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
-        consensus_parameters: ConsensusParameters,
-        dpc_parameters: PublicParameters<Components>,
+        consensus_parameters: Arc<ConsensusParameters>,
+        dpc_parameters: Arc<PublicParameters<Components>>,
         is_miner: bool,
         block_sync_interval: Duration,
         transaction_sync_interval: Duration,
@@ -148,13 +148,13 @@ impl Environment {
 
     /// Returns a reference to the consensus parameters of this node.
     #[inline]
-    pub fn consensus_parameters(&self) -> &ConsensusParameters {
+    pub fn consensus_parameters(&self) -> &Arc<ConsensusParameters> {
         &self.consensus().consensus_parameters
     }
 
     /// Returns a reference to the DPC parameters of this node.
     #[inline]
-    pub fn dpc_parameters(&self) -> &PublicParameters<Components> {
+    pub fn dpc_parameters(&self) -> &Arc<PublicParameters<Components>> {
         &self.consensus().dpc_parameters
     }
 
