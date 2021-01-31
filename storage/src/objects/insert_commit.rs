@@ -285,8 +285,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![new_digest]?.to_vec(),
         });
 
-        let mut cm_merkle_tree = self.cm_merkle_tree.write();
-        *cm_merkle_tree = new_merkle_tree;
+        *self.cm_merkle_tree.write() = new_merkle_tree;
 
         self.storage.write(database_transaction)?;
 

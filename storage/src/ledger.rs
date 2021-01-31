@@ -185,8 +185,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
                 // the secondary instance requires it.
                 if update_merkle_tree {
                     // Update the Merkle tree of the secondary instance.
-                    let mut merkle_tree = self.cm_merkle_tree.write();
-                    *merkle_tree = self.build_merkle_tree(vec![])?;
+                    *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
                 }
             }
         }
