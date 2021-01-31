@@ -168,7 +168,7 @@ impl Miner {
         parameters: &PublicParameters<Components>,
         storage: &Arc<RwLock<MerkleTreeLedger>>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
-    ) -> Result<(Vec<u8>, Vec<DPCRecord<Components>>), ConsensusError> {
+    ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let candidate_transactions = Self::fetch_memory_pool_transactions(
             &storage.clone(),
             memory_pool,
@@ -206,6 +206,6 @@ impl Miner {
         }
         storage.read().store_records(&records_to_store)?;
 
-        Ok((block.serialize()?, coinbase_records))
+        Ok((block, coinbase_records))
     }
 }

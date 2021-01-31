@@ -17,7 +17,7 @@
 use snarkos_consensus::Miner;
 use snarkos_network::{environment::Environment, Server as NodeServer};
 use snarkvm_dpc::base_dpc::instantiated::*;
-use snarkvm_objects::{AccountAddress, Block};
+use snarkvm_objects::AccountAddress;
 
 use tokio::task;
 use tracing::*;
@@ -61,7 +61,7 @@ impl MinerInstance {
             loop {
                 info!("Starting to mine the next block");
 
-                let (block_serialized, _coinbase_records) = match miner
+                let (block, _coinbase_records) = match miner
                     .mine_block(
                         self.environment.dpc_parameters(),
                         self.environment.storage(),
@@ -89,18 +89,19 @@ impl MinerInstance {
                     }
                 };
 
-                match Block::<Tx>::deserialize(&block_serialized) {
-                    Ok(block) => {
-                        info!("Mined a new block!\t{:?}", hex::encode(block.header.get_hash().0));
-                        let peers = self.node_server.peers.connected_peers();
+                info!("Mined a new block!\t{:?}", hex::encode(block.header.get_hash().0));
+                let peers = self.node_server.peers.connected_peers();
+                let serialized_block = if let Ok(block) = block.serialize() {
+                    block
+                } else {
+                    error!("Our own miner baked an unserializable block!");
+                    continue;
+                };
 
-                        self.node_server
-                            .blocks
-                            .propagate_block(block_serialized, local_address, &peers)
-                            .await;
-                    }
-                    Err(_) => continue,
-                }
+                self.node_server
+                    .blocks
+                    .propagate_block(serialized_block, local_address, &peers)
+                    .await;
             }
         });
     }
