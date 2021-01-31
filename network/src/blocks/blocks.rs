@@ -46,10 +46,12 @@ impl Blocks {
 
         if let Ok(block_locator_hashes) = block_locator_hashes {
             // Send a GetSync to the selected sync node.
-            self.outbound.send_request(Message::new(
-                Direction::Outbound(sync_node),
-                Payload::GetSync(block_locator_hashes),
-            ));
+            self.outbound
+                .send_request(Message::new(
+                    Direction::Outbound(sync_node),
+                    Payload::GetSync(block_locator_hashes),
+                ))
+                .await;
         } else {
             // If no sync node is available, wait until peers have been established.
             debug!("No sync node is registered, blocks could not be synced");
@@ -76,10 +78,12 @@ impl Blocks {
         for remote_address in connected_peers.keys() {
             if *remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(*remote_address),
-                    Payload::Block(block_bytes.clone()),
-                ));
+                self.outbound
+                    .send_request(Message::new(
+                        Direction::Outbound(*remote_address),
+                        Payload::Block(block_bytes.clone()),
+                    ))
+                    .await;
             }
         }
     }
@@ -140,10 +144,12 @@ impl Blocks {
             let block = self.environment.storage().read().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.
-            self.outbound.send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::SyncBlock(block.serialize()?),
-            ));
+            self.outbound
+                .send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::SyncBlock(block.serialize()?),
+                ))
+                .await;
         }
 
         Ok(())
@@ -189,7 +195,8 @@ impl Blocks {
 
         // send a `Sync` message to the connected peer.
         self.outbound
-            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)));
+            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)))
+            .await;
 
         Ok(())
     }
@@ -201,10 +208,12 @@ impl Blocks {
             for batch in block_hashes.chunks(crate::MAX_BLOCK_SYNC_COUNT as usize) {
                 // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
                 // detect missing blocks and divergence in chain for now.
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::GetBlocks(batch.to_vec()),
-                ));
+                self.outbound
+                    .send_request(Message::new(
+                        Direction::Outbound(remote_address),
+                        Payload::GetBlocks(batch.to_vec()),
+                    ))
+                    .await;
             }
         }
     }

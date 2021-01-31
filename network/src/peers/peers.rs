@@ -104,7 +104,7 @@ impl Peers {
                     .await;
 
                 // Broadcast a `GetPeers` message to request for more peers.
-                self.broadcast_getpeers_requests();
+                self.broadcast_getpeers_requests().await;
             }
         }
 
@@ -137,7 +137,7 @@ impl Peers {
 
         if number_of_connected_peers != 0 {
             // Send a `Ping` to every connected peer.
-            self.broadcast_pings();
+            self.broadcast_pings().await;
 
             // Store the peer book to storage.
             self.save_peer_book_to_storage()?;
@@ -340,27 +340,30 @@ impl Peers {
     }
 
     /// Broadcasts a `Ping` message to all connected peers.
-    fn broadcast_pings(&self) {
+    async fn broadcast_pings(&self) {
         trace!("Broadcasting Ping messages");
 
         let current_block_height = self.environment.current_block_height();
         for (remote_address, _) in self.connected_peers() {
             self.sending_ping(remote_address);
 
-            self.outbound.send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::Ping(current_block_height),
-            ));
+            self.outbound
+                .send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::Ping(current_block_height),
+                ))
+                .await;
         }
     }
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
-    fn broadcast_getpeers_requests(&self) {
+    async fn broadcast_getpeers_requests(&self) {
         trace!("Sending GetPeers requests to connected peers");
 
         for (remote_address, _) in self.connected_peers() {
             self.outbound
-                .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers));
+                .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
+                .await;
 
             // // Fetch the connection channel.
             // if let Some(channel) = self.get_channel(&remote_address) {
@@ -504,27 +507,11 @@ impl Peers {
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
-    pub(crate) fn version_to_verack(
-        &self,
-        remote_address: SocketAddr,
-        remote_version: &Version,
-    ) -> Result<(), NetworkError> {
-        // FIXME(ljedrz): it appears that Verack is not sent back in a 1:1 fashion
-        if self.number_of_connected_peers() < self.environment.maximum_number_of_connected_peers() {
-            self.outbound.send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::Verack(remote_version.nonce),
-            ));
-
-            if !self.connected_peers().contains_key(&remote_address) {
-                self.connecting_to_peer(remote_address, remote_version.nonce)?;
-            }
-        }
-
-        Ok(())
+    pub(crate) async fn version_to_verack(&self, _remote_address: SocketAddr, _remote_version: &Version) {
+        // TODO: remove entirely; obviated by the noise handshake
     }
 
-    pub(crate) fn send_peers(&self, remote_address: SocketAddr) {
+    pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
@@ -537,7 +524,8 @@ impl Peers {
             peers.push(peer_address);
         }
         self.outbound
-            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)));
+            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
+            .await;
     }
 
     /// A miner has sent their list of peer addresses.

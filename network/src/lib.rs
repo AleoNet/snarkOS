@@ -152,7 +152,7 @@ impl Server {
 
                         // select last seen node as block sync node
                         let sync_node = self_clone.peers.last_seen();
-                        transactions.update(sync_node);
+                        transactions.update(sync_node).await;
                     }
                 }
             });
@@ -195,7 +195,7 @@ impl Server {
                 }
             }
             Payload::Version(version) => {
-                self.peers.version_to_verack(source.unwrap(), &version)?;
+                self.peers.version_to_verack(source.unwrap(), &version).await;
             }
             Payload::Verack(_verack) => {
                 // no action required
@@ -249,14 +249,15 @@ impl Server {
                 }
             }
             Payload::GetPeers => {
-                self.peers.send_peers(source.unwrap());
+                self.peers.send_peers(source.unwrap()).await;
             }
             Payload::Peers(peers) => {
                 self.peers.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
                 self.outbound
-                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong));
+                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
+                    .await;
 
                 if block_height > self.environment.current_block_height() + 1
                     && self.environment.should_sync_blocks()

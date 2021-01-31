@@ -45,10 +45,11 @@ impl Transactions {
     ///
     /// Triggers the transaction sync with a selected peer.
     ///
-    pub fn update(&self, sync_node: Option<SocketAddr>) {
+    pub async fn update(&self, sync_node: Option<SocketAddr>) {
         if let Some(sync_node) = sync_node {
             self.outbound
-                .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
+                .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool))
+                .await;
         } else {
             debug!("No sync node is registered, transactions could not be synced");
         }
@@ -68,10 +69,12 @@ impl Transactions {
         for remote_address in connected_peers.keys() {
             if *remote_address != transaction_sender && *remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
-                self.outbound.send_request(Message::new(
-                    Direction::Outbound(*remote_address),
-                    Payload::Transaction(transaction_bytes.clone()),
-                ));
+                self.outbound
+                    .send_request(Message::new(
+                        Direction::Outbound(*remote_address),
+                        Payload::Transaction(transaction_bytes.clone()),
+                    ))
+                    .await;
             }
         }
 
@@ -139,10 +142,12 @@ impl Transactions {
 
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
-            self.outbound.send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::MemoryPool(transactions),
-            ));
+            self.outbound
+                .send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::MemoryPool(transactions),
+                ))
+                .await;
         }
 
         Ok(())
