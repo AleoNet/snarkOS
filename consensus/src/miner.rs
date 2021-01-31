@@ -176,21 +176,21 @@ impl Miner {
         )
         .await?;
 
-        println!("Miner creating block");
+        debug!("The miner is creating a block");
 
         let (previous_block_header, transactions, coinbase_records) =
             self.establish_block(parameters, &storage.read(), &candidate_transactions)?;
 
-        println!("Miner generated coinbase transaction");
+        debug!("The miner generated a coinbase transaction");
 
         for (index, record) in coinbase_records.iter().enumerate() {
             let record_commitment = hex::encode(&to_bytes![record.commitment()]?);
-            println!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
+            debug!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
         }
 
         let header = self.find_block(&transactions, &previous_block_header)?;
 
-        println!("Miner found block");
+        debug!("The Miner found a block");
 
         let block = Block { header, transactions };
 
