@@ -43,7 +43,7 @@ commands:
 jobs:
   rust_stable:
     docker:
-      - image: cimg/rust:1.46.0
+      - image: cimg/rust:1.49.0
     resource_class: xlarge
     steps:
       - checkout
@@ -72,11 +72,11 @@ jobs:
           command: >
             cd ~/project/project/ &&
             docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-            howardwu/snarkos-codecov:2020-09-06 bash /home/circleci/project/ci/kcov.sh
+            howardwu/snarkos-codecov:2021-01-31 bash /home/circleci/project/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
-      - image: howardwu/snarkos-ci:2020-08-27
+      - image: howardwu/snarkos-ci:2021-01-31
     resource_class: xlarge
     steps:
       - checkout
