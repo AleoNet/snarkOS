@@ -240,11 +240,7 @@ impl Server {
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {
-                    if self.peers.is_syncing_blocks(addr) {
-                        self.environment.finished_syncing_blocks();
-                    }
-
-                    self.peers.disconnected_from_peer(addr)?;
+                    self.peers.disconnect_from_peer(addr)?;
                 }
             }
             Payload::GetPeers => {

@@ -130,10 +130,7 @@ impl Peers {
             for _ in 0..number_to_disconnect {
                 if let Some(peer_info) = connected.pop() {
                     let addr = peer_info.address();
-                    debug!("Disconnecting from {}", addr);
-                    self.inbound
-                        .route(Message::new(Direction::Internal, Payload::Disconnect(addr)))
-                        .await;
+                    let _ = self.disconnect_from_peer(addr);
                 }
             }
         }
@@ -336,7 +333,7 @@ impl Peers {
         {
             if let Err(e) = self.initiate_connection(bootnode_address).await {
                 warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                let _ = self.disconnected_from_peer(bootnode_address);
+                let _ = self.disconnect_from_peer(bootnode_address);
             }
         }
     }
@@ -349,7 +346,7 @@ impl Peers {
         for remote_address in self.disconnected_peers().keys().take(count).copied() {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
-                let _ = self.disconnected_from_peer(remote_address);
+                let _ = self.disconnect_from_peer(remote_address);
             }
         }
     }
@@ -385,11 +382,11 @@ impl Peers {
             //     // Broadcast the message over the channel.
             //     if let Err(_) = channel.write(&GetPeers).await {
             //         // Disconnect from the peer if the message fails to send.
-            //         self.disconnected_from_peer(&remote_address).await?;
+            //         self.disconnect_from_peer(&remote_address).await?;
             //     }
             // } else {
             //     // Disconnect from the peer if the channel is not active.
-            //     self.disconnected_from_peer(&remote_address).await?;
+            //     self.disconnect_from_peer(&remote_address).await?;
             // }
         }
     }
@@ -521,7 +518,17 @@ impl Peers {
     /// Sets the given remote address in the peer book as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) fn disconnected_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+        debug!("Disconnecting from {}", remote_address);
+
+        if self.is_syncing_blocks(remote_address) {
+            self.environment.finished_syncing_blocks();
+        }
+
+        if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {
+            handle.abort();
+        };
+
         self.peer_book.write().set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }

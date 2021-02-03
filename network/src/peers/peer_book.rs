@@ -28,7 +28,7 @@ use std::{
 ///
 /// A data structure for storing the history of all peers with this node server.
 ///
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PeerBook {
     /// The map of the addresses currently being handshaken with.
     connecting_peers: HashSet<SocketAddr>,

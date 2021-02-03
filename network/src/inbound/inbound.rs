@@ -35,7 +35,7 @@ use parking_lot::{Mutex, RwLock};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    task,
+    task::{self, JoinHandle},
 };
 
 /// The map of remote addresses to their active writers.
@@ -56,6 +56,8 @@ pub struct Inbound {
     receive_success_count: Arc<AtomicU64>,
     /// A counter for the number of received responses that failed.
     receive_failure_count: Arc<AtomicU64>,
+    /// The tasks dedicated to handling inbound messages.
+    pub(crate) tasks: Arc<Mutex<HashMap<SocketAddr, JoinHandle<()>>>>,
 }
 
 impl Inbound {
@@ -70,6 +72,7 @@ impl Inbound {
             receive_response_count: Default::default(),
             receive_success_count: Default::default(),
             receive_failure_count: Default::default(),
+            tasks: Default::default(),
         }
     }
 
@@ -102,13 +105,16 @@ impl Inbound {
                                 // Save the channel under the provided remote address
                                 inbound.channels.write().insert(remote_address, Arc::new(channel));
 
-                                let inbound = inbound.clone();
-                                tokio::spawn(async move {
-                                    inbound.listen_for_messages(&mut reader).await;
+                                let inbound_clone = inbound.clone();
+                                let task = tokio::spawn(async move {
+                                    inbound_clone.listen_for_messages(&mut reader).await;
                                 });
+
+                                inbound.tasks.lock().insert(remote_address, task);
                             }
                             Err(e) => {
                                 error!("Failed to accept a connection: {}", e);
+                                // FIXME(ljedrz/nkls): this should be done immediately, bypassing the message channel
                                 let _ = inbound
                                     .sender
                                     .send(Message::new(Direction::Internal, Payload::Disconnect(remote_address)))
@@ -142,6 +148,7 @@ impl Inbound {
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
+                            // FIXME(ljedrz/nkls): this should be done immediately, bypassing the message channel
                             self.route(Message::new(Direction::Internal, Payload::Disconnect(reader.addr)))
                                 .await;
 
