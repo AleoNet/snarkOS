@@ -528,6 +528,7 @@ impl Peers {
         if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {
             handle.abort();
         };
+        self.outbound.channels.write().remove(&remote_address);
 
         self.peer_book.write().set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
