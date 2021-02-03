@@ -280,12 +280,11 @@ impl Peers {
         let len = noise
             .read_message(&buf[..len], &mut buffer)
             .map_err(|_| NetworkError::InvalidHandshake)?;
-        let _peer_version: Version =
-            bincode::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
+        let _peer_version = Version::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
         trace!("received e, ee, s, es (XX handshake part 2/3)");
 
         // -> s, se, psk
-        let own_version = bincode::serialize(&Version::new(1u64, own_address.port())).unwrap();
+        let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
         let len = noise
             .write_message(&own_version, &mut buffer)
             .map_err(NetworkError::Noise)?;

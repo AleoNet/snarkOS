@@ -48,7 +48,7 @@ impl ConnWriter {
 
     /// Writes a message consisting of a header and payload.
     pub async fn write_message(&self, payload: &Payload) -> Result<(), ConnectError> {
-        let serialized_payload = bincode::serialize(payload).map_err(|e| ConnectError::MessageError(e.into()))?;
+        let serialized_payload = Payload::serialize(payload).map_err(|e| ConnectError::Message(e.to_string()))?;
 
         {
             let mut buffer = self.buffer.lock().await;

@@ -73,10 +73,10 @@ async fn handshake_responder_side() {
     let len = buf[0] as usize;
     let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
     let len = noise.read_message(&buf[..len], &mut buffer).unwrap();
-    let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
+    let _node_version = Version::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk
-    let peer_version = bincode::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let peer_version = Version::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
     let len = noise.write_message(&peer_version, &mut buffer).unwrap();
     peer_stream.write_all(&[len as u8]).await.unwrap();
     peer_stream.write_all(&buffer[..len]).await.unwrap();
@@ -128,7 +128,7 @@ async fn handshake_initiator_side() {
     noise.read_message(&buf[..len], &mut buffer).unwrap();
 
     // -> e, ee, s, es
-    let peer_version = bincode::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let peer_version = Version::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
     let len = noise.write_message(&peer_version, &mut buffer).unwrap();
     peer_stream.write_all(&[len as u8]).await.unwrap();
     peer_stream.write_all(&buffer[..len]).await.unwrap();
@@ -138,7 +138,7 @@ async fn handshake_initiator_side() {
     let len = buf[0] as usize;
     let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
     let len = noise.read_message(&buf[..len], &mut buffer).unwrap();
-    let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
+    let _node_version = Version::deserialize(&buffer[..len]).unwrap();
 
     // the node should now have registered the peer as 'connected'
     sleep(Duration::from_millis(200)).await;

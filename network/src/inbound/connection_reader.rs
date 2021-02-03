@@ -79,7 +79,7 @@ impl ConnReader {
             }
         }
         let payload =
-            bincode::deserialize(&self.buffer[..decrypted_len]).map_err(|e| ConnectError::MessageError(e.into()))?;
+            Payload::deserialize(&self.buffer[..decrypted_len]).map_err(|e| ConnectError::Message(e.to_string()))?;
 
         debug!("Received a '{}' message from {}", payload, self.addr);
 

@@ -17,8 +17,6 @@
 use snarkos_storage::BlockHeight;
 use snarkvm_objects::BlockHeaderHash;
 
-use serde::{Deserialize, Serialize};
-
 use std::{fmt, net::SocketAddr};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -64,7 +62,7 @@ impl fmt::Display for Message {
 }
 
 /// The actual message transmitted over the network.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Payload {
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/block.md"))]
     Block(Vec<u8>),
@@ -90,6 +88,10 @@ pub enum Payload {
     SyncBlock(Vec<u8>),
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/transaction.md"))]
     Transaction(Vec<u8>),
+
+    // a placeholder indicating the introduction of a new payload type; used for forward compatibility
+    #[doc(hide)]
+    Unknown,
 
     /* internal messages */
     #[doc(hide)]
@@ -120,6 +122,7 @@ impl fmt::Display for Payload {
             Self::ConnectedTo(..) => "connectedto",
             Self::ConnectingTo(..) => "connectingto",
             Self::Disconnect(..) => "disconnect",
+            Self::Unknown => "unknown",
         };
 
         f.write_str(str)

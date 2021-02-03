@@ -18,6 +18,15 @@
 use rustc_version::{version_meta, Channel};
 
 fn main() {
+    capnpc::CompilerCommand::new()
+        .file(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/network/src/external/message/payload.capnp"
+        ))
+        .output_path(".")
+        .run()
+        .expect("cap'n'proto network schema compilation failed");
+
     // Set cfg flags depending on release channel
     match version_meta().unwrap().channel {
         Channel::Stable => println!("cargo:rustc-cfg=stable"),
