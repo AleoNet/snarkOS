@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -48,11 +48,11 @@ async fn peer_initiator_side() {
 
     // respond with a Peers message
     let (addr, _) = random_bound_address().await;
-    let peers = Payload::Peers(vec![(addr, chrono::Utc::now())]);
+    let peers = Payload::Peers(vec![addr]);
     write_message_to_stream(peers, &mut peer_stream).await;
 
     // check the address has been added to the disconnected list in the peer book
-    wait_until!(5, node.peers.is_disconnected(&addr));
+    wait_until!(5, node.peers.is_disconnected(addr));
 }
 
 #[tokio::test]
@@ -99,7 +99,7 @@ async fn triangle() {
     let node_charlie = test_node(setup(vec![addr_bob.to_string()])).await;
 
     let triangle_is_formed = || {
-        node_charlie.peers.is_connected(&addr_alice)
+        node_charlie.peers.is_connected(addr_alice)
             && node_alice.peers.number_of_connected_peers() == 2
             && node_bob.peers.number_of_connected_peers() == 2
             && node_charlie.peers.number_of_connected_peers() == 2
