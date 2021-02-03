@@ -49,20 +49,15 @@ async fn block_initiator_side() {
 
     // trigger the full node to request synchronization by sending it a higher block_height than it has
     let ping = Payload::Ping(2u32);
-    write_message_to_stream(ping, &mut peer_stream).await;
-
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 128];
+    peer.write_message(&ping).await;
 
     // read the Pong
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Pong));
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Pong));
 
     // check if a GetSync message was received
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::GetSync(..)));
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::GetSync(..)));
 
     let block_1_header_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
     let block_2_header_hash = BlockHeaderHash::new(BLOCK_2_HEADER_HASH.to_vec());
@@ -75,9 +70,8 @@ async fn block_initiator_side() {
     peer.write_message(&sync).await;
 
     // make sure both GetBlock messages are received
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let block_hashes = if let Payload::GetBlocks(block_hashes) = bincode::deserialize(&payload).unwrap() {
+    let payload = peer.read_payload().await.unwrap();
+    let block_hashes = if let Payload::GetBlocks(block_hashes) = payload {
         block_hashes
     } else {
         unreachable!();
@@ -145,7 +139,7 @@ async fn block_responder_side() {
 
     // request the block from the node
     let get_block = Payload::GetBlocks(vec![block_header_hash.clone()]);
-    write_message_to_stream(get_block, &mut peer_stream).await;
+    peer.write_message(&get_block).await;
 
     // receive a SyncBlock message with the requested block
     let payload = peer.read_payload().await.unwrap();

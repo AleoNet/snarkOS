@@ -248,7 +248,7 @@ impl Server {
                 }
             }
             Payload::GetPeers => {
-                self.peers.send_get_peers(source.unwrap());
+                self.peers.send_get_peers(source.unwrap()).await;
             }
             Payload::Peers(peers) => {
                 self.peers.process_inbound_peers(peers);
