@@ -16,7 +16,7 @@
 
 use snarkos_network::{
     external::{message::*, Version},
-    Server,
+    Node,
 };
 use snarkos_testing::{
     network::{test_node, write_message_to_stream, TestSetup},
@@ -147,7 +147,7 @@ async fn handshake_initiator_side() {
     assert_eq!(node.peers.number_of_connected_peers(), 1);
 }
 
-async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream) {
+async fn assert_node_rejected_message(node: &Node, peer_stream: &mut TcpStream) {
     // read the response from the stream
     let mut buffer = String::new();
     let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();

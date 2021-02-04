@@ -73,7 +73,7 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 
 /// A core data structure for operating the networking stack of this node.
 #[derive(Clone)]
-pub struct Server {
+pub struct Node {
     /// The parameters and settings of this node server.
     pub environment: Environment,
     /// The inbound handler of this node server.
@@ -86,8 +86,8 @@ pub struct Server {
     pub transactions: Transactions,
 }
 
-impl Server {
-    /// Creates a new instance of `Server`.
+impl Node {
+    /// Creates a new instance of `Node`.
     pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
@@ -126,7 +126,7 @@ impl Server {
         task::spawn(async move {
             loop {
                 if let Err(e) = server.process_incoming_messages(&mut receiver).await {
-                    error!("Server error: {}", e);
+                    error!("Node error: {}", e);
                 }
             }
         });

@@ -32,7 +32,7 @@ use snarkos_network::{
     external::message::*,
     Consensus,
     Environment,
-    Server,
+    Node,
     MAX_MESSAGE_SIZE,
 };
 
@@ -172,10 +172,10 @@ pub fn test_environment(setup: TestSetup) -> Environment {
 }
 
 /// Starts a node with the specified bootnodes.
-pub async fn test_node(setup: TestSetup) -> Server {
+pub async fn test_node(setup: TestSetup) -> Node {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let environment = test_environment(setup);
-    let mut node = Server::new(environment).await.unwrap();
+    let mut node = Node::new(environment).await.unwrap();
     node.start().await.unwrap();
 
     if is_miner {
@@ -298,7 +298,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     (node0, node1)
 }
 
-pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, FakeNode) {
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode) {
     // start a test node and listen for incoming connections
     let node = test_node(node_setup).await;
     let node_listener = node.local_address().unwrap();

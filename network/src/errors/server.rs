@@ -19,7 +19,7 @@ use snarkos_storage::error::StorageError;
 use snarkvm_errors::objects::{BlockError, TransactionError};
 
 #[derive(Debug, Error)]
-pub enum ServerError {
+pub enum NodeError {
     #[error("{}", _0)]
     BlockError(BlockError),
 
@@ -45,50 +45,50 @@ pub enum ServerError {
     TransactionError(TransactionError),
 }
 
-impl From<BlockError> for ServerError {
+impl From<BlockError> for NodeError {
     fn from(error: BlockError) -> Self {
-        ServerError::BlockError(error)
+        NodeError::BlockError(error)
     }
 }
 
-impl From<ConnectError> for ServerError {
+impl From<ConnectError> for NodeError {
     fn from(error: ConnectError) -> Self {
-        ServerError::ConnectError(error)
+        NodeError::ConnectError(error)
     }
 }
 
-impl From<MessageError> for ServerError {
+impl From<MessageError> for NodeError {
     fn from(error: MessageError) -> Self {
-        ServerError::MessageError(error)
+        NodeError::MessageError(error)
     }
 }
 
-impl From<SendError> for ServerError {
+impl From<SendError> for NodeError {
     fn from(error: SendError) -> Self {
-        ServerError::SendError(error)
+        NodeError::SendError(error)
     }
 }
 
-impl From<StorageError> for ServerError {
+impl From<StorageError> for NodeError {
     fn from(error: StorageError) -> Self {
-        ServerError::StorageError(error)
+        NodeError::StorageError(error)
     }
 }
 
-impl From<TransactionError> for ServerError {
+impl From<TransactionError> for NodeError {
     fn from(error: TransactionError) -> Self {
-        ServerError::TransactionError(error)
+        NodeError::TransactionError(error)
     }
 }
 
-impl From<std::io::Error> for ServerError {
+impl From<std::io::Error> for NodeError {
     fn from(error: std::io::Error) -> Self {
-        ServerError::Crate("std::io", format!("{:?}", error))
+        NodeError::Crate("std::io", format!("{:?}", error))
     }
 }
 
-impl From<std::net::AddrParseError> for ServerError {
+impl From<std::net::AddrParseError> for NodeError {
     fn from(error: std::net::AddrParseError) -> Self {
-        ServerError::Crate("std::net::AddrParseError", format!("{:?}", error))
+        NodeError::Crate("std::net::AddrParseError", format!("{:?}", error))
     }
 }
