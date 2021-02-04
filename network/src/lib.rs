@@ -55,8 +55,19 @@ pub use transactions::*;
 
 use crate::{external::message::*, peers::peers::Peers, ConnWriter};
 
-use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkvm_dpc::base_dpc::{
+    instantiated::{Components, Tx},
+    parameters::PublicParameters,
+};
+
+use parking_lot::{Mutex, RwLock};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{task, time::sleep};
 
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
@@ -71,6 +82,49 @@ pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
 pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 
+#[derive(Clone)]
+pub struct Consensus {
+    /// The storage system of this node.
+    storage: Arc<RwLock<MerkleTreeLedger>>,
+    /// The memory pool of this node.
+    memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
+    /// The consensus parameters for the associated network ID.
+    consensus_parameters: Arc<ConsensusParameters>,
+    /// The DPC parameters for the associated network ID.
+    dpc_parameters: Arc<PublicParameters<Components>>,
+    /// If `true`, initializes a mining task on this node.
+    is_miner: bool,
+    /// The interval between each block sync.
+    block_sync_interval: Duration,
+    /// The last time a block sync was initiated.
+    last_block_sync: Arc<RwLock<Instant>>,
+    /// The interval between each transaction (memory pool) sync.
+    transaction_sync_interval: Duration,
+}
+
+impl Consensus {
+    pub fn new(
+        storage: Arc<RwLock<MerkleTreeLedger>>,
+        memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
+        consensus_parameters: Arc<ConsensusParameters>,
+        dpc_parameters: Arc<PublicParameters<Components>>,
+        is_miner: bool,
+        block_sync_interval: Duration,
+        transaction_sync_interval: Duration,
+    ) -> Self {
+        Self {
+            storage,
+            memory_pool,
+            consensus_parameters,
+            dpc_parameters,
+            is_miner,
+            block_sync_interval,
+            last_block_sync: Arc::new(RwLock::new(Instant::now())),
+            transaction_sync_interval,
+        }
+    }
+}
+
 /// A core data structure for operating the networking stack of this node.
 #[derive(Clone)]
 pub struct Node {
@@ -81,6 +135,9 @@ pub struct Node {
     /// The outbound handler of this node server.
     outbound: Arc<Outbound>,
 
+    /// The objects related to consensus.
+    consensus: Option<Consensus>,
+
     pub peers: Peers,
     pub blocks: Blocks,
     pub transactions: Transactions,
@@ -88,7 +145,7 @@ pub struct Node {
 
 impl Node {
     /// Creates a new instance of `Node`.
-    pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
+    pub async fn new(environment: Environment, consensus: Option<Consensus>) -> Result<Self, NetworkError> {
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
         let inbound = Arc::new(Inbound::new(channels.clone()));
@@ -103,6 +160,7 @@ impl Node {
             environment,
             inbound,
             outbound,
+            consensus,
             peers,
             blocks,
             transactions,

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::NetworkError;
+use crate::{Consensus, NetworkError};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
@@ -30,49 +30,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-
-#[derive(Clone)]
-pub struct Consensus {
-    /// The storage system of this node.
-    storage: Arc<RwLock<MerkleTreeLedger>>,
-    /// The memory pool of this node.
-    memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
-    /// The consensus parameters for the associated network ID.
-    consensus_parameters: Arc<ConsensusParameters>,
-    /// The DPC parameters for the associated network ID.
-    dpc_parameters: Arc<PublicParameters<Components>>,
-    /// If `true`, initializes a mining task on this node.
-    is_miner: bool,
-    /// The interval between each block sync.
-    block_sync_interval: Duration,
-    /// The last time a block sync was initiated.
-    last_block_sync: Arc<RwLock<Instant>>,
-    /// The interval between each transaction (memory pool) sync.
-    transaction_sync_interval: Duration,
-}
-
-impl Consensus {
-    pub fn new(
-        storage: Arc<RwLock<MerkleTreeLedger>>,
-        memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
-        consensus_parameters: Arc<ConsensusParameters>,
-        dpc_parameters: Arc<PublicParameters<Components>>,
-        is_miner: bool,
-        block_sync_interval: Duration,
-        transaction_sync_interval: Duration,
-    ) -> Self {
-        Self {
-            storage,
-            memory_pool,
-            consensus_parameters,
-            dpc_parameters,
-            is_miner,
-            block_sync_interval,
-            last_block_sync: Arc::new(RwLock::new(Instant::now())),
-            transaction_sync_interval,
-        }
-    }
-}
 
 /// A core data structure containing the networking parameters for this node.
 #[derive(Clone)]
