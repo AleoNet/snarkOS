@@ -65,7 +65,10 @@ use parking_lot::{Mutex, RwLock};
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 use tokio::{task, time::sleep};
@@ -84,6 +87,7 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 
 #[derive(Clone)]
 pub struct Consensus {
+    node: Node,
     /// The storage system of this node.
     storage: Arc<RwLock<MerkleTreeLedger>>,
     /// The memory pool of this node.
@@ -100,10 +104,13 @@ pub struct Consensus {
     last_block_sync: Arc<RwLock<Instant>>,
     /// The interval between each transaction (memory pool) sync.
     transaction_sync_interval: Duration,
+    /// Is the node currently syncing blocks?
+    is_syncing_blocks: Arc<AtomicBool>,
 }
 
 impl Consensus {
     pub fn new(
+        mut node: Node,
         storage: Arc<RwLock<MerkleTreeLedger>>,
         memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
         consensus_parameters: Arc<ConsensusParameters>,
@@ -112,7 +119,8 @@ impl Consensus {
         block_sync_interval: Duration,
         transaction_sync_interval: Duration,
     ) -> Self {
-        Self {
+        let consensus = Self {
+            node,
             storage,
             memory_pool,
             consensus_parameters,
@@ -121,7 +129,13 @@ impl Consensus {
             block_sync_interval,
             last_block_sync: Arc::new(RwLock::new(Instant::now())),
             transaction_sync_interval,
-        }
+            is_syncing_blocks: Default::default(),
+        };
+
+        // Set the Consensus on the node.
+        node.consensus = Some(Arc::new(consensus));
+
+        consensus
     }
 }
 
@@ -136,7 +150,7 @@ pub struct Node {
     outbound: Arc<Outbound>,
 
     /// The objects related to consensus.
-    consensus: Option<Consensus>,
+    consensus: Option<Arc<Consensus>>,
 
     pub peers: Peers,
     pub blocks: Blocks,
@@ -145,7 +159,7 @@ pub struct Node {
 
 impl Node {
     /// Creates a new instance of `Node`.
-    pub async fn new(environment: Environment, consensus: Option<Consensus>) -> Result<Self, NetworkError> {
+    pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
         let inbound = Arc::new(Inbound::new(channels.clone()));
@@ -160,7 +174,8 @@ impl Node {
             environment,
             inbound,
             outbound,
-            consensus,
+            // Consensus set to None as the node needs to be created first.
+            consensus: None,
             peers,
             blocks,
             transactions,
@@ -202,15 +217,15 @@ impl Node {
             }
         });
 
-        if self.environment.has_consensus() && !self.environment.is_bootnode() {
+        if self.has_consensus() && !self.environment.is_bootnode() {
             let self_clone = self.clone();
             let transactions = self.transactions.clone();
-            let transaction_sync_interval = self.environment.transaction_sync_interval();
+            let transaction_sync_interval = self.transaction_sync_interval();
             task::spawn(async move {
                 loop {
                     sleep(transaction_sync_interval).await;
 
-                    if !self_clone.environment.is_syncing_blocks() {
+                    if !self_clone.is_syncing_blocks() {
                         info!("Updating transactions");
 
                         // select last seen node as block sync node
@@ -271,16 +286,16 @@ impl Node {
             Payload::SyncBlock(block) => {
                 self.blocks.received_block(source.unwrap(), block, None).await?;
                 if self.peers.got_sync_block(source.unwrap()) {
-                    self.environment.finished_syncing_blocks();
+                    self.finished_syncing_blocks();
                 }
             }
             Payload::GetBlocks(hashes) => {
-                if !self.environment.is_syncing_blocks() {
+                if !self.is_syncing_blocks() {
                     self.blocks.received_get_blocks(source.unwrap(), hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
-                if !self.environment.is_syncing_blocks() {
+                if !self.is_syncing_blocks() {
                     self.transactions.received_get_memory_pool(source.unwrap()).await?;
                 }
             }
@@ -288,7 +303,7 @@ impl Node {
                 self.transactions.received_memory_pool(mempool)?;
             }
             Payload::GetSync(getsync) => {
-                if !self.environment.is_syncing_blocks() {
+                if !self.is_syncing_blocks() {
                     self.blocks.received_get_sync(source.unwrap(), getsync).await?;
                 }
             }
@@ -312,15 +327,15 @@ impl Node {
                     .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
                     .await;
 
-                if block_height > self.environment.current_block_height() + 1
-                    && self.environment.should_sync_blocks()
+                if block_height > self.current_block_height() + 1
+                    && self.should_sync_blocks()
                     && !self.peers.is_syncing_blocks(source.unwrap())
                 {
-                    self.environment.register_block_sync_attempt();
+                    self.register_block_sync_attempt();
                     trace!("Attempting to sync with {}", source.unwrap());
                     self.blocks.update(source.unwrap()).await;
                 } else {
-                    self.environment.finished_syncing_blocks();
+                    self.finished_syncing_blocks();
                 }
             }
             Payload::Pong => {
@@ -332,5 +347,93 @@ impl Node {
         }
 
         Ok(())
+    }
+
+    // TODO: Probably not the right place for these.
+    // CONSENSUS
+
+    /// Returns a reference to the consensus objects.
+    #[inline]
+    pub fn consensus(&self) -> &Consensus {
+        self.consensus.as_ref().expect("no consensus!")
+    }
+
+    /// Returns a reference to the storage system of this node.
+    #[inline]
+    pub fn storage(&self) -> &Arc<RwLock<MerkleTreeLedger>> {
+        &self.consensus().storage
+    }
+
+    /// Returns a reference to the memory pool of this node.
+    #[inline]
+    pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
+        &self.consensus().memory_pool
+    }
+
+    /// Returns a reference to the consensus parameters of this node.
+    #[inline]
+    pub fn consensus_parameters(&self) -> &Arc<ConsensusParameters> {
+        &self.consensus().consensus_parameters
+    }
+
+    /// Returns a reference to the DPC parameters of this node.
+    #[inline]
+    pub fn dpc_parameters(&self) -> &Arc<PublicParameters<Components>> {
+        &self.consensus().dpc_parameters
+    }
+
+    #[inline]
+    #[doc(hide)]
+    pub fn has_consensus(&self) -> bool {
+        self.consensus.is_some()
+    }
+
+    /// Returns `true` if this node is a mining node. Otherwise, returns `false`.
+    #[inline]
+    pub fn is_miner(&self) -> bool {
+        self.consensus().is_miner
+    }
+
+    /// Returns the current block height of the ledger from storage.
+    #[inline]
+    pub fn current_block_height(&self) -> u32 {
+        self.consensus().storage.read().get_current_block_height()
+    }
+
+    /// Returns the minimum interval between block sync attempts.
+    pub fn block_sync_interval(&self) -> Duration {
+        self.consensus().block_sync_interval
+    }
+
+    /// Checks whether enough time has elapsed for the node to attempt another block sync.
+    pub fn should_sync_blocks(&self) -> bool {
+        let consensus = self.consensus();
+
+        !self.is_syncing_blocks() && consensus.last_block_sync.read().elapsed() > consensus.block_sync_interval
+    }
+
+    /// Register that the node attempted to sync blocks.
+    pub fn register_block_sync_attempt(&self) {
+        *self.consensus().last_block_sync.write() = Instant::now();
+        self.consensus().is_syncing_blocks.store(true, Ordering::SeqCst);
+    }
+
+    /// Returns the interval between each transaction (memory pool) sync.
+    pub fn transaction_sync_interval(&self) -> Duration {
+        self.consensus().transaction_sync_interval
+    }
+
+    /// Checks whether the node is currently syncing blocks.
+    pub fn is_syncing_blocks(&self) -> bool {
+        self.consensus().is_syncing_blocks.load(Ordering::SeqCst)
+    }
+
+    /// Register that the node is no longer syncing blocks.
+    pub fn finished_syncing_blocks(&self) {
+        self.consensus().is_syncing_blocks.store(false, Ordering::SeqCst);
+    }
+
+    pub fn max_block_size(&self) -> usize {
+        self.consensus().consensus_parameters.max_block_size
     }
 }
