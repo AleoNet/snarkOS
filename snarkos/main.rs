@@ -27,7 +27,7 @@ use snarkos::{
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_network::{
     environment::{Consensus, Environment},
-    Server,
+    Node,
 };
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
@@ -144,7 +144,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the server instance. Note this does not start the server.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut server = Server::new(environment.clone()).await?;
+    let mut server = Node::new(environment.clone()).await?;
 
     // Establish the address of the server.
     server.establish_address().await?;

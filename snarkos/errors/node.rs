@@ -16,7 +16,7 @@
 
 use crate::errors::CliError;
 use snarkos_consensus::error::ConsensusError;
-use snarkos_network::errors::ServerError;
+use snarkos_network::errors::NodeError as NetworkError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::{algorithms::CRHError, objects::AccountError};
 
@@ -44,7 +44,7 @@ pub enum NodeError {
     Message(String),
 
     #[error("{}", _0)]
-    ServerError(ServerError),
+    ServerError(NetworkError),
 
     #[error("{}", _0)]
     StorageError(StorageError),
@@ -80,8 +80,8 @@ impl From<hex::FromHexError> for NodeError {
     }
 }
 
-impl From<ServerError> for NodeError {
-    fn from(error: ServerError) -> Self {
+impl From<NetworkError> for NodeError {
+    fn from(error: NetworkError) -> Self {
         NodeError::ServerError(error)
     }
 }

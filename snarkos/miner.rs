@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::Miner;
-use snarkos_network::{environment::Environment, Server as NodeServer};
+use snarkos_network::{environment::Environment, Node};
 use snarkvm_dpc::base_dpc::instantiated::*;
 use snarkvm_objects::AccountAddress;
 
@@ -28,16 +28,16 @@ use std::sync::Arc;
 pub struct MinerInstance {
     miner_address: AccountAddress<Components>,
     environment: Environment,
-    node_server: NodeServer,
+    node: Node,
 }
 
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node_server: NodeServer) -> Self {
+    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node: Node) -> Self {
         Self {
             miner_address,
             environment,
-            node_server,
+            node,
         }
     }
 
@@ -90,7 +90,7 @@ impl MinerInstance {
                 };
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
-                let peers = self.node_server.peers.connected_peers();
+                let peers = self.node.peers.connected_peers();
                 let serialized_block = if let Ok(block) = block.serialize() {
                     block
                 } else {
@@ -98,7 +98,7 @@ impl MinerInstance {
                     continue;
                 };
 
-                self.node_server
+                self.node
                     .blocks
                     .propagate_block(serialized_block, local_address, &peers)
                     .await;
