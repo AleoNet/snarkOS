@@ -57,16 +57,8 @@ impl Outbound {
     /// and attempts to send the given request to them.
     ///
     #[inline]
-    pub fn send_request(&self, request: Message) {
-        let outbound = self.clone();
-
-        // issues related to spawning this task are unlikely and not interesting;
-        // it's the failures with `Outbound::send` that are important, and the're
-        // handled within that method
-        tokio::spawn(async move {
-            // Send the request.
-            outbound.send(&request).await;
-        });
+    pub async fn send_request(&self, request: Message) {
+        self.send(&request).await
     }
 
     ///

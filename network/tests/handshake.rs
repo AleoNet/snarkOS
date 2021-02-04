@@ -174,7 +174,7 @@ async fn reject_non_version_messages_before_handshake() {
     // GetBlock
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
     let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
-    write_message_to_stream(Payload::GetBlock(block_hash), &mut peer_stream).await;
+    write_message_to_stream(Payload::GetBlocks(vec![block_hash]), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
     // GetSync

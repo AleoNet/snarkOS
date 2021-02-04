@@ -59,6 +59,9 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
 
+/// The maximum number of block hashes that can be requested or provided in a single batch.
+pub const MAX_BLOCK_SYNC_COUNT: u32 = 250;
+
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
 pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
@@ -113,6 +116,16 @@ impl Server {
     }
 
     pub async fn start_services(&self) {
+        let server = self.clone();
+        let mut receiver = self.inbound.take_receiver();
+        task::spawn(async move {
+            loop {
+                if let Err(e) = server.process_incoming_messages(&mut receiver).await {
+                    error!("Server error: {}", e);
+                }
+            }
+        });
+
         let peer_sync_interval = self.environment.peer_sync_interval();
         let peers = self.peers.clone();
         task::spawn(async move {
@@ -127,44 +140,23 @@ impl Server {
         });
 
         if self.environment.has_consensus() && !self.environment.is_bootnode() {
-            let peers = self.peers.clone();
-            let blocks = self.blocks.clone();
-            let block_sync_interval = self.environment.block_sync_interval();
-            task::spawn(async move {
-                loop {
-                    sleep(block_sync_interval).await;
-                    info!("Updating blocks");
-
-                    // select last seen node as block sync node
-                    let sync_node = peers.last_seen();
-                    blocks.update(sync_node).await;
-                }
-            });
-
-            let peers = self.peers.clone();
+            let self_clone = self.clone();
             let transactions = self.transactions.clone();
             let transaction_sync_interval = self.environment.transaction_sync_interval();
             task::spawn(async move {
                 loop {
                     sleep(transaction_sync_interval).await;
-                    info!("Updating transactions");
 
-                    // select last seen node as block sync node
-                    let sync_node = peers.last_seen();
-                    transactions.update(sync_node);
+                    if !self_clone.environment.is_syncing_blocks() {
+                        info!("Updating transactions");
+
+                        // select last seen node as block sync node
+                        let sync_node = self_clone.peers.last_seen();
+                        transactions.update(sync_node).await;
+                    }
                 }
             });
         }
-
-        let server = self.clone();
-        let mut receiver = self.inbound.take_receiver();
-        task::spawn(async move {
-            loop {
-                if let Err(e) = server.process_incoming_messages(&mut receiver).await {
-                    error!("Server error: {}", e);
-                }
-            }
-        });
     }
 
     pub async fn start(&mut self) -> Result<(), NetworkError> {
@@ -203,7 +195,7 @@ impl Server {
                 }
             }
             Payload::Version(version) => {
-                self.peers.version_to_verack(source.unwrap(), &version)?;
+                self.peers.version_to_verack(source.unwrap(), &version).await;
             }
             Payload::Verack(_verack) => {
                 // no action required
@@ -221,37 +213,62 @@ impl Server {
             }
             Payload::SyncBlock(block) => {
                 self.blocks.received_block(source.unwrap(), block, None).await?;
+                if self.peers.got_sync_block(source.unwrap()) {
+                    self.environment.finished_syncing_blocks();
+                }
             }
-            Payload::GetBlock(hash) => {
-                self.blocks.received_get_block(source.unwrap(), hash).await?;
+            Payload::GetBlocks(hashes) => {
+                if !self.environment.is_syncing_blocks() {
+                    self.blocks.received_get_blocks(source.unwrap(), hashes).await?;
+                }
             }
             Payload::GetMemoryPool => {
-                self.transactions.received_get_memory_pool(source.unwrap()).await?;
+                if !self.environment.is_syncing_blocks() {
+                    self.transactions.received_get_memory_pool(source.unwrap()).await?;
+                }
             }
             Payload::MemoryPool(mempool) => {
                 self.transactions.received_memory_pool(mempool)?;
             }
             Payload::GetSync(getsync) => {
-                self.blocks.received_get_sync(source.unwrap(), getsync).await?;
+                if !self.environment.is_syncing_blocks() {
+                    self.blocks.received_get_sync(source.unwrap(), getsync).await?;
+                }
             }
             Payload::Sync(sync) => {
+                self.peers.expecting_sync_blocks(source.unwrap(), sync.len());
                 self.blocks.received_sync(source.unwrap(), sync).await;
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {
+                    if self.peers.is_syncing_blocks(addr) {
+                        self.environment.finished_syncing_blocks();
+                    }
+
                     self.peers.disconnected_from_peer(addr)?;
                 }
             }
             Payload::GetPeers => {
-                self.peers.send_peers(source.unwrap());
+                self.peers.send_peers(source.unwrap()).await;
             }
             Payload::Peers(peers) => {
                 self.peers.process_inbound_peers(peers);
             }
-            Payload::Ping(_block_height) => {
+            Payload::Ping(block_height) => {
                 self.outbound
-                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong));
-                // TODO(ljedrz/niklas): perform a sync if needed
+                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
+                    .await;
+
+                if block_height > self.environment.current_block_height() + 1
+                    && self.environment.should_sync_blocks()
+                    && !self.peers.is_syncing_blocks(source.unwrap())
+                {
+                    self.environment.register_block_sync_attempt();
+                    trace!("Attempting to sync with {}", source.unwrap());
+                    self.blocks.update(source.unwrap()).await;
+                } else {
+                    self.environment.finished_syncing_blocks();
+                }
             }
             Payload::Pong => {
                 self.peers.received_pong(source.unwrap());

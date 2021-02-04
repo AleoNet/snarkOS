@@ -27,6 +27,8 @@ mod miner {
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
+    use std::sync::Arc;
+
     fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountAddress<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
         let comm_params = C::AccountCommitment::setup(rng);
@@ -41,7 +43,7 @@ mod miner {
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<TestTx>, parent_header: &BlockHeader) {
-        let consensus = TEST_CONSENSUS.clone();
+        let consensus = Arc::new(TEST_CONSENSUS.clone());
         let mut rng = XorShiftRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
 
         let (_, miner_address) = keygen(&mut rng);

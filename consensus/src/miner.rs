@@ -38,14 +38,14 @@ pub struct Miner {
     /// The coinbase address that mining rewards are assigned to.
     address: AccountAddress<Components>,
     /// The consensus parameters for the network of this miner.
-    pub consensus_parameters: ConsensusParameters,
+    pub consensus_parameters: Arc<ConsensusParameters>,
     /// The mining instance that is initialized with a proving key.
     miner: PoswMarlin,
 }
 
 impl Miner {
     /// Creates a new instance of `Miner`.
-    pub fn new(address: AccountAddress<Components>, consensus_parameters: ConsensusParameters) -> Self {
+    pub fn new(address: AccountAddress<Components>, consensus_parameters: Arc<ConsensusParameters>) -> Self {
         Self {
             address,
             consensus_parameters,
@@ -168,7 +168,7 @@ impl Miner {
         parameters: &PublicParameters<Components>,
         storage: &Arc<RwLock<MerkleTreeLedger>>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
-    ) -> Result<(Vec<u8>, Vec<DPCRecord<Components>>), ConsensusError> {
+    ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let candidate_transactions = Self::fetch_memory_pool_transactions(
             &storage.clone(),
             memory_pool,
@@ -176,21 +176,21 @@ impl Miner {
         )
         .await?;
 
-        println!("Miner creating block");
+        debug!("The miner is creating a block");
 
         let (previous_block_header, transactions, coinbase_records) =
             self.establish_block(parameters, &storage.read(), &candidate_transactions)?;
 
-        println!("Miner generated coinbase transaction");
+        debug!("The miner generated a coinbase transaction");
 
         for (index, record) in coinbase_records.iter().enumerate() {
             let record_commitment = hex::encode(&to_bytes![record.commitment()]?);
-            println!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
+            debug!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
         }
 
         let header = self.find_block(&transactions, &previous_block_header)?;
 
-        println!("Miner found block");
+        debug!("The Miner found a block");
 
         let block = Block { header, transactions };
 
@@ -206,6 +206,6 @@ impl Miner {
         }
         storage.read().store_records(&records_to_store)?;
 
-        Ok((block.serialize()?, coinbase_records))
+        Ok((block, coinbase_records))
     }
 }

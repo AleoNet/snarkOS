@@ -24,7 +24,7 @@ use std::{
     collections::HashSet,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU64, AtomicU8},
+        atomic::{AtomicBool, AtomicU16, AtomicU64, AtomicU8},
         Arc,
     },
     time::Instant,
@@ -50,6 +50,8 @@ pub struct PeerQuality {
     pub rtt_ms: AtomicU64,
     /// The number of failures associated with the peer; grounds for dismissal.
     pub failures: AtomicU8,
+    /// The number of remaining blocs to sync with.
+    pub remaining_sync_blocks: AtomicU16,
 }
 
 /// A data structure containing information about a peer.

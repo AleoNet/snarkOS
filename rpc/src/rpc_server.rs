@@ -21,15 +21,11 @@ use crate::{
     rpc_types::{Meta, RpcCredentials},
     RpcImpl,
 };
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_consensus::MerkleTreeLedger;
 use snarkos_network::{Environment, Server as NodeServer};
-use snarkvm_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
-};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
@@ -41,10 +37,7 @@ pub async fn start_rpc_server(
     rpc_port: u16,
     secondary_storage: Arc<RwLock<MerkleTreeLedger>>,
     storage_path: PathBuf,
-    parameters: PublicParameters<Components>,
     environment: Environment,
-    consensus: ConsensusParameters,
-    memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
     node_server: NodeServer,
     username: Option<String>,
     password: Option<String>,
@@ -56,16 +49,7 @@ pub async fn start_rpc_server(
         _ => None,
     };
 
-    let rpc_impl = RpcImpl::new(
-        secondary_storage,
-        storage_path,
-        parameters,
-        environment,
-        consensus,
-        memory_pool,
-        credentials,
-        node_server,
-    );
+    let rpc_impl = RpcImpl::new(secondary_storage, storage_path, environment, credentials, node_server);
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
     rpc_impl.add_protected(&mut io);

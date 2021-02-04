@@ -3119,7 +3119,6 @@ dependencies = [
  "snarkvm-parameters",
  "snarkvm-utilities",
  "tokio 0.3.7",
- "tokio-test",
  "tracing",
  "tracing-futures",
  "tracing-subscriber",

@@ -129,13 +129,12 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Rebuild the stored merkle tree with the current stored commitments
     pub fn update_merkle_tree(&self) -> Result<(), StorageError> {
-        let mut merkle_tree = self.cm_merkle_tree.write();
-        *merkle_tree = self.build_merkle_tree(vec![])?;
+        *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
 
         let update_current_digest = DatabaseTransaction(vec![Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![merkle_tree.root()]?.to_vec(),
+            value: to_bytes![self.cm_merkle_tree.read().root()]?.to_vec(),
         }]);
 
         self.storage.write(update_current_digest)

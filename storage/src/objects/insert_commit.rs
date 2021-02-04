@@ -170,11 +170,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Commit/canonize a particular block.
-    pub fn commit(&self, block_header_hash: &BlockHeaderHash) -> Result<(), StorageError> {
-        let block = self.get_block(block_header_hash)?;
+    pub fn commit(&self, block: &Block<T>) -> Result<(), StorageError> {
+        let block_header_hash = block.header.get_hash();
 
         // Check if the block is already in the canon chain
-        if self.is_canon(block_header_hash) {
+        if self.is_canon(&block_header_hash) {
             return Err(StorageError::ExistingCanonBlock(block_header_hash.to_string()));
         }
 
@@ -285,8 +285,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![new_digest]?.to_vec(),
         });
 
-        let mut cm_merkle_tree = self.cm_merkle_tree.write();
-        *cm_merkle_tree = new_merkle_tree;
+        *self.cm_merkle_tree.write() = new_merkle_tree;
 
         self.storage.write(database_transaction)?;
 
@@ -307,7 +306,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             self.insert_only(&block)?;
         }
         // Commit it
-        self.commit(&block_hash)
+        self.commit(block)
     }
 
     /// Returns true if the block exists in the canon chain.

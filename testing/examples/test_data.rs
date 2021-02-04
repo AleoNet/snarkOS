@@ -22,7 +22,7 @@ use snarkvm_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
 use snarkvm_utilities::bytes::ToBytes;
 
 use rand::Rng;
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 fn setup_test_data() -> Result<TestData, ConsensusError> {
     // get the params
@@ -30,7 +30,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     let ledger = FIXTURE.ledger();
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
-    let consensus = TEST_CONSENSUS.clone();
+    let consensus = Arc::new(TEST_CONSENSUS.clone());
 
     // setup the miner
     let miner = Miner::new(miner_acc.address.clone(), consensus.clone());

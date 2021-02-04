@@ -283,11 +283,6 @@ impl ConsensusParameters {
         memory_pool: &mut MemoryPool<Tx>,
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
-        let block_size = block.serialize()?.len();
-        if block_size > self.max_block_size {
-            return Err(ConsensusError::BlockTooLarge(block_size, self.max_block_size));
-        }
-
         // Block is an unknown orphan
         if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
@@ -303,7 +298,10 @@ impl ConsensusParameters {
         } else {
             // If the block is not an unknown orphan, find the origin of the block
             match storage.get_block_path(&block.header)? {
-                BlockPath::ExistingBlock => {}
+                BlockPath::ExistingBlock => {
+                    debug!("Received a pre-existing block");
+                    return Err(ConsensusError::PreExistingBlock);
+                }
                 BlockPath::CanonChain(block_height) => {
                     debug!("Processing a block that is on canon chain. Height {}", block_height);
 

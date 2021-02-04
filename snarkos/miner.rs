@@ -14,36 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{ConsensusParameters, Miner};
+use snarkos_consensus::Miner;
 use snarkos_network::{environment::Environment, Server as NodeServer};
-use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
-use snarkvm_objects::{AccountAddress, Block};
+use snarkvm_dpc::base_dpc::instantiated::*;
+use snarkvm_objects::AccountAddress;
 
 use tokio::task;
 use tracing::*;
 
+use std::sync::Arc;
+
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
     miner_address: AccountAddress<Components>,
-    consensus: ConsensusParameters,
-    parameters: PublicParameters<Components>,
     environment: Environment,
     node_server: NodeServer,
 }
 
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(
-        miner_address: AccountAddress<Components>,
-        consensus: ConsensusParameters,
-        parameters: PublicParameters<Components>,
-        environment: Environment,
-        node_server: NodeServer,
-    ) -> Self {
+    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node_server: NodeServer) -> Self {
         Self {
             miner_address,
-            consensus,
-            parameters,
             environment,
             node_server,
         }
@@ -57,7 +49,10 @@ impl MinerInstance {
         task::spawn(async move {
             let local_address = self.environment.local_address().unwrap();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
-            let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
+            let miner = Miner::new(
+                self.miner_address.clone(),
+                Arc::clone(self.environment.consensus_parameters()),
+            );
             info!("Miner instantiated; starting to mine blocks");
 
             let mut mining_failure_count = 0;
@@ -66,9 +61,9 @@ impl MinerInstance {
             loop {
                 info!("Starting to mine the next block");
 
-                let (block_serialized, _coinbase_records) = match miner
+                let (block, _coinbase_records) = match miner
                     .mine_block(
-                        &self.parameters,
+                        self.environment.dpc_parameters(),
                         self.environment.storage(),
                         self.environment.memory_pool(),
                     )
@@ -94,18 +89,19 @@ impl MinerInstance {
                     }
                 };
 
-                match Block::<Tx>::deserialize(&block_serialized) {
-                    Ok(block) => {
-                        info!("Mined a new block!\t{:?}", hex::encode(block.header.get_hash().0));
-                        let peers = self.node_server.peers.connected_peers();
+                info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
+                let peers = self.node_server.peers.connected_peers();
+                let serialized_block = if let Ok(block) = block.serialize() {
+                    block
+                } else {
+                    error!("Our own miner baked an unserializable block!");
+                    continue;
+                };
 
-                        self.node_server
-                            .blocks
-                            .propagate_block(block_serialized, local_address, &peers)
-                            .await;
-                    }
-                    Err(_) => continue,
-                }
+                self.node_server
+                    .blocks
+                    .propagate_block(serialized_block, local_address, &peers)
+                    .await;
             }
         });
     }

@@ -20,10 +20,7 @@ pub use blocks::*;
 #[cfg(test)]
 pub mod sync;
 
-use crate::{
-    consensus::{FIXTURE_VK, TEST_CONSENSUS},
-    dpc::load_verifying_parameters,
-};
+use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
 use snarkos_network::{
     errors::message::*,
@@ -143,8 +140,8 @@ pub fn test_environment(setup: TestSetup) -> Environment {
         Some(Consensus::new(
             Arc::new(RwLock::new(FIXTURE_VK.ledger())),
             Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-            TEST_CONSENSUS.clone(),
-            load_verifying_parameters(),
+            Arc::new(TEST_CONSENSUS.clone()),
+            Arc::new(FIXTURE.parameters.clone()),
             setup.is_miner,
             Duration::from_secs(setup.block_sync_interval),
             Duration::from_secs(setup.tx_sync_interval),
@@ -167,9 +164,14 @@ pub fn test_environment(setup: TestSetup) -> Environment {
 
 /// Starts a node with the specified bootnodes.
 pub async fn test_node(setup: TestSetup) -> Server {
+    let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let environment = test_environment(setup);
     let mut node = Server::new(environment).await.unwrap();
     node.start().await.unwrap();
+
+    if is_miner {
+        // TODO(ljedrz/nkls): spawn a miner
+    }
 
     node
 }

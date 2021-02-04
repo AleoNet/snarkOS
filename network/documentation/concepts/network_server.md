@@ -60,12 +60,12 @@ and repeats this process until its chain state is fully up to date.
 
 Here is a basic iteration of the sync protocol:
 
-|   Message  |   Sender  |  Receiver | Data                                |
-|:----------:|:---------:|:---------:|-------------------------------------|
-| `GetSync`  | Node      | Sync Node | 1 or more block hashes              |
-| `Sync`     | Sync Node | Node      | Up to 100 new block headers         |
-| `GetBlock` | Node      | Any Peer  | Block header of the requested block |
-| `Block`    | Any Peer  | Node      | A serialized block                  |
+|   Message   |   Sender  |  Receiver | Data                                  |
+|:-----------:|:---------:|:---------:|---------------------------------------|
+| `GetSync`   | Node      | Sync Node | 1 or more block hashes                |
+| `Sync`      | Sync Node | Node      | Up to 100 new block headers           |
+| `GetBlocks` | Node      | Any Peer  | Block headers of the requested blocks |
+| `Block`     | Any Peer  | Node      | A serialized block                    |
 
 ## Transaction Broadcasting
 

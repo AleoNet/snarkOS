@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use tokio::time::sleep;
+
 use crate::{
     consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
     network::{
@@ -32,8 +34,11 @@ use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::external::message::*;
 
 use snarkvm_dpc::instantiated::Tx;
-use snarkvm_objects::{block::Block, block_header_hash::BlockHeaderHash};
-use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_objects::block_header_hash::BlockHeaderHash;
+#[cfg(test)]
+use snarkvm_utilities::FromBytes;
+
+use std::time::Duration;
 
 #[tokio::test]
 async fn block_initiator_side() {
@@ -47,10 +52,22 @@ async fn block_initiator_side() {
     };
     let (node, mut peer_stream) = handshaken_node_and_peer(setup).await;
 
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    // wait for the block_sync_interval to "expire"
+    sleep(Duration::from_secs(1)).await;
 
-    // check GetSync message was received
+    // trigger the full node to request synchronization by sending it a higher block_height than it has
+    let ping = Payload::Ping(2u32);
+    write_message_to_stream(ping, &mut peer_stream).await;
+
+    // the buffer for peer's reads
+    let mut peer_buf = [0u8; 128];
+
+    // read the Pong
+    let len = read_header(&mut peer_stream).await.unwrap().len();
+    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
+    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Pong));
+
+    // check if a GetSync message was received
     let len = read_header(&mut peer_stream).await.unwrap().len();
     let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
     assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::GetSync(..)));
@@ -68,23 +85,13 @@ async fn block_initiator_side() {
     // make sure both GetBlock messages are received
     let len = read_header(&mut peer_stream).await.unwrap().len();
     let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let block_hash = if let Payload::GetBlock(block_hash) = bincode::deserialize(&payload).unwrap() {
-        block_hash
+    let block_hashes = if let Payload::GetBlocks(block_hashes) = bincode::deserialize(&payload).unwrap() {
+        block_hashes
     } else {
         unreachable!();
     };
 
-    assert_eq!(block_hash, block_1_header_hash);
-
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let block_hash = if let Payload::GetBlock(block_hash) = bincode::deserialize(&payload).unwrap() {
-        block_hash
-    } else {
-        unreachable!();
-    };
-
-    assert_eq!(block_hash, block_2_header_hash);
+    assert!(block_hashes.contains(&block_1_header_hash) && block_hashes.contains(&block_2_header_hash));
 
     // respond with the full blocks
     let block_1 = Payload::Block(BLOCK_1.to_vec());
@@ -149,7 +156,7 @@ async fn block_responder_side() {
     assert_eq!(*block_header_hash, block_struct_1.header.get_hash());
 
     // request the block from the node
-    let get_block = Payload::GetBlock(block_header_hash.clone());
+    let get_block = Payload::GetBlocks(vec![block_header_hash.clone()]);
     write_message_to_stream(get_block, &mut peer_stream).await;
 
     // receive a SyncBlock message with the requested block
@@ -166,65 +173,46 @@ async fn block_responder_side() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn block_two_node() {
-    let node_alice = test_node(TestSetup::default()).await;
+    let setup = TestSetup {
+        peer_sync_interval: 1,
+        ..Default::default()
+    };
+    let node_alice = test_node(setup).await;
     let alice_address = node_alice.local_address().unwrap();
 
-    // insert blocks into node_alice
-    let block_1 = BLOCK_1.to_vec();
-    let block_struct_1 = Block::deserialize(&block_1).unwrap();
-    node_alice
-        .environment
-        .consensus_parameters()
-        .receive_block(
-            node_alice.environment.dpc_parameters(),
-            &node_alice.environment.storage().read(),
-            &mut node_alice.environment.memory_pool().lock(),
-            &block_struct_1,
-        )
-        .unwrap();
+    const NUM_BLOCKS: usize = 100;
 
-    let block_2 = BLOCK_2.to_vec();
-    let block_struct_2 = Block::deserialize(&block_2).unwrap();
-    node_alice
-        .environment
-        .consensus_parameters()
-        .receive_block(
-            node_alice.environment.dpc_parameters(),
-            &node_alice.environment.storage().read(),
-            &mut node_alice.environment.memory_pool().lock(),
-            &block_struct_2,
-        )
-        .unwrap();
+    let blocks = crate::network::TestBlocks::load(NUM_BLOCKS).0;
+    assert_eq!(blocks.len(), NUM_BLOCKS);
+
+    for block in blocks {
+        node_alice
+            .environment
+            .consensus_parameters()
+            .receive_block(
+                node_alice.environment.dpc_parameters(),
+                &node_alice.environment.storage().read(),
+                &mut node_alice.environment.memory_pool().lock(),
+                &block,
+            )
+            .unwrap();
+    }
 
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
-            block_sync_interval: 1,
+            block_sync_interval: 5,
             ..Default::default()
         }),
-        peer_sync_interval: 1,
+        peer_sync_interval: 5,
         bootnodes: vec![alice_address.to_string()],
         ..Default::default()
     };
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(
-        5,
-        node_bob
-            .environment
-            .storage()
-            .read()
-            .block_hash_exists(&block_struct_1.header.get_hash())
-    );
-    wait_until!(
-        5,
-        node_bob
-            .environment
-            .storage()
-            .read()
-            .block_hash_exists(&block_struct_2.header.get_hash())
-    );
+    wait_until!(30, node_bob.environment.current_block_height() as usize == NUM_BLOCKS);
 }
 
 #[tokio::test]
