@@ -328,6 +328,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "capnp"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee33f13b9419d35f9ae6e0ee2e5ef6bd059a4d0da2fda16a88ddaf57dfe9acca"
+
+[[package]]
+name = "capnpc"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76c50eb1605fb64e5cbf9a22c244ea4136516f1aa38ee8e2c8f94a080370521e"
+dependencies = [
+ "capnp",
+]
+
+[[package]]
 name = "cast"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2952,6 +2967,7 @@ name = "snarkos"
 version = "1.1.4"
 dependencies = [
  "anyhow",
+ "capnpc",
  "clap",
  "colored",
  "dirs",
@@ -3053,6 +3069,8 @@ dependencies = [
  "anyhow",
  "bincode",
  "byteorder",
+ "capnp",
+ "capnpc",
  "chrono",
  "hex",
  "log",
