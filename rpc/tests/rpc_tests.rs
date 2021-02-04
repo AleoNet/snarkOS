@@ -17,7 +17,7 @@
 /// Tests for public RPC endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
-    use snarkos_network::Server;
+    use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_testing::{
         consensus::*,
@@ -47,7 +47,7 @@ mod rpc_tests {
 
     async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> Rpc {
         let environment = test_environment(TestSetup::default());
-        let server = Server::new(environment.clone()).await.unwrap();
+        let server = Node::new(environment.clone()).await.unwrap();
 
         let storage_path = storage.read().storage.db.path().to_path_buf();
 

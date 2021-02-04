@@ -17,7 +17,7 @@
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
     use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
-    use snarkos_network::Server;
+    use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_testing::{
         consensus::*,
@@ -81,7 +81,7 @@ mod protected_rpc_tests {
         };
 
         let environment = test_environment(TestSetup::default());
-        let server = Server::new(environment.clone()).await.unwrap();
+        let server = Node::new(environment.clone()).await.unwrap();
 
         let storage_path = storage.read().storage.db.path().to_path_buf();
 

@@ -20,7 +20,7 @@
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{Environment, Server};
+use snarkos_network::{Environment, Node};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
@@ -54,8 +54,8 @@ pub struct RpcImpl {
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
 
-    /// A clone of the Server
-    pub(crate) server: Server,
+    /// A clone of the Node
+    pub(crate) server: Node,
 }
 
 impl RpcImpl {
@@ -66,7 +66,7 @@ impl RpcImpl {
         storage_path: PathBuf,
         environment: Environment,
         credentials: Option<RpcCredentials>,
-        server: Server,
+        server: Node,
     ) -> Self {
         Self {
             storage,
