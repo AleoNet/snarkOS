@@ -16,7 +16,7 @@
 
 use crate::{
     errors::{connect::ConnectError, send::SendError},
-    external::Message,
+    Message,
 };
 use snarkos_consensus::error::ConsensusError;
 use snarkos_storage::error::StorageError;

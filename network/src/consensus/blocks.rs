@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::message::*, peers::PeerInfo, Consensus, NetworkError};
+use crate::{message::*, peers::PeerInfo, Consensus, NetworkError};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash};
 

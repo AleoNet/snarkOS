@@ -23,7 +23,7 @@ use crate::{
 };
 
 use snarkos_consensus::memory_pool::Entry;
-use snarkos_network::external::message::*;
+use snarkos_network::message::*;
 
 use snarkvm_dpc::instantiated::Tx;
 use snarkvm_objects::block_header_hash::BlockHeaderHash;

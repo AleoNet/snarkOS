@@ -30,8 +30,6 @@ extern crate tracing;
 #[macro_use]
 extern crate snarkos_metrics;
 
-pub mod external;
-
 pub mod consensus;
 pub use consensus::*;
 
@@ -44,13 +42,16 @@ pub use errors::*;
 pub mod inbound;
 pub use inbound::*;
 
+pub mod message;
+pub use message::*;
+
 pub mod outbound;
 pub use outbound::*;
 
 pub mod peers;
 pub use peers::*;
 
-use crate::{external::message::*, ConnWriter};
+use crate::ConnWriter;
 
 use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};

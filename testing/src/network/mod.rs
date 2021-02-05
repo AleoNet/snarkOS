@@ -29,7 +29,7 @@ use snarkos_network::{
     connection_reader::ConnReader,
     connection_writer::ConnWriter,
     errors::{message::*, network::*},
-    external::message::*,
+    message::*,
     Consensus,
     Environment,
     Node,
