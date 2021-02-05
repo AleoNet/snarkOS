@@ -87,8 +87,20 @@ async fn block_initiator_side() {
     peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
-    wait_until!(1, node.storage().read().block_hash_exists(&block_1_header_hash));
-    wait_until!(1, node.storage().read().block_hash_exists(&block_2_header_hash));
+    wait_until!(
+        1,
+        node.consensus()
+            .storage()
+            .read()
+            .block_hash_exists(&block_1_header_hash)
+    );
+    wait_until!(
+        1,
+        node.consensus()
+            .storage()
+            .read()
+            .block_hash_exists(&block_2_header_hash)
+    );
 }
 
 #[tokio::test]
@@ -98,11 +110,12 @@ async fn block_responder_side() {
 
     // insert block into node
     let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
-    node.consensus_parameters()
+    node.consensus()
+        .consensus_parameters()
         .receive_block(
-            node.dpc_parameters(),
-            &node.storage().read(),
-            &mut node.memory_pool().lock(),
+            node.consensus().dpc_parameters(),
+            &node.consensus().storage().read(),
+            &mut node.consensus().memory_pool().lock(),
             &block_struct_1,
         )
         .unwrap();
@@ -157,11 +170,12 @@ async fn block_two_node() {
 
     for block in blocks {
         node_alice
+            .consensus()
             .consensus_parameters()
             .receive_block(
-                node_alice.dpc_parameters(),
-                &node_alice.storage().read(),
-                &mut node_alice.memory_pool().lock(),
+                node_alice.consensus().dpc_parameters(),
+                &node_alice.consensus().storage().read(),
+                &mut node_alice.consensus().memory_pool().lock(),
                 &block,
             )
             .unwrap();
@@ -179,7 +193,7 @@ async fn block_two_node() {
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(30, node_bob.current_block_height() as usize == NUM_BLOCKS);
+    wait_until!(30, node_bob.consensus().current_block_height() as usize == NUM_BLOCKS);
 }
 
 #[tokio::test]
@@ -214,8 +228,8 @@ async fn transaction_initiator_side() {
     };
 
     // Verify the transactions have been stored in the node's memory pool
-    wait_until!(1, node.memory_pool().lock().contains(&entry_1));
-    wait_until!(1, node.memory_pool().lock().contains(&entry_2));
+    wait_until!(1, node.consensus().memory_pool().lock().contains(&entry_1));
+    wait_until!(1, node.consensus().memory_pool().lock().contains(&entry_2));
 }
 
 #[tokio::test]
@@ -224,8 +238,8 @@ async fn transaction_responder_side() {
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
 
     // insert transaction into node
-    let mut memory_pool = node.memory_pool().lock();
-    let storage = node.storage().read();
+    let mut memory_pool = node.consensus().memory_pool().lock();
+    let storage = node.consensus().storage().read();
 
     let entry_1 = Entry {
         size_in_bytes: TRANSACTION_1.len(),
@@ -271,8 +285,8 @@ async fn transaction_two_node() {
     let alice_address = node_alice.local_address().unwrap();
 
     // insert transaction into node_alice
-    let mut memory_pool = node_alice.memory_pool().lock();
-    let storage = node_alice.storage().read();
+    let mut memory_pool = node_alice.consensus().memory_pool().lock();
+    let storage = node_alice.consensus().storage().read();
 
     let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
     let size = TRANSACTION_1.len();
@@ -299,5 +313,5 @@ async fn transaction_two_node() {
     let node_bob = test_node(setup).await;
 
     // check transaction is present in bob's memory pool
-    wait_until!(5, node_bob.memory_pool().lock().contains(&entry));
+    wait_until!(5, node_bob.consensus().memory_pool().lock().contains(&entry));
 }
