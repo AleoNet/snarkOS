@@ -83,15 +83,15 @@ impl RpcImpl {
     }
 
     pub fn consensus(&self) -> &ConsensusParameters {
-        self.environment.consensus_parameters()
+        self.server.consensus_parameters()
     }
 
     pub fn parameters(&self) -> &PublicParameters<Components> {
-        self.environment.dpc_parameters()
+        self.server.dpc_parameters()
     }
 
     pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
-        self.environment.memory_pool()
+        self.server.memory_pool()
     }
 }
 
@@ -303,7 +303,7 @@ impl RpcFunctions for RpcImpl {
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let number = self.server.peers.number_of_connected_peers();
+        let number = self.server.number_of_connected_peers();
 
         Ok(number as usize)
     }
@@ -311,7 +311,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns this nodes connected peers.
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peers = self.server.peers.connected_peers().keys().copied().collect();
+        let peers = self.server.connected_peers().keys().copied().collect();
 
         Ok(PeerInfo { peers })
     }
@@ -322,7 +322,7 @@ impl RpcFunctions for RpcImpl {
         let is_syncing = false;
 
         Ok(NodeInfo {
-            is_miner: self.environment.is_miner(),
+            is_miner: self.server.is_miner(),
             is_syncing,
         })
     }
