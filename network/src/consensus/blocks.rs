@@ -42,14 +42,6 @@ impl Consensus {
         }
     }
 
-    ///
-    /// Returns the local address of this node.
-    ///
-    #[inline]
-    pub fn local_address(&self) -> SocketAddr {
-        self.node().local_address().unwrap() // the address must be known by now
-    }
-
     /// Broadcast block to connected peers
     pub async fn propagate_block(
         &self,

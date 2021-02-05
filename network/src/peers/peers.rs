@@ -32,7 +32,7 @@ impl Node {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    pub async fn update_peers(&self) -> Result<(), NetworkError> {
+    pub(crate) async fn update_peers(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
         let number_of_connected_peers = self.peer_book.read().number_of_connected_peers() as usize;
         trace!(
