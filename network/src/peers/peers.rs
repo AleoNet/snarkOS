@@ -14,18 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    message::*,
-    peers::{PeerInfo, PeerQuality},
-    ConnReader,
-    ConnWriter,
-    NetworkError,
-    Node,
-    Version,
-};
+use crate::{message::*, peers::PeerQuality, ConnReader, ConnWriter, NetworkError, Node, Version};
 
 use std::{
-    collections::HashMap,
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
     time::Instant,
