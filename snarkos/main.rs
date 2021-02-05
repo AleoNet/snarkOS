@@ -144,6 +144,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Duration::from_secs(config.p2p.mempool_interval.into()),
     );
 
+    // Set the consensus on the server.
+    server.set_consensus(consensus);
     // Establish the address of the server.
     server.establish_address().await?;
     environment.set_local_address(server.local_address().unwrap());

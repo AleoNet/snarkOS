@@ -110,7 +110,7 @@ pub struct Consensus {
 
 impl Consensus {
     pub fn new(
-        mut node: Node,
+        node: Node,
         storage: Arc<RwLock<MerkleTreeLedger>>,
         memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
         consensus_parameters: Arc<ConsensusParameters>,
@@ -119,8 +119,8 @@ impl Consensus {
         block_sync_interval: Duration,
         transaction_sync_interval: Duration,
     ) -> Self {
-        let consensus = Self {
-            node: node.clone(),
+        Self {
+            node,
             storage,
             memory_pool,
             consensus_parameters,
@@ -130,12 +130,7 @@ impl Consensus {
             last_block_sync: Arc::new(RwLock::new(Instant::now())),
             transaction_sync_interval,
             is_syncing_blocks: Default::default(),
-        };
-
-        // Set the Consensus on the node.
-        node.consensus = Some(Arc::new(consensus.clone()));
-
-        consensus
+        }
     }
 
     /// Checks whether the node is currently syncing blocks.
@@ -165,7 +160,7 @@ pub struct Node {
     /// The list of connected and disconnected peers of this node server.
     peer_book: Arc<RwLock<PeerBook>>,
     /// The objects related to consensus.
-    consensus: Option<Arc<Consensus>>,
+    pub consensus: Option<Arc<Consensus>>,
 }
 
 impl Node {
@@ -185,6 +180,10 @@ impl Node {
             // Consensus set to None as the node needs to be created first.
             consensus: None,
         })
+    }
+
+    pub fn set_consensus(&mut self, consensus: Consensus) {
+        self.consensus = Some(Arc::new(consensus));
     }
 
     pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
