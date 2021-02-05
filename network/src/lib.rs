@@ -137,6 +137,15 @@ impl Consensus {
 
         consensus
     }
+
+    /// Checks whether the node is currently syncing blocks.
+    pub fn is_syncing_blocks(&self) -> bool {
+        self.is_syncing_blocks.load(Ordering::SeqCst)
+    }
+
+    pub fn max_block_size(&self) -> usize {
+        self.consensus_parameters.max_block_size
+    }
 }
 
 /// A core data structure for operating the networking stack of this node.
@@ -153,7 +162,6 @@ pub struct Node {
     consensus: Option<Arc<Consensus>>,
 
     pub peers: Peers,
-    pub blocks: Blocks,
 }
 
 impl Node {
@@ -166,7 +174,6 @@ impl Node {
 
         // Initialize the peer and block services.
         let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
-        let blocks = Blocks::new(environment.clone(), outbound.clone());
 
         Ok(Self {
             environment,
@@ -175,7 +182,6 @@ impl Node {
             // Consensus set to None as the node needs to be created first.
             consensus: None,
             peers,
-            blocks,
         })
     }
 
@@ -185,7 +191,6 @@ impl Node {
 
         // update the local address for Blocks and Peers
         self.peers.environment.set_local_address(address);
-        self.blocks.environment.set_local_address(address);
 
         Ok(())
     }
@@ -226,7 +231,7 @@ impl Node {
 
                         // select last seen node as block sync node
                         let sync_node = self_clone.peers.last_seen();
-                        self_clone.consensus().update(sync_node).await;
+                        self_clone.consensus().update_transactions(sync_node).await;
                     }
                 }
             });
@@ -275,19 +280,19 @@ impl Node {
                     .await?;
             }
             Payload::Block(block) => {
-                self.blocks
+                self.consensus()
                     .received_block(source.unwrap(), block, Some(self.peers.connected_peers()))
                     .await?;
             }
             Payload::SyncBlock(block) => {
-                self.blocks.received_block(source.unwrap(), block, None).await?;
+                self.consensus().received_block(source.unwrap(), block, None).await?;
                 if self.peers.got_sync_block(source.unwrap()) {
                     self.finished_syncing_blocks();
                 }
             }
             Payload::GetBlocks(hashes) => {
                 if !self.is_syncing_blocks() {
-                    self.blocks.received_get_blocks(source.unwrap(), hashes).await?;
+                    self.consensus().received_get_blocks(source.unwrap(), hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
@@ -300,12 +305,12 @@ impl Node {
             }
             Payload::GetSync(getsync) => {
                 if !self.is_syncing_blocks() {
-                    self.blocks.received_get_sync(source.unwrap(), getsync).await?;
+                    self.consensus().received_get_sync(source.unwrap(), getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
                 self.peers.expecting_sync_blocks(source.unwrap(), sync.len());
-                self.blocks.received_sync(source.unwrap(), sync).await;
+                self.consensus().received_sync(source.unwrap(), sync).await;
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {
@@ -329,7 +334,7 @@ impl Node {
                 {
                     self.register_block_sync_attempt();
                     trace!("Attempting to sync with {}", source.unwrap());
-                    self.blocks.update(source.unwrap()).await;
+                    self.consensus().update_blocks(source.unwrap()).await;
                 } else {
                     self.finished_syncing_blocks();
                 }

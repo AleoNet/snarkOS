@@ -28,7 +28,7 @@ impl Consensus {
     ///
     /// Triggers the transaction sync with a selected peer.
     ///
-    pub async fn update(&self, sync_node: Option<SocketAddr>) {
+    pub async fn update_transactions(&self, sync_node: Option<SocketAddr>) {
         if let Some(sync_node) = sync_node {
             self.node
                 .outbound

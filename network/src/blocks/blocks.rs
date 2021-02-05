@@ -14,39 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::message::*, peers::PeerInfo, Environment, NetworkError, Outbound};
+use crate::{external::message::*, peers::PeerInfo, Consensus, Environment, NetworkError, Outbound};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-/// A stateful component for managing the blocks for the ledger on this node server.
-#[derive(Clone)]
-pub struct Blocks {
-    /// The parameters and settings of this node server.
-    pub(crate) environment: Environment,
-    /// The outbound handler of this node server.
-    outbound: Arc<Outbound>,
-}
-
-impl Blocks {
-    ///
-    /// Creates a new instance of `Blocks`.
-    ///
-    pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Self {
-        trace!("Instantiating the block service");
-        Self { environment, outbound }
-    }
-
+impl Consensus {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    pub async fn update(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = self.environment.storage().read().get_block_locator_hashes();
+    pub async fn update_blocks(&self, sync_node: SocketAddr) {
+        let block_locator_hashes = self.storage.read().get_block_locator_hashes();
 
         if let Ok(block_locator_hashes) = block_locator_hashes {
             // Send a GetSync to the selected sync node.
-            self.outbound
+            self.node
+                .outbound
                 .send_request(Message::new(
                     Direction::Outbound(sync_node),
                     Payload::GetSync(block_locator_hashes),
@@ -63,7 +47,7 @@ impl Blocks {
     ///
     #[inline]
     pub fn local_address(&self) -> SocketAddr {
-        self.environment.local_address().unwrap() // the address must be known by now
+        self.node.local_address().unwrap() // the address must be known by now
     }
 
     /// Broadcast block to connected peers
@@ -78,7 +62,8 @@ impl Blocks {
         for remote_address in connected_peers.keys() {
             if *remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
-                self.outbound
+                self.node
+                    .outbound
                     .send_request(Message::new(
                         Direction::Outbound(*remote_address),
                         Payload::Block(block_bytes.clone()),
@@ -96,7 +81,7 @@ impl Blocks {
         connected_peers: Option<HashMap<SocketAddr, PeerInfo>>,
     ) -> Result<(), NetworkError> {
         let block_size = block.len();
-        let max_block_size = self.environment.max_block_size();
+        let max_block_size = self.max_block_size();
 
         if block_size > max_block_size {
             return Err(NetworkError::ConsensusError(ConsensusError::BlockTooLarge(
@@ -114,19 +99,18 @@ impl Blocks {
 
         // Verify the block and insert it into the storage.
         let is_valid_block = self
-            .environment
-            .consensus_parameters()
+            .consensus_parameters
             .receive_block(
-                self.environment.dpc_parameters(),
-                &self.environment.storage().read(),
-                &mut self.environment.memory_pool().lock(),
+                &self.dpc_parameters,
+                &self.storage.read(),
+                &mut self.memory_pool.lock(),
                 &block_struct,
             )
             .is_ok();
 
         // This is a new block, send it to our peers.
         if let Some(connected_peers) = connected_peers {
-            if is_valid_block && !self.environment.is_syncing_blocks() {
+            if is_valid_block && !self.is_syncing_blocks() {
                 self.propagate_block(block, remote_address, &connected_peers).await;
             }
         }
@@ -141,10 +125,11 @@ impl Blocks {
         header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         for hash in header_hashes {
-            let block = self.environment.storage().read().get_block(&hash)?;
+            let block = self.storage.read().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.
-            self.outbound
+            self.node
+                .outbound
                 .send_request(Message::new(
                     Direction::Outbound(remote_address),
                     Payload::SyncBlock(block.serialize()?),
@@ -162,10 +147,10 @@ impl Blocks {
         block_locator_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         let sync = {
-            let storage_lock = self.environment.storage().read();
+            let storage_lock = self.storage.read();
 
             let latest_shared_hash = storage_lock.get_latest_shared_hash(block_locator_hashes)?;
-            let current_height = self.environment.storage().read().get_current_block_height();
+            let current_height = self.storage.read().get_current_block_height();
 
             if let Ok(height) = storage_lock.get_block_number(&latest_shared_hash) {
                 if height < current_height {
@@ -194,7 +179,8 @@ impl Blocks {
         };
 
         // send a `Sync` message to the connected peer.
-        self.outbound
+        self.node
+            .outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)))
             .await;
 
@@ -208,7 +194,8 @@ impl Blocks {
             for batch in block_hashes.chunks(crate::MAX_BLOCK_SYNC_COUNT as usize) {
                 // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
                 // detect missing blocks and divergence in chain for now.
-                self.outbound
+                self.node
+                    .outbound
                     .send_request(Message::new(
                         Direction::Outbound(remote_address),
                         Payload::GetBlocks(batch.to_vec()),
