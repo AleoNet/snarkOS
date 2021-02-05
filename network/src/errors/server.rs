@@ -92,9 +92,3 @@ impl From<std::net::AddrParseError> for ServerError {
         ServerError::Crate("std::net::AddrParseError", format!("{:?}", error))
     }
 }
-
-impl From<bincode::Error> for ServerError {
-    fn from(error: bincode::Error) -> Self {
-        ServerError::Crate("bincode", format!("{:?}", error))
-    }
-}
