@@ -57,6 +57,7 @@ pub struct Consensus {
 }
 
 impl Consensus {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         node: Node,
         storage: Arc<RwLock<MerkleTreeLedger>>,

@@ -134,7 +134,6 @@ impl Node {
 
     pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
         self.inbound.listen(&mut self.environment).await?;
-        let address = self.environment.local_address().unwrap();
 
         Ok(())
     }
