@@ -32,8 +32,8 @@ extern crate snarkos_metrics;
 
 pub mod external;
 
-pub mod blocks;
-pub use blocks::*;
+pub mod consensus;
+pub use consensus::*;
 
 pub mod environment;
 pub use environment::*;
@@ -49,9 +49,6 @@ pub use outbound::*;
 
 pub mod peers;
 pub use peers::*;
-
-pub mod transactions;
-pub use transactions::*;
 
 use crate::{external::message::*, ConnWriter};
 
@@ -84,121 +81,6 @@ pub const MAX_BLOCK_SYNC_COUNT: u32 = 250;
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
 pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
-
-#[derive(Clone)]
-pub struct Consensus {
-    node: Node,
-    /// The storage system of this node.
-    storage: Arc<RwLock<MerkleTreeLedger>>,
-    /// The memory pool of this node.
-    memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
-    /// The consensus parameters for the associated network ID.
-    consensus_parameters: Arc<ConsensusParameters>,
-    /// The DPC parameters for the associated network ID.
-    dpc_parameters: Arc<PublicParameters<Components>>,
-    /// If `true`, initializes a mining task on this node.
-    is_miner: bool,
-    /// The interval between each block sync.
-    block_sync_interval: Duration,
-    /// The last time a block sync was initiated.
-    last_block_sync: Arc<RwLock<Instant>>,
-    /// The interval between each transaction (memory pool) sync.
-    transaction_sync_interval: Duration,
-    /// Is the node currently syncing blocks?
-    is_syncing_blocks: Arc<AtomicBool>,
-}
-
-impl Consensus {
-    pub fn new(
-        node: Node,
-        storage: Arc<RwLock<MerkleTreeLedger>>,
-        memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
-        consensus_parameters: Arc<ConsensusParameters>,
-        dpc_parameters: Arc<PublicParameters<Components>>,
-        is_miner: bool,
-        block_sync_interval: Duration,
-        transaction_sync_interval: Duration,
-    ) -> Self {
-        Self {
-            node,
-            storage,
-            memory_pool,
-            consensus_parameters,
-            dpc_parameters,
-            is_miner,
-            block_sync_interval,
-            last_block_sync: Arc::new(RwLock::new(Instant::now())),
-            transaction_sync_interval,
-            is_syncing_blocks: Default::default(),
-        }
-    }
-
-    /// Returns a reference to the storage system of this node.
-    #[inline]
-    pub fn storage(&self) -> &Arc<RwLock<MerkleTreeLedger>> {
-        &self.storage
-    }
-
-    /// Returns a reference to the memory pool of this node.
-    #[inline]
-    pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
-        &self.memory_pool
-    }
-
-    /// Returns a reference to the consensus parameters of this node.
-    #[inline]
-    pub fn consensus_parameters(&self) -> &Arc<ConsensusParameters> {
-        &self.consensus_parameters
-    }
-
-    /// Returns a reference to the DPC parameters of this node.
-    #[inline]
-    pub fn dpc_parameters(&self) -> &Arc<PublicParameters<Components>> {
-        &self.dpc_parameters
-    }
-
-    /// Checks whether the node is currently syncing blocks.
-    pub fn is_syncing_blocks(&self) -> bool {
-        self.is_syncing_blocks.load(Ordering::SeqCst)
-    }
-
-    /// Register that the node is no longer syncing blocks.
-    pub fn finished_syncing_blocks(&self) {
-        self.is_syncing_blocks.store(false, Ordering::SeqCst);
-    }
-
-    /// Returns `true` if this node is a mining node. Otherwise, returns `false`.
-    #[inline]
-    pub fn is_miner(&self) -> bool {
-        self.is_miner
-    }
-
-    /// Returns the current block height of the ledger from storage.
-    #[inline]
-    pub fn current_block_height(&self) -> u32 {
-        self.storage.read().get_current_block_height()
-    }
-
-    /// Checks whether enough time has elapsed for the node to attempt another block sync.
-    pub fn should_sync_blocks(&self) -> bool {
-        !self.is_syncing_blocks() && self.last_block_sync.read().elapsed() > self.block_sync_interval
-    }
-
-    /// Register that the node attempted to sync blocks.
-    pub fn register_block_sync_attempt(&self) {
-        *self.last_block_sync.write() = Instant::now();
-        self.is_syncing_blocks.store(true, Ordering::SeqCst);
-    }
-
-    /// Returns the interval between each transaction (memory pool) sync.
-    pub fn transaction_sync_interval(&self) -> Duration {
-        self.transaction_sync_interval
-    }
-
-    pub fn max_block_size(&self) -> usize {
-        self.consensus_parameters.max_block_size
-    }
-}
 
 /// A core data structure for operating the networking stack of this node.
 #[derive(Clone)]
@@ -236,6 +118,18 @@ impl Node {
 
     pub fn set_consensus(&mut self, consensus: Consensus) {
         self.consensus = Some(Arc::new(consensus));
+    }
+
+    /// Returns a reference to the consensus objects.
+    #[inline]
+    pub fn consensus(&self) -> &Consensus {
+        self.consensus.as_ref().expect("no consensus!")
+    }
+
+    #[inline]
+    #[doc(hide)]
+    pub fn has_consensus(&self) -> bool {
+        self.consensus.is_some()
     }
 
     pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
@@ -398,20 +292,5 @@ impl Node {
         }
 
         Ok(())
-    }
-
-    // TODO: Probably not the right place for these.
-    // CONSENSUS
-
-    /// Returns a reference to the consensus objects.
-    #[inline]
-    pub fn consensus(&self) -> &Consensus {
-        self.consensus.as_ref().expect("no consensus!")
-    }
-
-    #[inline]
-    #[doc(hide)]
-    pub fn has_consensus(&self) -> bool {
-        self.consensus.is_some()
     }
 }

@@ -30,7 +30,7 @@ impl Consensus {
     ///
     pub async fn update_transactions(&self, sync_node: Option<SocketAddr>) {
         if let Some(sync_node) = sync_node {
-            self.node
+            self.node()
                 .outbound
                 .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool))
                 .await;
@@ -48,12 +48,12 @@ impl Consensus {
     ) -> Result<(), NetworkError> {
         debug!("Propagating a transaction to peers");
 
-        let local_address = self.node.local_address().unwrap();
+        let local_address = self.node().local_address().unwrap();
 
         for remote_address in connected_peers.keys() {
             if *remote_address != transaction_sender && *remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
-                self.node
+                self.node()
                     .outbound
                     .send_request(Message::new(
                         Direction::Outbound(*remote_address),
@@ -75,9 +75,9 @@ impl Consensus {
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&*transaction) {
             let insertion = {
-                let parameters = &self.dpc_parameters;
-                let storage = self.storage.read();
-                let consensus = &self.consensus_parameters;
+                let parameters = &self.dpc_parameters();
+                let storage = self.storage().read();
+                let consensus = &self.consensus_parameters();
 
                 if !consensus.verify_transaction(&parameters, &tx, &storage)? {
                     error!("Received a transaction that was invalid");
@@ -94,7 +94,7 @@ impl Consensus {
                     transaction: tx,
                 };
 
-                self.memory_pool.lock().insert(&storage, entry)
+                self.memory_pool().lock().insert(&storage, entry)
             };
 
             if let Ok(inserted) = insertion {
@@ -115,7 +115,7 @@ impl Consensus {
         let transactions = {
             let mut txs = vec![];
 
-            let memory_pool = self.memory_pool.lock();
+            let memory_pool = self.memory_pool().lock();
             for entry in memory_pool.transactions.values() {
                 if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                     txs.push(transaction_bytes);
@@ -127,7 +127,7 @@ impl Consensus {
 
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
-            self.node
+            self.node()
                 .outbound
                 .send_request(Message::new(
                     Direction::Outbound(remote_address),
@@ -141,8 +141,8 @@ impl Consensus {
 
     /// A peer has sent us their memory pool transactions.
     pub(crate) fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
-        let mut memory_pool = self.memory_pool.lock();
-        let storage = self.storage.read();
+        let mut memory_pool = self.memory_pool().lock();
+        let storage = self.storage().read();
 
         for transaction_bytes in transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;

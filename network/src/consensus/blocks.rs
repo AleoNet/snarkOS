@@ -25,11 +25,11 @@ impl Consensus {
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
     pub async fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = self.storage.read().get_block_locator_hashes();
+        let block_locator_hashes = self.storage().read().get_block_locator_hashes();
 
         if let Ok(block_locator_hashes) = block_locator_hashes {
             // Send a GetSync to the selected sync node.
-            self.node
+            self.node()
                 .outbound
                 .send_request(Message::new(
                     Direction::Outbound(sync_node),
@@ -47,7 +47,7 @@ impl Consensus {
     ///
     #[inline]
     pub fn local_address(&self) -> SocketAddr {
-        self.node.local_address().unwrap() // the address must be known by now
+        self.node().local_address().unwrap() // the address must be known by now
     }
 
     /// Broadcast block to connected peers
@@ -62,7 +62,7 @@ impl Consensus {
         for remote_address in connected_peers.keys() {
             if *remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
-                self.node
+                self.node()
                     .outbound
                     .send_request(Message::new(
                         Direction::Outbound(*remote_address),
@@ -99,11 +99,11 @@ impl Consensus {
 
         // Verify the block and insert it into the storage.
         let is_valid_block = self
-            .consensus_parameters
+            .consensus_parameters()
             .receive_block(
-                &self.dpc_parameters,
-                &self.storage.read(),
-                &mut self.memory_pool.lock(),
+                &self.dpc_parameters(),
+                &self.storage().read(),
+                &mut self.memory_pool().lock(),
                 &block_struct,
             )
             .is_ok();
@@ -125,10 +125,10 @@ impl Consensus {
         header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         for hash in header_hashes {
-            let block = self.storage.read().get_block(&hash)?;
+            let block = self.storage().read().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.
-            self.node
+            self.node()
                 .outbound
                 .send_request(Message::new(
                     Direction::Outbound(remote_address),
@@ -147,10 +147,10 @@ impl Consensus {
         block_locator_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         let sync = {
-            let storage_lock = self.storage.read();
+            let storage_lock = self.storage().read();
 
             let latest_shared_hash = storage_lock.get_latest_shared_hash(block_locator_hashes)?;
-            let current_height = self.storage.read().get_current_block_height();
+            let current_height = self.storage().read().get_current_block_height();
 
             if let Ok(height) = storage_lock.get_block_number(&latest_shared_hash) {
                 if height < current_height {
@@ -179,7 +179,7 @@ impl Consensus {
         };
 
         // send a `Sync` message to the connected peer.
-        self.node
+        self.node()
             .outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)))
             .await;
@@ -194,7 +194,7 @@ impl Consensus {
             for batch in block_hashes.chunks(crate::MAX_BLOCK_SYNC_COUNT as usize) {
                 // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
                 // detect missing blocks and divergence in chain for now.
-                self.node
+                self.node()
                     .outbound
                     .send_request(Message::new(
                         Direction::Outbound(remote_address),
