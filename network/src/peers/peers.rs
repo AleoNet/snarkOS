@@ -43,7 +43,7 @@ impl Node {
     ///
     pub async fn update_peers(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
-        let number_of_connected_peers = self.number_of_connected_peers() as usize;
+        let number_of_connected_peers = self.peer_book.read().number_of_connected_peers() as usize;
         trace!(
             "Connected to {} peer{}",
             number_of_connected_peers,
@@ -76,7 +76,9 @@ impl Node {
                 number_to_disconnect
             );
 
-            let mut connected = self
+            let peer_book = self.peer_book.read();
+
+            let mut connected = peer_book
                 .connected_peers()
                 .into_iter()
                 .map(|(_, peer_info)| peer_info)
@@ -103,58 +105,12 @@ impl Node {
     }
 
     ///
-    /// Returns `true` if the given address is connecting with this node.
-    ///
-    #[inline]
-    pub fn is_connecting(&self, address: SocketAddr) -> bool {
-        self.peer_book.read().is_connecting(address)
-    }
-
-    ///
-    /// Returns `true` if the given address is connected with this node.
-    ///
-    #[inline]
-    pub fn is_connected(&self, address: SocketAddr) -> bool {
-        self.peer_book.read().is_connected(address)
-    }
-
-    ///
-    /// Returns `true` if the given address is a disconnected peer of this node.
-    ///
-    #[inline]
-    pub fn is_disconnected(&self, address: SocketAddr) -> bool {
-        self.peer_book.read().is_disconnected(address)
-    }
-
-    ///
-    /// Returns the number of peers connecting to this node.
-    ///
-    #[inline]
-    pub fn number_of_connecting_peers(&self) -> u16 {
-        self.peer_book.read().number_of_connecting_peers()
-    }
-
-    ///
-    /// Returns the number of peers connected to this node.
-    ///
-    #[inline]
-    pub fn number_of_connected_peers(&self) -> u16 {
-        self.peer_book.read().number_of_connected_peers()
-    }
-
-    ///
-    /// Returns a map of all connected peers with their peer-specific information.
-    ///
-    #[inline]
-    pub fn connected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
-        self.peer_book.read().connected_peers().clone()
-    }
-
-    ///
     /// Returns the `SocketAddr` of the last seen peer to be used as a sync node, or `None`.
     ///
     pub fn last_seen(&self) -> Option<SocketAddr> {
         if let Some((&socket_address, _)) = self
+            .peer_book
+            .read()
             .connected_peers()
             .iter()
             .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
@@ -189,10 +145,10 @@ impl Node {
         {
             return Err(NetworkError::SelfConnectAttempt);
         }
-        if self.is_connecting(remote_address) {
+        if self.peer_book.read().is_connecting(remote_address) {
             return Err(NetworkError::PeerAlreadyConnecting);
         }
-        if self.is_connected(remote_address) {
+        if self.peer_book.read().is_connected(remote_address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
@@ -268,7 +224,7 @@ impl Node {
         trace!("Connecting to default bootnodes");
 
         // Fetch the current connected peers of this node.
-        let connected_peers = self.connected_peers();
+        let connected_peers = self.peer_book.read().connected_peers().clone();
 
         // Iterate through each bootnode address and attempt a connection request.
         for bootnode_address in self
@@ -303,7 +259,8 @@ impl Node {
         trace!("Broadcasting Ping messages");
 
         let current_block_height = self.consensus().current_block_height();
-        for (remote_address, _) in self.connected_peers() {
+        let connected_peers = self.peer_book.read().connected_peers().clone();
+        for (remote_address, _) in connected_peers {
             self.sending_ping(remote_address);
 
             self.outbound
@@ -319,7 +276,8 @@ impl Node {
     async fn broadcast_getpeers_requests(&self) {
         trace!("Sending GetPeers requests to connected peers");
 
-        for (remote_address, _) in self.connected_peers() {
+        let connected_peers = self.peer_book.read().connected_peers().clone();
+        for (remote_address, _) in connected_peers {
             self.outbound
                 .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
                 .await;
@@ -485,7 +443,7 @@ impl Node {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
-        for peer_address in self.connected_peers().keys().copied() {
+        for peer_address in self.peer_book.read().connected_peers().keys().copied() {
             // Skip the iteration if the requesting peer that we're sending the response to
             // appears in the list of peers.
             if peer_address == remote_address {
@@ -507,7 +465,7 @@ impl Node {
         // by informing the peer book of that we found peers.
         let local_address = self.environment.local_address().unwrap(); // the address must be known by now
 
-        let number_of_connected_peers = self.number_of_connected_peers();
+        let number_of_connected_peers = self.peer_book.read().number_of_connected_peers();
         let number_to_connect = self
             .environment
             .maximum_number_of_connected_peers()

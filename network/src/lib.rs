@@ -79,7 +79,7 @@ pub struct Node {
     /// The outbound handler of this node server.
     outbound: Arc<Outbound>,
     /// The list of connected and disconnected peers of this node server.
-    peer_book: Arc<RwLock<PeerBook>>,
+    pub peer_book: Arc<RwLock<PeerBook>>,
     /// The objects related to consensus.
     pub consensus: Option<Arc<Consensus>>,
 }
@@ -204,14 +204,15 @@ impl Node {
                 }
             }
             Payload::Transaction(transaction) => {
-                let connected_peers = self.connected_peers();
+                let connected_peers = self.peer_book.read().connected_peers().clone();
                 self.consensus()
                     .received_transaction(source.unwrap(), transaction, connected_peers)
                     .await?;
             }
             Payload::Block(block) => {
+                let connected_peers = self.peer_book.read().connected_peers().clone();
                 self.consensus()
-                    .received_block(source.unwrap(), block, Some(self.connected_peers()))
+                    .received_block(source.unwrap(), block, Some(connected_peers))
                     .await?;
             }
             Payload::SyncBlock(block) => {

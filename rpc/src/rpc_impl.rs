@@ -303,7 +303,7 @@ impl RpcFunctions for RpcImpl {
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let number = self.server.number_of_connected_peers();
+        let number = self.server.peer_book.read().number_of_connected_peers();
 
         Ok(number as usize)
     }
@@ -311,7 +311,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns this nodes connected peers.
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peers = self.server.connected_peers().keys().copied().collect();
+        let peers = self.server.peer_book.read().connected_peers().keys().copied().collect();
 
         Ok(PeerInfo { peers })
     }
