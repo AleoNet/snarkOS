@@ -14,22 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Consensus, NetworkError};
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkvm_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
-};
+use crate::NetworkError;
 
-use parking_lot::{Mutex, RwLock};
-use std::{
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant},
-};
+use std::{self, net::SocketAddr, time::Duration};
 
 /// A core data structure containing the networking parameters for this node.
 #[derive(Clone)]

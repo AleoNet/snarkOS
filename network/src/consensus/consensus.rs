@@ -23,15 +23,12 @@ use snarkvm_dpc::base_dpc::{
 
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::HashMap,
-    net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
     time::{Duration, Instant},
 };
-use tokio::{task, time::sleep};
 
 #[derive(Clone)]
 pub struct Consensus {

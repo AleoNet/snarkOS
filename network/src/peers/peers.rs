@@ -16,14 +16,11 @@
 
 use crate::{
     external::{message::*, Version},
-    peers::{PeerBook, PeerInfo, PeerQuality},
+    peers::{PeerInfo, PeerQuality},
     ConnReader,
     ConnWriter,
-    Environment,
-    Inbound,
     NetworkError,
     Node,
-    Outbound,
 };
 
 use std::{
@@ -33,7 +30,7 @@ use std::{
     time::Instant,
 };
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
