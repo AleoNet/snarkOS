@@ -22,6 +22,7 @@ use crate::{
     Environment,
     Inbound,
     NetworkError,
+    Node,
     Outbound,
 };
 
@@ -38,54 +39,11 @@ use tokio::{
     net::TcpStream,
 };
 
-/// A stateful component for managing the peer connections of this node server.
-#[derive(Clone)]
-pub struct Peers {
-    /// The parameters and settings of this node server.
-    pub(crate) environment: Environment,
-    /// The inbound service of this node server.
-    inbound: Arc<Inbound>,
-    /// The outbound service of this node server.
-    outbound: Arc<Outbound>,
-    /// The list of connected and disconnected peers of this node server.
-    peer_book: Arc<RwLock<PeerBook>>,
-}
-
-impl Peers {
-    ///
-    /// Creates a new instance of `Peers`.
-    ///
-    pub fn new(environment: Environment, inbound: Arc<Inbound>, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
-        trace!("Instantiating the peer manager");
-
-        // Load the peer book from storage, or create a new peer book.
-        let peer_book = PeerBook::default();
-        // let peer_book = match PeerBook::load(&*environment.storage_read().await) {
-        //     // Case 1 - The peer book was found in storage.
-        //     Ok(peer_book) => peer_book,
-        //     // Case 2 - Either the peer book does not exist in storage, or could not be deserialized.
-        //     // Create a new instance of the peer book.
-        //     _ => PeerBook::new(*environment.local_address()),
-        // };
-
-        // Instantiate the peer manager.
-        let peers = Self {
-            environment,
-            inbound,
-            outbound,
-            peer_book: Arc::new(RwLock::new(peer_book)),
-        };
-
-        // Save the peer book to storage.
-        // peers.save_peer_book_to_storage().await?;
-
-        Ok(peers)
-    }
-
+impl Node {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    pub async fn update(&self) -> Result<(), NetworkError> {
+    pub async fn update_peers(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
         let number_of_connected_peers = self.number_of_connected_peers() as usize;
         trace!(
@@ -140,7 +98,7 @@ impl Peers {
             self.broadcast_pings().await;
 
             // Store the peer book to storage.
-            self.save_peer_book_to_storage()?;
+            // self.save_peer_book_to_storage()?;
         }
 
         Ok(())
@@ -223,14 +181,6 @@ impl Peers {
     #[inline]
     pub fn add_peer(&self, address: SocketAddr) {
         self.peer_book.write().add_peer(address);
-    }
-
-    ///
-    /// Returns the local address of the node.
-    ///
-    #[inline]
-    pub fn local_address(&self) -> Option<SocketAddr> {
-        self.environment.local_address()
     }
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
@@ -354,7 +304,7 @@ impl Peers {
     async fn broadcast_pings(&self) {
         trace!("Broadcasting Ping messages");
 
-        let current_block_height = self.environment.current_block_height();
+        let current_block_height = self.current_block_height();
         for (remote_address, _) in self.connected_peers() {
             self.sending_ping(remote_address);
 
@@ -446,19 +396,19 @@ impl Peers {
     /// This function checks that this node is not connected to itself,
     /// and proceeds to serialize the peer book into a byte vector for storage.
     ///
-    #[inline]
-    fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
-        // Serialize the peer book.
-        let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
+    // #[inline]
+    // fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
+    //     // Serialize the peer book.
+    //     let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
-        // Save the serialized peer book to storage.
-        self.environment
-            .storage()
-            .write()
-            .save_peer_book_to_storage(serialized_peer_book)?;
+    //     // Save the serialized peer book to storage.
+    //     self.environment
+    //         .storage()
+    //         .write()
+    //         .save_peer_book_to_storage(serialized_peer_book)?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     /// Registers that the given number of blocks is expected as part of syncing with a peer.
     pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) {
@@ -490,7 +440,7 @@ impl Peers {
     }
 }
 
-impl Peers {
+impl Node {
     ///
     /// Sets the given remote address as connecting to this node.
     ///
@@ -521,7 +471,7 @@ impl Peers {
         debug!("Disconnecting from {}", remote_address);
 
         if self.is_syncing_blocks(remote_address) {
-            self.environment.finished_syncing_blocks();
+            self.consensus().finished_syncing_blocks();
         }
 
         if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {

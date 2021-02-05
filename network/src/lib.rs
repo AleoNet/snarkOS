@@ -53,7 +53,7 @@ pub use peers::*;
 pub mod transactions;
 pub use transactions::*;
 
-use crate::{external::message::*, peers::peers::Peers, ConnWriter};
+use crate::{external::message::*, ConnWriter};
 
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkvm_dpc::base_dpc::{
@@ -120,7 +120,7 @@ impl Consensus {
         transaction_sync_interval: Duration,
     ) -> Self {
         let consensus = Self {
-            node,
+            node: node.clone(),
             storage,
             memory_pool,
             consensus_parameters,
@@ -133,7 +133,7 @@ impl Consensus {
         };
 
         // Set the Consensus on the node.
-        node.consensus = Some(Arc::new(consensus));
+        node.consensus = Some(Arc::new(consensus.clone()));
 
         consensus
     }
@@ -141,6 +141,11 @@ impl Consensus {
     /// Checks whether the node is currently syncing blocks.
     pub fn is_syncing_blocks(&self) -> bool {
         self.is_syncing_blocks.load(Ordering::SeqCst)
+    }
+
+    /// Register that the node is no longer syncing blocks.
+    pub fn finished_syncing_blocks(&self) {
+        self.is_syncing_blocks.store(false, Ordering::SeqCst);
     }
 
     pub fn max_block_size(&self) -> usize {
@@ -157,11 +162,10 @@ pub struct Node {
     inbound: Arc<Inbound>,
     /// The outbound handler of this node server.
     outbound: Arc<Outbound>,
-
+    /// The list of connected and disconnected peers of this node server.
+    peer_book: Arc<RwLock<PeerBook>>,
     /// The objects related to consensus.
     consensus: Option<Arc<Consensus>>,
-
-    pub peers: Peers,
 }
 
 impl Node {
@@ -172,25 +176,20 @@ impl Node {
         let inbound = Arc::new(Inbound::new(channels.clone()));
         let outbound = Arc::new(Outbound::new(channels));
 
-        // Initialize the peer and block services.
-        let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
-
         Ok(Self {
             environment,
             inbound,
             outbound,
+            // TODO (nkls): derive default?
+            peer_book: Default::default(),
             // Consensus set to None as the node needs to be created first.
             consensus: None,
-            peers,
         })
     }
 
     pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
         self.inbound.listen(&mut self.environment).await?;
         let address = self.environment.local_address().unwrap();
-
-        // update the local address for Blocks and Peers
-        self.peers.environment.set_local_address(address);
 
         Ok(())
     }
@@ -206,14 +205,14 @@ impl Node {
             }
         });
 
+        let self_clone = self.clone();
         let peer_sync_interval = self.environment.peer_sync_interval();
-        let peers = self.peers.clone();
         task::spawn(async move {
             loop {
                 sleep(peer_sync_interval).await;
                 info!("Updating peers");
 
-                if let Err(e) = peers.update().await {
+                if let Err(e) = self_clone.update_peers().await {
                     error!("Peer update error: {}", e);
                 }
             }
@@ -226,11 +225,11 @@ impl Node {
                 loop {
                     sleep(transaction_sync_interval).await;
 
-                    if !self_clone.is_syncing_blocks() {
+                    if !self_clone.consensus().is_syncing_blocks() {
                         info!("Updating transactions");
 
                         // select last seen node as block sync node
-                        let sync_node = self_clone.peers.last_seen();
+                        let sync_node = self_clone.last_seen();
                         self_clone.consensus().update_transactions(sync_node).await;
                     }
                 }
@@ -256,7 +255,7 @@ impl Node {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         let source = if let Direction::Inbound(addr) = direction {
-            self.peers.update_last_seen(addr);
+            self.update_last_seen(addr);
             Some(addr)
         } else {
             None
@@ -265,38 +264,38 @@ impl Node {
         match payload {
             Payload::ConnectingTo(remote_address) => {
                 if direction == Direction::Internal {
-                    self.peers.connecting_to_peer(remote_address)?;
+                    self.connecting_to_peer(remote_address)?;
                 }
             }
             Payload::ConnectedTo(remote_address, remote_listener) => {
                 if direction == Direction::Internal {
-                    self.peers.connected_to_peer(remote_address, remote_listener)?;
+                    self.connected_to_peer(remote_address, remote_listener)?;
                 }
             }
             Payload::Transaction(transaction) => {
-                let connected_peers = self.peers.connected_peers();
+                let connected_peers = self.connected_peers();
                 self.consensus()
                     .received_transaction(source.unwrap(), transaction, connected_peers)
                     .await?;
             }
             Payload::Block(block) => {
                 self.consensus()
-                    .received_block(source.unwrap(), block, Some(self.peers.connected_peers()))
+                    .received_block(source.unwrap(), block, Some(self.connected_peers()))
                     .await?;
             }
             Payload::SyncBlock(block) => {
                 self.consensus().received_block(source.unwrap(), block, None).await?;
-                if self.peers.got_sync_block(source.unwrap()) {
-                    self.finished_syncing_blocks();
+                if self.got_sync_block(source.unwrap()) {
+                    self.consensus().finished_syncing_blocks();
                 }
             }
             Payload::GetBlocks(hashes) => {
-                if !self.is_syncing_blocks() {
+                if !self.consensus().is_syncing_blocks() {
                     self.consensus().received_get_blocks(source.unwrap(), hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
-                if !self.is_syncing_blocks() {
+                if !self.consensus().is_syncing_blocks() {
                     self.consensus().received_get_memory_pool(source.unwrap()).await?;
                 }
             }
@@ -304,24 +303,24 @@ impl Node {
                 self.consensus().received_memory_pool(mempool)?;
             }
             Payload::GetSync(getsync) => {
-                if !self.is_syncing_blocks() {
+                if !self.consensus().is_syncing_blocks() {
                     self.consensus().received_get_sync(source.unwrap(), getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
-                self.peers.expecting_sync_blocks(source.unwrap(), sync.len());
+                self.expecting_sync_blocks(source.unwrap(), sync.len());
                 self.consensus().received_sync(source.unwrap(), sync).await;
             }
             Payload::Disconnect(addr) => {
                 if direction == Direction::Internal {
-                    self.peers.disconnect_from_peer(addr)?;
+                    self.disconnect_from_peer(addr)?;
                 }
             }
             Payload::GetPeers => {
-                self.peers.send_get_peers(source.unwrap()).await;
+                self.send_get_peers(source.unwrap()).await;
             }
             Payload::Peers(peers) => {
-                self.peers.process_inbound_peers(peers);
+                self.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
                 self.outbound
@@ -330,17 +329,17 @@ impl Node {
 
                 if block_height > self.current_block_height() + 1
                     && self.should_sync_blocks()
-                    && !self.peers.is_syncing_blocks(source.unwrap())
+                    && !self.is_syncing_blocks(source.unwrap())
                 {
                     self.register_block_sync_attempt();
                     trace!("Attempting to sync with {}", source.unwrap());
                     self.consensus().update_blocks(source.unwrap()).await;
                 } else {
-                    self.finished_syncing_blocks();
+                    self.consensus().finished_syncing_blocks();
                 }
             }
             Payload::Pong => {
-                self.peers.received_pong(source.unwrap());
+                self.received_pong(source.unwrap());
             }
             Payload::Unknown => {
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
@@ -401,16 +400,17 @@ impl Node {
         self.consensus().storage.read().get_current_block_height()
     }
 
-    /// Returns the minimum interval between block sync attempts.
-    pub fn block_sync_interval(&self) -> Duration {
-        self.consensus().block_sync_interval
-    }
+    //  /// Returns the minimum interval between block sync attempts.
+    //  pub fn block_sync_interval(&self) -> Duration {
+    //      self.consensus().block_sync_interval
+    //  }
 
     /// Checks whether enough time has elapsed for the node to attempt another block sync.
     pub fn should_sync_blocks(&self) -> bool {
         let consensus = self.consensus();
 
-        !self.is_syncing_blocks() && consensus.last_block_sync.read().elapsed() > consensus.block_sync_interval
+        !self.consensus().is_syncing_blocks()
+            && consensus.last_block_sync.read().elapsed() > consensus.block_sync_interval
     }
 
     /// Register that the node attempted to sync blocks.
@@ -422,16 +422,6 @@ impl Node {
     /// Returns the interval between each transaction (memory pool) sync.
     pub fn transaction_sync_interval(&self) -> Duration {
         self.consensus().transaction_sync_interval
-    }
-
-    /// Checks whether the node is currently syncing blocks.
-    pub fn is_syncing_blocks(&self) -> bool {
-        self.consensus().is_syncing_blocks.load(Ordering::SeqCst)
-    }
-
-    /// Register that the node is no longer syncing blocks.
-    pub fn finished_syncing_blocks(&self) {
-        self.consensus().is_syncing_blocks.store(false, Ordering::SeqCst);
     }
 
     pub fn max_block_size(&self) -> usize {
