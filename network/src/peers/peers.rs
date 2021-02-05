@@ -14,13 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, peers::PeerQuality, ConnReader, ConnWriter, NetworkError, Node, Version};
+use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
 
-use std::{
-    net::SocketAddr,
-    sync::{atomic::Ordering, Arc},
-    time::Instant,
-};
+use std::{net::SocketAddr, sync::Arc};
 
 use parking_lot::Mutex;
 use tokio::{
@@ -71,7 +67,7 @@ impl Node {
 
             let mut connected = peer_book
                 .connected_peers()
-                .into_iter()
+                .iter()
                 .map(|(_, peer_info)| peer_info)
                 .collect::<Vec<_>>();
             connected.sort_unstable_by_key(|info| info.last_connected());
