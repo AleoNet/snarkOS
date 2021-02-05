@@ -121,22 +121,6 @@ impl Node {
         }
     }
 
-    ///
-    /// Returns a map of all disconnected peers with their peer-specific information.
-    ///
-    #[inline]
-    pub fn disconnected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
-        self.peer_book.read().disconnected_peers().clone()
-    }
-
-    ///
-    /// Adds the given address to the disconnected peers in this peer book.
-    ///
-    #[inline]
-    pub fn add_peer(&self, address: SocketAddr) {
-        self.peer_book.write().add_peer(address);
-    }
-
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         let own_address = self.local_address().unwrap(); // must be known by now
         if remote_address == own_address
@@ -152,7 +136,7 @@ impl Node {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
-        self.connecting_to_peer(remote_address)?;
+        self.peer_book.write().set_connecting(remote_address)?;
 
         // open the connection
         let stream = TcpStream::connect(remote_address).await?;
@@ -209,7 +193,7 @@ impl Node {
         // save the outbound channel
         self.outbound.channels.write().insert(remote_address, Arc::new(writer));
 
-        self.connected_to_peer(remote_address, None)
+        self.peer_book.write().set_connected(remote_address, None)
     }
 
     ///
@@ -246,7 +230,8 @@ impl Node {
         trace!("Connecting to disconnected peers");
 
         // Iterate through each connected peer and attempts a connection request.
-        for remote_address in self.disconnected_peers().keys().take(count).copied() {
+        let disconnected_peers = self.peer_book.read().disconnected_peers().clone();
+        for remote_address in disconnected_peers.keys().take(count).copied() {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
                 let _ = self.disconnect_from_peer(remote_address);
@@ -394,29 +379,6 @@ impl Node {
             false
         }
     }
-}
-
-impl Node {
-    ///
-    /// Sets the given remote address as connecting to this node.
-    ///
-    #[inline]
-    pub(crate) fn connecting_to_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        // Set the peer as connecting with this node server.
-        self.peer_book.write().set_connecting(remote_address)
-    }
-
-    ///
-    /// Sets the given remote address in the peer book as connected to this node server.
-    ///
-    #[inline]
-    pub(crate) fn connected_to_peer(
-        &self,
-        remote_address: SocketAddr,
-        remote_listener: Option<SocketAddr>,
-    ) -> Result<(), NetworkError> {
-        self.peer_book.write().set_connected(remote_address, remote_listener)
-    }
 
     /// TODO (howardwu): Add logic to remove the active channels
     ///  and handshakes of the peer from this struct.
@@ -480,7 +442,7 @@ impl Node {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            self.add_peer(peer_address);
+            self.peer_book.write().add_peer(peer_address);
         }
     }
 }

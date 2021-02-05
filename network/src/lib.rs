@@ -195,12 +195,12 @@ impl Node {
         match payload {
             Payload::ConnectingTo(remote_address) => {
                 if direction == Direction::Internal {
-                    self.connecting_to_peer(remote_address)?;
+                    self.peer_book.write().set_connecting(remote_address)?;
                 }
             }
             Payload::ConnectedTo(remote_address, remote_listener) => {
                 if direction == Direction::Internal {
-                    self.connected_to_peer(remote_address, remote_listener)?;
+                    self.peer_book.write().set_connected(remote_address, remote_listener)?;
                 }
             }
             Payload::Transaction(transaction) => {
