@@ -61,7 +61,7 @@ async fn handshake_responder_side() {
     let mut buffer: Box<[u8]> = vec![0u8; snarkos_network::NOISE_BUF_LEN].into();
     let mut buf = [0u8; snarkos_network::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-    wait_until!(1, node.peers.is_connecting(peer_address));
+    wait_until!(1, node.is_connecting(peer_address));
 
     // -> e
     let len = noise.write_message(&[], &mut buffer).unwrap();
@@ -83,9 +83,9 @@ async fn handshake_responder_side() {
 
     // the node should now have register the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
-    assert!(node.peers.is_connected(peer_address));
-    assert_eq!(node.peers.number_of_connecting_peers(), 0);
-    assert_eq!(node.peers.number_of_connected_peers(), 1);
+    assert!(node.is_connected(peer_address));
+    assert_eq!(node.number_of_connecting_peers(), 0);
+    assert_eq!(node.number_of_connected_peers(), 1);
 }
 
 #[tokio::test]
@@ -107,7 +107,7 @@ async fn handshake_initiator_side() {
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
 
-    wait_until!(1, node.peers.is_connecting(peer_address));
+    wait_until!(1, node.is_connecting(peer_address));
 
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
@@ -142,9 +142,9 @@ async fn handshake_initiator_side() {
 
     // the node should now have registered the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
-    assert!(node.peers.is_connected(peer_address));
-    assert_eq!(node.peers.number_of_connecting_peers(), 0);
-    assert_eq!(node.peers.number_of_connected_peers(), 1);
+    assert!(node.is_connected(peer_address));
+    assert_eq!(node.number_of_connecting_peers(), 0);
+    assert_eq!(node.number_of_connected_peers(), 1);
 }
 
 async fn assert_node_rejected_message(node: &Node, peer_stream: &mut TcpStream) {
@@ -157,8 +157,8 @@ async fn assert_node_rejected_message(node: &Node, peer_stream: &mut TcpStream) 
     assert!(buffer.is_empty());
 
     // check the node's state hasn't been altered by the message
-    wait_until!(1, !node.peers.is_connecting(peer_stream.local_addr().unwrap()));
-    assert_eq!(node.peers.number_of_connected_peers(), 0);
+    wait_until!(1, !node.is_connecting(peer_stream.local_addr().unwrap()));
+    assert_eq!(node.number_of_connected_peers(), 0);
 }
 
 #[tokio::test]
