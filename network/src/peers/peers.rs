@@ -304,7 +304,7 @@ impl Node {
     async fn broadcast_pings(&self) {
         trace!("Broadcasting Ping messages");
 
-        let current_block_height = self.current_block_height();
+        let current_block_height = self.consensus().current_block_height();
         for (remote_address, _) in self.connected_peers() {
             self.sending_ping(remote_address);
 

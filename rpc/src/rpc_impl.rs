@@ -83,15 +83,15 @@ impl RpcImpl {
     }
 
     pub fn consensus(&self) -> &ConsensusParameters {
-        self.server.consensus_parameters()
+        self.server.consensus().consensus_parameters()
     }
 
     pub fn parameters(&self) -> &PublicParameters<Components> {
-        self.server.dpc_parameters()
+        self.server.consensus().dpc_parameters()
     }
 
     pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
-        self.server.memory_pool()
+        self.server.consensus().memory_pool()
     }
 }
 
@@ -322,7 +322,7 @@ impl RpcFunctions for RpcImpl {
         let is_syncing = false;
 
         Ok(NodeInfo {
-            is_miner: self.server.is_miner(),
+            is_miner: self.server.consensus().is_miner(),
             is_syncing,
         })
     }

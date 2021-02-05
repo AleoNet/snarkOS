@@ -49,7 +49,10 @@ impl MinerInstance {
         task::spawn(async move {
             let local_address = self.environment.local_address().unwrap();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
-            let miner = Miner::new(self.miner_address.clone(), Arc::clone(self.node.consensus_parameters()));
+            let miner = Miner::new(
+                self.miner_address.clone(),
+                Arc::clone(self.node.consensus().consensus_parameters()),
+            );
             info!("Miner instantiated; starting to mine blocks");
 
             let mut mining_failure_count = 0;
@@ -57,9 +60,10 @@ impl MinerInstance {
 
             loop {
                 info!("Starting to mine the next block");
+                let consensus = self.node.consensus();
 
                 let (block, _coinbase_records) = match miner
-                    .mine_block(self.node.dpc_parameters(), self.node.storage(), self.node.memory_pool())
+                    .mine_block(consensus.dpc_parameters(), consensus.storage(), consensus.memory_pool())
                     .await
                 {
                     Ok(mined_block) => mined_block,
