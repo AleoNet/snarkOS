@@ -35,6 +35,7 @@ pub enum NetworkError {
     Error(anyhow::Error),
     InboundDeserializationFailed,
     InvalidHandshake,
+    Noise(snow::error::Error),
     PeerAddressIsLocalAddress,
     PeerAlreadyConnected,
     PeerAlreadyConnecting,

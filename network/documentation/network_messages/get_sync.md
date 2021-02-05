@@ -6,6 +6,6 @@ A request for knowledge of specified block locator hashes.
 
 ### Payload
 
-|        Parameter       | Type  |                            Description                            |
-|:----------------------:|-------|:-----------------------------------------------------------------:|
-| `block_locator_hashes` | array | A list block hashes describing the state of the requester's chain |
+|        Parameter       | Type  |                             Description                             |
+|:----------------------:|-------|:--------------------------------------------------------------------:|
+| `block_locator_hashes` | array | A list of block hashes describing the state of the requester's chain |

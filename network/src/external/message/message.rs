@@ -14,15 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::external::Version;
 use snarkos_storage::BlockHeight;
 use snarkvm_objects::BlockHeaderHash;
 
 use serde::{Deserialize, Serialize};
 
 use std::{fmt, net::SocketAddr};
-
-pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {
@@ -93,16 +90,12 @@ pub enum Payload {
     SyncBlock(Vec<u8>),
     #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/transaction.md"))]
     Transaction(Vec<u8>),
-    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/verack.md"))]
-    Verack(u64),
-    #[cfg_attr(nightly, doc(include = "../../../documentation/network_messages/version.md"))]
-    Version(Version),
 
     /* internal messages */
     #[doc(hide)]
-    ConnectedTo(SocketAddr, u64),
+    ConnectedTo(SocketAddr, Option<SocketAddr>),
     #[doc(hide)]
-    ConnectingTo(SocketAddr, u64),
+    ConnectingTo(SocketAddr),
     // TODO: used internally, but can also be used to allow a clean disconnect for connected peers on shutdown
     // add a doc if this is introduced
     #[doc(hide)]
@@ -124,8 +117,6 @@ impl fmt::Display for Payload {
             Self::Sync(..) => "sync",
             Self::SyncBlock(..) => "syncblock",
             Self::Transaction(..) => "transaction",
-            Self::Verack(..) => "verack",
-            Self::Version(..) => "version",
             Self::ConnectedTo(..) => "connectedto",
             Self::ConnectingTo(..) => "connectingto",
             Self::Disconnect(..) => "disconnect",

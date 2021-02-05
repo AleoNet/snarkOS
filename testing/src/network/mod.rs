@@ -18,16 +18,22 @@ pub mod blocks;
 pub use blocks::*;
 
 #[cfg(test)]
+pub mod encryption;
+
+#[cfg(test)]
 pub mod sync;
 
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
 use snarkos_network::{
-    errors::message::*,
-    external::{message::*, MAX_MESSAGE_SIZE},
+    connection_reader::ConnReader,
+    connection_writer::ConnWriter,
+    errors::{message::*, network::*},
+    external::message::*,
     Consensus,
     Environment,
     Server,
+    MAX_MESSAGE_SIZE,
 };
 
 use parking_lot::{Mutex, RwLock};
@@ -176,45 +182,168 @@ pub async fn test_node(setup: TestSetup) -> Server {
     node
 }
 
-pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, TcpStream) {
+pub struct FakeNode {
+    reader: ConnReader,
+    writer: ConnWriter,
+}
+
+impl FakeNode {
+    pub fn new(stream: TcpStream, peer_addr: SocketAddr, noise: snow::TransportState) -> Self {
+        let buffer = vec![0u8; snarkos_network::MAX_MESSAGE_SIZE].into_boxed_slice();
+        let noise = Arc::new(Mutex::new(noise));
+        let (reader, writer) = stream.into_split();
+
+        let reader = ConnReader::new(peer_addr, reader, buffer.clone(), noise.clone());
+
+        let writer = ConnWriter::new(peer_addr, writer, buffer, noise);
+
+        Self { reader, writer }
+    }
+
+    pub async fn read_payload(&mut self) -> Result<Payload, NetworkError> {
+        let message = self.reader.read_message().await?;
+
+        Ok(message.payload)
+    }
+
+    pub async fn write_message(&mut self, payload: &Payload) {
+        self.writer.write_message(payload).await.unwrap();
+    }
+}
+
+pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
+    // set up listeners and establish addresses
+    let node0_listener = TcpListener::bind("127.0.0.1:0".parse::<SocketAddr>().unwrap())
+        .await
+        .unwrap();
+    let node0_addr = node0_listener.local_addr().unwrap();
+    let node0_listening_task = tokio::spawn(async move { node0_listener.accept().await.unwrap() });
+
+    // set up streams
+    let mut node1_stream = TcpStream::connect(&node0_addr).await.unwrap();
+    let (mut node0_stream, node1_addr) = node0_listening_task.await.unwrap();
+
+    // node0's noise - initiator
+    let builder = snow::Builder::with_resolver(
+        snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
+        Box::new(snow::resolvers::SodiumResolver),
+    );
+    let static_key = builder.generate_keypair().unwrap().private;
+    let noise_builder = builder
+        .local_private_key(&static_key)
+        .psk(3, snarkos_network::HANDSHAKE_PSK);
+    let mut node0_noise = noise_builder.build_initiator().unwrap();
+
+    // node1's noise - responder
+    let builder = snow::Builder::with_resolver(
+        snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
+        Box::new(snow::resolvers::SodiumResolver),
+    );
+    let static_key = builder.generate_keypair().unwrap().private;
+    let noise_builder = builder
+        .local_private_key(&static_key)
+        .psk(3, snarkos_network::HANDSHAKE_PSK);
+    let mut node1_noise = noise_builder.build_responder().unwrap();
+
+    // shared bits
+    let mut buffer: Box<[u8]> = vec![0u8; snarkos_network::NOISE_BUF_LEN].into();
+    let mut buf = [0u8; snarkos_network::NOISE_BUF_LEN];
+
+    // -> e (node0)
+    let len = node0_noise.write_message(&[], &mut buffer).unwrap();
+    node0_stream.write_all(&[len as u8]).await.unwrap();
+    node0_stream.write_all(&buffer[..len]).await.unwrap();
+
+    // <- e (node1)
+    node1_stream.read_exact(&mut buf[..1]).await.unwrap();
+    let len = buf[0] as usize;
+    let len = node1_stream.read_exact(&mut buf[..len]).await.unwrap();
+    node1_noise.read_message(&buf[..len], &mut buffer).unwrap();
+
+    // -> e, ee, s, es (node1)
+    let version = bincode::serialize(&Version::new(1u64, node1_addr.port())).unwrap();
+    let len = node1_noise.write_message(&version, &mut buffer).unwrap();
+    node1_stream.write_all(&[len as u8]).await.unwrap();
+    node1_stream.write_all(&buffer[..len]).await.unwrap();
+
+    // <- e, ee, s, es (node0)
+    node0_stream.read_exact(&mut buf[..1]).await.unwrap();
+    let len = buf[0] as usize;
+    let len = node0_stream.read_exact(&mut buf[..len]).await.unwrap();
+    let len = node0_noise.read_message(&buf[..len], &mut buffer).unwrap();
+    let _version: Version = bincode::deserialize(&buffer[..len]).unwrap();
+
+    // -> s, se, psk (node0)
+    let peer_version = bincode::serialize(&Version::new(1u64, node0_addr.port())).unwrap();
+    let len = node0_noise.write_message(&peer_version, &mut buffer).unwrap();
+    node0_stream.write_all(&[len as u8]).await.unwrap();
+    node0_stream.write_all(&buffer[..len]).await.unwrap();
+
+    // <- e, ee, s, es (node1)
+    node1_stream.read_exact(&mut buf[..1]).await.unwrap();
+    let len = buf[0] as usize;
+    let len = node1_stream.read_exact(&mut buf[..len]).await.unwrap();
+    let len = node1_noise.read_message(&buf[..len], &mut buffer).unwrap();
+    let _version: Version = bincode::deserialize(&buffer[..len]).unwrap();
+
+    let node0_noise = node0_noise.into_transport_mode().unwrap();
+    let node1_noise = node1_noise.into_transport_mode().unwrap();
+
+    let node0 = FakeNode::new(node0_stream, node0_addr, node0_noise);
+    let node1 = FakeNode::new(node1_stream, node1_addr, node1_noise);
+
+    (node0, node1)
+}
+
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, FakeNode) {
     // start a test node and listen for incoming connections
     let node = test_node(node_setup).await;
     let node_listener = node.local_address().unwrap();
 
-    // set up a fake node (peer), which is just a socket
+    // set up a fake node (peer), which is basically just a socket
     let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
 
     // register the addresses bound to the connection between the node and the peer
-    let peer_address = peer_stream.local_addr().unwrap();
+    let peer_addr = peer_stream.local_addr().unwrap();
 
-    // the peer initiates a handshake by sending a Version message
-    let version = Payload::Version(Version::new(1u64, 1u64, peer_address.port()));
-    write_message_to_stream(version, &mut peer_stream).await;
+    let builder = snow::Builder::with_resolver(
+        snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
+        Box::new(snow::resolvers::SodiumResolver),
+    );
+    let static_key = builder.generate_keypair().unwrap().private;
+    let noise_builder = builder
+        .local_private_key(&static_key)
+        .psk(3, snarkos_network::HANDSHAKE_PSK);
+    let mut noise = noise_builder.build_initiator().unwrap();
+    let mut buffer: Box<[u8]> = vec![0u8; snarkos_network::NOISE_BUF_LEN].into();
+    let mut buf = [0u8; snarkos_network::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    // -> e
+    let len = noise.write_message(&[], &mut buffer).unwrap();
+    peer_stream.write_all(&[len as u8]).await.unwrap();
+    peer_stream.write_all(&buffer[..len]).await.unwrap();
 
-    // check if the peer has received the Verack message from the node
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Verack(_)));
+    // <- e, ee, s, es
+    peer_stream.read_exact(&mut buf[..1]).await.unwrap();
+    let len = buf[0] as usize;
+    let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
+    let len = noise.read_message(&buf[..len], &mut buffer).unwrap();
+    let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
 
-    // check if it was followed by a Version message
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
-        version
-    } else {
-        unreachable!();
-    };
+    // -> s, se, psk
+    let peer_version = bincode::serialize(&Version::new(1u64, peer_addr.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let len = noise.write_message(&peer_version, &mut buffer).unwrap();
+    peer_stream.write_all(&[len as u8]).await.unwrap();
+    peer_stream.write_all(&buffer[..len]).await.unwrap();
 
-    // in response to the Version, the peer sends a Verack message to finish the handshake
-    let verack = Payload::Verack(version.nonce);
-    write_message_to_stream(verack, &mut peer_stream).await;
+    let noise = noise.into_transport_mode().unwrap();
 
-    (node, peer_stream)
+    let fake_node = FakeNode::new(peer_stream, peer_addr, noise);
+
+    (node, fake_node)
 }
 
+#[allow(clippy::needless_lifetimes)] // clippy bug: https://github.com/rust-lang/rust-clippy/issues/5787
 pub async fn read_payload<'a, T: AsyncRead + Unpin>(
     stream: &mut T,
     buffer: &'a mut [u8],

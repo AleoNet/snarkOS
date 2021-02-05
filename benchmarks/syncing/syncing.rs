@@ -15,17 +15,19 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use criterion::*;
-use rand::{distributions::Standard, thread_rng, Rng};
 
-use snarkos_testing::network::{blocks::*, handshaken_node_and_peer, test_node, ConsensusSetup, TestSetup};
+use snarkos_network::external::Payload;
+use snarkos_testing::network::{blocks::*, handshaken_node_and_peer, TestSetup};
 
-fn sync_blocks(c: &mut Criterion) {
+// FIXME(ljedrz/nkls): gracefully shut the node and peer down once shutdown is implemented
+fn providing_sync_blocks(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     // prepare the block provider node and a fake requester node
     let (provider, requester) = rt.block_on(handshaken_node_and_peer(TestSetup::default()));
+    let requester = tokio::sync::Mutex::new(requester);
 
-    const NUM_BLOCKS: usize = 2;
+    const NUM_BLOCKS: usize = 10;
 
     let blocks = TestBlocks::load(NUM_BLOCKS);
     for block in &blocks.0 {
@@ -40,18 +42,37 @@ fn sync_blocks(c: &mut Criterion) {
             )
             .unwrap();
     }
-    wait_until!(1, provider.environment.current_block_height() == NUM_BLOCKS);
+    assert_eq!(provider.environment.current_block_height() as usize, NUM_BLOCKS);
 
-    c.bench_function("sync_blocks", move |b| {
+    c.bench_function("providing_sync_blocks", move |b| {
         b.to_async(&rt).iter(|| async {
             let get_sync = Payload::GetSync(vec![]);
-            requester.write_message_to_stream(&get_sync);
-            wait_until!(10, requester.environment.current_block_height == NUM_BLOCKS);
-            requester.environment.consensus().memory_pool.lock().cleanse().unwrap();
+            requester.lock().await.write_message(&get_sync).await;
+
+            // requester obtains hashes
+            let hashes = if let Payload::Sync(hashes) = requester.lock().await.read_payload().await.unwrap() {
+                hashes
+            } else {
+                unreachable!();
+            };
+
+            let get_blocks = Payload::GetBlocks(hashes);
+            requester.lock().await.write_message(&get_blocks).await;
+
+            let mut sync_blocks_count = 0;
+            loop {
+                let payload = requester.lock().await.read_payload().await.unwrap();
+                if let Payload::SyncBlock(_) = payload {
+                    sync_blocks_count += 1;
+                }
+                if sync_blocks_count == NUM_BLOCKS {
+                    break;
+                }
+            }
         })
     });
 }
 
-criterion_group!(block_sync_benches, sync_blocks);
+criterion_group!(block_sync_benches, providing_sync_blocks);
 
 criterion_main!(block_sync_benches);

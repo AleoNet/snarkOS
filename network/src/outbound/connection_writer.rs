@@ -16,35 +16,64 @@
 
 use crate::{errors::ConnectError, external::message::*};
 
+use parking_lot::Mutex;
 use tokio::{io::AsyncWriteExt, net::tcp::OwnedWriteHalf, sync::Mutex as AsyncMutex};
 
 use std::{net::SocketAddr, sync::Arc};
 
 /// A channel for writing messages to a peer.
 /// The write stream is protected by an Arc + Mutex to enable cloning.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ConnWriter {
     pub addr: SocketAddr,
-    pub writer: Arc<AsyncMutex<OwnedWriteHalf>>,
+    pub writer: AsyncMutex<OwnedWriteHalf>,
+    buffer: AsyncMutex<Box<[u8]>>,
+    noise: Arc<Mutex<snow::TransportState>>,
 }
 
 impl ConnWriter {
-    pub fn new(addr: SocketAddr, writer: OwnedWriteHalf) -> Self {
+    pub fn new(
+        addr: SocketAddr,
+        writer: OwnedWriteHalf,
+        buffer: Box<[u8]>,
+        noise: Arc<Mutex<snow::TransportState>>,
+    ) -> Self {
         Self {
             addr,
-            writer: Arc::new(AsyncMutex::new(writer)),
+            writer: AsyncMutex::new(writer),
+            buffer: AsyncMutex::new(buffer),
+            noise,
         }
     }
 
     /// Writes a message consisting of a header and payload.
     pub async fn write_message(&self, payload: &Payload) -> Result<(), ConnectError> {
         let serialized_payload = bincode::serialize(payload).map_err(|e| ConnectError::MessageError(e.into()))?;
-        let header = MessageHeader::from(serialized_payload.len());
 
         {
+            let mut buffer = self.buffer.lock().await;
+            let mut encrypted_len = 0;
+            let mut processed_len = 0;
+
+            while processed_len < serialized_payload.len() {
+                let chunk_len = std::cmp::min(
+                    crate::NOISE_BUF_LEN - crate::NOISE_TAG_LEN,
+                    serialized_payload[processed_len..].len(),
+                );
+                let chunk = &serialized_payload[processed_len..][..chunk_len];
+
+                encrypted_len += self
+                    .noise
+                    .lock()
+                    .write_message(chunk, &mut buffer[encrypted_len..])
+                    .map_err(|e| ConnectError::Message(e.to_string()))?;
+                processed_len += chunk_len;
+            }
+
+            let header = MessageHeader::from(encrypted_len);
             let mut writer = self.writer.lock().await;
             writer.write_all(&header.as_bytes()[..]).await?;
-            writer.write_all(&serialized_payload).await?;
+            writer.write_all(&buffer[..encrypted_len]).await?;
         }
 
         debug!("Sent a {} to {}", payload, self.addr);

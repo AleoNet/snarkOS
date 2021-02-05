@@ -18,14 +18,17 @@ use snarkos_network::{
     external::{message::*, Version},
     Server,
 };
-use snarkos_testing::network::{read_header, read_payload, test_node, write_message_to_stream, TestSetup};
+use snarkos_testing::{
+    network::{test_node, write_message_to_stream, TestSetup},
+    wait_until,
+};
 
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
 use std::time::Duration;
 
 use tokio::{
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -46,38 +49,42 @@ async fn handshake_responder_side() {
     // register the addresses bound to the connection between the node and the peer
     let peer_address = peer_stream.local_addr().unwrap();
 
-    // the peer initiates a handshake by sending a Version message
-    let version = Payload::Version(Version::new(1u64, 1u64, peer_address.port()));
-    write_message_to_stream(version, &mut peer_stream).await;
+    let builder = snow::Builder::with_resolver(
+        snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
+        Box::new(snow::resolvers::SodiumResolver),
+    );
+    let static_key = builder.generate_keypair().unwrap().private;
+    let noise_builder = builder
+        .local_private_key(&static_key)
+        .psk(3, snarkos_network::HANDSHAKE_PSK);
+    let mut noise = noise_builder.build_initiator().unwrap();
+    let mut buffer: Box<[u8]> = vec![0u8; snarkos_network::NOISE_BUF_LEN].into();
+    let mut buf = [0u8; snarkos_network::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-    // at this point the node should have marked the peer as ' connecting'
-    sleep(Duration::from_millis(200)).await;
-    assert!(node.peers.is_connecting(peer_address));
+    wait_until!(1, node.peers.is_connecting(peer_address));
 
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    // -> e
+    let len = noise.write_message(&[], &mut buffer).unwrap();
+    peer_stream.write_all(&[len as u8]).await.unwrap();
+    peer_stream.write_all(&buffer[..len]).await.unwrap();
 
-    // check if the peer has received the Verack message from the node
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Verack(..)));
+    // <- e, ee, s, es
+    peer_stream.read_exact(&mut buf[..1]).await.unwrap();
+    let len = buf[0] as usize;
+    let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
+    let len = noise.read_message(&buf[..len], &mut buffer).unwrap();
+    let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
 
-    // check if it was followed by a Version message
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
-        version
-    } else {
-        unreachable!();
-    };
-
-    // in response to the Version, the peer sends a Verack message to finish the handshake
-    let verack = Payload::Verack(version.nonce);
-    write_message_to_stream(verack, &mut peer_stream).await;
+    // -> s, se, psk
+    let peer_version = bincode::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let len = noise.write_message(&peer_version, &mut buffer).unwrap();
+    peer_stream.write_all(&[len as u8]).await.unwrap();
+    peer_stream.write_all(&buffer[..len]).await.unwrap();
 
     // the node should now have register the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
     assert!(node.peers.is_connected(peer_address));
+    assert_eq!(node.peers.number_of_connecting_peers(), 0);
     assert_eq!(node.peers.number_of_connected_peers(), 1);
 }
 
@@ -100,39 +107,47 @@ async fn handshake_initiator_side() {
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
 
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    wait_until!(1, node.peers.is_connecting(peer_address));
 
-    // the peer should receive a Version message from the node (initiator of the handshake)
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let version = if let Payload::Version(version) = bincode::deserialize(&payload).unwrap() {
-        version
-    } else {
-        unreachable!();
-    };
+    let builder = snow::Builder::with_resolver(
+        snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
+        Box::new(snow::resolvers::SodiumResolver),
+    );
+    let static_key = builder.generate_keypair().unwrap().private;
+    let noise_builder = builder
+        .local_private_key(&static_key)
+        .psk(3, snarkos_network::HANDSHAKE_PSK);
+    let mut noise = noise_builder.build_responder().unwrap();
+    let mut buffer: Box<[u8]> = vec![0u8; snarkos_network::NOISE_BUF_LEN].into();
+    let mut buf = [0u8; snarkos_network::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-    // at this point the node should have marked the peer as 'connecting'
-    assert!(node.peers.is_connecting(peer_address));
+    // <- e
+    peer_stream.read_exact(&mut buf[..1]).await.unwrap();
+    let len = buf[0] as usize;
+    let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
+    noise.read_message(&buf[..len], &mut buffer).unwrap();
 
-    // the peer responds with a Verack acknowledging the Version message
-    let verack = Payload::Verack(version.nonce);
-    write_message_to_stream(verack, &mut peer_stream).await;
+    // -> e, ee, s, es
+    let peer_version = bincode::serialize(&Version::new(1u64, peer_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let len = noise.write_message(&peer_version, &mut buffer).unwrap();
+    peer_stream.write_all(&[len as u8]).await.unwrap();
+    peer_stream.write_all(&buffer[..len]).await.unwrap();
 
-    // the peer then follows up with a Version message
-    let version = Payload::Version(Version::new(1u64, 1u64, peer_address.port()));
-    write_message_to_stream(version, &mut peer_stream).await;
+    // <- s, se, psk
+    peer_stream.read_exact(&mut buf[..1]).await.unwrap();
+    let len = buf[0] as usize;
+    let len = peer_stream.read_exact(&mut buf[..len]).await.unwrap();
+    let len = noise.read_message(&buf[..len], &mut buffer).unwrap();
+    let _node_version: Version = bincode::deserialize(&buffer[..len]).unwrap();
 
     // the node should now have registered the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
     assert!(node.peers.is_connected(peer_address));
+    assert_eq!(node.peers.number_of_connecting_peers(), 0);
     assert_eq!(node.peers.number_of_connected_peers(), 1);
 }
 
 async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream) {
-    // slight delay for server to process the message
-    sleep(Duration::from_millis(200)).await;
-
     // read the response from the stream
     let mut buffer = String::new();
     let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
@@ -142,7 +157,7 @@ async fn assert_node_rejected_message(node: &Server, peer_stream: &mut TcpStream
     assert!(buffer.is_empty());
 
     // check the node's state hasn't been altered by the message
-    assert!(!node.peers.is_connecting(peer_stream.local_addr().unwrap()));
+    wait_until!(1, !node.peers.is_connecting(peer_stream.local_addr().unwrap()));
     assert_eq!(node.peers.number_of_connected_peers(), 0);
 }
 
@@ -217,10 +232,5 @@ async fn reject_non_version_messages_before_handshake() {
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
     let transaction = vec![0u8, 10];
     write_message_to_stream(Payload::Transaction(transaction), &mut peer_stream).await;
-    assert_node_rejected_message(&node, &mut peer_stream).await;
-
-    // Verack
-    let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
-    write_message_to_stream(Payload::Verack(1u64), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 }

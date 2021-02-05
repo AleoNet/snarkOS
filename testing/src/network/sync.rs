@@ -18,15 +18,7 @@ use tokio::time::sleep;
 
 use crate::{
     consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
-    network::{
-        handshaken_node_and_peer,
-        read_header,
-        read_payload,
-        test_node,
-        write_message_to_stream,
-        ConsensusSetup,
-        TestSetup,
-    },
+    network::{handshaken_node_and_peer, test_node, ConsensusSetup, TestSetup},
     wait_until,
 };
 
@@ -50,27 +42,22 @@ async fn block_initiator_side() {
         }),
         ..Default::default()
     };
-    let (node, mut peer_stream) = handshaken_node_and_peer(setup).await;
+    let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
     // wait for the block_sync_interval to "expire"
     sleep(Duration::from_secs(1)).await;
 
     // trigger the full node to request synchronization by sending it a higher block_height than it has
     let ping = Payload::Ping(2u32);
-    write_message_to_stream(ping, &mut peer_stream).await;
-
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 128];
+    peer.write_message(&ping).await;
 
     // read the Pong
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Pong));
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Pong));
 
     // check if a GetSync message was received
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::GetSync(..)));
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::GetSync(..)));
 
     let block_1_header_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
     let block_2_header_hash = BlockHeaderHash::new(BLOCK_2_HEADER_HASH.to_vec());
@@ -80,12 +67,11 @@ async fn block_initiator_side() {
     // respond to GetSync with Sync message containing the block header hashes of the missing
     // blocks
     let sync = Payload::Sync(block_header_hashes);
-    write_message_to_stream(sync, &mut peer_stream).await;
+    peer.write_message(&sync).await;
 
     // make sure both GetBlock messages are received
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let block_hashes = if let Payload::GetBlocks(block_hashes) = bincode::deserialize(&payload).unwrap() {
+    let payload = peer.read_payload().await.unwrap();
+    let block_hashes = if let Payload::GetBlocks(block_hashes) = payload {
         block_hashes
     } else {
         unreachable!();
@@ -95,10 +81,10 @@ async fn block_initiator_side() {
 
     // respond with the full blocks
     let block_1 = Payload::Block(BLOCK_1.to_vec());
-    write_message_to_stream(block_1, &mut peer_stream).await;
+    peer.write_message(&block_1).await;
 
     let block_2 = Payload::Block(BLOCK_2.to_vec());
-    write_message_to_stream(block_2, &mut peer_stream).await;
+    peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
     wait_until!(
@@ -120,7 +106,7 @@ async fn block_initiator_side() {
 #[tokio::test]
 async fn block_responder_side() {
     // handshake between a fake node and a full node
-    let (node, mut peer_stream) = handshaken_node_and_peer(TestSetup::default()).await;
+    let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
 
     // insert block into node
     let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
@@ -136,15 +122,11 @@ async fn block_responder_side() {
 
     // send a GetSync with an empty vec as only the genesis block is in the ledger
     let get_sync = Payload::GetSync(vec![]);
-    write_message_to_stream(get_sync, &mut peer_stream).await;
-
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 4096];
+    peer.write_message(&get_sync).await;
 
     // receive a Sync message from the node with the block header
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let sync = if let Payload::Sync(sync) = bincode::deserialize(&payload).unwrap() {
+    let payload = peer.read_payload().await.unwrap();
+    let sync = if let Payload::Sync(sync) = payload {
         sync
     } else {
         unreachable!();
@@ -157,12 +139,11 @@ async fn block_responder_side() {
 
     // request the block from the node
     let get_block = Payload::GetBlocks(vec![block_header_hash.clone()]);
-    write_message_to_stream(get_block, &mut peer_stream).await;
+    peer.write_message(&get_block).await;
 
     // receive a SyncBlock message with the requested block
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let block = if let Payload::SyncBlock(block) = bincode::deserialize(&payload).unwrap() {
+    let payload = peer.read_payload().await.unwrap();
+    let block = if let Payload::SyncBlock(block) = payload {
         block
     } else {
         unreachable!();
@@ -225,22 +206,15 @@ async fn transaction_initiator_side() {
         }),
         ..Default::default()
     };
-    let (node, mut peer_stream) = handshaken_node_and_peer(setup).await;
-
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
     // check GetMemoryPool message was received
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(
-        bincode::deserialize(&payload).unwrap(),
-        Payload::GetMemoryPool
-    ));
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::GetMemoryPool));
 
     // Respond with MemoryPool message
     let memory_pool = Payload::MemoryPool(vec![TRANSACTION_1.to_vec(), TRANSACTION_2.to_vec()]);
-    write_message_to_stream(memory_pool, &mut peer_stream).await;
+    peer.write_message(&memory_pool).await;
 
     // Create the entries to verify
     let entry_1 = Entry {
@@ -261,7 +235,7 @@ async fn transaction_initiator_side() {
 #[tokio::test]
 async fn transaction_responder_side() {
     // handshake between a fake node and a full node
-    let (node, mut peer_stream) = handshaken_node_and_peer(TestSetup::default()).await;
+    let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
 
     // insert transaction into node
     let mut memory_pool = node.environment.memory_pool().lock();
@@ -286,15 +260,11 @@ async fn transaction_responder_side() {
 
     // send a GetMemoryPool message
     let get_memory_pool = Payload::GetMemoryPool;
-    write_message_to_stream(get_memory_pool, &mut peer_stream).await;
-
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 4096];
+    peer.write_message(&get_memory_pool).await;
 
     // check GetMemoryPool message was received
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    let txs = if let Payload::MemoryPool(txs) = bincode::deserialize(&payload).unwrap() {
+    let payload = peer.read_payload().await.unwrap();
+    let txs = if let Payload::MemoryPool(txs) = payload {
         txs
     } else {
         unreachable!();

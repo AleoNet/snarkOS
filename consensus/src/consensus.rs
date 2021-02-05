@@ -494,6 +494,7 @@ impl ConsensusParameters {
 
     // TODO (raychu86): Genericize this model to allow for generic programs.
     /// Generate the birth and death program proofs for a transaction for a given transaction kernel
+    #[allow(clippy::type_complexity)]
     pub fn generate_program_proofs<R: Rng>(
         parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
         transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::TransactionKernel,

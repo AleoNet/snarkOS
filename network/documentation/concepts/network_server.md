@@ -30,11 +30,7 @@ by enabling new nodes to connect and participate in the network effortlessly.
 
 ## Connecting to Peers
 
-Peer connections are established with a handshake.
-A valid handshake begins with a `Version` message that includes the node's version, block height, and current timestamp.
-The receiver returns with its own `Version` message.
-Then, both nodes send a `Verack` message acknowledging the receipt of the `Version` message
-and establishes a peer connection.
+Peer connections are established with an XX [noise](https://noiseprotocol.org/) handshake.
 
 Peer connections are maintained with a ping-pong protocol that periodically relays `Ping` / `Pong` messages to
 verify that peers are still connected. snarkOS will update its peer book to account for newly-connected peers,

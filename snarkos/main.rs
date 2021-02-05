@@ -39,10 +39,7 @@ use snarkvm_utilities::{to_bytes, ToBytes};
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::{Mutex, RwLock};
-use tokio::{
-    runtime::Builder,
-    stream::{self, StreamExt},
-};
+use tokio::runtime::Builder;
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
@@ -185,7 +182,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start the server
     server.start_services().await;
 
-    stream::pending::<()>().next().await;
+    std::future::pending::<()>().await;
 
     Ok(())
 }

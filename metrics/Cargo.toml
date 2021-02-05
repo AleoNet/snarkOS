@@ -15,7 +15,7 @@ edition = "2018"
 futures-util = { version = "0.3.5", default-features = false }
 lazy_static = { version = "1.4" }
 prometheus = { version = "0.11", features = ["process"] }
-tokio = { version = "0.2.22", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 warp = { version = "0.2" }
 
 [dev-dependencies]

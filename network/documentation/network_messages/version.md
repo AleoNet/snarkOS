@@ -1,4 +1,4 @@
-A handshake request for a `Verack` to establish a connection with a potential peer.
+Sent during the handshake.
 
 ### Message Name
 
@@ -6,9 +6,7 @@ A handshake request for a `Verack` to establish a connection with a potential pe
 
 ### Payload
 
-|      Parameter     | Type   |                  Description                 |
-|:------------------:|--------|:--------------------------------------------:|
-| `version`          | number | The serialized bytes of a transaction        |
-| `height`           | number | Latest block height of the node              |
-| `nonce`            | number | Random nonce to identify the version message |
-| `listening_port`   | number | The node's listening port                    |
+|      Parameter     | Type   |              Description            |
+|:------------------:|--------|:-----------------------------------:|
+| `version`          | number | The version of the network protocol |
+| `listening_port`   | number | The node's listening port           |

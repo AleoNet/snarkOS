@@ -32,8 +32,11 @@ use std::{
     time::Instant,
 };
 
-use parking_lot::RwLock;
-use tokio::net::TcpStream;
+use parking_lot::{Mutex, RwLock};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 /// A stateful component for managing the peer connections of this node server.
 #[derive(Clone)]
@@ -127,10 +130,7 @@ impl Peers {
             for _ in 0..number_to_disconnect {
                 if let Some(peer_info) = connected.pop() {
                     let addr = peer_info.address();
-                    debug!("Disconnecting from {}", addr);
-                    self.inbound
-                        .route(Message::new(Direction::Internal, Payload::Disconnect(addr)))
-                        .await;
+                    let _ = self.disconnect_from_peer(addr);
                 }
             }
         }
@@ -168,6 +168,14 @@ impl Peers {
     #[inline]
     pub fn is_disconnected(&self, address: SocketAddr) -> bool {
         self.peer_book.read().is_disconnected(address)
+    }
+
+    ///
+    /// Returns the number of peers connecting to this node.
+    ///
+    #[inline]
+    pub fn number_of_connecting_peers(&self) -> u16 {
+        self.peer_book.read().number_of_connecting_peers()
     }
 
     ///
@@ -240,64 +248,65 @@ impl Peers {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
+        self.connecting_to_peer(remote_address)?;
+
         // open the connection
         let stream = TcpStream::connect(remote_address).await?;
+        let (mut reader, mut writer) = stream.into_split();
 
-        let (reader, writer) = stream.into_split();
-        let writer = ConnWriter::new(remote_address, writer);
-        let mut reader = ConnReader::new(remote_address, reader);
+        let builder = snow::Builder::with_resolver(
+            crate::HANDSHAKE_PATTERN
+                .parse()
+                .expect("Invalid noise handshake pattern!"),
+            Box::new(snow::resolvers::SodiumResolver),
+        );
+        let static_key = builder.generate_keypair().map_err(NetworkError::Noise)?.private;
+        let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
+        let mut noise = noise_builder.build_initiator().map_err(NetworkError::Noise)?;
+        let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
+        let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-        // TODO (raychu86): Establish a formal node version.
-        let version = Version::new_with_rng(1u64, own_address.port());
+        // -> e
+        let len = noise.write_message(&[], &mut buffer).map_err(NetworkError::Noise)?;
+        println!("len: {}", len);
+        writer.write_all(&[len as u8]).await?;
+        writer.write_all(&buffer[..len]).await?;
+        trace!("sent e (XX handshake part 1/3)");
 
-        // Set the peer as a connecting peer in the peer book.
-        self.connecting_to_peer(remote_address, version.nonce)?;
+        // <- e, ee, s, es
+        reader.read_exact(&mut buf[..1]).await?;
+        let len = buf[0] as usize;
+        let len = reader.read_exact(&mut buf[..len]).await?;
+        let len = noise
+            .read_message(&buf[..len], &mut buffer)
+            .map_err(|_| NetworkError::InvalidHandshake)?;
+        let _peer_version: Version =
+            bincode::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
+        trace!("received e, ee, s, es (XX handshake part 2/3)");
 
-        // Send a connection request with the outbound handler.
-        writer.write_message(&Payload::Version(version.clone())).await?;
+        // -> s, se, psk
+        let own_version = bincode::serialize(&Version::new(1u64, own_address.port())).unwrap();
+        let len = noise
+            .write_message(&own_version, &mut buffer)
+            .map_err(NetworkError::Noise)?;
+        writer.write_all(&[len as u8]).await?;
+        writer.write_all(&buffer[..len]).await?;
+        trace!("sent s, se, psk (XX handshake part 3/3)");
 
-        let message = match reader.read_message().await {
-            Ok(inbound_message) => inbound_message,
-            Err(e) => {
-                error!("An error occurred while handshaking with {}: {}", remote_address, e);
-                return Err(NetworkError::InvalidHandshake);
-            }
-        };
+        let noise = Arc::new(Mutex::new(noise.into_transport_mode().map_err(NetworkError::Noise)?));
+        let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
+        let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
-        if let Payload::Verack(_) = message.payload {
-            let message = match reader.read_message().await {
-                Ok(inbound_message) => inbound_message,
-                Err(e) => {
-                    error!("An error occurred while handshaking with {}: {}", remote_address, e);
-                    return Err(NetworkError::InvalidHandshake);
-                }
-            };
+        // spawn the inbound loop
+        let inbound = self.inbound.clone();
+        tokio::spawn(async move {
+            inbound.listen_for_messages(&mut reader).await;
+        });
 
-            if let Payload::Version(_) = message.payload {
-                writer.write_message(&Payload::Verack(version.nonce)).await?;
+        // save the outbound channel
+        self.outbound.channels.write().insert(remote_address, Arc::new(writer));
 
-                // spawn the inbound loop
-                let inbound = self.inbound.clone();
-                tokio::spawn(async move {
-                    inbound.listen_for_messages(&mut reader).await;
-                });
-
-                // save the outbound channel
-                self.outbound.channels.write().insert(remote_address, writer);
-
-                self.connected_to_peer(remote_address, version.nonce)?;
-
-                debug!("Successfully handshaken with {}", remote_address);
-
-                Ok(())
-            } else {
-                Err(NetworkError::InvalidHandshake)
-            }
-        } else {
-            error!("{} didn't respond with a Verack during the handshake", remote_address);
-            self.disconnected_from_peer(remote_address)?;
-            Err(NetworkError::InvalidHandshake)
-        }
+        self.connected_to_peer(remote_address, None)
     }
 
     ///
@@ -320,9 +329,11 @@ impl Peers {
             .bootnodes()
             .iter()
             .filter(|addr| !connected_peers.contains_key(addr))
+            .copied()
         {
-            if let Err(e) = self.initiate_connection(*bootnode_address).await {
+            if let Err(e) = self.initiate_connection(bootnode_address).await {
                 warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                let _ = self.disconnect_from_peer(bootnode_address);
             }
         }
     }
@@ -335,6 +346,7 @@ impl Peers {
         for remote_address in self.disconnected_peers().keys().take(count).copied() {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+                let _ = self.disconnect_from_peer(remote_address);
             }
         }
     }
@@ -370,11 +382,11 @@ impl Peers {
             //     // Broadcast the message over the channel.
             //     if let Err(_) = channel.write(&GetPeers).await {
             //         // Disconnect from the peer if the message fails to send.
-            //         self.disconnected_from_peer(&remote_address).await?;
+            //         self.disconnect_from_peer(&remote_address).await?;
             //     }
             // } else {
             //     // Disconnect from the peer if the channel is not active.
-            //     self.disconnected_from_peer(&remote_address).await?;
+            //     self.disconnect_from_peer(&remote_address).await?;
             // }
         }
     }
@@ -481,20 +493,24 @@ impl Peers {
 
 impl Peers {
     ///
-    /// Sets the given remote address and nonce in the peer book as connecting to this node server.
+    /// Sets the given remote address as connecting to this node.
     ///
     #[inline]
-    pub(crate) fn connecting_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
+    pub(crate) fn connecting_to_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // Set the peer as connecting with this node server.
-        self.peer_book.write().set_connecting(&remote_address, nonce)
+        self.peer_book.write().set_connecting(remote_address)
     }
 
     ///
     /// Sets the given remote address in the peer book as connected to this node server.
     ///
     #[inline]
-    pub(crate) fn connected_to_peer(&self, remote_address: SocketAddr, nonce: u64) -> Result<(), NetworkError> {
-        self.peer_book.write().set_connected(remote_address, nonce)
+    pub(crate) fn connected_to_peer(
+        &self,
+        remote_address: SocketAddr,
+        remote_listener: Option<SocketAddr>,
+    ) -> Result<(), NetworkError> {
+        self.peer_book.write().set_connected(remote_address, remote_listener)
     }
 
     /// TODO (howardwu): Add logic to remove the active channels
@@ -502,16 +518,23 @@ impl Peers {
     /// Sets the given remote address in the peer book as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) fn disconnected_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+        debug!("Disconnecting from {}", remote_address);
+
+        if self.is_syncing_blocks(remote_address) {
+            self.environment.finished_syncing_blocks();
+        }
+
+        if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {
+            handle.abort();
+        };
+        self.outbound.channels.write().remove(&remote_address);
+
         self.peer_book.write().set_disconnected(remote_address)
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
-    pub(crate) async fn version_to_verack(&self, _remote_address: SocketAddr, _remote_version: &Version) {
-        // TODO: remove entirely; obviated by the noise handshake
-    }
-
-    pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
+    pub(crate) async fn send_get_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
