@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{peers::PeerInfo, NetworkError};
+use crate::{
+    peers::{PeerInfo, PeerQuality},
+    NetworkError,
+};
 use snarkos_metrics::Metrics;
 use snarkos_storage::Ledger;
 use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
@@ -23,6 +26,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+    time::Instant,
 };
 
 ///
@@ -269,6 +274,94 @@ impl PeerBook {
 
         // Remove the address from the disconnected peers, if it exists.
         self.disconnected_peers.remove(address);
+    }
+
+    fn peer_quality(&self, addr: SocketAddr) -> Option<Arc<PeerQuality>> {
+        self.connected_peers().get(&addr).map(|peer| Arc::clone(&peer.quality))
+    }
+
+    ///
+    /// Returns the `SocketAddr` of the last seen peer to be used as a sync node, or `None`.
+    ///
+    pub fn last_seen(&self) -> Option<SocketAddr> {
+        if let Some((&socket_address, _)) = self
+            .connected_peers()
+            .iter()
+            .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
+        {
+            Some(socket_address)
+        } else {
+            None
+        }
+    }
+
+    ///
+    /// Updates the last seen timestamp of this peer to the current time.
+    ///
+    #[inline]
+    pub fn update_last_seen(&self, addr: SocketAddr) {
+        if let Some(ref quality) = self.peer_quality(addr) {
+            *quality.last_seen.write() = Some(chrono::Utc::now());
+        } else {
+            warn!("Attempted to update state of a peer that's not connected: {}", addr);
+        }
+    }
+
+    pub fn sending_ping(&self, target: SocketAddr) {
+        if let Some(quality) = self.peer_quality(target) {
+            let timestamp = Instant::now();
+            *quality.last_ping_sent.lock() = Some(timestamp);
+            quality.expecting_pong.store(true, Ordering::SeqCst);
+        } else {
+            // shouldn't occur, but just in case
+            warn!("Tried to send a Ping to an unknown peer: {}!", target);
+        }
+    }
+
+    /// Handles an incoming `Pong` message.
+    pub fn received_pong(&self, source: SocketAddr) {
+        if let Some(quality) = self.peer_quality(source) {
+            if quality.expecting_pong.load(Ordering::SeqCst) {
+                let ping_sent = quality.last_ping_sent.lock().unwrap();
+                let rtt = ping_sent.elapsed().as_millis() as u64;
+                quality.rtt_ms.store(rtt, Ordering::SeqCst);
+                quality.expecting_pong.store(false, Ordering::SeqCst);
+            } else {
+                quality.failures.fetch_add(1, Ordering::Relaxed);
+            }
+        } else {
+            // shouldn't occur, but just in case
+            warn!("Received a Pong from an unknown peer: {}!", source);
+        }
+    }
+
+    /// Registers that the given number of blocks is expected as part of syncing with a peer.
+    pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) {
+        if let Some(ref pq) = self.peer_quality(addr) {
+            pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
+        } else {
+            error!("Peer for expecting_sync_blocks purposes not found!");
+        }
+    }
+
+    /// Registers the receipt of a sync block from a peer; returns `true` when finished syncing.
+    pub fn got_sync_block(&self, addr: SocketAddr) -> bool {
+        if let Some(ref pq) = self.peer_quality(addr) {
+            pq.remaining_sync_blocks.fetch_sub(1, Ordering::SeqCst) == 1
+        } else {
+            error!("Peer for got_sync_block purposes not found!");
+            true
+        }
+    }
+
+    /// Checks whether the current peer is involved in a block syncing process.
+    pub fn is_syncing_blocks(&self, addr: SocketAddr) -> bool {
+        if let Some(ref pq) = self.peer_quality(addr) {
+            pq.remaining_sync_blocks.load(Ordering::SeqCst) != 0
+        } else {
+            error!("Peer for got_sync_block purposes not found!");
+            false
+        }
     }
 }
 

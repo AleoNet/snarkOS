@@ -160,7 +160,7 @@ impl Node {
                         info!("Updating transactions");
 
                         // select last seen node as block sync node
-                        let sync_node = self_clone.last_seen();
+                        let sync_node = self_clone.peer_book.read().last_seen();
                         self_clone.consensus().update_transactions(sync_node).await;
                     }
                 }
@@ -186,7 +186,7 @@ impl Node {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         let source = if let Direction::Inbound(addr) = direction {
-            self.update_last_seen(addr);
+            self.peer_book.read().update_last_seen(addr);
             Some(addr)
         } else {
             None
@@ -217,7 +217,7 @@ impl Node {
             }
             Payload::SyncBlock(block) => {
                 self.consensus().received_block(source.unwrap(), block, None).await?;
-                if self.got_sync_block(source.unwrap()) {
+                if self.peer_book.read().got_sync_block(source.unwrap()) {
                     self.consensus().finished_syncing_blocks();
                 }
             }
@@ -240,7 +240,7 @@ impl Node {
                 }
             }
             Payload::Sync(sync) => {
-                self.expecting_sync_blocks(source.unwrap(), sync.len());
+                self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len());
                 self.consensus().received_sync(source.unwrap(), sync).await;
             }
             Payload::Disconnect(addr) => {
@@ -261,7 +261,7 @@ impl Node {
 
                 if block_height > self.consensus().current_block_height() + 1
                     && self.consensus().should_sync_blocks()
-                    && !self.is_syncing_blocks(source.unwrap())
+                    && !self.peer_book.read().is_syncing_blocks(source.unwrap())
                 {
                     self.consensus().register_block_sync_attempt();
                     trace!("Attempting to sync with {}", source.unwrap());
@@ -271,7 +271,7 @@ impl Node {
                 }
             }
             Payload::Pong => {
-                self.received_pong(source.unwrap());
+                self.peer_book.read().received_pong(source.unwrap());
             }
             Payload::Unknown => {
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
