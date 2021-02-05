@@ -154,7 +154,6 @@ pub struct Node {
 
     pub peers: Peers,
     pub blocks: Blocks,
-    pub transactions: Transactions,
 }
 
 impl Node {
@@ -168,7 +167,6 @@ impl Node {
         // Initialize the peer and block services.
         let peers = Peers::new(environment.clone(), inbound.clone(), outbound.clone())?;
         let blocks = Blocks::new(environment.clone(), outbound.clone());
-        let transactions = Transactions::new(environment.clone(), outbound.clone());
 
         Ok(Self {
             environment,
@@ -178,7 +176,6 @@ impl Node {
             consensus: None,
             peers,
             blocks,
-            transactions,
         })
     }
 
@@ -219,7 +216,6 @@ impl Node {
 
         if self.has_consensus() && !self.environment.is_bootnode() {
             let self_clone = self.clone();
-            let transactions = self.transactions.clone();
             let transaction_sync_interval = self.transaction_sync_interval();
             task::spawn(async move {
                 loop {
@@ -230,7 +226,7 @@ impl Node {
 
                         // select last seen node as block sync node
                         let sync_node = self_clone.peers.last_seen();
-                        transactions.update(sync_node).await;
+                        self_clone.consensus().update(sync_node).await;
                     }
                 }
             });
@@ -274,7 +270,7 @@ impl Node {
             }
             Payload::Transaction(transaction) => {
                 let connected_peers = self.peers.connected_peers();
-                self.transactions
+                self.consensus()
                     .received_transaction(source.unwrap(), transaction, connected_peers)
                     .await?;
             }
@@ -296,11 +292,11 @@ impl Node {
             }
             Payload::GetMemoryPool => {
                 if !self.is_syncing_blocks() {
-                    self.transactions.received_get_memory_pool(source.unwrap()).await?;
+                    self.consensus().received_get_memory_pool(source.unwrap()).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
-                self.transactions.received_memory_pool(mempool)?;
+                self.consensus().received_memory_pool(mempool)?;
             }
             Payload::GetSync(getsync) => {
                 if !self.is_syncing_blocks() {
