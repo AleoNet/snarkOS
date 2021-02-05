@@ -49,10 +49,7 @@ impl MinerInstance {
         task::spawn(async move {
             let local_address = self.environment.local_address().unwrap();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
-            let miner = Miner::new(
-                self.miner_address.clone(),
-                Arc::clone(self.environment.consensus_parameters()),
-            );
+            let miner = Miner::new(self.miner_address.clone(), Arc::clone(self.node.consensus_parameters()));
             info!("Miner instantiated; starting to mine blocks");
 
             let mut mining_failure_count = 0;
@@ -62,11 +59,7 @@ impl MinerInstance {
                 info!("Starting to mine the next block");
 
                 let (block, _coinbase_records) = match miner
-                    .mine_block(
-                        self.environment.dpc_parameters(),
-                        self.environment.storage(),
-                        self.environment.memory_pool(),
-                    )
+                    .mine_block(self.node.dpc_parameters(), self.node.storage(), self.node.memory_pool())
                     .await
                 {
                     Ok(mined_block) => mined_block,
@@ -90,7 +83,7 @@ impl MinerInstance {
                 };
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
-                let peers = self.node.peers.connected_peers();
+                let peers = self.node.connected_peers();
                 let serialized_block = if let Ok(block) = block.serialize() {
                     block
                 } else {
@@ -99,7 +92,7 @@ impl MinerInstance {
                 };
 
                 self.node
-                    .blocks
+                    .consensus()
                     .propagate_block(serialized_block, local_address, &peers)
                     .await;
             }

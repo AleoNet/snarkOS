@@ -117,18 +117,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         authorized_inner_snark_ids,
     });
 
-    let consensus = Consensus::new(
-        Arc::new(RwLock::new(storage)),
-        memory_pool.clone(),
-        consensus_params.clone(),
-        dpc_parameters.clone(),
-        config.miner.is_miner,
-        Duration::from_secs(config.p2p.block_sync_interval.into()),
-        Duration::from_secs(config.p2p.mempool_interval.into()),
-    );
-
     let mut environment = Environment::new(
-        Some(consensus),
         Some(socket_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
@@ -141,8 +130,19 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the server instance. Note this does not start the server.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    // TODO (nkls): pass consensus in here.
-    let mut server = Node::new(environment.clone(), None).await?;
+    let mut server = Node::new(environment.clone()).await?;
+
+    // Construct the consensus instance and set it on the server instance.
+    let consensus = Consensus::new(
+        server.clone(),
+        Arc::new(RwLock::new(storage)),
+        memory_pool.clone(),
+        consensus_params.clone(),
+        dpc_parameters.clone(),
+        config.miner.is_miner,
+        Duration::from_secs(config.p2p.block_sync_interval.into()),
+        Duration::from_secs(config.p2p.mempool_interval.into()),
+    );
 
     // Establish the address of the server.
     server.establish_address().await?;
