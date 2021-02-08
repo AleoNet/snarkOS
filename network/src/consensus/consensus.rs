@@ -30,6 +30,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+// TODO: Remove the inner Arcs, currently these objects are being cloned individually in the miner.
 pub struct Consensus {
     /// The node this consensus is bound to.
     node: Node,
@@ -46,11 +47,11 @@ pub struct Consensus {
     /// The interval between each block sync.
     block_sync_interval: Duration,
     /// The last time a block sync was initiated.
-    last_block_sync: Arc<RwLock<Instant>>,
+    last_block_sync: RwLock<Instant>,
     /// The interval between each transaction (memory pool) sync.
     transaction_sync_interval: Duration,
     /// Is the node currently syncing blocks?
-    is_syncing_blocks: Arc<AtomicBool>,
+    is_syncing_blocks: AtomicBool,
 }
 
 impl Consensus {
@@ -73,7 +74,7 @@ impl Consensus {
             dpc_parameters,
             is_miner,
             block_sync_interval,
-            last_block_sync: Arc::new(RwLock::new(Instant::now())),
+            last_block_sync: RwLock::new(Instant::now()),
             transaction_sync_interval,
             is_syncing_blocks: Default::default(),
         }

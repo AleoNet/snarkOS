@@ -70,6 +70,7 @@ pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 
 /// A core data structure for operating the networking stack of this node.
+// TODO: remove inner Arcs.
 #[derive(Clone)]
 pub struct Node {
     /// The parameters and settings of this node server.
