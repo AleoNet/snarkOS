@@ -16,7 +16,7 @@
 
 use criterion::*;
 
-use snarkos_network::external::Payload;
+use snarkos_network::Payload;
 use snarkos_testing::network::{blocks::*, handshaken_node_and_peer, TestSetup};
 
 // FIXME(ljedrz/nkls): gracefully shut the node and peer down once shutdown is implemented
@@ -32,17 +32,17 @@ fn providing_sync_blocks(c: &mut Criterion) {
     let blocks = TestBlocks::load(NUM_BLOCKS);
     for block in &blocks.0 {
         provider
-            .environment
+            .consensus()
             .consensus_parameters()
             .receive_block(
-                provider.environment.dpc_parameters(),
-                &provider.environment.storage().read(),
-                &mut provider.environment.memory_pool().lock(),
+                provider.consensus().dpc_parameters(),
+                &provider.consensus().storage().read(),
+                &mut provider.consensus().memory_pool().lock(),
                 &block,
             )
             .unwrap();
     }
-    assert_eq!(provider.environment.current_block_height() as usize, NUM_BLOCKS);
+    assert_eq!(provider.consensus().current_block_height() as usize, NUM_BLOCKS);
 
     c.bench_function("providing_sync_blocks", move |b| {
         b.to_async(&rt).iter(|| async {

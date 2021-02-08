@@ -17,7 +17,7 @@
 use criterion::*;
 use rand::{distributions::Standard, thread_rng, Rng};
 
-use snarkos_network::external::Payload;
+use snarkos_network::Payload;
 use snarkos_testing::network::spawn_2_fake_nodes;
 
 fn send_small_messages(c: &mut Criterion) {
