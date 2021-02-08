@@ -21,9 +21,10 @@ mod protected_rpc_tests {
     use snarkos_rpc::*;
     use snarkos_testing::{
         consensus::*,
-        network::{test_environment, TestSetup},
+        network::{test_consensus, test_environment, ConsensusSetup, TestSetup},
         storage::*,
     };
+
     use snarkvm_dpc::base_dpc::{
         instantiated::{Components, Tx},
         record::DPCRecord,
@@ -81,7 +82,9 @@ mod protected_rpc_tests {
         };
 
         let environment = test_environment(TestSetup::default());
-        let node = Node::new(environment.clone()).await.unwrap();
+        let mut node = Node::new(environment.clone()).await.unwrap();
+        let consensus = test_consensus(ConsensusSetup::default(), node.clone());
+        node.set_consensus(consensus);
 
         let storage_path = storage.read().storage.db.path().to_path_buf();
 
