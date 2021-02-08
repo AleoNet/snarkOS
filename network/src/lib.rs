@@ -73,13 +73,13 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 // TODO: remove inner Arcs.
 #[derive(Clone)]
 pub struct Node {
-    /// The parameters and settings of this node server.
+    /// The parameters and settings of this node.
     pub environment: Environment,
-    /// The inbound handler of this node server.
+    /// The inbound handler of this node.
     inbound: Arc<Inbound>,
-    /// The outbound handler of this node server.
+    /// The outbound handler of this node.
     outbound: Arc<Outbound>,
-    /// The list of connected and disconnected peers of this node server.
+    /// The list of connected and disconnected peers of this node.
     pub peer_book: Arc<RwLock<PeerBook>>,
     /// The objects related to consensus.
     pub consensus: Option<Arc<Consensus>>,
@@ -125,11 +125,11 @@ impl Node {
     }
 
     pub async fn start_services(&self) {
-        let server = self.clone();
+        let self_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
         task::spawn(async move {
             loop {
-                if let Err(e) = server.process_incoming_messages(&mut receiver).await {
+                if let Err(e) = self_clone.process_incoming_messages(&mut receiver).await {
                     error!("Node error: {}", e);
                 }
             }

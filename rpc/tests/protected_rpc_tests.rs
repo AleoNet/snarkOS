@@ -81,11 +81,11 @@ mod protected_rpc_tests {
         };
 
         let environment = test_environment(TestSetup::default());
-        let server = Node::new(environment.clone()).await.unwrap();
+        let node = Node::new(environment.clone()).await.unwrap();
 
         let storage_path = storage.read().storage.db.path().to_path_buf();
 
-        let rpc_impl = RpcImpl::new(storage, storage_path, environment, Some(credentials), server);
+        let rpc_impl = RpcImpl::new(storage, storage_path, environment, Some(credentials), node);
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);

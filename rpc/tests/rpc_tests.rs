@@ -47,11 +47,11 @@ mod rpc_tests {
 
     async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> Rpc {
         let environment = test_environment(TestSetup::default());
-        let server = Node::new(environment.clone()).await.unwrap();
+        let node = Node::new(environment.clone()).await.unwrap();
 
         let storage_path = storage.read().storage.db.path().to_path_buf();
 
-        Rpc::new(RpcImpl::new(storage, storage_path, environment, None, server).to_delegate())
+        Rpc::new(RpcImpl::new(storage, storage_path, environment, None, node).to_delegate())
     }
 
     fn verify_transaction_info(transaction_bytes: Vec<u8>, transaction_info: Value) {

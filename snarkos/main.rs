@@ -127,14 +127,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
 
-    // Construct the server instance. Note this does not start the server.
+    // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut server = Node::new(environment.clone()).await?;
+    let mut node = Node::new(environment.clone()).await?;
 
-    // Construct the consensus instance and set it on the server instance.
+    // Construct the consensus instance and set it on the node instance.
     let consensus = Consensus::new(
-        server.clone(),
+        node.clone(),
         Arc::new(RwLock::new(storage)),
         memory_pool.clone(),
         consensus_params.clone(),
@@ -144,17 +144,17 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Duration::from_secs(config.p2p.mempool_interval.into()),
     );
 
-    // Set the consensus on the server.
-    server.set_consensus(consensus);
-    // Establish the address of the server.
-    server.establish_address().await?;
-    environment.set_local_address(server.local_address().unwrap());
+    // Set the consensus on the node.
+    node.set_consensus(consensus);
+    // Establish the address of the node.
+    node.establish_address().await?;
+    environment.set_local_address(node.local_address().unwrap());
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(miner_address, environment.clone(), server.clone()).spawn();
+                MinerInstance::new(miner_address, environment.clone(), node.clone()).spawn();
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -172,15 +172,15 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             secondary_storage,
             path.to_path_buf(),
             environment,
-            server.clone(),
+            node.clone(),
             config.rpc.username,
             config.rpc.password,
         )
         .await;
     }
 
-    // Start the server
-    server.start_services().await;
+    // Start the network services
+    node.start_services().await;
 
     std::future::pending::<()>().await;
 
