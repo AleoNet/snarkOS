@@ -244,7 +244,6 @@ async fn transaction_responder_side() {
 
     // drop the locks to avoid deadlocks
     drop(memory_pool);
-    drop(storage);
 
     // send a GetMemoryPool message
     let get_memory_pool = Payload::GetMemoryPool;
@@ -287,7 +286,6 @@ async fn transaction_two_node() {
 
     // drop the locks to avoid deadlocks
     drop(memory_pool);
-    drop(storage);
 
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
