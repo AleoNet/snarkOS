@@ -137,7 +137,7 @@ impl Peers {
 
         if number_of_connected_peers != 0 {
             // Send a `Ping` to every connected peer.
-            self.broadcast_pings();
+            self.broadcast_pings().await;
         }
 
         Ok(())

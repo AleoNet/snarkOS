@@ -16,15 +16,7 @@
 
 use snarkos_network::external::message::*;
 use snarkos_testing::{
-    network::{
-        handshaken_node_and_peer,
-        random_bound_address,
-        read_header,
-        read_payload,
-        test_node,
-        write_message_to_stream,
-        TestSetup,
-    },
+    network::{handshaken_node_and_peer, random_bound_address, test_node, TestSetup},
     wait_until,
 };
 
@@ -36,20 +28,15 @@ async fn peer_initiator_side() {
         min_peers: 2,
         ..Default::default()
     };
-    let (node, mut peer_stream) = handshaken_node_and_peer(setup).await;
-
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
     // check if the peer has received the GetPeers message from the node
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::GetPeers));
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::GetPeers));
 
     // respond with a Peers message
     let (addr, _) = random_bound_address().await;
-    let peers = Payload::Peers(vec![addr]);
-    write_message_to_stream(peers, &mut peer_stream).await;
+    peer.write_message(&Payload::Peers(vec![addr])).await;
 
     // check the address has been added to the disconnected list in the peer book
     wait_until!(5, node.peers.is_disconnected(addr));
@@ -61,21 +48,14 @@ async fn peer_responder_side() {
         consensus_setup: None,
         ..Default::default()
     };
-    let (_node, mut peer_stream) = handshaken_node_and_peer(setup).await;
+    let (_node, mut peer) = handshaken_node_and_peer(setup).await;
 
     // send GetPeers message
-    write_message_to_stream(Payload::GetPeers, &mut peer_stream).await;
-
-    // the buffer for peer's reads
-    let mut peer_buf = [0u8; 64];
+    peer.write_message(&Payload::GetPeers).await;
 
     // check if the peer has received the Peers message from the node
-    // TODO(nkls): check the message contains a node, currently empty as there is no simple way to
-    // insert a node into the peer book marked as connected other than spinning up another and
-    // connecting them.
-    let len = read_header(&mut peer_stream).await.unwrap().len();
-    let payload = read_payload(&mut peer_stream, &mut peer_buf[..len]).await.unwrap();
-    assert!(matches!(bincode::deserialize(&payload).unwrap(), Payload::Peers(..)));
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Peers(..)));
 }
 
 #[tokio::test(flavor = "multi_thread")]
