@@ -30,7 +30,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone)]
 pub struct Consensus {
     /// The node this consensus is bound to.
     node: Node,
