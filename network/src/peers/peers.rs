@@ -85,7 +85,7 @@ impl Node {
             self.broadcast_pings().await;
 
             // Store the peer book to storage.
-            // self.save_peer_book_to_storage()?;
+            self.save_peer_book_to_storage()?;
         }
 
         Ok(())
@@ -259,19 +259,19 @@ impl Node {
     /// This function checks that this node is not connected to itself,
     /// and proceeds to serialize the peer book into a byte vector for storage.
     ///
-    // #[inline]
-    // fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
-    //     // Serialize the peer book.
-    //     let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
+    #[inline]
+    fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
+        // Serialize the peer book.
+        let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
-    //     // Save the serialized peer book to storage.
-    //     self.environment
-    //         .storage()
-    //         .write()
-    //         .save_peer_book_to_storage(serialized_peer_book)?;
+        // Save the serialized peer book to storage.
+        self.consensus()
+            .storage()
+            .write()
+            .save_peer_book_to_storage(serialized_peer_book)?;
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     /// TODO (howardwu): Add logic to remove the active channels
     ///  and handshakes of the peer from this struct.
