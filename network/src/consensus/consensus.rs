@@ -32,6 +32,7 @@ use std::{
 
 #[derive(Clone)]
 pub struct Consensus {
+    /// The node this consensus is bound to.
     node: Node,
     /// The storage system of this node.
     storage: Arc<RwLock<MerkleTreeLedger>>,

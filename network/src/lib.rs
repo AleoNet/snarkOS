@@ -96,9 +96,7 @@ impl Node {
             environment,
             inbound,
             outbound,
-            // TODO (nkls): derive default?
             peer_book: Default::default(),
-            // Consensus set to None as the node needs to be created first.
             consensus: None,
         })
     }
