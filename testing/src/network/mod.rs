@@ -50,6 +50,9 @@ pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
     (addr, listener)
 }
 
+/// Waits until an expression is true or times out.
+///
+/// Uses polling to cut down on time otherwise used by calling `sleep` in tests.
 #[macro_export]
 macro_rules! wait_until {
     ($limit_secs: expr, $condition: expr) => {
@@ -353,6 +356,7 @@ pub async fn read_payload<'a, T: AsyncRead + Unpin>(
     Ok(buffer)
 }
 
+/// Reads the message header into a `MessageHeader`.
 pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
     let mut header_arr = [0u8; 4];
     stream.read_exact(&mut header_arr).await?;
@@ -365,6 +369,7 @@ pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<Message
     }
 }
 
+/// Writes a payload into the supplied `TcpStream`.
 pub async fn write_message_to_stream(payload: Payload, peer_stream: &mut TcpStream) {
     let payload = Payload::serialize(&payload).unwrap();
     let header = MessageHeader {
