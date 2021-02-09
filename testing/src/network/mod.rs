@@ -351,7 +351,7 @@ pub async fn handshaken_peer(node_listener: SocketAddr) -> FakeNode {
     FakeNode::new(peer_stream, peer_addr, noise)
 }
 
-pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, FakeNode) {
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode) {
     // start a test node and listen for incoming connections
     let node = test_node(node_setup).await;
     let node_listener = node.local_address().unwrap();
