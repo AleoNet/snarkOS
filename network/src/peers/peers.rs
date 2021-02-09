@@ -303,8 +303,13 @@ impl Node {
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
-        let mut peers = Vec::new();
-        for peer_address in self.peer_book.read().connected_peers().keys().copied() {
+        let own_peers = if !self.environment.is_bootnode() {
+            self.connected_peers()
+        } else {
+            self.disconnected_peers()
+        };
+
+        for peer_address in own_peers.keys().copied() {
             // Skip the iteration if the requesting peer that we're sending the response to
             // appears in the list of peers.
             if peer_address == remote_address {
