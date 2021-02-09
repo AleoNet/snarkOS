@@ -211,9 +211,14 @@ impl Node {
     async fn connect_to_disconnected_peers(&self, count: usize) {
         trace!("Connecting to disconnected peers");
 
-        // Iterate through each connected peer and attempts a connection request.
-        let disconnected_peers = self.peer_book.read().disconnected_peers().clone();
-        for remote_address in disconnected_peers.keys().take(count).copied() {
+        // Iterate through a selection of random peers and attempt to connect.
+        let random_peers = self
+            .disconnected_peers()
+            .into_iter()
+            .map(|(k, _)| k)
+            .choose_multiple(&mut rand::thread_rng(), count);
+
+        for remote_address in random_peers {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
                 let _ = self.disconnect_from_peer(remote_address);
