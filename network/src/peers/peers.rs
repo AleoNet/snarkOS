@@ -300,7 +300,7 @@ impl Node {
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
-    pub(crate) async fn send_get_peers(&self, remote_address: SocketAddr) {
+    pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();

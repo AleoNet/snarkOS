@@ -250,7 +250,7 @@ impl Node {
                 }
             }
             Payload::GetPeers => {
-                self.send_get_peers(source.unwrap()).await;
+                self.send_peers(source.unwrap()).await;
             }
             Payload::Peers(peers) => {
                 self.process_inbound_peers(peers);
