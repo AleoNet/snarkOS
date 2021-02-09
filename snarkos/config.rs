@@ -21,8 +21,6 @@ use crate::{
     update::UpdateCLI,
 };
 
-use snarkos_network::errors::NetworkError;
-
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
@@ -323,15 +321,19 @@ impl Config {
         }
     }
 
-    pub fn check(&self) -> Result<(), NetworkError> {
+    pub fn check(&self) -> Result<(), CliError> {
         // Check that the minimum and maximum number of peers is valid.
         if self.p2p.min_peers == 0 || self.p2p.max_peers == 0 {
-            return Err(NetworkError::PeerCountInvalid);
+            return Err(CliError::PeerCountInvalid);
         }
 
         // Check that the sync interval is a reasonable number of seconds.
         if !(2..=300).contains(&self.p2p.peer_sync_interval) || !(2..=300).contains(&self.p2p.block_sync_interval) {
-            return Err(NetworkError::SyncIntervalInvalid);
+            return Err(CliError::SyncIntervalInvalid);
+        }
+
+        if self.node.is_bootnode && self.miner.is_miner {
+            return Err(CliError::MinerBootstrapper);
         }
 
         // TODO (howardwu): Check the memory pool interval.
