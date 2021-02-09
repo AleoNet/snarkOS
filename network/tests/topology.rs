@@ -14,17 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::external::message::*;
+use snarkos_network::message::*;
 use snarkos_testing::{
     network::{
-        connect_nodes,
         handshaken_node_and_peer,
         random_bound_address,
         read_header,
         read_payload,
+        topology::{connect_nodes, Topology},
         write_message_to_stream,
         TestSetup,
-        Topology,
     },
     wait_until,
 };
@@ -39,12 +38,18 @@ async fn line() {
     let nodes = connect_nodes(10, setup, Topology::Line).await;
 
     // First and Last nodes should have 1 connected peer.
-    wait_until!(5, nodes.first().unwrap().peers.number_of_connected_peers() == 1);
-    assert_eq!(nodes.last().unwrap().peers.number_of_connected_peers(), 1);
+    wait_until!(
+        5,
+        nodes.first().unwrap().peer_book.read().number_of_connected_peers() == 1
+    );
+    wait_until!(
+        5,
+        nodes.last().unwrap().peer_book.read().number_of_connected_peers() == 1
+    );
 
     // All other nodes should have two.
     for i in 1..(nodes.len() - 1) {
-        assert_eq!(nodes[i].peers.number_of_connected_peers(), 2);
+        wait_until!(5, nodes[i].peer_book.read().number_of_connected_peers() == 2);
     }
 }
 
@@ -59,5 +64,5 @@ async fn star() {
     let core = nodes.first().unwrap();
 
     assert!(core.environment.is_bootnode());
-    wait_until!(5, core.peers.number_of_connected_peers() == 9);
+    wait_until!(5, core.peer_book.read().number_of_connected_peers() == 9);
 }

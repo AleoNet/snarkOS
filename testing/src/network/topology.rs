@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
 
 use crate::network::{test_node, TestSetup};
 
-use snarkos_network::Server;
+use snarkos_network::Node;
 
 use std::net::SocketAddr;
 
@@ -31,7 +31,7 @@ pub enum Topology {
     Star,
 }
 
-pub async fn connect_nodes(n: u32, setup: TestSetup, topology: Topology) -> Vec<Server> {
+pub async fn connect_nodes(n: u32, setup: TestSetup, topology: Topology) -> Vec<Node> {
     if n < 2 {
         unimplemented!();
     }
@@ -44,7 +44,7 @@ pub async fn connect_nodes(n: u32, setup: TestSetup, topology: Topology) -> Vec<
 }
 
 /// Starts n network nodes in a line topology.
-pub async fn line(n: u32, setup: TestSetup) -> Vec<Server> {
+pub async fn line(n: u32, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
     let mut prev_node: Option<SocketAddr> = None;
 
@@ -71,7 +71,7 @@ pub async fn line(n: u32, setup: TestSetup) -> Vec<Server> {
 ///
 /// The bootnode is at the center and is included in the total node count. It is the first node in
 /// the returned list.
-pub async fn star_topology(n: u32, setup: TestSetup) -> Vec<Server> {
+pub async fn star_topology(n: u32, setup: TestSetup) -> Vec<Node> {
     // Start the bootnode at the center of the star.
     let core_setup = TestSetup {
         is_bootnode: true,
