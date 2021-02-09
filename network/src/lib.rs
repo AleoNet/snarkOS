@@ -268,6 +268,9 @@ impl Server {
             Payload::Pong => {
                 self.peers.received_pong(source.unwrap());
             }
+            Payload::Unknown => {
+                warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
+            }
         }
 
         Ok(())

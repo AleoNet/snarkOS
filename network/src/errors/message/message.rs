@@ -46,12 +46,6 @@ impl From<StreamReadError> for MessageError {
     }
 }
 
-impl From<bincode::Error> for MessageError {
-    fn from(error: bincode::Error) -> Self {
-        MessageError::Crate("bincode", format!("{:?}", error))
-    }
-}
-
 impl From<std::io::Error> for MessageError {
     fn from(error: std::io::Error) -> Self {
         MessageError::Crate("std::io", format!("{:?}", error))

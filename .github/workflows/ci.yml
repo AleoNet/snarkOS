@@ -53,6 +53,9 @@ jobs:
           override: true
           components: clippy
 
+      - name: Install capnproto
+        run: sudo apt-get install capnproto
+
       - name: Check examples
         uses: actions-rs/cargo@v1
         with:

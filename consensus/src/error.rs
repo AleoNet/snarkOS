@@ -145,12 +145,6 @@ impl From<anyhow::Error> for ConsensusError {
     }
 }
 
-impl From<bincode::Error> for ConsensusError {
-    fn from(error: bincode::Error) -> Self {
-        ConsensusError::Crate("bincode", format!("{:?}", error))
-    }
-}
-
 impl From<std::io::Error> for ConsensusError {
     fn from(error: std::io::Error) -> Self {
         ConsensusError::Crate("std::io", format!("{:?}", error))

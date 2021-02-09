@@ -10,6 +10,7 @@ categories = ["cryptography::cryptocurrencies", "operating-systems"]
 include = ["Cargo.toml", "snarkos", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
+build = "build.rs"
 
 [workspace]
 members = [
@@ -66,6 +67,7 @@ rusty-hook = { version = "0.11.2" }
 
 [build-dependencies]
 rustc_version = "0.2"
+capnpc = "0.14"
 
 [profile.release]
 opt-level = 3

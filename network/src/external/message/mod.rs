@@ -20,5 +20,8 @@ pub use message::*;
 pub mod message_header;
 pub use message_header::*;
 
+pub mod serialization;
+pub use serialization::*;
+
 pub mod version;
 pub use version::*;

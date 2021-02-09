@@ -21,9 +21,6 @@ pub enum MessageHeaderError {
     #[error("IO error: {}", _0)]
     Io(std::io::Error),
 
-    #[error("Serialization error: {}", _0)]
-    Serialization(bincode::Error),
-
     #[error("{}", _0)]
     Message(String),
 
@@ -37,12 +34,6 @@ pub enum MessageHeaderError {
 impl From<StreamReadError> for MessageHeaderError {
     fn from(error: StreamReadError) -> Self {
         MessageHeaderError::StreamReadError(error)
-    }
-}
-
-impl From<bincode::Error> for MessageHeaderError {
-    fn from(error: bincode::Error) -> Self {
-        MessageHeaderError::Serialization(error)
     }
 }
 

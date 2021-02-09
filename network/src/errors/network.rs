@@ -27,7 +27,6 @@ use std::fmt;
 #[derive(Debug)]
 pub enum NetworkError {
     Bincode(Box<bincode::ErrorKind>),
-    Bincode2(bincode::ErrorKind),
     BlockError(BlockError),
     ConnectError(ConnectError),
     ConsensusError(ConsensusError),
@@ -97,12 +96,6 @@ impl From<StorageError> for NetworkError {
 impl From<Box<bincode::ErrorKind>> for NetworkError {
     fn from(error: Box<bincode::ErrorKind>) -> Self {
         NetworkError::Bincode(error)
-    }
-}
-
-impl From<bincode::ErrorKind> for NetworkError {
-    fn from(error: bincode::ErrorKind) -> Self {
-        NetworkError::Bincode2(error)
     }
 }
 

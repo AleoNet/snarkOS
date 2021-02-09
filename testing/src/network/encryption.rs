@@ -20,14 +20,12 @@ use snarkos_network::external::message::Payload;
 
 use rand::{distributions::Standard, thread_rng, Rng};
 
-// note: this test is "byte-tight"; if there's any changes to block serialization or MAX_MESSAGE_SIZE is
-// increased without increasing the size of the subtracted overhead, the test will fail
 #[tokio::test]
 async fn encrypt_and_decrypt_a_big_payload() {
     let (mut node0, mut node1) = spawn_2_fake_nodes().await;
 
     // account for the overhead of serialization and noise tags
-    let block_size = snarkos_network::MAX_MESSAGE_SIZE - 2076;
+    let block_size = snarkos_network::MAX_MESSAGE_SIZE / 2;
 
     // create a big block containing random data
     let fake_block_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(block_size).collect();

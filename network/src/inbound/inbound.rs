@@ -252,7 +252,7 @@ impl Inbound {
         trace!("received e (XX handshake part 1/3)");
 
         // -> e, ee, s, es
-        let own_version = bincode::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+        let own_version = Version::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
         let len = noise
             .write_message(&own_version, &mut buffer)
             .map_err(NetworkError::Noise)?;
@@ -267,7 +267,7 @@ impl Inbound {
         let len = noise
             .read_message(&buf[..len], &mut buffer)
             .map_err(|_| NetworkError::InvalidHandshake)?;
-        let peer_version: Version = bincode::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
+        let peer_version = Version::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
         trace!("received s, se, psk (XX handshake part 3/3)");
 
         // the remote listening address
