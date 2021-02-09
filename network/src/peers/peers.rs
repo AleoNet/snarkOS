@@ -81,6 +81,16 @@ impl Node {
             }
         }
 
+        // disconnect from peers after a while, even if they haven't sent a GetPeers
+        let now = chrono::Utc::now();
+        if self.environment.is_bootnode() {
+            for (peer_addr, peer_info) in self.connected_peers() {
+                if (now - peer_info.last_connected().unwrap()).num_seconds() > 10 {
+                    let _ = self.disconnect_from_peer(peer_addr);
+                }
+            }
+        }
+
         if number_of_connected_peers != 0 {
             if !self.environment.is_bootnode() {
                 // Send a `Ping` to every connected peer.
