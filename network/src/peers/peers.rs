@@ -19,6 +19,7 @@ use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
 use std::{net::SocketAddr, sync::Arc};
 
 use parking_lot::Mutex;
+use rand::seq::IteratorRandom;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -309,14 +310,12 @@ impl Node {
             self.disconnected_peers()
         };
 
-        for peer_address in own_peers.keys().copied() {
-            // Skip the iteration if the requesting peer that we're sending the response to
-            // appears in the list of peers.
-            if peer_address == remote_address {
-                continue;
-            }
-            peers.push(peer_address);
-        }
+        let peers = own_peers
+            .into_iter()
+            .map(|(k, _)| k)
+            .filter(|&addr| addr != remote_address)
+            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
+
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
             .await;
