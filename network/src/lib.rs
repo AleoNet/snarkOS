@@ -181,6 +181,11 @@ impl Node {
     async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
+        if self.environment.is_bootnode() && !(payload == Payload::GetPeers || direction == Direction::Internal) {
+            // the bootstrapper nodes should ignore inbound messages other than GetPeers
+            return Ok(());
+        }
+
         let source = if let Direction::Inbound(addr) = direction {
             self.peer_book.read().update_last_seen(addr);
             Some(addr)
