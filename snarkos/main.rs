@@ -88,9 +88,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
-    let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
 
-    let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
+    let consensus = if !config.node.is_bootnode {
+        let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
+        let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
     info!("Loading Aleo parameters...");
     let dpc_parameters = Arc::new(PublicParameters::<Components>::load(!config.miner.is_miner)?);
@@ -116,6 +117,19 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         authorized_inner_snark_ids,
     });
 
+        Some(Consensus::new(
+            storage,
+            memory_pool,
+            consensus_params,
+            dpc_parameters,
+            config.miner.is_miner,
+            Duration::from_secs(config.p2p.block_sync_interval.into()),
+            Duration::from_secs(config.p2p.mempool_interval.into()),
+        ))
+    } else {
+        None
+    };
+
     let mut environment = Environment::new(
         Some(socket_address),
         config.p2p.min_peers,
@@ -130,18 +144,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
     let mut node = Node::new(environment.clone()).await?;
-
-    // Construct the consensus instance and set it on the node instance.
-    let consensus = Consensus::new(
-        node.clone(),
-        storage,
-        memory_pool.clone(),
-        consensus_params.clone(),
-        dpc_parameters.clone(),
-        config.miner.is_miner,
-        Duration::from_secs(config.p2p.block_sync_interval.into()),
-        Duration::from_secs(config.p2p.mempool_interval.into()),
-    );
 
     // Set the consensus on the node.
     node.set_consensus(consensus);
