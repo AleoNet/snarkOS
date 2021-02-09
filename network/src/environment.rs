@@ -209,7 +209,10 @@ impl Environment {
     /// Returns the current block height of the ledger from storage.
     #[inline]
     pub fn current_block_height(&self) -> u32 {
-        self.consensus().storage.read().get_current_block_height()
+        match &self.consensus {
+            Some(consensus) => consensus.storage.read().get_current_block_height(),
+            None => 0,
+        }
     }
 
     /// Returns the interval between each peer sync.
