@@ -21,7 +21,7 @@ fn main() {
     capnpc::CompilerCommand::new()
         .file(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/network/src/external/message/payload.capnp"
+            "/network/src/message/payload.capnp"
         ))
         .output_path(".")
         .run()

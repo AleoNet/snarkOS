@@ -16,7 +16,7 @@
 
 use snarkvm_objects::BlockHeaderHash;
 
-use crate::external::message::{Payload, Version};
+use crate::message::{Payload, Version};
 use payload_capnp::{
     block,
     block_hash,
