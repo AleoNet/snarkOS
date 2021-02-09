@@ -26,6 +26,7 @@ pub mod sync;
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
+use snarkos::miner::MinerInstance;
 
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -175,7 +176,8 @@ pub async fn test_node(setup: TestSetup) -> Node {
     node.start().await.unwrap();
 
     if is_miner {
-        // TODO(ljedrz/nkls): spawn a miner
+        let miner_address = FIXTURE.test_accounts[0].address.clone();
+        MinerInstance::new(miner_address, node.environment.clone(), node.clone()).spawn();
     }
 
     node
