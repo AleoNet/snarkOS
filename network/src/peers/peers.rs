@@ -315,6 +315,15 @@ impl Node {
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
             .await;
+
+        // the bootstrapper's job is finished once it's sent its peer a list of peers
+        if self.environment.is_bootnode() {
+            let _ = self
+                .inbound
+                .sender
+                .send(Message::new(Direction::Internal, Payload::Disconnect(remote_address)))
+                .await;
+        }
     }
 
     /// A miner has sent their list of peer addresses.

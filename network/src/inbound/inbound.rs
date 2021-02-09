@@ -36,7 +36,7 @@ pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 #[derive(Debug, Clone)]
 pub struct Inbound {
     /// The producer for sending inbound messages to the server.
-    sender: Sender,
+    pub(crate) sender: Sender,
     /// The consumer for receiving inbound messages to the server.
     receiver: Arc<Mutex<Option<Receiver>>>,
     /// The map of remote addresses to their active read channels.
