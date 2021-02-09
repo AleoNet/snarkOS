@@ -111,6 +111,8 @@ We recommend installing Rust using [rustup](https://www.rustup.rs/). You can ins
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
+*Note:* You will need [`capnp`](https://capnproto.org/install.html), which can be installed using your OS's package manager.
+
 ##### Windows
   
 Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
