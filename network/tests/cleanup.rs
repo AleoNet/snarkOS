@@ -21,8 +21,8 @@ use snarkos_testing::{
 
 use peak_alloc::PeakAlloc;
 
-#[ignore]
 #[tokio::test]
+#[ignore]
 async fn check_node_cleanup() {
     #[global_allocator]
     static PEAK_ALLOC: PeakAlloc = PeakAlloc;
