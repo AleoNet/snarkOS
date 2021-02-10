@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::error::ConsensusError;
-use snarkos_network::errors::SendError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::{
     algorithms::CRHError,
@@ -55,9 +54,6 @@ pub enum RpcError {
     Message(String),
 
     #[error("{}", _0)]
-    SendError(SendError),
-
-    #[error("{}", _0)]
     StorageError(StorageError),
 
     #[error("{}", _0)]
@@ -91,12 +87,6 @@ impl From<CRHError> for RpcError {
 impl From<DPCError> for RpcError {
     fn from(error: DPCError) -> Self {
         RpcError::DPCError(error)
-    }
-}
-
-impl From<SendError> for RpcError {
-    fn from(error: SendError) -> Self {
-        RpcError::SendError(error)
     }
 }
 

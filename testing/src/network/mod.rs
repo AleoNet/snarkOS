@@ -25,16 +25,7 @@ pub mod sync;
 
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
-use snarkos_network::{
-    connection_reader::ConnReader,
-    connection_writer::ConnWriter,
-    errors::{message::*, network::*},
-    message::*,
-    Consensus,
-    Environment,
-    Node,
-    MAX_MESSAGE_SIZE,
-};
+use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 
 use parking_lot::{Mutex, RwLock};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -354,20 +345,20 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode)
 pub async fn read_payload<'a, T: AsyncRead + Unpin>(
     stream: &mut T,
     buffer: &'a mut [u8],
-) -> Result<&'a [u8], MessageError> {
+) -> Result<&'a [u8], NetworkError> {
     stream.read_exact(buffer).await?;
 
     Ok(buffer)
 }
 
 /// Reads the message header into a `MessageHeader`.
-pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
+pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, NetworkError> {
     let mut header_arr = [0u8; 4];
     stream.read_exact(&mut header_arr).await?;
     let header = MessageHeader::from(header_arr);
 
     if header.len as usize > MAX_MESSAGE_SIZE {
-        Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE))
+        Err(NetworkError::MessageTooBig(header.len as usize))
     } else {
         Ok(header)
     }

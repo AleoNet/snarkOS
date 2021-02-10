@@ -118,14 +118,14 @@ impl Node {
                 .expect("Invalid noise handshake pattern!"),
             Box::new(snow::resolvers::SodiumResolver),
         );
-        let static_key = builder.generate_keypair().map_err(NetworkError::Noise)?.private;
+        let static_key = builder.generate_keypair()?.private;
         let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
-        let mut noise = noise_builder.build_initiator().map_err(NetworkError::Noise)?;
+        let mut noise = noise_builder.build_initiator()?;
         let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
         let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
         // -> e
-        let len = noise.write_message(&[], &mut buffer).map_err(NetworkError::Noise)?;
+        let len = noise.write_message(&[], &mut buffer)?;
         println!("len: {}", len);
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
@@ -138,22 +138,18 @@ impl Node {
             return Err(NetworkError::InvalidHandshake);
         }
         let len = reader.read_exact(&mut buf[..len]).await?;
-        let len = noise
-            .read_message(&buf[..len], &mut buffer)
-            .map_err(|_| NetworkError::InvalidHandshake)?;
-        let _peer_version = Version::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
+        let len = noise.read_message(&buf[..len], &mut buffer)?;
+        let _peer_version = Version::deserialize(&buffer[..len])?;
         trace!("received e, ee, s, es (XX handshake part 2/3)");
 
         // -> s, se, psk
         let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
-        let len = noise
-            .write_message(&own_version, &mut buffer)
-            .map_err(NetworkError::Noise)?;
+        let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
         trace!("sent s, se, psk (XX handshake part 3/3)");
 
-        let noise = Arc::new(Mutex::new(noise.into_transport_mode().map_err(NetworkError::Noise)?));
+        let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
         let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
         let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 

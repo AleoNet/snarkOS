@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::ConnectError, message::*, ConnReader, ConnWriter, Environment, NetworkError, Receiver, Sender};
+use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Environment, Receiver, Sender};
 
 use std::{
     collections::HashMap,
@@ -171,14 +171,14 @@ impl Inbound {
         failure: &mut bool,
         failure_count: &mut u8,
         disconnect_from_peer: &mut bool,
-        error: ConnectError,
+        error: NetworkError,
     ) {
         // Only increment failure_count if we haven't seen a failure yet.
         if !*failure {
             // Update the state to reflect a new failure.
             *failure = true;
             *failure_count += 1;
-            error!("Connection error: {}", error);
+            error!("Network error: {}", error);
 
             // Determine if we should disconnect.
             *disconnect_from_peer = error.is_fatal() || *failure_count >= 10;
@@ -187,7 +187,7 @@ impl Inbound {
                 debug!("Should disconnect from peer");
             }
         } else {
-            debug!("Connection errored again in the same loop (error message: {})", error);
+            debug!("A connection errored again in the same loop (error message: {})", error);
         }
     }
 
@@ -227,9 +227,9 @@ impl Inbound {
                 .expect("Invalid noise handshake pattern!"),
             Box::new(snow::resolvers::SodiumResolver),
         );
-        let static_key = builder.generate_keypair().map_err(NetworkError::Noise)?.private;
+        let static_key = builder.generate_keypair()?.private;
         let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
-        let mut noise = noise_builder.build_responder().map_err(NetworkError::Noise)?;
+        let mut noise = noise_builder.build_responder()?;
         let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
         let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
@@ -240,16 +240,12 @@ impl Inbound {
             return Err(NetworkError::InvalidHandshake);
         }
         let len = reader.read_exact(&mut buf[..len]).await?;
-        noise
-            .read_message(&buf[..len], &mut buffer)
-            .map_err(|_| NetworkError::InvalidHandshake)?;
+        noise.read_message(&buf[..len], &mut buffer)?;
         trace!("received e (XX handshake part 1/3)");
 
         // -> e, ee, s, es
         let own_version = Version::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
-        let len = noise
-            .write_message(&own_version, &mut buffer)
-            .map_err(NetworkError::Noise)?;
+        let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
         trace!("sent e, ee, s, es (XX handshake part 2/3)");
@@ -261,10 +257,8 @@ impl Inbound {
             return Err(NetworkError::InvalidHandshake);
         }
         let len = reader.read_exact(&mut buf[..len]).await?;
-        let len = noise
-            .read_message(&buf[..len], &mut buffer)
-            .map_err(|_| NetworkError::InvalidHandshake)?;
-        let peer_version = Version::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
+        let len = noise.read_message(&buf[..len], &mut buffer)?;
+        let peer_version = Version::deserialize(&buffer[..len])?;
         trace!("received s, se, psk (XX handshake part 3/3)");
 
         // the remote listening address
@@ -277,7 +271,7 @@ impl Inbound {
             ))
             .await?;
 
-        let noise = Arc::new(Mutex::new(noise.into_transport_mode().map_err(NetworkError::Noise)?));
+        let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
         let reader = ConnReader::new(remote_listener, reader, buffer.clone(), Arc::clone(&noise));
         let writer = ConnWriter::new(remote_listener, writer, buffer, noise);
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::message::*, message::*, ConnectError};
+use crate::{errors::*, message::*};
 
 use parking_lot::Mutex;
 use tokio::{io::AsyncReadExt, net::tcp::OwnedReadHalf};
@@ -46,22 +46,22 @@ impl ConnReader {
     }
 
     /// Returns a message header read from an input stream.
-    pub async fn read_header(&mut self) -> Result<MessageHeader, MessageHeaderError> {
+    pub async fn read_header(&mut self) -> Result<MessageHeader, NetworkError> {
         let mut header_arr = [0u8; 4];
         self.reader.read_exact(&mut header_arr).await?;
         let header = MessageHeader::from(header_arr);
 
         if header.len as usize > crate::MAX_MESSAGE_SIZE {
-            Err(MessageHeaderError::TooBig(header.len as usize, crate::MAX_MESSAGE_SIZE))
+            Err(NetworkError::MessageTooBig(header.len as usize))
         } else if header.len == 0 {
-            Err(MessageHeaderError::ZeroLength)
+            Err(NetworkError::ZeroLengthMessage)
         } else {
             Ok(header)
         }
     }
 
     /// Reads a message header + payload.
-    pub async fn read_message(&mut self) -> Result<Message, ConnectError> {
+    pub async fn read_message(&mut self) -> Result<Message, NetworkError> {
         let header = self.read_header().await?;
         let len = header.len();
         let mut decrypted_len = 0;
@@ -76,12 +76,10 @@ impl ConnReader {
                 decrypted_len += self
                     .noise
                     .lock()
-                    .read_message(&self.noise_buffer[..chunk_len], &mut self.buffer[decrypted_len..])
-                    .unwrap();
+                    .read_message(&self.noise_buffer[..chunk_len], &mut self.buffer[decrypted_len..])?;
             }
         }
-        let payload =
-            Payload::deserialize(&self.buffer[..decrypted_len]).map_err(|e| ConnectError::Message(e.to_string()))?;
+        let payload = Payload::deserialize(&self.buffer[..decrypted_len])?;
 
         debug!("Received a '{}' message from {}", payload, self.addr);
 
