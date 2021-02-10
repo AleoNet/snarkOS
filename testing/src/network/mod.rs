@@ -33,6 +33,7 @@ use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
+use tracing::*;
 
 /// Returns a random tcp socket address and binds it to a listener
 pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
@@ -199,13 +200,28 @@ impl FakeNode {
     }
 
     pub async fn read_payload(&mut self) -> Result<Payload, NetworkError> {
-        let message = self.reader.read_message().await?;
+        let message = match self.reader.read_message().await {
+            Ok(msg) => {
+                debug!("read a {}", msg.payload);
+                msg
+            }
+            Err(e) => {
+                error!("can't read a payload: {}", e);
+                return Err(e);
+            }
+        };
 
         Ok(message.payload)
     }
 
-    pub async fn write_message(&mut self, payload: &Payload) {
+    pub async fn write_message(&self, payload: &Payload) {
         self.writer.write_message(payload).await.unwrap();
+        debug!("wrote a message containing a {} to the stream", payload);
+    }
+
+    pub async fn write_bytes(&self, bytes: &[u8]) {
+        self.writer.writer.lock().await.write_all(bytes).await.unwrap();
+        debug!("wrote {}B to the stream", bytes.len());
     }
 }
 
