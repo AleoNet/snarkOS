@@ -14,16 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::{message::*, Node};
+use snarkos_network::Node;
 use snarkos_testing::{
     network::{
-        handshaken_node_and_peer,
-        random_bound_address,
-        read_header,
-        read_payload,
         test_environment,
         topology::{connect_nodes, Topology},
-        write_message_to_stream,
         TestSetup,
     },
     wait_until,
@@ -31,8 +26,7 @@ use snarkos_testing::{
 
 const N: usize = 10;
 
-#[tokio::test]
-async fn line() {
+async fn test_nodes() -> Vec<Node> {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
@@ -49,6 +43,12 @@ async fn line() {
         nodes.push(node);
     }
 
+    nodes
+}
+
+#[tokio::test]
+async fn line() {
+    let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Line).await;
 
     for node in &nodes {
@@ -73,22 +73,7 @@ async fn line() {
 
 #[tokio::test]
 async fn ring() {
-    let setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 2,
-        ..Default::default()
-    };
-
-    let mut nodes = vec![];
-
-    for _ in 0..N {
-        let environment = test_environment(setup.clone());
-        let mut node = Node::new(environment).await.unwrap();
-
-        node.establish_address().await.unwrap();
-        nodes.push(node);
-    }
-
+    let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Ring).await;
 
     for node in &nodes {
@@ -102,22 +87,7 @@ async fn ring() {
 
 #[tokio::test]
 async fn mesh() {
-    let setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 2,
-        ..Default::default()
-    };
-
-    let mut nodes = vec![];
-
-    for _ in 0..N {
-        let environment = test_environment(setup.clone());
-        let mut node = Node::new(environment).await.unwrap();
-
-        node.establish_address().await.unwrap();
-        nodes.push(node);
-    }
-
+    let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Mesh).await;
 
     for node in &nodes {
@@ -131,23 +101,7 @@ async fn mesh() {
 
 #[tokio::test]
 async fn star() {
-    let setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 2,
-        ..Default::default()
-    };
-
-    let mut nodes = vec![];
-
-    for _ in 0..N {
-        let environment = test_environment(setup.clone());
-        let mut node = Node::new(environment).await.unwrap();
-
-        node.establish_address().await.unwrap();
-        nodes.push(node);
-    }
-
-    // Set up the topology.
+    let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Star).await;
 
     // Start the nodes.

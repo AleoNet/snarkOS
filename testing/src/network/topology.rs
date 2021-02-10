@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::network::{test_node, TestSetup};
-
 use snarkos_network::Node;
 
 use std::{collections::HashSet, net::SocketAddr};
