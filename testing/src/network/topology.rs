@@ -18,7 +18,7 @@ use crate::network::{test_node, TestSetup};
 
 use snarkos_network::Node;
 
-use std::net::SocketAddr;
+use std::{collections::HashSet, net::SocketAddr};
 
 pub enum Topology {
     /// Each node - except the last one - connects to the next one in a linear fashion.
@@ -39,7 +39,7 @@ pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
     match topology {
         Topology::Line => line(nodes).await,
         Topology::Ring => ring(nodes).await,
-        Topology::Mesh => unimplemented!(),
+        Topology::Mesh => mesh(nodes).await,
         Topology::Star => star(nodes).await,
     }
 }
@@ -69,6 +69,19 @@ pub async fn ring(nodes: &mut Vec<Node>) {
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
     nodes.last_mut().unwrap().environment.bootnodes.push(first_addr);
+}
+
+pub async fn mesh(nodes: &mut Vec<Node>) {
+    let mut connected_pairs = HashSet::new();
+
+    for i in 0..nodes.len() {
+        for j in 0..nodes.len() {
+            if i != j && connected_pairs.insert((i, j)) && connected_pairs.insert((j, i)) {
+                let addr = nodes[j].local_address().unwrap();
+                nodes[i].environment.bootnodes.push(addr);
+            }
+        }
+    }
 }
 
 /// Starts n network nodes in a star topology.

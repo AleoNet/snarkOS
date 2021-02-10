@@ -101,6 +101,35 @@ async fn ring() {
 }
 
 #[tokio::test]
+async fn mesh() {
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        ..Default::default()
+    };
+
+    let mut nodes = vec![];
+
+    for _ in 0..N {
+        let environment = test_environment(setup.clone());
+        let mut node = Node::new(environment).await.unwrap();
+
+        node.establish_address().await.unwrap();
+        nodes.push(node);
+    }
+
+    connect_nodes(&mut nodes, Topology::Mesh).await;
+
+    for node in &nodes {
+        node.start_services().await;
+    }
+
+    for node in &nodes {
+        wait_until!(5, node.peer_book.read().number_of_connected_peers() as usize == N - 1);
+    }
+}
+
+#[tokio::test]
 async fn star() {
     let setup = TestSetup {
         consensus_setup: None,
