@@ -134,6 +134,9 @@ impl Node {
         // <- e, ee, s, es
         reader.read_exact(&mut buf[..1]).await?;
         let len = buf[0] as usize;
+        if len == 0 {
+            return Err(NetworkError::InvalidHandshake);
+        }
         let len = reader.read_exact(&mut buf[..len]).await?;
         let len = noise
             .read_message(&buf[..len], &mut buffer)

@@ -236,6 +236,9 @@ impl Inbound {
         // <- e
         reader.read_exact(&mut buf[..1]).await?;
         let len = buf[0] as usize;
+        if len == 0 {
+            return Err(NetworkError::InvalidHandshake);
+        }
         let len = reader.read_exact(&mut buf[..len]).await?;
         noise
             .read_message(&buf[..len], &mut buffer)
@@ -254,6 +257,9 @@ impl Inbound {
         // <- s, se, psk
         reader.read_exact(&mut buf[..1]).await?;
         let len = buf[0] as usize;
+        if len == 0 {
+            return Err(NetworkError::InvalidHandshake);
+        }
         let len = reader.read_exact(&mut buf[..len]).await?;
         let len = noise
             .read_message(&buf[..len], &mut buffer)
