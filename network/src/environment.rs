@@ -28,7 +28,7 @@ pub struct Environment {
     /// The maximum number of peers permitted to maintain connections with.
     maximum_number_of_connected_peers: u16,
     /// The default bootnodes of the network.
-    bootnodes: Vec<SocketAddr>,
+    pub bootnodes: Vec<SocketAddr>,
     /// If `true`, initializes this node as a bootnode and forgoes connecting
     /// to the default bootnodes or saved peers in the peer book.
     is_bootnode: bool,
