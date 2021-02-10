@@ -29,6 +29,9 @@ pub enum MessageHeaderError {
 
     #[error("{}", _0)]
     StreamReadError(StreamReadError),
+
+    #[error("Zero-sized message")]
+    ZeroLength,
 }
 
 impl From<StreamReadError> for MessageHeaderError {

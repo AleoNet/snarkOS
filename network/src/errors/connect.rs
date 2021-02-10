@@ -48,6 +48,8 @@ impl ConnectError {
                 ErrorKind::UnexpectedEof,
             ]
             .contains(&err.kind()),
+            Self::MessageHeaderError(MessageHeaderError::TooBig(..))
+            | Self::MessageHeaderError(MessageHeaderError::ZeroLength) => true,
             _ => false,
         }
     }

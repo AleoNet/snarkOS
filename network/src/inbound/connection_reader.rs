@@ -53,6 +53,8 @@ impl ConnReader {
 
         if header.len as usize > crate::MAX_MESSAGE_SIZE {
             Err(MessageHeaderError::TooBig(header.len as usize, crate::MAX_MESSAGE_SIZE))
+        } else if header.len == 0 {
+            Err(MessageHeaderError::ZeroLength)
         } else {
             Ok(header)
         }
