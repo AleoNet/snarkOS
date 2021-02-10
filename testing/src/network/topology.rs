@@ -29,9 +29,15 @@ pub enum Topology {
     Star,
 }
 
+/// Connects the nodes in a given `Topology`.
+///
+/// This function assumes the nodes have an established address but don't have their services
+/// started yet, as it uses the bootnodes to establish the connections between nodes.
+///
+/// When connecting in a `Star`, the first node in the `nodes` will be used as the hub.
 pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
     if nodes.len() < 2 {
-        unimplemented!();
+        panic!("Can't connect less than two nodes");
     }
 
     match topology {
@@ -42,8 +48,8 @@ pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
     }
 }
 
-/// Starts n network nodes in a line topology.
-pub async fn line(nodes: &mut Vec<Node>) {
+/// Connects the network nodes in a line topology.
+async fn line(nodes: &mut Vec<Node>) {
     let mut prev_node: Option<SocketAddr> = None;
 
     // Start each node with the previous as a bootnode.
@@ -60,7 +66,8 @@ pub async fn line(nodes: &mut Vec<Node>) {
     }
 }
 
-pub async fn ring(nodes: &mut Vec<Node>) {
+/// Connects the network nodes in a ring topology.
+async fn ring(nodes: &mut Vec<Node>) {
     // Set the nodes up in a line.
     line(nodes).await;
 
@@ -69,7 +76,8 @@ pub async fn ring(nodes: &mut Vec<Node>) {
     nodes.last_mut().unwrap().environment.bootnodes.push(first_addr);
 }
 
-pub async fn mesh(nodes: &mut Vec<Node>) {
+/// Connects the network nodes in a mesh topology.
+async fn mesh(nodes: &mut Vec<Node>) {
     let mut connected_pairs = HashSet::new();
 
     for i in 0..nodes.len() {
@@ -82,11 +90,8 @@ pub async fn mesh(nodes: &mut Vec<Node>) {
     }
 }
 
-/// Starts n network nodes in a star topology.
-///
-/// The hub is at the center and is included in the total node count. It is the first node in
-/// the list.
-pub async fn star(nodes: &mut Vec<Node>) {
+/// Connects thr network nodes in a star topology.
+async fn star(nodes: &mut Vec<Node>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().local_address().unwrap();
 
