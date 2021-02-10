@@ -29,6 +29,8 @@ use snarkos_testing::{
     wait_until,
 };
 
+const N: usize = 10;
+
 #[tokio::test]
 async fn line() {
     let setup = TestSetup {
@@ -39,7 +41,7 @@ async fn line() {
 
     let mut nodes = vec![];
 
-    for _ in 0..10 {
+    for _ in 0..N {
         let environment = test_environment(setup.clone());
         let mut node = Node::new(environment).await.unwrap();
 
@@ -70,6 +72,35 @@ async fn line() {
 }
 
 #[tokio::test]
+async fn ring() {
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        ..Default::default()
+    };
+
+    let mut nodes = vec![];
+
+    for _ in 0..N {
+        let environment = test_environment(setup.clone());
+        let mut node = Node::new(environment).await.unwrap();
+
+        node.establish_address().await.unwrap();
+        nodes.push(node);
+    }
+
+    connect_nodes(&mut nodes, Topology::Ring).await;
+
+    for node in &nodes {
+        node.start_services().await;
+    }
+
+    for node in &nodes {
+        wait_until!(5, node.peer_book.read().number_of_connected_peers() == 2);
+    }
+}
+
+#[tokio::test]
 async fn star() {
     let setup = TestSetup {
         consensus_setup: None,
@@ -79,7 +110,7 @@ async fn star() {
 
     let mut nodes = vec![];
 
-    for _ in 0..10 {
+    for _ in 0..N {
         let environment = test_environment(setup.clone());
         let mut node = Node::new(environment).await.unwrap();
 
@@ -96,5 +127,5 @@ async fn star() {
     }
 
     let hub = nodes.first().unwrap();
-    wait_until!(5, hub.peer_book.read().number_of_connected_peers() == 9);
+    wait_until!(5, hub.peer_book.read().number_of_connected_peers() as usize == N - 1);
 }

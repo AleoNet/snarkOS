@@ -38,8 +38,9 @@ pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
 
     match topology {
         Topology::Line => line(nodes).await,
-        Topology::Ring | Topology::Mesh => unimplemented!(),
-        Topology::Star => star_topology(nodes).await,
+        Topology::Ring => ring(nodes).await,
+        Topology::Mesh => unimplemented!(),
+        Topology::Star => star(nodes).await,
     }
 }
 
@@ -61,11 +62,20 @@ pub async fn line(nodes: &mut Vec<Node>) {
     }
 }
 
+pub async fn ring(nodes: &mut Vec<Node>) {
+    // Set the nodes up in a line.
+    line(nodes).await;
+
+    // Connect the first to the last.
+    let first_addr = nodes.first().unwrap().local_address().unwrap();
+    nodes.last_mut().unwrap().environment.bootnodes.push(first_addr);
+}
+
 /// Starts n network nodes in a star topology.
 ///
 /// The hub is at the center and is included in the total node count. It is the first node in
 /// the list.
-pub async fn star_topology(nodes: &mut Vec<Node>) {
+pub async fn star(nodes: &mut Vec<Node>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().local_address().unwrap();
 
