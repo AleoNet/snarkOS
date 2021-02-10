@@ -31,66 +31,47 @@ pub enum Topology {
     Star,
 }
 
-pub async fn connect_nodes(n: u32, setup: TestSetup, topology: Topology) -> Vec<Node> {
-    if n < 2 {
+pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
+    if nodes.len() < 2 {
         unimplemented!();
     }
 
     match topology {
-        Topology::Line => line(n, setup).await,
+        Topology::Line => line(nodes).await,
         Topology::Ring | Topology::Mesh => unimplemented!(),
-        Topology::Star => star_topology(n, setup).await,
+        Topology::Star => star_topology(nodes).await,
     }
 }
 
 /// Starts n network nodes in a line topology.
-pub async fn line(n: u32, setup: TestSetup) -> Vec<Node> {
-    let mut nodes = vec![];
+pub async fn line(nodes: &mut Vec<Node>) {
     let mut prev_node: Option<SocketAddr> = None;
 
     // Start each node with the previous as a bootnode.
-    for _ in 0..n {
+    for mut node in nodes {
         let bootnodes = match prev_node {
-            Some(addr) => vec![addr.to_string()],
+            Some(addr) => vec![addr],
             None => vec![],
         };
 
-        let setup = TestSetup {
-            bootnodes,
-            ..setup.clone()
-        };
-        let node = test_node(setup).await;
-        prev_node = node.local_address();
-        nodes.push(node);
-    }
+        node.environment.bootnodes = bootnodes;
 
-    nodes
+        // Assumes the node has an established address.
+        prev_node = node.local_address();
+    }
 }
 
 /// Starts n network nodes in a star topology.
 ///
-/// The bootnode is at the center and is included in the total node count. It is the first node in
-/// the returned list.
-pub async fn star_topology(n: u32, setup: TestSetup) -> Vec<Node> {
-    // Start the bootnode at the center of the star.
-    let core_setup = TestSetup {
-        is_bootnode: true,
-        ..setup.clone()
-    };
-    let core = test_node(core_setup).await;
-    let core_addr = core.local_address().unwrap();
+/// The hub is at the center and is included in the total node count. It is the first node in
+/// the list.
+pub async fn star_topology(nodes: &mut Vec<Node>) {
+    // Setup the hub.
+    let hub_address = nodes.first().unwrap().local_address().unwrap();
 
     // Start the rest of the nodes with the core node as the bootnode.
-    let mut nodes = vec![core];
-    for _ in 1..n {
-        let leaf_setup = TestSetup {
-            bootnodes: vec![core_addr.to_string()],
-            ..setup.clone()
-        };
-
-        let node = test_node(leaf_setup).await;
-        nodes.push(node);
+    let bootnodes = vec![hub_address];
+    for i in 1..nodes.len() {
+        nodes[i].environment.bootnodes = bootnodes.clone();
     }
-
-    nodes
 }

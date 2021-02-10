@@ -69,16 +69,32 @@ async fn line() {
     }
 }
 
-// #[tokio::test]
-// async fn star() {
-//     let setup = TestSetup {
-//         consensus_setup: None,
-//         peer_sync_interval: 2,
-//         ..Default::default()
-//     };
-//     let nodes = connect_nodes(10, setup, Topology::Star).await;
-//     let core = nodes.first().unwrap();
-//
-//     assert!(core.environment.is_bootnode());
-//     wait_until!(5, core.peer_book.read().number_of_connected_peers() == 9);
-// }
+#[tokio::test]
+async fn star() {
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        ..Default::default()
+    };
+
+    let mut nodes = vec![];
+
+    for _ in 0..10 {
+        let environment = test_environment(setup.clone());
+        let mut node = Node::new(environment).await.unwrap();
+
+        node.establish_address().await.unwrap();
+        nodes.push(node);
+    }
+
+    // Set up the topology.
+    connect_nodes(&mut nodes, Topology::Star).await;
+
+    // Start the nodes.
+    for node in &nodes {
+        node.start_services().await;
+    }
+
+    let hub = nodes.first().unwrap();
+    wait_until!(5, hub.peer_book.read().number_of_connected_peers() == 9);
+}
