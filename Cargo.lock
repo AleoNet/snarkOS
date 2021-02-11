@@ -3269,7 +3269,7 @@ dependencies = [
  "criterion",
  "hex",
  "rand 0.7.3",
- "rand_chacha 0.2.2",
+ "rand_chacha 0.3.0",
  "snarkvm-algorithms",
  "snarkvm-dpc",
  "snarkvm-errors",
