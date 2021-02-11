@@ -26,13 +26,7 @@ use snarkos_testing::{
 
 const N: usize = 10;
 
-async fn test_nodes() -> Vec<Node> {
-    let setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 2,
-        ..Default::default()
-    };
-
+async fn test_nodes(setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
 
     for _ in 0..N {
@@ -54,7 +48,12 @@ async fn start_nodes(nodes: &Vec<Node>) {
 
 #[tokio::test]
 async fn line() {
-    let mut nodes = test_nodes().await;
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        ..Default::default()
+    };
+    let mut nodes = test_nodes(setup).await;
     connect_nodes(&mut nodes, Topology::Line).await;
     start_nodes(&nodes).await;
 
@@ -76,7 +75,12 @@ async fn line() {
 
 #[tokio::test]
 async fn ring() {
-    let mut nodes = test_nodes().await;
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        ..Default::default()
+    };
+    let mut nodes = test_nodes(setup).await;
     connect_nodes(&mut nodes, Topology::Ring).await;
     start_nodes(&nodes).await;
 
@@ -87,7 +91,12 @@ async fn ring() {
 
 #[tokio::test]
 async fn mesh() {
-    let mut nodes = test_nodes().await;
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        ..Default::default()
+    };
+    let mut nodes = test_nodes(setup).await;
     connect_nodes(&mut nodes, Topology::Mesh).await;
     start_nodes(&nodes).await;
 
@@ -98,7 +107,12 @@ async fn mesh() {
 
 #[tokio::test]
 async fn star() {
-    let mut nodes = test_nodes().await;
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        ..Default::default()
+    };
+    let mut nodes = test_nodes(setup).await;
     connect_nodes(&mut nodes, Topology::Star).await;
     start_nodes(&nodes).await;
 
