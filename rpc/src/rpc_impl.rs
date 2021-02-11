@@ -20,7 +20,7 @@
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{Environment, Server};
+use snarkos_network::{Environment, Node};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
@@ -48,14 +48,14 @@ pub struct RpcImpl {
     /// The path to the Blockchain database storage.
     pub(crate) storage_path: PathBuf,
 
-    /// Network context held by the server.
+    /// Network context held by the node.
     pub(crate) environment: Environment,
 
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
 
-    /// A clone of the Server
-    pub(crate) server: Server,
+    /// A clone of the network Node
+    pub(crate) node: Node,
 }
 
 impl RpcImpl {
@@ -66,14 +66,14 @@ impl RpcImpl {
         storage_path: PathBuf,
         environment: Environment,
         credentials: Option<RpcCredentials>,
-        server: Server,
+        node: Node,
     ) -> Self {
         Self {
             storage,
             storage_path,
             environment,
             credentials,
-            server,
+            node,
         }
     }
 
@@ -83,15 +83,15 @@ impl RpcImpl {
     }
 
     pub fn consensus(&self) -> &ConsensusParameters {
-        self.environment.consensus_parameters()
+        self.node.consensus().consensus_parameters()
     }
 
     pub fn parameters(&self) -> &PublicParameters<Components> {
-        self.environment.dpc_parameters()
+        self.node.consensus().dpc_parameters()
     }
 
     pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
-        self.environment.memory_pool()
+        self.node.consensus().memory_pool()
     }
 }
 
@@ -303,7 +303,7 @@ impl RpcFunctions for RpcImpl {
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let number = self.server.peers.number_of_connected_peers();
+        let number = self.node.peer_book.read().number_of_connected_peers();
 
         Ok(number as usize)
     }
@@ -311,7 +311,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns this nodes connected peers.
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peers = self.server.peers.connected_peers().keys().copied().collect();
+        let peers = self.node.peer_book.read().connected_peers().keys().copied().collect();
 
         Ok(PeerInfo { peers })
     }
@@ -322,7 +322,7 @@ impl RpcFunctions for RpcImpl {
         let is_syncing = false;
 
         Ok(NodeInfo {
-            is_miner: self.environment.is_miner(),
+            is_miner: self.node.consensus().is_miner(),
             is_syncing,
         })
     }

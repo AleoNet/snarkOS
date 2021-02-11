@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{external::message::*, peers::PeerInfo, Environment, NetworkError, Outbound};
+use crate::{message::*, peers::PeerInfo, Consensus, NetworkError};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_utilities::{
@@ -22,32 +22,16 @@ use snarkvm_utilities::{
     to_bytes,
 };
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr};
 
-/// A stateful component for managing the transactions for the ledger on this node server.
-#[derive(Clone)]
-pub struct Transactions {
-    /// The parameters and settings of this node server.
-    pub(crate) environment: Environment,
-    /// The outbound handler of this node server.
-    outbound: Arc<Outbound>,
-}
-
-impl Transactions {
-    ///
-    /// Creates a new instance of `Transactions`.
-    ///
-    pub fn new(environment: Environment, outbound: Arc<Outbound>) -> Self {
-        trace!("Instantiating the transaction service");
-        Self { environment, outbound }
-    }
-
+impl Consensus {
     ///
     /// Triggers the transaction sync with a selected peer.
     ///
-    pub async fn update(&self, sync_node: Option<SocketAddr>) {
+    pub async fn update_transactions(&self, sync_node: Option<SocketAddr>) {
         if let Some(sync_node) = sync_node {
-            self.outbound
+            self.node()
+                .outbound
                 .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool))
                 .await;
         } else {
@@ -64,12 +48,13 @@ impl Transactions {
     ) -> Result<(), NetworkError> {
         debug!("Propagating a transaction to peers");
 
-        let local_address = self.environment.local_address().unwrap();
+        let local_address = self.node().local_address().unwrap();
 
         for remote_address in connected_peers.keys() {
             if *remote_address != transaction_sender && *remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
-                self.outbound
+                self.node()
+                    .outbound
                     .send_request(Message::new(
                         Direction::Outbound(*remote_address),
                         Payload::Transaction(transaction_bytes.clone()),
@@ -90,11 +75,11 @@ impl Transactions {
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&*transaction) {
             let insertion = {
-                let parameters = self.environment.dpc_parameters();
-                let storage = self.environment.storage().read();
-                let consensus = self.environment.consensus_parameters();
+                let parameters = &self.dpc_parameters();
+                let storage = self.storage().read();
+                let consensus = &self.consensus_parameters();
 
-                if !consensus.verify_transaction(parameters, &tx, &storage)? {
+                if !consensus.verify_transaction(&parameters, &tx, &storage)? {
                     error!("Received a transaction that was invalid");
                     return Ok(());
                 }
@@ -109,7 +94,7 @@ impl Transactions {
                     transaction: tx,
                 };
 
-                self.environment.memory_pool().lock().insert(&storage, entry)
+                self.memory_pool().lock().insert(&storage, entry)
             };
 
             if let Ok(inserted) = insertion {
@@ -130,7 +115,7 @@ impl Transactions {
         let transactions = {
             let mut txs = vec![];
 
-            let memory_pool = self.environment.memory_pool().lock();
+            let memory_pool = self.memory_pool().lock();
             for entry in memory_pool.transactions.values() {
                 if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                     txs.push(transaction_bytes);
@@ -142,7 +127,8 @@ impl Transactions {
 
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
-            self.outbound
+            self.node()
+                .outbound
                 .send_request(Message::new(
                     Direction::Outbound(remote_address),
                     Payload::MemoryPool(transactions),
@@ -155,8 +141,8 @@ impl Transactions {
 
     /// A peer has sent us their memory pool transactions.
     pub(crate) fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
-        let mut memory_pool = self.environment.memory_pool().lock();
-        let storage = self.environment.storage().read();
+        let mut memory_pool = self.memory_pool().lock();
+        let storage = self.storage().read();
 
         for transaction_bytes in transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;

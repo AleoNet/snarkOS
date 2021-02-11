@@ -29,10 +29,10 @@ use snarkos_network::{
     connection_reader::ConnReader,
     connection_writer::ConnWriter,
     errors::{message::*, network::*},
-    external::message::*,
+    message::*,
     Consensus,
     Environment,
-    Server,
+    Node,
     MAX_MESSAGE_SIZE,
 };
 
@@ -143,24 +143,22 @@ impl Default for TestSetup {
     }
 }
 
+pub fn test_consensus(setup: ConsensusSetup, node: Node) -> Consensus {
+    Consensus::new(
+        node,
+        Arc::new(RwLock::new(FIXTURE_VK.ledger())),
+        Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
+        Arc::new(TEST_CONSENSUS.clone()),
+        Arc::new(FIXTURE.parameters.clone()),
+        setup.is_miner,
+        Duration::from_secs(setup.block_sync_interval),
+        Duration::from_secs(setup.tx_sync_interval),
+    )
+}
+
 /// Returns an `Environment` struct with given arguments
 pub fn test_environment(setup: TestSetup) -> Environment {
-    let consensus = if let Some(ref setup) = setup.consensus_setup {
-        Some(Consensus::new(
-            Arc::new(RwLock::new(FIXTURE_VK.ledger())),
-            Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-            Arc::new(TEST_CONSENSUS.clone()),
-            Arc::new(FIXTURE.parameters.clone()),
-            setup.is_miner,
-            Duration::from_secs(setup.block_sync_interval),
-            Duration::from_secs(setup.tx_sync_interval),
-        ))
-    } else {
-        None
-    };
-
     Environment::new(
-        consensus,
         setup.socket_address,
         setup.min_peers,
         setup.max_peers,
@@ -172,10 +170,16 @@ pub fn test_environment(setup: TestSetup) -> Environment {
 }
 
 /// Starts a node with the specified bootnodes.
-pub async fn test_node(setup: TestSetup) -> Server {
+pub async fn test_node(setup: TestSetup) -> Node {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
-    let environment = test_environment(setup);
-    let mut node = Server::new(environment).await.unwrap();
+    let environment = test_environment(setup.clone());
+    let mut node = Node::new(environment).await.unwrap();
+
+    if let Some(consensus_setup) = setup.consensus_setup {
+        let consensus = test_consensus(consensus_setup, node.clone());
+        node.set_consensus(consensus);
+    }
+
     node.start().await.unwrap();
 
     if is_miner {
@@ -298,7 +302,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     (node0, node1)
 }
 
-pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Server, FakeNode) {
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode) {
     // start a test node and listen for incoming connections
     let node = test_node(node_setup).await;
     let node_listener = node.local_address().unwrap();

@@ -22,7 +22,7 @@ use crate::{
     RpcImpl,
 };
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_network::{Environment, Server as NodeServer};
+use snarkos_network::{Environment, Node};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use parking_lot::RwLock;
@@ -38,7 +38,7 @@ pub async fn start_rpc_server(
     secondary_storage: Arc<RwLock<MerkleTreeLedger>>,
     storage_path: PathBuf,
     environment: Environment,
-    node_server: NodeServer,
+    node_server: Node,
     username: Option<String>,
     password: Option<String>,
 ) {

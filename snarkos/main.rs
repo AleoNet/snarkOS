@@ -25,10 +25,7 @@ use snarkos::{
     miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{
-    environment::{Consensus, Environment},
-    Server,
-};
+use snarkos_network::{environment::Environment, Consensus, Node};
 use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
@@ -120,18 +117,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         authorized_inner_snark_ids,
     });
 
-    let consensus = Consensus::new(
-        Arc::new(RwLock::new(storage)),
-        memory_pool.clone(),
-        consensus_params.clone(),
-        dpc_parameters.clone(),
-        config.miner.is_miner,
-        Duration::from_secs(config.p2p.block_sync_interval.into()),
-        Duration::from_secs(config.p2p.mempool_interval.into()),
-    );
-
     let mut environment = Environment::new(
-        Some(consensus),
         Some(socket_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
@@ -141,20 +127,34 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
 
-    // Construct the server instance. Note this does not start the server.
+    // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut server = Server::new(environment.clone()).await?;
+    let mut node = Node::new(environment.clone()).await?;
 
-    // Establish the address of the server.
-    server.establish_address().await?;
-    environment.set_local_address(server.local_address().unwrap());
+    // Construct the consensus instance and set it on the node instance.
+    let consensus = Consensus::new(
+        node.clone(),
+        Arc::new(RwLock::new(storage)),
+        memory_pool.clone(),
+        consensus_params.clone(),
+        dpc_parameters.clone(),
+        config.miner.is_miner,
+        Duration::from_secs(config.p2p.block_sync_interval.into()),
+        Duration::from_secs(config.p2p.mempool_interval.into()),
+    );
+
+    // Set the consensus on the node.
+    node.set_consensus(consensus);
+    // Establish the address of the node.
+    node.establish_address().await?;
+    environment.set_local_address(node.local_address().unwrap());
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(miner_address, environment.clone(), server.clone()).spawn();
+                MinerInstance::new(miner_address, environment.clone(), node.clone()).spawn();
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -172,15 +172,15 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             secondary_storage,
             path.to_path_buf(),
             environment,
-            server.clone(),
+            node.clone(),
             config.rpc.username,
             config.rpc.password,
         )
         .await;
     }
 
-    // Start the server
-    server.start_services().await;
+    // Start the network services
+    node.start_services().await;
 
     std::future::pending::<()>().await;
 

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::Miner;
-use snarkos_network::{environment::Environment, Server as NodeServer};
+use snarkos_network::{environment::Environment, Node};
 use snarkvm_dpc::base_dpc::instantiated::*;
 use snarkvm_objects::AccountAddress;
 
@@ -28,16 +28,16 @@ use std::sync::Arc;
 pub struct MinerInstance {
     miner_address: AccountAddress<Components>,
     environment: Environment,
-    node_server: NodeServer,
+    node: Node,
 }
 
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node_server: NodeServer) -> Self {
+    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node: Node) -> Self {
         Self {
             miner_address,
             environment,
-            node_server,
+            node,
         }
     }
 
@@ -51,7 +51,7 @@ impl MinerInstance {
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
             let miner = Miner::new(
                 self.miner_address.clone(),
-                Arc::clone(self.environment.consensus_parameters()),
+                Arc::clone(self.node.consensus().consensus_parameters()),
             );
             info!("Miner instantiated; starting to mine blocks");
 
@@ -60,13 +60,10 @@ impl MinerInstance {
 
             loop {
                 info!("Starting to mine the next block");
+                let consensus = self.node.consensus();
 
                 let (block, _coinbase_records) = match miner
-                    .mine_block(
-                        self.environment.dpc_parameters(),
-                        self.environment.storage(),
-                        self.environment.memory_pool(),
-                    )
+                    .mine_block(consensus.dpc_parameters(), consensus.storage(), consensus.memory_pool())
                     .await
                 {
                     Ok(mined_block) => mined_block,
@@ -90,7 +87,7 @@ impl MinerInstance {
                 };
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
-                let peers = self.node_server.peers.connected_peers();
+                let peers = self.node.peer_book.read().connected_peers().clone();
                 let serialized_block = if let Ok(block) = block.serialize() {
                     block
                 } else {
@@ -98,8 +95,8 @@ impl MinerInstance {
                     continue;
                 };
 
-                self.node_server
-                    .blocks
+                self.node
+                    .consensus()
                     .propagate_block(serialized_block, local_address, &peers)
                     .await;
             }

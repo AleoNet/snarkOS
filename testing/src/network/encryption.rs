@@ -16,7 +16,7 @@
 
 use crate::network::spawn_2_fake_nodes;
 
-use snarkos_network::external::message::Payload;
+use snarkos_network::message::Payload;
 
 use rand::{distributions::Standard, thread_rng, Rng};
 

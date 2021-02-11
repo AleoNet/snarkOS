@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::external::message::*;
+use snarkos_network::message::*;
 use snarkos_testing::{
     network::{handshaken_node_and_peer, random_bound_address, test_node, TestSetup},
     wait_until,
@@ -39,7 +39,7 @@ async fn peer_initiator_side() {
     peer.write_message(&Payload::Peers(vec![addr])).await;
 
     // check the address has been added to the disconnected list in the peer book
-    wait_until!(5, node.peers.is_disconnected(addr));
+    wait_until!(5, node.peer_book.read().is_disconnected(addr));
 }
 
 #[tokio::test]
@@ -79,10 +79,10 @@ async fn triangle() {
     let node_charlie = test_node(setup(vec![addr_bob.to_string()])).await;
 
     let triangle_is_formed = || {
-        node_charlie.peers.is_connected(addr_alice)
-            && node_alice.peers.number_of_connected_peers() == 2
-            && node_bob.peers.number_of_connected_peers() == 2
-            && node_charlie.peers.number_of_connected_peers() == 2
+        node_charlie.peer_book.read().is_connected(addr_alice)
+            && node_alice.peer_book.read().number_of_connected_peers() == 2
+            && node_bob.peer_book.read().number_of_connected_peers() == 2
+            && node_charlie.peer_book.read().number_of_connected_peers() == 2
     };
 
     // Make sure C connects to A => peer propagation works.

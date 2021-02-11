@@ -14,16 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::ConnectError,
-    external::message::*,
-    ConnReader,
-    ConnWriter,
-    Environment,
-    NetworkError,
-    Receiver,
-    Sender,
-};
+use crate::{errors::ConnectError, message::*, ConnReader, ConnWriter, Environment, NetworkError, Receiver, Sender};
 
 use std::{
     collections::HashMap,

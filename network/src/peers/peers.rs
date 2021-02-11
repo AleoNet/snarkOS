@@ -14,80 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    external::{message::*, Version},
-    peers::{PeerBook, PeerInfo, PeerQuality},
-    ConnReader,
-    ConnWriter,
-    Environment,
-    Inbound,
-    NetworkError,
-    Outbound,
-};
+use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{atomic::Ordering, Arc},
-    time::Instant,
-};
+use std::{net::SocketAddr, sync::Arc};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 
-/// A stateful component for managing the peer connections of this node server.
-#[derive(Clone)]
-pub struct Peers {
-    /// The parameters and settings of this node server.
-    pub(crate) environment: Environment,
-    /// The inbound service of this node server.
-    inbound: Arc<Inbound>,
-    /// The outbound service of this node server.
-    outbound: Arc<Outbound>,
-    /// The list of connected and disconnected peers of this node server.
-    peer_book: Arc<RwLock<PeerBook>>,
-}
-
-impl Peers {
-    ///
-    /// Creates a new instance of `Peers`.
-    ///
-    pub fn new(environment: Environment, inbound: Arc<Inbound>, outbound: Arc<Outbound>) -> Result<Self, NetworkError> {
-        trace!("Instantiating the peer manager");
-
-        // Load the peer book from storage, or create a new peer book.
-        let peer_book = PeerBook::default();
-        // let peer_book = match PeerBook::load(&*environment.storage_read().await) {
-        //     // Case 1 - The peer book was found in storage.
-        //     Ok(peer_book) => peer_book,
-        //     // Case 2 - Either the peer book does not exist in storage, or could not be deserialized.
-        //     // Create a new instance of the peer book.
-        //     _ => PeerBook::new(*environment.local_address()),
-        // };
-
-        // Instantiate the peer manager.
-        let peers = Self {
-            environment,
-            inbound,
-            outbound,
-            peer_book: Arc::new(RwLock::new(peer_book)),
-        };
-
-        // Save the peer book to storage.
-        // peers.save_peer_book_to_storage().await?;
-
-        Ok(peers)
-    }
-
+impl Node {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    pub async fn update(&self) -> Result<(), NetworkError> {
+    pub(crate) async fn update_peers(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
-        let number_of_connected_peers = self.number_of_connected_peers() as usize;
+        let number_of_connected_peers = self.peer_book.read().number_of_connected_peers() as usize;
         trace!(
             "Connected to {} peer{}",
             number_of_connected_peers,
@@ -120,9 +63,11 @@ impl Peers {
                 number_to_disconnect
             );
 
-            let mut connected = self
+            let peer_book = self.peer_book.read();
+
+            let mut connected = peer_book
                 .connected_peers()
-                .into_iter()
+                .iter()
                 .map(|(_, peer_info)| peer_info)
                 .collect::<Vec<_>>();
             connected.sort_unstable_by_key(|info| info.last_connected());
@@ -146,93 +91,6 @@ impl Peers {
         Ok(())
     }
 
-    ///
-    /// Returns `true` if the given address is connecting with this node.
-    ///
-    #[inline]
-    pub fn is_connecting(&self, address: SocketAddr) -> bool {
-        self.peer_book.read().is_connecting(address)
-    }
-
-    ///
-    /// Returns `true` if the given address is connected with this node.
-    ///
-    #[inline]
-    pub fn is_connected(&self, address: SocketAddr) -> bool {
-        self.peer_book.read().is_connected(address)
-    }
-
-    ///
-    /// Returns `true` if the given address is a disconnected peer of this node.
-    ///
-    #[inline]
-    pub fn is_disconnected(&self, address: SocketAddr) -> bool {
-        self.peer_book.read().is_disconnected(address)
-    }
-
-    ///
-    /// Returns the number of peers connecting to this node.
-    ///
-    #[inline]
-    pub fn number_of_connecting_peers(&self) -> u16 {
-        self.peer_book.read().number_of_connecting_peers()
-    }
-
-    ///
-    /// Returns the number of peers connected to this node.
-    ///
-    #[inline]
-    pub fn number_of_connected_peers(&self) -> u16 {
-        self.peer_book.read().number_of_connected_peers()
-    }
-
-    ///
-    /// Returns a map of all connected peers with their peer-specific information.
-    ///
-    #[inline]
-    pub fn connected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
-        self.peer_book.read().connected_peers().clone()
-    }
-
-    ///
-    /// Returns the `SocketAddr` of the last seen peer to be used as a sync node, or `None`.
-    ///
-    pub fn last_seen(&self) -> Option<SocketAddr> {
-        if let Some((&socket_address, _)) = self
-            .connected_peers()
-            .iter()
-            .max_by(|a, b| a.1.last_seen().cmp(&b.1.last_seen()))
-        {
-            Some(socket_address)
-        } else {
-            None
-        }
-    }
-
-    ///
-    /// Returns a map of all disconnected peers with their peer-specific information.
-    ///
-    #[inline]
-    pub fn disconnected_peers(&self) -> HashMap<SocketAddr, PeerInfo> {
-        self.peer_book.read().disconnected_peers().clone()
-    }
-
-    ///
-    /// Adds the given address to the disconnected peers in this peer book.
-    ///
-    #[inline]
-    pub fn add_peer(&self, address: SocketAddr) {
-        self.peer_book.write().add_peer(address);
-    }
-
-    ///
-    /// Returns the local address of the node.
-    ///
-    #[inline]
-    pub fn local_address(&self) -> Option<SocketAddr> {
-        self.environment.local_address()
-    }
-
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         let own_address = self.local_address().unwrap(); // must be known by now
         if remote_address == own_address
@@ -241,14 +99,14 @@ impl Peers {
         {
             return Err(NetworkError::SelfConnectAttempt);
         }
-        if self.is_connecting(remote_address) {
+        if self.peer_book.read().is_connecting(remote_address) {
             return Err(NetworkError::PeerAlreadyConnecting);
         }
-        if self.is_connected(remote_address) {
+        if self.peer_book.read().is_connected(remote_address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
-        self.connecting_to_peer(remote_address)?;
+        self.peer_book.write().set_connecting(remote_address)?;
 
         // open the connection
         let stream = TcpStream::connect(remote_address).await?;
@@ -305,7 +163,7 @@ impl Peers {
         // save the outbound channel
         self.outbound.channels.write().insert(remote_address, Arc::new(writer));
 
-        self.connected_to_peer(remote_address, None)
+        self.peer_book.write().set_connected(remote_address, None)
     }
 
     ///
@@ -320,7 +178,7 @@ impl Peers {
         trace!("Connecting to default bootnodes");
 
         // Fetch the current connected peers of this node.
-        let connected_peers = self.connected_peers();
+        let connected_peers = self.peer_book.read().connected_peers().clone();
 
         // Iterate through each bootnode address and attempt a connection request.
         for bootnode_address in self
@@ -342,7 +200,8 @@ impl Peers {
         trace!("Connecting to disconnected peers");
 
         // Iterate through each connected peer and attempts a connection request.
-        for remote_address in self.disconnected_peers().keys().take(count).copied() {
+        let disconnected_peers = self.peer_book.read().disconnected_peers().clone();
+        for remote_address in disconnected_peers.keys().take(count).copied() {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
                 let _ = self.disconnect_from_peer(remote_address);
@@ -354,9 +213,10 @@ impl Peers {
     async fn broadcast_pings(&self) {
         trace!("Broadcasting Ping messages");
 
-        let current_block_height = self.environment.current_block_height();
-        for (remote_address, _) in self.connected_peers() {
-            self.sending_ping(remote_address);
+        let current_block_height = self.consensus().current_block_height();
+        let connected_peers = self.peer_book.read().connected_peers().clone();
+        for (remote_address, _) in connected_peers {
+            self.peer_book.read().sending_ping(remote_address);
 
             self.outbound
                 .send_request(Message::new(
@@ -371,7 +231,8 @@ impl Peers {
     async fn broadcast_getpeers_requests(&self) {
         trace!("Sending GetPeers requests to connected peers");
 
-        for (remote_address, _) in self.connected_peers() {
+        let connected_peers = self.peer_book.read().connected_peers().clone();
+        for (remote_address, _) in connected_peers {
             self.outbound
                 .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
                 .await;
@@ -390,54 +251,6 @@ impl Peers {
         }
     }
 
-    fn peer_quality(&self, addr: SocketAddr) -> Option<Arc<PeerQuality>> {
-        self.peer_book
-            .read()
-            .connected_peers()
-            .get(&addr)
-            .map(|peer| Arc::clone(&peer.quality))
-    }
-
-    fn sending_ping(&self, target: SocketAddr) {
-        if let Some(quality) = self.peer_quality(target) {
-            let timestamp = Instant::now();
-            *quality.last_ping_sent.lock() = Some(timestamp);
-            quality.expecting_pong.store(true, Ordering::SeqCst);
-        } else {
-            // shouldn't occur, but just in case
-            warn!("Tried to send a Ping to an unknown peer: {}!", target);
-        }
-    }
-
-    /// Handles an incoming `Pong` message.
-    pub fn received_pong(&self, source: SocketAddr) {
-        if let Some(quality) = self.peer_quality(source) {
-            if quality.expecting_pong.load(Ordering::SeqCst) {
-                let ping_sent = quality.last_ping_sent.lock().unwrap();
-                let rtt = ping_sent.elapsed().as_millis() as u64;
-                quality.rtt_ms.store(rtt, Ordering::SeqCst);
-                quality.expecting_pong.store(false, Ordering::SeqCst);
-            } else {
-                quality.failures.fetch_add(1, Ordering::Relaxed);
-            }
-        } else {
-            // shouldn't occur, but just in case
-            warn!("Received a Pong from an unknown peer: {}!", source);
-        }
-    }
-
-    ///
-    /// Updates the last seen timestamp of this peer to the current time.
-    ///
-    #[inline]
-    pub fn update_last_seen(&self, addr: SocketAddr) {
-        if let Some(ref quality) = self.peer_quality(addr) {
-            *quality.last_seen.write() = Some(chrono::Utc::now());
-        } else {
-            warn!("Attempted to update state of a peer that's not connected: {}", addr);
-        }
-    }
-
     /// TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
     ///  when the PeerBook or PeerInfo struct fields change.
     ///
@@ -452,64 +265,12 @@ impl Peers {
         let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
         // Save the serialized peer book to storage.
-        self.environment
+        self.consensus()
             .storage()
             .write()
             .save_peer_book_to_storage(serialized_peer_book)?;
 
         Ok(())
-    }
-
-    /// Registers that the given number of blocks is expected as part of syncing with a peer.
-    pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) {
-        if let Some(ref pq) = self.peer_quality(addr) {
-            pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
-        } else {
-            error!("Peer for expecting_sync_blocks purposes not found!");
-        }
-    }
-
-    /// Registers the receipt of a sync block from a peer; returns `true` when finished syncing.
-    pub fn got_sync_block(&self, addr: SocketAddr) -> bool {
-        if let Some(ref pq) = self.peer_quality(addr) {
-            pq.remaining_sync_blocks.fetch_sub(1, Ordering::SeqCst) == 1
-        } else {
-            error!("Peer for got_sync_block purposes not found!");
-            true
-        }
-    }
-
-    /// Checks whether the current peer is involved in a block syncing process.
-    pub fn is_syncing_blocks(&self, addr: SocketAddr) -> bool {
-        if let Some(ref pq) = self.peer_quality(addr) {
-            pq.remaining_sync_blocks.load(Ordering::SeqCst) != 0
-        } else {
-            error!("Peer for got_sync_block purposes not found!");
-            false
-        }
-    }
-}
-
-impl Peers {
-    ///
-    /// Sets the given remote address as connecting to this node.
-    ///
-    #[inline]
-    pub(crate) fn connecting_to_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        // Set the peer as connecting with this node server.
-        self.peer_book.write().set_connecting(remote_address)
-    }
-
-    ///
-    /// Sets the given remote address in the peer book as connected to this node server.
-    ///
-    #[inline]
-    pub(crate) fn connected_to_peer(
-        &self,
-        remote_address: SocketAddr,
-        remote_listener: Option<SocketAddr>,
-    ) -> Result<(), NetworkError> {
-        self.peer_book.write().set_connected(remote_address, remote_listener)
     }
 
     /// TODO (howardwu): Add logic to remove the active channels
@@ -520,8 +281,8 @@ impl Peers {
     pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         debug!("Disconnecting from {}", remote_address);
 
-        if self.is_syncing_blocks(remote_address) {
-            self.environment.finished_syncing_blocks();
+        if self.peer_book.read().is_syncing_blocks(remote_address) {
+            self.consensus().finished_syncing_blocks();
         }
 
         if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {
@@ -537,7 +298,7 @@ impl Peers {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let mut peers = Vec::new();
-        for peer_address in self.connected_peers().keys().copied() {
+        for peer_address in self.peer_book.read().connected_peers().keys().copied() {
             // Skip the iteration if the requesting peer that we're sending the response to
             // appears in the list of peers.
             if peer_address == remote_address {
@@ -559,7 +320,7 @@ impl Peers {
         // by informing the peer book of that we found peers.
         let local_address = self.environment.local_address().unwrap(); // the address must be known by now
 
-        let number_of_connected_peers = self.number_of_connected_peers();
+        let number_of_connected_peers = self.peer_book.read().number_of_connected_peers();
         let number_to_connect = self
             .environment
             .maximum_number_of_connected_peers()
@@ -574,7 +335,7 @@ impl Peers {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            self.add_peer(peer_address);
+            self.peer_book.write().add_peer(peer_address);
         }
     }
 }

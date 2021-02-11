@@ -17,11 +17,11 @@
 /// Tests for public RPC endpoints
 mod rpc_tests {
     use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
-    use snarkos_network::Server;
+    use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_testing::{
         consensus::*,
-        network::{test_environment, TestSetup},
+        network::{test_consensus, test_environment, ConsensusSetup, TestSetup},
         storage::*,
     };
     use snarkvm_dpc::base_dpc::instantiated::Tx;
@@ -47,11 +47,13 @@ mod rpc_tests {
 
     async fn initialize_test_rpc(storage: Arc<RwLock<MerkleTreeLedger>>) -> Rpc {
         let environment = test_environment(TestSetup::default());
-        let server = Server::new(environment.clone()).await.unwrap();
+        let mut node = Node::new(environment.clone()).await.unwrap();
+        let consensus = test_consensus(ConsensusSetup::default(), node.clone());
+        node.set_consensus(consensus);
 
         let storage_path = storage.read().storage.db.path().to_path_buf();
 
-        Rpc::new(RpcImpl::new(storage, storage_path, environment, None, server).to_delegate())
+        Rpc::new(RpcImpl::new(storage, storage_path, environment, None, node).to_delegate())
     }
 
     fn verify_transaction_info(transaction_bytes: Vec<u8>, transaction_info: Value) {
