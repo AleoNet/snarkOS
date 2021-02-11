@@ -18,7 +18,7 @@ use snarkos_consensus::ConsensusParameters;
 use snarkos_posw::PoswMarlin;
 use snarkvm_dpc::instantiated::Components;
 use snarkvm_errors::objects::TransactionError;
-use snarkvm_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameters};
+use snarkvm_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameter};
 use snarkvm_objects::Network;
 use snarkvm_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};

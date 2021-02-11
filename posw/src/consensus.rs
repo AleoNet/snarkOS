@@ -32,7 +32,7 @@ use snarkvm_models::{
     algorithms::{MaskedMerkleParameters, SNARK},
     curves::{to_field_vec::ToConstraintField, PairingEngine, PrimeField},
     gadgets::algorithms::MaskedCRHGadget,
-    parameters::Parameters,
+    parameters::Parameter,
 };
 use snarkvm_objects::{
     pedersen_merkle_tree::{pedersen_merkle_root_hash_with_leaves, PedersenMerkleRootHash, PARAMS},

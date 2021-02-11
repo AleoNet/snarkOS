@@ -348,7 +348,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b9434b9a5aa1450faa3f9cb14ea0e8c53bb5d2b3c1bfd1ab4fc03e9f33fbfb0"
 dependencies = [
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]
@@ -979,6 +979,7 @@ checksum = "da9052a1a50244d8d5aa9bf55cbc2fb6f357c86cc52e46c62ed390a7180cf150"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -1050,6 +1051,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28be053525281ad8259d47e4de5de657b25e7bac113458555bb4b70bc6870500"
 
 [[package]]
+name = "futures-macro"
+version = "0.3.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c287d25add322d9f9abdcdc5927ca398917996600182178774032e9f8258fedd"
+dependencies = [
+ "proc-macro-hack",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "futures-sink"
 version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1070,13 +1083,17 @@ version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "632a8cd0f2a4b3fdea1657f08bde063848c3bd00f9bbf6e256b8be78802e624b"
 dependencies = [
+ "futures-channel",
  "futures-core",
  "futures-io",
+ "futures-macro",
  "futures-sink",
  "futures-task",
  "memchr",
  "pin-project-lite 0.2.4",
  "pin-utils",
+ "proc-macro-hack",
+ "proc-macro-nested",
  "slab",
 ]
 
@@ -1377,7 +1394,7 @@ dependencies = [
  "itoa",
  "log",
  "net2",
- "rustc_version",
+ "rustc_version 0.2.3",
  "time",
  "tokio 0.1.22",
  "tokio-buf",
@@ -1578,7 +1595,7 @@ checksum = "2773fa94a2a1fd51efb89a8f45b8861023dbb415d18d3c9235ae9388d780f9ec"
 dependencies = [
  "failure",
  "futures 0.1.30",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-pubsub",
  "log",
  "serde",
@@ -1593,6 +1610,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0747307121ffb9703afd93afbd0fb4f854c38fb873f2c8b90e0e902f27c7b62"
 dependencies = [
  "futures 0.1.30",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "jsonrpc-core"
+version = "17.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07569945133257ff557eb37b015497104cea61a2c9edaf126c1cbd6e8332397f"
+dependencies = [
+ "futures 0.3.12",
  "log",
  "serde",
  "serde_derive",
@@ -1627,7 +1657,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0da906d682799df05754480dac1b9e70ec92e12c19ebafd2662a5ea1c9fd6522"
 dependencies = [
  "hyper 0.12.35",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-server-utils",
  "log",
  "net2",
@@ -1641,7 +1671,7 @@ version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d44f5602a11d657946aac09357956d2841299ed422035edf140c552cb057986"
 dependencies = [
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "log",
  "parking_lot 0.10.2",
  "rand 0.7.3",
@@ -1656,7 +1686,7 @@ checksum = "56cbfb462e7f902e21121d9f0d1c2b77b2c5b642e1a4e8f4ebfa2e15b94402bb"
 dependencies = [
  "bytes 0.4.12",
  "globset",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "lazy_static",
  "log",
  "tokio 0.1.22",
@@ -1670,7 +1700,7 @@ version = "14.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fdbfe280021d220b3392e38b34781647f8268eef6d71564074a870a08404899"
 dependencies = [
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-core-client",
  "jsonrpc-pubsub",
  "log",
@@ -2101,7 +2131,7 @@ checksum = "f842b1982eb6c2fe34036a4fbfb06dd185a3f5c8edfaacdf7d1ea10b07de6252"
 dependencies = [
  "lock_api 0.3.4",
  "parking_lot_core 0.6.2",
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]
@@ -2135,7 +2165,7 @@ dependencies = [
  "cloudabi",
  "libc",
  "redox_syscall 0.1.57",
- "rustc_version",
+ "rustc_version 0.2.3",
  "smallvec 0.6.14",
  "winapi 0.3.9",
 ]
@@ -2334,6 +2364,18 @@ dependencies = [
  "quote",
  "version_check",
 ]
+
+[[package]]
+name = "proc-macro-hack"
+version = "0.5.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf0c48bc1d91375ae5c3cd81e3722dff1abcf81a30960240640d223f59fe0e5"
+
+[[package]]
+name = "proc-macro-nested"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc881b2c22681370c6a780e47af9840ef841837bc98118431d4e1868bd0c1086"
 
 [[package]]
 name = "proc-macro2"
@@ -2662,6 +2704,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustc_version"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0dfe2087c51c460008730de8b57e6a320782fbfb312e1f4d520e6c6fae155ee"
+dependencies = [
+ "semver 0.11.0",
+]
+
+[[package]]
 name = "rusty-hook"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2974,7 +3025,7 @@ dependencies = [
  "hex",
  "parking_lot 0.11.1",
  "rand 0.7.3",
- "rustc_version",
+ "rustc_version 0.2.3",
  "rusty-hook",
  "self_update",
  "serde",
@@ -3074,7 +3125,7 @@ dependencies = [
  "log",
  "parking_lot 0.11.1",
  "rand 0.7.3",
- "rustc_version",
+ "rustc_version 0.2.3",
  "serde",
  "serial_test",
  "snarkos-consensus",
@@ -3133,14 +3184,14 @@ dependencies = [
  "chrono",
  "hex",
  "itertools 0.9.0",
- "jsonrpc-core",
+ "jsonrpc-core 14.2.0",
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpc-http-server",
  "jsonrpc-test",
  "parking_lot 0.11.1",
  "rand 0.7.3",
- "rustc_version",
+ "rustc_version 0.2.3",
  "serde",
  "serde_json",
  "snarkos-consensus",
@@ -3232,13 +3283,14 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-algorithms"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ceb01228059c36bb95507d1df131dea4e7b600c87ac26dc66c07a651d8a03f6e"
 dependencies = [
  "blake2 0.8.1",
  "derivative",
  "digest 0.8.1",
- "itertools 0.9.0",
+ "itertools 0.10.0",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
  "rayon",
@@ -3252,13 +3304,14 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-curves"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7f9bb31389dce334a6c0c5855829afbb1e4469c4c03143e167c5353ccb1e307"
 dependencies = [
  "derivative",
  "rand 0.7.3",
  "rand_xorshift",
- "rustc_version",
+ "rustc_version 0.3.3",
  "serde",
  "snarkvm-errors",
  "snarkvm-models",
@@ -3267,8 +3320,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-derives"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ccaf7047e41bc356a3af8257e9ffe13a5b619c9f51278c019d5201790ddd677"
 dependencies = [
  "proc-macro-crate",
  "proc-macro-error",
@@ -3279,14 +3333,15 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-dpc"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea20c9a289304d22755ddfc644e164e1232f41ebe016edc8bf7f0007b828b92d"
 dependencies = [
  "anyhow",
  "blake2 0.8.1",
  "derivative",
  "hex",
- "itertools 0.9.0",
+ "itertools 0.10.0",
  "rand 0.7.3",
  "snarkvm-algorithms",
  "snarkvm-curves",
@@ -3301,15 +3356,16 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-errors"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dcff02240b6b5b36f47953ea9be5c29aef109164b0cebd84e7260ef7bf67f6c"
 dependencies = [
  "base58",
  "bech32",
  "bincode",
  "curl",
  "hex",
- "jsonrpc-core",
+ "jsonrpc-core 17.0.0",
  "rocksdb",
  "thiserror",
  "toml",
@@ -3317,12 +3373,13 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-gadgets"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5692f39b5b9351b6584e1f9a2739b13d82e5a4a74a074eb0b743e9d7583fdb5"
 dependencies = [
  "derivative",
  "digest 0.8.1",
- "itertools 0.9.0",
+ "itertools 0.10.0",
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-errors",
@@ -3332,8 +3389,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-marlin"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed155797600bb133751458bc23b51bad7aacd88669ebe742d448315cf2181b72"
 dependencies = [
  "blake2 0.8.1",
  "derivative",
@@ -3351,16 +3409,17 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-models"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e622885901322b1d2b26c1bc8d94a717df1e83672cbc41a16f2afc4d2702afab"
 dependencies = [
  "anyhow",
  "bincode",
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "derivative",
  "fxhash",
  "indexmap",
- "itertools 0.9.0",
+ "itertools 0.10.0",
  "rand 0.7.3",
  "rand_xorshift",
  "serde",
@@ -3370,8 +3429,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-objects"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd47dd986ba53600dd5762c72214250b37af114720dc494770114e9bf8281819"
 dependencies = [
  "base58",
  "bech32",
@@ -3391,8 +3451,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-parameters"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd0e2f9bdbce0750aa0def386e4324f278c7e0d58cfbdb42128c03d246c862f4"
 dependencies = [
  "curl",
  "hex",
@@ -3404,8 +3465,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-polycommit"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a1cd90c24e07c652f368fa505f52dda413872e5ace87ed4eb9f98b1eec1d6c1"
 dependencies = [
  "derivative",
  "digest 0.8.1",
@@ -3419,13 +3481,15 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-profiler"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5f9c37df04e66b18ef0c4a69861eaf1f83170f1e71509e208d6006c20e65b91"
 
 [[package]]
 name = "snarkvm-utilities"
-version = "0.0.2"
-source = "git+https://github.com/AleoHQ/snarkVM.git?rev=a7e017b#a7e017b8693693d4f32c676982dd079172ae747c"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7518dfe2e8dc37beeaf3131ef5c77e4e9818843e6c33e7b665240dc8ec805b1"
 dependencies = [
  "bincode",
  "rand 0.7.3",
@@ -3444,7 +3508,7 @@ dependencies = [
  "chacha20poly1305",
  "rand 0.7.3",
  "rand_core 0.5.1",
- "rustc_version",
+ "rustc_version 0.2.3",
  "sha2",
  "sodiumoxide",
  "subtle 2.4.0",

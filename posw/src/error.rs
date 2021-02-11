@@ -17,7 +17,7 @@
 use snarkvm_errors::{
     algorithms::SNARKError,
     curves::constraint_field::ConstraintFieldError,
-    parameters::ParametersError,
+    parameters::ParameterError,
 };
 
 use std::io::Error as IoError;
@@ -28,7 +28,7 @@ use thiserror::Error;
 pub enum PoswError {
     /// Thrown when the parameters cannot be loaded
     #[error("could not load PoSW parameters: {0}")]
-    Parameters(#[from] ParametersError),
+    Parameters(#[from] ParameterError),
 
     /// Thrown when a proof fails verification
     #[error("could not verify PoSW")]

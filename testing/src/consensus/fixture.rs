@@ -37,7 +37,7 @@ pub static FIXTURE_VK: Lazy<Fixture> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
 pub struct Fixture {
-    pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
     pub genesis_block: Block<Tx>,

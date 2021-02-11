@@ -78,7 +78,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
 fn mine_block(
     miner: &Miner,
     ledger: &MerkleTreeLedger,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
     consensus: &ConsensusParameters,
     memory_pool: &mut MemoryPool<Tx>,
     txs: Vec<Tx>,
@@ -114,7 +114,7 @@ fn mine_block(
 #[allow(clippy::too_many_arguments)]
 fn send<R: Rng>(
     ledger: &MerkleTreeLedger,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
     consensus: &ConsensusParameters,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,

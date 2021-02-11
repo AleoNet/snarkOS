@@ -20,12 +20,12 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2", default-features = false }
-snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2", default-features = false }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2", default-features = false }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2", default-features = false }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2", default-features = false }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2", default-features = false }
+snarkvm-algorithms = { version = "0.0.3", default-features = false }
+snarkvm-dpc = { version = "0.0.3", default-features = false }
+snarkvm-errors = { version = "0.0.3", default-features = false }
+snarkvm-models = { version = "0.0.3", default-features = false }
+snarkvm-objects = { version = "0.0.3", default-features = false }
+snarkvm-utilities = { version = "0.0.3", default-features = false }
 
 anyhow = { version = "1.0.37" }
 hex = { version = "0.4.2" }

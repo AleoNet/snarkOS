@@ -17,7 +17,7 @@
 use snarkvm_errors::{
     algorithms::MerkleError,
     objects::{BlockError, TransactionError},
-    parameters::ParametersError,
+    parameters::ParameterError,
 };
 
 use std::fmt::Debug;
@@ -127,7 +127,7 @@ pub enum StorageError {
     MerkleError(MerkleError),
 
     #[error("{}", _0)]
-    ParametersError(ParametersError),
+    ParameterError(ParameterError),
 
     #[error("{}", _0)]
     TransactionError(TransactionError),
@@ -181,9 +181,9 @@ impl From<MerkleError> for StorageError {
     }
 }
 
-impl From<ParametersError> for StorageError {
-    fn from(error: ParametersError) -> Self {
-        StorageError::ParametersError(error)
+impl From<ParameterError> for StorageError {
+    fn from(error: ParameterError) -> Self {
+        StorageError::ParameterError(error)
     }
 }
 

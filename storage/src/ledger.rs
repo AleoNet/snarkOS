@@ -20,7 +20,7 @@ use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     genesis::Genesis,
     objects::{LedgerScheme, Transaction},
-    parameters::Parameters,
+    parameters::Parameter,
 };
 use snarkvm_objects::Block;
 use snarkvm_parameters::{GenesisBlock, LedgerMerkleTreeParameters};

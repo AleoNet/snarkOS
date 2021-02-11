@@ -159,7 +159,7 @@ impl ConsensusParameters {
     /// Check if the transaction is valid.
     pub fn verify_transaction(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         transaction: &Tx,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
@@ -176,7 +176,7 @@ impl ConsensusParameters {
     /// Check if the transactions are valid.
     pub fn verify_transactions(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         transactions: &[Tx],
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
@@ -193,7 +193,7 @@ impl ConsensusParameters {
     /// Verify transactions and transaction fees.
     pub fn verify_block(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         block: &Block<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
@@ -446,7 +446,7 @@ impl ConsensusParameters {
     #[allow(clippy::too_many_arguments)]
     pub fn create_transaction<R: Rng>(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
         new_record_owners: Vec<AccountAddress<Components>>,
@@ -496,7 +496,7 @@ impl ConsensusParameters {
     /// Generate the birth and death program proofs for a transaction for a given transaction kernel
     #[allow(clippy::type_complexity)]
     pub fn generate_program_proofs<R: Rng>(
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::TransactionKernel,
         rng: &mut R,
     ) -> Result<

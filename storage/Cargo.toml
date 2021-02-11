@@ -12,12 +12,12 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2"}
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
-snarkvm-parameters = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-algorithms = { version = "0.0.3"}
+snarkvm-objects = { version = "0.0.3" }
+snarkvm-errors = { version = "0.0.3" }
+snarkvm-models = { version = "0.0.3" }
+snarkvm-parameters = { version = "0.0.3" }
+snarkvm-utilities = { version = "0.0.3" }
 
 anyhow = { version = "1.0.37" }
 bincode = { version = "1.3.1" }
@@ -31,6 +31,6 @@ thiserror = { version = "1.0" }
 [dev-dependencies]
 snarkos-consensus = { path = "../consensus" }
 
-snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "a7e017b", version = "0.0.2" }
+snarkvm-curves = { version = "0.0.3" }
 
 snarkos-testing = { path = "../testing" }

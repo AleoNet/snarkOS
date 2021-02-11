@@ -83,7 +83,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_parameters = From::from(merkle_tree_hash_parameters);
 
-    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(false)?;
+    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters::load(false)?;
 
     let noop_program_vk_hash = parameters
         .system_parameters
