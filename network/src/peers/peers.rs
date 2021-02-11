@@ -84,7 +84,7 @@ impl Node {
         // disconnect from peers after a while, even if they haven't sent a GetPeers
         let now = chrono::Utc::now();
         if self.environment.is_bootnode() {
-            for (peer_addr, peer_info) in self.connected_peers() {
+            for (peer_addr, peer_info) in self.peer_book.read().connected_peers().clone() {
                 if (now - peer_info.last_connected().unwrap()).num_seconds() > 10 {
                     let _ = self.disconnect_from_peer(peer_addr);
                 }
@@ -213,9 +213,12 @@ impl Node {
 
         // Iterate through a selection of random peers and attempt to connect.
         let random_peers = self
+            .peer_book
+            .read()
             .disconnected_peers()
-            .into_iter()
+            .iter()
             .map(|(k, _)| k)
+            .copied()
             .choose_multiple(&mut rand::thread_rng(), count);
 
         for remote_address in random_peers {
@@ -321,17 +324,25 @@ impl Node {
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
-        let own_peers = if !self.environment.is_bootnode() {
-            self.connected_peers()
+        let peers = if !self.environment.is_bootnode() {
+            self.peer_book
+                .read()
+                .connected_peers()
+                .iter()
+                .map(|(k, _)| k)
+                .filter(|&addr| *addr != remote_address)
+                .copied()
+                .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
         } else {
-            self.disconnected_peers()
+            self.peer_book
+                .read()
+                .disconnected_peers()
+                .iter()
+                .map(|(k, _)| k)
+                .filter(|&addr| *addr != remote_address)
+                .copied()
+                .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
         };
-
-        let peers = own_peers
-            .into_iter()
-            .map(|(k, _)| k)
-            .filter(|&addr| addr != remote_address)
-            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
 
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
