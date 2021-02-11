@@ -53,25 +53,11 @@ jobs:
           override: true
           components: clippy
 
-      - name: Check examples
+      - name: Run clippy accross the workspace against all targets
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --examples --all
-
-      - name: Check examples with all features on stable
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --examples --all-features --all
-        if: matrix.rust == 'stable'
-
-      - name: Check benchmarks on nightly
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-features --examples --all --benches
-        if: matrix.rust == 'nightly'
+          args: --workspace --all-targets
 
   test-wasm:
     name: WASM Tests
