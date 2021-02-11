@@ -212,7 +212,12 @@ impl Node {
     async fn broadcast_pings(&self) {
         trace!("Broadcasting Ping messages");
 
-        let current_block_height = self.consensus().current_block_height();
+        // consider peering tests that don't use the consensus layer
+        let current_block_height = if self.consensus.is_some() {
+            self.consensus().current_block_height()
+        } else {
+            0
+        };
         let connected_peers = self.peer_book.read().connected_peers().clone();
         for (remote_address, _) in connected_peers {
             self.peer_book.read().sending_ping(remote_address);
@@ -263,11 +268,14 @@ impl Node {
         // Serialize the peer book.
         let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
-        // Save the serialized peer book to storage.
-        self.consensus()
-            .storage()
-            .write()
-            .save_peer_book_to_storage(serialized_peer_book)?;
+        // TODO: the peer book should be stored outside of consensus
+        if self.consensus.is_some() {
+            // Save the serialized peer book to storage.
+            self.consensus()
+                .storage()
+                .write()
+                .save_peer_book_to_storage(serialized_peer_book)?;
+        }
 
         Ok(())
     }

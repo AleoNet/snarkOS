@@ -255,15 +255,17 @@ impl Node {
                     .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
                     .await;
 
-                if block_height > self.consensus().current_block_height() + 1
-                    && self.consensus().should_sync_blocks()
-                    && !self.peer_book.read().is_syncing_blocks(source.unwrap())
-                {
-                    self.consensus().register_block_sync_attempt();
-                    trace!("Attempting to sync with {}", source.unwrap());
-                    self.consensus().update_blocks(source.unwrap()).await;
-                } else {
-                    self.consensus().finished_syncing_blocks();
+                if self.consensus.is_some() {
+                    if block_height > self.consensus().current_block_height() + 1
+                        && self.consensus().should_sync_blocks()
+                        && !self.peer_book.read().is_syncing_blocks(source.unwrap())
+                    {
+                        self.consensus().register_block_sync_attempt();
+                        trace!("Attempting to sync with {}", source.unwrap());
+                        self.consensus().update_blocks(source.unwrap()).await;
+                    } else {
+                        self.consensus().finished_syncing_blocks();
+                    }
                 }
             }
             Payload::Pong => {
