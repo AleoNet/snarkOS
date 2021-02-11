@@ -45,4 +45,4 @@ rayon = { version = "1" }
 smallvec = { version = "1.6" }
 criterion = { version = "0.3.4", features = ["async_tokio"] }
 rand_xorshift = { version = "0.2" }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1" }
