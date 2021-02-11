@@ -46,14 +46,17 @@ async fn test_nodes() -> Vec<Node> {
     nodes
 }
 
+async fn start_nodes(nodes: &Vec<Node>) {
+    for node in nodes {
+        node.start_services().await;
+    }
+}
+
 #[tokio::test]
 async fn line() {
     let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Line).await;
-
-    for node in &nodes {
-        node.start_services().await;
-    }
+    start_nodes(&nodes).await;
 
     // First and Last nodes should have 1 connected peer.
     wait_until!(
@@ -75,10 +78,7 @@ async fn line() {
 async fn ring() {
     let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Ring).await;
-
-    for node in &nodes {
-        node.start_services().await;
-    }
+    start_nodes(&nodes).await;
 
     for node in &nodes {
         wait_until!(5, node.peer_book.read().number_of_connected_peers() == 2);
@@ -89,10 +89,7 @@ async fn ring() {
 async fn mesh() {
     let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Mesh).await;
-
-    for node in &nodes {
-        node.start_services().await;
-    }
+    start_nodes(&nodes).await;
 
     for node in &nodes {
         wait_until!(5, node.peer_book.read().number_of_connected_peers() as usize == N - 1);
@@ -103,11 +100,7 @@ async fn mesh() {
 async fn star() {
     let mut nodes = test_nodes().await;
     connect_nodes(&mut nodes, Topology::Star).await;
-
-    // Start the nodes.
-    for node in &nodes {
-        node.start_services().await;
-    }
+    start_nodes(&nodes).await;
 
     let hub = nodes.first().unwrap();
     wait_until!(5, hub.peer_book.read().number_of_connected_peers() as usize == N - 1);

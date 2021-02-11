@@ -53,13 +53,10 @@ async fn line(nodes: &mut Vec<Node>) {
     let mut prev_node: Option<SocketAddr> = None;
 
     // Start each node with the previous as a bootnode.
-    for mut node in nodes {
-        let bootnodes = match prev_node {
-            Some(addr) => vec![addr],
-            None => vec![],
+    for node in nodes {
+        if let Some(addr) = prev_node {
+            node.environment.bootnodes.push(addr);
         };
-
-        node.environment.bootnodes = bootnodes;
 
         // Assumes the node has an established address.
         prev_node = node.local_address();
