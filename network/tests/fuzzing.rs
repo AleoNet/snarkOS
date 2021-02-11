@@ -32,10 +32,10 @@ async fn fuzzing_zeroes_pre_handshake() {
     let node_addr = node.environment.local_address().unwrap();
 
     let mut stream = TcpStream::connect(node_addr).await.unwrap();
-    wait_until!(1, node.peers.number_of_connecting_peers() == 1);
+    wait_until!(1, node.peer_book.read().number_of_connecting_peers() == 1);
 
     let _ = stream.write_all(&vec![0u8; 64]).await;
-    wait_until!(1, node.peers.number_of_connecting_peers() == 0);
+    wait_until!(1, node.peer_book.read().number_of_connecting_peers() == 0);
 }
 
 #[tokio::test]
@@ -46,10 +46,10 @@ async fn fuzzing_zeroes_post_handshake() {
         ..Default::default()
     };
     let (node, fake_node) = handshaken_node_and_peer(node_setup).await;
-    wait_until!(1, node.peers.number_of_connected_peers() == 1);
+    wait_until!(1, node.peer_book.read().number_of_connected_peers() == 1);
 
     fake_node.write_bytes(&vec![0u8; 64]).await;
-    wait_until!(1, node.peers.number_of_connected_peers() == 0);
+    wait_until!(1, node.peer_book.read().number_of_connected_peers() == 0);
 }
 
 #[ignore]
