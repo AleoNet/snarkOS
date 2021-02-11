@@ -36,7 +36,6 @@ tracing = { default-features = false, features = ["log"], version = "0.1" }
 snarkos-testing = { path = "../testing" }
 
 criterion = { version = "0.3" }
-futures-await-test = { version = "0.3.0" }
 rand_xorshift = { version = "0.2" }
 
 [[bench]]

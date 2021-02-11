@@ -43,9 +43,5 @@ tracing-futures = { version = "0.2" }
 [dev-dependencies]
 snarkos-testing = { path = "../testing" }
 
-serial_test = { version = "0.5.1" }
-tokio-test = { version = "0.2.0" }
-tracing-subscriber = { version = "0.2" }
-
 [build-dependencies]
 rustc_version = "0.2"
