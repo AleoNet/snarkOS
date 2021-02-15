@@ -102,7 +102,7 @@ impl Node {
 
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
-        let inbound = Arc::new(Inbound::new(channels.clone()));
+        let inbound = Arc::new(Inbound::new(channels.clone(), span.clone()));
         let outbound = Arc::new(Outbound::new(channels));
 
         Ok(Self {
