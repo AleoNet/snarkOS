@@ -70,13 +70,13 @@ impl Inbound {
     pub async fn listen(&self, environment: &mut Environment) -> Result<(), NetworkError> {
         let (listener_address, listener) = if let Some(addr) = environment.local_address() {
             let listener = TcpListener::bind(&addr).await?;
-            (addr, listener)
+            (listener.local_addr()?, listener)
         } else {
             let listener = TcpListener::bind("0.0.0.0:0").await?;
             let listener_address = listener.local_addr()?;
-            environment.set_local_address(listener_address);
             (listener_address, listener)
         };
+        environment.set_local_address(listener_address);
         info!("Listening at {}", listener_address);
 
         let inbound = self.clone();
