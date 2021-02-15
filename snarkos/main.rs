@@ -193,13 +193,12 @@ fn main() -> Result<(), NodeError> {
 
     let config: Config = ConfigCli::parse(&arguments)?;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
-    let node_span = debug_span!("node");
 
     Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?
-        .block_on(start_server(config).instrument(node_span))?;
+        .block_on(start_server(config))?;
 
     Ok(())
 }
