@@ -141,6 +141,107 @@ async fn star_degeneration() {
     wait_until!(5, density() >= 0.5);
 }
 
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn binary_star_contact() {
+    let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .init();
+
+    // 1. pass N nodes through a bootstrapper
+    // 2. pass K nodes through a different bootstrapper (totally separate networks)
+    // 3. introduce a node that is "fed" the list of random nodes from the N and K sets
+    // 4. check out the end topology
+
+    // Setup the bootnodes for each star topology.
+    let bootnode_setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        min_peers: N as u16,
+        is_bootnode: true,
+        ..Default::default()
+    };
+    let environment_a = test_environment(bootnode_setup.clone());
+    let environment_b = test_environment(bootnode_setup);
+    let mut bootnode_a = Node::new(environment_a).await.unwrap();
+    let mut bootnode_b = Node::new(environment_b).await.unwrap();
+
+    bootnode_a.establish_address().await.unwrap();
+    bootnode_b.establish_address().await.unwrap();
+
+    let ba = dbg!(bootnode_a.local_address().unwrap().to_string());
+    let bb = dbg!(bootnode_b.local_address().unwrap().to_string());
+
+    // Create the nodes to be used as the leafs in the stars.
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        min_peers: N as u16,
+        ..Default::default()
+    };
+    let mut star_a_nodes = test_nodes(N - 1, setup.clone()).await;
+    let mut star_b_nodes = test_nodes(N - 1, setup).await;
+
+    // Insert the bootnodes at the begining of the node lists.
+    star_a_nodes.insert(0, bootnode_a);
+    star_b_nodes.insert(0, bootnode_b);
+
+    // Create the star topologies.
+    connect_nodes(&mut star_a_nodes, Topology::Star).await;
+    connect_nodes(&mut star_b_nodes, Topology::Star).await;
+
+    // Start the services.
+    start_nodes(&star_a_nodes).await;
+    start_nodes(&star_b_nodes).await;
+
+    // Measure the initial density once the topologies are established. The two star topologies
+    // should still be disconnected.
+    let hub_a = star_a_nodes.first().unwrap();
+    wait_until!(5, hub_a.peer_book.read().number_of_connected_peers() as usize == N - 1);
+    let hub_b = star_b_nodes.first().unwrap();
+    wait_until!(5, hub_b.peer_book.read().number_of_connected_peers() as usize == N - 1);
+
+    // Setting up a list of nodes as we will consider them as a whole graph from this point
+    // forwards.
+    star_a_nodes.append(&mut star_b_nodes);
+    let mut nodes = star_a_nodes;
+
+    // First density measurement.
+    let actual_connections = total_connection_count(&nodes);
+    // The count includes the as yet unspawned single node.
+    let density = network_density((nodes.len() + 1) as f64, actual_connections as f64);
+
+    println!("Network density: {}", density);
+
+    // Single node to connect to a subset of N and K.
+    let mut bootnodes = vec![ba, bb];
+
+    //  for node in &nodes {
+    //      let addr = node.local_address().unwrap().to_string();
+    //      if addr != ba && addr != bb {
+    //          bootnodes.push(addr);
+    //      }
+    //  }
+
+    let solo_setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        min_peers: N as u16,
+        bootnodes,
+        ..Default::default()
+    };
+    let solo = test_node(solo_setup).await;
+    nodes.push(solo);
+
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+    let actual_connections = total_connection_count(&nodes);
+    let density = network_density(nodes.len() as f64, actual_connections as f64);
+    println!("Network density: {}", density);
+}
+
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
     let mut count = 0;
 
@@ -151,25 +252,18 @@ fn total_connection_count(nodes: &Vec<Node>) -> usize {
     (count / 2).into()
 }
 
-fn network_density(n: f64, ac: f64) -> f64 {
-    dbg!(n);
-    dbg!(ac);
-    // Calculate the total number of possible connections given a node count.
-    let pc = n * (n - 1.0) / 2.0;
-    // Actual connections divided by the possbile connections gives the density.
-    dbg!(ac / pc)
-}
-
 // Topology metrics
 //
 // 1. node count
 // 2. density
-//
-//
-//
 // 3. centrality measurements:
 //
-// - degree centrality
-// - eigenvector centrality
-//
-//
+//      - degree centrality (covered by the number of connected peers)
+//      - eigenvector centrality
+
+fn network_density(n: f64, ac: f64) -> f64 {
+    // Calculate the total number of possible connections given a node count.
+    let pc = n * (n - 1.0) / 2.0;
+    // Actual connections divided by the possbile connections gives the density.
+    ac / pc
+}
