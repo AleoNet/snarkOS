@@ -127,7 +127,7 @@ impl TestSetup {
 impl Default for TestSetup {
     fn default() -> Self {
         Self {
-            socket_address: None,
+            socket_address: "127.0.0.1:0".parse().ok(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
             min_peers: 1,
