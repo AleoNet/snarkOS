@@ -28,7 +28,6 @@ use tokio::{
     net::{TcpListener, TcpStream},
     task::{self, JoinHandle},
 };
-use tracing::Span;
 
 /// The map of remote addresses to their active writers.
 pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
@@ -36,8 +35,6 @@ pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug, Clone)]
 pub struct Inbound {
-    /// The tracing span of the node.
-    span: Span,
     /// The producer for sending inbound messages to the server.
     pub(crate) sender: Sender,
     /// The consumer for receiving inbound messages to the server.
@@ -55,12 +52,11 @@ pub struct Inbound {
 }
 
 impl Inbound {
-    pub fn new(channels: Arc<RwLock<Channels>>, span: Span) -> Self {
+    pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
         // Initialize the sender and receiver.
         let (sender, receiver) = tokio::sync::mpsc::channel(1024);
 
         Self {
-            span,
             sender,
             receiver: Arc::new(Mutex::new(Some(receiver))),
             channels,
@@ -81,14 +77,14 @@ impl Inbound {
             (listener_address, listener)
         };
         environment.set_local_address(listener_address);
-        info!(parent: &self.span, "Listening at {}", listener_address);
+        info!("Listening at {}", listener_address);
 
         let inbound = self.clone();
         task::spawn(async move {
             loop {
                 match listener.accept().await {
                     Ok((stream, remote_address)) => {
-                        info!(parent: &inbound.span, "Got a connection request from {}", remote_address);
+                        info!("Got a connection request from {}", remote_address);
 
                         match inbound
                             .connection_request(listener_address, remote_address, stream)
@@ -108,7 +104,7 @@ impl Inbound {
                                 inbound.tasks.lock().insert(remote_address, task);
                             }
                             Err(e) => {
-                                error!(parent: &inbound.span, "Failed to accept a connection: {}", e);
+                                error!("Failed to accept a connection: {}", e);
                                 // FIXME(ljedrz/nkls): this should be done immediately, bypassing the message channel
                                 let _ = inbound
                                     .sender
@@ -138,13 +134,7 @@ impl Inbound {
             let message = match reader.read_message().await {
                 Ok(message) => message,
                 Err(error) => {
-                    Self::handle_failure(
-                        &mut failure,
-                        &mut failure_count,
-                        &mut disconnect_from_peer,
-                        error,
-                        &self.span,
-                    );
+                    Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
 
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
@@ -155,7 +145,7 @@ impl Inbound {
 
                             // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
                             // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
-                            warn!(parent: &self.span, "Disconnecting from an unreliable peer");
+                            warn!("Disconnecting from an unreliable peer");
                             break; // the error has already been handled and reported
                         }
                         false => {
@@ -182,33 +172,29 @@ impl Inbound {
         failure_count: &mut u8,
         disconnect_from_peer: &mut bool,
         error: NetworkError,
-        span: &Span,
     ) {
         // Only increment failure_count if we haven't seen a failure yet.
         if !*failure {
             // Update the state to reflect a new failure.
             *failure = true;
             *failure_count += 1;
-            error!(parent: span, "Network error: {}", error);
+            error!("Network error: {}", error);
 
             // Determine if we should disconnect.
             *disconnect_from_peer = error.is_fatal() || *failure_count >= 10;
 
             if *disconnect_from_peer {
-                debug!(parent: span, "Should disconnect from peer");
+                debug!("Should disconnect from peer");
             }
         } else {
-            debug!(
-                parent: span,
-                "A connection errored again in the same loop (error message: {})", error
-            );
+            debug!("A connection errored again in the same loop (error message: {})", error);
         }
     }
 
     #[inline]
     pub(crate) async fn route(&self, response: Message) {
         if let Err(err) = self.sender.send(response).await {
-            error!(parent: &self.span, "Failed to route a response for a message: {}", err);
+            error!("Failed to route a response for a message: {}", err);
         }
     }
 
@@ -255,14 +241,14 @@ impl Inbound {
         }
         let len = reader.read_exact(&mut buf[..len]).await?;
         noise.read_message(&buf[..len], &mut buffer)?;
-        trace!(parent: &self.span, "received e (XX handshake part 1/3)");
+        trace!("received e (XX handshake part 1/3)");
 
         // -> e, ee, s, es
         let own_version = Version::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
         let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
-        trace!(parent: &self.span, "sent e, ee, s, es (XX handshake part 2/3)");
+        trace!("sent e, ee, s, es (XX handshake part 2/3)");
 
         // <- s, se, psk
         reader.read_exact(&mut buf[..1]).await?;
@@ -273,7 +259,7 @@ impl Inbound {
         let len = reader.read_exact(&mut buf[..len]).await?;
         let len = noise.read_message(&buf[..len], &mut buffer)?;
         let peer_version = Version::deserialize(&buffer[..len])?;
-        trace!(parent: &self.span, "received s, se, psk (XX handshake part 3/3)");
+        trace!("received s, se, psk (XX handshake part 3/3)");
 
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));

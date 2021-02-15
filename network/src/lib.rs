@@ -54,7 +54,6 @@ use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
-use tracing::Span;
 
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
 pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
@@ -76,8 +75,6 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 pub struct Node {
     /// The id of this node, generated on creation.
     name: u64,
-    /// The tracing span of this node.
-    span: Span,
     /// The parameters and settings of this node.
     pub environment: Environment,
     /// The inbound handler of this node.
@@ -97,17 +94,13 @@ impl Node {
         let mut rng = thread_rng();
         let name = rng.gen();
 
-        // Create the node's tracing span with the name.
-        let span = create_span(name);
-
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
-        let inbound = Arc::new(Inbound::new(channels.clone(), span.clone()));
+        let inbound = Arc::new(Inbound::new(channels.clone()));
         let outbound = Arc::new(Outbound::new(channels));
 
         Ok(Self {
             name,
-            span,
             environment,
             inbound,
             outbound,
@@ -138,11 +131,6 @@ impl Node {
         self.consensus.is_some()
     }
 
-    /// Returns the tracing `Span` associated with the node.
-    pub fn span(&self) -> &Span {
-        &self.span
-    }
-
     pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
         self.inbound.listen(&mut self.environment).await?;
 
@@ -155,7 +143,7 @@ impl Node {
         task::spawn(async move {
             loop {
                 if let Err(e) = self_clone.process_incoming_messages(&mut receiver).await {
-                    error!(parent: self_clone.span(), "Node error: {}", e);
+                    error!("Node error: {}", e);
                 }
             }
         });
@@ -165,10 +153,10 @@ impl Node {
         task::spawn(async move {
             loop {
                 sleep(peer_sync_interval).await;
-                info!(parent: self_clone.span(), "Updating peers");
+                info!("Updating peers");
 
                 if let Err(e) = self_clone.update_peers().await {
-                    error!(parent: self_clone.span(), "Peer update error: {}", e);
+                    error!("Peer update error: {}", e);
                 }
             }
         });
@@ -196,10 +184,10 @@ impl Node {
     }
 
     pub async fn start(&mut self) -> Result<(), NetworkError> {
-        debug!(parent: self.span(), "Initializing the connection server");
+        debug!("Initializing the connection server");
         self.establish_address().await?;
         self.start_services().await;
-        debug!(parent: self.span(), "Connection server initialized");
+        debug!("Connection server initialized");
 
         Ok(())
     }
@@ -324,34 +312,10 @@ impl Node {
                 self.peer_book.read().received_pong(source.unwrap());
             }
             Payload::Unknown => {
-                warn!(parent: self.span(), "Unknown payload received; this could indicate that the client you're using is out-of-date");
+                warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
             }
         }
 
         Ok(())
-    }
-}
-
-fn create_span(node_name: u64) -> Span {
-    let mut span = trace_span!("node", name = node_name);
-    if !span.is_disabled() {
-        return span;
-    } else {
-        span = debug_span!("node", name = node_name);
-    }
-    if !span.is_disabled() {
-        return span;
-    } else {
-        span = info_span!("node", name = node_name);
-    }
-    if !span.is_disabled() {
-        return span;
-    } else {
-        span = warn_span!("node", name = node_name);
-    }
-    if !span.is_disabled() {
-        span
-    } else {
-        error_span!("node", name = node_name)
     }
 }
