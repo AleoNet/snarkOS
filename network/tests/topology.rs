@@ -18,6 +18,7 @@ use snarkos_network::Node;
 use snarkos_testing::{
     network::{
         test_environment,
+        test_node,
         topology::{connect_nodes, Topology},
         TestSetup,
     },
@@ -26,10 +27,10 @@ use snarkos_testing::{
 
 const N: usize = 10;
 
-async fn test_nodes(setup: TestSetup) -> Vec<Node> {
+async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
 
-    for _ in 0..N {
+    for _ in 0..n {
         let environment = test_environment(setup.clone());
         let mut node = Node::new(environment).await.unwrap();
 
@@ -53,7 +54,7 @@ async fn line() {
         peer_sync_interval: 2,
         ..Default::default()
     };
-    let mut nodes = test_nodes(setup).await;
+    let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Line).await;
     start_nodes(&nodes).await;
 
@@ -80,7 +81,7 @@ async fn ring() {
         peer_sync_interval: 2,
         ..Default::default()
     };
-    let mut nodes = test_nodes(setup).await;
+    let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Ring).await;
     start_nodes(&nodes).await;
 
@@ -96,7 +97,7 @@ async fn mesh() {
         peer_sync_interval: 2,
         ..Default::default()
     };
-    let mut nodes = test_nodes(setup).await;
+    let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Mesh).await;
     start_nodes(&nodes).await;
 
@@ -112,10 +113,63 @@ async fn star() {
         peer_sync_interval: 2,
         ..Default::default()
     };
-    let mut nodes = test_nodes(setup).await;
+    let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Star).await;
     start_nodes(&nodes).await;
 
     let hub = nodes.first().unwrap();
     wait_until!(5, hub.peer_book.read().number_of_connected_peers() as usize == N - 1);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn star_degeneration() {
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 1,
+        min_peers: (N / 2) as u16,
+        ..Default::default()
+    };
+    let mut nodes = test_nodes(N, setup).await;
+    connect_nodes(&mut nodes, Topology::Star).await;
+    start_nodes(&nodes).await;
+
+    let density = || {
+        let connections = total_connection_count(&nodes);
+        network_density(N as f64, connections as f64)
+    };
+    wait_until!(5, density() >= 0.5);
+}
+
+fn total_connection_count(nodes: &Vec<Node>) -> usize {
+    let mut count = 0;
+
+    for node in nodes {
+        count += dbg!(node.peer_book.read().number_of_connected_peers())
+    }
+
+    (count / 2).into()
+}
+
+fn network_density(n: f64, ac: f64) -> f64 {
+    dbg!(n);
+    dbg!(ac);
+    // Calculate the total number of possible connections given a node count.
+    let pc = n * (n - 1.0) / 2.0;
+    // Actual connections divided by the possbile connections gives the density.
+    dbg!(ac / pc)
+}
+
+// Topology metrics
+//
+// 1. node count
+// 2. density
+//
+//
+//
+// 3. centrality measurements:
+//
+// - degree centrality
+// - eigenvector centrality
+//
+//
