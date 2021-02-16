@@ -23,6 +23,7 @@ use std::{
 };
 
 use parking_lot::{Mutex, RwLock};
+use rand::{thread_rng, Rng};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -68,6 +69,10 @@ impl Inbound {
     }
 
     pub async fn listen(&self, environment: &mut Environment) -> Result<(), NetworkError> {
+        // Generate the node name.
+        let mut rng = thread_rng();
+        let name = rng.gen();
+
         let (listener_address, listener) = if let Some(addr) = environment.local_address() {
             let listener = TcpListener::bind(&addr).await?;
             (listener.local_addr()?, listener)
@@ -77,7 +82,8 @@ impl Inbound {
             (listener_address, listener)
         };
         environment.set_local_address(listener_address);
-        info!("Listening at {}", listener_address);
+        environment.name = Some(name);
+        info!("Node {:?} listening at {}", name, listener_address);
 
         let inbound = self.clone();
         task::spawn(async move {

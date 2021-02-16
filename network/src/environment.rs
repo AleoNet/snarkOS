@@ -21,6 +21,7 @@ use std::{self, net::SocketAddr, time::Duration};
 /// A core data structure containing the networking parameters for this node.
 #[derive(Clone)]
 pub struct Environment {
+    pub name: Option<u64>,
     /// The local address of this node.
     local_address: Option<SocketAddr>,
     /// The minimum number of peers required to maintain connections with.
@@ -56,6 +57,7 @@ impl Environment {
         }
 
         Ok(Self {
+            name: None,
             local_address,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,

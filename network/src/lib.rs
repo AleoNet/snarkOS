@@ -51,7 +51,6 @@ pub use peers::*;
 use crate::ConnWriter;
 
 use parking_lot::RwLock;
-use rand::{thread_rng, Rng};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
 
@@ -73,8 +72,6 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 // TODO: remove inner Arcs once the Node itself is passed around in an Arc or contains an inner object wrapped in an Arc (causing all the Node's contents that are not to be "cloned around" to be Arced too).
 #[derive(Clone)]
 pub struct Node {
-    /// The id of this node, generated on creation.
-    name: u64,
     /// The parameters and settings of this node.
     pub environment: Environment,
     /// The inbound handler of this node.
@@ -90,17 +87,12 @@ pub struct Node {
 impl Node {
     /// Creates a new instance of `Node`.
     pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
-        // Generate the node name.
-        let mut rng = thread_rng();
-        let name = rng.gen();
-
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
         let inbound = Arc::new(Inbound::new(channels.clone()));
         let outbound = Arc::new(Outbound::new(channels));
 
         Ok(Self {
-            name,
             environment,
             inbound,
             outbound,
