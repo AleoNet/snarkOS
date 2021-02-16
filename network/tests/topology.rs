@@ -75,6 +75,27 @@ async fn line() {
 }
 
 #[tokio::test]
+#[ignore]
+async fn line_degeneration() {
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 1,
+        min_peers: (N / 2) as u16,
+        ..Default::default()
+    };
+    let mut nodes = test_nodes(N, setup).await;
+    connect_nodes(&mut nodes, Topology::Line).await;
+    start_nodes(&nodes).await;
+
+    let density = || {
+        let connections = total_connection_count(&nodes);
+        network_density(N as f64, connections as f64)
+    };
+    wait_until!(5, density() >= 0.5);
+    assert!(degree_centrality_delta(&nodes) as f64 <= 0.3 * N as f64);
+}
+
+#[tokio::test]
 async fn ring() {
     let setup = TestSetup {
         consensus_setup: None,
@@ -88,6 +109,27 @@ async fn ring() {
     for node in &nodes {
         wait_until!(5, node.peer_book.read().number_of_connected_peers() == 2);
     }
+}
+
+#[tokio::test]
+#[ignore]
+async fn ring_degeneration() {
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 1,
+        min_peers: (N / 2) as u16,
+        ..Default::default()
+    };
+    let mut nodes = test_nodes(N, setup).await;
+    connect_nodes(&mut nodes, Topology::Ring).await;
+    start_nodes(&nodes).await;
+
+    let density = || {
+        let connections = total_connection_count(&nodes);
+        network_density(N as f64, connections as f64)
+    };
+    wait_until!(5, density() >= 0.5);
+    assert!(degree_centrality_delta(&nodes) as f64 <= 0.3 * N as f64);
 }
 
 #[tokio::test]
@@ -266,4 +308,14 @@ fn network_density(n: f64, ac: f64) -> f64 {
     let pc = n * (n - 1.0) / 2.0;
     // Actual connections divided by the possbile connections gives the density.
     ac / pc
+}
+
+fn degree_centrality_delta(nodes: &Vec<Node>) -> u16 {
+    let dc = nodes
+        .iter()
+        .map(|node| node.peer_book.read().number_of_connected_peers());
+    let min = dc.clone().min().unwrap();
+    let max = dc.max().unwrap();
+
+    max - min
 }
