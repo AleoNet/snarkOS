@@ -1,0 +1,67 @@
+[package]
+name = "snarkvm-parameters"
+version = "0.0.4"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "Parameters for a decentralized virtual machine"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkVM"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies.snarkvm-algorithms]
+path = "../algorithms"
+version = "0.0.4"
+default-features = false
+
+[dependencies.snarkvm-errors]
+path = "../errors"
+version = "0.0.4"
+default-features = false
+
+[dependencies.snarkvm-models]
+path = "../models"
+version = "0.0.4"
+default-features = false
+
+[dependencies.snarkvm-utilities]
+path = "../utilities"
+version = "0.0.4"
+default-features = false
+
+[dependencies.curl]
+version = "0.4.34"
+optional = true
+
+[dependencies.hex]
+version = "0.4.2"
+
+[dev-dependencies.snarkvm-dpc]
+path = "../dpc"
+version = "0.0.4"
+default-features = false
+
+[dev-dependencies.curl]
+version = "0.4.34"
+
+[dev-dependencies.hex]
+version = "0.4.2"
+
+[dev-dependencies.rand]
+version = "0.7"
+
+[features]
+default = [
+  "remote",
+  "snarkvm-algorithms/default",
+  "snarkvm-models/default"
+]
+remote = [ "curl" ]
