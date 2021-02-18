@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use parking_lot::RwLock;
 use snarkos_network::Node;
 use snarkos_testing::{
     network::{
@@ -24,8 +25,9 @@ use snarkos_testing::{
     },
     wait_until,
 };
+use std::sync::Arc;
 
-const N: usize = 5;
+const N: usize = 10;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
@@ -265,9 +267,56 @@ async fn binary_star_contact() {
 
     let density = || {
         let connections = total_connection_count(&nodes);
-        network_density(N as f64, connections as f64)
+        network_density(nodes.len() as f64, connections as f64)
     };
-    wait_until!(5, density() >= 0.5);
+    // wait_until!(10, density() >= 0.5);
+
+    // let jh = start_rpc_server(nodes.clone()).await;
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn graph_test() {
+    let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .init();
+
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        min_peers: 3 as u16,
+        ..Default::default()
+    };
+    let mut nodes = Arc::new(RwLock::new(test_nodes(N, setup).await));
+
+    connect_nodes(&mut nodes.write(), Topology::Star).await;
+    start_nodes(&nodes.read()).await;
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+    let jh = start_rpc_server(nodes.clone()).await;
+
+    let solo_setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        min_peers: 3 as u16,
+        bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
+        ..Default::default()
+    };
+    let solo = test_node(solo_setup).await;
+    dbg!(nodes.read().len());
+    nodes.write().push(solo);
+    dbg!("PUSHED");
+    dbg!(nodes.read().len());
+
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    nodes.write().pop();
+
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
@@ -293,7 +342,9 @@ fn network_density(n: f64, ac: f64) -> f64 {
     // Calculate the total number of possible connections given a node count.
     let pc = n * (n - 1.0) / 2.0;
     // Actual connections divided by the possbile connections gives the density.
-    ac / pc
+    dbg!(ac);
+    dbg!(pc);
+    dbg!(ac / pc)
 }
 
 fn degree_centrality_delta(nodes: &Vec<Node>) -> u16 {
@@ -304,4 +355,123 @@ fn degree_centrality_delta(nodes: &Vec<Node>) -> u16 {
     let max = dc.max().unwrap();
 
     max - min
+}
+
+use serde::Serialize;
+use std::{collections::HashSet, net::SocketAddr};
+
+#[derive(Debug, Serialize, Eq, Hash, PartialEq, Copy, Clone)]
+struct Vertex {
+    id: SocketAddr,
+    is_bootnode: bool,
+}
+
+#[derive(Debug, Serialize, Eq, Hash, PartialEq, Copy, Clone)]
+struct Edge {
+    source: SocketAddr,
+    target: SocketAddr,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct Graph {
+    vertices: HashSet<Vertex>,
+    edges: HashSet<Edge>,
+}
+
+#[derive(Debug, Serialize)]
+struct GraphDiff {
+    added_vertices: Vec<Vertex>,
+    removed_vertices: Vec<Vertex>,
+    added_edges: Vec<Edge>,
+    removed_edges: Vec<Edge>,
+}
+
+impl Graph {
+    fn new() -> Self {
+        Self {
+            vertices: HashSet::new(),
+            edges: HashSet::new(),
+        }
+    }
+
+    fn from(nodes: Vec<Node>) -> Self {
+        let mut vertices = HashSet::new();
+        let mut edges = HashSet::new();
+
+        // Used only for dedup purposes.
+        let mut connected_pairs = HashSet::new();
+
+        for node in nodes {
+            let own_addr = node.local_address().unwrap();
+            vertices.insert(Vertex {
+                id: own_addr,
+                is_bootnode: node.environment.is_bootnode(),
+            });
+
+            for (addr, _peer_info) in node.peer_book.read().connected_peers() {
+                if own_addr != *addr
+                    && connected_pairs.insert((own_addr, *addr))
+                    && connected_pairs.insert((*addr, own_addr))
+                {
+                    edges.insert(Edge {
+                        source: own_addr,
+                        target: *addr,
+                    });
+                }
+            }
+        }
+
+        Self { vertices, edges }
+    }
+
+    //  Returns new state as well as an instance of Graph representing the Diff.
+    fn update(&mut self, nodes: Vec<Node>) -> GraphDiff {
+        // Self is the last sent state.
+
+        dbg!(nodes.len());
+        let current_state = Graph::from(nodes);
+
+        // Compute the diffs.
+        let removed_vertices: Vec<Vertex> = self.vertices.difference(&current_state.vertices).copied().collect();
+        let removed_edges: Vec<Edge> = self.edges.difference(&current_state.edges).copied().collect();
+
+        let added_vertices: Vec<Vertex> = current_state.vertices.difference(&self.vertices).copied().collect();
+        let added_edges: Vec<Edge> = current_state.edges.difference(&self.edges).copied().collect();
+
+        *self = current_state;
+
+        GraphDiff {
+            added_vertices,
+            removed_vertices,
+            added_edges,
+            removed_edges,
+        }
+    }
+}
+
+use tokio::task::JoinHandle;
+async fn start_rpc_server(nodes: Arc<RwLock<Vec<Node>>>) {
+    use jsonrpc_http_server::{jsonrpc_core::IoHandler, AccessControlAllowOrigin, DomainsValidation, ServerBuilder};
+    use serde_json::json;
+    use tokio::task;
+
+    let g = Arc::new(RwLock::new(Graph::new()));
+
+    // Listener responds with the current graph every time an RPC call occures.
+    let mut io = IoHandler::default();
+    io.add_method("graph", move |_| {
+        let diff = g.write().update(nodes.read().clone());
+        Ok(json!(diff))
+    });
+
+    let server = ServerBuilder::new(io)
+        .cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Null]))
+        .start_http(&"127.0.0.1:3030".parse().unwrap())
+        .expect("Unable to start RPC server");
+
+    task::spawn(async {
+        server.wait();
+    });
+
+    dbg!("MADE IT");
 }
