@@ -25,7 +25,7 @@ use snarkos_testing::{
     wait_until,
 };
 
-const N: usize = 10;
+const N: usize = 5;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
@@ -213,14 +213,14 @@ async fn binary_star_contact() {
     bootnode_a.establish_address().await.unwrap();
     bootnode_b.establish_address().await.unwrap();
 
-    let ba = dbg!(bootnode_a.local_address().unwrap().to_string());
-    let bb = dbg!(bootnode_b.local_address().unwrap().to_string());
+    let ba = bootnode_a.local_address().unwrap().to_string();
+    let bb = bootnode_b.local_address().unwrap().to_string();
 
     // Create the nodes to be used as the leafs in the stars.
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: N as u16,
+        min_peers: (N / 2) as u16,
         ..Default::default()
     };
     let mut star_a_nodes = test_nodes(N - 1, setup.clone()).await;
@@ -250,22 +250,8 @@ async fn binary_star_contact() {
     star_a_nodes.append(&mut star_b_nodes);
     let mut nodes = star_a_nodes;
 
-    // First density measurement.
-    let actual_connections = total_connection_count(&nodes);
-    // The count includes the as yet unspawned single node.
-    let density = network_density((nodes.len() + 1) as f64, actual_connections as f64);
-
-    println!("Network density: {}", density);
-
     // Single node to connect to a subset of N and K.
-    let mut bootnodes = vec![ba, bb];
-
-    //  for node in &nodes {
-    //      let addr = node.local_address().unwrap().to_string();
-    //      if addr != ba && addr != bb {
-    //          bootnodes.push(addr);
-    //      }
-    //  }
+    let bootnodes = vec![ba, bb];
 
     let solo_setup = TestSetup {
         consensus_setup: None,
@@ -277,18 +263,18 @@ async fn binary_star_contact() {
     let solo = test_node(solo_setup).await;
     nodes.push(solo);
 
-    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-
-    let actual_connections = total_connection_count(&nodes);
-    let density = network_density(nodes.len() as f64, actual_connections as f64);
-    println!("Network density: {}", density);
+    let density = || {
+        let connections = total_connection_count(&nodes);
+        network_density(N as f64, connections as f64)
+    };
+    wait_until!(5, density() >= 0.5);
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
     let mut count = 0;
 
     for node in nodes {
-        count += dbg!(node.peer_book.read().number_of_connected_peers())
+        count += node.peer_book.read().number_of_connected_peers()
     }
 
     (count / 2).into()
