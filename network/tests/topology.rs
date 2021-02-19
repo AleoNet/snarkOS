@@ -27,7 +27,7 @@ use snarkos_testing::{
 };
 use std::sync::Arc;
 
-const N: usize = 10;
+const N: usize = 3;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
@@ -278,45 +278,32 @@ async fn binary_star_contact() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn graph_test() {
-    let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .init();
-
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
         min_peers: 3 as u16,
+        max_peers: 7,
         ..Default::default()
     };
     let mut nodes = Arc::new(RwLock::new(test_nodes(N, setup).await));
 
-    connect_nodes(&mut nodes.write(), Topology::Star).await;
+    let jh = start_rpc_server(nodes.clone()).await;
+
+    connect_nodes(&mut nodes.write(), Topology::Ring).await;
     start_nodes(&nodes.read()).await;
 
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-    let jh = start_rpc_server(nodes.clone()).await;
-
     let solo_setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 3 as u16,
+        min_peers: 5 as u16,
+        max_peers: 7,
         bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
         ..Default::default()
     };
     let solo = test_node(solo_setup).await;
-    dbg!(nodes.read().len());
     nodes.write().push(solo);
-    dbg!("PUSHED");
-    dbg!(nodes.read().len());
-
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-
-    nodes.write().pop();
-
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
@@ -342,9 +329,7 @@ fn network_density(n: f64, ac: f64) -> f64 {
     // Calculate the total number of possible connections given a node count.
     let pc = n * (n - 1.0) / 2.0;
     // Actual connections divided by the possbile connections gives the density.
-    dbg!(ac);
-    dbg!(pc);
-    dbg!(ac / pc)
+    ac / pc
 }
 
 fn degree_centrality_delta(nodes: &Vec<Node>) -> u16 {
@@ -427,9 +412,7 @@ impl Graph {
     //  Returns new state as well as an instance of Graph representing the Diff.
     fn update(&mut self, nodes: Vec<Node>) -> GraphDiff {
         // Self is the last sent state.
-
-        dbg!(nodes.len());
-        let current_state = Graph::from(nodes);
+        let current_state = dbg!(Graph::from(nodes));
 
         // Compute the diffs.
         let removed_vertices: Vec<Vertex> = self.vertices.difference(&current_state.vertices).copied().collect();
@@ -472,6 +455,4 @@ async fn start_rpc_server(nodes: Arc<RwLock<Vec<Node>>>) {
     task::spawn(async {
         server.wait();
     });
-
-    dbg!("MADE IT");
 }
