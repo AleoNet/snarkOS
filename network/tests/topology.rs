@@ -27,7 +27,7 @@ use snarkos_testing::{
 };
 use std::sync::Arc;
 
-const N: usize = 40;
+const N: usize = 5;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
@@ -287,8 +287,8 @@ async fn graph_test() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 4 as u16,
-        max_peers: 5,
+        min_peers: 2 as u16,
+        max_peers: 41,
         ..Default::default()
     };
     let nodes = Arc::new(RwLock::new(test_nodes(N, setup).await));
@@ -303,8 +303,9 @@ async fn graph_test() {
     let solo_setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 4 as u16,
-        max_peers: 6,
+        min_peers: 2 as u16,
+        max_peers: 41,
+        is_bootnode: true,
         bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
         ..Default::default()
     };
@@ -314,8 +315,8 @@ async fn graph_test() {
     let solo_setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 4 as u16,
-        max_peers: 6,
+        min_peers: 2 as u16,
+        max_peers: 41,
         bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
         ..Default::default()
     };
@@ -325,6 +326,7 @@ async fn graph_test() {
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     nodes.write().remove(2);
+    nodes.write().remove(7);
 
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
@@ -481,7 +483,7 @@ async fn start_rpc_server(nodes: Arc<RwLock<Vec<Node>>>) {
 
     // Listener responds with the current graph every time an RPC call occures.
     let mut io = IoHandler::new();
-    io.add_method("graph", move |_| {
+    io.add_sync_method("graph", move |_| {
         let diff = g.write().update(nodes.read().clone());
         Ok(json!(diff))
     });
