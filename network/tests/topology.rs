@@ -27,7 +27,7 @@ use snarkos_testing::{
 };
 use std::sync::Arc;
 
-const N: usize = 3;
+const N: usize = 40;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
@@ -278,14 +278,20 @@ async fn binary_star_contact() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn graph_test() {
+    let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .init();
+
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 3 as u16,
-        max_peers: 7,
+        min_peers: 4 as u16,
+        max_peers: 5,
         ..Default::default()
     };
-    let mut nodes = Arc::new(RwLock::new(test_nodes(N, setup).await));
+    let nodes = Arc::new(RwLock::new(test_nodes(N, setup).await));
 
     let jh = start_rpc_server(nodes.clone()).await;
 
@@ -297,13 +303,35 @@ async fn graph_test() {
     let solo_setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 5 as u16,
-        max_peers: 7,
+        min_peers: 4 as u16,
+        max_peers: 6,
         bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
         ..Default::default()
     };
     let solo = test_node(solo_setup).await;
     nodes.write().push(solo);
+
+    let solo_setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        min_peers: 4 as u16,
+        max_peers: 6,
+        bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
+        ..Default::default()
+    };
+    let solo = test_node(solo_setup).await;
+    nodes.write().push(solo);
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+    nodes.write().remove(2);
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+    nodes.write().remove(1);
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    nodes.write().remove(0);
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
@@ -393,6 +421,7 @@ impl Graph {
                 is_bootnode: node.environment.is_bootnode(),
             });
 
+            dbg!("READING PEER BOOK");
             for (addr, _peer_info) in node.peer_book.read().connected_peers() {
                 if own_addr != *addr
                     && connected_pairs.insert((own_addr, *addr))
@@ -404,6 +433,7 @@ impl Graph {
                     });
                 }
             }
+            dbg!("PEER BOOK READ");
         }
 
         Self { vertices, edges }
@@ -412,11 +442,12 @@ impl Graph {
     //  Returns new state as well as an instance of Graph representing the Diff.
     fn update(&mut self, nodes: Vec<Node>) -> GraphDiff {
         // Self is the last sent state.
-        let current_state = dbg!(Graph::from(nodes));
+        let mut current_state = Graph::from(nodes);
+        current_state.prune_edges();
 
         // Compute the diffs.
         let removed_vertices: Vec<Vertex> = self.vertices.difference(&current_state.vertices).copied().collect();
-        let removed_edges: Vec<Edge> = self.edges.difference(&current_state.edges).copied().collect();
+        let removed_edges: Vec<Edge> = dbg!(self.edges.difference(&current_state.edges).copied().collect());
 
         let added_vertices: Vec<Vertex> = current_state.vertices.difference(&self.vertices).copied().collect();
         let added_edges: Vec<Edge> = current_state.edges.difference(&self.edges).copied().collect();
@@ -430,18 +461,26 @@ impl Graph {
             removed_edges,
         }
     }
+
+    fn prune_edges(&mut self) {
+        let vertice_ids: HashSet<SocketAddr> = self.vertices.iter().map(|vertice| vertice.id).collect();
+
+        self.edges
+            .retain(|edge| vertice_ids.contains(&edge.source) && vertice_ids.contains(&edge.target));
+    }
 }
 
 use tokio::task::JoinHandle;
 async fn start_rpc_server(nodes: Arc<RwLock<Vec<Node>>>) {
-    use jsonrpc_http_server::{jsonrpc_core::IoHandler, AccessControlAllowOrigin, DomainsValidation, ServerBuilder};
-    use serde_json::json;
-    use tokio::task;
+    use ::tokio::task;
+    use jsonrpc_core::*;
+    use jsonrpc_http_server::*;
+    use serde_json::{json, Value};
 
     let g = Arc::new(RwLock::new(Graph::new()));
 
     // Listener responds with the current graph every time an RPC call occures.
-    let mut io = IoHandler::default();
+    let mut io = IoHandler::new();
     io.add_method("graph", move |_| {
         let diff = g.write().update(nodes.read().clone());
         Ok(json!(diff))
