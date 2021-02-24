@@ -27,7 +27,7 @@ use snarkos_testing::{
 };
 use std::sync::Arc;
 
-const N: usize = 5;
+const N: usize = 100;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
@@ -36,6 +36,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
         let environment = test_environment(setup.clone());
         let mut node = Node::new(environment).await.unwrap();
 
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         node.establish_address().await.unwrap();
         nodes.push(node);
     }
@@ -45,6 +46,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
 
 async fn start_nodes(nodes: &Vec<Node>) {
     for node in nodes {
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         node.start_services().await;
     }
 }
@@ -188,16 +190,16 @@ async fn star_degeneration() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn binary_star_contact() {
+    // 1. pass N nodes through a bootstrapper
+    // 2. pass K nodes through a different bootstrapper (totally separate networks)
+    // 3. introduce a node that is "fed" the list of random nodes from the N and K sets
+    // 4. check out the end topology
+
     let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_target(false)
         .init();
-
-    // 1. pass N nodes through a bootstrapper
-    // 2. pass K nodes through a different bootstrapper (totally separate networks)
-    // 3. introduce a node that is "fed" the list of random nodes from the N and K sets
-    // 4. check out the end topology
 
     // Setup the bootnodes for each star topology.
     let bootnode_setup = TestSetup {
@@ -253,7 +255,7 @@ async fn binary_star_contact() {
     let mut nodes = star_a_nodes;
 
     // Single node to connect to a subset of N and K.
-    let bootnodes = vec![ba, bb];
+    let bootnodes = vec![ba];
 
     let solo_setup = TestSetup {
         consensus_setup: None,
@@ -284,56 +286,40 @@ async fn graph_test() {
         .with_target(false)
         .init();
 
+    // Setup the bootnodes for each star topology.
+    let bootnode_setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 2,
+        min_peers: 5 as u16,
+        max_peers: 10 as u16,
+        is_bootnode: true,
+        ..Default::default()
+    };
+    let environment = test_environment(bootnode_setup.clone());
+    let mut bootnode = Node::new(environment).await.unwrap();
+
+    bootnode.establish_address().await.unwrap();
+
+    // Create the nodes to be used as the leafs in the stars.
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 2 as u16,
-        max_peers: 41,
+        min_peers: 5 as u16,
+        max_peers: 10 as u16,
         ..Default::default()
     };
-    let nodes = Arc::new(RwLock::new(test_nodes(N, setup).await));
+    let mut nodes = test_nodes(N - 1, setup.clone()).await;
 
+    // Insert the bootnodes at the begining of the node lists.
+    nodes.insert(0, bootnode);
+    let nodes = Arc::new(RwLock::new(nodes));
     let jh = start_rpc_server(nodes.clone()).await;
 
-    connect_nodes(&mut nodes.write(), Topology::Ring).await;
+    // Create the star topologies.
+    connect_nodes(&mut nodes.write(), Topology::Star).await;
+
+    // Start the services.
     start_nodes(&nodes.read()).await;
-
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-
-    let solo_setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 2,
-        min_peers: 2 as u16,
-        max_peers: 41,
-        is_bootnode: true,
-        bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
-        ..Default::default()
-    };
-    let solo = test_node(solo_setup).await;
-    nodes.write().push(solo);
-
-    let solo_setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 2,
-        min_peers: 2 as u16,
-        max_peers: 41,
-        bootnodes: vec![nodes.read().first().unwrap().local_address().unwrap().to_string()],
-        ..Default::default()
-    };
-    let solo = test_node(solo_setup).await;
-    nodes.write().push(solo);
-
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-
-    nodes.write().remove(2);
-    nodes.write().remove(7);
-
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-
-    nodes.write().remove(1);
-
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-    nodes.write().remove(0);
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
@@ -423,7 +409,6 @@ impl Graph {
                 is_bootnode: node.environment.is_bootnode(),
             });
 
-            dbg!("READING PEER BOOK");
             for (addr, _peer_info) in node.peer_book.read().connected_peers() {
                 if own_addr != *addr
                     && connected_pairs.insert((own_addr, *addr))
@@ -435,7 +420,6 @@ impl Graph {
                     });
                 }
             }
-            dbg!("PEER BOOK READ");
         }
 
         Self { vertices, edges }

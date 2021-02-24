@@ -42,7 +42,7 @@ impl Node {
         if !self.environment.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
             let min_peers = self.environment.minimum_number_of_connected_peers() as usize;
-            if number_of_connected_peers < min_peers {
+            if self.can_connect() && number_of_connected_peers < min_peers {
                 // Attempt to connect to the default bootnodes of the network.
                 self.connect_to_bootnodes().await;
 
@@ -64,10 +64,9 @@ impl Node {
                 number_to_disconnect
             );
 
-            let peer_book = self.peer_book.read();
+            let connected_peers = self.peer_book.read().connected_peers().clone();
 
-            let mut connected = peer_book
-                .connected_peers()
+            let mut connected = connected_peers
                 .iter()
                 .map(|(_, peer_info)| peer_info)
                 .collect::<Vec<_>>();
@@ -383,6 +382,19 @@ impl Node {
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
             self.peer_book.write().add_peer(peer_address);
+        }
+    }
+
+    fn can_connect(&self) -> bool {
+        let num_connected = self.peer_book.read().number_of_connected_peers() as usize;
+        let num_connecting = self.peer_book.read().number_of_connecting_peers() as usize;
+        let max_peers = self.environment.maximum_number_of_connected_peers() as usize;
+
+        if num_connected >= max_peers || num_connected + num_connecting >= max_peers {
+            warn!("Max number of connections ({}) reached", max_peers);
+            false
+        } else {
+            true
         }
     }
 }
