@@ -119,7 +119,6 @@ async fn fuzzing_pre_handshake() {
     }
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_post_handshake() {
     tracing_subscriber::fmt::init();
@@ -132,7 +131,7 @@ async fn fuzzing_post_handshake() {
         }
     });
 
-    loop {
+    for _ in 0..10000 {
         let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
         let random_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
