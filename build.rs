@@ -18,14 +18,17 @@
 use rustc_version::{version_meta, Channel};
 
 fn main() {
-    capnpc::CompilerCommand::new()
-        .file(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/network/src/message/payload.capnp"
-        ))
-        .output_path(".")
-        .run()
-        .expect("cap'n'proto network schema compilation failed");
+    #[cfg(feature = "compile_capnp_schema")]
+    {
+        capnpc::CompilerCommand::new()
+            .file(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/network/src/message/payload.capnp"
+            ))
+            .output_path(".")
+            .run()
+            .expect("cap'n'proto network schema compilation failed");
+    }
 
     // Set cfg flags depending on release channel
     match version_meta().unwrap().channel {

@@ -67,7 +67,7 @@ rusty-hook = { version = "0.11.2" }
 
 [build-dependencies]
 rustc_version = "0.2"
-capnpc = "0.14"
+capnpc = { version = "0.14", optional = true }
 
 [profile.release]
 opt-level = 3
@@ -91,3 +91,7 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
+
+[features]
+default = []
+compile_capnp_schema = ["capnpc"] # use when the Cap'n Proto schema is updated so that it's recompiled
