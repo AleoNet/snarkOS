@@ -12,21 +12,20 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { version = "0.0.4", default-features = false }
-snarkvm-errors = { version = "0.0.4", default-features = false }
-snarkvm-models = { version = "0.0.4", default-features = false }
-snarkvm-utilities = { version = "0.0.4", default-features = false }
+snarkvm-algorithms = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4", default-features = false }
+snarkvm-errors = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4", default-features = false }
+snarkvm-models = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4", default-features = false }
+snarkvm-utilities = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4", default-features = false }
 
 curl = { version = "0.4.34", optional = true }
 hex = { version = "0.4.2" }
 
 [dev-dependencies]
-snarkvm-curves = { version = "0.0.4" }
-snarkvm-dpc = { version = "0.0.4" }
-snarkvm-marlin = { version = "0.0.4" }
-snarkvm-objects = { version = "0.0.4" }
+snarkvm-curves = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-dpc = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-marlin = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-objects = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
 snarkvm-posw = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
-
 snarkos-consensus = { path = "../consensus", version = "1.1.4" }
 snarkos-posw = { path = "../consensus", version = "1.1.4" }
 snarkos-storage = { path = "../consensus", version = "1.1.4" }
@@ -35,7 +34,7 @@ chrono = { version = "0.4", features = ["serde"] }
 curl = { version = "0.4.34" }
 hex = { version = "0.4.2" }
 parking_lot = { version = "0.11.1" }
-rand = { version = "0.7" }
+rand = { version = "0.8" }
 
 [features]
 default = [ "remote", "snarkvm-algorithms/default", "snarkvm-models/default" ]

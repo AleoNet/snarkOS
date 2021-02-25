@@ -26,11 +26,11 @@ snarkvm-utilities = { version = "0.0.4" }
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
 
 blake2 = { version = "0.8.1" }
-rand = { version = "0.7" }
+rand = { version = "0.8" }
 thiserror = "1.0.22"
 
 [dev-dependencies]
-rand_xorshift = { version = "0.2" }
+rand_xorshift = { version = "0.3" }
 
 [features]
 print-trace = [ "snarkos-profiler/print-trace" ]

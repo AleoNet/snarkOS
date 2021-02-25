@@ -20,21 +20,21 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies]
-snarkvm-algorithms = { version = "0.0.3", default-features = false }
-snarkvm-dpc = { version = "0.0.3", default-features = false }
-snarkvm-errors = { version = "0.0.3", default-features = false }
-snarkvm-models = { version = "0.0.3", default-features = false }
-snarkvm-objects = { version = "0.0.3", default-features = false }
-snarkvm-utilities = { version = "0.0.3", default-features = false }
+snarkvm-algorithms = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-dpc = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-errors = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-models = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-objects = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-utilities = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
 
 anyhow = { version = "1.0.37" }
 hex = { version = "0.4.2" }
-rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
+rand = { version = "0.8" }
 thiserror = { version = "1.0" }
-wasm-bindgen = { version = "0.2.68" }
+wasm-bindgen = { version = "0.2.70" }
 
 [dev-dependencies]
 criterion = { version = "0.3.1" }
 hex = { version = "0.4.2" }
-rand_chacha = { version = "0.2", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
 wasm-bindgen-test = { version = "0.3.18" }

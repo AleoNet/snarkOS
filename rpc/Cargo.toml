@@ -12,11 +12,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-dpc = { version = "0.0.4" }
-snarkvm-errors = { version = "0.0.4" }
-snarkvm-models = { version = "0.0.4" }
-snarkvm-objects = { version = "0.0.4" }
-snarkvm-utilities = { version = "0.0.4" }
+snarkvm-dpc = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-errors = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-models = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-objects = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-utilities = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
 
 snarkos-consensus = { path = "../consensus", version = "1.1.4" }
 snarkos-network = { path = "../network", version = "1.1.4"}
@@ -33,7 +33,7 @@ jsonrpc-core-client = { version = "14.0.5" }
 jsonrpc-derive = { version = "14.2.2" }
 jsonrpc-http-server = { version = "14.2.0" }
 parking_lot = { version = "0.11.1" }
-rand = { version = "0.7" }
+rand = { version = "0.8" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.61" }
 thiserror = { version = "1.0" }
