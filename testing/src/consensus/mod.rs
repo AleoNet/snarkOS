@@ -15,12 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::ConsensusParameters;
-use snarkos_posw::PoswMarlin;
 use snarkvm_dpc::instantiated::Components;
 use snarkvm_errors::objects::TransactionError;
 use snarkvm_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameter};
 use snarkvm_objects::Network;
 use snarkvm_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters};
+use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;

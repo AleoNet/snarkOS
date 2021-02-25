@@ -15,7 +15,6 @@
 // along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_posw::PoswMarlin;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
 use snarkvm_algorithms::merkle_tree::MerkleTree;
 use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
@@ -28,6 +27,7 @@ use snarkvm_models::{
 };
 use snarkvm_objects::{Account, AccountAddress, Network};
 use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

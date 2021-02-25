@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{difficulty::bitcoin_retarget, error::ConsensusError, memory_pool::MemoryPool, MerkleTreeLedger};
-use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
 use snarkvm_curves::bls12_377::Bls12_377;
@@ -45,6 +44,7 @@ use snarkvm_objects::{
     Network,
     PedersenMerkleRootHash,
 };
+use snarkvm_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use chrono::Utc;

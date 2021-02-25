@@ -16,13 +16,13 @@
 
 mod miner {
     use snarkos_consensus::Miner;
-    use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;
     use snarkvm_models::{
         algorithms::{commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme},
         dpc::DPCComponents,
     };
     use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, AccountPrivateKey, BlockHeader};
+    use snarkvm_posw::txids_to_roots;
 
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
