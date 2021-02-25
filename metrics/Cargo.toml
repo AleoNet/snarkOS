@@ -19,6 +19,6 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 warp = { version = "0.3" }
 
 [dev-dependencies]
-snarkvm-derives = { version = "0.0.3" }
+snarkvm-derives = { version = "0.0.5" }
 
 serial_test = { version = "0.5.0" }

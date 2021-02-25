@@ -16,10 +16,10 @@
 
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
-    use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
+    use snarkvm_posw::txids_to_roots;
 
     use std::sync::Arc;
 

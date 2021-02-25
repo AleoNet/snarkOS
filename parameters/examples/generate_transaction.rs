@@ -15,7 +15,6 @@
 // along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_posw::PoswMarlin;
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
 use snarkvm_algorithms::merkle_tree::MerkleTree;
 use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
@@ -28,6 +27,7 @@ use snarkvm_models::{
 };
 use snarkvm_objects::{Account, AccountAddress, Network};
 use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -50,7 +50,9 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     path: &PathBuf,
 ) -> Result<Ledger<T, P>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-    let storage = Storage::open_cf(path, NUM_COLS).map(|storage| {storage}).map_err(|err| { LedgerError::StorageError(err) })?;
+    let storage = Storage::open_cf(path, NUM_COLS)
+        .map(|storage| storage)
+        .map_err(|err| LedgerError::StorageError(err))?;
 
     let leaves: Vec<[u8; 32]> = vec![];
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;

@@ -18,7 +18,6 @@ members = [
     "consensus",
     "metrics",
     "network",
-    "posw",
     "profiler",
     "rpc",
     "storage",
@@ -34,15 +33,15 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [dependencies]
-snarkvm-dpc = { version = "0.0.3" }
-snarkvm-errors = { version = "0.0.3" }
-snarkvm-models = { version = "0.0.3" }
-snarkvm-objects = { version = "0.0.3" }
-snarkvm-utilities = { version = "0.0.3" }
+snarkvm-dpc = { version = "0.0.5" }
+snarkvm-errors = { version = "0.0.5" }
+snarkvm-models = { version = "0.0.5" }
+snarkvm-objects = { version = "0.0.5" }
+snarkvm-posw = { version = "0.0.5" }
+snarkvm-utilities = { version = "0.0.5" }
 
 snarkos-consensus = { path = "./consensus", version = "1.1.4" }
 snarkos-network = { path = "./network", version = "1.1.4" }
-snarkos-posw = { path = "./posw", version = "1.1.4" }
 snarkos-rpc = { path = "./rpc", version = "1.1.4" }
 snarkos-storage = { path = "./storage", version = "1.1.4" }
 
@@ -52,7 +51,7 @@ colored = { version = "2.0" }
 dirs = { version = "3.0.1" }
 hex = { version = "0.4.1" }
 parking_lot = { version = "0.11.1" }
-rand = { version = "0.7" }
+rand = { version = "0.8" }
 self_update = { version = "0.23.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = { version = "1.0" }

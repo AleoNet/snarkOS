@@ -12,12 +12,12 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { version = "0.0.3" }
-snarkvm-dpc = { version = "0.0.3" }
-snarkvm-errors = { version = "0.0.3" }
-snarkvm-models = { version = "0.0.3" }
-snarkvm-objects = { version = "0.0.3" }
-snarkvm-utilities = { version = "0.0.3" }
+snarkvm-algorithms = { version = "0.0.5" }
+snarkvm-dpc = { version = "0.0.5" }
+snarkvm-errors = { version = "0.0.5" }
+snarkvm-models = { version = "0.0.5" }
+snarkvm-objects = { version = "0.0.5" }
+snarkvm-utilities = { version = "0.0.5" }
 
 snarkos-consensus = { path = "../consensus", version = "1.1.4" }
 snarkos-metrics = { path = "../metrics", version = "1.1.4"}
@@ -32,7 +32,7 @@ chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
 log = { version = "0.4.11" }
 parking_lot = { version = "0.11.1" }
-rand = { version = "0.7.3" }
+rand = { version = "0.8" }
 serde = { version = "1.0", features = ["derive"] }
 snow = { version = "0.7", default-features = false, features = ["libsodium-resolver", "chacha20poly1305", "blake2", "sha2", "x25519-dalek", "rand"] }
 thiserror = { version = "1.0" }
