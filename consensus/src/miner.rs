@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_posw::{txids_to_roots, PoswMarlin};
 use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
 use snarkvm_models::{
@@ -24,10 +23,11 @@ use snarkvm_models::{
     objects::Transaction,
 };
 use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
+use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
@@ -56,12 +56,12 @@ impl Miner {
 
     /// Fetches new transactions from the memory pool.
     pub async fn fetch_memory_pool_transactions<T: Transaction, P: LoadableMerkleParameters>(
-        storage: &RwLock<Ledger<T, P>>,
+        storage: &Ledger<T, P>,
         memory_pool: &Mutex<MemoryPool<T>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
         let memory_pool = memory_pool.lock();
-        Ok(memory_pool.get_candidates(&storage.read(), max_size)?)
+        Ok(memory_pool.get_candidates(&storage, max_size)?)
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
@@ -166,20 +166,17 @@ impl Miner {
     pub async fn mine_block(
         &self,
         parameters: &PublicParameters<Components>,
-        storage: &Arc<RwLock<MerkleTreeLedger>>,
+        storage: &Arc<MerkleTreeLedger>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
     ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
-        let candidate_transactions = Self::fetch_memory_pool_transactions(
-            &storage.clone(),
-            memory_pool,
-            self.consensus_parameters.max_block_size,
-        )
-        .await?;
+        let candidate_transactions =
+            Self::fetch_memory_pool_transactions(&storage, memory_pool, self.consensus_parameters.max_block_size)
+                .await?;
 
         debug!("The miner is creating a block");
 
         let (previous_block_header, transactions, coinbase_records) =
-            self.establish_block(parameters, &storage.read(), &candidate_transactions)?;
+            self.establish_block(parameters, storage, &candidate_transactions)?;
 
         debug!("The miner generated a coinbase transaction");
 
@@ -195,7 +192,7 @@ impl Miner {
         let block = Block { header, transactions };
 
         self.consensus_parameters
-            .receive_block(parameters, &storage.read(), &mut memory_pool.lock(), &block)?;
+            .receive_block(parameters, storage, &mut memory_pool.lock(), &block)?;
 
         // Store the non-dummy coinbase records.
         let mut records_to_store = vec![];
@@ -204,7 +201,7 @@ impl Miner {
                 records_to_store.push(record.clone());
             }
         }
-        storage.read().store_records(&records_to_store)?;
+        storage.store_records(&records_to_store)?;
 
         Ok((block, coinbase_records))
     }

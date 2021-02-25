@@ -75,11 +75,11 @@ impl Consensus {
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&*transaction) {
             let insertion = {
-                let parameters = &self.dpc_parameters();
-                let storage = self.storage().read();
-                let consensus = &self.consensus_parameters();
+                let parameters = self.dpc_parameters();
+                let storage = self.storage();
+                let consensus = self.consensus_parameters();
 
-                if !consensus.verify_transaction(&parameters, &tx, &storage)? {
+                if !consensus.verify_transaction(parameters, &tx, storage)? {
                     error!("Received a transaction that was invalid");
                     return Ok(());
                 }
@@ -94,7 +94,7 @@ impl Consensus {
                     transaction: tx,
                 };
 
-                self.memory_pool().lock().insert(&storage, entry)
+                self.memory_pool().lock().insert(storage, entry)
             };
 
             if let Ok(inserted) = insertion {
@@ -142,7 +142,7 @@ impl Consensus {
     /// A peer has sent us their memory pool transactions.
     pub(crate) fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
         let mut memory_pool = self.memory_pool().lock();
-        let storage = self.storage().read();
+        let storage = self.storage();
 
         for transaction_bytes in transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;

@@ -14,53 +14,66 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    errors::{connect::ConnectError, send::SendError},
-    Message,
-};
+use crate::Message;
 use snarkos_consensus::error::ConsensusError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::objects::BlockError;
 
-use std::fmt;
+use std::{fmt, io::ErrorKind};
 
 #[derive(Debug)]
 pub enum NetworkError {
     Bincode(Box<bincode::ErrorKind>),
     BlockError(BlockError),
-    ConnectError(ConnectError),
+    CapnProto(capnp::Error),
     ConsensusError(ConsensusError),
-    IOError(std::io::Error),
-    Error(anyhow::Error),
-    InboundDeserializationFailed,
+    Io(std::io::Error),
     InvalidHandshake,
+    MessageTooBig(usize),
     Noise(snow::error::Error),
-    PeerAddressIsLocalAddress,
     PeerAlreadyConnected,
     PeerAlreadyConnecting,
     PeerAlreadyDisconnected,
-    PeerAlreadyExists,
     PeerBookFailedToLoad,
     PeerBookIsCorrupt,
     PeerBookMissingPeer,
     PeerCountInvalid,
-    PeerHasNeverConnected,
     PeerIsDisconnected,
-    PeerIsMissingNonce,
-    PeerIsReusingNonce,
-    PeerNonceMismatch,
-    PeerUnauthorized,
-    PeerWasNotSetToConnecting,
     SelfConnectAttempt,
-    SendError(SendError),
     SenderError(tokio::sync::mpsc::error::SendError<Message>),
     OutboundChannelMissing,
-    OutboundPendingRequestsMissing,
     ReceiverFailedToParse,
-    SendRequestUnauthorized,
     StorageError(StorageError),
     SyncIntervalInvalid,
-    TryLockError(tokio::sync::TryLockError),
+    ZeroLengthMessage,
+}
+
+impl NetworkError {
+    pub fn is_fatal(&self) -> bool {
+        match self {
+            Self::Io(err) => [
+                ErrorKind::BrokenPipe,
+                ErrorKind::ConnectionReset,
+                ErrorKind::UnexpectedEof,
+            ]
+            .contains(&err.kind()),
+            // other critical errors
+            Self::CapnProto(_) | Self::MessageTooBig(..) | Self::ZeroLengthMessage | Self::Noise(_) => true,
+            _ => false,
+        }
+    }
+}
+
+impl From<capnp::Error> for NetworkError {
+    fn from(error: capnp::Error) -> Self {
+        NetworkError::CapnProto(error)
+    }
+}
+
+impl From<snow::Error> for NetworkError {
+    fn from(error: snow::Error) -> Self {
+        NetworkError::Noise(error)
+    }
 }
 
 impl From<BlockError> for NetworkError {
@@ -69,21 +82,9 @@ impl From<BlockError> for NetworkError {
     }
 }
 
-impl From<ConnectError> for NetworkError {
-    fn from(error: ConnectError) -> Self {
-        NetworkError::ConnectError(error)
-    }
-}
-
 impl From<ConsensusError> for NetworkError {
     fn from(error: ConsensusError) -> Self {
         NetworkError::ConsensusError(error)
-    }
-}
-
-impl From<SendError> for NetworkError {
-    fn from(error: SendError) -> Self {
-        NetworkError::SendError(error)
     }
 }
 
@@ -107,25 +108,13 @@ impl fmt::Display for NetworkError {
 
 impl From<std::io::Error> for NetworkError {
     fn from(error: std::io::Error) -> Self {
-        NetworkError::IOError(error)
-    }
-}
-
-impl From<tokio::sync::TryLockError> for NetworkError {
-    fn from(error: tokio::sync::TryLockError) -> Self {
-        NetworkError::TryLockError(error)
+        NetworkError::Io(error)
     }
 }
 
 impl From<tokio::sync::mpsc::error::SendError<Message>> for NetworkError {
     fn from(error: tokio::sync::mpsc::error::SendError<Message>) -> Self {
         NetworkError::SenderError(error)
-    }
-}
-
-impl From<anyhow::Error> for NetworkError {
-    fn from(error: anyhow::Error) -> Self {
-        NetworkError::Error(error)
     }
 }
 

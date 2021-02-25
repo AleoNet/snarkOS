@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_posw::error::PoswError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::{
     algorithms::CRHError,
     dpc::DPCError,
     objects::{BlockError, TransactionError},
 };
+use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;
 

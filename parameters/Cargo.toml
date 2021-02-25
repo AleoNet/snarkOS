@@ -1,5 +1,5 @@
 [package]
-name = "snarkvm-parameters"
+name = "snarkos-parameters"
 version = "0.0.4"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Parameters for a decentralized virtual machine"
@@ -17,46 +17,27 @@ include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies.snarkvm-algorithms]
-path = "../algorithms"
-version = "0.0.4"
-default-features = false
+[dependencies]
+snarkvm-errors = { version = "0.0.5", default-features = false }
+snarkvm-models = { version = "0.0.5", default-features = false }
+snarkvm-utilities = { version = "0.0.5", default-features = false }
 
-[dependencies.snarkvm-errors]
-path = "../errors"
-version = "0.0.4"
-default-features = false
+curl = { version = "0.4.34", optional = true }
 
-[dependencies.snarkvm-models]
-path = "../models"
-version = "0.0.4"
-default-features = false
+[dev-dependencies]
+snarkvm-algorithms = { version = "0.0.5" }
+snarkvm-curves = { version = "0.0.5" }
+snarkvm-dpc = { version = "0.0.5" }
+snarkvm-marlin = { version = "0.0.5" }
+snarkvm-objects = { version = "0.0.5" }
+snarkos-consensus = { path = "../consensus", version = "1.1.4" }
+snarkos-storage = { path = "../storage", version = "1.1.4" }
 
-[dependencies.snarkvm-utilities]
-path = "../utilities"
-version = "0.0.4"
-default-features = false
-
-[dependencies.curl]
-version = "0.4.34"
-optional = true
-
-[dependencies.hex]
-version = "0.4.2"
-
-[dev-dependencies.snarkvm-dpc]
-path = "../dpc"
-version = "0.0.4"
-default-features = false
-
-[dev-dependencies.curl]
-version = "0.4.34"
-
-[dev-dependencies.hex]
-version = "0.4.2"
-
-[dev-dependencies.rand]
-version = "0.7"
+chrono = { version = "0.4", features = ["serde"] }
+curl = { version = "0.4.34" }
+hex = { version = "0.4.2" }
+parking_lot = { version = "0.11.1" }
+rand = { version = "0.8" }
 
 [features]
 default = [

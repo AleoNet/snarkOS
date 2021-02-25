@@ -22,7 +22,7 @@ commands:
             export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
             export RUSTC_WRAPPER="sccache"
             rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
-            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev capnproto
+            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
       - restore_cache:
           keys:
             - << parameters.cache_key >>
@@ -43,7 +43,7 @@ commands:
 jobs:
   rust_stable:
     docker:
-      - image: cimg/rust:1.49.0
+      - image: cimg/rust:1.50.0
     resource_class: xlarge
     steps:
       - checkout

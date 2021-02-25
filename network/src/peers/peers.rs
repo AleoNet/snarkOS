@@ -118,14 +118,14 @@ impl Node {
                 .expect("Invalid noise handshake pattern!"),
             Box::new(snow::resolvers::SodiumResolver),
         );
-        let static_key = builder.generate_keypair().map_err(NetworkError::Noise)?.private;
+        let static_key = builder.generate_keypair()?.private;
         let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
-        let mut noise = noise_builder.build_initiator().map_err(NetworkError::Noise)?;
+        let mut noise = noise_builder.build_initiator()?;
         let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
         let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
         // -> e
-        let len = noise.write_message(&[], &mut buffer).map_err(NetworkError::Noise)?;
+        let len = noise.write_message(&[], &mut buffer)?;
         println!("len: {}", len);
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
@@ -134,23 +134,22 @@ impl Node {
         // <- e, ee, s, es
         reader.read_exact(&mut buf[..1]).await?;
         let len = buf[0] as usize;
+        if len == 0 {
+            return Err(NetworkError::InvalidHandshake);
+        }
         let len = reader.read_exact(&mut buf[..len]).await?;
-        let len = noise
-            .read_message(&buf[..len], &mut buffer)
-            .map_err(|_| NetworkError::InvalidHandshake)?;
-        let _peer_version = Version::deserialize(&buffer[..len]).map_err(|_| NetworkError::InvalidHandshake)?;
+        let len = noise.read_message(&buf[..len], &mut buffer)?;
+        let _peer_version = Version::deserialize(&buffer[..len])?;
         trace!("received e, ee, s, es (XX handshake part 2/3)");
 
         // -> s, se, psk
         let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
-        let len = noise
-            .write_message(&own_version, &mut buffer)
-            .map_err(NetworkError::Noise)?;
+        let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
         trace!("sent s, se, psk (XX handshake part 3/3)");
 
-        let noise = Arc::new(Mutex::new(noise.into_transport_mode().map_err(NetworkError::Noise)?));
+        let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
         let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
         let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
@@ -213,7 +212,12 @@ impl Node {
     async fn broadcast_pings(&self) {
         trace!("Broadcasting Ping messages");
 
-        let current_block_height = self.consensus().current_block_height();
+        // consider peering tests that don't use the consensus layer
+        let current_block_height = if self.consensus.is_some() {
+            self.consensus().current_block_height()
+        } else {
+            0
+        };
         let connected_peers = self.peer_book.read().connected_peers().clone();
         for (remote_address, _) in connected_peers {
             self.peer_book.read().sending_ping(remote_address);
@@ -264,11 +268,13 @@ impl Node {
         // Serialize the peer book.
         let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
-        // Save the serialized peer book to storage.
-        self.consensus()
-            .storage()
-            .write()
-            .save_peer_book_to_storage(serialized_peer_book)?;
+        // TODO: the peer book should be stored outside of consensus
+        if self.consensus.is_some() {
+            // Save the serialized peer book to storage.
+            self.consensus()
+                .storage()
+                .save_peer_book_to_storage(serialized_peer_book)?;
+        }
 
         Ok(())
     }

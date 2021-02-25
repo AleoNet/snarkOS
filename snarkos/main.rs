@@ -26,11 +26,11 @@ use snarkos::{
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_network::{environment::Environment, Consensus, Node};
-use snarkos_posw::PoswMarlin;
 use snarkos_rpc::start_rpc_server;
 use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
 use snarkvm_models::algorithms::{CRH, SNARK};
 use snarkvm_objects::{AccountAddress, Network};
+use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
@@ -88,8 +88,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
-    let storage = MerkleTreeLedger::open_at_path(path.clone())?;
-    // let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
+    let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
 
     let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
@@ -135,7 +134,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the consensus instance and set it on the node instance.
     let consensus = Consensus::new(
         node.clone(),
-        Arc::new(RwLock::new(storage)),
+        storage,
         memory_pool.clone(),
         consensus_params.clone(),
         dpc_parameters.clone(),

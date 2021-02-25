@@ -25,23 +25,15 @@ pub mod sync;
 
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
-use snarkos_network::{
-    connection_reader::ConnReader,
-    connection_writer::ConnWriter,
-    errors::{message::*, network::*},
-    message::*,
-    Consensus,
-    Environment,
-    Node,
-    MAX_MESSAGE_SIZE,
-};
+use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
+use tracing::*;
 
 /// Returns a random tcp socket address and binds it to a listener
 pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
@@ -146,7 +138,7 @@ impl Default for TestSetup {
 pub fn test_consensus(setup: ConsensusSetup, node: Node) -> Consensus {
     Consensus::new(
         node,
-        Arc::new(RwLock::new(FIXTURE_VK.ledger())),
+        Arc::new(FIXTURE_VK.ledger()),
         Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
         Arc::new(TEST_CONSENSUS.clone()),
         Arc::new(FIXTURE.parameters.clone()),
@@ -208,13 +200,28 @@ impl FakeNode {
     }
 
     pub async fn read_payload(&mut self) -> Result<Payload, NetworkError> {
-        let message = self.reader.read_message().await?;
+        let message = match self.reader.read_message().await {
+            Ok(msg) => {
+                debug!("read a {}", msg.payload);
+                msg
+            }
+            Err(e) => {
+                error!("can't read a payload: {}", e);
+                return Err(e);
+            }
+        };
 
         Ok(message.payload)
     }
 
-    pub async fn write_message(&mut self, payload: &Payload) {
+    pub async fn write_message(&self, payload: &Payload) {
         self.writer.write_message(payload).await.unwrap();
+        debug!("wrote a message containing a {} to the stream", payload);
+    }
+
+    pub async fn write_bytes(&self, bytes: &[u8]) {
+        self.writer.writer.lock().await.write_all(bytes).await.unwrap();
+        debug!("wrote {}B to the stream", bytes.len());
     }
 }
 
@@ -354,20 +361,20 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode)
 pub async fn read_payload<'a, T: AsyncRead + Unpin>(
     stream: &mut T,
     buffer: &'a mut [u8],
-) -> Result<&'a [u8], MessageError> {
+) -> Result<&'a [u8], NetworkError> {
     stream.read_exact(buffer).await?;
 
     Ok(buffer)
 }
 
 /// Reads the message header into a `MessageHeader`.
-pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, MessageHeaderError> {
+pub async fn read_header<T: AsyncRead + Unpin>(stream: &mut T) -> Result<MessageHeader, NetworkError> {
     let mut header_arr = [0u8; 4];
     stream.read_exact(&mut header_arr).await?;
     let header = MessageHeader::from(header_arr);
 
     if header.len as usize > MAX_MESSAGE_SIZE {
-        Err(MessageHeaderError::TooBig(header.len as usize, MAX_MESSAGE_SIZE))
+        Err(NetworkError::MessageTooBig(header.len as usize))
     } else {
         Ok(header)
     }
