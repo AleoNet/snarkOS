@@ -69,27 +69,16 @@ rustc_version = "0.2"
 capnpc = { version = "0.14", optional = true }
 
 [profile.release]
-opt-level = 3
 lto = "thin"
 incremental = true
 
 [profile.bench]
-opt-level = 3
-debug = false
-rpath = false
 lto = "thin"
 incremental = true
-debug-assertions = false
-
-[profile.dev]
-opt-level = 0
 
 [profile.test]
 opt-level = 3 # necessary for DPC testing
 lto = "thin"
-incremental = true
-debug-assertions = true
-debug = true
 
 [features]
 default = []
