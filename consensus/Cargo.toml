@@ -21,7 +21,6 @@ snarkvm-objects = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb
 snarkvm-posw = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
 snarkvm-utilities = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
 
-snarkos-posw = { path = "../posw", version = "1.1.4"}
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
 snarkos-storage = { path = "../storage", version = "1.1.4"}
 

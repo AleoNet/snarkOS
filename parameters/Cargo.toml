@@ -27,7 +27,6 @@ snarkvm-marlin = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5
 snarkvm-objects = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
 snarkvm-posw = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
 snarkos-consensus = { path = "../consensus", version = "1.1.4" }
-snarkos-posw = { path = "../consensus", version = "1.1.4" }
 snarkos-storage = { path = "../consensus", version = "1.1.4" }
 
 chrono = { version = "0.4", features = ["serde"] }
