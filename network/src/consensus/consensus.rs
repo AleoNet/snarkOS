@@ -35,7 +35,7 @@ pub struct Consensus {
     /// The node this consensus is bound to.
     node: Node,
     /// The storage system of this node.
-    storage: Arc<RwLock<MerkleTreeLedger>>,
+    storage: Arc<MerkleTreeLedger>,
     /// The memory pool of this node.
     memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
     /// The consensus parameters for the associated network ID.
@@ -58,7 +58,7 @@ impl Consensus {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         node: Node,
-        storage: Arc<RwLock<MerkleTreeLedger>>,
+        storage: Arc<MerkleTreeLedger>,
         memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
         consensus_parameters: Arc<ConsensusParameters>,
         dpc_parameters: Arc<PublicParameters<Components>>,
@@ -87,7 +87,7 @@ impl Consensus {
 
     /// Returns a reference to the storage system of this node.
     #[inline]
-    pub fn storage(&self) -> &Arc<RwLock<MerkleTreeLedger>> {
+    pub fn storage(&self) -> &Arc<MerkleTreeLedger> {
         &self.storage
     }
 
@@ -128,7 +128,7 @@ impl Consensus {
     /// Returns the current block height of the ledger from storage.
     #[inline]
     pub fn current_block_height(&self) -> u32 {
-        self.storage.read().get_current_block_height()
+        self.storage.get_current_block_height()
     }
 
     /// Checks whether enough time has elapsed for the node to attempt another block sync.

@@ -36,7 +36,7 @@ fn providing_sync_blocks(c: &mut Criterion) {
             .consensus_parameters()
             .receive_block(
                 provider.consensus().dpc_parameters(),
-                &provider.consensus().storage().read(),
+                &provider.consensus().storage(),
                 &mut provider.consensus().memory_pool().lock(),
                 &block,
             )

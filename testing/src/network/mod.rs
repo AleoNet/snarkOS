@@ -27,7 +27,7 @@ use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
@@ -138,7 +138,7 @@ impl Default for TestSetup {
 pub fn test_consensus(setup: ConsensusSetup, node: Node) -> Consensus {
     Consensus::new(
         node,
-        Arc::new(RwLock::new(FIXTURE_VK.ledger())),
+        Arc::new(FIXTURE_VK.ledger()),
         Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
         Arc::new(TEST_CONSENSUS.clone()),
         Arc::new(FIXTURE.parameters.clone()),
