@@ -566,7 +566,7 @@ mod tests {
         assert_eq!(get_block_reward(0).0, block_reward);
 
         for _ in 0..100 {
-            let block_num: u32 = rng.gen_range(0, first_halfing);
+            let block_num: u32 = rng.gen_range(0..first_halfing);
             assert_eq!(get_block_reward(block_num).0, block_reward);
         }
 
@@ -577,7 +577,7 @@ mod tests {
         assert_eq!(get_block_reward(first_halfing).0, block_reward);
 
         for _ in 0..100 {
-            let block_num: u32 = rng.gen_range(first_halfing + 1, second_halfing);
+            let block_num: u32 = rng.gen_range((first_halfing + 1)..second_halfing);
             assert_eq!(get_block_reward(block_num).0, block_reward);
         }
 
@@ -589,7 +589,7 @@ mod tests {
         assert_eq!(get_block_reward(u32::MAX).0, block_reward);
 
         for _ in 0..100 {
-            let block_num: u32 = rng.gen_range(second_halfing, u32::MAX);
+            let block_num: u32 = rng.gen_range(second_halfing..u32::MAX);
             assert_eq!(get_block_reward(block_num).0, block_reward);
         }
     }
