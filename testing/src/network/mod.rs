@@ -25,8 +25,8 @@ pub mod sync;
 
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
-use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 use snarkos::miner::MinerInstance;
+use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
