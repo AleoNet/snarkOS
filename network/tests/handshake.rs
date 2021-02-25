@@ -48,7 +48,7 @@ async fn handshake_responder_side() {
 
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
-        Box::new(snow::resolvers::SodiumResolver),
+        Box::new(snow::resolvers::RingResolver),
     );
     let static_key = builder.generate_keypair().unwrap().private;
     let noise_builder = builder
@@ -109,7 +109,7 @@ async fn handshake_initiator_side() {
 
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
-        Box::new(snow::resolvers::SodiumResolver),
+        Box::new(snow::resolvers::RingResolver),
     );
     let static_key = builder.generate_keypair().unwrap().private;
     let noise_builder = builder

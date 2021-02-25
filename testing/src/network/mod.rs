@@ -240,7 +240,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     // node0's noise - initiator
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
-        Box::new(snow::resolvers::SodiumResolver),
+        Box::new(snow::resolvers::RingResolver),
     );
     let static_key = builder.generate_keypair().unwrap().private;
     let noise_builder = builder
@@ -251,7 +251,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     // node1's noise - responder
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
-        Box::new(snow::resolvers::SodiumResolver),
+        Box::new(snow::resolvers::RingResolver),
     );
     let static_key = builder.generate_keypair().unwrap().private;
     let noise_builder = builder
@@ -322,7 +322,7 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode)
 
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
-        Box::new(snow::resolvers::SodiumResolver),
+        Box::new(snow::resolvers::RingResolver),
     );
     let static_key = builder.generate_keypair().unwrap().private;
     let noise_builder = builder

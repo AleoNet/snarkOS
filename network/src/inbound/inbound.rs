@@ -225,7 +225,7 @@ impl Inbound {
             crate::HANDSHAKE_PATTERN
                 .parse()
                 .expect("Invalid noise handshake pattern!"),
-            Box::new(snow::resolvers::SodiumResolver),
+            Box::new(snow::resolvers::RingResolver),
         );
         let static_key = builder.generate_keypair()?.private;
         let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
