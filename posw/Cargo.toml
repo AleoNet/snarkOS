@@ -12,16 +12,16 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { version = "0.0.3" }
-snarkvm-curves = { version = "0.0.3" } # needed to instantiate with BLS12-377
-snarkvm-errors = { version = "0.0.3" }
-snarkvm-gadgets = { version = "0.0.3" }
-snarkvm-marlin = { version = "0.0.3" }
-snarkvm-models = { version = "0.0.3" }
-snarkvm-polycommit = { version = "0.0.3" }
-snarkvm-objects = { version = "0.0.3" } # needed to instantiate with BLS12-377
-snarkvm-parameters = { version = "0.0.3" }
-snarkvm-utilities = { version = "0.0.3" }
+snarkvm-algorithms = { version = "0.0.4" }
+snarkvm-curves = { version = "0.0.4" } # needed to instantiate with BLS12-377
+snarkvm-errors = { version = "0.0.4" }
+snarkvm-gadgets = { version = "0.0.4" }
+snarkvm-marlin = { version = "0.0.4" }
+snarkvm-models = { version = "0.0.4" }
+snarkvm-polycommit = { version = "0.0.4" }
+snarkvm-objects = { version = "0.0.4" } # needed to instantiate with BLS12-377
+snarkvm-parameters = { version = "0.0.4" }
+snarkvm-utilities = { version = "0.0.4" }
 
 snarkos-profiler = { path = "../profiler", version = "1.1.4"}
 

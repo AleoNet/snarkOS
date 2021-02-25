@@ -12,14 +12,14 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm-algorithms = { version = "0.0.3" }
-snarkvm-curves = { version = "0.0.3" }
-snarkvm-dpc = { version = "0.0.3" }
-snarkvm-errors = { version = "0.0.3" }
-snarkvm-models = { version = "0.0.3" }
-snarkvm-objects = { version = "0.0.3" }
-snarkvm-parameters = { version = "0.0.3" }
-snarkvm-utilities = { version = "0.0.3" }
+snarkvm-algorithms = { version = "0.0.4" }
+snarkvm-curves = { version = "0.0.4" }
+snarkvm-dpc = { version = "0.0.4" }
+snarkvm-errors = { version = "0.0.4" }
+snarkvm-models = { version = "0.0.4" }
+snarkvm-objects = { version = "0.0.4" }
+snarkvm-parameters = { version = "0.0.4" }
+snarkvm-utilities = { version = "0.0.4" }
 
 snarkos-consensus = { path = "../consensus", version = "1.1.4" }
 snarkos-network = { path = "../network", version = "1.1.4" }
