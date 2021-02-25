@@ -71,7 +71,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `create_raw_transaction`
-    pub fn create_raw_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn create_raw_transaction_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -89,7 +89,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `create_transaction_kernel`
-    pub fn create_transaction_kernel_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn create_transaction_kernel_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -107,7 +107,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `create_transaction`
-    pub fn create_transaction_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn create_transaction_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -132,7 +132,11 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `get_record_commitment_count`
-    pub fn get_record_commitment_count_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn get_record_commitment_count_protected(
+        self,
+        params: Params,
+        meta: Meta,
+    ) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         params.expect_no_params()?;
@@ -144,7 +148,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `get_record_commitments`
-    pub fn get_record_commitments_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn get_record_commitments_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         params.expect_no_params()?;
@@ -156,7 +160,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `get_raw_record`
-    pub fn get_raw_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn get_raw_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -181,7 +185,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `decode_record`
-    pub fn decode_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn decode_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -206,7 +210,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `decrypt_record`
-    pub fn decrypt_record_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn decrypt_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -224,7 +228,7 @@ impl RpcImpl {
     }
 
     /// Wrap authentication around `create_account`
-    pub fn create_account_protected(&self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    pub async fn create_account_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         params.expect_no_params()?;
@@ -239,15 +243,42 @@ impl RpcImpl {
     pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
-        d.add_method_with_meta("createrawtransaction", Self::create_raw_transaction_protected);
-        d.add_method_with_meta("createtransactionkernel", Self::create_transaction_kernel_protected);
-        d.add_method_with_meta("createtransaction", Self::create_transaction_protected);
-        d.add_method_with_meta("decoderecord", Self::decode_record_protected);
-        d.add_method_with_meta("decryptrecord", Self::decrypt_record_protected);
-        d.add_method_with_meta("getrecordcommitmentcount", Self::get_record_commitment_count_protected);
-        d.add_method_with_meta("getrecordcommitments", Self::get_record_commitments_protected);
-        d.add_method_with_meta("getrawrecord", Self::get_raw_record_protected);
-        d.add_method_with_meta("createaccount", Self::create_account_protected);
+        d.add_method_with_meta("createrawtransaction", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.create_raw_transaction_protected(params, meta)
+        });
+        d.add_method_with_meta("createtransactionkernel", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.create_transaction_kernel_protected(params, meta)
+        });
+        d.add_method_with_meta("createtransaction", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.create_transaction_protected(params, meta)
+        });
+        d.add_method_with_meta("decoderecord", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.decode_record_protected(params, meta)
+        });
+        d.add_method_with_meta("decryptrecord", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.decrypt_record_protected(params, meta)
+        });
+        d.add_method_with_meta("getrecordcommitmentcount", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.get_record_commitment_count_protected(params, meta)
+        });
+        d.add_method_with_meta("getrecordcommitments", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.get_record_commitments_protected(params, meta)
+        });
+        d.add_method_with_meta("getrawrecord", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.get_raw_record_protected(params, meta)
+        });
+        d.add_method_with_meta("createaccount", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.create_account_protected(params, meta)
+        });
 
         io.extend_with(d)
     }
