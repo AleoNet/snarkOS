@@ -1,8 +1,8 @@
 [package]
-name = "snarkvm-parameters"
-version = "0.0.4"
+name = "snarkos-parameters"
+version = "1.1.4"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "Parameters for a decentralized virtual machine"
+description = "Parameters for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkVM"
 keywords = [
