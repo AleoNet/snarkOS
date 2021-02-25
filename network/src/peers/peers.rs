@@ -267,7 +267,6 @@ impl Node {
         // Save the serialized peer book to storage.
         self.consensus()
             .storage()
-            .write()
             .save_peer_book_to_storage(serialized_peer_book)?;
 
         Ok(())

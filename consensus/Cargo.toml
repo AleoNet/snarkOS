@@ -30,14 +30,12 @@ hex = { version = "0.4.2" }
 parking_lot = { version = "0.11.1" }
 rand = { version = "0.8" }
 thiserror = { version = "1.0" }
-tokio = { version = "1", features = ["full"] }
 tracing = { default-features = false, features = ["log"], version = "0.1" }
 
 [dev-dependencies]
 snarkos-testing = { path = "../testing" }
 
 criterion = { version = "0.3" }
-futures-await-test = { version = "0.3.0" }
 rand_xorshift = { version = "0.3" }
 
 [[bench]]

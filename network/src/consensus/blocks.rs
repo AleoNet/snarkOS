@@ -25,7 +25,7 @@ impl Consensus {
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
     pub async fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = self.storage().read().get_block_locator_hashes();
+        let block_locator_hashes = self.storage().get_block_locator_hashes();
 
         if let Ok(block_locator_hashes) = block_locator_hashes {
             // Send a GetSync to the selected sync node.
@@ -94,7 +94,7 @@ impl Consensus {
             .consensus_parameters()
             .receive_block(
                 &self.dpc_parameters(),
-                &self.storage().read(),
+                &self.storage(),
                 &mut self.memory_pool().lock(),
                 &block_struct,
             )
@@ -117,7 +117,7 @@ impl Consensus {
         header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         for hash in header_hashes {
-            let block = self.storage().read().get_block(&hash)?;
+            let block = self.storage().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.
             self.node()
@@ -139,12 +139,12 @@ impl Consensus {
         block_locator_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         let sync = {
-            let storage_lock = self.storage().read();
+            let storage = self.storage();
 
-            let latest_shared_hash = storage_lock.get_latest_shared_hash(block_locator_hashes)?;
-            let current_height = self.storage().read().get_current_block_height();
+            let latest_shared_hash = storage.get_latest_shared_hash(block_locator_hashes)?;
+            let current_height = storage.get_current_block_height();
 
-            if let Ok(height) = storage_lock.get_block_number(&latest_shared_hash) {
+            if let Ok(height) = storage.get_block_number(&latest_shared_hash) {
                 if height < current_height {
                     let mut max_height = current_height;
 
@@ -157,7 +157,7 @@ impl Consensus {
                     let mut block_hashes = Vec::with_capacity((max_height - height) as usize);
 
                     for block_num in height + 1..=max_height {
-                        block_hashes.push(storage_lock.get_block_hash(block_num)?);
+                        block_hashes.push(storage.get_block_hash(block_num)?);
                     }
 
                     // send block hashes to requester

@@ -88,8 +88,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
-    let storage = MerkleTreeLedger::open_at_path(path.clone())?;
-    // let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
+    let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
 
     let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
@@ -135,7 +134,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the consensus instance and set it on the node instance.
     let consensus = Consensus::new(
         node.clone(),
-        Arc::new(RwLock::new(storage)),
+        storage,
         memory_pool.clone(),
         consensus_params.clone(),
         dpc_parameters.clone(),
