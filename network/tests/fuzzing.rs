@@ -67,7 +67,7 @@ async fn fuzzing_valid_header_pre_handshake() {
     let node_addr = node.environment.local_address().unwrap();
 
     for _ in 0..ITERATIONS {
-        let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
+        let random_len: usize = thread_rng().gen_range(1..(64 * 1024));
         let random_payload: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
         let mut stream = TcpStream::connect(node_addr).await.unwrap();
@@ -89,7 +89,7 @@ async fn fuzzing_valid_header_post_handshake() {
     });
 
     for _ in 0..ITERATIONS {
-        let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
+        let random_len: usize = thread_rng().gen_range(1..(64 * 1024));
         let random_payload: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
         node1.write_bytes(&(random_len as u32).to_be_bytes()).await;
@@ -110,7 +110,7 @@ async fn fuzzing_pre_handshake() {
     let node_addr = node.environment.local_address().unwrap();
 
     for _ in 0..ITERATIONS {
-        let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
+        let random_len: usize = thread_rng().gen_range(1..(64 * 1024));
         let random_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
         let mut stream = TcpStream::connect(node_addr).await.unwrap();
@@ -131,7 +131,7 @@ async fn fuzzing_post_handshake() {
     });
 
     for _ in 0..ITERATIONS {
-        let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
+        let random_len: usize = thread_rng().gen_range(1..(64 * 1024));
         let random_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
         node1.write_bytes(&random_bytes).await;
