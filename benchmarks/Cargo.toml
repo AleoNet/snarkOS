@@ -27,11 +27,11 @@ path = "posw/posw.rs"
 harness = false
 
 [dependencies]
-snarkvm-curves = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
-snarkvm-marlin = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
-snarkvm-models = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
-snarkvm-posw = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4", features = ["test-helpers"] }
-snarkvm-utilities = { git="https://github.com/AleoHQ/snarkVM", rev="d9da9ad62cb8bb5b7a6d2bedb959c578cfc770cc", version = "0.0.4" }
+snarkvm-curves = { version = "0.0.5" }
+snarkvm-marlin = { version = "0.0.5" }
+snarkvm-models = { version = "0.0.5" }
+snarkvm-posw = { version = "0.0.5", features = ["test-helpers"] }
+snarkvm-utilities = { version = "0.0.5" }
 
 snarkos-profiler = { path = "../profiler", version = "1.1.4" }
 snarkos-network = { path = "../network" }
