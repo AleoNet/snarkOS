@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_parameters::transaction_1::Transaction1;
+
 use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
 use snarkvm_errors::objects::TransactionError;
 use snarkvm_models::genesis::Genesis;

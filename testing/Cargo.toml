@@ -24,6 +24,7 @@ snarkvm-utilities = { version = "0.0.5" }
 
 snarkos-consensus = { path = "../consensus", version = "1.1.4" }
 snarkos-network = { path = "../network", version = "1.1.4" }
+snarkos-parameters = { path = "../parameters", version = "1.1.4" }
 snarkos-storage = { path = "../storage", version = "1.1.4"}
 
 anyhow = { version = "1.0.33" }

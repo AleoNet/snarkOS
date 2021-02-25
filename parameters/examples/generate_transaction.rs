@@ -52,13 +52,13 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
     let storage = Storage::open_cf(path, NUM_COLS)
         .map(|storage| storage)
-        .map_err(|err| LedgerError::StorageError(err))?;
+        .map_err(|err| LedgerError::Message(err.to_string()))?;
 
     let leaves: Vec<[u8; 32]> = vec![];
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
 
     Ok(Ledger {
-        current_block_height: RwLock::new(0),
+        current_block_height: Default::default(),
         storage: Arc::new(storage),
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
         ledger_parameters: parameters,

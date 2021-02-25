@@ -2991,6 +2991,8 @@ dependencies = [
  "snarkvm-marlin",
  "snarkvm-models",
  "snarkvm-objects",
+ "snarkvm-parameters",
+ "snarkvm-posw",
  "snarkvm-utilities",
 ]
 
@@ -3047,6 +3049,7 @@ dependencies = [
  "rocksdb",
  "serde",
  "snarkos-consensus",
+ "snarkos-parameters",
  "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-curves",
@@ -3070,6 +3073,7 @@ dependencies = [
  "rand_xorshift",
  "snarkos-consensus",
  "snarkos-network",
+ "snarkos-parameters",
  "snarkos-storage",
  "snarkvm-algorithms",
  "snarkvm-curves",
