@@ -2975,7 +2975,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-parameters"
-version = "0.0.4"
+version = "1.1.4"
 dependencies = [
  "chrono",
  "curl",
