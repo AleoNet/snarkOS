@@ -29,7 +29,7 @@ chrono = { version = "0.4", features = ["serde"] }
 hex = { version = "0.4.2" }
 itertools = { version = "0.9.0" }
 jsonrpc-core = { version = "14.2.0" }
-jsonrpc-core-client = { version = "14.0.5" }
+jsonrpc-core-client = { version = "17.0.0" }
 jsonrpc-derive = { version = "14.2.2" }
 jsonrpc-http-server = { version = "14.2.0" }
 parking_lot = { version = "0.11.1" }
