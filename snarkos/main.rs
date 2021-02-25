@@ -106,7 +106,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Enable the consensus layer if the node is not a bootstrapper.
     if !config.node.is_bootnode {
-        let storage = MerkleTreeLedger::open_at_path(path.clone())?;
+        let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
         let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
         info!("Loading Aleo parameters...");
@@ -135,7 +135,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
         let consensus = Consensus::new(
             node.clone(),
-            Arc::new(RwLock::new(storage)),
+            storage,
             memory_pool,
             consensus_params,
             dpc_parameters,
