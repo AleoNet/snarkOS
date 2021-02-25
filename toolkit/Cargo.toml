@@ -20,16 +20,16 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies]
-snarkvm-algorithms = { version = "0.0.5" }
-snarkvm-dpc = { version = "0.0.5" }
-snarkvm-errors = { version = "0.0.5" }
-snarkvm-models = { version = "0.0.5" }
-snarkvm-objects = { version = "0.0.5" }
-snarkvm-utilities = { version = "0.0.5" }
+snarkvm-algorithms = { version = "0.0.5", default-features = false }
+snarkvm-dpc = { version = "0.0.5", default-features = false }
+snarkvm-errors = { version = "0.0.5", default-features = false }
+snarkvm-models = { version = "0.0.5", default-features = false }
+snarkvm-objects = { version = "0.0.5", default-features = false }
+snarkvm-utilities = { version = "0.0.5", default-features = false }
 
 anyhow = { version = "1.0.37" }
 hex = { version = "0.4.2" }
-rand = { version = "0.8" }
+rand = { version = "0.8", default-features = false }
 thiserror = { version = "1.0" }
 wasm-bindgen = { version = "0.2.68" }
 
