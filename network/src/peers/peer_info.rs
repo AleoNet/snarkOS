@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
+        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
         let peer_info = PeerInfo::new(address);
 
         assert_eq!(address, peer_info.address());
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_set_disconnected_from_connected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
+        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
 
         peer_info.set_connected().unwrap();
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_set_disconnected_from_never_connected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
+        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
 
         assert!(peer_info.set_disconnected().is_err());
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_set_connected_from_disconnected() {
-        let address: SocketAddr = format!("127.0.0.1:4130").parse().unwrap();
+        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
 
         peer_info.set_connected().unwrap();
