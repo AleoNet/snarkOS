@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::ConnectError, message::*};
+use crate::{errors::NetworkError, message::*};
 
 use parking_lot::Mutex;
 use tokio::{io::AsyncWriteExt, net::tcp::OwnedWriteHalf, sync::Mutex as AsyncMutex};
@@ -47,8 +47,8 @@ impl ConnWriter {
     }
 
     /// Writes a message consisting of a header and payload.
-    pub async fn write_message(&self, payload: &Payload) -> Result<(), ConnectError> {
-        let serialized_payload = Payload::serialize(payload).map_err(|e| ConnectError::Message(e.to_string()))?;
+    pub async fn write_message(&self, payload: &Payload) -> Result<(), NetworkError> {
+        let serialized_payload = Payload::serialize(payload)?;
 
         {
             let mut buffer = self.buffer.lock().await;
@@ -62,11 +62,7 @@ impl ConnWriter {
                 );
                 let chunk = &serialized_payload[processed_len..][..chunk_len];
 
-                encrypted_len += self
-                    .noise
-                    .lock()
-                    .write_message(chunk, &mut buffer[encrypted_len..])
-                    .map_err(|e| ConnectError::Message(e.to_string()))?;
+                encrypted_len += self.noise.lock().write_message(chunk, &mut buffer[encrypted_len..])?;
                 processed_len += chunk_len;
             }
 

@@ -14,16 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod connect;
-pub use connect::*;
-
 pub mod network;
 pub use network::*;
-
-pub mod send;
-pub use send::*;
-
-pub mod server;
-pub use server::*;
-
-pub mod message;
