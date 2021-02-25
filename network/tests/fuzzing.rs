@@ -21,6 +21,8 @@ use snarkos_testing::{
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
+pub const ITERATIONS: usize = 50000;
+
 #[tokio::test]
 async fn fuzzing_zeroes_pre_handshake() {
     let node_setup = TestSetup {
@@ -52,7 +54,6 @@ async fn fuzzing_zeroes_post_handshake() {
     wait_until!(1, node.peer_book.read().number_of_connected_peers() == 0);
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_valid_header_pre_handshake() {
     // tracing_subscriber::fmt::init();
@@ -65,7 +66,7 @@ async fn fuzzing_valid_header_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.environment.local_address().unwrap();
 
-    loop {
+    for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
         let random_payload: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
@@ -75,7 +76,6 @@ async fn fuzzing_valid_header_pre_handshake() {
     }
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_valid_header_post_handshake() {
     // tracing_subscriber::fmt::init();
@@ -88,7 +88,7 @@ async fn fuzzing_valid_header_post_handshake() {
         }
     });
 
-    loop {
+    for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
         let random_payload: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
@@ -97,7 +97,6 @@ async fn fuzzing_valid_header_post_handshake() {
     }
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_pre_handshake() {
     // tracing_subscriber::fmt::init();
@@ -110,7 +109,7 @@ async fn fuzzing_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.environment.local_address().unwrap();
 
-    loop {
+    for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
         let random_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
@@ -121,7 +120,7 @@ async fn fuzzing_pre_handshake() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_post_handshake() {
-    tracing_subscriber::fmt::init();
+    // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
 
@@ -131,7 +130,7 @@ async fn fuzzing_post_handshake() {
         }
     });
 
-    for _ in 0..10000 {
+    for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1, 64 * 1024);
         let random_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(random_len).collect();
 
