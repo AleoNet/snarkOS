@@ -43,7 +43,7 @@ tracing = { default-features = false, features = ["log"], version = "0.1" }
 [dev-dependencies]
 snarkos-testing = { path = "../testing" }
 
-jsonrpc-test = { version = "14.2.0" }
+jsonrpc-test = { version = "17.0.0" }
 
 [build-dependencies]
 rustc_version = "0.2"
