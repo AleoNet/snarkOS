@@ -234,8 +234,8 @@ impl Node {
         trace!("Broadcasting Ping messages");
 
         // consider peering tests that don't use the consensus layer
-        let current_block_height = if self.consensus.is_some() {
-            self.consensus().current_block_height()
+        let current_block_height = if let Some(ref consensus) = self.consensus() {
+            consensus.current_block_height()
         } else {
             0
         };
@@ -290,11 +290,9 @@ impl Node {
         let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
         // TODO: the peer book should be stored outside of consensus
-        if self.consensus.is_some() {
+        if let Some(ref consensus) = self.consensus() {
             // Save the serialized peer book to storage.
-            self.consensus()
-                .storage()
-                .save_peer_book_to_storage(serialized_peer_book)?;
+            consensus.storage().save_peer_book_to_storage(serialized_peer_book)?;
         }
 
         Ok(())
@@ -308,8 +306,10 @@ impl Node {
     pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         debug!("Disconnecting from {}", remote_address);
 
-        if self.peer_book.read().is_syncing_blocks(remote_address) {
-            self.consensus().finished_syncing_blocks();
+        if let Some(ref consensus) = self.consensus() {
+            if self.peer_book.read().is_syncing_blocks(remote_address) {
+                consensus.finished_syncing_blocks();
+            }
         }
 
         if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {

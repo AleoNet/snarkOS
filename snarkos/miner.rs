@@ -51,7 +51,7 @@ impl MinerInstance {
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
             let miner = Miner::new(
                 self.miner_address.clone(),
-                Arc::clone(self.node.consensus().consensus_parameters()),
+                Arc::clone(self.node.expect_consensus().consensus_parameters()),
             );
             info!("Miner instantiated; starting to mine blocks");
 
@@ -60,7 +60,7 @@ impl MinerInstance {
 
             loop {
                 info!("Starting to mine the next block");
-                let consensus = self.node.consensus();
+                let consensus = self.node.expect_consensus();
 
                 let (block, _coinbase_records) = match miner
                     .mine_block(consensus.dpc_parameters(), consensus.storage(), consensus.memory_pool())
@@ -96,7 +96,7 @@ impl MinerInstance {
                 };
 
                 self.node
-                    .consensus()
+                    .expect_consensus()
                     .propagate_block(serialized_block, local_address, &peers)
                     .await;
             }

@@ -292,15 +292,15 @@ impl ProtectedRpcFunctions for RpcImpl {
         let rng = &mut thread_rng();
 
         let account = Account::<Components>::new(
-            self.parameters().account_signature_parameters(),
-            self.parameters().account_commitment_parameters(),
-            self.parameters().account_encryption_parameters(),
+            self.parameters()?.account_signature_parameters(),
+            self.parameters()?.account_commitment_parameters(),
+            self.parameters()?.account_encryption_parameters(),
             rng,
         )?;
 
         let view_key = AccountViewKey::<Components>::from_private_key(
-            self.parameters().account_signature_parameters(),
-            self.parameters().account_commitment_parameters(),
+            self.parameters()?.account_signature_parameters(),
+            self.parameters()?.account_commitment_parameters(),
             &account.private_key,
         )?;
 
@@ -328,11 +328,11 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Fetch birth/death programs
         let program_vk_hash = self
-            .parameters()
+            .parameters()?
             .system_parameters
             .program_verification_key_crh
             .hash(&to_bytes![
-                self.parameters().noop_program_snark_parameters.verification_key
+                self.parameters()?.noop_program_snark_parameters.verification_key
             ]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
@@ -356,21 +356,21 @@ impl ProtectedRpcFunctions for RpcImpl {
         // Fill any unused old_record indices with dummy records
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
-                .parameters()
+                .parameters()?
                 .system_parameters
                 .serial_number_nonce
                 .hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
             let address = AccountAddress::<Components>::from_private_key(
-                self.parameters().account_signature_parameters(),
-                self.parameters().account_commitment_parameters(),
-                self.parameters().account_encryption_parameters(),
+                self.parameters()?.account_signature_parameters(),
+                self.parameters()?.account_commitment_parameters(),
+                self.parameters()?.account_encryption_parameters(),
                 &private_key,
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &self.parameters().system_parameters,
+                &self.parameters()?.system_parameters,
                 old_sn_nonce,
                 address,
                 true, // The input record is dummy
@@ -430,8 +430,8 @@ impl ProtectedRpcFunctions for RpcImpl {
         let storage = self.new_secondary_storage_instance()?;
 
         // Generate transaction
-        let (records, transaction) = self.consensus().create_transaction(
-            &self.parameters(),
+        let (records, transaction) = self.consensus()?.create_transaction(
+            self.parameters()?,
             old_records,
             old_account_private_keys,
             new_record_owners,
@@ -524,7 +524,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Construct the program proofs
         let (old_death_program_proofs, new_birth_program_proofs) =
-            ConsensusParameters::generate_program_proofs(&self.parameters(), &transaction_kernel, rng)?;
+            ConsensusParameters::generate_program_proofs(self.parameters()?, &transaction_kernel, rng)?;
 
         // Because this is a computationally heavy endpoint, we open a
         // new secondary storage instance to prevent storage bottle-necking.
@@ -532,7 +532,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Online execution to generate a DPC transaction
         let (records, transaction) = InstantiatedDPC::execute_online(
-            &self.parameters(),
+            self.parameters()?,
             transaction_kernel,
             old_death_program_proofs,
             new_birth_program_proofs,
@@ -597,7 +597,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Decrypt the record ciphertext
         let record = RecordEncryption::decrypt_record(
-            &self.parameters().system_parameters,
+            &self.parameters()?.system_parameters,
             &account_view_key,
             &encrypted_record,
         )?;

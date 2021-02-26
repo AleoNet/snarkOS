@@ -20,7 +20,7 @@
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{Environment, Node};
+use snarkos_network::{Consensus, Environment, Node};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
@@ -82,16 +82,20 @@ impl RpcImpl {
         Ok(MerkleTreeLedger::open_secondary_at_path(self.storage_path.clone())?)
     }
 
-    pub fn consensus(&self) -> &ConsensusParameters {
-        self.node.consensus().consensus_parameters()
+    fn consensus_layer(&self) -> Result<&Arc<Consensus>, RpcError> {
+        self.node.consensus().ok_or(RpcError::NoConsensus)
     }
 
-    pub fn parameters(&self) -> &PublicParameters<Components> {
-        self.node.consensus().dpc_parameters()
+    pub fn consensus(&self) -> Result<&ConsensusParameters, RpcError> {
+        Ok(self.consensus_layer()?.consensus_parameters())
     }
 
-    pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
-        self.node.consensus().memory_pool()
+    pub fn parameters(&self) -> Result<&PublicParameters<Components>, RpcError> {
+        Ok(self.consensus_layer()?.dpc_parameters())
+    }
+
+    pub fn memory_pool(&self) -> Result<&Arc<Mutex<MemoryPool<Tx>>>, RpcError> {
+        Ok(self.consensus_layer()?.memory_pool())
     }
 }
 
@@ -258,8 +262,8 @@ impl RpcFunctions for RpcImpl {
         storage.catch_up_secondary(false)?;
 
         if !self
-            .consensus()
-            .verify_transaction(&self.parameters(), &transaction, &storage)?
+            .consensus()?
+            .verify_transaction(self.parameters()?, &transaction, &storage)?
         {
             // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
             return Ok("Transaction did not verify".into());
@@ -272,7 +276,7 @@ impl RpcFunctions for RpcImpl {
                     transaction,
                 };
 
-                if let Ok(inserted) = self.memory_pool().lock().insert(&storage, entry) {
+                if let Ok(inserted) = self.memory_pool()?.lock().insert(&storage, entry) {
                     if inserted.is_some() {
                         info!("Transaction added to the memory pool.");
                         // TODO(ljedrz): checks if needs to be propagated to the network; if need be, this could
@@ -296,8 +300,8 @@ impl RpcFunctions for RpcImpl {
         storage.catch_up_secondary(false)?;
 
         Ok(self
-            .consensus()
-            .verify_transaction(&self.parameters(), &transaction, &storage)?)
+            .consensus()?
+            .verify_transaction(self.parameters()?, &transaction, &storage)?)
     }
 
     /// Fetch the number of connected peers this node has.
@@ -322,7 +326,7 @@ impl RpcFunctions for RpcImpl {
         let is_syncing = false;
 
         Ok(NodeInfo {
-            is_miner: self.node.consensus().is_miner(),
+            is_miner: self.consensus_layer()?.is_miner(),
             is_syncing,
         })
     }
@@ -338,9 +342,9 @@ impl RpcFunctions for RpcImpl {
         let time = Utc::now().timestamp();
 
         let full_transactions = self
-            .memory_pool()
+            .memory_pool()?
             .lock()
-            .get_candidates(&storage, self.consensus().max_block_size)?;
+            .get_candidates(&storage, self.consensus()?.max_block_size)?;
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 
@@ -353,7 +357,7 @@ impl RpcFunctions for RpcImpl {
             previous_block_hash: hex::encode(&block.header.get_hash().0),
             block_height: block_height + 1,
             time,
-            difficulty_target: self.consensus().get_block_difficulty(&block.header, time),
+            difficulty_target: self.consensus()?.get_block_difficulty(&block.header, time),
             transactions: transaction_strings,
             coinbase_value: coinbase_value.0 as u64,
         })

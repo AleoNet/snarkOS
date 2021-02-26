@@ -32,17 +32,17 @@ fn providing_sync_blocks(c: &mut Criterion) {
     let blocks = TestBlocks::load(NUM_BLOCKS);
     for block in &blocks.0 {
         provider
-            .consensus()
+            .expect_consensus()
             .consensus_parameters()
             .receive_block(
-                provider.consensus().dpc_parameters(),
-                &provider.consensus().storage(),
-                &mut provider.consensus().memory_pool().lock(),
+                provider.expect_consensus().dpc_parameters(),
+                &provider.expect_consensus().storage(),
+                &mut provider.expect_consensus().memory_pool().lock(),
                 &block,
             )
             .unwrap();
     }
-    assert_eq!(provider.consensus().current_block_height() as usize, NUM_BLOCKS);
+    assert_eq!(provider.expect_consensus().current_block_height() as usize, NUM_BLOCKS);
 
     c.bench_function("providing_sync_blocks", move |b| {
         b.to_async(&rt).iter(|| async {

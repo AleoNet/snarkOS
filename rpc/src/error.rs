@@ -53,6 +53,9 @@ pub enum RpcError {
     #[error("{}", _0)]
     Message(String),
 
+    #[error("The node doesn't have the consensus layer running")]
+    NoConsensus,
+
     #[error("{}", _0)]
     StorageError(StorageError),
 
