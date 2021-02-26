@@ -36,7 +36,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
         let environment = test_environment(setup.clone());
         let mut node = Node::new(environment).await.unwrap();
 
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         node.establish_address().await.unwrap();
         nodes.push(node);
     }
@@ -195,12 +195,6 @@ async fn binary_star_contact() {
     // 3. introduce a node that is "fed" the list of random nodes from the N and K sets
     // 4. check out the end topology
 
-    let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .init();
-
     // Setup the bootnodes for each star topology.
     let bootnode_setup = TestSetup {
         consensus_setup: None,
@@ -280,17 +274,11 @@ async fn binary_star_contact() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn graph_test() {
-    let filter = tracing_subscriber::EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .init();
-
     // Setup the bootnodes for each star topology.
     let bootnode_setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
-        min_peers: 5 as u16,
+        peer_sync_interval: 3,
+        min_peers: 3 as u16,
         max_peers: 10 as u16,
         is_bootnode: true,
         ..Default::default()
@@ -304,8 +292,8 @@ async fn graph_test() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 2,
-        min_peers: 5 as u16,
-        max_peers: 10 as u16,
+        min_peers: 3 as u16,
+        max_peers: 7 as u16,
         ..Default::default()
     };
     let mut nodes = test_nodes(N - 1, setup.clone()).await;
@@ -320,6 +308,8 @@ async fn graph_test() {
 
     // Start the services.
     start_nodes(&nodes.read()).await;
+
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
@@ -339,7 +329,7 @@ fn total_connection_count(nodes: &Vec<Node>) -> usize {
 // 3. centrality measurements:
 //
 //      - degree centrality (covered by the number of connected peers)
-//      - eigenvector centrality
+//      - eigenvector centrality (tbd)
 
 fn network_density(n: f64, ac: f64) -> f64 {
     // Calculate the total number of possible connections given a node count.
@@ -404,6 +394,7 @@ impl Graph {
 
         for node in nodes {
             let own_addr = node.local_address().unwrap();
+            node.peer_book.read().number_of_connected_peers();
             vertices.insert(Vertex {
                 id: own_addr,
                 is_bootnode: node.environment.is_bootnode(),
@@ -433,7 +424,7 @@ impl Graph {
 
         // Compute the diffs.
         let removed_vertices: Vec<Vertex> = self.vertices.difference(&current_state.vertices).copied().collect();
-        let removed_edges: Vec<Edge> = dbg!(self.edges.difference(&current_state.edges).copied().collect());
+        let removed_edges: Vec<Edge> = self.edges.difference(&current_state.edges).copied().collect();
 
         let added_vertices: Vec<Vertex> = current_state.vertices.difference(&self.vertices).copied().collect();
         let added_edges: Vec<Edge> = current_state.edges.difference(&self.edges).copied().collect();
