@@ -24,7 +24,7 @@ use snarkos_testing::{
 async fn peer_initiator_side() {
     let setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
         min_peers: 2,
         ..Default::default()
     };
@@ -63,7 +63,7 @@ async fn triangle() {
     let setup = |bootnodes| TestSetup {
         consensus_setup: None,
         min_peers: 2,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
         bootnodes,
         ..Default::default()
     };

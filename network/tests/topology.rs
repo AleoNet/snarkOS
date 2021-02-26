@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use parking_lot::RwLock;
 use snarkos_network::Node;
 use snarkos_testing::{
     network::{
@@ -25,9 +24,8 @@ use snarkos_testing::{
     },
     wait_until,
 };
-use std::sync::Arc;
 
-const N: usize = 100;
+const N: usize = 10;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     let mut nodes = vec![];
@@ -51,11 +49,11 @@ async fn start_nodes(nodes: &Vec<Node>) {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn line() {
     let setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
@@ -78,9 +76,8 @@ async fn line() {
     }
 }
 
-#[tokio::test]
-#[ignore]
-async fn line_degeneration() {
+#[tokio::test(flavor = "multi_thread")]
+async fn line_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -95,15 +92,15 @@ async fn line_degeneration() {
         let connections = total_connection_count(&nodes);
         network_density(N as f64, connections as f64)
     };
-    wait_until!(5, density() >= 0.5);
+    wait_until!(5, density() >= 0.3);
     assert!(degree_centrality_delta(&nodes) as f64 <= 0.3 * N as f64);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn ring() {
     let setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
@@ -115,9 +112,8 @@ async fn ring() {
     }
 }
 
-#[tokio::test]
-#[ignore]
-async fn ring_degeneration() {
+#[tokio::test(flavor = "multi_thread")]
+async fn ring_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -132,15 +128,16 @@ async fn ring_degeneration() {
         let connections = total_connection_count(&nodes);
         network_density(N as f64, connections as f64)
     };
-    wait_until!(5, density() >= 0.5);
+    wait_until!(5, density() >= 0.3);
     assert!(degree_centrality_delta(&nodes) as f64 <= 0.3 * N as f64);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn mesh() {
     let setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
+        min_peers: N as u16,
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
@@ -152,7 +149,7 @@ async fn mesh() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn star() {
     let setup = TestSetup {
         consensus_setup: None,
@@ -168,8 +165,7 @@ async fn star() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
-async fn star_degeneration() {
+async fn star_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -184,7 +180,8 @@ async fn star_degeneration() {
         let connections = total_connection_count(&nodes);
         network_density(N as f64, connections as f64)
     };
-    wait_until!(5, density() >= 0.5);
+    wait_until!(5, density() >= 0.3);
+    assert!(degree_centrality_delta(&nodes) as f64 <= 0.5 * N as f64);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -193,7 +190,7 @@ async fn binary_star_contact() {
     // Setup the bootnodes for each star topology.
     let bootnode_setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
         min_peers: N as u16,
         is_bootnode: true,
         ..Default::default()
@@ -212,7 +209,7 @@ async fn binary_star_contact() {
     // Create the nodes to be used as the leafs in the stars.
     let setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
         min_peers: (N / 2) as u16,
         ..Default::default()
     };
@@ -234,9 +231,15 @@ async fn binary_star_contact() {
     // Measure the initial density once the topologies are established. The two star topologies
     // should still be disconnected.
     let hub_a = star_a_nodes.first().unwrap();
-    wait_until!(5, hub_a.peer_book.read().number_of_connected_peers() as usize == N - 1);
+    wait_until!(
+        5,
+        hub_a.peer_book.read().number_of_disconnected_peers() as usize == N - 1
+    );
     let hub_b = star_b_nodes.first().unwrap();
-    wait_until!(5, hub_b.peer_book.read().number_of_connected_peers() as usize == N - 1);
+    wait_until!(
+        5,
+        hub_b.peer_book.read().number_of_disconnected_peers() as usize == N - 1
+    );
 
     // Setting up a list of nodes as we will consider them as a whole graph from this point
     // forwards.
@@ -248,7 +251,7 @@ async fn binary_star_contact() {
 
     let solo_setup = TestSetup {
         consensus_setup: None,
-        peer_sync_interval: 2,
+        peer_sync_interval: 1,
         min_peers: N as u16,
         bootnodes,
         ..Default::default()
@@ -260,7 +263,7 @@ async fn binary_star_contact() {
         let connections = total_connection_count(&nodes);
         network_density(nodes.len() as f64, connections as f64)
     };
-    wait_until!(10, density() >= 0.5);
+    wait_until!(10, density() >= 0.3);
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
