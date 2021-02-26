@@ -190,11 +190,6 @@ async fn star_degeneration() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn binary_star_contact() {
-    // 1. pass N nodes through a bootstrapper
-    // 2. pass K nodes through a different bootstrapper (totally separate networks)
-    // 3. introduce a node that is "fed" the list of random nodes from the N and K sets
-    // 4. check out the end topology
-
     // Setup the bootnodes for each star topology.
     let bootnode_setup = TestSetup {
         consensus_setup: None,
@@ -249,7 +244,7 @@ async fn binary_star_contact() {
     let mut nodes = star_a_nodes;
 
     // Single node to connect to a subset of N and K.
-    let bootnodes = vec![ba];
+    let bootnodes = vec![ba, bb];
 
     let solo_setup = TestSetup {
         consensus_setup: None,
@@ -265,51 +260,7 @@ async fn binary_star_contact() {
         let connections = total_connection_count(&nodes);
         network_density(nodes.len() as f64, connections as f64)
     };
-    // wait_until!(10, density() >= 0.5);
-
-    // let jh = start_rpc_server(nodes.clone()).await;
-    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[ignore]
-async fn graph_test() {
-    // Setup the bootnodes for each star topology.
-    let bootnode_setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 3,
-        min_peers: 3 as u16,
-        max_peers: 10 as u16,
-        is_bootnode: true,
-        ..Default::default()
-    };
-    let environment = test_environment(bootnode_setup.clone());
-    let mut bootnode = Node::new(environment).await.unwrap();
-
-    bootnode.establish_address().await.unwrap();
-
-    // Create the nodes to be used as the leafs in the stars.
-    let setup = TestSetup {
-        consensus_setup: None,
-        peer_sync_interval: 2,
-        min_peers: 3 as u16,
-        max_peers: 7 as u16,
-        ..Default::default()
-    };
-    let mut nodes = test_nodes(N - 1, setup.clone()).await;
-
-    // Insert the bootnodes at the begining of the node lists.
-    nodes.insert(0, bootnode);
-    let nodes = Arc::new(RwLock::new(nodes));
-    let jh = start_rpc_server(nodes.clone()).await;
-
-    // Create the star topologies.
-    connect_nodes(&mut nodes.write(), Topology::Star).await;
-
-    // Start the services.
-    start_nodes(&nodes.read()).await;
-
-    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    wait_until!(10, density() >= 0.5);
 }
 
 fn total_connection_count(nodes: &Vec<Node>) -> usize {
@@ -346,129 +297,4 @@ fn degree_centrality_delta(nodes: &Vec<Node>) -> u16 {
     let max = dc.max().unwrap();
 
     max - min
-}
-
-use serde::Serialize;
-use std::{collections::HashSet, net::SocketAddr};
-
-#[derive(Debug, Serialize, Eq, Hash, PartialEq, Copy, Clone)]
-struct Vertex {
-    id: SocketAddr,
-    is_bootnode: bool,
-}
-
-#[derive(Debug, Serialize, Eq, Hash, PartialEq, Copy, Clone)]
-struct Edge {
-    source: SocketAddr,
-    target: SocketAddr,
-}
-
-#[derive(Debug, Serialize, Clone)]
-struct Graph {
-    vertices: HashSet<Vertex>,
-    edges: HashSet<Edge>,
-}
-
-#[derive(Debug, Serialize)]
-struct GraphDiff {
-    added_vertices: Vec<Vertex>,
-    removed_vertices: Vec<Vertex>,
-    added_edges: Vec<Edge>,
-    removed_edges: Vec<Edge>,
-}
-
-impl Graph {
-    fn new() -> Self {
-        Self {
-            vertices: HashSet::new(),
-            edges: HashSet::new(),
-        }
-    }
-
-    fn from(nodes: Vec<Node>) -> Self {
-        let mut vertices = HashSet::new();
-        let mut edges = HashSet::new();
-
-        // Used only for dedup purposes.
-        let mut connected_pairs = HashSet::new();
-
-        for node in nodes {
-            let own_addr = node.local_address().unwrap();
-            node.peer_book.read().number_of_connected_peers();
-            vertices.insert(Vertex {
-                id: own_addr,
-                is_bootnode: node.environment.is_bootnode(),
-            });
-
-            for (addr, _peer_info) in node.peer_book.read().connected_peers() {
-                if own_addr != *addr
-                    && connected_pairs.insert((own_addr, *addr))
-                    && connected_pairs.insert((*addr, own_addr))
-                {
-                    edges.insert(Edge {
-                        source: own_addr,
-                        target: *addr,
-                    });
-                }
-            }
-        }
-
-        Self { vertices, edges }
-    }
-
-    //  Returns new state as well as an instance of Graph representing the Diff.
-    fn update(&mut self, nodes: Vec<Node>) -> GraphDiff {
-        // Self is the last sent state.
-        let mut current_state = Graph::from(nodes);
-        current_state.prune_edges();
-
-        // Compute the diffs.
-        let removed_vertices: Vec<Vertex> = self.vertices.difference(&current_state.vertices).copied().collect();
-        let removed_edges: Vec<Edge> = self.edges.difference(&current_state.edges).copied().collect();
-
-        let added_vertices: Vec<Vertex> = current_state.vertices.difference(&self.vertices).copied().collect();
-        let added_edges: Vec<Edge> = current_state.edges.difference(&self.edges).copied().collect();
-
-        *self = current_state;
-
-        GraphDiff {
-            added_vertices,
-            removed_vertices,
-            added_edges,
-            removed_edges,
-        }
-    }
-
-    fn prune_edges(&mut self) {
-        let vertice_ids: HashSet<SocketAddr> = self.vertices.iter().map(|vertice| vertice.id).collect();
-
-        self.edges
-            .retain(|edge| vertice_ids.contains(&edge.source) && vertice_ids.contains(&edge.target));
-    }
-}
-
-use tokio::task::JoinHandle;
-async fn start_rpc_server(nodes: Arc<RwLock<Vec<Node>>>) {
-    use ::tokio::task;
-    use jsonrpc_core::*;
-    use jsonrpc_http_server::*;
-    use serde_json::{json, Value};
-
-    let g = Arc::new(RwLock::new(Graph::new()));
-
-    // Listener responds with the current graph every time an RPC call occures.
-    let mut io = IoHandler::new();
-    io.add_sync_method("graph", move |_| {
-        let diff = g.write().update(nodes.read().clone());
-        Ok(json!(diff))
-    });
-
-    let server = ServerBuilder::new(io)
-        .cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Null]))
-        .start_http(&"127.0.0.1:3030".parse().unwrap())
-        .expect("Unable to start RPC server");
-
-    task::spawn(async {
-        server.wait();
-    });
 }
