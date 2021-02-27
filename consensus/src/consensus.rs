@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{difficulty::bitcoin_retarget, error::ConsensusError, memory_pool::MemoryPool, MerkleTreeLedger};
-use snarkos_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
 use snarkvm_curves::bls12_377::Bls12_377;
@@ -45,34 +44,13 @@ use snarkvm_objects::{
     Network,
     PedersenMerkleRootHash,
 };
+use snarkvm_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use chrono::Utc;
 use rand::Rng;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
-
-/// Parameters for a proof of work blockchain.
-#[derive(Clone, Debug)]
-pub struct ConsensusParameters {
-    /// Maximum block size in bytes
-    pub max_block_size: usize,
-
-    /// Maximum nonce value allowed
-    pub max_nonce: u32,
-
-    /// The amount of time it should take to find a block
-    pub target_block_time: i64,
-
-    /// Network
-    pub network: Network,
-
-    /// The Proof of Succinct Work verifier (read-only mode, no proving key loaded)
-    pub verifier: PoswMarlin,
-
-    /// The authorized inner SNARK IDs
-    pub authorized_inner_snark_ids: Vec<Vec<u8>>,
-}
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> AleoAmount {
@@ -88,6 +66,23 @@ pub fn get_block_reward(block_num: u32) -> AleoAmount {
     let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
 
     AleoAmount::from_bytes(reward)
+}
+
+/// A data structure containing the consensus parameters for a specified network on this node.
+#[derive(Clone, Debug)]
+pub struct ConsensusParameters {
+    /// The network ID that these parameters correspond to.
+    pub network_id: Network,
+    /// The maximum permitted block size (in bytes).
+    pub max_block_size: usize,
+    /// The maximum permitted nonce value.
+    pub max_nonce: u32,
+    /// The anticipated number of seconds for finding a new block.
+    pub target_block_time: i64,
+    /// The PoSW consensus verifier (read-only mode, no proving key loaded).
+    pub verifier: PoswMarlin,
+    /// The authorized inner SNARK IDs.
+    pub authorized_inner_snark_ids: Vec<Vec<u8>>,
 }
 
 impl ConsensusParameters {
@@ -164,7 +159,7 @@ impl ConsensusParameters {
     /// Check if the transaction is valid.
     pub fn verify_transaction(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         transaction: &Tx,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
@@ -181,7 +176,7 @@ impl ConsensusParameters {
     /// Check if the transactions are valid.
     pub fn verify_transactions(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         transactions: &[Tx],
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
@@ -198,7 +193,7 @@ impl ConsensusParameters {
     /// Verify transactions and transaction fees.
     pub fn verify_block(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         block: &Block<Tx>,
         ledger: &MerkleTreeLedger,
     ) -> Result<bool, ConsensusError> {
@@ -245,8 +240,8 @@ impl ConsensusParameters {
             return Ok(false);
         }
 
-        // Check that all the transction proofs verify
-        Ok(self.verify_transactions(parameters, &block.transactions.0, ledger)?)
+        // Check that all the transaction proofs verify
+        self.verify_transactions(parameters, &block.transactions.0, ledger)
     }
 
     /// Return whether or not the given block is valid and insert it.
@@ -288,11 +283,6 @@ impl ConsensusParameters {
         memory_pool: &mut MemoryPool<Tx>,
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
-        let block_size = block.serialize()?.len();
-        if block_size > self.max_block_size {
-            return Err(ConsensusError::BlockTooLarge(block_size, self.max_block_size));
-        }
-
         // Block is an unknown orphan
         if !storage.previous_block_hash_exists(block) && !storage.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
@@ -308,7 +298,10 @@ impl ConsensusParameters {
         } else {
             // If the block is not an unknown orphan, find the origin of the block
             match storage.get_block_path(&block.header)? {
-                BlockPath::ExistingBlock => {}
+                BlockPath::ExistingBlock => {
+                    debug!("Received a pre-existing block");
+                    return Err(ConsensusError::PreExistingBlock);
+                }
                 BlockPath::CanonChain(block_height) => {
                     debug!("Processing a block that is on canon chain. Height {}", block_height);
 
@@ -330,10 +323,10 @@ impl ConsensusParameters {
 
                     // If the side chain is now longer than the canon chain,
                     // perform a fork to the side chain.
-                    if side_chain_path.new_block_number > storage.get_latest_block_height() {
+                    if side_chain_path.new_block_number > storage.get_current_block_height() {
                         debug!(
                             "Determined side chain is longer than canon chain by {} blocks",
-                            side_chain_path.new_block_number - storage.get_latest_block_height()
+                            side_chain_path.new_block_number - storage.get_current_block_height()
                         );
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
@@ -406,7 +399,7 @@ impl ConsensusParameters {
                 SerialNumberNonce::hash(&parameters.system_parameters.serial_number_nonce, &sn_nonce_input)?;
 
             let old_record = InstantiatedDPC::generate_record(
-                parameters.system_parameters.clone(),
+                &parameters.system_parameters,
                 old_sn_nonce,
                 new_account.address.clone(),
                 true, // The input record is dummy
@@ -453,7 +446,7 @@ impl ConsensusParameters {
     #[allow(clippy::too_many_arguments)]
     pub fn create_transaction<R: Rng>(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
         new_record_owners: Vec<AccountAddress<Components>>,
@@ -467,7 +460,7 @@ impl ConsensusParameters {
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         // Offline execution to generate a DPC transaction
-        let execute_context = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
+        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
             parameters.system_parameters.clone(),
             old_records,
             old_account_private_keys,
@@ -478,13 +471,42 @@ impl ConsensusParameters {
             new_birth_program_ids,
             new_death_program_ids,
             memo,
-            self.network.id(),
+            self.network_id.id(),
             rng,
         )?;
 
         // Construct the program proofs
+        let (old_death_program_proofs, new_birth_program_proofs) =
+            Self::generate_program_proofs(&parameters, &transaction_kernel, rng)?;
 
-        let local_data = execute_context.into_local_data();
+        // Online execution to generate a DPC transaction
+        let (new_records, transaction) = InstantiatedDPC::execute_online(
+            &parameters,
+            transaction_kernel,
+            old_death_program_proofs,
+            new_birth_program_proofs,
+            ledger,
+            rng,
+        )?;
+
+        Ok((new_records, transaction))
+    }
+
+    // TODO (raychu86): Genericize this model to allow for generic programs.
+    /// Generate the birth and death program proofs for a transaction for a given transaction kernel
+    #[allow(clippy::type_complexity)]
+    pub fn generate_program_proofs<R: Rng>(
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
+        transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::TransactionKernel,
+        rng: &mut R,
+    ) -> Result<
+        (
+            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::PrivateProgramInput>,
+            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::PrivateProgramInput>,
+        ),
+        ConsensusError,
+    > {
+        let local_data = transaction_kernel.into_local_data();
 
         let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
             &parameters.system_parameters.program_verification_key_crh,
@@ -520,17 +542,7 @@ impl ConsensusParameters {
             new_birth_program_proofs.push(private_input);
         }
 
-        // Online execution to generate a DPC transaction
-        let (new_records, transaction) = InstantiatedDPC::execute_online(
-            &parameters,
-            execute_context,
-            old_death_program_proofs,
-            new_birth_program_proofs,
-            ledger,
-            rng,
-        )?;
-
-        Ok((new_records, transaction))
+        Ok((old_death_program_proofs, new_birth_program_proofs))
     }
 }
 
@@ -554,7 +566,7 @@ mod tests {
         assert_eq!(get_block_reward(0).0, block_reward);
 
         for _ in 0..100 {
-            let block_num: u32 = rng.gen_range(0, first_halfing);
+            let block_num: u32 = rng.gen_range(0..first_halfing);
             assert_eq!(get_block_reward(block_num).0, block_reward);
         }
 
@@ -565,7 +577,7 @@ mod tests {
         assert_eq!(get_block_reward(first_halfing).0, block_reward);
 
         for _ in 0..100 {
-            let block_num: u32 = rng.gen_range(first_halfing + 1, second_halfing);
+            let block_num: u32 = rng.gen_range((first_halfing + 1)..second_halfing);
             assert_eq!(get_block_reward(block_num).0, block_reward);
         }
 
@@ -577,7 +589,7 @@ mod tests {
         assert_eq!(get_block_reward(u32::MAX).0, block_reward);
 
         for _ in 0..100 {
-            let block_num: u32 = rng.gen_range(second_halfing, u32::MAX);
+            let block_num: u32 = rng.gen_range(second_halfing..u32::MAX);
             assert_eq!(get_block_reward(block_num).0, block_reward);
         }
     }
@@ -591,7 +603,7 @@ mod tests {
             max_block_size: 1_000_000usize,
             max_nonce: std::u32::MAX - 1,
             target_block_time: 2i64, //unix seconds
-            network: Network::Mainnet,
+            network_id: Network::Mainnet,
             verifier: posw,
             authorized_inner_snark_ids: vec![],
         };

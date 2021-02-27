@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -35,9 +35,9 @@ impl UpdateCLI {
             .build()?
             .fetch()?;
 
-        println!("List of available snarkOS release versions");
+        println!("List of available versions");
         for release in releases {
-            println!("* {}", release.version);
+            println!("  * {}", release.version);
         }
         Ok(())
     }

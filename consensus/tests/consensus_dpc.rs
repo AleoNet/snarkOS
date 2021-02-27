@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -25,6 +25,8 @@ mod consensus_dpc {
     use snarkvm_objects::{dpc::DPCTransactions, Block};
     use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
+    use std::sync::Arc;
+
     #[test]
     fn base_dpc_multiple_transactions() {
         let parameters = &FIXTURE.parameters;
@@ -33,7 +35,7 @@ mod consensus_dpc {
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
         let mut rng = FIXTURE.rng.clone();
 
-        let consensus = TEST_CONSENSUS.clone();
+        let consensus = Arc::new(TEST_CONSENSUS.clone());
         let miner = Miner::new(miner_acc.address, consensus.clone());
 
         println!("Creating block with coinbase transaction");

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -19,10 +19,10 @@ use crate::{
     storage::*,
 };
 use snarkos_consensus::MerkleTreeLedger;
+use snarkos_parameters::GenesisBlock;
 use snarkvm_dpc::base_dpc::{instantiated::*, BaseDPCComponents, NoopProgram};
 use snarkvm_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
 use snarkvm_objects::{Account, Block};
-use snarkvm_parameters::GenesisBlock;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -37,7 +37,7 @@ pub static FIXTURE_VK: Lazy<Fixture> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
 pub struct Fixture {
-    pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: CommitmentMerkleParameters,
     pub genesis_block: Block<Tx>,

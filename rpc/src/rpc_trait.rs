@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -89,6 +89,15 @@ pub trait ProtectedRpcFunctions {
         &self,
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError>;
+
+    #[cfg_attr(
+        nightly,
+        doc(include = "../documentation/private_endpoints/createtransactionkernel.md")
+    )]
+    fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError>;
+
+    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createtransaction.md"))]
+    fn create_transaction(&self, transaction_kernel: String) -> Result<CreateRawTransactionOuput, RpcError>;
 
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrecordcommitments.md"))]
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError>;

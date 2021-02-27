@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -17,6 +17,7 @@
 use crate::parameters::{flag, types::*};
 
 use clap::AppSettings;
+
 // Format
 // (name, about, options, flags, settings)
 

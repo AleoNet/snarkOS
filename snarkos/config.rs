@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -21,6 +21,8 @@ use crate::{
     update::UpdateCLI,
 };
 
+use snarkos_network::errors::NetworkError;
+
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
@@ -33,16 +35,17 @@ use std::{
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
 pub const TESTNET_BOOTNODES: &[&str] = &[
-    "138.197.232.178:4131",
-    "64.225.91.42:4131",
-    "64.225.91.43:4131",
-    "46.101.144.133:4131",
-    "46.101.147.96:4131",
-    "167.71.79.152:4131",
-    "167.99.69.230:4131",
-    "206.189.80.245:4131",
-    "178.128.18.3:4131",
-    "50.18.83.123:4131",
+    // "50.18.246.201:4131",
+    // "138.197.232.178:4131",
+    // "64.225.91.42:4131",
+    // "64.225.91.43:4131",
+    // "46.101.144.133:4131",
+    // "46.101.147.96:4131",
+    // "167.71.79.152:4131",
+    // "167.99.69.230:4131",
+    // "206.189.80.245:4131",
+    // "178.128.18.3:4131",
+    // "50.18.83.123:4131",
 ]; // "192.168.0.1:4131"
 
 /// Represents all configuration options for a node.
@@ -89,6 +92,8 @@ pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
     pub mempool_interval: u8,
+    pub block_sync_interval: u16,
+    pub peer_sync_interval: u16,
     pub min_peers: u16,
     pub max_peers: u16,
 }
@@ -103,7 +108,7 @@ impl Default for Config {
                 is_bootnode: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
-                verbose: 1,
+                verbose: 3,
             },
             miner: Miner {
                 is_miner: false,
@@ -122,6 +127,8 @@ impl Default for Config {
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
                 mempool_interval: 5,
+                peer_sync_interval: 20,
+                block_sync_interval: 10,
                 min_peers: 7,
                 max_peers: 25,
             },
@@ -314,6 +321,22 @@ impl Config {
         if let Some(verbose) = argument {
             self.node.verbose = verbose
         }
+    }
+
+    pub fn check(&self) -> Result<(), NetworkError> {
+        // Check that the minimum and maximum number of peers is valid.
+        if self.p2p.min_peers == 0 || self.p2p.max_peers == 0 {
+            return Err(NetworkError::PeerCountInvalid);
+        }
+
+        // Check that the sync interval is a reasonable number of seconds.
+        if !(2..=300).contains(&self.p2p.peer_sync_interval) || !(2..=300).contains(&self.p2p.block_sync_interval) {
+            return Err(NetworkError::SyncIntervalInvalid);
+        }
+
+        // TODO (howardwu): Check the memory pool interval.
+
+        Ok(())
     }
 }
 

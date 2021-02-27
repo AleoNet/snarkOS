@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::error::ConsensusError;
-use snarkos_network::errors::SendError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::{
     algorithms::CRHError,
@@ -55,9 +54,6 @@ pub enum RpcError {
     Message(String),
 
     #[error("{}", _0)]
-    SendError(SendError),
-
-    #[error("{}", _0)]
     StorageError(StorageError),
 
     #[error("{}", _0)]
@@ -91,12 +87,6 @@ impl From<CRHError> for RpcError {
 impl From<DPCError> for RpcError {
     fn from(error: DPCError) -> Self {
         RpcError::DPCError(error)
-    }
-}
-
-impl From<SendError> for RpcError {
-    fn from(error: SendError) -> Self {
-        RpcError::SendError(error)
     }
 }
 
@@ -136,14 +126,38 @@ impl From<&'static str> for RpcError {
     }
 }
 
-impl From<std::boxed::Box<dyn std::any::Any + std::marker::Send>> for RpcError {
-    fn from(error: std::boxed::Box<dyn std::any::Any + std::marker::Send>) -> Self {
-        RpcError::Crate("std::boxed::Box", format!("{:?}", error))
+impl From<anyhow::Error> for RpcError {
+    fn from(error: anyhow::Error) -> Self {
+        RpcError::Crate("anyhow", format!("{:?}", error))
     }
 }
 
 impl From<RpcError> for jsonrpc_core::Error {
     fn from(_error: RpcError) -> Self {
         jsonrpc_core::Error::invalid_request()
+    }
+}
+
+impl From<snarkos_toolkit::errors::AddressError> for RpcError {
+    fn from(error: snarkos_toolkit::errors::AddressError) -> Self {
+        RpcError::Crate("snarkos_toolkit::errors::address", format!("{:?}", error))
+    }
+}
+
+impl From<snarkos_toolkit::errors::DPCError> for RpcError {
+    fn from(error: snarkos_toolkit::errors::DPCError) -> Self {
+        RpcError::Crate("snarkos_toolkit::errors::dpc", format!("{:?}", error))
+    }
+}
+
+impl From<snarkos_toolkit::errors::PrivateKeyError> for RpcError {
+    fn from(error: snarkos_toolkit::errors::PrivateKeyError) -> Self {
+        RpcError::Crate("snarkos_toolkit::errors::privatekey", format!("{:?}", error))
+    }
+}
+
+impl From<std::boxed::Box<dyn std::any::Any + std::marker::Send>> for RpcError {
+    fn from(error: std::boxed::Box<dyn std::any::Any + std::marker::Send>) -> Self {
+        RpcError::Crate("std::boxed::Box", format!("{:?}", error))
     }
 }

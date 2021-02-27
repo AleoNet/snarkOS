@@ -10,7 +10,7 @@ commands:
       - run: set -e
       - setup_remote_docker
       - run:
-          name: Prepare envrionment and install dependencies
+          name: Prepare environment and install dependencies
           command: |
             export SCCACHE_CACHE_SIZE=200M
             export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
@@ -43,27 +43,27 @@ commands:
 jobs:
   rust_stable:
     docker:
-      - image: cimg/rust:1.46.0
-    resource_class: xlarge
+      - image: cimg/rust:1.50.0
+    resource_class: 2xlarge
     steps:
       - checkout
       - setup_environment:
           cache_key: snarkos-stable-cache
       - run:
           name: Build and run tests
+          no_output_timeout: 30m
           command: >
-            RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc
-            --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
+            RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
       - persist_to_workspace:
           root: ~/
           paths: project/
       - clear_environment:
           cache_key: snarkos-stable-cache
-  analyse_and_store_coverage:
+  codecov:
     machine:
       image: ubuntu-1604:202004-01
       docker_layer_caching: true
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - attach_workspace:
           at: /home/circleci/project/
@@ -72,21 +72,20 @@ jobs:
           command: >
             cd ~/project/project/ &&
             docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-            howardwu/snarkos-codecov bash /home/circleci/project/ci/kcov.sh
+            howardwu/snarkos-codecov:2021-01-31 bash /home/circleci/project/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
   rust_nightly:
     docker:
-      - image: howardwu/snarkos-ci:2020-08-27
-    resource_class: xlarge
+      - image: howardwu/snarkos-ci:2021-01-31
+    resource_class: 2xlarge
     steps:
       - checkout
       - setup_environment:
           cache_key: snarkos-nightly-cache
-      - run: rustup component add rustfmt
-      - run: cargo fmt -- --check
       - run:
           name: Build and test
-          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip dpc --skip dpc_integration_test --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
+          no_output_timeout: 30m
+          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
       - clear_environment:
           cache_key: snarkos-nightly-cache
 workflows:
@@ -95,6 +94,6 @@ workflows:
     jobs:
       - rust_stable
       - rust_nightly
-      - analyse_and_store_coverage:
+      - codecov:
           requires:
             - rust_stable

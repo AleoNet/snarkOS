@@ -10,13 +10,15 @@ categories = ["cryptography::cryptocurrencies", "operating-systems"]
 include = ["Cargo.toml", "snarkos", "README.md", "LICENSE.md"]
 license = "GPL-3.0"
 edition = "2018"
+build = "build.rs"
 
 [workspace]
 members = [
     "benchmarks",
     "consensus",
+    "metrics",
     "network",
-    "posw",
+    "parameters",
     "profiler",
     "rpc",
     "storage",
@@ -32,27 +34,29 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [dependencies]
-snarkvm-dpc = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-errors = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-models = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-objects = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
-snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "14d1f50", version = "0.0.1" }
+snarkvm-dpc = { version = "0.0.5" }
+snarkvm-errors = { version = "0.0.5" }
+snarkvm-models = { version = "0.0.5" }
+snarkvm-objects = { version = "0.0.5" }
+snarkvm-posw = { version = "0.0.5" }
+snarkvm-utilities = { version = "0.0.5" }
 
 snarkos-consensus = { path = "./consensus", version = "1.1.4" }
 snarkos-network = { path = "./network", version = "1.1.4" }
-snarkos-posw = { path = "./posw", version = "1.1.4" }
 snarkos-rpc = { path = "./rpc", version = "1.1.4" }
 snarkos-storage = { path = "./storage", version = "1.1.4" }
 
+anyhow = { version = "1.0" }
 clap = { version = "2.33.3" }
 colored = { version = "2.0" }
 dirs = { version = "3.0.1" }
 hex = { version = "0.4.1" }
-rand = { version = "0.7" }
-self_update = { version = "0.20.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
+parking_lot = { version = "0.11.1" }
+rand = { version = "0.8" }
+self_update = { version = "0.23.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = { version = "1.0" }
-tokio = { version = "0.2.22", features = ["full"] }
+tokio = { version = "1", features = ["parking_lot", "rt-multi-thread", "macros", "net"] }
 toml = { version = "0.5.6" }
 tracing = { default-features = false, features = ["log"], version = "0.1" }
 tracing-futures = { version = "0.2" }
@@ -63,6 +67,7 @@ rusty-hook = { version = "0.11.2" }
 
 [build-dependencies]
 rustc_version = "0.2"
+capnpc = { version = "0.14", optional = true }
 
 [profile.release]
 opt-level = 3
@@ -86,3 +91,7 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
+
+[features]
+default = []
+compile_capnp_schema = ["capnpc"] # use when the Cap'n Proto schema is updated so that it's recompiled

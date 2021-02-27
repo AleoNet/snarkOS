@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -21,7 +21,7 @@ use snarkvm_objects::AccountAddress;
 use colored::*;
 use std::str::FromStr;
 
-pub fn render_init(config: &Config) -> String {
+pub fn render_welcome(config: &Config) -> String {
     let mut output = String::new();
 
     output += &r#"

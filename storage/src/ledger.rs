@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -15,15 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::StorageError, *};
+use snarkos_parameters::GenesisBlock;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
 use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     genesis::Genesis,
     objects::{LedgerScheme, Transaction},
-    parameters::Parameters,
+    parameters::Parameter,
 };
 use snarkvm_objects::Block;
-use snarkvm_parameters::{GenesisBlock, LedgerMerkleTreeParameters};
+use snarkvm_parameters::LedgerMerkleTreeParameters;
 use snarkvm_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
@@ -31,11 +32,16 @@ use std::{
     fs,
     marker::PhantomData,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
+pub type BlockHeight = u32;
+
 pub struct Ledger<T: Transaction, P: LoadableMerkleParameters> {
-    pub latest_block_height: RwLock<u32>,
+    pub current_block_height: AtomicU32,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
     pub storage: Arc<Storage>,
@@ -63,22 +69,22 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Get the latest block height of the chain.
-    pub fn get_latest_block_height(&self) -> u32 {
-        *self.latest_block_height.read()
+    pub fn get_current_block_height(&self) -> BlockHeight {
+        self.current_block_height.load(Ordering::SeqCst)
     }
 
     /// Get the latest number of blocks in the chain.
-    pub fn get_block_count(&self) -> u32 {
-        *self.latest_block_height.read() + 1
+    pub fn get_block_count(&self) -> BlockHeight {
+        self.get_current_block_height() + 1
     }
 
     /// Get the stored old connected peers.
     pub fn get_peer_book(&self) -> Result<Vec<u8>, StorageError> {
-        Ok(self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())?)
+        self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())
     }
 
     /// Store the connected peers.
-    pub fn store_to_peer_book(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub fn save_peer_book_to_storage(&self, peers_serialized: Vec<u8>) -> Result<(), StorageError> {
         let op = Op::Insert {
             col: COL_META,
             key: KEY_PEER_BOOK.as_bytes().to_vec(),
@@ -135,7 +141,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
                 let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
 
                 Ok(Self {
-                    latest_block_height: RwLock::new(bytes_to_u32(val)),
+                    current_block_height: AtomicU32::new(bytes_to_u32(val)),
                     storage: Arc::new(storage),
                     cm_merkle_tree: RwLock::new(merkle_tree),
                     ledger_parameters,
@@ -165,22 +171,22 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     pub fn catch_up_secondary(&self, update_merkle_tree: bool) -> Result<(), StorageError> {
         // Sync the secondary and primary instances
         if self.storage.db.try_catch_up_with_primary().is_ok() {
-            let latest_block_height_bytes = self.get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?;
-            let new_latest_block_height = bytes_to_u32(latest_block_height_bytes);
-            let mut latest_block_height = self.latest_block_height.write();
+            let current_block_height_bytes = self.get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?;
+            let new_current_block_height = bytes_to_u32(current_block_height_bytes);
+            let current_block_height = self.get_current_block_height();
 
             // If the new block height is greater than the stored block height,
             // update the block height and merkle tree.
-            if new_latest_block_height > *latest_block_height {
+            if new_current_block_height > current_block_height {
                 // Update the latest block height of the secondary instance.
-                *latest_block_height = new_latest_block_height;
+                self.current_block_height
+                    .store(new_current_block_height, Ordering::SeqCst);
 
                 // Optional `cm_merkle_tree` regeneration because not all usages of
                 // the secondary instance requires it.
                 if update_merkle_tree {
                     // Update the Merkle tree of the secondary instance.
-                    let mut merkle_tree = self.cm_merkle_tree.write();
-                    *merkle_tree = self.build_merkle_tree(vec![])?;
+                    *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
                 }
             }
         }

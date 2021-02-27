@@ -1,4 +1,6 @@
-<h1 align="center">snarkOS</h1>
+<p align="center">
+    <img alt="snarkOS" width="1412" src="./.resources/banner.png">
+</p>
 
 <p align="center">
     <a href="https://circleci.com/gh/AleoHQ/snarkOS"><img src="https://circleci.com/gh/AleoHQ/snarkOS.svg?style=svg&circle-token=6e9ad6d39d95350544f352d34e0e5c62ef54db26"></a>

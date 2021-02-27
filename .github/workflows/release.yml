@@ -26,8 +26,6 @@ jobs:
       - name: Build snarkOS
         run: |
           cargo build --all --release && strip target/release/snarkos
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
 
       - id: get_version
         uses: battila7/get-version-action@v2
@@ -68,8 +66,6 @@ jobs:
       - name: Build snarkOS
         run: |
           cargo build --all --release && strip target/release/snarkos
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
 
       - id: get_version
         uses: battila7/get-version-action@v2
@@ -111,8 +107,6 @@ jobs:
       - name: Build snarkOS
         run: |
           cargo build --all --release
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
 
       - id: get_version
         uses: battila7/get-version-action@v2

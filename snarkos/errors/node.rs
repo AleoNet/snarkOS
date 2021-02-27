@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,7 +16,6 @@
 
 use crate::errors::CliError;
 use snarkos_consensus::error::ConsensusError;
-use snarkos_network::errors::ServerError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::{algorithms::CRHError, objects::AccountError};
 
@@ -38,10 +37,10 @@ pub enum NodeError {
     Crate(&'static str, String),
 
     #[error("{}", _0)]
-    Message(String),
+    Error(anyhow::Error),
 
     #[error("{}", _0)]
-    ServerError(ServerError),
+    Message(String),
 
     #[error("{}", _0)]
     StorageError(StorageError),
@@ -77,12 +76,6 @@ impl From<hex::FromHexError> for NodeError {
     }
 }
 
-impl From<ServerError> for NodeError {
-    fn from(error: ServerError) -> Self {
-        NodeError::ServerError(error)
-    }
-}
-
 impl From<StorageError> for NodeError {
     fn from(error: StorageError) -> Self {
         NodeError::StorageError(error)
@@ -104,5 +97,11 @@ impl From<std::net::AddrParseError> for NodeError {
 impl From<std::boxed::Box<dyn std::error::Error>> for NodeError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
         NodeError::Crate("std::boxed::Box", format!("{:?}", error))
+    }
+}
+
+impl From<anyhow::Error> for NodeError {
+    fn from(error: anyhow::Error) -> Self {
+        NodeError::Error(error)
     }
 }

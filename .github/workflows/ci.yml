@@ -2,6 +2,7 @@ name: CI
 on:
   push:
     branches:
+      - staging
       - master
   pull_request:
 env:
@@ -32,8 +33,8 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: -Dwarnings
+#    env:
+#      RUSTFLAGS: -Dwarnings
     strategy:
       matrix:
         rust:
@@ -52,76 +53,14 @@ jobs:
           override: true
           components: clippy
 
-      - name: Check examples
+      - name: Run clippy accross the workspace against all targets
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --examples --all
-
-      - name: Check examples with all features on stable
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --examples --all-features --all
-        if: matrix.rust == 'stable'
-
-      - name: Check benchmarks on nightly
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-features --examples --all --benches
-        if: matrix.rust == 'nightly'
-
-  test:
-    name: Check Tests (Simple)
-    runs-on: [self-hosted, snarkos-ci1]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install Rust (nightly)
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2020-07-13
-          override: true
-
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all --lib
-
-#  test-ga:
-#    name: Check Tests (Simple)
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v2
-#
-#      - name: Install Rust (nightly)
-#        uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: nightly
-#          override: true
-#
-#      - uses: actions/cache@v2
-#        with:
-#          path: |
-#            ~/.cargo/registry
-#            ~/.cargo/git
-#            target
-#          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-#
-#      - name: Test
-#        uses: actions-rs/cargo@v1
-#        with:
-#          command: test
-#          args: --all --lib
+          args: --workspace --all-targets
 
   test-wasm:
-    name: Check Tests (Wasm)
+    name: WASM Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

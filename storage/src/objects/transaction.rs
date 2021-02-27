@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -59,7 +59,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Returns true if the transaction has internal parameters that already exist in the ledger.
-    pub fn transcation_conflicts(&self, transaction: &T) -> bool {
+    pub fn transaction_conflicts(&self, transaction: &T) -> bool {
         let transaction_serial_numbers = transaction.old_serial_numbers();
         let transaction_commitments = transaction.new_commitments();
         let transaction_memo = transaction.memorandum();

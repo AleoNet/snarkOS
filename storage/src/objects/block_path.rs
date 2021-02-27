@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -52,7 +52,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         // The given block header is valid on the canon chain
         if self.get_latest_block()?.header.get_hash() == block_header.previous_block_hash {
-            return Ok(BlockPath::CanonChain(self.get_latest_block_height() + 1));
+            return Ok(BlockPath::CanonChain(self.get_current_block_height() + 1));
         }
 
         let mut side_chain_path = vec![];

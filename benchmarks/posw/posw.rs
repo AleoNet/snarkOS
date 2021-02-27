@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_posw::{txids_to_roots, Marlin, Posw, PoswMarlin, GM17};
-
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_models::algorithms::snark::SNARK;
+use snarkvm_posw::{txids_to_roots, Marlin, Posw, PoswMarlin, GM17};
 use snarkvm_utilities::bytes::FromBytes;
 
 use criterion::{criterion_group, criterion_main, Criterion};

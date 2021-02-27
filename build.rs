@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -18,6 +18,18 @@
 use rustc_version::{version_meta, Channel};
 
 fn main() {
+    #[cfg(feature = "compile_capnp_schema")]
+    {
+        capnpc::CompilerCommand::new()
+            .file(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/network/src/message/payload.capnp"
+            ))
+            .output_path(".")
+            .run()
+            .expect("cap'n'proto network schema compilation failed");
+    }
+
     // Set cfg flags depending on release channel
     match version_meta().unwrap().channel {
         Channel::Stable => println!("cargo:rustc-cfg=stable"),

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -19,6 +19,8 @@ use snarkvm_errors::objects::BlockError;
 use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
 use snarkvm_objects::{Block, BlockHeader, BlockHeaderHash};
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
+
+use std::sync::atomic::Ordering;
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Commit a transaction to the canon chain
@@ -168,11 +170,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Commit/canonize a particular block.
-    pub fn commit(&self, block_header_hash: &BlockHeaderHash) -> Result<(), StorageError> {
-        let block = self.get_block(block_header_hash)?;
+    pub fn commit(&self, block: &Block<T>) -> Result<(), StorageError> {
+        let block_header_hash = block.header.get_hash();
 
         // Check if the block is already in the canon chain
-        if self.is_canon(block_header_hash) {
+        if self.is_canon(&block_header_hash) {
             return Err(StorageError::ExistingCanonBlock(block_header_hash.to_string()));
         }
 
@@ -240,13 +242,13 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         // Update the best block number
 
         let is_genesis = block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
-            && self.get_latest_block_height() == 0
+            && self.get_current_block_height() == 0
             && self.is_empty();
 
-        let mut height = self.latest_block_height.write();
+        let height = self.get_current_block_height();
         let mut new_best_block_number = 0;
         if !is_genesis {
-            new_best_block_number = *height + 1;
+            new_best_block_number = height + 1;
         }
 
         database_transaction.push(Op::Insert {
@@ -283,13 +285,12 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![new_digest]?.to_vec(),
         });
 
-        let mut cm_merkle_tree = self.cm_merkle_tree.write();
-        *cm_merkle_tree = new_merkle_tree;
+        *self.cm_merkle_tree.write() = new_merkle_tree;
 
         self.storage.write(database_transaction)?;
 
         if !is_genesis {
-            *height += 1;
+            self.current_block_height.fetch_add(1, Ordering::SeqCst);
         }
 
         Ok(())
@@ -305,7 +306,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             self.insert_only(&block)?;
         }
         // Commit it
-        self.commit(&block_hash)
+        self.commit(block)
     }
 
     /// Returns true if the block exists in the canon chain.
@@ -320,11 +321,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Revert the chain to the state before the fork.
     pub fn revert_for_fork(&self, side_chain_path: &SideChainPath) -> Result<(), StorageError> {
-        let latest_block_height = self.get_latest_block_height();
+        let current_block_height = self.get_current_block_height();
 
-        if side_chain_path.new_block_number > latest_block_height {
+        if side_chain_path.new_block_number > current_block_height {
             // Decommit all blocks on canon chain up to the shared block number with the side chain.
-            for _ in (side_chain_path.shared_block_number)..latest_block_height {
+            for _ in (side_chain_path.shared_block_number)..current_block_height {
                 self.decommit_latest_block()?;
             }
         }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -15,12 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::ConsensusParameters;
-use snarkos_posw::PoswMarlin;
 use snarkvm_dpc::instantiated::Components;
 use snarkvm_errors::objects::TransactionError;
-use snarkvm_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameters};
+use snarkvm_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameter};
 use snarkvm_objects::Network;
 use snarkvm_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters};
+use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
@@ -49,7 +49,7 @@ pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| {
         max_block_size: 1_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 2i64, //unix seconds
-        network: Network::Mainnet,
+        network_id: Network::Mainnet,
         verifier: PoswMarlin::verify_only().unwrap(),
         authorized_inner_snark_ids: vec![inner_snark_id],
     }

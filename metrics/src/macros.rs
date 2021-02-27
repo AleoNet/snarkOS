@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -52,10 +52,11 @@ macro_rules! connected_peers_dec {
 #[cfg(test)]
 mod tests {
     use crate::Metrics;
-    use snarkos_derives::test_with_metrics;
+    use snarkvm_derives::test_with_metrics;
 
     use serial_test::serial;
 
+    #[allow(clippy::if_same_then_else)]
     fn macro_connected_peers_boolean_test(boolean: bool) {
         // Increment by 1.
         connected_peers_inc!(boolean);

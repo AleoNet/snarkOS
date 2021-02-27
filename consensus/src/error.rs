@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_posw::error::PoswError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::{
     algorithms::CRHError,
     dpc::DPCError,
     objects::{BlockError, TransactionError},
 };
+use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;
 
@@ -104,6 +104,9 @@ pub enum ConsensusError {
 
     #[error("Transactions are spending more funds than they have available")]
     TransactionOverspending,
+
+    #[error("The block is already known")]
+    PreExistingBlock,
 }
 
 impl From<BlockError> for ConsensusError {
@@ -139,12 +142,6 @@ impl From<TransactionError> for ConsensusError {
 impl From<anyhow::Error> for ConsensusError {
     fn from(error: anyhow::Error) -> Self {
         ConsensusError::Crate("anyhow", format!("{:?}", error))
-    }
-}
-
-impl From<bincode::Error> for ConsensusError {
-    fn from(error: bincode::Error) -> Self {
-        ConsensusError::Crate("bincode", format!("{:?}", error))
     }
 }
 

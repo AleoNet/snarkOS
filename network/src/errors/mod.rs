@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,16 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod connect;
-pub use connect::*;
-
-pub mod protocol;
-pub use protocol::*;
-
-pub mod send;
-pub use send::*;
-
-pub mod server;
-pub use server::*;
-
-pub mod message;
+pub mod network;
+pub use network::*;

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,15 +16,17 @@
 
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
-    use snarkos_posw::txids_to_roots;
     use snarkos_testing::consensus::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
+    use snarkvm_posw::txids_to_roots;
+
+    use std::sync::Arc;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<Tx>, parent_header: &BlockHeader) {
-        let consensus = TEST_CONSENSUS.clone();
+        let consensus = Arc::new(TEST_CONSENSUS.clone());
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = Miner::new(miner_address, consensus.clone());
 

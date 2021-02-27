@@ -15,18 +15,18 @@ The snarkOS network protocol establishes a peer-to-peer network of nodes that ma
 
 snarkOS uses TCP connections to facilitate data transfers over the network.
 Networking on snarkOS is built with asynchronous calls in Rust and [tokio.rs](https://docs.rs/tokio/).
-Tokio tasks are spawned to handle new connections and broadcast messages to the main event loop.
+Tokio tasks are spawned to handle new connections and send messages to the main event loop.
 
 snarkOS downloads, verifies, and stores the history of valid blocks and transactions prior to becoming an active node on the network.
 
 ## Peer Discovery
 
-When a node joins the network for the first time, it needs to populate a list of active peers in the network. 
+When a node joins the network for the first time, it needs to populate a list of active peers in the network.
 In order to bootstrap peer discovery, snarkOS includes a set of optional bootnodes which provides an initial set of peers.
 To allow users flexibility, snarkOS provides allows users to configure the initial set of nodes in the configuration file,
 or as a input via a command-line flag.
 
-Once a node is connected to one or more nodes, it may scan the network to discover more peers. 
+Once a node is connected to one or more nodes, it may scan the network to discover more peers.
 This processes starts by asking peers for more connected nodes in the network with a `GetPeers` message,
 followed by attempts to establish a connection with each newly discovered peer.
 
@@ -41,11 +41,7 @@ by enabling new nodes to connect and participate in the network effortlessly.
 
 ## Connecting to Peers
 
-Peer connections are established with a handshake.
-A valid handshake begins with a `Version` message that includes the node's version, block height, and current timestamp.
-The receiver returns with its own `Version` message.
-Then, both nodes send a `Verack` message acknowledging the receipt of the `Version` message
-and establishes a peer connection.
+Peer connections are established with an XX [noise](https://noiseprotocol.org/) handshake.
 
 Peer connections are maintained with a ping-pong protocol that periodically relays `Ping` / `Pong` messages to
 verify that peers are still connected. snarkOS will update its peer book to account for newly-connected peers,
@@ -55,14 +51,14 @@ and disconnected peers.
 
 Before a node can participate in the network, it must sync itself to the latest state of the ledger.
 Whether a node is newly connecting to the network or simply has stale state,
-it must sync with its peers, and download its missing blocks and transactions. 
+it must sync with its peers, and download its missing blocks and transactions.
 
 snarkOS uses a "Header-First" approach to syncing blocks,
-where a node downloads and validates each block header before downloading the corresponding full block, in parallel. 
- 
+where a node downloads and validates each block header before downloading the corresponding full block, in parallel.
+
 When a node determines it needs to download state, it selects a peer as the sync-node and sends it a `GetSync` message.
 The `GetSync` message contains information about the current block state of the node,
-so the sync-node is able to determine which block headers are necessary to send as a response.  
+so the sync-node is able to determine which block headers are necessary to send as a response.
 
 Upon receiving a `GetSync` message, the sync-node sends back at most 100 block headers via a `Sync` message.
 The requester then validates these headers and downloads the blocks in parallel by sending out `GetBlock` messages.
@@ -89,14 +85,8 @@ This transaction continues through the network until it is propagated to every c
 
 A node may broadcast a block using a `Block` message, in the same manner as broadcasting a transaction.
 
-
-
 ## Block
 Send a block to a peer.
-
-### Message Name
-
-`block`
 
 ### Payload
 
@@ -104,10 +94,6 @@ The serialized bytes of the block.
 
 ## GetBlock
 A request for a block with the specified hash.
-
-### Message Name
-
-`getblock`
 
 ### Payload
 
@@ -129,20 +115,12 @@ A request for a peer's memory pool transactions.
 ## GetPeers
 A request for a list of the peer's connected peer addresses.
 
-### Message Name
-
-`getpeers`
-
 ### Payload
 
 `None`
 
 ## GetSync
 A request for knowledge of specified block locator hashes.
-
-### Message Name
-
-`getsync`
 
 ### Payload
 
@@ -153,10 +131,6 @@ A request for knowledge of specified block locator hashes.
 ## MemoryPool
 A response to a `GetMemoryPool` request.
 
-### Message Name
-
-`memorypool`
-
 ### Payload
 
 |    Parameter   | Type  |                  Description                  |
@@ -166,48 +140,30 @@ A response to a `GetMemoryPool` request.
 ## Peers
 A response to a `GetPeers` request.
 
-### Message Name
-
-`peers`
-
 ### Payload
 
-|  Parameter  | Type  |                     Description                     |
-|:-----------:|-------|:---------------------------------------------------:|
-| `addresses` | array | A list of connected peers and their last seen dates |
+|  Parameter  | Type  |                   Description                    |
+|:-----------:|-------|:------------------------------------------------:|
+| `addresses` | array | A list of listening addresses of connected peers |
 
 ## Ping
-A ping protocol request for a `Pong`.
-
-### Message Name
-
-`ping`
+A message used to check if a peer is active and calculate their RTT.
 
 ### Payload
 
-| Parameter | Type   |            Description            |
-|:---------:|--------|:---------------------------------:|
-| `nonce`   | number | A unique ping protocol identifier |
+| Parameter        | Type   |            Description            |
+|:----------------:|--------|:---------------------------------:|
+| `block_height`   | number | The current height of the chain   |
 
 ## Pong
 A response to a `Ping` request.
 
-### Message Name
-
-`pong`
-
 ### Payload
 
-| Parameter | Type   |              Description              |
-|:---------:|--------|:-------------------------------------:|
-| `nonce`   | number | The received ping protocol identifier |
+None.
 
 ## Sync
 A response to a `GetSync` message.
-
-### Message Name
-
-`sync`
 
 ### Payload
 
@@ -218,10 +174,6 @@ A response to a `GetSync` message.
 ## SyncBlock
 A response to a `GetBlock` request.
 
-### Message Name
-
-`syncblock`
-
 ### Payload
 
 | Parameter | Type  |                 Description                 |
@@ -231,54 +183,24 @@ A response to a `GetBlock` request.
 ## Transaction
 A transaction sent by a peer.
 
-### Message Name
-
-`transaction`
-
 ### Payload
 
 | Parameter | Type  |              Description              |
 |:---------:|-------|:-------------------------------------:|
 | `data`    | bytes | The serialized bytes of a transaction |
 
-## Verack
-A handshake response to a `Version` message.
-
-### Message Name
-
-`verack`
-
-### Payload
-
-|      Parameter     |  Type  |           Description          |
-|:------------------:|:------:|:------------------------------:|
-|       `nonce`      | number | Nonce of the `Version` message |
-| `address_receiver` | string |   IP of the message receiver   |
-|  `address_sender`  | string |    IP of the message sender    |
-
 ## Version
-A handshake request for a `Verack` to establish a connection with a potential peer.
-
-### Message Name
-
-`version`
+Sent during the handshake.
 
 ### Payload
 
-|      Parameter     | Type   |                  Description                 |
-|:------------------:|--------|:--------------------------------------------:|
-| `version`          | number | The serialized bytes of a transaction        |
-| `height`           | number | Latest block height of the node              |
-| `nonce`            | number | Random nonce to identify the version message |
-| `timestamp`        | number | Message timestamp                            |
-| `address_receiver` | string | IP of the message receiver                   |
-| `address_sender`   | string | IP of the message sender                     |
-
-
-
+|      Parameter     | Type   |              Description            |
+|:------------------:|--------|:-----------------------------------:|
+| `version`          | number | The version of the network protocol |
+| `listening_port`   | number | The node's listening port           |
 
 ## Contributing
- 
+
 ### How to Update this README
 
 This README is auto-generated during continuous integration.

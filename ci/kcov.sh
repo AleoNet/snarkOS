@@ -1,6 +1,8 @@
 cd /home/circleci/project/ &&
-rm -rf target/debug/base_dpc* && rm -rf target/debug/consensus_dpc* && rm -rf target/debug/consensus_integration* && rm -rf target/debug/miner* && rm -rf target/debug/protected_rpc_tests*
-for file in target/debug/*-*[^\.d];
+echo "---START_LIST---"
+ls target/debug/deps
+echo "---END_LIST---"
+for file in target/debug/deps/snarkos*-*[^\.d];
   do
     mkdir -p "target/cov/$(basename $file)";
     echo "Processing target/cov/$(basename $file)"

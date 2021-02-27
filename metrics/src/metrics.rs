@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -18,11 +18,12 @@ use crate::prometheus::{self, metrics_handler, CONNECTED_PEERS};
 
 use warp::Filter;
 
+#[derive(Default)]
 pub struct Metrics {}
 
 impl Metrics {
     pub fn new() -> Self {
-        Self {}
+        Default::default()
     }
 
     pub async fn start(self) {
@@ -50,7 +51,7 @@ impl Metrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_derives::test_with_metrics;
+    use snarkvm_derives::test_with_metrics;
 
     use serial_test::serial;
 

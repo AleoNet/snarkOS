@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,7 +16,15 @@
 
 use crate::{
     record::tests::*,
-    wasm::{Account, Record, SignatureScheme, SignatureSchemePublicKey, ViewKey},
+    wasm::{
+        Account,
+        Record,
+        SignatureScheme,
+        SignatureSchemePublicKey,
+        TransactionKernel,
+        TransactionKernelBuilder,
+        ViewKey,
+    },
 };
 
 use wasm_bindgen_test::*;
@@ -186,4 +194,23 @@ pub fn signature_verification_test() {
 
     println!("{} == {}", true, signature_verification);
     assert!(signature_verification);
+}
+
+#[wasm_bindgen_test]
+pub fn offline_transaction_test() {
+    let given_private_key = "APrivateKey1tvv5YV1dipNiku2My8jMkqpqCyYKvR5Jq4y2mtjw7s77Zpn";
+    let given_record = "4f6d042c3bc73e412f4b4740ad27354a1b25bb9df93f29313350356aa88dca050080d1f008000000000000000000000000000000000000000000000000000000000000000000000000304e7ae3ef9577877ddcef8f8c5d9b5e3bf544c78c50c51213857f35c33c3502df12f0fb72a0d7c56ccd31a87dada92b00304e7ae3ef9577877ddcef8f8c5d9b5e3bf544c78c50c51213857f35c33c3502df12f0fb72a0d7c56ccd31a87dada92b003f07ea7279544031efc42c1c785f4f403146e6fdbfcae26bfaa61f2d2202fd0117df47122a693ceaf27c4ceabb3c4b619333f4663bb7e85a6e741252ba1c6e11af1e1c74edf8ae1963c3532ec6e05a07f96d6731334bc368f93b428491343004";
+    let given_address = "aleo1faksgtpmculyzt6tgaq26fe4fgdjtwualyljjvfn2q6k42ydegzspfz9uh";
+
+    let builder = TransactionKernelBuilder::new()
+        .add_input(given_private_key, given_record)
+        .add_output(given_address, 10000)
+        .network_id(1);
+
+    let transaction_kernel = builder.build();
+
+    let transaction_kernel_string = transaction_kernel.transaction_kernel.to_string();
+
+    // Offline transaction kernel can be recovered
+    let _transaction_kernel = TransactionKernel::from_string(&transaction_kernel_string);
 }
