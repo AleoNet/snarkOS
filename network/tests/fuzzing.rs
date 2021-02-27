@@ -21,7 +21,7 @@ use snarkos_testing::{
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-pub const ITERATIONS: usize = 50000;
+pub const ITERATIONS: usize = 10000;
 
 #[tokio::test]
 async fn fuzzing_zeroes_pre_handshake() {
