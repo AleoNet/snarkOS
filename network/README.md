@@ -67,12 +67,12 @@ and repeats this process until its chain state is fully up to date.
 
 Here is a basic iteration of the sync protocol:
 
-|   Message  |   Sender  |  Receiver | Data                                |
-|:----------:|:---------:|:---------:|-------------------------------------|
-| `GetSync`  | Node      | Sync Node | 1 or more block hashes              |
-| `Sync`     | Sync Node | Node      | Up to 100 new block headers         |
-| `GetBlock` | Node      | Any Peer  | Block header of the requested block |
-| `Block`    | Any Peer  | Node      | A serialized block                  |
+|   Message   |   Sender  |  Receiver | Data                                  |
+|:-----------:|:---------:|:---------:|---------------------------------------|
+| `GetSync`   | Node      | Sync Node | 1 or more block hashes                |
+| `Sync`      | Sync Node | Node      | Up to 100 new block headers           |
+| `GetBlocks` | Node      | Any Peer  | Block headers of the requested blocks |
+| `Block`     | Any Peer  | Node      | A serialized block                    |
 
 ## Transaction Broadcasting
 
@@ -85,21 +85,31 @@ This transaction continues through the network until it is propagated to every c
 
 A node may broadcast a block using a `Block` message, in the same manner as broadcasting a transaction.
 
+
+
 ## Block
 Send a block to a peer.
+
+### Message Name
+
+`block`
 
 ### Payload
 
 The serialized bytes of the block.
 
-## GetBlock
-A request for a block with the specified hash.
+## GetBlocks
+A request for blocks with the specified hashes.
+
+### Message Name
+
+`getblocks`
 
 ### Payload
 
-|   Parameter  | Type  |              Description              |
-|:------------:|-------|:-------------------------------------:|
-| `block_hash` | bytes | The block hash of the requested block |
+|    Parameter   | Type  |              Description              |
+|:--------------:|-------|:-------------------------------------:|
+| `block_hashes` | array | A list of hashes of blocks to request |
 
 ## GetMemoryPool
 A request for a peer's memory pool transactions.
@@ -115,6 +125,10 @@ A request for a peer's memory pool transactions.
 ## GetPeers
 A request for a list of the peer's connected peer addresses.
 
+### Message Name
+
+`getpeers`
+
 ### Payload
 
 `None`
@@ -122,14 +136,22 @@ A request for a list of the peer's connected peer addresses.
 ## GetSync
 A request for knowledge of specified block locator hashes.
 
+### Message Name
+
+`getsync`
+
 ### Payload
 
-|        Parameter       | Type  |                            Description                            |
-|:----------------------:|-------|:-----------------------------------------------------------------:|
-| `block_locator_hashes` | array | A list block hashes describing the state of the requester's chain |
+|        Parameter       | Type  |                             Description                             |
+|:----------------------:|-------|:--------------------------------------------------------------------:|
+| `block_locator_hashes` | array | A list of block hashes describing the state of the requester's chain |
 
 ## MemoryPool
 A response to a `GetMemoryPool` request.
+
+### Message Name
+
+`memorypool`
 
 ### Payload
 
@@ -140,6 +162,10 @@ A response to a `GetMemoryPool` request.
 ## Peers
 A response to a `GetPeers` request.
 
+### Message Name
+
+`peers`
+
 ### Payload
 
 |  Parameter  | Type  |                   Description                    |
@@ -148,6 +174,10 @@ A response to a `GetPeers` request.
 
 ## Ping
 A message used to check if a peer is active and calculate their RTT.
+
+### Message Name
+
+`ping`
 
 ### Payload
 
@@ -158,12 +188,20 @@ A message used to check if a peer is active and calculate their RTT.
 ## Pong
 A response to a `Ping` request.
 
+### Message Name
+
+`pong`
+
 ### Payload
 
-None.
+`None`
 
 ## Sync
 A response to a `GetSync` message.
+
+### Message Name
+
+`sync`
 
 ### Payload
 
@@ -174,6 +212,10 @@ A response to a `GetSync` message.
 ## SyncBlock
 A response to a `GetBlock` request.
 
+### Message Name
+
+`syncblock`
+
 ### Payload
 
 | Parameter | Type  |                 Description                 |
@@ -182,6 +224,10 @@ A response to a `GetBlock` request.
 
 ## Transaction
 A transaction sent by a peer.
+
+### Message Name
+
+`transaction`
 
 ### Payload
 
@@ -192,6 +238,10 @@ A transaction sent by a peer.
 ## Version
 Sent during the handshake.
 
+### Message Name
+
+`version`
+
 ### Payload
 
 |      Parameter     | Type   |              Description            |
@@ -199,8 +249,11 @@ Sent during the handshake.
 | `version`          | number | The version of the network protocol |
 | `listening_port`   | number | The node's listening port           |
 
-## Contributing
 
+
+
+## Contributing
+ 
 ### How to Update this README
 
 This README is auto-generated during continuous integration.
