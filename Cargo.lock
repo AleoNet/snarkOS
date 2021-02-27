@@ -2744,6 +2744,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-parameters"
+version = "1.1.4"
+dependencies = [
+ "chrono",
+ "curl",
+ "hex",
+ "parking_lot 0.11.1",
+ "rand 0.8.3",
+ "snarkos-consensus",
+ "snarkos-storage",
+ "snarkvm-algorithms",
+ "snarkvm-curves",
+ "snarkvm-dpc",
+ "snarkvm-errors",
+ "snarkvm-marlin",
+ "snarkvm-models",
+ "snarkvm-objects",
+ "snarkvm-parameters",
+ "snarkvm-posw",
+ "snarkvm-utilities",
+]
+
+[[package]]
 name = "snarkos-profiler"
 version = "1.1.4"
 dependencies = [
@@ -2796,6 +2819,7 @@ dependencies = [
  "rocksdb",
  "serde",
  "snarkos-consensus",
+ "snarkos-parameters",
  "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-curves",
@@ -2819,6 +2843,7 @@ dependencies = [
  "rand_xorshift",
  "snarkos-consensus",
  "snarkos-network",
+ "snarkos-parameters",
  "snarkos-storage",
  "snarkvm-algorithms",
  "snarkvm-curves",

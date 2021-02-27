@@ -1,29 +1,32 @@
 // Copyright (C) 2019-2021 Aleo Systems Inc.
-// This file is part of the snarkVM library.
+// This file is part of the snarkOS library.
 
-// The snarkVM library is free software: you can redistribute it and/or modify
+// The snarkOS library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkVM library is distributed in the hope that it will be useful,
+// The snarkOS library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::base_dpc::{
-    instantiated::Components, transaction::DPCTransaction, BaseDPCComponents,
-};
+use snarkos_parameters::transaction_1::Transaction1;
+
+use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
 use snarkvm_errors::objects::TransactionError;
 use snarkvm_models::genesis::Genesis;
 use snarkvm_objects::{
-    BlockHeader, BlockHeaderHash, DPCTransactions, MerkleRootHash, PedersenMerkleRootHash,
+    BlockHeader,
+    BlockHeaderHash,
+    DPCTransactions,
+    MerkleRootHash,
+    PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
-use snarkvm_parameters::Transaction1;
 use snarkvm_utilities::bytes::FromBytes;
 
 use chrono::Utc;

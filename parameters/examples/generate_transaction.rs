@@ -1,18 +1,18 @@
 // Copyright (C) 2019-2021 Aleo Systems Inc.
-// This file is part of the snarkVM library.
+// This file is part of the snarkOS library.
 
-// The snarkVM library is free software: you can redistribute it and/or modify
+// The snarkOS library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkVM library is distributed in the hope that it will be useful,
+// The snarkOS library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
@@ -23,7 +23,7 @@ use snarkvm_models::{
     algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
     dpc::{DPCComponents, DPCScheme},
     objects::{account::AccountScheme, Transaction},
-    parameters::Parameters,
+    parameters::Parameter,
 };
 use snarkvm_objects::{Account, AccountAddress, Network};
 use snarkvm_parameters::LedgerMerkleTreeParameters;
@@ -52,13 +52,13 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
     let storage = Storage::open_cf(path, NUM_COLS)
         .map(|storage| storage)
-        .map_err(|err| LedgerError::StorageError(err))?;
+        .map_err(|err| LedgerError::Message(err.to_string()))?;
 
     let leaves: Vec<[u8; 32]> = vec![];
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
 
     Ok(Ledger {
-        current_block_height: RwLock::new(0),
+        current_block_height: Default::default(),
         storage: Arc::new(storage),
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
         ledger_parameters: parameters,
