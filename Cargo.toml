@@ -1,29 +1,35 @@
 [package]
 name = "snarkos"
-version = "1.1.4"
-authors = ["The Aleo Team <hello@aleo.org>"]
+version = "1.2.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
-categories = ["cryptography::cryptocurrencies", "operating-systems"]
-include = ["Cargo.toml", "snarkos", "README.md", "LICENSE.md"]
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "snarkos", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 build = "build.rs"
 
 [workspace]
 members = [
-    "benchmarks",
-    "consensus",
-    "metrics",
-    "network",
-    "parameters",
-    "profiler",
-    "rpc",
-    "storage",
-    "testing",
-    "toolkit",
+  "benchmarks",
+  "consensus",
+  "metrics",
+  "network",
+  "parameters",
+  "profiler",
+  "rpc",
+  "storage",
+  "testing",
+  "toolkit"
 ]
 
 [lib]
@@ -33,41 +39,104 @@ path = "snarkos/lib.rs"
 name = "snarkos"
 path = "snarkos/main.rs"
 
-[dependencies]
-snarkvm-dpc = { version = "0.0.5" }
-snarkvm-errors = { version = "0.0.5" }
-snarkvm-models = { version = "0.0.5" }
-snarkvm-objects = { version = "0.0.5" }
-snarkvm-posw = { version = "0.0.5" }
-snarkvm-utilities = { version = "0.0.5" }
+[dependencies.snarkvm-dpc]
+version = "0.0.5"
 
-snarkos-consensus = { path = "./consensus", version = "1.1.4" }
-snarkos-network = { path = "./network", version = "1.1.4" }
-snarkos-rpc = { path = "./rpc", version = "1.1.4" }
-snarkos-storage = { path = "./storage", version = "1.1.4" }
+[dependencies.snarkvm-errors]
+version = "0.0.5"
 
-anyhow = { version = "1.0" }
-clap = { version = "2.33.3" }
-colored = { version = "2.0" }
-dirs = { version = "3.0.1" }
-hex = { version = "0.4.1" }
-parking_lot = { version = "0.11.1" }
-rand = { version = "0.8" }
-self_update = { version = "0.23.0", features = ["archive-zip", "compression-zip-bzip2", "compression-zip-deflate", "compression-flate2"] }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = { version = "1.0" }
-tokio = { version = "1", features = ["parking_lot", "rt-multi-thread", "macros", "net"] }
-toml = { version = "0.5.6" }
-tracing = { default-features = false, features = ["log"], version = "0.1" }
-tracing-futures = { version = "0.2" }
-tracing-subscriber = { version = "0.2" }
+[dependencies.snarkvm-models]
+version = "0.0.5"
 
-[dev-dependencies]
-rusty-hook = { version = "0.11.2" }
+[dependencies.snarkvm-objects]
+version = "0.0.5"
+
+[dependencies.snarkvm-posw]
+version = "0.0.5"
+
+[dependencies.snarkvm-utilities]
+version = "0.0.5"
+
+[dependencies.snarkos-consensus]
+path = "./consensus"
+version = "1.2.0"
+
+[dependencies.snarkos-network]
+path = "./network"
+version = "1.2.0"
+
+[dependencies.snarkos-rpc]
+path = "./rpc"
+version = "1.2.0"
+
+[dependencies.snarkos-storage]
+path = "./storage"
+version = "1.2.0"
+
+[dependencies.anyhow]
+version = "1.0"
+
+[dependencies.clap]
+version = "2.33.3"
+
+[dependencies.colored]
+version = "2.0"
+
+[dependencies.dirs]
+version = "3.0.1"
+
+[dependencies.hex]
+version = "0.4.1"
+
+[dependencies.parking_lot]
+version = "0.11.1"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.self_update]
+version = "0.23.0"
+features = [
+  "archive-zip",
+  "compression-zip-bzip2",
+  "compression-zip-deflate",
+  "compression-flate2"
+]
+
+[dependencies.serde]
+version = "1.0"
+features = [ "derive" ]
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.tokio]
+version = "1"
+features = [ "parking_lot", "rt-multi-thread", "macros", "net" ]
+
+[dependencies.toml]
+version = "0.5.6"
+
+[dependencies.tracing]
+default-features = false
+features = [ "log" ]
+version = "0.1"
+
+[dependencies.tracing-futures]
+version = "0.2"
+
+[dependencies.tracing-subscriber]
+version = "0.2"
+
+[dev-dependencies.rusty-hook]
+version = "0.11.2"
 
 [build-dependencies]
 rustc_version = "0.2"
-capnpc = { version = "0.14", optional = true }
+
+  [build-dependencies.capnpc]
+  version = "0.14"
+  optional = true
 
 [profile.release]
 opt-level = 3
@@ -86,12 +155,12 @@ debug-assertions = false
 opt-level = 0
 
 [profile.test]
-opt-level = 3 # necessary for DPC testing
+opt-level = 3
 lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
 
 [features]
-default = []
-compile_capnp_schema = ["capnpc"] # use when the Cap'n Proto schema is updated so that it's recompiled
+default = [ ]
+compile_capnp_schema = [ "capnpc" ]

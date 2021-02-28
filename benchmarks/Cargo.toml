@@ -1,13 +1,19 @@
 [package]
 name = "snarkos-benchmarks"
-version = "1.1.4"
-authors = ["The Aleo Team <hello@aleo.org>"]
+version = "1.2.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Benchmarks for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
-categories = ["cryptography::cryptocurrencies", "operating-systems"]
-include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
@@ -26,23 +32,58 @@ name = "posw"
 path = "posw/posw.rs"
 harness = false
 
-[dependencies]
-snarkvm-curves = { version = "0.0.5" }
-snarkvm-marlin = { version = "0.0.5" }
-snarkvm-models = { version = "0.0.5" }
-snarkvm-posw = { version = "0.0.5", features = ["test-helpers"] }
-snarkvm-utilities = { version = "0.0.5" }
+[dependencies.snarkvm-curves]
+version = "0.0.5"
 
-snarkos-profiler = { path = "../profiler", version = "1.1.4" }
-snarkos-network = { path = "../network", version = "1.1.4" }
-snarkos-testing = { path = "../testing", version = "1.1.4" }
+[dependencies.snarkvm-marlin]
+version = "0.0.5"
 
-csv = { version = "1" }
-derivative = { version = "2" }
-digest = { version = "0.7" }
-rand = { version = "0.8" }
-rayon = { version = "1" }
-smallvec = { version = "1.6" }
-criterion = { version = "0.3.4", features = ["async_tokio"] }
-rand_xorshift = { version = "0.3" }
-tokio = { version = "1" }
+[dependencies.snarkvm-models]
+version = "0.0.5"
+
+[dependencies.snarkvm-posw]
+version = "0.0.5"
+features = [ "test-helpers" ]
+
+[dependencies.snarkvm-utilities]
+version = "0.0.5"
+
+[dependencies.snarkos-profiler]
+path = "../profiler"
+version = "1.2.0"
+
+[dependencies.snarkos-network]
+path = "../network"
+version = "1.2.0"
+
+[dependencies.snarkos-testing]
+path = "../testing"
+version = "1.2.0"
+
+[dependencies.csv]
+version = "1"
+
+[dependencies.derivative]
+version = "2"
+
+[dependencies.digest]
+version = "0.7"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.rayon]
+version = "1"
+
+[dependencies.smallvec]
+version = "1.6"
+
+[dependencies.criterion]
+version = "0.3.4"
+features = [ "async_tokio" ]
+
+[dependencies.rand_xorshift]
+version = "0.3"
+
+[dependencies.tokio]
+version = "1"

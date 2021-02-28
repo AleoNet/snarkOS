@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-parameters"
-version = "1.1.4"
+version = "1.2.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Parameters for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -17,29 +17,67 @@ include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies]
-snarkvm-algorithms = { version = "0.0.5", default-features = false  }
-snarkvm-errors = { version = "0.0.5", default-features = false }
-snarkvm-models = { version = "0.0.5", default-features = false }
-snarkvm-utilities = { version = "0.0.5", default-features = false }
+[dependencies.snarkvm-algorithms]
+version = "0.0.5"
+default-features = false
 
-curl = { version = "0.4.34", optional = true }
+[dependencies.snarkvm-errors]
+version = "0.0.5"
+default-features = false
 
-[dev-dependencies]
-snarkvm-curves = { version = "0.0.5" }
-snarkvm-dpc = { version = "0.0.5" }
-snarkvm-marlin = { version = "0.0.5" }
-snarkvm-objects = { version = "0.0.5" }
-snarkvm-parameters = { version = "0.0.5" }
-snarkvm-posw = { version = "0.0.5" }
-snarkos-consensus = { path = "../consensus", version = "1.1.4" }
-snarkos-storage = { path = "../storage", version = "1.1.4" }
+[dependencies.snarkvm-models]
+version = "0.0.5"
+default-features = false
 
-chrono = { version = "0.4", features = ["serde"] }
-curl = { version = "0.4.34" }
-hex = { version = "0.4.2" }
-parking_lot = { version = "0.11.1" }
-rand = { version = "0.8" }
+[dependencies.snarkvm-utilities]
+version = "0.0.5"
+default-features = false
+
+[dependencies.curl]
+version = "0.4.34"
+optional = true
+
+[dev-dependencies.snarkvm-curves]
+version = "0.0.5"
+
+[dev-dependencies.snarkvm-dpc]
+version = "0.0.5"
+
+[dev-dependencies.snarkvm-marlin]
+version = "0.0.5"
+
+[dev-dependencies.snarkvm-objects]
+version = "0.0.5"
+
+[dev-dependencies.snarkvm-parameters]
+version = "0.0.5"
+
+[dev-dependencies.snarkvm-posw]
+version = "0.0.5"
+
+[dev-dependencies.snarkos-consensus]
+path = "../consensus"
+version = "1.1.4"
+
+[dev-dependencies.snarkos-storage]
+path = "../storage"
+version = "1.1.4"
+
+[dev-dependencies.chrono]
+version = "0.4"
+features = [ "serde" ]
+
+[dev-dependencies.curl]
+version = "0.4.34"
+
+[dev-dependencies.hex]
+version = "0.4.2"
+
+[dev-dependencies.parking_lot]
+version = "0.11.1"
+
+[dev-dependencies.rand]
+version = "0.8"
 
 [features]
 default = [

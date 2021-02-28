@@ -1,24 +1,42 @@
 [package]
 name = "snarkos-metrics"
-version = "1.1.4"
-authors = ["The Aleo Team <hello@aleo.org>"]
+version = "1.2.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Metrics for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
-categories = ["cryptography::cryptocurrencies", "operating-systems"]
-include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies]
-futures-util = { version = "0.3.5", default-features = false }
-lazy_static = { version = "1.4" }
-prometheus = { version = "0.11", features = ["process"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-warp = { version = "0.3" }
+[dependencies.futures-util]
+version = "0.3.5"
+default-features = false
 
-[dev-dependencies]
-snarkvm-derives = { version = "0.0.5" }
+[dependencies.lazy_static]
+version = "1.4"
 
-serial_test = { version = "0.5.0" }
+[dependencies.prometheus]
+version = "0.11"
+features = [ "process" ]
+
+[dependencies.tokio]
+version = "1"
+features = [ "macros", "rt-multi-thread" ]
+
+[dependencies.warp]
+version = "0.3"
+
+[dev-dependencies.snarkvm-derives]
+version = "0.0.5"
+
+[dev-dependencies.serial_test]
+version = "0.5.0"

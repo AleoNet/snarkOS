@@ -1,42 +1,86 @@
 [package]
 name = "snarkos-consensus"
-version = "1.1.4"
-authors = ["The Aleo Team <hello@aleo.org>"]
+version = "1.2.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Consensus for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
-categories = ["cryptography::cryptocurrencies", "operating-systems"]
-include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies]
-snarkvm-algorithms = { version = "0.0.5" }
-snarkvm-curves = { version = "0.0.5" }
-snarkvm-dpc = { version = "0.0.5" }
-snarkvm-errors = { version = "0.0.5" }
-snarkvm-models = { version = "0.0.5" }
-snarkvm-objects = { version = "0.0.5" }
-snarkvm-posw = { version = "0.0.5" }
-snarkvm-utilities = { version = "0.0.5" }
+[dependencies.snarkvm-algorithms]
+version = "0.0.5"
 
-snarkos-profiler = { path = "../profiler", version = "1.1.4"}
-snarkos-storage = { path = "../storage", version = "1.1.4"}
+[dependencies.snarkvm-curves]
+version = "0.0.5"
 
-anyhow = { version = "1.0.37" }
-chrono = { version = "0.4", features = ["serde"] }
-hex = { version = "0.4.2" }
-parking_lot = { version = "0.11.1" }
-rand = { version = "0.8" }
-thiserror = { version = "1.0" }
-tracing = { default-features = false, features = ["log"], version = "0.1" }
+[dependencies.snarkvm-dpc]
+version = "0.0.5"
 
-[dev-dependencies]
-snarkos-testing = { path = "../testing" }
+[dependencies.snarkvm-errors]
+version = "0.0.5"
 
-criterion = { version = "0.3" }
-rand_xorshift = { version = "0.3" }
+[dependencies.snarkvm-models]
+version = "0.0.5"
+
+[dependencies.snarkvm-objects]
+version = "0.0.5"
+
+[dependencies.snarkvm-posw]
+version = "0.0.5"
+
+[dependencies.snarkvm-utilities]
+version = "0.0.5"
+
+[dependencies.snarkos-profiler]
+path = "../profiler"
+version = "1.2.0"
+
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "1.2.0"
+
+[dependencies.anyhow]
+version = "1.0.37"
+
+[dependencies.chrono]
+version = "0.4"
+features = [ "serde" ]
+
+[dependencies.hex]
+version = "0.4.2"
+
+[dependencies.parking_lot]
+version = "0.11.1"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.tracing]
+default-features = false
+features = [ "log" ]
+version = "0.1"
+
+[dev-dependencies.snarkos-testing]
+path = "../testing"
+
+[dev-dependencies.criterion]
+version = "0.3"
+
+[dev-dependencies.rand_xorshift]
+version = "0.3"
 
 [[bench]]
 name = "transactions"
