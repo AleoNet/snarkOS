@@ -53,7 +53,7 @@ version = "0.0.5"
 version = "0.0.5"
 
 [dev-dependencies.snarkvm-posw]
-version = "0.0.5"
+version = "0.0.6"
 
 [dev-dependencies.snarkos-consensus]
 path = "../consensus"
