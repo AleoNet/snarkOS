@@ -42,7 +42,7 @@ impl Node {
         if !self.environment.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
             let min_peers = self.environment.minimum_number_of_connected_peers() as usize;
-            if self.can_connect() && number_of_connected_peers < min_peers {
+            if number_of_connected_peers < min_peers {
                 // Attempt to connect to the default bootnodes of the network.
                 self.connect_to_bootnodes().await;
 
@@ -199,9 +199,11 @@ impl Node {
             .filter(|addr| !connected_peers.contains_key(addr))
             .copied()
         {
-            if let Err(e) = self.initiate_connection(bootnode_address).await {
-                warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                let _ = self.disconnect_from_peer(bootnode_address);
+            if self.can_connect() {
+                if let Err(e) = self.initiate_connection(bootnode_address).await {
+                    warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                    let _ = self.disconnect_from_peer(bootnode_address);
+                }
             }
         }
     }
@@ -221,9 +223,11 @@ impl Node {
             .choose_multiple(&mut rand::thread_rng(), count);
 
         for remote_address in random_peers {
-            if let Err(e) = self.initiate_connection(remote_address).await {
-                trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
-                let _ = self.disconnect_from_peer(remote_address);
+            if self.can_connect() {
+                if let Err(e) = self.initiate_connection(remote_address).await {
+                    trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+                    let _ = self.disconnect_from_peer(remote_address);
+                }
             }
         }
     }
