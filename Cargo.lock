@@ -2635,7 +2635,7 @@ dependencies = [
  "snarkos-rpc",
  "snarkos-storage",
  "snarkvm-dpc",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-posw",
@@ -2688,7 +2688,7 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-posw",
@@ -2732,7 +2732,7 @@ dependencies = [
  "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-dpc",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
@@ -2757,7 +2757,7 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-marlin",
  "snarkvm-models",
  "snarkvm-objects",
@@ -2798,7 +2798,7 @@ dependencies = [
  "snarkos-testing",
  "snarkos-toolkit",
  "snarkvm-dpc",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
@@ -2823,7 +2823,7 @@ dependencies = [
  "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-curves",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-parameters",
@@ -2848,7 +2848,7 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-parameters",
@@ -2873,7 +2873,7 @@ dependencies = [
  "rand_chacha 0.3.0",
  "snarkvm-algorithms",
  "snarkvm-dpc",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.6",
  "snarkvm-models",
  "snarkvm-objects",
  "snarkvm-utilities",
@@ -2897,7 +2897,7 @@ dependencies = [
  "rayon",
  "sha2",
  "smallvec",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-models",
  "snarkvm-profiler",
  "snarkvm-utilities",
@@ -2914,7 +2914,7 @@ dependencies = [
  "rand_xorshift",
  "rustc_version 0.3.3",
  "serde",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-models",
  "snarkvm-utilities",
 ]
@@ -2946,7 +2946,7 @@ dependencies = [
  "rand 0.8.3",
  "snarkvm-algorithms",
  "snarkvm-curves",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-gadgets",
  "snarkvm-models",
  "snarkvm-objects",
@@ -2970,6 +2970,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkvm-errors"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce13866aa05abf33972261ab9803b2f223bd5bee9e5336aac0618c2aa8249f24"
+dependencies = [
+ "base58",
+ "bech32",
+ "bincode",
+ "curl",
+ "hex",
+ "thiserror",
+]
+
+[[package]]
 name = "snarkvm-gadgets"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2980,7 +2994,7 @@ dependencies = [
  "itertools 0.10.0",
  "snarkvm-algorithms",
  "snarkvm-curves",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-models",
  "snarkvm-utilities",
 ]
@@ -2998,7 +3012,7 @@ dependencies = [
  "rand_core 0.6.2",
  "rayon",
  "snarkvm-algorithms",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-models",
  "snarkvm-polycommit",
  "snarkvm-profiler",
@@ -3021,7 +3035,7 @@ dependencies = [
  "rand 0.8.3",
  "rand_xorshift",
  "serde",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-utilities",
 ]
 
@@ -3042,7 +3056,7 @@ dependencies = [
  "sha2",
  "snarkvm-algorithms",
  "snarkvm-curves",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-models",
  "snarkvm-utilities",
 ]
@@ -3056,7 +3070,7 @@ dependencies = [
  "curl",
  "hex",
  "snarkvm-algorithms",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-models",
  "snarkvm-utilities",
 ]
@@ -3071,7 +3085,7 @@ dependencies = [
  "digest 0.9.0",
  "rand_core 0.6.2",
  "snarkvm-algorithms",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-models",
  "snarkvm-profiler",
  "snarkvm-utilities",
@@ -3087,7 +3101,7 @@ dependencies = [
  "rand 0.8.3",
  "snarkvm-algorithms",
  "snarkvm-curves",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
  "snarkvm-gadgets",
  "snarkvm-marlin",
  "snarkvm-models",
@@ -3114,7 +3128,7 @@ dependencies = [
  "bincode",
  "rand 0.8.3",
  "snarkvm-derives",
- "snarkvm-errors",
+ "snarkvm-errors 0.0.5",
 ]
 
 [[package]]

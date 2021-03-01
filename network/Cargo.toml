@@ -24,7 +24,7 @@ version = "0.0.5"
 version = "0.0.5"
 
 [dependencies.snarkvm-errors]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-models]
 version = "0.0.5"
