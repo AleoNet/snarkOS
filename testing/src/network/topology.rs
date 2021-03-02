@@ -73,17 +73,21 @@ async fn ring(nodes: &mut Vec<Node>) {
     nodes.last_mut().unwrap().environment.bootnodes.push(first_addr);
 }
 
-/// Connects the network nodes in a mesh topology.
+/// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
+/// minimum number of connected peers value.
 async fn mesh(nodes: &mut Vec<Node>) {
-    let mut connected_pairs = HashSet::new();
+    let local_addresses: Vec<SocketAddr> = nodes.iter().map(|node| node.local_address().unwrap()).collect();
 
-    for i in 0..nodes.len() {
-        for j in 0..nodes.len() {
-            if i != j && connected_pairs.insert((i, j)) && connected_pairs.insert((j, i)) {
-                let addr = nodes[j].local_address().unwrap();
-                nodes[i].environment.bootnodes.push(addr);
-            }
-        }
+    for node in nodes {
+        use rand::seq::SliceRandom;
+        let random_addrs = local_addresses
+            .choose_multiple(
+                &mut rand::thread_rng(),
+                node.environment.minimum_number_of_connected_peers().into(),
+            )
+            .copied()
+            .collect();
+        node.environment.bootnodes = random_addrs;
     }
 }
 
