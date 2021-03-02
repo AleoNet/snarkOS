@@ -47,7 +47,7 @@ async fn start_nodes(nodes: &Vec<Node>) {
     for node in nodes {
         // Nodes are started with a slight delay to avoid having peering intervals in phase (this
         // is the hypothetical real-world worst case scenario).
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         node.start_services().await;
     }
 }
@@ -117,21 +117,17 @@ async fn mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 5,
-        min_peers: MIN_PEERS as u16,
-        max_peers: MAX_PEERS as u16,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Mesh).await;
     start_nodes(&nodes).await;
 
-    let density = || {
-        let connections = total_connection_count(&nodes);
-        network_density(N as f64, connections as f64)
-    };
-
-    wait_until!(10, density() >= 0.1);
-    assert!(degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS);
+    // Set the sleep interval to 200ms to avoid lock issues.
+    wait_until!(15, density(&nodes) >= 0.1, 200);
+    wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -140,20 +136,16 @@ async fn line_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
-        min_peers: MIN_PEERS as u16,
-        max_peers: MAX_PEERS as u16,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Line).await;
     start_nodes(&nodes).await;
 
-    let density = || {
-        let connections = total_connection_count(&nodes);
-        network_density(N as f64, connections as f64)
-    };
-    wait_until!(10, density() >= 0.1);
-    assert!(degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS);
+    wait_until!(10, density(&nodes) >= 0.1, 200);
+    wait_until!(10, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -162,20 +154,16 @@ async fn ring_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
-        min_peers: MIN_PEERS as u16,
-        max_peers: MAX_PEERS as u16,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Ring).await;
     start_nodes(&nodes).await;
 
-    let density = || {
-        let connections = total_connection_count(&nodes);
-        network_density(N as f64, connections as f64)
-    };
-    wait_until!(10, density() >= 0.1);
-    assert!(degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS);
+    wait_until!(10, density(&nodes) >= 0.1, 200);
+    wait_until!(10, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -184,20 +172,16 @@ async fn star_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
-        min_peers: MIN_PEERS as u16,
-        max_peers: MAX_PEERS as u16,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Star).await;
     start_nodes(&nodes).await;
 
-    let density = || {
-        let connections = total_connection_count(&nodes);
-        network_density(N as f64, connections as f64)
-    };
-    wait_until!(10, density() >= 0.1);
-    assert!(degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS);
+    wait_until!(15, density(&nodes) >= 0.1, 200);
+    wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -282,7 +266,7 @@ async fn binary_star_contact() {
     wait_until!(10, density() >= 0.3);
 }
 
-fn total_connection_count(nodes: &Vec<Node>) -> usize {
+fn total_connection_count(nodes: &[Node]) -> usize {
     let mut count = 0;
 
     for node in nodes {
@@ -301,6 +285,11 @@ fn total_connection_count(nodes: &Vec<Node>) -> usize {
 //      - degree centrality (covered by the number of connected peers)
 //      - eigenvector centrality (tbd)
 
+fn density(nodes: &[Node]) -> f64 {
+    let connections = total_connection_count(nodes);
+    network_density(nodes.len() as f64, connections as f64)
+}
+
 fn network_density(n: f64, ac: f64) -> f64 {
     // Calculate the total number of possible connections given a node count.
     let pc = n * (n - 1.0) / 2.0;
@@ -308,7 +297,7 @@ fn network_density(n: f64, ac: f64) -> f64 {
     ac / pc
 }
 
-fn degree_centrality_delta(nodes: &Vec<Node>) -> u16 {
+fn degree_centrality_delta(nodes: &[Node]) -> u16 {
     let dc = nodes
         .iter()
         .map(|node| node.peer_book.read().number_of_connected_peers());
