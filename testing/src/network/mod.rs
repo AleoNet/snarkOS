@@ -50,13 +50,18 @@ pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
 /// Uses polling to cut down on time otherwise used by calling `sleep` in tests.
 #[macro_export]
 macro_rules! wait_until {
-    ($limit_secs: expr, $condition: expr) => {
+    ($limit_secs: expr, $condition: expr $(, $sleep_secs: expr)?) => {
         let now = std::time::Instant::now();
         loop {
             if $condition {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+            // Default timout.
+            let sleep = 10;
+            // Set if present in args.
+            $(let sleep = $sleep_secs;)?
+            tokio::time::sleep(std::time::Duration::from_millis(sleep)).await;
             if now.elapsed() > std::time::Duration::from_secs($limit_secs) {
                 panic!("timed out!");
             }
