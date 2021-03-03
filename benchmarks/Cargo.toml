@@ -33,20 +33,20 @@ path = "posw/posw.rs"
 harness = false
 
 [dependencies.snarkvm-curves]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-marlin]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-models]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-posw]
-version = "0.0.5"
+version = "0.0.6"
 features = [ "test-helpers" ]
 
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"

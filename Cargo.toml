@@ -40,22 +40,22 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [dependencies.snarkvm-dpc]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-errors]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-models]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-objects]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-posw]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkos-consensus]
 path = "./consensus"
