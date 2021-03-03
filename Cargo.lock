@@ -2711,7 +2711,7 @@ dependencies = [
  "lazy_static",
  "prometheus",
  "serial_test",
- "snarkvm-derives",
+ "snarkvm-derives 0.0.6",
  "tokio 1.2.0",
  "warp",
 ]
@@ -2941,6 +2941,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkvm-derives"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b3339f816745870549adbcf7f5b1db3441c8d73377278fec9c7829a87ebdc07"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "snarkvm-dpc"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3121,7 +3134,7 @@ checksum = "872c2ee1675c5039caf8cb4c5ef37b0ad844ffe7e0d81b68fb39f713da199561"
 dependencies = [
  "bincode",
  "rand 0.8.3",
- "snarkvm-derives",
+ "snarkvm-derives 0.0.5",
  "snarkvm-errors",
 ]
 
