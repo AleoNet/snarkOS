@@ -107,13 +107,11 @@ async fn star() {
     start_nodes(&nodes).await;
 
     let hub = nodes.first().unwrap();
-    wait_until!(5, hub.peer_book.read().number_of_connected_peers() as usize == N - 1);
+    wait_until!(10, hub.peer_book.read().number_of_connected_peers() as usize == N - 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
 async fn mesh() {
-    tracing_subscriber::fmt::init();
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 5,
@@ -126,12 +124,11 @@ async fn mesh() {
     start_nodes(&nodes).await;
 
     // Set the sleep interval to 200ms to avoid lock issues.
-    wait_until!(15, density(&nodes) >= 0.1, 200);
+    wait_until!(15, network_density(&nodes) >= 0.1, 200);
     wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
 async fn line_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
@@ -144,12 +141,11 @@ async fn line_into_mesh() {
     connect_nodes(&mut nodes, Topology::Line).await;
     start_nodes(&nodes).await;
 
-    wait_until!(10, density(&nodes) >= 0.1, 200);
+    wait_until!(10, network_density(&nodes) >= 0.1, 200);
     wait_until!(10, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
 async fn ring_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
@@ -162,12 +158,11 @@ async fn ring_into_mesh() {
     connect_nodes(&mut nodes, Topology::Ring).await;
     start_nodes(&nodes).await;
 
-    wait_until!(10, density(&nodes) >= 0.1, 200);
+    wait_until!(10, network_density(&nodes) >= 0.1, 200);
     wait_until!(10, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
 async fn star_into_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
@@ -180,7 +175,7 @@ async fn star_into_mesh() {
     connect_nodes(&mut nodes, Topology::Star).await;
     start_nodes(&nodes).await;
 
-    wait_until!(15, density(&nodes) >= 0.1, 200);
+    wait_until!(15, network_density(&nodes) >= 0.1, 200);
     wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
@@ -191,7 +186,6 @@ async fn binary_star_contact() {
     let bootnode_setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
-        min_peers: N as u16,
         is_bootnode: true,
         ..Default::default()
     };
@@ -210,7 +204,8 @@ async fn binary_star_contact() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
-        min_peers: (N / 2) as u16,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
         ..Default::default()
     };
     let mut star_a_nodes = test_nodes(N - 1, setup.clone()).await;
@@ -224,22 +219,9 @@ async fn binary_star_contact() {
     connect_nodes(&mut star_a_nodes, Topology::Star).await;
     connect_nodes(&mut star_b_nodes, Topology::Star).await;
 
-    // Start the services.
+    // Start the services. The two meshes should still be disconnected.
     start_nodes(&star_a_nodes).await;
     start_nodes(&star_b_nodes).await;
-
-    // Measure the initial density once the topologies are established. The two star topologies
-    // should still be disconnected.
-    let hub_a = star_a_nodes.first().unwrap();
-    wait_until!(
-        5,
-        hub_a.peer_book.read().number_of_disconnected_peers() as usize == N - 1
-    );
-    let hub_b = star_b_nodes.first().unwrap();
-    wait_until!(
-        5,
-        hub_b.peer_book.read().number_of_disconnected_peers() as usize == N - 1
-    );
 
     // Setting up a list of nodes as we will consider them as a whole graph from this point
     // forwards.
@@ -252,18 +234,15 @@ async fn binary_star_contact() {
     let solo_setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
-        min_peers: N as u16,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
         bootnodes,
         ..Default::default()
     };
     let solo = test_node(solo_setup).await;
     nodes.push(solo);
 
-    let density = || {
-        let connections = total_connection_count(&nodes);
-        network_density(nodes.len() as f64, connections as f64)
-    };
-    wait_until!(10, density() >= 0.3);
+    wait_until!(10, network_density(&nodes) >= 0.05);
 }
 
 fn total_connection_count(nodes: &[Node]) -> usize {
@@ -283,14 +262,17 @@ fn total_connection_count(nodes: &[Node]) -> usize {
 // 3. centrality measurements:
 //
 //      - degree centrality (covered by the number of connected peers)
-//      - eigenvector centrality (tbd)
+//
+//      (TODO):
+//      - eigenvector centrality (would be useful in support of density measurements)
+//      - betweenness centrality (good for detecting clusters)
 
-fn density(nodes: &[Node]) -> f64 {
+fn network_density(nodes: &[Node]) -> f64 {
     let connections = total_connection_count(nodes);
-    network_density(nodes.len() as f64, connections as f64)
+    calculate_density(nodes.len() as f64, connections as f64)
 }
 
-fn network_density(n: f64, ac: f64) -> f64 {
+fn calculate_density(n: f64, ac: f64) -> f64 {
     // Calculate the total number of possible connections given a node count.
     let pc = n * (n - 1.0) / 2.0;
     // Actual connections divided by the possbile connections gives the density.
@@ -304,7 +286,5 @@ fn degree_centrality_delta(nodes: &[Node]) -> u16 {
     let min = dc.clone().min().unwrap();
     let max = dc.max().unwrap();
 
-    dbg!(min);
-    dbg!(max);
     max - min
 }
