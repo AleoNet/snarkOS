@@ -111,5 +111,8 @@ version = "0.2"
 [dev-dependencies.snarkos-testing]
 path = "../testing"
 
+[dev-dependencies.peak_alloc]
+version = "0.1.0"
+
 [build-dependencies]
 rustc_version = "0.2"

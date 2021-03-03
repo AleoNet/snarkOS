@@ -25,6 +25,7 @@ pub mod sync;
 
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
+use snarkos::miner::MinerInstance;
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 
 use parking_lot::Mutex;
@@ -175,7 +176,8 @@ pub async fn test_node(setup: TestSetup) -> Node {
     node.start().await.unwrap();
 
     if is_miner {
-        // TODO(ljedrz/nkls): spawn a miner
+        let miner_address = FIXTURE.test_accounts[0].address.clone();
+        MinerInstance::new(miner_address, node.environment.clone(), node.clone()).spawn();
     }
 
     node
@@ -309,11 +311,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     (node0, node1)
 }
 
-pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode) {
-    // start a test node and listen for incoming connections
-    let node = test_node(node_setup).await;
-    let node_listener = node.local_address().unwrap();
-
+pub async fn handshaken_peer(node_listener: SocketAddr) -> FakeNode {
     // set up a fake node (peer), which is basically just a socket
     let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
 
@@ -352,7 +350,14 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode)
 
     let noise = noise.into_transport_mode().unwrap();
 
-    let fake_node = FakeNode::new(peer_stream, peer_addr, noise);
+    FakeNode::new(peer_stream, peer_addr, noise)
+}
+
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode) {
+    // start a test node and listen for incoming connections
+    let node = test_node(node_setup).await;
+    let node_listener = node.local_address().unwrap();
+    let fake_node = handshaken_peer(node_listener).await;
 
     (node, fake_node)
 }

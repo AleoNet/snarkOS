@@ -44,6 +44,10 @@ version = "0.0.5"
 [dependencies.snarkvm-utilities]
 version = "0.0.5"
 
+[dependencies.snarkos]
+path = "../" 
+version = "1.2.0"
+
 [dependencies.snarkos-consensus]
 path = "../consensus"
 version = "1.2.0"
