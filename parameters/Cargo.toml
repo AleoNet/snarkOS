@@ -47,7 +47,7 @@ version = "0.0.5"
 version = "0.0.5"
 
 [dev-dependencies.snarkvm-objects]
-version = "0.0.5"
+version = "0.0.6"
 
 [dev-dependencies.snarkvm-parameters]
 version = "0.0.5"
