@@ -62,7 +62,7 @@ features = [ "serde" ]
 version = "0.4.2"
 
 [dependencies.itertools]
-version = "0.9.0"
+version = "0.10.0"
 
 [dependencies.jsonrpc-core]
 version = "17"
