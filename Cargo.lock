@@ -2423,9 +2423,9 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.23.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "502f26626811e30581f6cb80ee588ccc709f8e490d14a4363f4b16f5d24cd7e2"
+checksum = "5abe13436707b8fd0044592de0b8d9565ab700fbb06611d6e4d89384687da195"
 dependencies = [
  "either",
  "flate2",
