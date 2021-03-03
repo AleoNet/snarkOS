@@ -16,16 +16,16 @@
 
 use snarkos_network::Node;
 
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 
 pub enum Topology {
     /// Each node - except the last one - connects to the next one in a linear fashion.
     Line,
     /// Like the `Line`, but the last node connects to the first one, forming a ring.
     Ring,
-    /// All the nodes become connected to one another, forming a full mesh.
+    /// All the nodes become connected to one another, forming a mesh.
     Mesh,
-    /// The first node is the central one (the hub); all the other nodes connect to it.
+    /// The first node is the hub; all the other nodes connect to it.
     Star,
 }
 
@@ -91,7 +91,7 @@ async fn mesh(nodes: &mut Vec<Node>) {
     }
 }
 
-/// Connects thr network nodes in a star topology.
+/// Connects the network nodes in a star topology.
 async fn star(nodes: &mut Vec<Node>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().local_address().unwrap();
