@@ -33,7 +33,7 @@ path = "posw/posw.rs"
 harness = false
 
 [dependencies.snarkvm-curves]
-version = "0.0.5"
+version = "0.0.6"
 
 [dependencies.snarkvm-marlin]
 version = "0.0.5"
