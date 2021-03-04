@@ -392,6 +392,8 @@ impl Node {
         let peer_book = self.peer_book.read();
         let num_connected = peer_book.number_of_connected_peers() as usize;
         let num_connecting = peer_book.number_of_connecting_peers() as usize;
+        drop(peer_book);
+
         let max_peers = self.environment.maximum_number_of_connected_peers() as usize;
 
         if num_connected >= max_peers || num_connected + num_connecting >= max_peers {
