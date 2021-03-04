@@ -17,7 +17,7 @@
 use crate::consensus::TestTx;
 pub use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
-use snarkvm_algorithms::merkle_tree::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_objects::LedgerScheme;
 use snarkvm_objects::Transaction;
 use snarkvm_objects::Block;
