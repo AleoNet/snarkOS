@@ -18,7 +18,7 @@ use crate::errors::PrivateKeyError;
 
 use snarkvm_dpc::base_dpc::instantiated::Components;
 use snarkvm_dpc::base_dpc::parameters::SystemParameters;
-use snarkvm_objects::AccountPrivateKey;
+use snarkvm_dpc::AccountPrivateKey;
 
 use rand::CryptoRng;
 use rand::Rng;

@@ -35,7 +35,7 @@ use snarkvm_dpc::base_dpc::parameters::PublicParameters;
 use snarkvm_dpc::base_dpc::BaseDPCComponents;
 use snarkvm_algorithms::CRH;
 use snarkvm_algorithms::SNARK;
-use snarkvm_objects::AccountAddress;
+use snarkvm_dpc::AccountAddress;
 use snarkvm_objects::Network;
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::to_bytes;

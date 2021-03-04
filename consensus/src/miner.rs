@@ -28,7 +28,7 @@ use snarkvm_dpc::DPCScheme;
 use snarkvm_dpc::Record;
 use snarkvm_objects::Transaction;
 use snarkvm_objects::dpc::DPCTransactions;
-use snarkvm_objects::AccountAddress;
+use snarkvm_dpc::AccountAddress;
 use snarkvm_objects::Block;
 use snarkvm_objects::BlockHeader;
 use snarkvm_posw::txids_to_roots;

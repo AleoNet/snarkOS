@@ -16,7 +16,7 @@
 
 use crate::config::Config;
 use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_objects::AccountAddress;
+use snarkvm_dpc::AccountAddress;
 
 use colored::*;
 use std::str::FromStr;

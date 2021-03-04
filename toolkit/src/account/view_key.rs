@@ -18,7 +18,7 @@ use crate::account::PrivateKey;
 use crate::errors::ViewKeyError;
 use snarkvm_dpc::base_dpc::instantiated::Components;
 use snarkvm_dpc::base_dpc::parameters::SystemParameters;
-use snarkvm_objects::AccountViewKey;
+use snarkvm_dpc::AccountViewKey;
 
 use std::fmt;
 use std::str::FromStr;

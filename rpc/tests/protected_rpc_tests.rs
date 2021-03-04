@@ -32,9 +32,9 @@ mod protected_rpc_tests {
     use snarkvm_dpc::base_dpc::record::DPCRecord;
     use snarkvm_dpc::base_dpc::TransactionKernel;
     use snarkvm_dpc::Record;
-    use snarkvm_objects::AccountAddress;
-    use snarkvm_objects::AccountPrivateKey;
-    use snarkvm_objects::AccountViewKey;
+    use snarkvm_dpc::AccountAddress;
+    use snarkvm_dpc::AccountPrivateKey;
+    use snarkvm_dpc::AccountViewKey;
     use snarkvm_utilities::bytes::FromBytes;
     use snarkvm_utilities::bytes::ToBytes;
     use snarkvm_utilities::to_bytes;

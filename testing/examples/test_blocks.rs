@@ -31,8 +31,8 @@ use snarkvm_dpc::DPCScheme;
 use snarkvm_dpc::Program;
 use snarkvm_dpc::Record;
 use snarkvm_objects::dpc::DPCTransactions;
-use snarkvm_objects::Account;
-use snarkvm_objects::AccountAddress;
+use snarkvm_dpc::Account;
+use snarkvm_dpc::AccountAddress;
 use snarkvm_objects::Block;
 use tracing_subscriber::EnvFilter;
 

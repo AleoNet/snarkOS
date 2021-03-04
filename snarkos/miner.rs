@@ -18,7 +18,7 @@ use snarkos_consensus::Miner;
 use snarkos_network::environment::Environment;
 use snarkos_network::Node;
 use snarkvm_dpc::base_dpc::instantiated::*;
-use snarkvm_objects::AccountAddress;
+use snarkvm_dpc::AccountAddress;
 
 use tokio::task;
 use tracing::*;

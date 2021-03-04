@@ -22,7 +22,7 @@ use snarkvm_algorithms::CRH;
 use snarkvm_dpc::DPCScheme;
 use snarkvm_dpc::AccountScheme;
 use snarkvm_parameters::Parameter;
-use snarkvm_objects::Account;
+use snarkvm_dpc::Account;
 use snarkvm_parameters::LedgerMerkleTreeParameters;
 use snarkvm_utilities::bytes::FromBytes;
 

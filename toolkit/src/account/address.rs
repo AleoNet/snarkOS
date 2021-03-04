@@ -19,7 +19,7 @@ use crate::errors::AddressError;
 
 use snarkvm_dpc::base_dpc::instantiated::Components;
 use snarkvm_dpc::base_dpc::parameters::SystemParameters;
-use snarkvm_objects::AccountAddress;
+use snarkvm_dpc::AccountAddress;
 use snarkvm_utilities::bytes::ToBytes;
 
 use std::fmt;

@@ -22,8 +22,8 @@ mod miner {
     use snarkvm_algorithms::signature::SignatureScheme;
     use snarkvm_dpc::DPCComponents;
     use snarkvm_objects::dpc::DPCTransactions;
-    use snarkvm_objects::AccountAddress;
-    use snarkvm_objects::AccountPrivateKey;
+    use snarkvm_dpc::AccountAddress;
+    use snarkvm_dpc::AccountPrivateKey;
     use snarkvm_objects::BlockHeader;
     use snarkvm_posw::txids_to_roots;
 
