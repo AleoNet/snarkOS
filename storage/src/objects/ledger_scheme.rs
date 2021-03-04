@@ -16,7 +16,7 @@
 
 use crate::*;
 use snarkvm_algorithms::merkle_tree::*;
-use snarkvm_errors::dpc::LedgerError;
+use snarkvm_dpc::LedgerError;
 use snarkvm_algorithms::LoadableMerkleParameters;
 use snarkvm_objects::LedgerScheme;
 use snarkvm_objects::Transaction;

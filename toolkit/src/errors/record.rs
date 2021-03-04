@@ -40,9 +40,9 @@ impl From<hex::FromHexError> for RecordError {
     }
 }
 
-impl From<snarkvm_errors::dpc::DPCError> for RecordError {
-    fn from(error: snarkvm_errors::dpc::DPCError) -> Self {
-        RecordError::Crate("snarkvm_errors::dpc", format!("{:?}", error))
+impl From<snarkvm_dpc::DPCError> for RecordError {
+    fn from(error: snarkvm_dpc::DPCError) -> Self {
+        RecordError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 

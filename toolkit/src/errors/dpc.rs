@@ -59,9 +59,9 @@ impl From<snarkvm_algorithms::errors::crh::CRHError> for DPCError {
     }
 }
 
-impl From<snarkvm_errors::dpc::DPCError> for DPCError {
-    fn from(error: snarkvm_errors::dpc::DPCError) -> Self {
-        DPCError::Crate("snarkvm_errors::dpc", format!("{:?}", error))
+impl From<snarkvm_dpc::DPCError> for DPCError {
+    fn from(error: snarkvm_dpc::DPCError) -> Self {
+        DPCError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 
