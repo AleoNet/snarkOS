@@ -41,9 +41,9 @@ impl From<hex::FromHexError> for DPCError {
     }
 }
 
-impl From<snarkvm_objects::account::AccountError> for DPCError {
-    fn from(error: snarkvm_objects::account::AccountError) -> Self {
-        DPCError::Crate("snarkvm_objects::account", format!("{:?}", error))
+impl From<snarkvm_dpc::AccountError> for DPCError {
+    fn from(error: snarkvm_dpc::AccountError) -> Self {
+        DPCError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 

@@ -31,7 +31,7 @@ use snarkvm_algorithms::CRH;
 use snarkvm_dpc::DPCComponents;
 use snarkvm_dpc::DPCScheme;
 use snarkvm_dpc::Record as RecordScheme;
-use snarkvm_objects::account::*;
+use snarkvm_dpc::*;
 use snarkvm_utilities::to_bytes;
 use snarkvm_utilities::FromBytes;
 use snarkvm_utilities::ToBytes;
