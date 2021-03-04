@@ -27,7 +27,7 @@ use snarkvm_dpc::base_dpc::parameters::NoopProgramSNARKParameters;
 use snarkvm_dpc::base_dpc::parameters::SystemParameters;
 use snarkvm_dpc::base_dpc::record_payload::RecordPayload;
 use snarkvm_dpc::base_dpc::TransactionKernel as TransactionKernelNative;
-use snarkvm_models::algorithms::CRH;
+use snarkvm_algorithms::CRH;
 use snarkvm_models::dpc::DPCComponents;
 use snarkvm_models::dpc::DPCScheme;
 use snarkvm_models::dpc::Record as RecordScheme;

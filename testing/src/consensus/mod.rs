@@ -17,7 +17,7 @@
 use snarkos_consensus::ConsensusParameters;
 use snarkvm_dpc::instantiated::Components;
 use snarkvm_errors::objects::TransactionError;
-use snarkvm_models::algorithms::CRH;
+use snarkvm_algorithms::CRH;
 use snarkvm_models::dpc::DPCComponents;
 use snarkvm_models::objects::Transaction;
 use snarkvm_models::parameters::Parameter;

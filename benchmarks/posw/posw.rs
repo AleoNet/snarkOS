@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm_curves::bls12_377::Bls12_377;
-use snarkvm_models::algorithms::snark::SNARK;
+use snarkvm_algorithms::snark::SNARK;
 use snarkvm_posw::txids_to_roots;
 use snarkvm_posw::Marlin;
 use snarkvm_posw::Posw;

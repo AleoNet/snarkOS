@@ -22,7 +22,7 @@ use snarkos_parameters::GenesisBlock;
 use snarkvm_dpc::base_dpc::instantiated::*;
 use snarkvm_dpc::base_dpc::BaseDPCComponents;
 use snarkvm_dpc::base_dpc::NoopProgram;
-use snarkvm_models::algorithms::CRH;
+use snarkvm_algorithms::CRH;
 use snarkvm_models::dpc::DPCScheme;
 use snarkvm_models::genesis::Genesis;
 use snarkvm_objects::Account;

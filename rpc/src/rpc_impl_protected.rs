@@ -34,7 +34,7 @@ use snarkvm_dpc::base_dpc::record::DPCRecord;
 use snarkvm_dpc::base_dpc::record_encryption::RecordEncryption;
 use snarkvm_dpc::base_dpc::record_payload::RecordPayload;
 use snarkvm_dpc::base_dpc::TransactionKernel;
-use snarkvm_models::algorithms::CRH;
+use snarkvm_algorithms::CRH;
 use snarkvm_models::dpc::DPCComponents;
 use snarkvm_models::dpc::DPCScheme;
 use snarkvm_models::dpc::Record as RecordModel;
