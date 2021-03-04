@@ -14,29 +14,27 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, *};
+use crate::error::StorageError;
+use crate::*;
 use snarkos_parameters::GenesisBlock;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_models::{
-    algorithms::LoadableMerkleParameters,
-    genesis::Genesis,
-    objects::{LedgerScheme, Transaction},
-    parameters::Parameter,
-};
+use snarkvm_models::algorithms::LoadableMerkleParameters;
+use snarkvm_models::genesis::Genesis;
+use snarkvm_models::objects::LedgerScheme;
+use snarkvm_models::objects::Transaction;
+use snarkvm_models::parameters::Parameter;
 use snarkvm_objects::Block;
 use snarkvm_parameters::LedgerMerkleTreeParameters;
 use snarkvm_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
-use std::{
-    fs,
-    marker::PhantomData,
-    path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
-};
+use std::fs;
+use std::marker::PhantomData;
+use std::path::Path;
+use std::path::PathBuf;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 pub type BlockHeight = u32;
 

@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A fixed size message corresponding to a variable sized message.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

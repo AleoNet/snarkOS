@@ -16,31 +16,34 @@
 
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
-    use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
+    use snarkos_consensus::memory_pool::MemoryPool;
+    use snarkos_consensus::MerkleTreeLedger;
     use snarkos_network::Node;
     use snarkos_rpc::*;
-    use snarkos_testing::{
-        consensus::*,
-        network::{test_consensus, test_environment, ConsensusSetup, TestSetup},
-        storage::*,
-    };
+    use snarkos_testing::consensus::*;
+    use snarkos_testing::network::test_consensus;
+    use snarkos_testing::network::test_environment;
+    use snarkos_testing::network::ConsensusSetup;
+    use snarkos_testing::network::TestSetup;
+    use snarkos_testing::storage::*;
 
-    use snarkvm_dpc::base_dpc::{
-        instantiated::{Components, Tx},
-        record::DPCRecord,
-        TransactionKernel,
-    };
+    use snarkvm_dpc::base_dpc::instantiated::Components;
+    use snarkvm_dpc::base_dpc::instantiated::Tx;
+    use snarkvm_dpc::base_dpc::record::DPCRecord;
+    use snarkvm_dpc::base_dpc::TransactionKernel;
     use snarkvm_models::dpc::Record;
-    use snarkvm_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
-    use snarkvm_utilities::{
-        bytes::{FromBytes, ToBytes},
-        to_bytes,
-    };
+    use snarkvm_objects::AccountAddress;
+    use snarkvm_objects::AccountPrivateKey;
+    use snarkvm_objects::AccountViewKey;
+    use snarkvm_utilities::bytes::FromBytes;
+    use snarkvm_utilities::bytes::ToBytes;
+    use snarkvm_utilities::to_bytes;
 
     use jsonrpc_core::MetaIoHandler;
     use parking_lot::RwLock;
     use serde_json::Value;
-    use std::{str::FromStr, sync::Arc};
+    use std::str::FromStr;
+    use std::sync::Arc;
 
     const TEST_USERNAME: &str = "TEST_USERNAME";
     const TEST_PASSWORD: &str = "TEST_PASSWORD";

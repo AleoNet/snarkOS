@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_errors::{
-    algorithms::MerkleError,
-    objects::{BlockError, TransactionError},
-    parameters::ParameterError,
-};
+use snarkvm_errors::algorithms::MerkleError;
+use snarkvm_errors::objects::BlockError;
+use snarkvm_errors::objects::TransactionError;
+use snarkvm_errors::parameters::ParameterError;
 
 use std::fmt::Debug;
 

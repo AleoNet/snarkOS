@@ -25,17 +25,25 @@ pub mod sync;
 
 pub mod topology;
 
-use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
+use crate::consensus::FIXTURE;
+use crate::consensus::FIXTURE_VK;
+use crate::consensus::TEST_CONSENSUS;
 
 use snarkos::miner::MinerInstance;
-use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
+use snarkos_network::connection_reader::ConnReader;
+use snarkos_network::connection_writer::ConnWriter;
+use snarkos_network::errors::*;
+use snarkos_network::*;
 
 use parking_lot::Mutex;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
-};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::AsyncRead;
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 use tracing::*;
 
 /// Returns a random tcp socket address and binds it to a listener

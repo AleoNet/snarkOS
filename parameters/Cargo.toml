@@ -75,6 +75,5 @@ version = "0.8"
 default = [
   "remote",
   "snarkvm-algorithms/default",
-  "snarkvm-models/default"
 ]
 remote = [ "curl" ]

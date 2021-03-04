@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    account::PrivateKey,
-    signature::{Signature, SignaturePublicKey},
-};
+use crate::account::PrivateKey;
+use crate::signature::Signature;
+use crate::signature::SignaturePublicKey;
 
-use rand::{Rng, SeedableRng};
+use rand::Rng;
+use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::str::FromStr;
 

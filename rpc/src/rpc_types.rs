@@ -17,7 +17,8 @@
 //! Structures for RPC endpoint requests and responses.
 
 use jsonrpc_http_server::jsonrpc_core::Metadata;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use std::net::SocketAddr;
 
 /// Defines the authentication format for accessing private endpoints on the RPC server

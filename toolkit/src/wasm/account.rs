@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::{Address, PrivateKey};
+use crate::account::Address;
+use crate::account::PrivateKey;
 
-use rand::{rngs::StdRng, SeedableRng};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 

@@ -14,9 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::CliError, parameters::types::*};
+use crate::errors::CliError;
+use crate::parameters::types::*;
 
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::App;
+use clap::AppSettings;
+use clap::Arg;
+use clap::ArgMatches;
+use clap::SubCommand;
 
 pub trait CLI {
     type Config;

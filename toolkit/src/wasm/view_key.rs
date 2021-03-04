@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::{PrivateKey, ViewKey as ViewKeyNative};
+use crate::account::PrivateKey;
+use crate::account::ViewKey as ViewKeyNative;
 
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;

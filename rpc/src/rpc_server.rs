@@ -16,18 +16,22 @@
 
 //! Logic for instantiating the RPC server.
 
-use crate::{
-    rpc_trait::RpcFunctions,
-    rpc_types::{Meta, RpcCredentials},
-    RpcImpl,
-};
+use crate::rpc_trait::RpcFunctions;
+use crate::rpc_types::Meta;
+use crate::rpc_types::RpcCredentials;
+use crate::RpcImpl;
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_network::{Environment, Node};
+use snarkos_network::Environment;
+use snarkos_network::Node;
 
-use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
+use jsonrpc_http_server::cors::AccessControlAllowHeaders;
+use jsonrpc_http_server::hyper;
+use jsonrpc_http_server::ServerBuilder;
 use parking_lot::RwLock;
 
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.

@@ -17,14 +17,22 @@
 use snarkos_consensus::ConsensusParameters;
 use snarkvm_dpc::instantiated::Components;
 use snarkvm_errors::objects::TransactionError;
-use snarkvm_models::{algorithms::CRH, dpc::DPCComponents, objects::Transaction, parameters::Parameter};
+use snarkvm_models::algorithms::CRH;
+use snarkvm_models::dpc::DPCComponents;
+use snarkvm_models::objects::Transaction;
+use snarkvm_models::parameters::Parameter;
 use snarkvm_objects::Network;
-use snarkvm_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters};
+use snarkvm_parameters::InnerSNARKVKCRHParameters;
+use snarkvm_parameters::InnerSNARKVKParameters;
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::to_bytes;
+use snarkvm_utilities::FromBytes;
+use snarkvm_utilities::ToBytes;
 
 use once_cell::sync::Lazy;
-use std::io::{Read, Result as IoResult, Write};
+use std::io::Read;
+use std::io::Result as IoResult;
+use std::io::Write;
 
 mod e2e;
 pub use e2e::*;

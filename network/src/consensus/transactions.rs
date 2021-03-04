@@ -14,15 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, peers::PeerInfo, Consensus, NetworkError};
+use crate::message::*;
+use crate::peers::PeerInfo;
+use crate::Consensus;
+use crate::NetworkError;
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::ToBytes;
+use snarkvm_utilities::to_bytes;
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::collections::HashMap;
+use std::net::SocketAddr;
 
 impl Consensus {
     ///

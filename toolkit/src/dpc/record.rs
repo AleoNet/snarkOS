@@ -16,13 +16,14 @@
 
 use crate::errors::DPCError;
 
-use snarkvm_dpc::base_dpc::{instantiated::Components, DPCRecord};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_dpc::base_dpc::instantiated::Components;
+use snarkvm_dpc::base_dpc::DPCRecord;
+use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::ToBytes;
+use snarkvm_utilities::to_bytes;
 
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Clone, Debug)]
 pub struct Record {

@@ -51,8 +51,11 @@ pub use peers::*;
 use crate::ConnWriter;
 
 use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio::{task, time::sleep};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::task;
+use tokio::time::sleep;
 
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
 pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B

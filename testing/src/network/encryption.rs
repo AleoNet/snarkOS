@@ -18,7 +18,9 @@ use crate::network::spawn_2_fake_nodes;
 
 use snarkos_network::message::Payload;
 
-use rand::{distributions::Standard, thread_rng, Rng};
+use rand::distributions::Standard;
+use rand::thread_rng;
+use rand::Rng;
 
 #[tokio::test]
 async fn encrypt_and_decrypt_a_big_payload() {

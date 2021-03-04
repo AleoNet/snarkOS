@@ -17,18 +17,19 @@
 use crate::*;
 use snarkvm_algorithms::merkle_tree::*;
 use snarkvm_errors::dpc::LedgerError;
-use snarkvm_models::{
-    algorithms::LoadableMerkleParameters,
-    objects::{LedgerScheme, Transaction},
-};
+use snarkvm_models::algorithms::LoadableMerkleParameters;
+use snarkvm_models::objects::LedgerScheme;
+use snarkvm_models::objects::Transaction;
 use snarkvm_objects::Block;
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::ToBytes;
+use snarkvm_utilities::to_bytes;
 
 use parking_lot::RwLock;
-use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::fs;
+use std::marker::PhantomData;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> {
     type Block = Block<Self::Transaction>;

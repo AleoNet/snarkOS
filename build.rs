@@ -15,7 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 // Detect the rustc channel
-use rustc_version::{version_meta, Channel};
+use rustc_version::version_meta;
+use rustc_version::Channel;
 
 fn main() {
     #[cfg(feature = "compile_capnp_schema")]

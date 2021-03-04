@@ -14,35 +14,46 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
+use snarkos_consensus::ConsensusParameters;
+use snarkos_consensus::MerkleTreeLedger;
+use snarkos_storage::key_value::NUM_COLS;
+use snarkos_storage::storage::Storage;
+use snarkos_storage::Ledger;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
-use snarkvm_errors::dpc::{DPCError, LedgerError};
-use snarkvm_models::{
-    algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
-    dpc::{DPCComponents, DPCScheme},
-    objects::{account::AccountScheme, Transaction},
-    parameters::Parameter,
-};
-use snarkvm_objects::{Account, AccountAddress, Network};
+use snarkvm_dpc::base_dpc::instantiated::*;
+use snarkvm_dpc::base_dpc::record_payload::RecordPayload;
+use snarkvm_dpc::base_dpc::BaseDPCComponents;
+use snarkvm_dpc::base_dpc::DPC;
+use snarkvm_errors::dpc::DPCError;
+use snarkvm_errors::dpc::LedgerError;
+use snarkvm_models::algorithms::LoadableMerkleParameters;
+use snarkvm_models::algorithms::MerkleParameters;
+use snarkvm_models::algorithms::CRH;
+use snarkvm_models::dpc::DPCComponents;
+use snarkvm_models::dpc::DPCScheme;
+use snarkvm_models::objects::account::AccountScheme;
+use snarkvm_models::objects::Transaction;
+use snarkvm_models::parameters::Parameter;
+use snarkvm_objects::Account;
+use snarkvm_objects::AccountAddress;
+use snarkvm_objects::Network;
 use snarkvm_parameters::LedgerMerkleTreeParameters;
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::ToBytes;
+use snarkvm_utilities::to_bytes;
 
 use parking_lot::RwLock;
-use rand::{thread_rng, Rng};
-use std::{
-    fs::{self, File},
-    io::{Result as IoResult, Write},
-    marker::PhantomData,
-    path::PathBuf,
-    str::FromStr,
-    sync::Arc,
-};
+use rand::thread_rng;
+use rand::Rng;
+use std::fs::File;
+use std::fs::{self};
+use std::io::Result as IoResult;
+use std::io::Write;
+use std::marker::PhantomData;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 
 /// Generate a blank ledger to facilitate generation of the genesis block
 fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(

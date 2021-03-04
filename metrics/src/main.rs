@@ -14,12 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_metrics::prometheus::{initialize, metrics_handler, CONNECTED_PEERS};
+use snarkos_metrics::prometheus::initialize;
+use snarkos_metrics::prometheus::metrics_handler;
+use snarkos_metrics::prometheus::CONNECTED_PEERS;
 
 use futures_util::StreamExt;
 use std::time::Duration;
 use tokio::task;
-use warp::{ws::WebSocket, Filter, Rejection, Reply};
+use warp::ws::WebSocket;
+use warp::Filter;
+use warp::Rejection;
+use warp::Reply;
 
 async fn ws_client_connection(ws: WebSocket, id: String) {
     let (_client_ws_sender, mut client_ws_rcv) = ws.split();

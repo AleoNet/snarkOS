@@ -14,18 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    record::tests::*,
-    wasm::{
-        Account,
-        Record,
-        SignatureScheme,
-        SignatureSchemePublicKey,
-        TransactionKernel,
-        TransactionKernelBuilder,
-        ViewKey,
-    },
-};
+use crate::record::tests::*;
+use crate::wasm::Account;
+use crate::wasm::Record;
+use crate::wasm::SignatureScheme;
+use crate::wasm::SignatureSchemePublicKey;
+use crate::wasm::TransactionKernel;
+use crate::wasm::TransactionKernelBuilder;
+use crate::wasm::ViewKey;
 
 use wasm_bindgen_test::*;
 

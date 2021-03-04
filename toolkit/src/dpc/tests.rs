@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    account::{Address, PrivateKey},
-    dpc::{Record, TransactionKernel, TransactionKernelBuilder},
-};
+use crate::account::Address;
+use crate::account::PrivateKey;
+use crate::dpc::Record;
+use crate::dpc::TransactionKernel;
+use crate::dpc::TransactionKernelBuilder;
 
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;

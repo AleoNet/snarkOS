@@ -19,7 +19,8 @@ use snarkos_consensus::error::ConsensusError;
 use snarkos_storage::error::StorageError;
 use snarkvm_errors::objects::BlockError;
 
-use std::{fmt, io::ErrorKind};
+use std::fmt;
+use std::io::ErrorKind;
 
 #[derive(Debug)]
 pub enum NetworkError {

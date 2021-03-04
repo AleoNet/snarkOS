@@ -16,26 +16,28 @@
 
 /// Tests for public RPC endpoints
 mod rpc_tests {
-    use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
+    use snarkos_consensus::get_block_reward;
+    use snarkos_consensus::MerkleTreeLedger;
     use snarkos_network::Node;
     use snarkos_rpc::*;
-    use snarkos_testing::{
-        consensus::*,
-        network::{test_consensus, test_environment, ConsensusSetup, TestSetup},
-        storage::*,
-    };
+    use snarkos_testing::consensus::*;
+    use snarkos_testing::network::test_consensus;
+    use snarkos_testing::network::test_environment;
+    use snarkos_testing::network::ConsensusSetup;
+    use snarkos_testing::network::TestSetup;
+    use snarkos_testing::storage::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_models::objects::Transaction;
-    use snarkvm_utilities::{
-        bytes::{FromBytes, ToBytes},
-        serialize::CanonicalSerialize,
-        to_bytes,
-    };
+    use snarkvm_utilities::bytes::FromBytes;
+    use snarkvm_utilities::bytes::ToBytes;
+    use snarkvm_utilities::serialize::CanonicalSerialize;
+    use snarkvm_utilities::to_bytes;
 
     use jsonrpc_test::Rpc;
     use parking_lot::RwLock;
     use serde_json::Value;
-    use std::{net::SocketAddr, sync::Arc};
+    use std::net::SocketAddr;
+    use std::sync::Arc;
 
     fn unwrap_arc_rwlock<T>(x: Arc<RwLock<T>>) -> T {
         if let Ok(lock) = Arc::try_unwrap(x) {

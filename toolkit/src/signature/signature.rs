@@ -14,17 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{account::PrivateKey, errors::SignatureError, signature::SignaturePublicKey};
+use crate::account::PrivateKey;
+use crate::errors::SignatureError;
+use crate::signature::SignaturePublicKey;
 
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
-use snarkvm_models::{algorithms::SignatureScheme, dpc::DPCComponents};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_dpc::base_dpc::instantiated::Components;
+use snarkvm_dpc::base_dpc::parameters::SystemParameters;
+use snarkvm_models::algorithms::SignatureScheme;
+use snarkvm_models::dpc::DPCComponents;
+use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::ToBytes;
+use snarkvm_utilities::to_bytes;
 
-use rand::{CryptoRng, Rng};
-use std::{fmt, str::FromStr};
+use rand::CryptoRng;
+use rand::Rng;
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Signature {

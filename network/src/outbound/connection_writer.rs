@@ -14,12 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*};
+use crate::errors::NetworkError;
+use crate::message::*;
 
 use parking_lot::Mutex;
-use tokio::{io::AsyncWriteExt, net::tcp::OwnedWriteHalf, sync::Mutex as AsyncMutex};
+use tokio::io::AsyncWriteExt;
+use tokio::net::tcp::OwnedWriteHalf;
+use tokio::sync::Mutex as AsyncMutex;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 /// A channel for writing messages to a peer.
 /// The write stream is protected by an Arc + Mutex to enable cloning.

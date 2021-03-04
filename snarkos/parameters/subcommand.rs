@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::parameters::{flag, types::*};
+use crate::parameters::flag;
+use crate::parameters::types::*;
 
 use clap::AppSettings;
 

@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{account::PrivateKey, errors::ViewKeyError};
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
+use crate::account::PrivateKey;
+use crate::errors::ViewKeyError;
+use snarkvm_dpc::base_dpc::instantiated::Components;
+use snarkvm_dpc::base_dpc::parameters::SystemParameters;
 use snarkvm_objects::AccountViewKey;
 
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct ViewKey {

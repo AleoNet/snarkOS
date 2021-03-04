@@ -16,7 +16,9 @@
 
 mod consensus_sidechain {
     use snarkos_consensus::MemoryPool;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
+    use snarkos_testing::consensus::*;
+    use snarkos_testing::dpc::load_verifying_parameters;
+    use snarkos_testing::storage::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Block;
     use snarkvm_utilities::bytes::FromBytes;

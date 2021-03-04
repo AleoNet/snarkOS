@@ -14,16 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
+use crate::message::*;
+use crate::ConnReader;
+use crate::ConnWriter;
+use crate::NetworkError;
+use crate::Node;
+use crate::Version;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 use rand::seq::IteratorRandom;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 
 impl Node {
     ///

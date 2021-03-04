@@ -17,7 +17,8 @@
 use crate::errors::CliError;
 
 use clap::ArgMatches;
-use self_update::{backends::github, cargo_crate_version};
+use self_update::backends::github;
+use self_update::cargo_crate_version;
 
 const SNARKOS_BIN_NAME: &str = "snarkos";
 const SNARKOS_REPO_OWNER: &str = "AleoHQ";

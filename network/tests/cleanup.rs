@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_testing::{
-    network::{handshaken_peer, test_node, TestSetup},
-    wait_until,
-};
+use snarkos_testing::network::handshaken_peer;
+use snarkos_testing::network::test_node;
+use snarkos_testing::network::TestSetup;
+use snarkos_testing::wait_until;
 
 use peak_alloc::PeakAlloc;
 

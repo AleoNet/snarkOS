@@ -16,20 +16,20 @@
 
 use snarkvm_objects::BlockHeaderHash;
 
-use crate::message::{Payload, Version};
-use payload_capnp::{
-    block,
-    block_hash,
-    payload::{self, payload_type},
-    socket_addr,
-    transaction,
-    version,
-};
+use crate::message::Payload;
+use crate::message::Version;
+use payload_capnp::block;
+use payload_capnp::block_hash;
+use payload_capnp::payload::payload_type;
+use payload_capnp::payload::{self};
+use payload_capnp::socket_addr;
+use payload_capnp::transaction;
+use payload_capnp::version;
 
-use std::{
-    io,
-    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
-};
+use std::io;
+use std::net::Ipv4Addr;
+use std::net::Ipv6Addr;
+use std::net::SocketAddr;
 
 pub mod payload_capnp {
     include!("payload_capnp.rs");

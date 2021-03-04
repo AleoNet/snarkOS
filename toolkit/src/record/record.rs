@@ -14,24 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    account::{Address, PrivateKey, ViewKey},
-    errors::RecordError,
-};
+use crate::account::Address;
+use crate::account::PrivateKey;
+use crate::account::ViewKey;
+use crate::errors::RecordError;
 
-use snarkvm_dpc::base_dpc::{
-    instantiated::Components,
-    parameters::SystemParameters,
-    record::{DPCRecord, EncryptedRecord, RecordEncryption},
-    DPC,
-};
+use snarkvm_dpc::base_dpc::instantiated::Components;
+use snarkvm_dpc::base_dpc::parameters::SystemParameters;
+use snarkvm_dpc::base_dpc::record::DPCRecord;
+use snarkvm_dpc::base_dpc::record::EncryptedRecord;
+use snarkvm_dpc::base_dpc::record::RecordEncryption;
+use snarkvm_dpc::base_dpc::DPC;
 use snarkvm_models::dpc::Record as RecordTrait;
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::ToBytes;
+use snarkvm_utilities::to_bytes;
 
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Record {

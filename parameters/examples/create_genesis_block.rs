@@ -16,25 +16,24 @@
 
 use snarkos_parameters::transaction_1::Transaction1;
 
-use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
+use snarkvm_dpc::base_dpc::instantiated::Components;
+use snarkvm_dpc::base_dpc::transaction::DPCTransaction;
+use snarkvm_dpc::base_dpc::BaseDPCComponents;
 use snarkvm_errors::objects::TransactionError;
 use snarkvm_models::genesis::Genesis;
-use snarkvm_objects::{
-    BlockHeader,
-    BlockHeaderHash,
-    DPCTransactions,
-    MerkleRootHash,
-    PedersenMerkleRootHash,
-    ProofOfSuccinctWork,
-};
+use snarkvm_objects::BlockHeader;
+use snarkvm_objects::BlockHeaderHash;
+use snarkvm_objects::DPCTransactions;
+use snarkvm_objects::MerkleRootHash;
+use snarkvm_objects::PedersenMerkleRootHash;
+use snarkvm_objects::ProofOfSuccinctWork;
 use snarkvm_utilities::bytes::FromBytes;
 
 use chrono::Utc;
-use std::{
-    fs::File,
-    io::{Result as IoResult, Write},
-    path::PathBuf,
-};
+use std::fs::File;
+use std::io::Result as IoResult;
+use std::io::Write;
+use std::path::PathBuf;
 
 pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
     // Add transactions to block

@@ -20,16 +20,15 @@
 
 use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
-use snarkvm_models::{
-    algorithms::LoadableMerkleParameters,
-    objects::{LedgerScheme, Transaction},
-};
-use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    has_duplicates,
-    to_bytes,
-};
+use snarkvm_models::algorithms::LoadableMerkleParameters;
+use snarkvm_models::objects::LedgerScheme;
+use snarkvm_models::objects::Transaction;
+use snarkvm_objects::dpc::DPCTransactions;
+use snarkvm_objects::BlockHeader;
+use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::ToBytes;
+use snarkvm_utilities::has_duplicates;
+use snarkvm_utilities::to_bytes;
 
 use std::collections::HashMap;
 
@@ -240,7 +239,8 @@ impl<T: Transaction> Default for MemoryPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::{consensus::*, storage::*};
+    use snarkos_testing::consensus::*;
+    use snarkos_testing::storage::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Block;
 

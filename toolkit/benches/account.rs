@@ -14,9 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_toolkit::account::{Address, PrivateKey};
+use snarkos_toolkit::account::Address;
+use snarkos_toolkit::account::PrivateKey;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::Criterion;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 
