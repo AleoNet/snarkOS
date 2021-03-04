@@ -30,7 +30,7 @@ const MIN_PEERS: u16 = 5;
 const MAX_PEERS: u16 = 10;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
-    let mut nodes = vec![];
+    let mut nodes = Vec::with_capacity(n);
 
     for _ in 0..n {
         let environment = test_environment(setup.clone());
@@ -43,7 +43,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     nodes
 }
 
-async fn start_nodes(nodes: &Vec<Node>) {
+async fn start_nodes(nodes: &[Node]) {
     for node in nodes {
         // Nodes are started with a slight delay to avoid having peering intervals in phase (this
         // is the hypothetical real-world worst case scenario).
@@ -53,7 +53,7 @@ async fn start_nodes(nodes: &Vec<Node>) {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn line() {
+async fn spawn_nodes_in_a_line() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -80,7 +80,7 @@ async fn line() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn ring() {
+async fn spawn_nodes_in_a_ring() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -96,7 +96,7 @@ async fn ring() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn star() {
+async fn spawn_nodes_in_a_star() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -111,7 +111,7 @@ async fn star() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn mesh() {
+async fn spawn_nodes_in_a_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 5,
@@ -124,12 +124,20 @@ async fn mesh() {
     start_nodes(&nodes).await;
 
     // Set the sleep interval to 200ms to avoid lock issues.
+    // Density measurement here is proportional to the min peers: if every node in the topology
+    // only connected to the min node count, the total number of connections would be roughly 10
+    // percent of the total possible. With 50 nodes and min at 5 connections each this works out to
+    // be 125/1225 ≈ 0.1.
     wait_until!(15, network_density(&nodes) >= 0.1, 200);
+
+    // Make sure the node with the largest degree centrality and smallest degree centrality don't
+    // have a delta greater than the max-min peer interval allows for. This check also provides
+    // some insight into the proper homogenous meshing of the network.
     wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn line_into_mesh() {
+async fn line_converges_to_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -146,7 +154,7 @@ async fn line_into_mesh() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn ring_into_mesh() {
+async fn ring_converges_to_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -163,7 +171,7 @@ async fn ring_into_mesh() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn star_into_mesh() {
+async fn star_converges_to_mesh() {
     let setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
@@ -182,6 +190,9 @@ async fn star_into_mesh() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn binary_star_contact() {
+    // Two initally separate star topologies subsequently connected by a single node connecting to
+    // their bootnodes.
+
     // Setup the bootnodes for each star topology.
     let bootnode_setup = TestSetup {
         consensus_setup: None,
