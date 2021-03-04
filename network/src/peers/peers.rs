@@ -138,7 +138,6 @@ impl Node {
 
         // -> e
         let len = noise.write_message(&[], &mut buffer)?;
-        // println!("len: {}", len);
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
         trace!("sent e (XX handshake part 1/3)");

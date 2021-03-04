@@ -16,12 +16,13 @@
 
 use crate::NetworkError;
 
+use rand::{thread_rng, Rng};
 use std::{self, net::SocketAddr, time::Duration};
 
 /// A core data structure containing the networking parameters for this node.
 #[derive(Clone)]
 pub struct Environment {
-    pub name: Option<u64>,
+    pub name: u64,
     /// The local address of this node.
     local_address: Option<SocketAddr>,
     /// The minimum number of peers required to maintain connections with.
@@ -56,8 +57,12 @@ impl Environment {
             }
         }
 
+        // Generate the node name.
+        let mut rng = thread_rng();
+        let name = rng.gen();
+
         Ok(Self {
-            name: None,
+            name,
             local_address,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
