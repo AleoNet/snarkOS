@@ -118,7 +118,7 @@ impl Node {
     }
 
     #[inline]
-    #[doc(hide)]
+    #[doc(hidden)]
     pub fn has_consensus(&self) -> bool {
         self.consensus.is_some()
     }
