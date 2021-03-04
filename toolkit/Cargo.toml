@@ -28,6 +28,7 @@ harness = false
 [dependencies.snarkvm-algorithms]
 version = "0.2.0"
 default-features = false
+features = ["wasm", "parallel"]
 
 [dependencies.snarkvm-dpc]
 version = "0.2.0"
