@@ -18,13 +18,13 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-dpc]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-objects]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
