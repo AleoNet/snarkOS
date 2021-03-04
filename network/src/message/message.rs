@@ -90,17 +90,17 @@ pub enum Payload {
     Transaction(Vec<u8>),
 
     // a placeholder indicating the introduction of a new payload type; used for forward compatibility
-    #[doc(hide)]
+    #[doc(hidden)]
     Unknown,
 
     /* internal messages */
-    #[doc(hide)]
+    #[doc(hidden)]
     ConnectedTo(SocketAddr, Option<SocketAddr>),
-    #[doc(hide)]
+    #[doc(hidden)]
     ConnectingTo(SocketAddr),
     // TODO: used internally, but can also be used to allow a clean disconnect for connected peers on shutdown
     // add a doc if this is introduced
-    #[doc(hide)]
+    #[doc(hidden)]
     Disconnect(SocketAddr),
 }
 

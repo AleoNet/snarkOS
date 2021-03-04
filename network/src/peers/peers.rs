@@ -19,6 +19,7 @@ use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
 use std::{net::SocketAddr, sync::Arc};
 
 use parking_lot::Mutex;
+use rand::seq::IteratorRandom;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -63,10 +64,9 @@ impl Node {
                 number_to_disconnect
             );
 
-            let peer_book = self.peer_book.read();
+            let connected_peers = self.peer_book.read().connected_peers().clone();
 
-            let mut connected = peer_book
-                .connected_peers()
+            let mut connected = connected_peers
                 .iter()
                 .map(|(_, peer_info)| peer_info)
                 .collect::<Vec<_>>();
@@ -80,9 +80,21 @@ impl Node {
             }
         }
 
+        // disconnect from peers after a while, even if they haven't sent a GetPeers
+        let now = chrono::Utc::now();
+        if self.environment.is_bootnode() {
+            for (peer_addr, peer_info) in self.peer_book.read().connected_peers().clone() {
+                if (now - peer_info.last_connected().unwrap()).num_seconds() > 10 {
+                    let _ = self.disconnect_from_peer(peer_addr);
+                }
+            }
+        }
+
         if number_of_connected_peers != 0 {
-            // Send a `Ping` to every connected peer.
-            self.broadcast_pings().await;
+            if !self.environment.is_bootnode() {
+                // Send a `Ping` to every connected peer.
+                self.broadcast_pings().await;
+            }
 
             // Store the peer book to storage.
             self.save_peer_book_to_storage()?;
@@ -93,6 +105,10 @@ impl Node {
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         let own_address = self.local_address().unwrap(); // must be known by now
+        if !self.can_connect() {
+            // Don't connect if max number of connections has been reached.
+            return Err(NetworkError::TooManyConnections);
+        }
         if remote_address == own_address
             || ((remote_address.ip().is_unspecified() || remote_address.ip().is_loopback())
                 && remote_address.port() == own_address.port())
@@ -126,7 +142,6 @@ impl Node {
 
         // -> e
         let len = noise.write_message(&[], &mut buffer)?;
-        println!("len: {}", len);
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
         trace!("sent e (XX handshake part 1/3)");
@@ -198,9 +213,17 @@ impl Node {
     async fn connect_to_disconnected_peers(&self, count: usize) {
         trace!("Connecting to disconnected peers");
 
-        // Iterate through each connected peer and attempts a connection request.
-        let disconnected_peers = self.peer_book.read().disconnected_peers().clone();
-        for remote_address in disconnected_peers.keys().take(count).copied() {
+        // Iterate through a selection of random peers and attempt to connect.
+        let random_peers = self
+            .peer_book
+            .read()
+            .disconnected_peers()
+            .iter()
+            .map(|(k, _)| k)
+            .copied()
+            .choose_multiple(&mut rand::thread_rng(), count);
+
+        for remote_address in random_peers {
             if let Err(e) = self.initiate_connection(remote_address).await {
                 trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
                 let _ = self.disconnect_from_peer(remote_address);
@@ -213,8 +236,8 @@ impl Node {
         trace!("Broadcasting Ping messages");
 
         // consider peering tests that don't use the consensus layer
-        let current_block_height = if self.consensus.is_some() {
-            self.consensus().current_block_height()
+        let current_block_height = if let Some(ref consensus) = self.consensus() {
+            consensus.current_block_height()
         } else {
             0
         };
@@ -269,11 +292,9 @@ impl Node {
         let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
 
         // TODO: the peer book should be stored outside of consensus
-        if self.consensus.is_some() {
+        if let Some(ref consensus) = self.consensus() {
             // Save the serialized peer book to storage.
-            self.consensus()
-                .storage()
-                .save_peer_book_to_storage(serialized_peer_book)?;
+            consensus.storage().save_peer_book_to_storage(serialized_peer_book)?;
         }
 
         Ok(())
@@ -287,8 +308,10 @@ impl Node {
     pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         debug!("Disconnecting from {}", remote_address);
 
-        if self.peer_book.read().is_syncing_blocks(remote_address) {
-            self.consensus().finished_syncing_blocks();
+        if let Some(ref consensus) = self.consensus() {
+            if self.peer_book.read().is_syncing_blocks(remote_address) {
+                consensus.finished_syncing_blocks();
+            }
         }
 
         if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {
@@ -300,21 +323,41 @@ impl Node {
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
-    pub(crate) async fn send_get_peers(&self, remote_address: SocketAddr) {
+    pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
-        let mut peers = Vec::new();
-        for peer_address in self.peer_book.read().connected_peers().keys().copied() {
-            // Skip the iteration if the requesting peer that we're sending the response to
-            // appears in the list of peers.
-            if peer_address == remote_address {
-                continue;
-            }
-            peers.push(peer_address);
-        }
+        let peers = if !self.environment.is_bootnode() {
+            self.peer_book
+                .read()
+                .connected_peers()
+                .iter()
+                .map(|(k, _)| k)
+                .filter(|&addr| *addr != remote_address)
+                .copied()
+                .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
+        } else {
+            self.peer_book
+                .read()
+                .disconnected_peers()
+                .iter()
+                .map(|(k, _)| k)
+                .filter(|&addr| *addr != remote_address)
+                .copied()
+                .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
+        };
+
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
             .await;
+
+        // the bootstrapper's job is finished once it's sent its peer a list of peers
+        if self.environment.is_bootnode() {
+            let _ = self
+                .inbound
+                .sender
+                .send(Message::new(Direction::Internal, Payload::Disconnect(remote_address)))
+                .await;
+        }
     }
 
     /// A miner has sent their list of peer addresses.
@@ -342,6 +385,22 @@ impl Node {
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
             self.peer_book.write().add_peer(peer_address);
+        }
+    }
+
+    fn can_connect(&self) -> bool {
+        let peer_book = self.peer_book.read();
+        let num_connected = peer_book.number_of_connected_peers() as usize;
+        let num_connecting = peer_book.number_of_connecting_peers() as usize;
+        drop(peer_book);
+
+        let max_peers = self.environment.maximum_number_of_connected_peers() as usize;
+
+        if num_connected >= max_peers || num_connected + num_connecting >= max_peers {
+            warn!("Max number of connections ({}) reached", max_peers);
+            false
+        } else {
+            true
         }
     }
 }

@@ -23,6 +23,8 @@ pub mod encryption;
 #[cfg(test)]
 pub mod sync;
 
+pub mod topology;
+
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
 use snarkos::miner::MinerInstance;
@@ -48,13 +50,18 @@ pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
 /// Uses polling to cut down on time otherwise used by calling `sleep` in tests.
 #[macro_export]
 macro_rules! wait_until {
-    ($limit_secs: expr, $condition: expr) => {
+    ($limit_secs: expr, $condition: expr $(, $sleep_millis: expr)?) => {
         let now = std::time::Instant::now();
         loop {
             if $condition {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+            // Default timout.
+            let sleep_millis = 10;
+            // Set if present in args.
+            $(let sleep_millis = $sleep_millis;)?
+            tokio::time::sleep(std::time::Duration::from_millis(sleep_millis)).await;
             if now.elapsed() > std::time::Duration::from_secs($limit_secs) {
                 panic!("timed out!");
             }
@@ -125,7 +132,7 @@ impl TestSetup {
 impl Default for TestSetup {
     fn default() -> Self {
         Self {
-            socket_address: None,
+            socket_address: "127.0.0.1:0".parse().ok(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
             min_peers: 1,

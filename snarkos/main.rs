@@ -88,33 +88,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
-    let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
-
-    let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
-
-    info!("Loading Aleo parameters...");
-    let dpc_parameters = Arc::new(PublicParameters::<Components>::load(!config.miner.is_miner)?);
-    info!("Loading complete.");
-
-    // Fetch the set of valid inner circuit IDs.
-    let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
-        dpc_parameters.inner_snark_parameters.1.clone().into();
-    let inner_snark_id = dpc_parameters
-        .system_parameters
-        .inner_snark_verification_key_crh
-        .hash(&to_bytes![inner_snark_vk]?)?;
-
-    let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
-
-    // Set the initial consensus parameters.
-    let consensus_params = Arc::new(ConsensusParameters {
-        max_block_size: 1_000_000_000usize,
-        max_nonce: u32::max_value(),
-        target_block_time: 10i64,
-        network_id: Network::from_network_id(config.aleo.network_id),
-        verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
-        authorized_inner_snark_ids,
-    });
 
     let mut environment = Environment::new(
         Some(socket_address),
@@ -131,20 +104,49 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // before any other object (miner, RPC) needs to use it.
     let mut node = Node::new(environment.clone()).await?;
 
-    // Construct the consensus instance and set it on the node instance.
-    let consensus = Consensus::new(
-        node.clone(),
-        storage,
-        memory_pool.clone(),
-        consensus_params.clone(),
-        dpc_parameters.clone(),
-        config.miner.is_miner,
-        Duration::from_secs(config.p2p.block_sync_interval.into()),
-        Duration::from_secs(config.p2p.mempool_interval.into()),
-    );
+    // Enable the consensus layer if the node is not a bootstrapper.
+    if !config.node.is_bootnode {
+        let storage = Arc::new(MerkleTreeLedger::open_at_path(path.clone())?);
+        let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
 
-    // Set the consensus on the node.
-    node.set_consensus(consensus);
+        info!("Loading Aleo parameters...");
+        let dpc_parameters = Arc::new(PublicParameters::<Components>::load(!config.miner.is_miner)?);
+        info!("Loading complete.");
+
+        // Fetch the set of valid inner circuit IDs.
+        let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
+            dpc_parameters.inner_snark_parameters.1.clone().into();
+        let inner_snark_id = dpc_parameters
+            .system_parameters
+            .inner_snark_verification_key_crh
+            .hash(&to_bytes![inner_snark_vk]?)?;
+
+        let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
+
+        // Set the initial consensus parameters.
+        let consensus_params = Arc::new(ConsensusParameters {
+            max_block_size: 1_000_000_000usize,
+            max_nonce: u32::max_value(),
+            target_block_time: 10i64,
+            network_id: Network::from_network_id(config.aleo.network_id),
+            verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
+            authorized_inner_snark_ids,
+        });
+
+        let consensus = Consensus::new(
+            node.clone(),
+            storage,
+            memory_pool,
+            consensus_params,
+            dpc_parameters,
+            config.miner.is_miner,
+            Duration::from_secs(config.p2p.block_sync_interval.into()),
+            Duration::from_secs(config.p2p.mempool_interval.into()),
+        );
+
+        node.set_consensus(consensus);
+    };
+
     // Establish the address of the node.
     node.establish_address().await?;
     environment.set_local_address(node.local_address().unwrap());

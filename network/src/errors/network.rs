@@ -41,6 +41,7 @@ pub enum NetworkError {
     PeerIsDisconnected,
     SelfConnectAttempt,
     SenderError(tokio::sync::mpsc::error::SendError<Message>),
+    TooManyConnections,
     OutboundChannelMissing,
     ReceiverFailedToParse,
     StorageError(StorageError),
