@@ -107,7 +107,7 @@ impl Node {
         let own_address = self.local_address().unwrap(); // must be known by now
         if !self.can_connect() {
             // Don't connect if max number of connections has been reached.
-            return Ok(());
+            return Err(NetworkError::TooManyConnections);
         }
         if remote_address == own_address
             || ((remote_address.ip().is_unspecified() || remote_address.ip().is_loopback())
