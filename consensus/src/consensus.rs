@@ -39,7 +39,7 @@ use snarkvm_objects::dpc::DPCTransactions;
 use snarkvm_dpc::Account;
 use snarkvm_dpc::AccountAddress;
 use snarkvm_dpc::AccountPrivateKey;
-use snarkvm_dpc::AleoAmount;
+use snarkvm_objects::AleoAmount;
 use snarkvm_objects::Block;
 use snarkvm_objects::BlockHeader;
 use snarkvm_objects::BlockHeaderHash;
