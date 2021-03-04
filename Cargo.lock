@@ -2574,9 +2574,6 @@ dependencies = [
  "snarkos-network",
  "snarkos-profiler",
  "snarkos-testing",
- "snarkvm-curves",
- "snarkvm-marlin",
- "snarkvm-posw",
  "snarkvm-utilities",
  "tokio 1.2.0",
 ]
