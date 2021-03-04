@@ -15,9 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::StorageError, *};
-use snarkvm_errors::objects::BlockError;
-use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkvm_objects::{Block, BlockHeaderHash, DPCTransactions};
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::{Block, BlockError, BlockHeaderHash, DPCTransactions, Transaction};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;

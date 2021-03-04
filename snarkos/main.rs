@@ -27,9 +27,12 @@ use snarkos::{
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_network::{environment::Environment, Consensus, Node};
 use snarkos_rpc::start_rpc_server;
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents};
-use snarkvm_models::algorithms::{CRH, SNARK};
-use snarkvm_objects::{AccountAddress, Network};
+use snarkvm_algorithms::{CRH, SNARK};
+use snarkvm_dpc::{
+    base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
+    AccountAddress,
+};
+use snarkvm_objects::Network;
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, ToBytes};
 

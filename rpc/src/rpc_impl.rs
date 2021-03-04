@@ -25,8 +25,7 @@ use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkvm_models::objects::Transaction;
-use snarkvm_objects::BlockHeaderHash;
+use snarkvm_objects::{BlockHeaderHash, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

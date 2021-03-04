@@ -24,20 +24,25 @@ use snarkos_toolkit::{
     account::{Address, PrivateKey},
     dpc::{Record, TransactionKernelBuilder},
 };
-use snarkvm_dpc::base_dpc::{
-    encrypted_record::EncryptedRecord,
-    instantiated::{Components, InstantiatedDPC},
-    record::DPCRecord,
-    record_encryption::RecordEncryption,
-    record_payload::RecordPayload,
-    TransactionKernel,
+use snarkvm_algorithms::CRH;
+use snarkvm_dpc::{
+    base_dpc::{
+        encrypted_record::EncryptedRecord,
+        instantiated::{Components, InstantiatedDPC},
+        record::DPCRecord,
+        record_encryption::RecordEncryption,
+        record_payload::RecordPayload,
+        TransactionKernel,
+    },
+    Account,
+    AccountAddress,
+    AccountPrivateKey,
+    AccountScheme,
+    AccountViewKey,
+    DPCComponents,
+    DPCScheme,
+    Record as RecordModel,
 };
-use snarkvm_models::{
-    algorithms::CRH,
-    dpc::{DPCComponents, DPCScheme, Record as RecordModel},
-    objects::AccountScheme,
-};
-use snarkvm_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

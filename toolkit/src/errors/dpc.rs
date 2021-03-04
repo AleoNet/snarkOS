@@ -41,27 +41,27 @@ impl From<hex::FromHexError> for DPCError {
     }
 }
 
-impl From<snarkvm_errors::objects::account::AccountError> for DPCError {
-    fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        DPCError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
+impl From<snarkvm_dpc::AccountError> for DPCError {
+    fn from(error: snarkvm_dpc::AccountError) -> Self {
+        DPCError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 
-impl From<snarkvm_errors::algorithms::signature::SignatureError> for DPCError {
-    fn from(error: snarkvm_errors::algorithms::signature::SignatureError) -> Self {
-        DPCError::Crate("snarkvm_errors::algorithms::signature", format!("{:?}", error))
+impl From<snarkvm_algorithms::errors::signature::SignatureError> for DPCError {
+    fn from(error: snarkvm_algorithms::errors::signature::SignatureError) -> Self {
+        DPCError::Crate("snarkvm_algorithms::errors::signature", format!("{:?}", error))
     }
 }
 
-impl From<snarkvm_errors::algorithms::crh::CRHError> for DPCError {
-    fn from(error: snarkvm_errors::algorithms::crh::CRHError) -> Self {
-        DPCError::Crate("snarkvm_errors::algorithms::crh", format!("{:?}", error))
+impl From<snarkvm_algorithms::errors::crh::CRHError> for DPCError {
+    fn from(error: snarkvm_algorithms::errors::crh::CRHError) -> Self {
+        DPCError::Crate("snarkvm_algorithms::errors::crh", format!("{:?}", error))
     }
 }
 
-impl From<snarkvm_errors::dpc::DPCError> for DPCError {
-    fn from(error: snarkvm_errors::dpc::DPCError) -> Self {
-        DPCError::Crate("snarkvm_errors::dpc", format!("{:?}", error))
+impl From<snarkvm_dpc::DPCError> for DPCError {
+    fn from(error: snarkvm_dpc::DPCError) -> Self {
+        DPCError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 

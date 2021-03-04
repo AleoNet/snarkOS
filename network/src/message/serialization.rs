@@ -20,7 +20,10 @@ use crate::message::{Payload, Version};
 use payload_capnp::{
     block,
     block_hash,
-    payload::{self, payload_type},
+    payload::{
+        payload_type,
+        {self},
+    },
     socket_addr,
     transaction,
     version,

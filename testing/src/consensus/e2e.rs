@@ -16,8 +16,8 @@
 
 use snarkos_parameters::GenesisBlock;
 use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord};
-use snarkvm_models::genesis::Genesis;
 use snarkvm_objects::{Block, BlockHeader};
+use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

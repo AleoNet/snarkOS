@@ -20,11 +20,8 @@
 
 use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
-use snarkvm_models::{
-    algorithms::LoadableMerkleParameters,
-    objects::{LedgerScheme, Transaction},
-};
-use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::{dpc::DPCTransactions, BlockHeader, LedgerScheme, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,

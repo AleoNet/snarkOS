@@ -16,15 +16,9 @@
 
 use crate::{error::StorageError, *};
 use snarkos_parameters::GenesisBlock;
-use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_models::{
-    algorithms::LoadableMerkleParameters,
-    genesis::Genesis,
-    objects::{LedgerScheme, Transaction},
-    parameters::Parameter,
-};
-use snarkvm_objects::Block;
-use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters};
+use snarkvm_objects::{Block, LedgerScheme, Transaction};
+use snarkvm_parameters::{traits::genesis::Genesis, LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;

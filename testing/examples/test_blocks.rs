@@ -19,9 +19,15 @@ extern crate tracing;
 
 use snarkos_consensus::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_testing::{consensus::*, network::TestBlocks};
-use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
-use snarkvm_models::dpc::{DPCScheme, Program, Record};
-use snarkvm_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
+    Account,
+    AccountAddress,
+    DPCScheme,
+    Program,
+    Record,
+};
+use snarkvm_objects::{dpc::DPCTransactions, Block};
 use tracing_subscriber::EnvFilter;
 
 use rand::Rng;

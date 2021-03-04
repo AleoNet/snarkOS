@@ -18,31 +18,25 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-curves]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-dpc]
-version = "0.0.5"
-
-[dependencies.snarkvm-errors]
-version = "0.0.5"
-
-[dependencies.snarkvm-models]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-objects]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-parameters]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-posw]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
+version = "0.2.0"
 
 [dependencies.snarkos]
 path = "../" 

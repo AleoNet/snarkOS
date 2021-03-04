@@ -25,7 +25,7 @@ mod rpc_tests {
         storage::*,
     };
     use snarkvm_dpc::base_dpc::instantiated::Tx;
-    use snarkvm_models::objects::Transaction;
+    use snarkvm_objects::Transaction;
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,

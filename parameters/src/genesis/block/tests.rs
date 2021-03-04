@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::GenesisBlock;
-use snarkvm_models::genesis::Genesis;
+use snarkvm_parameters::traits::genesis::Genesis;
 
 #[test]
 fn test_genesis_block() {

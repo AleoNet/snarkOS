@@ -20,7 +20,8 @@ use crate::{
 };
 use snarkos_metrics::Metrics;
 use snarkos_storage::Ledger;
-use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::Transaction;
 
 use serde::{Deserialize, Serialize};
 use std::{

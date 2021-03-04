@@ -25,13 +25,17 @@ mod protected_rpc_tests {
         storage::*,
     };
 
-    use snarkvm_dpc::base_dpc::{
-        instantiated::{Components, Tx},
-        record::DPCRecord,
-        TransactionKernel,
+    use snarkvm_dpc::{
+        base_dpc::{
+            instantiated::{Components, Tx},
+            record::DPCRecord,
+            TransactionKernel,
+        },
+        AccountAddress,
+        AccountPrivateKey,
+        AccountViewKey,
+        Record,
     };
-    use snarkvm_models::dpc::Record;
-    use snarkvm_objects::{AccountAddress, AccountPrivateKey, AccountViewKey};
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         to_bytes,

@@ -17,29 +17,32 @@
 use crate::{difficulty::bitcoin_retarget, error::ConsensusError, memory_pool::MemoryPool, MerkleTreeLedger};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
+use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_curves::bls12_377::Bls12_377;
-use snarkvm_dpc::base_dpc::{
-    instantiated::*,
-    parameters::PublicParameters,
-    program::NoopProgram,
-    record::DPCRecord,
-    record_payload::RecordPayload,
-    BaseDPCComponents,
-};
-use snarkvm_models::{
-    algorithms::{CRH, SNARK},
-    dpc::{DPCComponents, DPCScheme, Program},
-    objects::{AccountScheme, LedgerScheme},
-};
-use snarkvm_objects::{
-    dpc::DPCTransactions,
+use snarkvm_dpc::{
+    base_dpc::{
+        instantiated::*,
+        parameters::PublicParameters,
+        program::NoopProgram,
+        record::DPCRecord,
+        record_payload::RecordPayload,
+        BaseDPCComponents,
+    },
     Account,
     AccountAddress,
     AccountPrivateKey,
+    AccountScheme,
+    DPCComponents,
+    DPCScheme,
+    Program,
+};
+use snarkvm_objects::{
+    dpc::DPCTransactions,
     AleoAmount,
     Block,
     BlockHeader,
     BlockHeaderHash,
+    LedgerScheme,
     MerkleRootHash,
     Network,
     PedersenMerkleRootHash,

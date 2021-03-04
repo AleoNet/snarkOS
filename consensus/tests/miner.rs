@@ -17,11 +17,13 @@
 mod miner {
     use snarkos_consensus::Miner;
     use snarkos_testing::consensus::*;
-    use snarkvm_models::{
-        algorithms::{commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme},
-        dpc::DPCComponents,
+    use snarkvm_algorithms::traits::{
+        commitment::CommitmentScheme,
+        encryption::EncryptionScheme,
+        signature::SignatureScheme,
     };
-    use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, AccountPrivateKey, BlockHeader};
+    use snarkvm_dpc::{AccountAddress, AccountPrivateKey, DPCComponents};
+    use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
     use snarkvm_posw::txids_to_roots;
 
     use rand::{Rng, SeedableRng};

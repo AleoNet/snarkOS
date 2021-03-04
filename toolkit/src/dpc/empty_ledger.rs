@@ -14,12 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_algorithms::merkle_tree::*;
-use snarkvm_models::{
-    algorithms::LoadableMerkleParameters,
-    objects::{LedgerScheme, Transaction},
-};
-use snarkvm_objects::Block;
+use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
+use snarkvm_objects::{Block, LedgerScheme, Transaction};
 
 use std::{marker::PhantomData, path::PathBuf};
 

@@ -17,7 +17,11 @@
 use crate::NetworkError;
 
 use rand::{thread_rng, Rng};
-use std::{self, net::SocketAddr, time::Duration};
+use std::{
+    net::SocketAddr,
+    time::Duration,
+    {self},
+};
 
 /// A core data structure containing the networking parameters for this node.
 #[derive(Clone)]

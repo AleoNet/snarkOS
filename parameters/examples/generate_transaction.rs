@@ -16,17 +16,19 @@
 
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
-use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
-use snarkvm_errors::dpc::{DPCError, LedgerError};
-use snarkvm_models::{
-    algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
-    dpc::{DPCComponents, DPCScheme},
-    objects::{account::AccountScheme, Transaction},
-    parameters::Parameter,
+use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters, MerkleParameters, CRH};
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC},
+    Account,
+    AccountAddress,
+    AccountScheme,
+    DPCComponents,
+    DPCError,
+    DPCScheme,
+    LedgerError,
 };
-use snarkvm_objects::{Account, AccountAddress, Network};
-use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_objects::{Network, Transaction};
+use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -36,7 +38,10 @@ use snarkvm_utilities::{
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use std::{
-    fs::{self, File},
+    fs::{
+        File,
+        {self},
+    },
     io::{Result as IoResult, Write},
     marker::PhantomData,
     path::PathBuf,

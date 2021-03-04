@@ -17,8 +17,6 @@
 use snarkos_parameters::transaction_1::Transaction1;
 
 use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
-use snarkvm_errors::objects::TransactionError;
-use snarkvm_models::genesis::Genesis;
 use snarkvm_objects::{
     BlockHeader,
     BlockHeaderHash,
@@ -26,7 +24,9 @@ use snarkvm_objects::{
     MerkleRootHash,
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
+    TransactionError,
 };
+use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
 
 use chrono::Utc;

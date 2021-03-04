@@ -20,9 +20,14 @@ use crate::{
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_parameters::GenesisBlock;
-use snarkvm_dpc::base_dpc::{instantiated::*, BaseDPCComponents, NoopProgram};
-use snarkvm_models::{algorithms::CRH, dpc::DPCScheme, genesis::Genesis};
-use snarkvm_objects::{Account, Block};
+use snarkvm_algorithms::CRH;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, BaseDPCComponents, NoopProgram},
+    Account,
+    DPCScheme,
+};
+use snarkvm_objects::Block;
+use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

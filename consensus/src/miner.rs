@@ -16,13 +16,14 @@
 
 use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::Ledger;
-use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
-use snarkvm_models::{
-    algorithms::{LoadableMerkleParameters, CRH},
-    dpc::{DPCScheme, Record},
-    objects::Transaction,
+use snarkvm_algorithms::{traits::LoadableMerkleParameters, CRH};
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord},
+    AccountAddress,
+    DPCScheme,
+    Record,
 };
-use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
+use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Transaction};
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
