@@ -46,7 +46,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
 async fn start_nodes(nodes: &[Node]) {
     for node in nodes {
         // Nodes are started with a slight delay to avoid having peering intervals in phase (this
-        // is the hypothetical real-world worst case scenario).
+        // is the hypothetical worst case scenario).
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         node.start_services().await;
     }
@@ -123,8 +123,8 @@ async fn spawn_nodes_in_a_mesh() {
     connect_nodes(&mut nodes, Topology::Mesh).await;
     start_nodes(&nodes).await;
 
-    // Set the sleep interval to 200ms to avoid lock issues.
-    // Density measurement here is proportional to the min peers: if every node in the topology
+    // Set the sleep interval to 200ms to avoid locking issues.
+    // Density measurement here is proportional to the min peers: if every node in the network
     // only connected to the min node count, the total number of connections would be roughly 10
     // percent of the total possible. With 50 nodes and min at 5 connections each this works out to
     // be 125/1225 ≈ 0.1.
@@ -132,7 +132,7 @@ async fn spawn_nodes_in_a_mesh() {
 
     // Make sure the node with the largest degree centrality and smallest degree centrality don't
     // have a delta greater than the max-min peer interval allows for. This check also provides
-    // some insight into the proper homogenous meshing of the network.
+    // some insight into whether the network is meshed in a homogeneous manner.
     wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
 }
 
