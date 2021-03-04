@@ -105,6 +105,10 @@ impl Node {
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         let own_address = self.local_address().unwrap(); // must be known by now
+        if !self.can_connect() {
+            // Don't connect if max number of connections has been reached.
+            return Ok(());
+        }
         if remote_address == own_address
             || ((remote_address.ip().is_unspecified() || remote_address.ip().is_loopback())
                 && remote_address.port() == own_address.port())
@@ -198,11 +202,9 @@ impl Node {
             .filter(|addr| !connected_peers.contains_key(addr))
             .copied()
         {
-            if self.can_connect() {
-                if let Err(e) = self.initiate_connection(bootnode_address).await {
-                    warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                    let _ = self.disconnect_from_peer(bootnode_address);
-                }
+            if let Err(e) = self.initiate_connection(bootnode_address).await {
+                warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                let _ = self.disconnect_from_peer(bootnode_address);
             }
         }
     }
@@ -222,11 +224,9 @@ impl Node {
             .choose_multiple(&mut rand::thread_rng(), count);
 
         for remote_address in random_peers {
-            if self.can_connect() {
-                if let Err(e) = self.initiate_connection(remote_address).await {
-                    trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
-                    let _ = self.disconnect_from_peer(remote_address);
-                }
+            if let Err(e) = self.initiate_connection(remote_address).await {
+                trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+                let _ = self.disconnect_from_peer(remote_address);
             }
         }
     }
