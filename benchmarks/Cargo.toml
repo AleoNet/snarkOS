@@ -38,9 +38,6 @@ version = "0.0.5"
 [dependencies.snarkvm-marlin]
 version = "0.0.5"
 
-[dependencies.snarkvm-models]
-version = "0.0.5"
-
 [dependencies.snarkvm-posw]
 version = "0.0.5"
 features = [ "test-helpers" ]
