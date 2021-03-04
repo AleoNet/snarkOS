@@ -20,7 +20,7 @@ use snarkvm_dpc::base_dpc::instantiated::Components;
 use snarkvm_dpc::base_dpc::transaction::DPCTransaction;
 use snarkvm_dpc::base_dpc::BaseDPCComponents;
 use snarkvm_errors::objects::TransactionError;
-use snarkvm_models::genesis::Genesis;
+use snarkvm_parameters::::Genesis;
 use snarkvm_objects::BlockHeader;
 use snarkvm_objects::BlockHeaderHash;
 use snarkvm_objects::DPCTransactions;
