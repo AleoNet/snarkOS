@@ -40,7 +40,6 @@ default-features = false
 
 [dependencies.snarkvm-utilities]
 version = "0.2.0"
-default-features = false
 
 [dependencies.anyhow]
 version = "1.0.37"
