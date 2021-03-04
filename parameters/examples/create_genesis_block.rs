@@ -19,7 +19,7 @@ use snarkos_parameters::transaction_1::Transaction1;
 use snarkvm_dpc::base_dpc::instantiated::Components;
 use snarkvm_dpc::base_dpc::transaction::DPCTransaction;
 use snarkvm_dpc::base_dpc::BaseDPCComponents;
-use snarkvm_errors::objects::TransactionError;
+use snarkvm_objects::TransactionError;
 use snarkvm_parameters::::Genesis;
 use snarkvm_objects::BlockHeader;
 use snarkvm_objects::BlockHeaderHash;
