@@ -16,7 +16,7 @@
 
 use snarkos_consensus::error::ConsensusError;
 use snarkos_storage::error::StorageError;
-use snarkvm_errors::algorithms::CRHError;
+use snarkvm_algorithms::errors::CRHError;
 use snarkvm_errors::dpc::DPCError;
 use snarkvm_errors::objects::AccountError;
 use snarkvm_errors::objects::BlockError;

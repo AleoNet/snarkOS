@@ -47,15 +47,15 @@ impl From<snarkvm_errors::objects::account::AccountError> for DPCError {
     }
 }
 
-impl From<snarkvm_errors::algorithms::signature::SignatureError> for DPCError {
-    fn from(error: snarkvm_errors::algorithms::signature::SignatureError) -> Self {
-        DPCError::Crate("snarkvm_errors::algorithms::signature", format!("{:?}", error))
+impl From<snarkvm_algorithms::errors::signature::SignatureError> for DPCError {
+    fn from(error: snarkvm_algorithms::errors::signature::SignatureError) -> Self {
+        DPCError::Crate("snarkvm_algorithms::errors::signature", format!("{:?}", error))
     }
 }
 
-impl From<snarkvm_errors::algorithms::crh::CRHError> for DPCError {
-    fn from(error: snarkvm_errors::algorithms::crh::CRHError) -> Self {
-        DPCError::Crate("snarkvm_errors::algorithms::crh", format!("{:?}", error))
+impl From<snarkvm_algorithms::errors::crh::CRHError> for DPCError {
+    fn from(error: snarkvm_algorithms::errors::crh::CRHError) -> Self {
+        DPCError::Crate("snarkvm_algorithms::errors::crh", format!("{:?}", error))
     }
 }
 
