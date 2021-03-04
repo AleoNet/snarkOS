@@ -20,7 +20,7 @@ mod miner {
     use snarkvm_algorithms::commitment::CommitmentScheme;
     use snarkvm_algorithms::encryption::EncryptionScheme;
     use snarkvm_algorithms::signature::SignatureScheme;
-    use snarkvm_models::dpc::DPCComponents;
+    use snarkvm_dpc::DPCComponents;
     use snarkvm_objects::dpc::DPCTransactions;
     use snarkvm_objects::AccountAddress;
     use snarkvm_objects::AccountPrivateKey;

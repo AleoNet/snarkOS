@@ -17,7 +17,7 @@
 use crate::error::StorageError;
 use crate::*;
 use snarkvm_algorithms::LoadableMerkleParameters;
-use snarkvm_models::dpc::Record;
+use snarkvm_dpc::Record;
 use snarkvm_models::objects::Transaction;
 use snarkvm_utilities::bytes::FromBytes;
 use snarkvm_utilities::bytes::ToBytes;

@@ -21,7 +21,7 @@ use crate::signature::SignaturePublicKey;
 use snarkvm_dpc::base_dpc::instantiated::Components;
 use snarkvm_dpc::base_dpc::parameters::SystemParameters;
 use snarkvm_algorithms::SignatureScheme;
-use snarkvm_models::dpc::DPCComponents;
+use snarkvm_dpc::DPCComponents;
 use snarkvm_utilities::bytes::FromBytes;
 use snarkvm_utilities::bytes::ToBytes;
 use snarkvm_utilities::to_bytes;

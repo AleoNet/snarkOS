@@ -25,7 +25,7 @@ use snarkvm_dpc::base_dpc::record::DPCRecord;
 use snarkvm_dpc::base_dpc::record::EncryptedRecord;
 use snarkvm_dpc::base_dpc::record::RecordEncryption;
 use snarkvm_dpc::base_dpc::DPC;
-use snarkvm_models::dpc::Record as RecordTrait;
+use snarkvm_dpc::Record as RecordTrait;
 use snarkvm_utilities::bytes::FromBytes;
 use snarkvm_utilities::bytes::ToBytes;
 use snarkvm_utilities::to_bytes;

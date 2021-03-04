@@ -19,7 +19,7 @@ use snarkvm_dpc::base_dpc::instantiated::*;
 use snarkvm_dpc::base_dpc::parameters::PublicParameters;
 use snarkvm_algorithms::MerkleParameters;
 use snarkvm_algorithms::CRH;
-use snarkvm_models::dpc::DPCScheme;
+use snarkvm_dpc::DPCScheme;
 use snarkvm_models::objects::AccountScheme;
 use snarkvm_models::parameters::Parameter;
 use snarkvm_objects::Account;

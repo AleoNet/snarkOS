@@ -31,7 +31,7 @@ mod protected_rpc_tests {
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_dpc::base_dpc::record::DPCRecord;
     use snarkvm_dpc::base_dpc::TransactionKernel;
-    use snarkvm_models::dpc::Record;
+    use snarkvm_dpc::Record;
     use snarkvm_objects::AccountAddress;
     use snarkvm_objects::AccountPrivateKey;
     use snarkvm_objects::AccountViewKey;

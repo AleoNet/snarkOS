@@ -17,7 +17,7 @@
 use crate::account::PrivateKey;
 use crate::account::ViewKey;
 use crate::record::Record as RecordNative;
-use snarkvm_models::dpc::Record as RecordTrait;
+use snarkvm_dpc::Record as RecordTrait;
 use snarkvm_utilities::to_bytes;
 use snarkvm_utilities::ToBytes;
 
