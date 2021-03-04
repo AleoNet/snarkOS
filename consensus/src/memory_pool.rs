@@ -21,8 +21,8 @@
 use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
 use snarkvm_algorithms::LoadableMerkleParameters;
-use snarkvm_models::objects::LedgerScheme;
-use snarkvm_models::objects::Transaction;
+use snarkvm_objects::LedgerScheme;
+use snarkvm_objects::Transaction;
 use snarkvm_objects::dpc::DPCTransactions;
 use snarkvm_objects::BlockHeader;
 use snarkvm_utilities::bytes::FromBytes;

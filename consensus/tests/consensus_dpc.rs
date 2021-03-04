@@ -26,7 +26,7 @@ mod consensus_dpc {
     use snarkvm_dpc::DPCScheme;
     use snarkvm_dpc::Program;
     use snarkvm_dpc::Record;
-    use snarkvm_models::objects::LedgerScheme;
+    use snarkvm_objects::LedgerScheme;
     use snarkvm_objects::dpc::DPCTransactions;
     use snarkvm_objects::Block;
     use snarkvm_utilities::bytes::ToBytes;

@@ -27,7 +27,7 @@ mod rpc_tests {
     use snarkos_testing::network::TestSetup;
     use snarkos_testing::storage::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
-    use snarkvm_models::objects::Transaction;
+    use snarkvm_objects::Transaction;
     use snarkvm_utilities::bytes::FromBytes;
     use snarkvm_utilities::bytes::ToBytes;
     use snarkvm_utilities::serialize::CanonicalSerialize;

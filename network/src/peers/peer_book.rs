@@ -20,7 +20,7 @@ use crate::NetworkError;
 use snarkos_metrics::Metrics;
 use snarkos_storage::Ledger;
 use snarkvm_algorithms::LoadableMerkleParameters;
-use snarkvm_models::objects::Transaction;
+use snarkvm_objects::Transaction;
 
 use serde::Deserialize;
 use serde::Serialize;

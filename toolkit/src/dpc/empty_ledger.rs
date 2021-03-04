@@ -16,8 +16,8 @@
 
 use snarkvm_algorithms::merkle_tree::*;
 use snarkvm_algorithms::LoadableMerkleParameters;
-use snarkvm_models::objects::LedgerScheme;
-use snarkvm_models::objects::Transaction;
+use snarkvm_objects::LedgerScheme;
+use snarkvm_objects::Transaction;
 use snarkvm_objects::Block;
 
 use std::marker::PhantomData;

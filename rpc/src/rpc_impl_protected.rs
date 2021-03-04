@@ -38,7 +38,7 @@ use snarkvm_algorithms::CRH;
 use snarkvm_dpc::DPCComponents;
 use snarkvm_dpc::DPCScheme;
 use snarkvm_dpc::Record as RecordModel;
-use snarkvm_models::objects::AccountScheme;
+use snarkvm_dpc::AccountScheme;
 use snarkvm_objects::Account;
 use snarkvm_objects::AccountAddress;
 use snarkvm_objects::AccountPrivateKey;

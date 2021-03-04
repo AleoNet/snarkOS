@@ -32,7 +32,7 @@ use snarkos_network::Node;
 use snarkvm_dpc::base_dpc::instantiated::Components;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_dpc::base_dpc::parameters::PublicParameters;
-use snarkvm_models::objects::Transaction;
+use snarkvm_objects::Transaction;
 use snarkvm_objects::BlockHeaderHash;
 use snarkvm_utilities::bytes::FromBytes;
 use snarkvm_utilities::bytes::ToBytes;

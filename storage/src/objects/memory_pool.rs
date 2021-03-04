@@ -21,7 +21,7 @@ use crate::Op;
 use crate::COL_META;
 use crate::KEY_MEMORY_POOL;
 use snarkvm_algorithms::LoadableMerkleParameters;
-use snarkvm_models::objects::Transaction;
+use snarkvm_objects::Transaction;
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the stored memory pool transactions.

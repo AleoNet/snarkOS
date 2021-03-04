@@ -26,7 +26,7 @@ use snarkvm_algorithms::LoadableMerkleParameters;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::DPCScheme;
 use snarkvm_dpc::Record;
-use snarkvm_models::objects::Transaction;
+use snarkvm_objects::Transaction;
 use snarkvm_objects::dpc::DPCTransactions;
 use snarkvm_objects::AccountAddress;
 use snarkvm_objects::Block;
