@@ -20,7 +20,7 @@
 
 use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
-use snarkvm_algorithms::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::LedgerScheme;
 use snarkvm_objects::Transaction;
 use snarkvm_objects::dpc::DPCTransactions;

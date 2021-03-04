@@ -18,7 +18,7 @@ use crate::error::StorageError;
 use crate::*;
 use snarkos_parameters::GenesisBlock;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_algorithms::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_parameters::genesis::Genesis;
 use snarkvm_objects::LedgerScheme;
 use snarkvm_objects::Transaction;

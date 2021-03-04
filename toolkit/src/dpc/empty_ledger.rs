@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm_algorithms::merkle_tree::*;
-use snarkvm_algorithms::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::LedgerScheme;
 use snarkvm_objects::Transaction;
 use snarkvm_objects::Block;

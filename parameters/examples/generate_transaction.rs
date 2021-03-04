@@ -26,7 +26,7 @@ use snarkvm_dpc::base_dpc::BaseDPCComponents;
 use snarkvm_dpc::base_dpc::DPC;
 use snarkvm_dpc::DPCError;
 use snarkvm_dpc::LedgerError;
-use snarkvm_algorithms::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_algorithms::MerkleParameters;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::DPCComponents;

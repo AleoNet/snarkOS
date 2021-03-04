@@ -22,7 +22,7 @@ use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::instantiated::*;
 use snarkvm_dpc::base_dpc::parameters::PublicParameters;
 use snarkvm_dpc::base_dpc::record::DPCRecord;
-use snarkvm_algorithms::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::DPCScheme;
 use snarkvm_dpc::Record;

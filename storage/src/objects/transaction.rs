@@ -18,7 +18,7 @@ use crate::error::StorageError;
 use crate::Ledger;
 use crate::TransactionLocation;
 use crate::COL_TRANSACTION_LOCATION;
-use snarkvm_algorithms::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::LedgerScheme;
 use snarkvm_objects::Transaction;
 use snarkvm_objects::BlockHeaderHash;

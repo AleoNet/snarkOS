@@ -19,7 +19,7 @@ use crate::peers::PeerQuality;
 use crate::NetworkError;
 use snarkos_metrics::Metrics;
 use snarkos_storage::Ledger;
-use snarkvm_algorithms::LoadableMerkleParameters;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::Transaction;
 
 use serde::Deserialize;
