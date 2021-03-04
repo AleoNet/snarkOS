@@ -19,7 +19,7 @@ mod miner {
     use snarkos_testing::consensus::*;
     use snarkvm_algorithms::traits::commitment::CommitmentScheme;
     use snarkvm_algorithms::traits::encryption::EncryptionScheme;
-    use snarkvm_algorithms::signature::SignatureScheme;
+    use snarkvm_algorithms::traits::signature::SignatureScheme;
     use snarkvm_dpc::DPCComponents;
     use snarkvm_objects::dpc::DPCTransactions;
     use snarkvm_dpc::AccountAddress;
