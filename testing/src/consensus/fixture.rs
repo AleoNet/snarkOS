@@ -24,7 +24,7 @@ use snarkvm_dpc::base_dpc::BaseDPCComponents;
 use snarkvm_dpc::base_dpc::NoopProgram;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::DPCScheme;
-use snarkvm_parameters::::Genesis;
+use snarkvm_parameters::Genesis;
 use snarkvm_objects::Account;
 use snarkvm_objects::Block;
 use snarkvm_utilities::bytes::FromBytes;
