@@ -14,21 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::cli::CLI;
-use crate::errors::CliError;
-use crate::parameters::flag;
-use crate::parameters::option;
-use crate::parameters::subcommand;
-use crate::parameters::types::*;
-use crate::update::UpdateCLI;
+use crate::{
+    cli::CLI,
+    errors::CliError,
+    parameters::{flag, option, subcommand, types::*},
+    update::UpdateCLI,
+};
 
 use clap::ArgMatches;
 use dirs::home_dir;
-use serde::Deserialize;
-use serde::Serialize;
-use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.

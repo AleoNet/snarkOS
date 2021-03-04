@@ -14,16 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use rand::distributions::Standard;
-use rand::thread_rng;
-use rand::Rng;
-use snarkos_testing::network::handshaken_node_and_peer;
-use snarkos_testing::network::spawn_2_fake_nodes;
-use snarkos_testing::network::test_node;
-use snarkos_testing::network::TestSetup;
-use snarkos_testing::wait_until;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+use rand::{distributions::Standard, thread_rng, Rng};
+use snarkos_testing::{
+    network::{handshaken_node_and_peer, spawn_2_fake_nodes, test_node, TestSetup},
+    wait_until,
+};
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub const ITERATIONS: usize = 10000;
 

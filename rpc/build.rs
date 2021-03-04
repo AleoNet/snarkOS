@@ -15,8 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 // Detect the rustc channel
-use rustc_version::version_meta;
-use rustc_version::Channel;
+use rustc_version::{version_meta, Channel};
 
 fn main() {
     // Set cfg flags depending on release channel

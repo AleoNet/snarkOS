@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::prometheus::metrics_handler;
-use crate::prometheus::CONNECTED_PEERS;
-use crate::prometheus::{self};
+use crate::prometheus::{
+    metrics_handler,
+    CONNECTED_PEERS,
+    {self},
+};
 
 use warp::Filter;
 

@@ -15,9 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use criterion::*;
-use rand::distributions::Standard;
-use rand::thread_rng;
-use rand::Rng;
+use rand::{distributions::Standard, thread_rng, Rng};
 
 use snarkos_network::Payload;
 use snarkos_testing::network::spawn_2_fake_nodes;

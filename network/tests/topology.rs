@@ -15,12 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::Node;
-use snarkos_testing::network::test_environment;
-use snarkos_testing::network::test_node;
-use snarkos_testing::network::topology::connect_nodes;
-use snarkos_testing::network::topology::Topology;
-use snarkos_testing::network::TestSetup;
-use snarkos_testing::wait_until;
+use snarkos_testing::{
+    network::{
+        test_environment,
+        test_node,
+        topology::{connect_nodes, Topology},
+        TestSetup,
+    },
+    wait_until,
+};
 
 const N: usize = 50;
 const MIN_PEERS: u16 = 5;

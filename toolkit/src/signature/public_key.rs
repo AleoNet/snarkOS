@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::PrivateKey;
-use crate::errors::SignatureError;
+use crate::{account::PrivateKey, errors::SignatureError};
 
-use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_dpc::base_dpc::parameters::SystemParameters;
 use snarkvm_algorithms::SignatureScheme;
-use snarkvm_dpc::DPCComponents;
-use snarkvm_utilities::bytes::FromBytes;
-use snarkvm_utilities::bytes::ToBytes;
-use snarkvm_utilities::to_bytes;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    DPCComponents,
+};
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 #[derive(Debug)]
 pub struct SignaturePublicKey {

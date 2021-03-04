@@ -15,24 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::ConsensusParameters;
-use snarkvm_dpc::instantiated::Components;
-use snarkvm_objects::TransactionError;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::DPCComponents;
-use snarkvm_objects::Transaction;
-use snarkvm_parameters::Parameter;
-use snarkvm_objects::Network;
-use snarkvm_parameters::InnerSNARKVKCRHParameters;
-use snarkvm_parameters::InnerSNARKVKParameters;
+use snarkvm_dpc::{instantiated::Components, DPCComponents};
+use snarkvm_objects::{Network, Transaction, TransactionError};
+use snarkvm_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::to_bytes;
-use snarkvm_utilities::FromBytes;
-use snarkvm_utilities::ToBytes;
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
-use std::io::Read;
-use std::io::Result as IoResult;
-use std::io::Write;
+use std::io::{Read, Result as IoResult, Write};
 
 mod e2e;
 pub use e2e::*;

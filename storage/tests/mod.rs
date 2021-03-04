@@ -16,13 +16,15 @@
 
 mod test_storage {
     use snarkos_testing::storage::*;
-    use snarkvm_objects::Block;
-    use snarkvm_objects::BlockHeader;
-    use snarkvm_objects::BlockHeaderHash;
-    use snarkvm_objects::DPCTransactions;
-    use snarkvm_objects::MerkleRootHash;
-    use snarkvm_objects::PedersenMerkleRootHash;
-    use snarkvm_objects::ProofOfSuccinctWork;
+    use snarkvm_objects::{
+        Block,
+        BlockHeader,
+        BlockHeaderHash,
+        DPCTransactions,
+        MerkleRootHash,
+        PedersenMerkleRootHash,
+        ProofOfSuccinctWork,
+    };
 
     #[test]
     pub fn test_new_blockchain() {

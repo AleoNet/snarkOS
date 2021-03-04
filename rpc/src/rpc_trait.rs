@@ -16,8 +16,7 @@
 
 //! Definition of the public and private RPC endpoints.
 
-use crate::error::RpcError;
-use crate::rpc_types::*;
+use crate::{error::RpcError, rpc_types::*};
 
 use jsonrpc_derive::rpc;
 

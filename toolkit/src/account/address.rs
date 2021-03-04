@@ -14,16 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::PrivateKey;
-use crate::errors::AddressError;
+use crate::{account::PrivateKey, errors::AddressError};
 
-use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_dpc::base_dpc::parameters::SystemParameters;
-use snarkvm_dpc::AccountAddress;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    AccountAddress,
+};
 use snarkvm_utilities::bytes::ToBytes;
 
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug)]
 pub struct Address {

@@ -16,17 +16,11 @@
 
 use tokio::time::sleep;
 
-use crate::consensus::BLOCK_1;
-use crate::consensus::BLOCK_1_HEADER_HASH;
-use crate::consensus::BLOCK_2;
-use crate::consensus::BLOCK_2_HEADER_HASH;
-use crate::consensus::TRANSACTION_1;
-use crate::consensus::TRANSACTION_2;
-use crate::network::handshaken_node_and_peer;
-use crate::network::test_node;
-use crate::network::ConsensusSetup;
-use crate::network::TestSetup;
-use crate::wait_until;
+use crate::{
+    consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
+    network::{handshaken_node_and_peer, test_node, ConsensusSetup, TestSetup},
+    wait_until,
+};
 
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;

@@ -14,44 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::difficulty::bitcoin_retarget;
-use crate::error::ConsensusError;
-use crate::memory_pool::MemoryPool;
-use crate::MerkleTreeLedger;
-use snarkos_profiler::end_timer;
-use snarkos_profiler::start_timer;
+use crate::{difficulty::bitcoin_retarget, error::ConsensusError, memory_pool::MemoryPool, MerkleTreeLedger};
+use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::BlockPath;
+use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_curves::bls12_377::Bls12_377;
-use snarkvm_dpc::base_dpc::instantiated::*;
-use snarkvm_dpc::base_dpc::parameters::PublicParameters;
-use snarkvm_dpc::base_dpc::program::NoopProgram;
-use snarkvm_dpc::base_dpc::record::DPCRecord;
-use snarkvm_dpc::base_dpc::record_payload::RecordPayload;
-use snarkvm_dpc::base_dpc::BaseDPCComponents;
-use snarkvm_algorithms::CRH;
-use snarkvm_algorithms::SNARK;
-use snarkvm_dpc::DPCComponents;
-use snarkvm_dpc::DPCScheme;
-use snarkvm_dpc::Program;
-use snarkvm_dpc::AccountScheme;
-use snarkvm_objects::LedgerScheme;
-use snarkvm_objects::dpc::DPCTransactions;
-use snarkvm_dpc::Account;
-use snarkvm_dpc::AccountAddress;
-use snarkvm_dpc::AccountPrivateKey;
-use snarkvm_objects::AleoAmount;
-use snarkvm_objects::Block;
-use snarkvm_objects::BlockHeader;
-use snarkvm_objects::BlockHeaderHash;
-use snarkvm_objects::MerkleRootHash;
-use snarkvm_objects::Network;
-use snarkvm_objects::PedersenMerkleRootHash;
-use snarkvm_posw::txids_to_roots;
-use snarkvm_posw::Marlin;
-use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::to_bytes;
-use snarkvm_utilities::FromBytes;
-use snarkvm_utilities::ToBytes;
+use snarkvm_dpc::{
+    base_dpc::{
+        instantiated::*,
+        parameters::PublicParameters,
+        program::NoopProgram,
+        record::DPCRecord,
+        record_payload::RecordPayload,
+        BaseDPCComponents,
+    },
+    Account,
+    AccountAddress,
+    AccountPrivateKey,
+    AccountScheme,
+    DPCComponents,
+    DPCScheme,
+    Program,
+};
+use snarkvm_objects::{
+    dpc::DPCTransactions,
+    AleoAmount,
+    Block,
+    BlockHeader,
+    BlockHeaderHash,
+    LedgerScheme,
+    MerkleRootHash,
+    Network,
+    PedersenMerkleRootHash,
+};
+use snarkvm_posw::{txids_to_roots, Marlin, PoswMarlin};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use chrono::Utc;
 use rand::Rng;
@@ -555,8 +552,7 @@ impl ConsensusParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::thread_rng;
-    use rand::Rng;
+    use rand::{thread_rng, Rng};
     use snarkos_testing::consensus::DATA;
     use snarkvm_objects::PedersenMerkleRootHash;
 

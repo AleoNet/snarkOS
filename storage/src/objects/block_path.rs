@@ -14,13 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::StorageError;
-use crate::Ledger;
-use snarkvm_objects::BlockError;
+use crate::{error::StorageError, Ledger};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::Transaction;
-use snarkvm_objects::BlockHeader;
-use snarkvm_objects::BlockHeaderHash;
+use snarkvm_objects::{BlockError, BlockHeader, BlockHeaderHash, Transaction};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
 

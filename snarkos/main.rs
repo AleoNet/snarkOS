@@ -17,37 +17,28 @@
 #[macro_use]
 extern crate tracing;
 
-use snarkos::cli::CLI;
-use snarkos::config::Config;
-use snarkos::config::ConfigCli;
-use snarkos::display::render_welcome;
-use snarkos::errors::NodeError;
-use snarkos::miner::MinerInstance;
-use snarkos_consensus::ConsensusParameters;
-use snarkos_consensus::MemoryPool;
-use snarkos_consensus::MerkleTreeLedger;
-use snarkos_network::environment::Environment;
-use snarkos_network::Consensus;
-use snarkos_network::Node;
+use snarkos::{
+    cli::CLI,
+    config::{Config, ConfigCli},
+    display::render_welcome,
+    errors::NodeError,
+    miner::MinerInstance,
+};
+use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_network::{environment::Environment, Consensus, Node};
 use snarkos_rpc::start_rpc_server;
-use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_dpc::base_dpc::parameters::PublicParameters;
-use snarkvm_dpc::base_dpc::BaseDPCComponents;
-use snarkvm_algorithms::CRH;
-use snarkvm_algorithms::SNARK;
-use snarkvm_dpc::AccountAddress;
+use snarkvm_algorithms::{CRH, SNARK};
+use snarkvm_dpc::{
+    base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
+    AccountAddress,
+};
 use snarkvm_objects::Network;
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::to_bytes;
-use snarkvm_utilities::ToBytes;
+use snarkvm_utilities::{to_bytes, ToBytes};
 
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
-use parking_lot::Mutex;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use tokio::runtime::Builder;
 use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;

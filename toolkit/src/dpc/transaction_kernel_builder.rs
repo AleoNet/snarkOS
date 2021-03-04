@@ -14,31 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::Address;
-use crate::account::PrivateKey;
-use crate::dpc::EmptyLedger;
-use crate::dpc::Record;
-use crate::errors::DPCError;
-use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
-use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_dpc::base_dpc::instantiated::InstantiatedDPC;
-use snarkvm_dpc::base_dpc::instantiated::Tx;
-use snarkvm_dpc::base_dpc::parameters::NoopProgramSNARKParameters;
-use snarkvm_dpc::base_dpc::parameters::SystemParameters;
-use snarkvm_dpc::base_dpc::record_payload::RecordPayload;
-use snarkvm_dpc::base_dpc::TransactionKernel as TransactionKernelNative;
+use crate::{
+    account::{Address, PrivateKey},
+    dpc::{EmptyLedger, Record},
+    errors::DPCError,
+};
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::DPCComponents;
-use snarkvm_dpc::DPCScheme;
-use snarkvm_dpc::Record as RecordScheme;
-use snarkvm_dpc::*;
-use snarkvm_utilities::to_bytes;
-use snarkvm_utilities::FromBytes;
-use snarkvm_utilities::ToBytes;
+use snarkvm_dpc::{
+    base_dpc::{
+        instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
+        parameters::{NoopProgramSNARKParameters, SystemParameters},
+        record_payload::RecordPayload,
+        TransactionKernel as TransactionKernelNative,
+    },
+    DPCComponents,
+    DPCScheme,
+    Record as RecordScheme,
+    *,
+};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use rand::Rng;
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 pub type MerkleTreeLedger = EmptyLedger<Tx, CommitmentMerkleParameters>;
 

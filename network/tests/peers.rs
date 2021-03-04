@@ -15,11 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::message::*;
-use snarkos_testing::network::handshaken_node_and_peer;
-use snarkos_testing::network::random_bound_address;
-use snarkos_testing::network::test_node;
-use snarkos_testing::network::TestSetup;
-use snarkos_testing::wait_until;
+use snarkos_testing::{
+    network::{handshaken_node_and_peer, random_bound_address, test_node, TestSetup},
+    wait_until,
+};
 
 #[tokio::test]
 async fn peer_initiator_side() {

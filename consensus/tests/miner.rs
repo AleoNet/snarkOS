@@ -17,18 +17,16 @@
 mod miner {
     use snarkos_consensus::Miner;
     use snarkos_testing::consensus::*;
-    use snarkvm_algorithms::traits::commitment::CommitmentScheme;
-    use snarkvm_algorithms::traits::encryption::EncryptionScheme;
-    use snarkvm_algorithms::traits::signature::SignatureScheme;
-    use snarkvm_dpc::DPCComponents;
-    use snarkvm_objects::dpc::DPCTransactions;
-    use snarkvm_dpc::AccountAddress;
-    use snarkvm_dpc::AccountPrivateKey;
-    use snarkvm_objects::BlockHeader;
+    use snarkvm_algorithms::traits::{
+        commitment::CommitmentScheme,
+        encryption::EncryptionScheme,
+        signature::SignatureScheme,
+    };
+    use snarkvm_dpc::{AccountAddress, AccountPrivateKey, DPCComponents};
+    use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
     use snarkvm_posw::txids_to_roots;
 
-    use rand::Rng;
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
 
     use std::sync::Arc;

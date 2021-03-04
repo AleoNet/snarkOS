@@ -14,15 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::*;
-use crate::message::*;
+use crate::{errors::*, message::*};
 
 use parking_lot::Mutex;
-use tokio::io::AsyncReadExt;
-use tokio::net::tcp::OwnedReadHalf;
+use tokio::{io::AsyncReadExt, net::tcp::OwnedReadHalf};
 
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 pub struct ConnReader {
     pub addr: SocketAddr,

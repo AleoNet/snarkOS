@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::block_header::GenesisBlockHeader;
-use crate::transaction_1::Transaction1;
+use crate::{block_header::GenesisBlockHeader, transaction_1::Transaction1};
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::variable_length_integer::variable_length_integer;
 

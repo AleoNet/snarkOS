@@ -15,21 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_algorithms::merkle_tree::*;
+use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
 use snarkvm_dpc::LedgerError;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::LedgerScheme;
-use snarkvm_objects::Transaction;
-use snarkvm_objects::Block;
-use snarkvm_utilities::bytes::FromBytes;
-use snarkvm_utilities::bytes::ToBytes;
-use snarkvm_utilities::to_bytes;
+use snarkvm_objects::{Block, LedgerScheme, Transaction};
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use parking_lot::RwLock;
-use std::fs;
-use std::marker::PhantomData;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
 
 impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> {
     type Block = Block<Self::Transaction>;

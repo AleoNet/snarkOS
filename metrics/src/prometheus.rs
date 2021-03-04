@@ -14,12 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use prometheus::Encoder;
-use prometheus::IntCounter;
-use prometheus::IntGauge;
-use prometheus::Registry;
-use warp::Rejection;
-use warp::Reply;
+use prometheus::{Encoder, IntCounter, IntGauge, Registry};
+use warp::{Rejection, Reply};
 
 lazy_static! {
     /// The Prometheus registry that metrics are registered in with.

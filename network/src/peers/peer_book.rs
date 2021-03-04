@@ -14,22 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::peers::PeerInfo;
-use crate::peers::PeerQuality;
-use crate::NetworkError;
+use crate::{
+    peers::{PeerInfo, PeerQuality},
+    NetworkError,
+};
 use snarkos_metrics::Metrics;
 use snarkos_storage::Ledger;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::Transaction;
 
-use serde::Deserialize;
-use serde::Serialize;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::net::SocketAddr;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::time::Instant;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+    time::Instant,
+};
 
 ///
 /// A data structure for storing the history of all peers with this node server.
@@ -369,8 +369,7 @@ impl PeerBook {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::IpAddr;
-    use std::net::Ipv4Addr;
+    use std::net::{IpAddr, Ipv4Addr};
 
     #[test]
     fn test_set_connecting_from_never_connected() {

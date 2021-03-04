@@ -16,10 +16,7 @@
 
 use snarkvm_dpc::instantiated::Tx;
 use snarkvm_objects::Block;
-use snarkvm_utilities::FromBytes;
-use snarkvm_utilities::Read;
-use snarkvm_utilities::ToBytes;
-use snarkvm_utilities::Write;
+use snarkvm_utilities::{FromBytes, Read, ToBytes, Write};
 use std::io::Result;
 
 #[derive(Debug)]

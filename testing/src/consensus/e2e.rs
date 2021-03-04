@@ -15,19 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_parameters::GenesisBlock;
-use snarkvm_dpc::base_dpc::instantiated::*;
-use snarkvm_dpc::base_dpc::record::DPCRecord;
+use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord};
+use snarkvm_objects::{Block, BlockHeader};
 use snarkvm_parameters::traits::genesis::Genesis;
-use snarkvm_objects::Block;
-use snarkvm_objects::BlockHeader;
-use snarkvm_utilities::bytes::FromBytes;
-use snarkvm_utilities::bytes::ToBytes;
-use snarkvm_utilities::to_bytes;
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use once_cell::sync::Lazy;
-use std::io::Read;
-use std::io::Result as IoResult;
-use std::io::Write;
+use std::io::{Read, Result as IoResult, Write};
 
 /// Helper providing pre-calculated data for e2e tests
 pub static DATA: Lazy<TestData> = Lazy::new(load_test_data);

@@ -16,20 +16,18 @@
 
 use crate::NetworkError;
 
-use chrono::DateTime;
-use chrono::Utc;
-use parking_lot::Mutex;
-use parking_lot::RwLock;
-use serde::Deserialize;
-use serde::Serialize;
+use chrono::{DateTime, Utc};
+use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
 
-use std::net::SocketAddr;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::AtomicU16;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::AtomicU8;
-use std::sync::Arc;
-use std::time::Instant;
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicBool, AtomicU16, AtomicU64, AtomicU8},
+        Arc,
+    },
+    time::Instant,
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerStatus {

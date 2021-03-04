@@ -17,8 +17,7 @@
 use snarkos_storage::BlockHeight;
 use snarkvm_objects::BlockHeaderHash;
 
-use std::fmt;
-use std::net::SocketAddr;
+use std::{fmt, net::SocketAddr};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {

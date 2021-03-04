@@ -16,14 +16,11 @@
 
 use crate::consensus::TestTx;
 pub use snarkos_storage::Ledger;
-use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
-use snarkvm_objects::LedgerScheme;
-use snarkvm_objects::Transaction;
-use snarkvm_objects::Block;
+use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
+use snarkvm_objects::{Block, LedgerScheme, Transaction};
 
-use rand::thread_rng;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use std::path::PathBuf;
 
 pub type Store = Ledger<TestTx, CommitmentMerkleParameters>;

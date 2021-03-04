@@ -15,22 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_dpc {
-    use snarkos_consensus::get_block_reward;
-    use snarkos_consensus::MemoryPool;
-    use snarkos_consensus::Miner;
-    use snarkos_testing::consensus::*;
-    use snarkos_testing::storage::kill_storage;
-    use snarkvm_dpc::base_dpc::instantiated::*;
-    use snarkvm_dpc::base_dpc::record::DPCRecord;
-    use snarkvm_dpc::base_dpc::record_payload::RecordPayload;
-    use snarkvm_dpc::DPCScheme;
-    use snarkvm_dpc::Program;
-    use snarkvm_dpc::Record;
-    use snarkvm_objects::LedgerScheme;
-    use snarkvm_objects::dpc::DPCTransactions;
-    use snarkvm_objects::Block;
-    use snarkvm_utilities::bytes::ToBytes;
-    use snarkvm_utilities::to_bytes;
+    use snarkos_consensus::{get_block_reward, MemoryPool, Miner};
+    use snarkos_testing::{consensus::*, storage::kill_storage};
+    use snarkvm_dpc::{
+        base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
+        DPCScheme,
+        Program,
+        Record,
+    };
+    use snarkvm_objects::{dpc::DPCTransactions, Block, LedgerScheme};
+    use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
     use std::sync::Arc;
 

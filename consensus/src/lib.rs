@@ -55,7 +55,6 @@ pub mod memory_pool;
 pub use memory_pool::MemoryPool;
 
 use snarkos_storage::Ledger;
-use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
-use snarkvm_dpc::base_dpc::instantiated::Tx;
+use snarkvm_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
 
 pub type MerkleTreeLedger = Ledger<Tx, CommitmentMerkleParameters>;

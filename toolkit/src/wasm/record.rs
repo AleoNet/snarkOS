@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::PrivateKey;
-use crate::account::ViewKey;
-use crate::record::Record as RecordNative;
+use crate::{
+    account::{PrivateKey, ViewKey},
+    record::Record as RecordNative,
+};
 use snarkvm_dpc::Record as RecordTrait;
-use snarkvm_utilities::to_bytes;
-use snarkvm_utilities::ToBytes;
+use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;

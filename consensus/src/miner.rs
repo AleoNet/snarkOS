@@ -14,32 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::ConsensusError;
-use crate::ConsensusParameters;
-use crate::MemoryPool;
-use crate::MerkleTreeLedger;
+use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::Ledger;
-use snarkvm_dpc::base_dpc::instantiated::*;
-use snarkvm_dpc::base_dpc::parameters::PublicParameters;
-use snarkvm_dpc::base_dpc::record::DPCRecord;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_algorithms::CRH;
-use snarkvm_dpc::DPCScheme;
-use snarkvm_dpc::Record;
-use snarkvm_objects::Transaction;
-use snarkvm_objects::dpc::DPCTransactions;
-use snarkvm_dpc::AccountAddress;
-use snarkvm_objects::Block;
-use snarkvm_objects::BlockHeader;
-use snarkvm_posw::txids_to_roots;
-use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::bytes::ToBytes;
-use snarkvm_utilities::to_bytes;
+use snarkvm_algorithms::{traits::LoadableMerkleParameters, CRH};
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord},
+    AccountAddress,
+    DPCScheme,
+    Record,
+};
+use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Transaction};
+use snarkvm_posw::{txids_to_roots, PoswMarlin};
+use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
 use parking_lot::Mutex;
-use rand::thread_rng;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
 /// Compiles transactions into blocks to be submitted to the network.

@@ -14,27 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::errors::NetworkError;
-use crate::message::*;
-use crate::ConnReader;
-use crate::ConnWriter;
-use crate::Environment;
-use crate::Receiver;
-use crate::Sender;
+use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Environment, Receiver, Sender};
 
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{atomic::AtomicU64, Arc},
+};
 
-use parking_lot::Mutex;
-use parking_lot::RwLock;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpListener;
-use tokio::net::TcpStream;
-use tokio::task::JoinHandle;
-use tokio::task::{self};
+use parking_lot::{Mutex, RwLock};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+    task::{
+        JoinHandle,
+        {self},
+    },
+};
 
 /// The map of remote addresses to their active writers.
 pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;

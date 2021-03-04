@@ -14,17 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::StorageError;
-use crate::*;
-use snarkvm_objects::BlockError;
+use crate::{error::StorageError, *};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::Transaction;
-use snarkvm_objects::Block;
-use snarkvm_objects::BlockHeaderHash;
-use snarkvm_objects::DPCTransactions;
-use snarkvm_utilities::to_bytes;
-use snarkvm_utilities::FromBytes;
-use snarkvm_utilities::ToBytes;
+use snarkvm_objects::{Block, BlockError, BlockHeaderHash, DPCTransactions, Transaction};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;
 

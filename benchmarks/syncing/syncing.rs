@@ -17,9 +17,7 @@
 use criterion::*;
 
 use snarkos_network::Payload;
-use snarkos_testing::network::blocks::*;
-use snarkos_testing::network::handshaken_node_and_peer;
-use snarkos_testing::network::TestSetup;
+use snarkos_testing::network::{blocks::*, handshaken_node_and_peer, TestSetup};
 
 // FIXME(ljedrz/nkls): gracefully shut the node and peer down once shutdown is implemented
 fn providing_sync_blocks(c: &mut Criterion) {

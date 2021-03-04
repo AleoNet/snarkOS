@@ -14,28 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::error::ConsensusError;
-use snarkos_consensus::ConsensusParameters;
-use snarkos_consensus::MemoryPool;
-use snarkos_consensus::MerkleTreeLedger;
-use snarkos_consensus::Miner;
+use snarkos_consensus::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_testing::consensus::*;
-use snarkvm_dpc::base_dpc::instantiated::*;
-use snarkvm_dpc::base_dpc::record::DPCRecord;
-use snarkvm_dpc::base_dpc::record_payload::RecordPayload;
-use snarkvm_dpc::DPCScheme;
-use snarkvm_dpc::Program;
-use snarkvm_dpc::Record;
-use snarkvm_objects::dpc::DPCTransactions;
-use snarkvm_dpc::Account;
-use snarkvm_dpc::AccountAddress;
-use snarkvm_objects::Block;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
+    Account,
+    AccountAddress,
+    DPCScheme,
+    Program,
+    Record,
+};
+use snarkvm_objects::{dpc::DPCTransactions, Block};
 use snarkvm_utilities::bytes::ToBytes;
 
 use rand::Rng;
-use std::fs::File;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 fn setup_test_data() -> Result<TestData, ConsensusError> {
     // get the params

@@ -18,33 +18,24 @@
 //!
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
-use crate::error::RpcError;
-use crate::rpc_trait::RpcFunctions;
-use crate::rpc_types::*;
-use snarkos_consensus::get_block_reward;
-use snarkos_consensus::memory_pool::Entry;
-use snarkos_consensus::ConsensusParameters;
-use snarkos_consensus::MemoryPool;
-use snarkos_consensus::MerkleTreeLedger;
-use snarkos_network::Consensus;
-use snarkos_network::Environment;
-use snarkos_network::Node;
-use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_dpc::base_dpc::instantiated::Tx;
-use snarkvm_dpc::base_dpc::parameters::PublicParameters;
-use snarkvm_objects::Transaction;
-use snarkvm_objects::BlockHeaderHash;
-use snarkvm_utilities::bytes::FromBytes;
-use snarkvm_utilities::bytes::ToBytes;
-use snarkvm_utilities::to_bytes;
-use snarkvm_utilities::CanonicalSerialize;
+use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
+use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_network::{Consensus, Environment, Node};
+use snarkvm_dpc::base_dpc::{
+    instantiated::{Components, Tx},
+    parameters::PublicParameters,
+};
+use snarkvm_objects::{BlockHeaderHash, Transaction};
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+    CanonicalSerialize,
+};
 
 use chrono::Utc;
-use parking_lot::Mutex;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.

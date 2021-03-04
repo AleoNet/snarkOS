@@ -14,22 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::dpc::generate_test_accounts;
-use crate::dpc::setup_or_load_parameters;
-use crate::storage::*;
+use crate::{
+    dpc::{generate_test_accounts, setup_or_load_parameters},
+    storage::*,
+};
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_parameters::GenesisBlock;
-use snarkvm_dpc::base_dpc::instantiated::*;
-use snarkvm_dpc::base_dpc::BaseDPCComponents;
-use snarkvm_dpc::base_dpc::NoopProgram;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::DPCScheme;
-use snarkvm_parameters::traits::genesis::Genesis;
-use snarkvm_dpc::Account;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, BaseDPCComponents, NoopProgram},
+    Account,
+    DPCScheme,
+};
 use snarkvm_objects::Block;
-use snarkvm_utilities::bytes::FromBytes;
-use snarkvm_utilities::bytes::ToBytes;
-use snarkvm_utilities::to_bytes;
+use snarkvm_parameters::traits::genesis::Genesis;
+use snarkvm_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;

@@ -16,14 +16,13 @@
 
 use crate::errors::PrivateKeyError;
 
-use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_dpc::base_dpc::parameters::SystemParameters;
-use snarkvm_dpc::AccountPrivateKey;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    AccountPrivateKey,
+};
 
-use rand::CryptoRng;
-use rand::Rng;
-use std::fmt;
-use std::str::FromStr;
+use rand::{CryptoRng, Rng};
+use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug)]
 pub struct PrivateKey {

@@ -14,18 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_algorithms::snark::SNARK;
-use snarkvm_posw::txids_to_roots;
-use snarkvm_posw::Marlin;
-use snarkvm_posw::Posw;
-use snarkvm_posw::PoswMarlin;
-use snarkvm_posw::GM17;
+use snarkvm_curves::bls12_377::Bls12_377;
+use snarkvm_posw::{txids_to_roots, Marlin, Posw, PoswMarlin, GM17};
 use snarkvm_utilities::bytes::FromBytes;
 
-use criterion::criterion_group;
-use criterion::criterion_main;
-use criterion::Criterion;
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 

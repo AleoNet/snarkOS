@@ -14,23 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::message::*;
-use snarkos_network::Node;
-use snarkos_network::Version;
-use snarkos_testing::network::test_node;
-use snarkos_testing::network::write_message_to_stream;
-use snarkos_testing::network::TestSetup;
-use snarkos_testing::wait_until;
+use snarkos_network::{message::*, Node, Version};
+use snarkos_testing::{
+    network::{test_node, write_message_to_stream, TestSetup},
+    wait_until,
+};
 
 use snarkvm_objects::block_header_hash::BlockHeaderHash;
 
 use std::time::Duration;
 
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpListener;
-use tokio::net::TcpStream;
-use tokio::time::sleep;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+    time::sleep,
+};
 
 #[tokio::test]
 async fn handshake_responder_side() {

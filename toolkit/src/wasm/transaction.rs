@@ -14,14 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::account::Address;
-use crate::account::PrivateKey;
-use crate::dpc::Record;
-use crate::dpc::TransactionKernel as TransactionKernelNative;
-use crate::dpc::TransactionKernelBuilder as TransactionKernelBuilderNative;
+use crate::{
+    account::{Address, PrivateKey},
+    dpc::{
+        Record,
+        TransactionKernel as TransactionKernelNative,
+        TransactionKernelBuilder as TransactionKernelBuilderNative,
+    },
+};
 
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 

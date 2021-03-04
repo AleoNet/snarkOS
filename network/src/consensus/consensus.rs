@@ -15,20 +15,20 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Node;
-use snarkos_consensus::ConsensusParameters;
-use snarkos_consensus::MemoryPool;
-use snarkos_consensus::MerkleTreeLedger;
-use snarkvm_dpc::base_dpc::instantiated::Components;
-use snarkvm_dpc::base_dpc::instantiated::Tx;
-use snarkvm_dpc::base_dpc::parameters::PublicParameters;
+use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkvm_dpc::base_dpc::{
+    instantiated::{Components, Tx},
+    parameters::PublicParameters,
+};
 
-use parking_lot::Mutex;
-use parking_lot::RwLock;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::time::Duration;
-use std::time::Instant;
+use parking_lot::{Mutex, RwLock};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
 
 // TODO: Remove the inner Arcs, currently these objects are being cloned individually in the miner.
 pub struct Consensus {
