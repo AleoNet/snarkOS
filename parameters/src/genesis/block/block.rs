@@ -16,7 +16,7 @@
 
 use crate::block_header::GenesisBlockHeader;
 use crate::transaction_1::Transaction1;
-use snarkvm_parameters::Genesis;
+use snarkvm_parameters::genesis::Genesis;
 use snarkvm_utilities::variable_length_integer::variable_length_integer;
 
 pub struct GenesisBlock;
