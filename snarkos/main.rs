@@ -22,10 +22,9 @@ use snarkos::{
     config::{Config, ConfigCli},
     display::render_welcome,
     errors::NodeError,
-    miner::MinerInstance,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{environment::Environment, Consensus, Node};
+use snarkos_network::{environment::Environment, Consensus, MinerInstance, Node};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};

@@ -27,7 +27,6 @@ pub mod topology;
 
 use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
 
-use snarkos::miner::MinerInstance;
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 use snarkos_storage::LedgerStorage;
 

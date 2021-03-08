@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::{environment::Environment, Node};
 use snarkos_consensus::Miner;
-use snarkos_network::{environment::Environment, Node};
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
 use snarkvm_objects::Storage;
 

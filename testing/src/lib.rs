@@ -19,5 +19,6 @@
 
 pub mod consensus;
 pub mod dpc;
+#[cfg(feature = "network")]
 pub mod network;
 pub mod storage;

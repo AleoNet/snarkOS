@@ -20,5 +20,8 @@ pub use consensus::*;
 pub mod blocks;
 pub use blocks::*;
 
+pub mod miner;
+pub use miner::*;
+
 pub mod transactions;
 pub use transactions::*;
