@@ -17,6 +17,11 @@ include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[features]
+default = ["rocksdb_storage"]
+rocksdb_storage = ["rocksdb"]
+mem_storage = []
+
 [dependencies.snarkvm-algorithms]
 version = "0.2.0"
 
@@ -53,6 +58,7 @@ version = "0.8"
 
 [dependencies.rocksdb]
 version = "0.15.0"
+optional = true
 
 [dependencies.serde]
 version = "1.0"

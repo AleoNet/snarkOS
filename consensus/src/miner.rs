@@ -23,7 +23,7 @@ use snarkvm_dpc::{
     DPCScheme,
     Record,
 };
-use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Transaction};
+use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Storage, Transaction};
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
@@ -56,8 +56,8 @@ impl Miner {
     }
 
     /// Fetches new transactions from the memory pool.
-    pub async fn fetch_memory_pool_transactions<T: Transaction, P: LoadableMerkleParameters>(
-        storage: &Ledger<T, P>,
+    pub async fn fetch_memory_pool_transactions<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
+        storage: &Ledger<T, P, S>,
         memory_pool: &Mutex<MemoryPool<T>>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
@@ -66,10 +66,10 @@ impl Miner {
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
-    pub fn add_coinbase_transaction<R: Rng>(
+    pub fn add_coinbase_transaction<R: Rng, S: Storage>(
         &self,
         parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger,
+        storage: &MerkleTreeLedger<S>,
         transactions: &mut DPCTransactions<Tx>,
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
@@ -108,10 +108,10 @@ impl Miner {
 
     /// Acquires the storage lock and returns the previous block header and verified transactions.
     #[allow(clippy::type_complexity)]
-    pub fn establish_block(
+    pub fn establish_block<S: Storage>(
         &self,
         parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger,
+        storage: &MerkleTreeLedger<S>,
         transactions: &DPCTransactions<Tx>,
     ) -> Result<(BlockHeader, DPCTransactions<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let rng = &mut thread_rng();
@@ -164,10 +164,10 @@ impl Miner {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(
+    pub async fn mine_block<S: Storage>(
         &self,
         parameters: &PublicParameters<Components>,
-        storage: &Arc<MerkleTreeLedger>,
+        storage: &Arc<MerkleTreeLedger<S>>,
         memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
     ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let candidate_transactions =

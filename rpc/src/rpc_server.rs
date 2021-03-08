@@ -22,23 +22,21 @@ use crate::{
     RpcImpl,
 };
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_network::{Environment, Node};
+use snarkos_network::Node;
+use snarkvm_objects::Storage;
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
-use parking_lot::RwLock;
 
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use std::net::SocketAddr;
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.
 /// This may be changed in the future to give the node more control of the rpc server.
 #[allow(clippy::too_many_arguments)]
-pub async fn start_rpc_server(
+pub async fn start_rpc_server<S: Storage + Send + Sync + 'static>(
     rpc_port: u16,
-    secondary_storage: Arc<RwLock<MerkleTreeLedger>>,
-    storage_path: PathBuf,
-    environment: Environment,
-    node_server: Node,
+    secondary_storage: MerkleTreeLedger<S>,
+    node_server: Node<S>,
     username: Option<String>,
     password: Option<String>,
 ) {
@@ -49,7 +47,7 @@ pub async fn start_rpc_server(
         _ => None,
     };
 
-    let rpc_impl = RpcImpl::new(secondary_storage, storage_path, environment, credentials, node_server);
+    let rpc_impl = RpcImpl::new(secondary_storage, credentials, node_server);
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
     rpc_impl.add_protected(&mut io);

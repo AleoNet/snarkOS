@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, DatabaseTransaction, Ledger, Op, COL_META, KEY_MEMORY_POOL};
+use crate::{Ledger, COL_META, KEY_MEMORY_POOL};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::Transaction;
+use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the stored memory pool transactions.
-    pub fn get_memory_pool(&self) -> Result<Vec<u8>, StorageError> {
-        self.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())
+    pub fn get_memory_pool(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        self.storage.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())
     }
 
     /// Store the memory pool transactions.
@@ -31,6 +31,6 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             key: KEY_MEMORY_POOL.as_bytes().to_vec(),
             value: transactions_serialized,
         };
-        self.storage.write(DatabaseTransaction(vec![op]))
+        self.storage.batch(DatabaseTransaction(vec![op]))
     }
 }

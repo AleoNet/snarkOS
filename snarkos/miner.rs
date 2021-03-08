@@ -17,6 +17,7 @@
 use snarkos_consensus::Miner;
 use snarkos_network::{environment::Environment, Node};
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
+use snarkvm_objects::Storage;
 
 use tokio::task;
 use tracing::*;
@@ -24,15 +25,15 @@ use tracing::*;
 use std::sync::Arc;
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
-pub struct MinerInstance {
+pub struct MinerInstance<S: Storage> {
     miner_address: AccountAddress<Components>,
     environment: Environment,
-    node: Node,
+    node: Node<S>,
 }
 
-impl MinerInstance {
+impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node: Node) -> Self {
+    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node: Node<S>) -> Self {
         Self {
             miner_address,
             environment,

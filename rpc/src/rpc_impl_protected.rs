@@ -43,6 +43,7 @@ use snarkvm_dpc::{
     DPCScheme,
     Record as RecordModel,
 };
+use snarkvm_objects::Storage;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -57,7 +58,7 @@ type JsonRPCError = jsonrpc_core::Error;
 
 /// The following `*_protected` functions wrap an authentication check around sensitive functions
 /// before being exposed as an RPC endpoint
-impl RpcImpl {
+impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
     /// Validate the authentication header in the request metadata
     pub fn validate_auth(&self, meta: Meta) -> Result<(), JsonRPCError> {
         if let Some(credentials) = &self.credentials {
@@ -291,7 +292,7 @@ impl RpcImpl {
 
 /// Functions that are sensitive and need to be protected with authentication.
 /// The authentication logic is defined in `validate_auth`
-impl ProtectedRpcFunctions for RpcImpl {
+impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     /// Generate a new account private key, account view key, and account address.
     fn create_account(&self) -> Result<RpcAccount, RpcError> {
         let rng = &mut thread_rng();
@@ -430,10 +431,6 @@ impl ProtectedRpcFunctions for RpcImpl {
             memo = rng.gen();
         }
 
-        // Because this is a computationally heavy endpoint, we open a
-        // new secondary storage instance to prevent storage bottle-necking.
-        let storage = self.new_secondary_storage_instance()?;
-
         // Generate transaction
         let (records, transaction) = self.consensus()?.create_transaction(
             self.parameters()?,
@@ -446,7 +443,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_values,
             new_payloads,
             memo,
-            &storage,
+            &self.storage,
             rng,
         )?;
 
@@ -529,11 +526,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Construct the program proofs
         let (old_death_program_proofs, new_birth_program_proofs) =
-            ConsensusParameters::generate_program_proofs(self.parameters()?, &transaction_kernel, rng)?;
-
-        // Because this is a computationally heavy endpoint, we open a
-        // new secondary storage instance to prevent storage bottle-necking.
-        let storage = self.new_secondary_storage_instance()?;
+            ConsensusParameters::generate_program_proofs::<_, S>(self.parameters()?, &transaction_kernel, rng)?;
 
         // Online execution to generate a DPC transaction
         let (records, transaction) = InstantiatedDPC::execute_online(
@@ -541,7 +534,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             transaction_kernel,
             old_death_program_proofs,
             new_birth_program_proofs,
-            &storage,
+            &self.storage,
             rng,
         )?;
 
@@ -559,7 +552,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
-        let storage = self.storage.read();
+        let storage = &self.storage;
         storage.catch_up_secondary(false)?;
         let record_commitments = storage.get_record_commitments(None)?;
 
@@ -568,7 +561,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns a list of record commitments that are stored on the full node.
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        let storage = self.storage.read();
+        let storage = &self.storage;
         storage.catch_up_secondary(false)?;
         let record_commitments = storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(hex::encode).collect();
@@ -580,7 +573,6 @@ impl ProtectedRpcFunctions for RpcImpl {
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         match self
             .storage
-            .read()
             .get_record::<DPCRecord<Components>>(&hex::decode(record_commitment)?)?
         {
             Some(record) => {

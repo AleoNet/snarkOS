@@ -20,6 +20,7 @@ use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
+use snarkvm_objects::Storage;
 
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -31,11 +32,11 @@ use std::{
 };
 
 // TODO: Remove the inner Arcs, currently these objects are being cloned individually in the miner.
-pub struct Consensus {
+pub struct Consensus<S: Storage> {
     /// The node this consensus is bound to.
-    node: Node,
+    node: Node<S>,
     /// The storage system of this node.
-    storage: Arc<MerkleTreeLedger>,
+    storage: Arc<MerkleTreeLedger<S>>,
     /// The memory pool of this node.
     memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
     /// The consensus parameters for the associated network ID.
@@ -54,11 +55,11 @@ pub struct Consensus {
     is_syncing_blocks: AtomicBool,
 }
 
-impl Consensus {
+impl<S: Storage> Consensus<S> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        node: Node,
-        storage: Arc<MerkleTreeLedger>,
+        node: Node<S>,
+        storage: Arc<MerkleTreeLedger<S>>,
         memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
         consensus_parameters: Arc<ConsensusParameters>,
         dpc_parameters: Arc<PublicParameters<Components>>,
@@ -81,13 +82,13 @@ impl Consensus {
     }
 
     #[inline]
-    pub fn node(&self) -> &Node {
+    pub fn node(&self) -> &Node<S> {
         &self.node
     }
 
     /// Returns a reference to the storage system of this node.
     #[inline]
-    pub fn storage(&self) -> &Arc<MerkleTreeLedger> {
+    pub fn storage(&self) -> &Arc<MerkleTreeLedger<S>> {
         &self.storage
     }
 

@@ -69,6 +69,7 @@ version = "1.2.0"
 
 [dependencies.snarkos-storage]
 path = "./storage"
+features = ["rocksdb_storage"]
 version = "1.2.0"
 
 [dependencies.anyhow]

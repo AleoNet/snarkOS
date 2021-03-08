@@ -23,6 +23,8 @@
 #![cfg_attr(nightly, doc(include = "../documentation/concepts/rpc_server.md"))]
 
 #[macro_use]
+extern crate derivative;
+#[macro_use]
 extern crate thiserror;
 
 pub mod error;

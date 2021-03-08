@@ -16,7 +16,7 @@
 
 mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, MemoryPool, Miner};
-    use snarkos_testing::{consensus::*, storage::kill_storage};
+    use snarkos_testing::consensus::*;
     use snarkvm_dpc::{
         base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
         DPCScheme,
@@ -153,7 +153,5 @@ mod consensus_dpc {
                 to_bytes![record].unwrap()
             );
         }
-
-        kill_storage(ledger);
     }
 }

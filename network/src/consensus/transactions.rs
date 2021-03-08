@@ -17,6 +17,7 @@
 use crate::{message::*, peers::PeerInfo, Consensus, NetworkError};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
+use snarkvm_objects::Storage;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -24,7 +25,7 @@ use snarkvm_utilities::{
 
 use std::{collections::HashMap, net::SocketAddr};
 
-impl Consensus {
+impl<S: Storage + Send + Sync + 'static> Consensus<S> {
     ///
     /// Triggers the transaction sync with a selected peer.
     ///
