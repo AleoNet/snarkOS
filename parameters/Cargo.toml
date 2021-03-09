@@ -29,7 +29,7 @@ version = "0.2.0"
 default-features = false
 
 [dependencies.curl]
-version = "0.4.34"
+version = "0.4.35"
 optional = true
 
 [dev-dependencies.snarkvm-curves]
