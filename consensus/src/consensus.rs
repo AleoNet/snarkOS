@@ -169,7 +169,7 @@ impl ConsensusParameters {
     ) -> Result<bool, ConsensusError> {
         if !self
             .authorized_inner_snark_ids
-            .contains(&to_bytes![transaction.inner_snark_id]?)
+            .contains(&to_bytes![transaction.inner_circuit_id]?)
         {
             return Ok(false);
         }
@@ -185,7 +185,10 @@ impl ConsensusParameters {
         ledger: &MerkleTreeLedger<S>,
     ) -> Result<bool, ConsensusError> {
         for tx in transactions {
-            if !self.authorized_inner_snark_ids.contains(&to_bytes![tx.inner_snark_id]?) {
+            if !self
+                .authorized_inner_snark_ids
+                .contains(&to_bytes![tx.inner_circuit_id]?)
+            {
                 return Ok(false);
             }
         }

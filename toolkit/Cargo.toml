@@ -26,20 +26,20 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies.snarkvm-algorithms]
-version = "0.2.0"
+version = "0.2.1"
 default-features = false
 features = ["wasm"]
 
 [dependencies.snarkvm-dpc]
-version = "0.2.0"
+version = "0.2.1"
 default-features = false
 
 [dependencies.snarkvm-objects]
-version = "0.2.0"
+version = "0.2.1"
 default-features = false
 
 [dependencies.snarkvm-utilities]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.anyhow]
 version = "1.0.37"
