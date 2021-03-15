@@ -36,7 +36,7 @@ features = [ "macros", "rt-multi-thread" ]
 version = "0.3"
 
 [dev-dependencies.snarkvm-derives]
-version = "0.2.0"
+version = "0.2.1"
 
 [dev-dependencies.serial_test]
 version = "0.5.0"
