@@ -13,10 +13,9 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
-include = [ "Cargo.toml", "snarkos", "README.md", "LICENSE.md" ]
+include = [ "Cargo.toml", "snarkos", "README.md", "LICENSE.md", "build.rs" ]
 license = "GPL-3.0"
 edition = "2018"
-build = "build.rs"
 
 [workspace]
 members = [
