@@ -144,12 +144,16 @@ impl Default for TestSetup {
 }
 
 pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Consensus<LedgerStorage> {
+    let consensus = snarkos_consensus::Consensus {
+        ledger: Arc::new(FIXTURE_VK.ledger()),
+        memory_pool: Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
+        parameters: Arc::new(TEST_CONSENSUS.clone()),
+        public_parameters: Arc::new(FIXTURE.parameters.clone()),
+    };
+
     Consensus::new(
         node,
-        Arc::new(FIXTURE_VK.ledger()),
-        Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-        Arc::new(TEST_CONSENSUS.clone()),
-        Arc::new(FIXTURE.parameters.clone()),
+        consensus,
         setup.is_miner,
         Duration::from_secs(setup.block_sync_interval),
         Duration::from_secs(setup.tx_sync_interval),

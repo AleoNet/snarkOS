@@ -34,7 +34,6 @@ use std::sync::Arc;
 
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.
-#[derive(Clone)]
 pub struct Miner {
     /// The coinbase address that mining rewards are assigned to.
     address: AccountAddress<Components>,

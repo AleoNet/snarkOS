@@ -54,6 +54,9 @@ pub use miner::Miner;
 pub mod memory_pool;
 pub use memory_pool::MemoryPool;
 
+pub mod parameters;
+pub use parameters::*;
+
 use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
 

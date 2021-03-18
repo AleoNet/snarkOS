@@ -139,12 +139,16 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             authorized_inner_snark_ids,
         });
 
+        let consensus = snarkos_consensus::Consensus {
+            ledger: storage,
+            memory_pool,
+            parameters: consensus_params,
+            public_parameters: dpc_parameters,
+        };
+
         let consensus = Consensus::new(
             node.clone(),
-            storage,
-            memory_pool,
-            consensus_params,
-            dpc_parameters,
+            consensus,
             config.miner.is_miner,
             Duration::from_secs(config.p2p.block_sync_interval.into()),
             Duration::from_secs(config.p2p.mempool_interval.into()),
