@@ -75,7 +75,7 @@ snarkos
 
 #### Prerequisite
 
-Before installing rust, you need to install below dependencies. 
+For **Ubuntu** users, start by installing the following dependencies. 
 - ubuntu-18.04: bionic
    - clang
    - pkg-config
