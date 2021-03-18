@@ -127,7 +127,7 @@ git clone https://github.com/AleoHQ/snarkOS --depth 1
 
 Next, compile and install snarkOS:
 ```bash
-cd snarkOS && cargo install --path .
+cargo install --path . --locked
 ```
 
 #### Step 3. Start snarkOS
