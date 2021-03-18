@@ -113,10 +113,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Enable the consensus layer if the node is not a bootstrapper.
     if !config.node.is_bootnode {
         let storage = Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?);
-        let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
+        let memory_pool = Mutex::new(MemoryPool::from_storage(&storage)?);
 
         info!("Loading Aleo parameters...");
-        let dpc_parameters = Arc::new(PublicParameters::<Components>::load(!config.miner.is_miner)?);
+        let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
         info!("Loading complete.");
 
         // Fetch the set of valid inner circuit IDs.
@@ -130,14 +130,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
 
         // Set the initial consensus parameters.
-        let consensus_params = Arc::new(ConsensusParameters {
+        let consensus_params = ConsensusParameters {
             max_block_size: 1_000_000_000usize,
             max_nonce: u32::max_value(),
             target_block_time: 10i64,
             network_id: Network::from_network_id(config.aleo.network_id),
             verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
             authorized_inner_snark_ids,
-        });
+        };
 
         let consensus = Arc::new(snarkos_consensus::Consensus {
             ledger: storage,

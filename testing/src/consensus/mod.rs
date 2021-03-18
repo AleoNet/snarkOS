@@ -24,7 +24,6 @@ use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
-use parking_lot::Mutex;
 use std::{
     io::{Read, Result as IoResult, Write},
     sync::Arc,
@@ -139,9 +138,9 @@ impl FromBytes for TestTx {
 pub fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
     snarkos_consensus::Consensus {
         ledger: Arc::new(FIXTURE_VK.ledger()),
-        memory_pool: Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-        parameters: Arc::new(TEST_CONSENSUS.clone()),
-        public_parameters: Arc::new(FIXTURE.parameters.clone()),
+        memory_pool: Default::default(),
+        parameters: TEST_CONSENSUS.clone(),
+        public_parameters: FIXTURE.parameters.clone(),
     }
 }
 
@@ -150,8 +149,8 @@ pub fn create_test_consensus_from_ledger(
 ) -> snarkos_consensus::Consensus<LedgerStorage> {
     snarkos_consensus::Consensus {
         ledger,
-        memory_pool: Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-        parameters: Arc::new(TEST_CONSENSUS.clone()),
-        public_parameters: Arc::new(FIXTURE.parameters.clone()),
+        memory_pool: Default::default(),
+        parameters: TEST_CONSENSUS.clone(),
+        public_parameters: FIXTURE.parameters.clone(),
     }
 }

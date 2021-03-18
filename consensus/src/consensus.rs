@@ -39,10 +39,10 @@ use rand::Rng;
 use std::sync::Arc;
 
 pub struct Consensus<S: Storage> {
-    pub parameters: Arc<ConsensusParameters>,
-    pub public_parameters: Arc<PublicParameters<Components>>,
+    pub parameters: ConsensusParameters,
+    pub public_parameters: PublicParameters<Components>,
     pub ledger: Arc<MerkleTreeLedger<S>>,
-    pub memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
+    pub memory_pool: Mutex<MemoryPool<Tx>>,
 }
 
 impl<S: Storage> Consensus<S> {

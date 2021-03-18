@@ -84,7 +84,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         Ok(self.consensus_layer()?.dpc_parameters())
     }
 
-    pub fn memory_pool(&self) -> Result<&Arc<Mutex<MemoryPool<Tx>>>, RpcError> {
+    pub fn memory_pool(&self) -> Result<&Mutex<MemoryPool<Tx>>, RpcError> {
         Ok(self.consensus_layer()?.memory_pool())
     }
 }

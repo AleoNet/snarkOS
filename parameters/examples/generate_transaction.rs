@@ -71,16 +71,15 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
 pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_name: &str) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
-    let parameters = Arc::new(ConsensusParameters {
+    let parameters = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
         network_id: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids: vec![],
-    });
-    let public_parameters =
-        Arc::new(<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(false)?);
+    };
+    let public_parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(false)?;
 
     let recipient = AccountAddress::<Components>::from_str(&recipient)?;
 

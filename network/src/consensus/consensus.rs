@@ -76,25 +76,25 @@ impl<S: Storage> Consensus<S> {
 
     /// Returns a reference to the storage system of this node.
     #[inline]
-    pub fn storage(&self) -> &Arc<MerkleTreeLedger<S>> {
+    pub fn storage(&self) -> &MerkleTreeLedger<S> {
         &self.consensus.ledger
     }
 
     /// Returns a reference to the memory pool of this node.
     #[inline]
-    pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
+    pub fn memory_pool(&self) -> &Mutex<MemoryPool<Tx>> {
         &self.consensus.memory_pool
     }
 
     /// Returns a reference to the consensus parameters of this node.
     #[inline]
-    pub fn consensus_parameters(&self) -> &Arc<ConsensusParameters> {
+    pub fn consensus_parameters(&self) -> &ConsensusParameters {
         &self.consensus.parameters
     }
 
     /// Returns a reference to the DPC parameters of this node.
     #[inline]
-    pub fn dpc_parameters(&self) -> &Arc<PublicParameters<Components>> {
+    pub fn dpc_parameters(&self) -> &PublicParameters<Components> {
         &self.consensus.public_parameters
     }
 
