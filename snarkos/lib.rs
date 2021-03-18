@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -15,11 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #[macro_use]
-extern crate tracing;
+extern crate thiserror;
 
 pub mod cli;
 pub mod config;
 pub mod display;
+pub mod errors;
 pub mod miner;
 pub mod parameters;
 pub mod update;

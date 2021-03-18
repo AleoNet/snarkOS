@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,16 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
-use snarkos_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
-use snarkos_errors::consensus::ConsensusError;
-use snarkos_models::dpc::{DPCScheme, Program, Record};
-use snarkos_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
+use snarkos_consensus::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
 use snarkos_testing::consensus::*;
-use snarkos_utilities::bytes::ToBytes;
+use snarkvm_dpc::base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload};
+use snarkvm_models::dpc::{DPCScheme, Program, Record};
+use snarkvm_objects::{dpc::DPCTransactions, Account, AccountAddress, Block};
+use snarkvm_utilities::bytes::ToBytes;
 
 use rand::Rng;
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 fn setup_test_data() -> Result<TestData, ConsensusError> {
     // get the params
@@ -31,7 +30,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     let ledger = FIXTURE.ledger();
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
-    let consensus = TEST_CONSENSUS.clone();
+    let consensus = Arc::new(TEST_CONSENSUS.clone());
 
     // setup the miner
     let miner = Miner::new(miner_acc.address.clone(), consensus.clone());
@@ -79,7 +78,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
 fn mine_block(
     miner: &Miner,
     ledger: &MerkleTreeLedger,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
     consensus: &ConsensusParameters,
     memory_pool: &mut MemoryPool<Tx>,
     txs: Vec<Tx>,
@@ -93,18 +92,18 @@ fn mine_block(
 
     let block = Block { header, transactions };
 
-    let old_block_height = ledger.get_latest_block_height();
+    let old_block_height = ledger.get_current_block_height();
 
     // add it to the chain
     consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
 
-    let new_block_height = ledger.get_latest_block_height();
+    let new_block_height = ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     // Duplicate blocks dont do anything
     consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
 
-    let new_block_height = ledger.get_latest_block_height();
+    let new_block_height = ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     Ok((block, coinbase_records))
@@ -115,7 +114,7 @@ fn mine_block(
 #[allow(clippy::too_many_arguments)]
 fn send<R: Rng>(
     ledger: &MerkleTreeLedger,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
     consensus: &ConsensusParameters,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,

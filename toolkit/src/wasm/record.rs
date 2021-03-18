@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -18,8 +18,8 @@ use crate::{
     account::{PrivateKey, ViewKey},
     record::Record as RecordNative,
 };
-use snarkos_models::dpc::Record as RecordTrait;
-use snarkos_utilities::{to_bytes, ToBytes};
+use snarkvm_models::dpc::Record as RecordTrait;
+use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;

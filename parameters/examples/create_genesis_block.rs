@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
-use snarkos_errors::objects::TransactionError;
-use snarkos_models::genesis::Genesis;
-use snarkos_objects::{
+use snarkos_parameters::transaction_1::Transaction1;
+
+use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
+use snarkvm_errors::objects::TransactionError;
+use snarkvm_models::genesis::Genesis;
+use snarkvm_objects::{
     BlockHeader,
     BlockHeaderHash,
     DPCTransactions,
@@ -25,8 +27,7 @@ use snarkos_objects::{
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
 };
-use snarkos_parameters::Transaction1;
-use snarkos_utilities::bytes::FromBytes;
+use snarkvm_utilities::bytes::FromBytes;
 
 use chrono::Utc;
 use std::{

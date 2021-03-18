@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_algorithms::merkle_tree::MerkleTree;
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
-use snarkos_errors::dpc::{DPCError, LedgerError};
-use snarkos_models::{
+use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
+use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
+use snarkvm_errors::dpc::{DPCError, LedgerError};
+use snarkvm_models::{
     algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
     dpc::{DPCComponents, DPCScheme},
     objects::{account::AccountScheme, Transaction},
-    parameters::Parameters,
+    parameters::Parameter,
 };
-use snarkos_objects::{Account, AccountAddress, Network};
-use snarkos_parameters::LedgerMerkleTreeParameters;
-use snarkos_posw::PoswMarlin;
-use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
-use snarkos_utilities::{
+use snarkvm_objects::{Account, AccountAddress, Network};
+use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_posw::PoswMarlin;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
@@ -50,16 +50,15 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
     path: &PathBuf,
 ) -> Result<Ledger<T, P>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-    let storage = match Storage::open_cf(path, NUM_COLS) {
-        Ok(storage) => storage,
-        Err(err) => return Err(LedgerError::StorageError(err)),
-    };
+    let storage = Storage::open_cf(path, NUM_COLS)
+        .map(|storage| storage)
+        .map_err(|err| LedgerError::Message(err.to_string()))?;
 
     let leaves: Vec<[u8; 32]> = vec![];
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
 
     Ok(Ledger {
-        latest_block_height: RwLock::new(0),
+        current_block_height: Default::default(),
         storage: Arc::new(storage),
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
         ledger_parameters: parameters,
@@ -74,7 +73,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network: Network::from_network_id(network_id),
+        network_id: Network::from_network_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids: vec![],
     };
@@ -86,7 +85,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_parameters = From::from(merkle_tree_hash_parameters);
 
-    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(false)?;
+    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters::load(false)?;
 
     let noop_program_vk_hash = parameters
         .system_parameters
@@ -112,7 +111,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
             .serial_number_nonce
             .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
-            parameters.system_parameters.clone(),
+            &parameters.system_parameters,
             old_sn_nonce.clone(),
             dummy_account.address.clone(),
             true, // The input record is dummy

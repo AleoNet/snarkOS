@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -40,9 +40,9 @@ impl From<hex::FromHexError> for RecordError {
     }
 }
 
-impl From<snarkos_errors::dpc::DPCError> for RecordError {
-    fn from(error: snarkos_errors::dpc::DPCError) -> Self {
-        RecordError::Crate("snarkos_errors::dpc", format!("{:?}", error))
+impl From<snarkvm_errors::dpc::DPCError> for RecordError {
+    fn from(error: snarkvm_errors::dpc::DPCError) -> Self {
+        RecordError::Crate("snarkvm_errors::dpc", format!("{:?}", error))
     }
 }
 

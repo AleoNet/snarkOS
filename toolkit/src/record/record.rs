@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -19,14 +19,14 @@ use crate::{
     errors::RecordError,
 };
 
-use snarkos_dpc::base_dpc::{
+use snarkvm_dpc::base_dpc::{
     instantiated::Components,
     parameters::SystemParameters,
     record::{DPCRecord, EncryptedRecord, RecordEncryption},
     DPC,
 };
-use snarkos_models::dpc::Record as RecordTrait;
-use snarkos_utilities::{
+use snarkvm_models::dpc::Record as RecordTrait;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };

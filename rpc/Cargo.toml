@@ -1,42 +1,110 @@
 [package]
 name = "snarkos-rpc"
-version = "1.1.4"
-authors = ["The Aleo Team <hello@aleo.org>"]
+version = "1.2.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "RPC for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
-categories = ["cryptography::cryptocurrencies", "operating-systems"]
-include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies]
-snarkos-consensus = { path = "../consensus", version = "1.1.4"}
-snarkos-dpc = { path = "../dpc", version = "1.1.4"}
-snarkos-errors = { path = "../errors", version = "1.1.4"}
-snarkos-models = { path = "../models", version = "1.1.4"}
-snarkos-network = { path = "../network", version = "1.1.4"}
-snarkos-objects = { path = "../objects", version = "1.1.4"}
-snarkos-storage = { path = "../storage", version = "1.1.4"}
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
+[dependencies.snarkvm-dpc]
+version = "0.0.5"
 
-base64 = { version = "0.13.0" }
-chrono = { version = "0.4", features = ["serde"] }
-hex = { version = "0.4.2" }
-jsonrpc-core = { version = "14.2.0" }
-jsonrpc-core-client = { version = "14.0.5" }
-jsonrpc-derive = { version = "14.2.2" }
-jsonrpc-http-server = { version = "14.2.0" }
-rand = { version = "0.7" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.59" }
-tokio = { version = "0.2.22", features = ["full"] }
+[dependencies.snarkvm-errors]
+version = "0.0.5"
 
-[dev-dependencies]
-snarkos-testing = { path = "../testing" }
+[dependencies.snarkvm-models]
+version = "0.0.5"
 
-jsonrpc-test = { version = "14.2.0" }
+[dependencies.snarkvm-objects]
+version = "0.0.5"
+
+[dependencies.snarkvm-utilities]
+version = "0.0.5"
+
+[dependencies.snarkos-consensus]
+path = "../consensus"
+version = "1.2.0"
+
+[dependencies.snarkos-network]
+path = "../network"
+version = "1.2.0"
+
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "1.2.0"
+
+[dependencies.snarkos-toolkit]
+path = "../toolkit"
+version = "1.2.0"
+
+[dependencies.anyhow]
+version = "1.0.37"
+
+[dependencies.base64]
+version = "0.13.0"
+
+[dependencies.chrono]
+version = "0.4"
+features = [ "serde" ]
+
+[dependencies.hex]
+version = "0.4.2"
+
+[dependencies.itertools]
+version = "0.9.0"
+
+[dependencies.jsonrpc-core]
+version = "17"
+
+[dependencies.jsonrpc-core-client]
+version = "17"
+
+[dependencies.jsonrpc-derive]
+version = "17"
+
+[dependencies.jsonrpc-http-server]
+version = "17"
+
+[dependencies.parking_lot]
+version = "0.11.1"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.serde]
+version = "1.0"
+features = [ "derive" ]
+
+[dependencies.serde_json]
+version = "1.0.61"
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.tokio]
+version = "1"
+
+[dependencies.tracing]
+default-features = false
+features = [ "log" ]
+version = "0.1"
+
+[dev-dependencies.snarkos-testing]
+path = "../testing"
+
+[dev-dependencies.jsonrpc-test]
+version = "17"
 
 [build-dependencies]
 rustc_version = "0.2"

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,13 +16,13 @@
 
 use crate::errors::PrivateKeyError;
 
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
-use snarkos_objects::AccountPrivateKey;
+use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
+use snarkvm_objects::AccountPrivateKey;
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PrivateKey {
     pub(crate) private_key: AccountPrivateKey<Components>,
 }

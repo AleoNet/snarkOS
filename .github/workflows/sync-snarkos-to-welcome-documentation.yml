@@ -1,0 +1,26 @@
+name: Sync snarkOS to Welcome Documentation
+
+on:
+  push:
+    paths:
+      - '**/documentation/**.md'
+      - '**/documentation/config.json'
+    branches:
+      - 'master'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Fetch branch name
+        run: echo Running on branch ${GITHUB_REF#refs/heads/}
+
+      - name: Sync repository
+        run: |
+          curl \
+            -X POST \
+            -u "${{ secrets.SYNC_USERNAME }}:${{ secrets.SYNC_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ secrets.SYNC_ORGANIZATION }}/${{ secrets.SYNC_APPLICATION }}/dispatches \
+            -d '{"event_type":"sync-snarkos-to-welcome-documentation", "client_payload": { "branch": "'"${GITHUB_REF#refs/heads/}"'" }}'

@@ -1,37 +1,83 @@
 [package]
 name = "snarkos-toolkit"
-version = "1.1.4"
-authors = ["The Aleo Team <hello@aleo.org>"]
+version = "1.2.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A developer toolkit for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
-categories = ["cryptography::cryptocurrencies", "operating-systems"]
-include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = [ "cdylib", "rlib" ]
 
 [[bench]]
 name = "account"
 path = "benches/account.rs"
 harness = false
 
-[dependencies]
-snarkos-dpc = { path = "../dpc", version = "1.1.4", default-features = false }
-snarkos-errors = { path = "../errors", version = "1.1.4", default-features = false }
-snarkos-models = { path = "../models", version = "1.1.4", default-features = false }
-snarkos-objects = { path = "../objects", version = "1.1.4", default-features = false }
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
+[dependencies.snarkvm-algorithms]
+version = "0.0.5"
+default-features = false
 
-hex = { version = "0.4.2" }
-rand = { version = "0.7", default-features = false, features = ["wasm-bindgen"] }
-thiserror = { version = "1.0" }
-wasm-bindgen = { version = "0.2.68" }
+[dependencies.snarkvm-dpc]
+version = "0.0.5"
+default-features = false
 
-[dev-dependencies]
-criterion = { version = "0.3.1" }
-rand_chacha = { version = "0.2", default-features = false }
-wasm-bindgen-test = { version = "0.3.18" }
+[dependencies.snarkvm-errors]
+version = "0.0.5"
+default-features = false
+
+[dependencies.snarkvm-models]
+version = "0.0.5"
+default-features = false
+
+[dependencies.snarkvm-objects]
+version = "0.0.5"
+default-features = false
+
+[dependencies.snarkvm-utilities]
+version = "0.0.5"
+default-features = false
+
+[dependencies.anyhow]
+version = "1.0.37"
+
+[dependencies.hex]
+version = "0.4.2"
+
+[dependencies.rand]
+version = "0.8"
+default-features = false
+
+[dependencies.getrandom]
+version = "0.2.2"
+features = [ "js" ]
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.wasm-bindgen]
+version = "0.2.68"
+
+[dev-dependencies.criterion]
+version = "0.3.1"
+
+[dev-dependencies.hex]
+version = "0.4.2"
+
+[dev-dependencies.rand_chacha]
+version = "0.3"
+default-features = false
+
+[dev-dependencies.wasm-bindgen-test]
+version = "0.3.18"

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Ledger, COL_BLOCK_HEADER};
-use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkos_objects::{Block, BlockHeader, BlockHeaderHash};
-use snarkos_utilities::FromBytes;
+use crate::{error::StorageError, Ledger, COL_BLOCK_HEADER};
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_objects::{Block, BlockHeader, BlockHeaderHash};
+use snarkvm_utilities::FromBytes;
 
 impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Returns true if the block for the given block header hash exists.
@@ -27,10 +26,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             return false;
         }
 
-        match self.get_block_header(block_hash) {
-            Ok(_block_header) => true,
-            Err(_) => false,
-        }
+        self.get_block_header(block_hash).is_ok()
     }
 
     /// Get a block header given the block hash.
@@ -66,7 +62,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// wrong branches in the caller's canon chain.
     pub fn get_block_locator_hashes(&self) -> Result<Vec<BlockHeaderHash>, StorageError> {
         // Start from the latest block and work backwards
-        let mut index = self.get_latest_block_height();
+        let mut index = self.get_current_block_height();
 
         // Update the step size with each iteration
         let mut step = 1;

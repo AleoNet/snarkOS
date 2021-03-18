@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -18,6 +18,3 @@
 
 pub mod genesis;
 pub use genesis::*;
-
-pub mod params;
-pub use params::*;

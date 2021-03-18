@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
-use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, dpc::Record, objects::Transaction};
-use snarkos_utilities::{
+use crate::{error::StorageError, *};
+use snarkvm_models::{algorithms::LoadableMerkleParameters, dpc::Record, objects::Transaction};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
@@ -29,7 +28,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     pub fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut record_commitments = vec![];
 
-        for (commitment_key, _record) in self.storage.get_iter(COL_RECORDS)? {
+        for (commitment_key, _record) in self.storage.get_iter(COL_RECORDS) {
             if let Some(limit) = limit {
                 if record_commitments.len() >= limit {
                     break;

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::parameters::types::*;
-use snarkos_errors::node::CliError;
+use crate::{errors::CliError, parameters::types::*};
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
@@ -29,7 +28,7 @@ pub trait CLI {
     const SUBCOMMANDS: &'static [SubCommandType];
 
     #[cfg_attr(tarpaulin, skip)]
-    fn new<'a>() -> ArgMatches<'a> {
+    fn args<'a>() -> ArgMatches<'a> {
         let flags = &Self::FLAGS
             .iter()
             .map(|a| Arg::from_usage(a))

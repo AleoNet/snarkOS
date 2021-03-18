@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_errors::node::CliError;
+use crate::errors::CliError;
 
 use clap::ArgMatches;
 use self_update::{backends::github, cargo_crate_version};
@@ -35,9 +35,9 @@ impl UpdateCLI {
             .build()?
             .fetch()?;
 
-        println!("List of available snarkOS release versions");
+        println!("List of available versions");
         for release in releases {
-            println!("* {}", release.version);
+            println!("  * {}", release.version);
         }
         Ok(())
     }

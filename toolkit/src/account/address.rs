@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,13 +16,13 @@
 
 use crate::{account::PrivateKey, errors::AddressError};
 
-use snarkos_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
-use snarkos_objects::AccountAddress;
-use snarkos_utilities::bytes::ToBytes;
+use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
+use snarkvm_objects::AccountAddress;
+use snarkvm_utilities::bytes::ToBytes;
 
 use std::{fmt, str::FromStr};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Address {
     pub(crate) address: AccountAddress<Components>,
 }

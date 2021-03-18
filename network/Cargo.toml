@@ -1,41 +1,115 @@
 [package]
 name = "snarkos-network"
-version = "1.1.4"
-authors = ["The Aleo Team <hello@aleo.org>"]
+version = "1.2.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Network for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
-keywords = ["aleo", "cryptography", "blockchain", "decentralized", "zero-knowledge"]
-categories = ["cryptography::cryptocurrencies", "operating-systems"]
-include = ["Cargo.toml", "src", "README.md", "LICENSE.md"]
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies]
-snarkos-algorithms = { path = "../algorithms", version = "1.1.4"}
-snarkos-consensus = { path = "../consensus", version = "1.1.4"}
-snarkos-dpc = { path = "../dpc", version = "1.1.4"}
-snarkos-errors = { path = "../errors", version = "1.1.4"}
-snarkos-models = { path = "../models", version = "1.1.4"}
-snarkos-objects = { path = "../objects", version = "1.1.4"}
-snarkos-storage = { path = "../storage", version = "1.1.4"}
-snarkos-utilities = { path = "../utilities", version = "1.1.4"}
+[dependencies.snarkvm-algorithms]
+version = "0.0.5"
 
-bincode = { version = "1.3.1" }
-byteorder = { version = "1" }
-chrono = { version = "0.4", features = ["serde"] }
-hex = { version="0.4.2" }
-rand = { version = "0.7.3" }
-serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "0.2.22", features = ["full"] }
-tracing = { default-features = false, features = ["log"], version = "0.1" }
-tracing-futures = { version = "0.2" }
+[dependencies.snarkvm-dpc]
+version = "0.0.5"
 
-[dev-dependencies]
-snarkos-testing = { path = "../testing" }
+[dependencies.snarkvm-errors]
+version = "0.0.5"
 
-serial_test = { version = "0.5.0" }
-tokio-test = { version = "0.2.0" }
+[dependencies.snarkvm-models]
+version = "0.0.5"
+
+[dependencies.snarkvm-objects]
+version = "0.0.5"
+
+[dependencies.snarkvm-utilities]
+version = "0.0.5"
+
+[dependencies.snarkos-consensus]
+path = "../consensus"
+version = "1.2.0"
+
+[dependencies.snarkos-metrics]
+path = "../metrics"
+version = "1.2.0"
+
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "1.2.0"
+
+[dependencies.anyhow]
+version = "1.0"
+
+[dependencies.bincode]
+version = "1.3.1"
+
+[dependencies.byteorder]
+version = "1"
+
+[dependencies.capnp]
+version = "0.14"
+
+[dependencies.capnpc]
+version = "0.14"
+
+[dependencies.chrono]
+version = "0.4"
+features = [ "serde" ]
+
+[dependencies.hex]
+version = "0.4.2"
+
+[dependencies.log]
+version = "0.4.11"
+
+[dependencies.parking_lot]
+version = "0.11.1"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.serde]
+version = "1.0"
+features = [ "derive" ]
+
+[dependencies.snow]
+version = "0.7"
+default-features = false
+features = [
+  "libsodium-resolver",
+  "chacha20poly1305",
+  "blake2",
+  "sha2",
+  "x25519-dalek",
+  "rand"
+]
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.tokio]
+version = "1"
+
+[dependencies.tracing]
+default-features = false
+features = [ "log" ]
+version = "0.1"
+
+[dependencies.tracing-futures]
+version = "0.2"
+
+[dev-dependencies.snarkos-testing]
+path = "../testing"
 
 [build-dependencies]
 rustc_version = "0.2"

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -15,16 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::MerkleTreeLedger;
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
-use snarkos_models::{
+use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
+use snarkvm_models::{
     algorithms::{MerkleParameters, CRH},
     dpc::DPCScheme,
     objects::AccountScheme,
-    parameters::Parameters,
+    parameters::Parameter,
 };
-use snarkos_objects::Account;
-use snarkos_parameters::LedgerMerkleTreeParameters;
-use snarkos_utilities::bytes::FromBytes;
+use snarkvm_objects::Account;
+use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_utilities::bytes::FromBytes;
 
 use rand::Rng;
 
@@ -33,7 +33,7 @@ pub fn setup_or_load_parameters<R: Rng>(
     rng: &mut R,
 ) -> (
     CommitmentMerkleParameters,
-    <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
 ) {
     // TODO (howardwu): Resolve this inconsistency on import structure with a new model once MerkleParameters are refactored.
     let crh_parameters =
@@ -42,7 +42,7 @@ pub fn setup_or_load_parameters<R: Rng>(
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
 
-    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters::load(verify_only) {
+    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters::load(verify_only) {
         Ok(parameters) => parameters,
         Err(err) => {
             println!("error - {}, re-running parameter Setup", err);
@@ -59,7 +59,7 @@ pub fn load_verifying_parameters() -> PublicParameters<Components> {
 }
 
 pub fn generate_test_accounts<R: Rng>(
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::Parameters,
+    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
     let signature_parameters = &parameters.system_parameters.account_signature;

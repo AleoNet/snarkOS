@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,41 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
-use snarkos_dpc::base_dpc::{instantiated::*, parameters::PublicParameters};
-use snarkos_network::{external::propagate_block, internal::context::Context};
-use snarkos_objects::{AccountAddress, Block};
+use snarkos_consensus::Miner;
+use snarkos_network::{environment::Environment, Node};
+use snarkvm_dpc::base_dpc::instantiated::*;
+use snarkvm_objects::AccountAddress;
+
+use tokio::task;
+use tracing::*;
 
 use std::sync::Arc;
-use tokio::{sync::Mutex, task};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
     miner_address: AccountAddress<Components>,
-    consensus: ConsensusParameters,
-    parameters: PublicParameters<Components>,
-    storage: Arc<MerkleTreeLedger>,
-    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    server_context: Arc<Context>,
+    environment: Environment,
+    node: Node,
 }
 
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(
-        miner_address: AccountAddress<Components>,
-        consensus: ConsensusParameters,
-        parameters: PublicParameters<Components>,
-        storage: Arc<MerkleTreeLedger>,
-        memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-        server_context: Arc<Context>,
-    ) -> Self {
+    pub fn new(miner_address: AccountAddress<Components>, environment: Environment, node: Node) -> Self {
         Self {
             miner_address,
-            consensus,
-            parameters,
-            storage,
-            memory_pool_lock,
-            server_context,
+            environment,
+            node,
         }
     }
 
@@ -58,19 +47,23 @@ impl MinerInstance {
     /// Miner threads are asynchronous so the only way to stop them is to kill the runtime they were started in. This may be changed in the future.
     pub fn spawn(self) {
         task::spawn(async move {
-            let context = self.server_context.clone();
-            let local_address = *self.server_context.local_address.read().await;
+            let local_address = self.environment.local_address().unwrap();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
-            let miner = Miner::new(self.miner_address.clone(), self.consensus.clone());
+            let miner = Miner::new(
+                self.miner_address.clone(),
+                Arc::clone(self.node.consensus().consensus_parameters()),
+            );
+            info!("Miner instantiated; starting to mine blocks");
 
             let mut mining_failure_count = 0;
             let mining_failure_threshold = 10;
 
             loop {
                 info!("Starting to mine the next block");
+                let consensus = self.node.consensus();
 
-                let (block_serialized, _coinbase_records) = match miner
-                    .mine_block(&self.parameters, &self.storage, &self.memory_pool_lock)
+                let (block, _coinbase_records) = match miner
+                    .mine_block(consensus.dpc_parameters(), consensus.storage(), consensus.memory_pool())
                     .await
                 {
                     Ok(mined_block) => mined_block,
@@ -93,16 +86,19 @@ impl MinerInstance {
                     }
                 };
 
-                match Block::<Tx>::deserialize(&block_serialized) {
-                    Ok(block) => {
-                        info!("Mined a new block!\t{:?}", hex::encode(block.header.get_hash().0));
+                info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
+                let peers = self.node.peer_book.read().connected_peers().clone();
+                let serialized_block = if let Ok(block) = block.serialize() {
+                    block
+                } else {
+                    error!("Our own miner baked an unserializable block!");
+                    continue;
+                };
 
-                        if let Err(err) = propagate_block(context.clone(), block_serialized, local_address).await {
-                            error!("Error propagating block to peers: {:?}", err);
-                        }
-                    }
-                    Err(_) => continue,
-                }
+                self.node
+                    .consensus()
+                    .propagate_block(serialized_block, local_address, &peers)
+                    .await;
             }
         });
     }

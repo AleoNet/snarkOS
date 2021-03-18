@@ -14,7 +14,7 @@ Please follow the instructions below when filing pull requests:
 
 snarkOS is a big project, so (non-)adherence to best practices related to performance can have a considerable impact; below are the rules we try to follow at all times in order to ensure high quality of the code:
 
-### memory handling
+### Memory handling
 - if the final size is known, pre-allocate the collections (`Vec`, `HashMap` etc.) using `with_capacity` or `reserve` - this ensures that there are both fewer allocations (which involve system calls) and that the final allocated capacity is as close to the required size as possible
 - create the collections right before they are populated/used, as opposed to e.g. creating a few big ones at the beginning of a function and only using them later on; this reduces the amount of time they occupy memory
 - if an intermediate vector is avoidable, use an `Iterator` instead; most of the time this just amounts to omitting the call to `.collect()` if a single-pass iteraton follows afterwards, or returning an `impl Iterator<Item = T>` from a function when the caller only needs to iterate over that result once
@@ -30,7 +30,7 @@ snarkOS is a big project, so (non-)adherence to best practices related to perfor
 - if possible, reuse collections; an example would be a loop that needs a clean vector on each iteration: instead of creating and allocating it over and over, create it _before_ the loop and use `.clear()` on every iteration instead
 - try to keep the sizes of `enum` variants uniform; use `Box<T>` on ones that are large
 
-### misc. performance
+### Misc. performance
 
 - avoid the `format!()` macro; if it is used only to convert a single value to a `String`, use `.to_string()` instead, which is also available to all the implementors of `Display`
 - don't check if an element belongs to a map (using `contains` or `get`) if you want to conditionally insert it too, as the return value of `insert` already indicates whether the value was present or not; use that or the `Entry` API instead

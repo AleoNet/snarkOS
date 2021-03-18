@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -21,16 +21,13 @@ use crate::{
     rpc_types::{Meta, RpcCredentials},
     RpcImpl,
 };
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_dpc::base_dpc::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
-};
-use snarkos_network::{external::SyncHandler, internal::context::Context};
+use snarkos_consensus::MerkleTreeLedger;
+use snarkos_network::{Environment, Node};
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
+use parking_lot::RwLock;
+
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.
@@ -38,33 +35,21 @@ use tokio::sync::Mutex;
 #[allow(clippy::too_many_arguments)]
 pub async fn start_rpc_server(
     rpc_port: u16,
-    secondary_storage: Arc<MerkleTreeLedger>,
+    secondary_storage: Arc<RwLock<MerkleTreeLedger>>,
     storage_path: PathBuf,
-    parameters: PublicParameters<Components>,
-    server_context: Arc<Context>,
-    consensus: ConsensusParameters,
-    memory_pool_lock: Arc<Mutex<MemoryPool<Tx>>>,
-    sync_handler_lock: Arc<Mutex<SyncHandler>>,
+    environment: Environment,
+    node_server: Node,
     username: Option<String>,
     password: Option<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse()?;
+) {
+    let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse().unwrap();
 
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
         _ => None,
     };
 
-    let rpc_impl = RpcImpl::new(
-        secondary_storage,
-        storage_path,
-        parameters,
-        server_context,
-        consensus,
-        memory_pool_lock,
-        sync_handler_lock,
-        credentials,
-    );
+    let rpc_impl = RpcImpl::new(secondary_storage, storage_path, environment, credentials, node_server);
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
     rpc_impl.add_protected(&mut io);
@@ -81,11 +66,10 @@ pub async fn start_rpc_server(
             Meta { auth }
         })
         .threads(1)
-        .start_http(&rpc_server)?;
+        .start_http(&rpc_server)
+        .expect("couldn't start the RPC server!");
 
     tokio::task::spawn(async move {
         server.wait();
     });
-
-    Ok(())
 }

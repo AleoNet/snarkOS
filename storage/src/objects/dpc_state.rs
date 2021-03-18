@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
-use snarkos_algorithms::merkle_tree::MerkleTree;
-use snarkos_errors::storage::StorageError;
-use snarkos_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkos_utilities::{
+use crate::{error::StorageError, *};
+use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
@@ -61,7 +60,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Get the set of past ledger digests
     pub fn past_digests(&self) -> Result<HashSet<Vec<u8>>, StorageError> {
         let mut digests = HashSet::new();
-        for (key, _value) in self.storage.get_iter(COL_DIGEST)? {
+        for (key, _value) in self.storage.get_iter(COL_DIGEST) {
             digests.insert(key.to_vec());
         }
 
@@ -115,7 +114,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         // TODO (raychu86) make this more efficient
         let mut cm_and_indices = additional_cms;
 
-        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT)? {
+        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT) {
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
             let index = bytes_to_u32(index_value.to_vec()) as usize;
 
@@ -130,13 +129,12 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
     /// Rebuild the stored merkle tree with the current stored commitments
     pub fn update_merkle_tree(&self) -> Result<(), StorageError> {
-        let mut merkle_tree = self.cm_merkle_tree.write();
-        *merkle_tree = self.build_merkle_tree(vec![])?;
+        *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
 
         let update_current_digest = DatabaseTransaction(vec![Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![merkle_tree.root()]?.to_vec(),
+            value: to_bytes![self.cm_merkle_tree.read().root()]?.to_vec(),
         }]);
 
         self.storage.write(update_current_digest)

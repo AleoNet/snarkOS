@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
-use snarkos_errors::storage::StorageError;
-use snarkos_models::{
+use crate::{error::StorageError, Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
+use snarkvm_models::{
     algorithms::LoadableMerkleParameters,
     objects::{LedgerScheme, Transaction},
 };
-use snarkos_objects::BlockHeaderHash;
-use snarkos_utilities::{
+use snarkvm_objects::BlockHeaderHash;
+use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
     to_bytes,
@@ -60,7 +59,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Returns true if the transaction has internal parameters that already exist in the ledger.
-    pub fn transcation_conflicts(&self, transaction: &T) -> bool {
+    pub fn transaction_conflicts(&self, transaction: &T) -> bool {
         let transaction_serial_numbers = transaction.old_serial_numbers();
         let transaction_commitments = transaction.new_commitments();
         let transaction_memo = transaction.memorandum();

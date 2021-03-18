@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::block_header::GenesisBlockHeader;
-use snarkos_models::genesis::Genesis;
+use snarkvm_models::genesis::Genesis;
 
 #[test]
 fn test_genesis_block_header() {

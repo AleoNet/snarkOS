@@ -9,7 +9,8 @@ use_try_shorthand = true
 
 # Nightly configurations
 imports_layout = "HorizontalVertical"
-merge_imports = true
+license_template_path = ".resources/license_header"
+imports_granularity = "Crate"
 overflow_delimited_expr = true
 reorder_impl_items = true
 version = "Two"

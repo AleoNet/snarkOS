@@ -1,4 +1,4 @@
-Create a new transaction, returning the encoded transaction and the new records.
+Creates a new transaction and returns the encoded transaction along with the encoded records.
 
 ### Protected Endpoint
 
