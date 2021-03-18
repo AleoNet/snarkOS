@@ -184,7 +184,7 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
 
     if is_miner {
         let miner_address = FIXTURE.test_accounts[0].address.clone();
-        MinerInstance::new(miner_address, node.environment.clone(), node.clone()).spawn();
+        MinerInstance::new(miner_address, node.clone()).spawn();
     }
 
     node

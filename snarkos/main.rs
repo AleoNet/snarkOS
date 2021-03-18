@@ -161,7 +161,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(miner_address, environment.clone(), node.clone()).spawn();
+                MinerInstance::new(miner_address, node.clone()).spawn();
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
