@@ -76,10 +76,6 @@ snarkos
 #### Prerequisite
 
 For **Ubuntu** users, start by installing the following dependencies. 
-- ubuntu-18.04: bionic
-   - clang
-   - pkg-config
-   - libssl-dev
 ```
 $sudo apt-get install -y pkg-config clang libssl-dev
 ```
