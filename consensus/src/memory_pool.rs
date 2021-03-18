@@ -21,7 +21,7 @@
 use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{dpc::DPCTransactions, BlockHeader, LedgerScheme, Transaction};
+use snarkvm_objects::{dpc::DPCTransactions, BlockHeader, LedgerScheme, Storage, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -58,10 +58,12 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     /// Load the memory pool from previously stored state in storage
-    pub fn from_storage<P: LoadableMerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, ConsensusError> {
+    pub fn from_storage<P: LoadableMerkleParameters, S: Storage>(
+        storage: &Ledger<T, P, S>,
+    ) -> Result<Self, ConsensusError> {
         let mut memory_pool = Self::new();
 
-        if let Ok(serialized_transactions) = storage.get_memory_pool() {
+        if let Ok(Some(serialized_transactions)) = storage.get_memory_pool() {
             if let Ok(transaction_bytes) = DPCTransactions::<T>::read(&serialized_transactions[..]) {
                 for transaction in transaction_bytes.0 {
                     let size = transaction.size();
@@ -79,7 +81,10 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Store the memory pool state to the database
     #[inline]
-    pub fn store<P: LoadableMerkleParameters>(&self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
+    pub fn store<P: LoadableMerkleParameters, S: Storage>(
+        &self,
+        storage: &Ledger<T, P, S>,
+    ) -> Result<(), ConsensusError> {
         let mut transactions = DPCTransactions::<T>::new();
 
         for (_transaction_id, entry) in self.transactions.iter() {
@@ -94,9 +99,9 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     /// Adds entry to memory pool if valid in the current ledger.
-    pub fn insert<P: LoadableMerkleParameters>(
+    pub fn insert<P: LoadableMerkleParameters, S: Storage>(
         &mut self,
-        storage: &Ledger<T, P>,
+        storage: &Ledger<T, P, S>,
         entry: Entry<T>,
     ) -> Result<Option<Vec<u8>>, ConsensusError> {
         let transaction_serial_numbers = entry.transaction.old_serial_numbers();
@@ -146,7 +151,10 @@ impl<T: Transaction> MemoryPool<T> {
 
     /// Cleanse the memory pool of outdated transactions.
     #[inline]
-    pub fn cleanse<P: LoadableMerkleParameters>(&mut self, storage: &Ledger<T, P>) -> Result<(), ConsensusError> {
+    pub fn cleanse<P: LoadableMerkleParameters, S: Storage>(
+        &mut self,
+        storage: &Ledger<T, P, S>,
+    ) -> Result<(), ConsensusError> {
         let mut new_memory_pool = Self::new();
 
         for (_, entry) in self.clone().transactions.iter() {
@@ -199,9 +207,9 @@ impl<T: Transaction> MemoryPool<T> {
     }
 
     /// Get candidate transactions for a new block.
-    pub fn get_candidates<P: LoadableMerkleParameters>(
+    pub fn get_candidates<P: LoadableMerkleParameters, S: Storage>(
         &self,
-        storage: &Ledger<T, P>,
+        storage: &Ledger<T, P, S>,
         max_size: usize,
     ) -> Result<DPCTransactions<T>, ConsensusError> {
         let max_size = max_size - (BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE);
@@ -237,7 +245,7 @@ impl<T: Transaction> Default for MemoryPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::{consensus::*, storage::*};
+    use snarkos_testing::consensus::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Block;
 
@@ -272,8 +280,6 @@ mod tests {
 
         assert_eq!(size, mem_pool.total_size_in_bytes);
         assert_eq!(1, mem_pool.transactions.len());
-
-        kill_storage_sync(blockchain);
     }
 
     #[test]
@@ -298,8 +304,6 @@ mod tests {
 
         assert_eq!(0, mem_pool.transactions.len());
         assert_eq!(0, mem_pool.total_size_in_bytes);
-
-        kill_storage_sync(blockchain);
     }
 
     #[test]
@@ -326,8 +330,6 @@ mod tests {
 
         assert_eq!(0, mem_pool.transactions.len());
         assert_eq!(0, mem_pool.total_size_in_bytes);
-
-        kill_storage_sync(blockchain);
     }
 
     #[test]
@@ -352,8 +354,6 @@ mod tests {
         let candidates = mem_pool.get_candidates(&blockchain, max_block_size).unwrap();
 
         assert!(candidates.contains(&expected_transaction));
-
-        kill_storage_sync(blockchain);
     }
 
     #[test]
@@ -376,8 +376,6 @@ mod tests {
         let new_mem_pool = MemoryPool::from_storage(&blockchain).unwrap();
 
         assert_eq!(mem_pool.total_size_in_bytes, new_mem_pool.total_size_in_bytes);
-
-        kill_storage_sync(blockchain);
     }
 
     #[test]
@@ -407,7 +405,5 @@ mod tests {
 
         assert_eq!(0, mem_pool.transactions.len());
         assert_eq!(0, mem_pool.total_size_in_bytes);
-
-        kill_storage_sync(blockchain);
     }
 }

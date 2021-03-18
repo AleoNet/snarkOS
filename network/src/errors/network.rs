@@ -16,8 +16,7 @@
 
 use crate::Message;
 use snarkos_consensus::error::ConsensusError;
-use snarkos_storage::error::StorageError;
-use snarkvm_objects::BlockError;
+use snarkvm_objects::{BlockError, StorageError};
 
 use std::{fmt, io::ErrorKind};
 

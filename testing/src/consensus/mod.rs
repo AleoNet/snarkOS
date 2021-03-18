@@ -80,7 +80,7 @@ impl Transaction for TestTx {
         &[0u8; 32]
     }
 
-    fn inner_snark_id(&self) -> &Self::InnerSNARKID {
+    fn inner_circuit_id(&self) -> &Self::InnerSNARKID {
         &[0u8; 32]
     }
 

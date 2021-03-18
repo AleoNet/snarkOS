@@ -14,14 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, *};
+use crate::*;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{Block, BlockError, BlockHeader, BlockHeaderHash, Transaction};
+use snarkvm_objects::{
+    Block,
+    BlockError,
+    BlockHeader,
+    BlockHeaderHash,
+    DatabaseTransaction,
+    Op,
+    Storage,
+    StorageError,
+    Transaction,
+};
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 use std::sync::atomic::Ordering;
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Commit a transaction to the canon chain
     #[allow(clippy::type_complexity)]
     pub(crate) fn commit_transaction(
@@ -163,7 +173,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![block.transactions]?.to_vec(),
         });
 
-        self.storage.write(database_transaction)?;
+        self.storage.batch(database_transaction)?;
 
         Ok(())
     }
@@ -286,7 +296,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         *self.cm_merkle_tree.write() = new_merkle_tree;
 
-        self.storage.write(database_transaction)?;
+        self.storage.batch(database_transaction)?;
 
         if !is_genesis {
             self.current_block_height.fetch_add(1, Ordering::SeqCst);

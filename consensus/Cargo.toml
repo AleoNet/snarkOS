@@ -18,22 +18,22 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-curves]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-dpc]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-objects]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-posw]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-utilities]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
@@ -42,6 +42,7 @@ version = "1.2.0"
 [dependencies.snarkos-storage]
 path = "../storage"
 version = "1.2.0"
+default-features = false
 
 [dependencies.anyhow]
 version = "1.0.37"

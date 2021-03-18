@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, *};
+use crate::*;
 use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters};
-use snarkvm_objects::Transaction;
+use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -24,7 +24,7 @@ use snarkvm_utilities::{
 
 use std::collections::HashSet;
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
@@ -58,11 +58,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Get the set of past ledger digests
-    pub fn past_digests(&self) -> Result<HashSet<Vec<u8>>, StorageError> {
-        let mut digests = HashSet::new();
-        for (key, _value) in self.storage.get_iter(COL_DIGEST) {
-            digests.insert(key.to_vec());
-        }
+    pub fn past_digests(&self) -> Result<HashSet<Box<[u8]>>, StorageError> {
+        let keys = self.storage.get_keys(COL_DIGEST)?;
+        let digests = keys.into_iter().collect();
 
         Ok(digests)
     }
@@ -114,7 +112,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         // TODO (raychu86) make this more efficient
         let mut cm_and_indices = additional_cms;
 
-        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT) {
+        for (commitment_key, index_value) in self.storage.get_col(COL_COMMITMENT)? {
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
             let index = bytes_to_u32(index_value.to_vec()) as usize;
 
@@ -137,6 +135,6 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![self.cm_merkle_tree.read().root()]?.to_vec(),
         }]);
 
-        self.storage.write(update_current_digest)
+        self.storage.batch(update_current_digest)
     }
 }

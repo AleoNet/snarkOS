@@ -17,16 +17,16 @@
 use crate::*;
 use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
 use snarkvm_dpc::LedgerError;
-use snarkvm_objects::{Block, LedgerScheme, Transaction};
+use snarkvm_objects::{Block, LedgerScheme, Storage, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
 
 use parking_lot::RwLock;
-use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{fs, marker::PhantomData, path::Path};
 
-impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for Ledger<T, P, S> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type MerkleParameters = P;
@@ -36,9 +36,18 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
     type Transaction = T;
 
     /// Instantiates a new ledger with a genesis block.
-    fn new(path: &PathBuf, parameters: Self::MerkleParameters, genesis_block: Self::Block) -> anyhow::Result<Self> {
-        fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-        let storage = Storage::open_cf(path, NUM_COLS)?;
+    fn new(
+        path: Option<&Path>,
+        parameters: Self::MerkleParameters,
+        genesis_block: Self::Block,
+    ) -> anyhow::Result<Self> {
+        let storage = if let Some(path) = path {
+            fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
+
+            S::open(Some(path), None)
+        } else {
+            S::open(None, None) // this must mean we're using an in-memory storage
+        }?;
 
         if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())? {
             if bytes_to_u32(block_num) != 0 {
@@ -51,7 +60,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for Ledger<T, P> 
 
         let ledger_storage = Self {
             current_block_height: Default::default(),
-            storage: Arc::new(storage),
+            storage,
             cm_merkle_tree: RwLock::new(empty_cm_merkle_tree),
             ledger_parameters: parameters,
             _transaction: PhantomData,

@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::Node;
+use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{
         test_environment,
@@ -29,7 +30,7 @@ const N: usize = 50;
 const MIN_PEERS: u16 = 5;
 const MAX_PEERS: u16 = 10;
 
-async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
+async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
     let mut nodes = Vec::with_capacity(n);
 
     for _ in 0..n {
@@ -43,7 +44,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
     nodes
 }
 
-async fn start_nodes(nodes: &[Node]) {
+async fn start_nodes(nodes: &[Node<LedgerStorage>]) {
     for node in nodes {
         // Nodes are started with a slight delay to avoid having peering intervals in phase (this
         // is the hypothetical worst case scenario).
@@ -256,7 +257,7 @@ async fn binary_star_contact() {
     wait_until!(10, network_density(&nodes) >= 0.05);
 }
 
-fn total_connection_count(nodes: &[Node]) -> usize {
+fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
     let mut count = 0;
 
     for node in nodes {
@@ -278,7 +279,7 @@ fn total_connection_count(nodes: &[Node]) -> usize {
 //      - eigenvector centrality (would be useful in support of density measurements)
 //      - betweenness centrality (good for detecting clusters)
 
-fn network_density(nodes: &[Node]) -> f64 {
+fn network_density(nodes: &[Node<LedgerStorage>]) -> f64 {
     let connections = total_connection_count(nodes);
     calculate_density(nodes.len() as f64, connections as f64)
 }
@@ -290,7 +291,7 @@ fn calculate_density(n: f64, ac: f64) -> f64 {
     ac / pc
 }
 
-fn degree_centrality_delta(nodes: &[Node]) -> u16 {
+fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
     let dc = nodes
         .iter()
         .map(|node| node.peer_book.read().number_of_connected_peers());

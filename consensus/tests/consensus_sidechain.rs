@@ -16,7 +16,7 @@
 
 mod consensus_sidechain {
     use snarkos_consensus::MemoryPool;
-    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters, storage::*};
+    use snarkos_testing::{consensus::*, dpc::load_verifying_parameters};
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Block;
     use snarkvm_utilities::bytes::FromBytes;
@@ -56,8 +56,6 @@ mod consensus_sidechain {
 
         let new_block_height = blockchain.get_current_block_height();
         assert_eq!(old_block_height + 2, new_block_height);
-
-        kill_storage_sync(blockchain);
     }
 
     // Receive two blocks that reference the same parent.
@@ -97,8 +95,6 @@ mod consensus_sidechain {
         let accepted = blockchain.get_latest_block().unwrap();
 
         assert_ne!(accepted, block_1_side);
-
-        kill_storage_sync(blockchain);
     }
 
     // Receive blocks from a sidechain that overtakes our current canonical chain.
@@ -142,8 +138,6 @@ mod consensus_sidechain {
         new_block_height = blockchain.get_current_block_height();
 
         assert_eq!(old_block_height + 1, new_block_height);
-
-        kill_storage_sync(blockchain);
     }
 
     // Receive blocks from a sidechain (out of order) that overtakes our current canonical chain.
@@ -208,7 +202,5 @@ mod consensus_sidechain {
         new_block_height = blockchain.get_current_block_height();
 
         assert_eq!(old_block_height, new_block_height);
-
-        kill_storage_sync(blockchain);
     }
 }

@@ -46,6 +46,7 @@ use snarkvm_objects::{
     MerkleRootHash,
     Network,
     PedersenMerkleRootHash,
+    Storage,
 };
 use snarkvm_posw::{txids_to_roots, Marlin, PoswMarlin};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
@@ -160,15 +161,15 @@ impl ConsensusParameters {
     }
 
     /// Check if the transaction is valid.
-    pub fn verify_transaction(
+    pub fn verify_transaction<S: Storage>(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
         transaction: &Tx,
-        ledger: &MerkleTreeLedger,
+        ledger: &MerkleTreeLedger<S>,
     ) -> Result<bool, ConsensusError> {
         if !self
             .authorized_inner_snark_ids
-            .contains(&to_bytes![transaction.inner_snark_id]?)
+            .contains(&to_bytes![transaction.inner_circuit_id]?)
         {
             return Ok(false);
         }
@@ -177,14 +178,17 @@ impl ConsensusParameters {
     }
 
     /// Check if the transactions are valid.
-    pub fn verify_transactions(
+    pub fn verify_transactions<S: Storage>(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
         transactions: &[Tx],
-        ledger: &MerkleTreeLedger,
+        ledger: &MerkleTreeLedger<S>,
     ) -> Result<bool, ConsensusError> {
         for tx in transactions {
-            if !self.authorized_inner_snark_ids.contains(&to_bytes![tx.inner_snark_id]?) {
+            if !self
+                .authorized_inner_snark_ids
+                .contains(&to_bytes![tx.inner_circuit_id]?)
+            {
                 return Ok(false);
             }
         }
@@ -194,11 +198,11 @@ impl ConsensusParameters {
 
     /// Check if the block is valid.
     /// Verify transactions and transaction fees.
-    pub fn verify_block(
+    pub fn verify_block<S: Storage>(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
         block: &Block<Tx>,
-        ledger: &MerkleTreeLedger,
+        ledger: &MerkleTreeLedger<S>,
     ) -> Result<bool, ConsensusError> {
         let transaction_ids: Vec<_> = block.transactions.to_transaction_ids()?;
         let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
@@ -251,10 +255,10 @@ impl ConsensusParameters {
     /// 1. Verify that the block header is valid.
     /// 2. Verify that the transactions are valid.
     /// 3. Insert/canonize block.
-    pub fn process_block(
+    pub fn process_block<S: Storage>(
         &self,
         parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger,
+        storage: &MerkleTreeLedger<S>,
         memory_pool: &mut MemoryPool<Tx>,
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
@@ -279,10 +283,10 @@ impl ConsensusParameters {
     }
 
     /// Receive a block from an external source and process it based on ledger state.
-    pub fn receive_block(
+    pub fn receive_block<S: Storage>(
         &self,
         parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger,
+        storage: &MerkleTreeLedger<S>,
         memory_pool: &mut MemoryPool<Tx>,
         block: &Block<Tx>,
     ) -> Result<(), ConsensusError> {
@@ -359,7 +363,7 @@ impl ConsensusParameters {
 
     /// Generate a coinbase transaction given candidate block transactions
     #[allow(clippy::too_many_arguments)]
-    pub fn create_coinbase_transaction<R: Rng>(
+    pub fn create_coinbase_transaction<R: Rng, S: Storage>(
         &self,
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
@@ -368,7 +372,7 @@ impl ConsensusParameters {
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
         recipient: AccountAddress<Components>,
-        ledger: &MerkleTreeLedger,
+        ledger: &MerkleTreeLedger<S>,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         let mut total_value_balance = get_block_reward(block_num);
@@ -447,9 +451,9 @@ impl ConsensusParameters {
 
     /// Generate a transaction by spending old records and specifying new record attributes
     #[allow(clippy::too_many_arguments)]
-    pub fn create_transaction<R: Rng>(
+    pub fn create_transaction<R: Rng, S: Storage>(
         &self,
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
         new_record_owners: Vec<AccountAddress<Components>>,
@@ -459,11 +463,11 @@ impl ConsensusParameters {
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
         memo: [u8; 32],
-        ledger: &MerkleTreeLedger,
+        ledger: &MerkleTreeLedger<S>,
         rng: &mut R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         // Offline execution to generate a DPC transaction
-        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
+        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::execute_offline(
             parameters.system_parameters.clone(),
             old_records,
             old_account_private_keys,
@@ -480,7 +484,7 @@ impl ConsensusParameters {
 
         // Construct the program proofs
         let (old_death_program_proofs, new_birth_program_proofs) =
-            Self::generate_program_proofs(&parameters, &transaction_kernel, rng)?;
+            Self::generate_program_proofs::<R, S>(&parameters, &transaction_kernel, rng)?;
 
         // Online execution to generate a DPC transaction
         let (new_records, transaction) = InstantiatedDPC::execute_online(
@@ -498,14 +502,14 @@ impl ConsensusParameters {
     // TODO (raychu86): Genericize this model to allow for generic programs.
     /// Generate the birth and death program proofs for a transaction for a given transaction kernel
     #[allow(clippy::type_complexity)]
-    pub fn generate_program_proofs<R: Rng>(
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters,
-        transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::TransactionKernel,
+    pub fn generate_program_proofs<R: Rng, S: Storage>(
+        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+        transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
         rng: &mut R,
     ) -> Result<
         (
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::PrivateProgramInput>,
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::PrivateProgramInput>,
+            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
+            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
         ),
         ConsensusError,
     > {

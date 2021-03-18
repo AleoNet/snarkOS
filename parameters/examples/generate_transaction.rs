@@ -15,10 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
+use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters, MerkleParameters, CRH};
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC},
+    base_dpc::{instantiated::*, record_payload::RecordPayload, DPC},
     Account,
     AccountAddress,
     AccountScheme,
@@ -27,7 +27,7 @@ use snarkvm_dpc::{
     DPCScheme,
     LedgerError,
 };
-use snarkvm_objects::{Network, Transaction};
+use snarkvm_objects::{Network, Storage, Transaction};
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{
@@ -44,18 +44,17 @@ use std::{
     },
     io::{Result as IoResult, Write},
     marker::PhantomData,
-    path::PathBuf,
+    path::Path,
     str::FromStr,
-    sync::Arc,
 };
 
 /// Generate a blank ledger to facilitate generation of the genesis block
-fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
+fn empty_ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
     parameters: P,
-    path: &PathBuf,
-) -> Result<Ledger<T, P>, LedgerError> {
+    path: &Path,
+) -> Result<Ledger<T, P, S>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-    let storage = Storage::open_cf(path, NUM_COLS)
+    let storage = S::open(Some(path), None)
         .map(|storage| storage)
         .map_err(|err| LedgerError::Message(err.to_string()))?;
 
@@ -64,14 +63,14 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
 
     Ok(Ledger {
         current_block_height: Default::default(),
-        storage: Arc::new(storage),
+        storage,
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
         ledger_parameters: parameters,
         _transaction: PhantomData,
     })
 }
 
-pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) -> Result<Vec<u8>, DPCError> {
+pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_name: &str) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
     let consensus = ConsensusParameters {
@@ -90,7 +89,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_parameters = From::from(merkle_tree_hash_parameters);
 
-    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters::load(false)?;
+    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(false)?;
 
     let noop_program_vk_hash = parameters
         .system_parameters
@@ -152,7 +151,7 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
     let random_path: usize = rng.gen();
     path.push(format!("./empty_ledger-{}", random_path));
 
-    let ledger = empty_ledger(ledger_parameters, &path)?;
+    let ledger = empty_ledger::<_, _, S>(ledger_parameters, &path)?;
 
     // Generate the transaction
     let (records, transaction) = consensus
@@ -182,15 +181,13 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
         println!("record {}: {:?}\n", i, hex::encode(record_bytes));
     }
 
-    drop(ledger);
-    Ledger::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
     Ok(transaction_bytes)
 }
 
-pub fn store(path: &PathBuf, bytes: &[u8]) -> IoResult<()> {
+pub fn store<P: AsRef<Path>>(path: P, bytes: &[u8]) -> IoResult<()> {
     let mut file = File::create(path)?;
     file.write_all(&bytes)?;
-    drop(file);
+
     Ok(())
 }
 
@@ -207,7 +204,6 @@ pub fn main() {
     let network_id = args[3].parse::<u8>().unwrap();
     let file_name = &args[4];
 
-    let bytes = generate(recipient, balance, network_id, file_name).unwrap();
-    let filename = PathBuf::from(file_name);
-    store(&filename, &bytes).unwrap();
+    let bytes = generate::<LedgerStorage>(recipient, balance, network_id, file_name).unwrap();
+    store(file_name, &bytes).unwrap();
 }

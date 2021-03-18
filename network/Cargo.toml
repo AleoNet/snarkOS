@@ -18,16 +18,16 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-dpc]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-objects]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkvm-utilities]
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
@@ -59,6 +59,9 @@ version = "0.14"
 [dependencies.chrono]
 version = "0.4"
 features = [ "serde" ]
+
+[dependencies.derivative]
+version = "2"
 
 [dependencies.hex]
 version = "0.4.2"
