@@ -79,11 +79,7 @@ fn mine_block<S: Storage>(
 ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
     let transactions = DPCTransactions(txs);
 
-    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(
-        &miner.consensus.public_parameters,
-        &miner.consensus.ledger,
-        &transactions,
-    )?;
+    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
 
     let header = miner.find_block(&transactions, &previous_block_header)?;
 

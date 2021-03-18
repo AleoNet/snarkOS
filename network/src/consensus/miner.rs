@@ -55,12 +55,8 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
 
             loop {
                 info!("Starting to mine the next block");
-                let consensus = self.node.expect_consensus();
 
-                let (block, _coinbase_records) = match miner
-                    .mine_block(consensus.dpc_parameters(), consensus.storage(), consensus.memory_pool())
-                    .await
-                {
+                let (block, _coinbase_records) = match miner.mine_block().await {
                     Ok(mined_block) => mined_block,
                     Err(error) => {
                         warn!(

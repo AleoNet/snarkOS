@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::ConsensusError, Consensus, MemoryPool, MerkleTreeLedger};
+use crate::{error::ConsensusError, Consensus};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord},
+    base_dpc::{instantiated::*, record::DPCRecord},
     AccountAddress,
     DPCScheme,
     Record,
@@ -27,7 +27,6 @@ use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
-use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
@@ -57,20 +56,28 @@ impl<S: Storage> Miner<S> {
     pub fn fetch_memory_pool_transactions(&self) -> Result<DPCTransactions<Tx>, ConsensusError> {
         let max_block_size = self.consensus.parameters.max_block_size;
         let memory_pool = self.consensus.memory_pool.lock();
-        Ok(memory_pool.get_candidates(&self.consensus.ledger, max_block_size)?)
+
+        memory_pool.get_candidates(&self.consensus.ledger, max_block_size)
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
     pub fn add_coinbase_transaction<R: Rng>(
         &self,
-        parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger<S>,
         transactions: &mut DPCTransactions<Tx>,
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let program_vk_hash = to_bytes![ProgramVerificationKeyCRH::hash(
-            &parameters.system_parameters.program_verification_key_crh,
-            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
+            &self
+                .consensus
+                .public_parameters
+                .system_parameters
+                .program_verification_key_crh,
+            &to_bytes![
+                self.consensus
+                    .public_parameters
+                    .noop_program_snark_parameters
+                    .verification_key
+            ]?
         )?]?;
 
         let new_birth_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
@@ -86,7 +93,7 @@ impl<S: Storage> Miner<S> {
         }
 
         let (records, tx) = self.consensus.create_coinbase_transaction(
-            storage.get_current_block_height() + 1,
+            self.consensus.ledger.get_current_block_height() + 1,
             transactions,
             program_vk_hash,
             new_birth_programs,
@@ -103,22 +110,20 @@ impl<S: Storage> Miner<S> {
     #[allow(clippy::type_complexity)]
     pub fn establish_block(
         &self,
-        parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger<S>,
         transactions: &DPCTransactions<Tx>,
     ) -> Result<(BlockHeader, DPCTransactions<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let rng = &mut thread_rng();
         let mut transactions = transactions.clone();
-        let coinbase_records = self.add_coinbase_transaction(parameters, &storage, &mut transactions, rng)?;
+        let coinbase_records = self.add_coinbase_transaction(&mut transactions, rng)?;
 
         // Verify transactions
         assert!(InstantiatedDPC::verify_transactions(
-            parameters,
+            &self.consensus.public_parameters,
             &transactions.0,
-            storage
+            &*self.consensus.ledger,
         )?);
 
-        let previous_block_header = storage.get_latest_block()?.header;
+        let previous_block_header = self.consensus.ledger.get_latest_block()?.header;
 
         Ok((previous_block_header, transactions, coinbase_records))
     }
@@ -157,18 +162,12 @@ impl<S: Storage> Miner<S> {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(
-        &self,
-        parameters: &PublicParameters<Components>,
-        storage: &Arc<MerkleTreeLedger<S>>,
-        memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
-    ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
-        let candidate_transactions =self.fetch_memory_pool_transactions()?;
+    pub async fn mine_block(&self) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
+        let candidate_transactions = self.fetch_memory_pool_transactions()?;
 
         debug!("The miner is creating a block");
 
-        let (previous_block_header, transactions, coinbase_records) =
-            self.establish_block(parameters, storage, &candidate_transactions)?;
+        let (previous_block_header, transactions, coinbase_records) = self.establish_block(&candidate_transactions)?;
 
         debug!("The miner generated a coinbase transaction");
 
@@ -192,7 +191,7 @@ impl<S: Storage> Miner<S> {
                 records_to_store.push(record.clone());
             }
         }
-        storage.store_records(&records_to_store)?;
+        self.consensus.ledger.store_records(&records_to_store)?;
 
         Ok((block, coinbase_records))
     }

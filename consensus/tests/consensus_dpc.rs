@@ -39,9 +39,7 @@ mod consensus_dpc {
 
         println!("Creating block with coinbase transaction");
         let transactions = DPCTransactions::<Tx>::new();
-        let (previous_block_header, transactions, coinbase_records) = miner
-            .establish_block(&consensus.public_parameters, &consensus.ledger, &transactions)
-            .unwrap();
+        let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions).unwrap();
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
         let block = Block { header, transactions };
 
@@ -112,9 +110,7 @@ mod consensus_dpc {
         println!("Create a new block with the payment transaction");
         let mut transactions = DPCTransactions::new();
         transactions.push(transaction);
-        let (previous_block_header, transactions, new_coinbase_records) = miner
-            .establish_block(&consensus.public_parameters, &consensus.ledger, &transactions)
-            .unwrap();
+        let (previous_block_header, transactions, new_coinbase_records) = miner.establish_block(&transactions).unwrap();
 
         assert!(
             InstantiatedDPC::verify_transactions(&consensus.public_parameters, &transactions, &*consensus.ledger)
