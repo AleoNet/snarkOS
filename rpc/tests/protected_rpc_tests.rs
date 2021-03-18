@@ -16,13 +16,13 @@
 
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
-    use snarkos_consensus::{memory_pool::MemoryPool, MerkleTreeLedger};
+    use snarkos_consensus::{Consensus, MerkleTreeLedger};
     use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_storage::LedgerStorage;
     use snarkos_testing::{
         consensus::*,
-        network::{test_consensus, test_environment, ConsensusSetup, TestSetup},
+        network::{test_environment, ConsensusSetup, TestSetup},
     };
 
     use snarkvm_dpc::{
@@ -43,7 +43,7 @@ mod protected_rpc_tests {
 
     use jsonrpc_core::MetaIoHandler;
     use serde_json::Value;
-    use std::str::FromStr;
+    use std::{str::FromStr, sync::Arc, time::Duration};
 
     const TEST_USERNAME: &str = "TEST_USERNAME";
     const TEST_PASSWORD: &str = "TEST_PASSWORD";
@@ -70,7 +70,9 @@ mod protected_rpc_tests {
         }
     }
 
-    async fn initialize_test_rpc(storage: MerkleTreeLedger<LedgerStorage>) -> MetaIoHandler<Meta> {
+    async fn initialize_test_rpc(
+        ledger: Arc<MerkleTreeLedger<LedgerStorage>>,
+    ) -> (MetaIoHandler<Meta>, Arc<Consensus<LedgerStorage>>) {
         let credentials = RpcCredentials {
             username: TEST_USERNAME.to_string(),
             password: TEST_PASSWORD.to_string(),
@@ -78,22 +80,34 @@ mod protected_rpc_tests {
 
         let environment = test_environment(TestSetup::default());
         let mut node = Node::new(environment.clone()).await.unwrap();
-        let consensus = test_consensus(ConsensusSetup::default(), node.clone());
-        node.set_consensus(consensus);
+        let consensus_setup = ConsensusSetup::default();
+        let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus_from_ledger(
+            ledger.clone(),
+        ));
 
-        let rpc_impl = RpcImpl::new(storage, Some(credentials), node);
+        let node_consensus = snarkos_network::Consensus::new(
+            node.clone(),
+            consensus.clone(),
+            consensus_setup.is_miner,
+            Duration::from_secs(consensus_setup.block_sync_interval),
+            Duration::from_secs(consensus_setup.tx_sync_interval),
+        );
+
+        node.set_consensus(node_consensus);
+
+        let rpc_impl = RpcImpl::new(ledger, Some(credentials), node);
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);
 
-        io
+        (io, consensus)
     }
 
     #[tokio::test]
     async fn test_rpc_authentication() {
-        let storage = FIXTURE_VK.ledger();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = invalid_authentication();
-        let rpc = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -107,11 +121,11 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitment_count() {
-        let storage = FIXTURE_VK.ledger();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
         let method = "getrecordcommitmentcount".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -124,11 +138,11 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitments() {
-        let storage = FIXTURE_VK.ledger();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -145,11 +159,11 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_raw_record() {
-        let storage = FIXTURE_VK.ledger();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
         let method = "getrawrecord".to_string();
         let params = hex::encode(to_bytes![DATA.records_1[0].commitment()].unwrap());
@@ -168,9 +182,9 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decode_record() {
-        let storage = FIXTURE_VK.ledger();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
         let record = &DATA.records_1[0];
 
@@ -208,9 +222,9 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decrypt_record() {
-        let storage = FIXTURE_VK.ledger();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
         let system_parameters = &FIXTURE_VK.parameters.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
@@ -253,17 +267,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_raw_transaction() {
-        let storage = FIXTURE.ledger();
-        let parameters = FIXTURE.parameters.clone();
+        let storage = Arc::new(FIXTURE.ledger());
         let meta = authentication();
 
-        let consensus = TEST_CONSENSUS.clone();
+        let (rpc, consensus) = initialize_test_rpc(storage).await;
 
-        consensus
-            .receive_block(&parameters, &storage, &mut MemoryPool::new(), &DATA.block_1)
-            .unwrap();
-
-        let rpc = initialize_test_rpc(storage).await;
+        consensus.receive_block(&DATA.block_1).unwrap();
 
         let method = "createrawtransaction".to_string();
 
@@ -310,17 +319,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction_kernel() {
-        let storage = FIXTURE_VK.ledger();
-        let parameters = FIXTURE.parameters.clone();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
 
-        let consensus = TEST_CONSENSUS.clone();
+        let (rpc, consensus) = initialize_test_rpc(storage).await;
 
-        consensus
-            .receive_block(&parameters, &storage, &mut MemoryPool::new(), &DATA.block_1)
-            .unwrap();
-
-        let rpc = initialize_test_rpc(storage).await;
+        consensus.receive_block(&DATA.block_1).unwrap();
 
         let method = "createtransactionkernel".to_string();
 
@@ -362,17 +366,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction() {
-        let storage = FIXTURE_VK.ledger();
-        let parameters = FIXTURE.parameters.clone();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
 
-        let consensus = TEST_CONSENSUS.clone();
+        let (rpc, consensus) = initialize_test_rpc(storage).await;
 
-        consensus
-            .receive_block(&parameters, &storage, &mut MemoryPool::new(), &DATA.block_1)
-            .unwrap();
-
-        let rpc = initialize_test_rpc(storage).await;
+        consensus.receive_block(&DATA.block_1).unwrap();
 
         let method = "createtransaction".to_string();
 
@@ -405,9 +404,9 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_create_account() {
-        let storage = FIXTURE_VK.ledger();
+        let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
-        let rpc = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
         let method = "createaccount".to_string();
 

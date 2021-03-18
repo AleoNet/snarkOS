@@ -25,7 +25,7 @@ pub mod sync;
 
 pub mod topology;
 
-use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
+use crate::consensus::FIXTURE;
 
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 use snarkos_storage::LedgerStorage;
@@ -144,12 +144,7 @@ impl Default for TestSetup {
 }
 
 pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Consensus<LedgerStorage> {
-    let consensus = snarkos_consensus::Consensus {
-        ledger: Arc::new(FIXTURE_VK.ledger()),
-        memory_pool: Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-        parameters: Arc::new(TEST_CONSENSUS.clone()),
-        public_parameters: Arc::new(FIXTURE.parameters.clone()),
-    };
+    let consensus = Arc::new(crate::consensus::create_test_consensus());
 
     Consensus::new(
         node,

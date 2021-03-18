@@ -139,12 +139,12 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             authorized_inner_snark_ids,
         });
 
-        let consensus = snarkos_consensus::Consensus {
+        let consensus = Arc::new(snarkos_consensus::Consensus {
             ledger: storage,
             memory_pool,
             parameters: consensus_params,
             public_parameters: dpc_parameters,
-        };
+        });
 
         let consensus = Consensus::new(
             node.clone(),
@@ -176,7 +176,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc && !is_storage_in_memory {
         // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-        let secondary_storage = MerkleTreeLedger::open_secondary_at_path(path.clone())?;
+        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
 
         start_rpc_server(
             config.rpc.port,

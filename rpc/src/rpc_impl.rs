@@ -53,7 +53,7 @@ impl<S: Storage> Deref for RpcImpl<S> {
 
 pub struct RpcInner<S: Storage> {
     /// Blockchain database storage.
-    pub(crate) storage: MerkleTreeLedger<S>,
+    pub(crate) storage: Arc<MerkleTreeLedger<S>>,
 
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
@@ -64,7 +64,7 @@ pub struct RpcInner<S: Storage> {
 
 impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(storage: MerkleTreeLedger<S>, credentials: Option<RpcCredentials>, node: Node<S>) -> Self {
+    pub fn new(storage: Arc<MerkleTreeLedger<S>>, credentials: Option<RpcCredentials>, node: Node<S>) -> Self {
         Self(Arc::new(RpcInner {
             storage,
             credentials,
@@ -72,7 +72,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         }))
     }
 
-    fn consensus_layer(&self) -> Result<&Arc<Consensus<S>>, RpcError> {
+    pub fn consensus_layer(&self) -> Result<&Arc<Consensus<S>>, RpcError> {
         self.node.consensus().ok_or(RpcError::NoConsensus)
     }
 
@@ -251,10 +251,7 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
 
         storage.catch_up_secondary(false)?;
 
-        if !self
-            .consensus()?
-            .verify_transaction(self.parameters()?, &transaction, &storage)?
-        {
+        if !self.consensus_layer()?.consensus.verify_transaction(&transaction)? {
             // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
             return Ok("Transaction did not verify".into());
         }
@@ -289,9 +286,7 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
 
         storage.catch_up_secondary(false)?;
 
-        Ok(self
-            .consensus()?
-            .verify_transaction(self.parameters()?, &transaction, &storage)?)
+        Ok(self.consensus_layer()?.consensus.verify_transaction(&transaction)?)
     }
 
     /// Fetch the number of connected peers this node has.

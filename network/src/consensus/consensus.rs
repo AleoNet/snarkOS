@@ -36,7 +36,7 @@ pub struct Consensus<S: Storage> {
     /// The node this consensus is bound to.
     node: Node<S>,
     /// The core consensus objects.
-    consensus: snarkos_consensus::Consensus<S>,
+    pub consensus: Arc<snarkos_consensus::Consensus<S>>,
     /// If `true`, initializes a mining task on this node.
     is_miner: bool,
     /// The interval between each block sync.
@@ -53,7 +53,7 @@ impl<S: Storage> Consensus<S> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         node: Node<S>,
-        consensus: snarkos_consensus::Consensus<S>,
+        consensus: Arc<snarkos_consensus::Consensus<S>>,
         is_miner: bool,
         block_sync_interval: Duration,
         transaction_sync_interval: Duration,

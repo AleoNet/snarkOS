@@ -14,13 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
+use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::consensus::*;
 use snarkvm_dpc::{
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
     Account,
     AccountAddress,
-    DPCScheme,
     Program,
     Record,
 };
@@ -31,24 +30,18 @@ use rand::Rng;
 use std::{fs::File, path::PathBuf, sync::Arc};
 
 fn setup_test_data() -> Result<TestData, ConsensusError> {
-    // get the params
-    let parameters = &FIXTURE.parameters;
-    let ledger = FIXTURE.ledger();
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
-    let consensus = Arc::new(TEST_CONSENSUS.clone());
+    let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus());
 
     // setup the miner
     let miner = Miner::new(miner_acc.address.clone(), consensus.clone());
-    let mut memory_pool = MemoryPool::new();
 
     // mine an empty block
-    let (block_1, coinbase_records) = mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![])?;
+    let (block_1, coinbase_records) = mine_block(&miner, vec![])?;
 
     // make a tx which spends 10 to the BaseDPCComponents receiver
     let (_records_1, tx_1) = send(
-        &ledger,
-        &parameters,
         &consensus,
         &miner_acc,
         coinbase_records.clone(),
@@ -58,14 +51,13 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     )?;
 
     // mine the block
-    let (block_2, coinbase_records_2) =
-        mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, vec![tx_1])?;
+    let (block_2, coinbase_records_2) = mine_block(&miner, vec![tx_1])?;
 
     // Find alternative conflicting/late blocks
 
     let alternative_block_1_header = miner.find_block(
         &block_1.transactions,
-        &ledger.get_block_header(&block_1.header.previous_block_hash)?,
+        &consensus.ledger.get_block_header(&block_1.header.previous_block_hash)?,
     )?;
     let alternative_block_2_header = miner.find_block(&block_2.transactions, &alternative_block_1_header)?;
 
@@ -82,34 +74,33 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
 }
 
 fn mine_block<S: Storage>(
-    miner: &Miner,
-    ledger: &MerkleTreeLedger<S>,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
-    consensus: &ConsensusParameters,
-    memory_pool: &mut MemoryPool<Tx>,
+    miner: &Miner<S>,
     txs: Vec<Tx>,
 ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
     let transactions = DPCTransactions(txs);
 
-    let (previous_block_header, transactions, coinbase_records) =
-        miner.establish_block(&parameters, ledger, &transactions)?;
+    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(
+        &miner.consensus.public_parameters,
+        &miner.consensus.ledger,
+        &transactions,
+    )?;
 
     let header = miner.find_block(&transactions, &previous_block_header)?;
 
     let block = Block { header, transactions };
 
-    let old_block_height = ledger.get_current_block_height();
+    let old_block_height = miner.consensus.ledger.get_current_block_height();
 
     // add it to the chain
-    consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
+    miner.consensus.receive_block(&block)?;
 
-    let new_block_height = ledger.get_current_block_height();
+    let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     // Duplicate blocks dont do anything
-    consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
+    miner.consensus.receive_block(&block)?;
 
-    let new_block_height = ledger.get_current_block_height();
+    let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     Ok((block, coinbase_records))
@@ -119,9 +110,7 @@ fn mine_block<S: Storage>(
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
 fn send<R: Rng, S: Storage>(
-    ledger: &MerkleTreeLedger<S>,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
-    consensus: &ConsensusParameters,
+    consensus: &Consensus<S>,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,
     receiver: &AccountAddress<Components>,
@@ -145,7 +134,6 @@ fn send<R: Rng, S: Storage>(
 
     let from = vec![from.private_key.clone(); NUM_INPUT_RECORDS];
     consensus.create_transaction(
-        parameters,
         inputs,
         from,
         to,
@@ -155,7 +143,6 @@ fn send<R: Rng, S: Storage>(
         values,
         output,
         [0u8; 32],
-        &ledger,
         rng,
     )
 }

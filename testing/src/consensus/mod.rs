@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::ConsensusParameters;
+use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
+use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{instantiated::Components, DPCComponents};
 use snarkvm_objects::{Network, Transaction, TransactionError};
@@ -23,7 +24,11 @@ use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
-use std::io::{Read, Result as IoResult, Write};
+use parking_lot::Mutex;
+use std::{
+    io::{Read, Result as IoResult, Write},
+    sync::Arc,
+};
 
 mod e2e;
 pub use e2e::*;
@@ -128,5 +133,25 @@ impl FromBytes for TestTx {
     #[inline]
     fn read<R: Read>(mut _reader: R) -> IoResult<Self> {
         Ok(Self)
+    }
+}
+
+pub fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
+    snarkos_consensus::Consensus {
+        ledger: Arc::new(FIXTURE_VK.ledger()),
+        memory_pool: Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
+        parameters: Arc::new(TEST_CONSENSUS.clone()),
+        public_parameters: Arc::new(FIXTURE.parameters.clone()),
+    }
+}
+
+pub fn create_test_consensus_from_ledger(
+    ledger: Arc<MerkleTreeLedger<LedgerStorage>>,
+) -> snarkos_consensus::Consensus<LedgerStorage> {
+    snarkos_consensus::Consensus {
+        ledger,
+        memory_pool: Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
+        parameters: Arc::new(TEST_CONSENSUS.clone()),
+        public_parameters: Arc::new(FIXTURE.parameters.clone()),
     }
 }

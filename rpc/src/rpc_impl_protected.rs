@@ -432,8 +432,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         }
 
         // Generate transaction
-        let (records, transaction) = self.consensus()?.create_transaction(
-            self.parameters()?,
+        let (records, transaction) = self.consensus_layer()?.consensus.create_transaction(
             old_records,
             old_account_private_keys,
             new_record_owners,
@@ -443,7 +442,6 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             new_values,
             new_payloads,
             memo,
-            &self.storage,
             rng,
         )?;
 
@@ -534,7 +532,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             transaction_kernel,
             old_death_program_proofs,
             new_birth_program_proofs,
-            &self.storage,
+            &*self.storage,
             rng,
         )?;
 

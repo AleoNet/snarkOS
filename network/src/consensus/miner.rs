@@ -46,7 +46,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
             let miner = Miner::new(
                 self.miner_address.clone(),
-                Arc::clone(self.node.expect_consensus().consensus_parameters()),
+                Arc::clone(&self.node.expect_consensus().consensus),
             );
             info!("Miner instantiated; starting to mine blocks");
 
