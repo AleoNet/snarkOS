@@ -136,12 +136,7 @@ impl FromBytes for TestTx {
 }
 
 pub fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
-    snarkos_consensus::Consensus {
-        ledger: Arc::new(FIXTURE_VK.ledger()),
-        memory_pool: Default::default(),
-        parameters: TEST_CONSENSUS_PARAMS.clone(),
-        public_parameters: FIXTURE.parameters.clone(),
-    }
+    create_test_consensus_from_ledger(Arc::new(FIXTURE_VK.ledger()))
 }
 
 pub fn create_test_consensus_from_ledger(
