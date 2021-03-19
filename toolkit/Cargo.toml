@@ -72,4 +72,4 @@ version = "0.3"
 default-features = false
 
 [dev-dependencies.wasm-bindgen-test]
-version = "0.3.18"
+version = "0.3.22"
