@@ -35,7 +35,7 @@ pub use e2e::*;
 mod fixture;
 pub use fixture::*;
 
-pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| {
+pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
     let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerSNARKVerificationKeyCRH as CRH>::Parameters = FromBytes::read(InnerSNARKVKCRHParameters::load_bytes().unwrap().as_slice()).unwrap();
 
     let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerSNARKVerificationKeyCRH =
@@ -139,7 +139,7 @@ pub fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
     snarkos_consensus::Consensus {
         ledger: Arc::new(FIXTURE_VK.ledger()),
         memory_pool: Default::default(),
-        parameters: TEST_CONSENSUS.clone(),
+        parameters: TEST_CONSENSUS_PARAMS.clone(),
         public_parameters: FIXTURE.parameters.clone(),
     }
 }
@@ -150,7 +150,7 @@ pub fn create_test_consensus_from_ledger(
     snarkos_consensus::Consensus {
         ledger,
         memory_pool: Default::default(),
-        parameters: TEST_CONSENSUS.clone(),
+        parameters: TEST_CONSENSUS_PARAMS.clone(),
         public_parameters: FIXTURE.parameters.clone(),
     }
 }
