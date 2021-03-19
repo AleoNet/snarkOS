@@ -56,7 +56,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
             loop {
                 info!("Starting to mine the next block");
 
-                let (block, _coinbase_records) = match miner.mine_block().await {
+                let (block, _coinbase_records) = match miner.mine_block() {
                     Ok(mined_block) => mined_block,
                     Err(error) => {
                         warn!(

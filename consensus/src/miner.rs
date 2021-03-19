@@ -162,7 +162,7 @@ impl<S: Storage> Miner<S> {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(&self) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
+    pub fn mine_block(&self) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let candidate_transactions = self.fetch_memory_pool_transactions()?;
 
         debug!("The miner is creating a block");
