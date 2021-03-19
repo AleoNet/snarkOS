@@ -59,7 +59,7 @@ features = [ "js" ]
 version = "1.0"
 
 [dependencies.wasm-bindgen]
-version = "0.2.68"
+version = "0.2.72"
 
 [dev-dependencies.criterion]
 version = "0.3.1"
