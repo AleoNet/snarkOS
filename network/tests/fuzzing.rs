@@ -13,6 +13,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+use snarkos_network::{MessageHeader, Version};
 
 use rand::{distributions::Standard, thread_rng, Rng};
 use snarkos_testing::{
@@ -21,7 +22,7 @@ use snarkos_testing::{
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-pub const ITERATIONS: usize = 10000;
+pub const ITERATIONS: usize = 5000;
 
 #[tokio::test]
 async fn fuzzing_zeroes_pre_handshake() {
@@ -99,7 +100,7 @@ async fn fuzzing_valid_header_post_handshake() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_pre_handshake() {
-    // tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt::init();
 
     let node_setup = TestSetup {
         consensus_setup: None,
@@ -136,4 +137,38 @@ async fn fuzzing_post_handshake() {
 
         node1.write_bytes(&random_bytes).await;
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fuzzing_corrupted_version_pre_handshake() {
+    // tracing_subscriber::fmt::init();
+
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        is_bootnode: false,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.environment.local_address().unwrap();
+
+    let mut rng = thread_rng();
+
+    for _ in 0..ITERATIONS {
+        let mut stream = TcpStream::connect(node_addr).await.unwrap();
+        let version = Version::serialize(&Version::new(1u64, stream.local_addr().unwrap().port())).unwrap();
+
+        // Replace a random percentage of random bytes at random indices in the serialised message.
+        let corrupted_version: Vec<u8> = version
+            .into_iter()
+            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
+            .collect();
+        let header = MessageHeader::from(corrupted_version.len());
+
+        let _ = stream.write_all(&header.as_bytes()).await;
+        let _ = stream.write_all(&corrupted_version).await;
+    }
+
+    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
+    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
