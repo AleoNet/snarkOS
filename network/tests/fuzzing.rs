@@ -13,7 +13,8 @@
 
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
-use snarkos_network::{MessageHeader, Version};
+use snarkos_network::{MessageHeader, Payload, Version};
+use snarkvm_objects::BlockHeaderHash;
 
 use rand::{distributions::Standard, thread_rng, Rng};
 use snarkos_testing::{
@@ -22,7 +23,7 @@ use snarkos_testing::{
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-pub const ITERATIONS: usize = 5000;
+pub const ITERATIONS: usize = 1000;
 
 #[tokio::test]
 async fn fuzzing_zeroes_pre_handshake() {
@@ -100,7 +101,7 @@ async fn fuzzing_valid_header_post_handshake() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_pre_handshake() {
-    tracing_subscriber::fmt::init();
+    // tracing_subscriber::fmt::init();
 
     let node_setup = TestSetup {
         consensus_setup: None,
@@ -145,12 +146,11 @@ async fn fuzzing_corrupted_version_pre_handshake() {
 
     let node_setup = TestSetup {
         consensus_setup: None,
-        is_bootnode: false,
         ..Default::default()
     };
 
     let node = test_node(node_setup).await;
-    let node_addr = node.environment.local_address().unwrap();
+    let node_addr = node.local_address().unwrap();
 
     let mut rng = thread_rng();
 
@@ -163,10 +163,124 @@ async fn fuzzing_corrupted_version_pre_handshake() {
             .into_iter()
             .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
             .collect();
+
         let header = MessageHeader::from(corrupted_version.len());
 
         let _ = stream.write_all(&header.as_bytes()).await;
         let _ = stream.write_all(&corrupted_version).await;
+    }
+
+    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
+    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
+    // tracing_subscriber::fmt::init();
+
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    let mut rng = thread_rng();
+
+    for payload in &[Payload::GetMemoryPool, Payload::GetPeers, Payload::Pong] {
+        for _ in 0..ITERATIONS {
+            let serialized = Payload::serialize(payload).unwrap();
+            let corrupted_payload: Vec<u8> = serialized
+                .into_iter()
+                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
+                .collect();
+
+            let header = MessageHeader::from(corrupted_payload.len());
+
+            let mut stream = TcpStream::connect(node_addr).await.unwrap();
+            let _ = stream.write_all(&header.as_bytes()).await;
+            let _ = stream.write_all(&corrupted_payload).await;
+        }
+    }
+
+    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
+    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
+    // tracing_subscriber::fmt::init();
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    let mut rng = thread_rng();
+
+    let blob: Vec<u8> = (0u8..255).collect();
+
+    for payload in &[
+        Payload::Block(blob.clone()),
+        Payload::MemoryPool(vec![blob.clone(); 10]),
+        Payload::SyncBlock(blob.clone()),
+        Payload::Transaction(blob),
+    ] {
+        for _ in 0..ITERATIONS {
+            let serialized = Payload::serialize(payload).unwrap();
+            let corrupted_payload: Vec<u8> = serialized
+                .into_iter()
+                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
+                .collect();
+
+            let header = MessageHeader::from(corrupted_payload.len());
+
+            let mut stream = TcpStream::connect(node_addr).await.unwrap();
+            let _ = stream.write_all(&header.as_bytes()).await;
+            let _ = stream.write_all(&corrupted_payload).await;
+        }
+    }
+
+    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
+    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
+    // tracing_subscriber::fmt::init();
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    let mut rng = thread_rng();
+
+    let hashes: Vec<BlockHeaderHash> = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect();
+
+    for payload in &[
+        Payload::GetBlocks(hashes.clone()),
+        Payload::GetSync(hashes.clone()),
+        Payload::Sync(hashes),
+    ] {
+        for _ in 0..ITERATIONS {
+            let serialized = Payload::serialize(payload).unwrap();
+            let corrupted_payload: Vec<u8> = serialized
+                .into_iter()
+                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
+                .collect();
+
+            let header = MessageHeader::from(corrupted_payload.len());
+
+            let mut stream = TcpStream::connect(node_addr).await.unwrap();
+            let _ = stream.write_all(&header.as_bytes()).await;
+            let _ = stream.write_all(&corrupted_payload).await;
+        }
     }
 
     assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
