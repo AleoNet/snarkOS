@@ -47,7 +47,7 @@ path = "../toolkit"
 version = "1.2.0"
 
 [dependencies.anyhow]
-version = "1.0.37"
+version = "1.0.39"
 
 [dependencies.base64]
 version = "0.13.0"
