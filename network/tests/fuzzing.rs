@@ -25,7 +25,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use std::net::SocketAddr;
 
-pub const ITERATIONS: usize = 1000;
+pub const ITERATIONS: usize = 10000;
 
 #[tokio::test]
 async fn fuzzing_zeroes_pre_handshake() {
@@ -271,6 +271,7 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
     // tracing_subscriber::fmt::init();
+
     let node_setup = TestSetup {
         consensus_setup: None,
         ..Default::default()
@@ -347,6 +348,7 @@ async fn fuzzing_corrupted_payloads_with_blobs_post_handshake() {
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     // tracing_subscriber::fmt::init();
+
     let node_setup = TestSetup {
         consensus_setup: None,
         ..Default::default()
@@ -421,6 +423,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
 #[tokio::test(flavor = "multi_thread")]
 async fn fuzzing_currupted_peers_pre_handshake() {
     // tracing_subscriber::fmt::init();
+
     let node_setup = TestSetup {
         consensus_setup: None,
         ..Default::default()
