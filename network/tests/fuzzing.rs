@@ -23,6 +23,8 @@ use snarkos_testing::{
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
+use std::net::SocketAddr;
+
 pub const ITERATIONS: usize = 1000;
 
 #[tokio::test]
@@ -170,7 +172,6 @@ async fn fuzzing_corrupted_version_pre_handshake() {
         let _ = stream.write_all(&corrupted_version).await;
     }
 
-    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
 
@@ -204,7 +205,6 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
         }
     }
 
-    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
 
@@ -244,7 +244,6 @@ async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
         }
     }
 
-    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
 
@@ -283,6 +282,78 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
         }
     }
 
-    assert_eq!(node.peer_book.read().number_of_connecting_peers(), 0);
+    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fuzzing_currupted_peers_pre_handshake() {
+    // tracing_subscriber::fmt::init();
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    let mut rng = thread_rng();
+
+    let addrs: Vec<SocketAddr> = [
+        "0.0.0.0:0",
+        "127.0.0.1:4141",
+        "192.168.1.1:4131",
+        "[::1]:0",
+        "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:4131",
+        "[::ffff:192.0.2.128]:4141",
+    ]
+    .iter()
+    .map(|addr| addr.parse().unwrap())
+    .collect();
+
+    for _ in 0..ITERATIONS {
+        let serialized = Payload::Peers(addrs.clone()).serialize().unwrap();
+        let corrupted_payload: Vec<u8> = serialized
+            .into_iter()
+            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
+            .collect();
+
+        let header = MessageHeader::from(corrupted_payload.len());
+
+        let mut stream = TcpStream::connect(node_addr).await.unwrap();
+        let _ = stream.write_all(&header.as_bytes()).await;
+        let _ = stream.write_all(&corrupted_payload).await;
+    }
+
+    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fuzzing_corrupted_ping_pre_handshake() {
+    // tracing_subscriber::fmt::init();
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    let mut rng = thread_rng();
+
+    for _ in 0..ITERATIONS {
+        let serialized = Payload::Ping(rng.gen()).serialize().unwrap();
+
+        let corrupted_payload: Vec<u8> = serialized
+            .into_iter()
+            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
+            .collect();
+
+        let header = MessageHeader::from(corrupted_payload.len());
+
+        let mut stream = TcpStream::connect(node_addr).await.unwrap();
+        let _ = stream.write_all(&header.as_bytes()).await;
+        let _ = stream.write_all(&corrupted_payload).await;
+    }
+
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
