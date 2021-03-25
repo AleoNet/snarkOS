@@ -25,7 +25,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use std::net::SocketAddr;
 
-pub const ITERATIONS: usize = 10000;
+pub const ITERATIONS: usize = 5000;
 pub const CORRUPTION_PROBABILITY: f64 = 0.1;
 
 fn corrupt_bytes(serialized: &[u8]) -> Vec<u8> {
