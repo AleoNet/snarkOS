@@ -25,7 +25,23 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use std::net::SocketAddr;
 
-pub const ITERATIONS: usize = 10000;
+pub const ITERATIONS: usize = 1000;
+pub const CORRUPTION_PROBABILITY: f64 = 0.1;
+
+fn corrupt_bytes(serialized: &[u8]) -> Vec<u8> {
+    let mut rng = thread_rng();
+
+    serialized
+        .iter()
+        .map(|byte| {
+            if rng.gen_bool(CORRUPTION_PROBABILITY) {
+                rng.gen()
+            } else {
+                *byte
+            }
+        })
+        .collect()
+}
 
 #[tokio::test]
 async fn fuzzing_zeroes_pre_handshake() {
@@ -154,17 +170,11 @@ async fn fuzzing_corrupted_version_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let mut rng = thread_rng();
-
     for _ in 0..ITERATIONS {
         let mut stream = TcpStream::connect(node_addr).await.unwrap();
         let version = Version::serialize(&Version::new(1u64, stream.local_addr().unwrap().port())).unwrap();
 
-        // Replace a random percentage of random bytes at random indices in the serialised message.
-        let corrupted_version: Vec<u8> = version
-            .into_iter()
-            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-            .collect();
+        let corrupted_version = corrupt_bytes(&version);
 
         let header = MessageHeader::from(corrupted_version.len());
 
@@ -187,16 +197,11 @@ async fn fuzzing_corrupted_version_post_handshake() {
         }
     });
 
-    let mut rng = thread_rng();
-
     for _ in 0..ITERATIONS {
         let version = Version::serialize(&Version::new(1, 4141)).unwrap();
 
         // Replace a random percentage of random bytes at random indices in the serialised message.
-        let corrupted_version: Vec<u8> = version
-            .into_iter()
-            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-            .collect();
+        let corrupted_version = corrupt_bytes(&version);
 
         let header = MessageHeader::from(corrupted_version.len());
 
@@ -217,15 +222,10 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let mut rng = thread_rng();
-
     for payload in &[Payload::GetMemoryPool, Payload::GetPeers, Payload::Pong] {
         for _ in 0..ITERATIONS {
             let serialized = Payload::serialize(payload).unwrap();
-            let corrupted_payload: Vec<u8> = serialized
-                .into_iter()
-                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-                .collect();
+            let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
 
@@ -250,15 +250,10 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
         }
     });
 
-    let mut rng = thread_rng();
-
     for payload in &[Payload::GetMemoryPool, Payload::GetPeers, Payload::Pong] {
         for _ in 0..ITERATIONS {
             let serialized = Payload::serialize(payload).unwrap();
-            let corrupted_payload: Vec<u8> = serialized
-                .into_iter()
-                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-                .collect();
+            let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
 
@@ -280,8 +275,6 @@ async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let mut rng = thread_rng();
-
     let blob: Vec<u8> = (0u8..255).collect();
 
     for payload in &[
@@ -292,10 +285,7 @@ async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
     ] {
         for _ in 0..ITERATIONS {
             let serialized = Payload::serialize(payload).unwrap();
-            let corrupted_payload: Vec<u8> = serialized
-                .into_iter()
-                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-                .collect();
+            let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
 
@@ -320,8 +310,6 @@ async fn fuzzing_corrupted_payloads_with_blobs_post_handshake() {
         }
     });
 
-    let mut rng = thread_rng();
-
     let blob: Vec<u8> = (0u8..255).collect();
 
     for payload in &[
@@ -332,10 +320,7 @@ async fn fuzzing_corrupted_payloads_with_blobs_post_handshake() {
     ] {
         for _ in 0..ITERATIONS {
             let serialized = Payload::serialize(payload).unwrap();
-            let corrupted_payload: Vec<u8> = serialized
-                .into_iter()
-                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-                .collect();
+            let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
 
@@ -357,8 +342,6 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let mut rng = thread_rng();
-
     let hashes: Vec<BlockHeaderHash> = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect();
 
     for payload in &[
@@ -368,10 +351,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     ] {
         for _ in 0..ITERATIONS {
             let serialized = Payload::serialize(payload).unwrap();
-            let corrupted_payload: Vec<u8> = serialized
-                .into_iter()
-                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-                .collect();
+            let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
 
@@ -396,8 +376,6 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
         }
     });
 
-    let mut rng = thread_rng();
-
     let hashes: Vec<BlockHeaderHash> = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect();
 
     for payload in &[
@@ -407,10 +385,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
     ] {
         for _ in 0..ITERATIONS {
             let serialized = Payload::serialize(payload).unwrap();
-            let corrupted_payload: Vec<u8> = serialized
-                .into_iter()
-                .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-                .collect();
+            let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
 
@@ -432,8 +407,6 @@ async fn fuzzing_currupted_peers_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let mut rng = thread_rng();
-
     let addrs: Vec<SocketAddr> = [
         "0.0.0.0:0",
         "127.0.0.1:4141",
@@ -448,10 +421,7 @@ async fn fuzzing_currupted_peers_pre_handshake() {
 
     for _ in 0..ITERATIONS {
         let serialized = Payload::Peers(addrs.clone()).serialize().unwrap();
-        let corrupted_payload: Vec<u8> = serialized
-            .into_iter()
-            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-            .collect();
+        let corrupted_payload = corrupt_bytes(&serialized);
 
         let header = MessageHeader::from(corrupted_payload.len());
 
@@ -475,8 +445,6 @@ async fn fuzzing_corrupted_peers_post_handshake() {
         }
     });
 
-    let mut rng = thread_rng();
-
     let addrs: Vec<SocketAddr> = [
         "0.0.0.0:0",
         "127.0.0.1:4141",
@@ -491,10 +459,7 @@ async fn fuzzing_corrupted_peers_post_handshake() {
 
     for _ in 0..ITERATIONS {
         let serialized = Payload::Peers(addrs.clone()).serialize().unwrap();
-        let corrupted_payload: Vec<u8> = serialized
-            .into_iter()
-            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-            .collect();
+        let corrupted_payload = corrupt_bytes(&serialized);
 
         let header = MessageHeader::from(corrupted_payload.len());
 
@@ -515,15 +480,9 @@ async fn fuzzing_corrupted_ping_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let mut rng = thread_rng();
-
     for _ in 0..ITERATIONS {
-        let serialized = Payload::Ping(rng.gen()).serialize().unwrap();
-
-        let corrupted_payload: Vec<u8> = serialized
-            .into_iter()
-            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-            .collect();
+        let serialized = Payload::Ping(thread_rng().gen()).serialize().unwrap();
+        let corrupted_payload = corrupt_bytes(&serialized);
 
         let header = MessageHeader::from(corrupted_payload.len());
 
@@ -547,15 +506,9 @@ async fn fuzzing_corrupted_ping_post_handshake() {
         }
     });
 
-    let mut rng = thread_rng();
-
     for _ in 0..ITERATIONS {
-        let serialized = Payload::Ping(rng.gen()).serialize().unwrap();
-
-        let corrupted_payload: Vec<u8> = serialized
-            .into_iter()
-            .map(|byte| if rng.gen_bool(0.1) { rng.gen() } else { byte })
-            .collect();
+        let serialized = Payload::Ping(thread_rng().gen()).serialize().unwrap();
+        let corrupted_payload = corrupt_bytes(&serialized);
 
         let header = MessageHeader::from(corrupted_payload.len());
 
