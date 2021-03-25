@@ -25,7 +25,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use std::net::SocketAddr;
 
-pub const ITERATIONS: usize = 1000;
+pub const ITERATIONS: usize = 10000;
 pub const CORRUPTION_PROBABILITY: f64 = 0.1;
 
 fn corrupt_bytes(serialized: &[u8]) -> Vec<u8> {
@@ -158,7 +158,7 @@ async fn fuzzing_post_handshake() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_version_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -185,7 +185,7 @@ async fn fuzzing_corrupted_version_pre_handshake() {
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_version_post_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -197,9 +197,8 @@ async fn fuzzing_corrupted_version_post_handshake() {
         }
     });
 
+    let version = Version::serialize(&Version::new(1, 4141)).unwrap();
     for _ in 0..ITERATIONS {
-        let version = Version::serialize(&Version::new(1, 4141)).unwrap();
-
         // Replace a random percentage of random bytes at random indices in the serialised message.
         let corrupted_version = corrupt_bytes(&version);
 
@@ -210,8 +209,11 @@ async fn fuzzing_corrupted_version_post_handshake() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
+    // All messages should get rejected pre-handshake, however, here we fuzz to search for
+    // potential breakage during deserialisation.
+
     // tracing_subscriber::fmt::init();
 
     let node_setup = TestSetup {
@@ -223,8 +225,9 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
     let node_addr = node.local_address().unwrap();
 
     for payload in &[Payload::GetMemoryPool, Payload::GetPeers, Payload::Pong] {
+        let serialized = Payload::serialize(payload).unwrap();
+
         for _ in 0..ITERATIONS {
-            let serialized = Payload::serialize(payload).unwrap();
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -238,7 +241,7 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_empty_payloads_post_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -251,8 +254,9 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
     });
 
     for payload in &[Payload::GetMemoryPool, Payload::GetPeers, Payload::Pong] {
+        let serialized = Payload::serialize(payload).unwrap();
+
         for _ in 0..ITERATIONS {
-            let serialized = Payload::serialize(payload).unwrap();
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -263,8 +267,9 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
     }
 }
 
+// Using a multi-threaded rt for this test notably improves performance.
 #[tokio::test(flavor = "multi_thread")]
-async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
+async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
     let node_setup = TestSetup {
@@ -275,16 +280,33 @@ async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let blob: Vec<u8> = (0u8..255).collect();
+    let mut rng = thread_rng();
+    let random_len: usize = rng.gen_range(1..(64 * 1024));
+    let blob: Vec<u8> = rng.sample_iter(Standard).take(random_len).collect();
+
+    let addrs: Vec<SocketAddr> = [
+        "0.0.0.0:0",
+        "127.0.0.1:4141",
+        "192.168.1.1:4131",
+        "[::1]:0",
+        "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:4131",
+        "[::ffff:192.0.2.128]:4141",
+    ]
+    .iter()
+    .map(|addr| addr.parse().unwrap())
+    .collect();
 
     for payload in &[
         Payload::Block(blob.clone()),
         Payload::MemoryPool(vec![blob.clone(); 10]),
         Payload::SyncBlock(blob.clone()),
-        Payload::Transaction(blob),
+        Payload::Transaction(blob.clone()),
+        Payload::Peers(addrs.clone()),
+        Payload::Ping(thread_rng().gen()),
     ] {
+        let serialized = Payload::serialize(payload).unwrap();
+
         for _ in 0..ITERATIONS {
-            let serialized = Payload::serialize(payload).unwrap();
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -298,8 +320,9 @@ async fn fuzzing_corrupted_payloads_with_blobs_pre_handshake() {
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
 
+// Using a multi-threaded rt for this test notably improves performance.
 #[tokio::test(flavor = "multi_thread")]
-async fn fuzzing_corrupted_payloads_with_blobs_post_handshake() {
+async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
@@ -310,16 +333,33 @@ async fn fuzzing_corrupted_payloads_with_blobs_post_handshake() {
         }
     });
 
-    let blob: Vec<u8> = (0u8..255).collect();
+    let mut rng = thread_rng();
+    let random_len: usize = rng.gen_range(1..(64 * 1024));
+    let blob: Vec<u8> = rng.sample_iter(Standard).take(random_len).collect();
+
+    let addrs: Vec<SocketAddr> = [
+        "0.0.0.0:0",
+        "127.0.0.1:4141",
+        "192.168.1.1:4131",
+        "[::1]:0",
+        "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:4131",
+        "[::ffff:192.0.2.128]:4141",
+    ]
+    .iter()
+    .map(|addr| addr.parse().unwrap())
+    .collect();
 
     for payload in &[
         Payload::Block(blob.clone()),
         Payload::MemoryPool(vec![blob.clone(); 10]),
         Payload::SyncBlock(blob.clone()),
-        Payload::Transaction(blob),
+        Payload::Transaction(blob.clone()),
+        Payload::Peers(addrs.clone()),
+        Payload::Ping(thread_rng().gen()),
     ] {
+        let serialized = Payload::serialize(payload).unwrap();
+
         for _ in 0..ITERATIONS {
-            let serialized = Payload::serialize(payload).unwrap();
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -330,7 +370,7 @@ async fn fuzzing_corrupted_payloads_with_blobs_post_handshake() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -349,8 +389,9 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
         Payload::GetSync(hashes.clone()),
         Payload::Sync(hashes),
     ] {
+        let serialized = Payload::serialize(payload).unwrap();
+
         for _ in 0..ITERATIONS {
-            let serialized = Payload::serialize(payload).unwrap();
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -364,7 +405,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -383,8 +424,9 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
         Payload::GetSync(hashes.clone()),
         Payload::Sync(hashes),
     ] {
+        let serialized = Payload::serialize(payload).unwrap();
+
         for _ in 0..ITERATIONS {
-            let serialized = Payload::serialize(payload).unwrap();
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -392,127 +434,5 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
             node1.write_bytes(&header.as_bytes()).await;
             node1.write_bytes(&corrupted_payload).await;
         }
-    }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn fuzzing_currupted_peers_pre_handshake() {
-    // tracing_subscriber::fmt::init();
-
-    let node_setup = TestSetup {
-        consensus_setup: None,
-        ..Default::default()
-    };
-
-    let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
-
-    let addrs: Vec<SocketAddr> = [
-        "0.0.0.0:0",
-        "127.0.0.1:4141",
-        "192.168.1.1:4131",
-        "[::1]:0",
-        "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:4131",
-        "[::ffff:192.0.2.128]:4141",
-    ]
-    .iter()
-    .map(|addr| addr.parse().unwrap())
-    .collect();
-
-    for _ in 0..ITERATIONS {
-        let serialized = Payload::Peers(addrs.clone()).serialize().unwrap();
-        let corrupted_payload = corrupt_bytes(&serialized);
-
-        let header = MessageHeader::from(corrupted_payload.len());
-
-        let mut stream = TcpStream::connect(node_addr).await.unwrap();
-        let _ = stream.write_all(&header.as_bytes()).await;
-        let _ = stream.write_all(&corrupted_payload).await;
-    }
-
-    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn fuzzing_corrupted_peers_post_handshake() {
-    // tracing_subscriber::fmt::init();
-
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
-
-    tokio::spawn(async move {
-        loop {
-            let _ = node2.read_payload().await;
-        }
-    });
-
-    let addrs: Vec<SocketAddr> = [
-        "0.0.0.0:0",
-        "127.0.0.1:4141",
-        "192.168.1.1:4131",
-        "[::1]:0",
-        "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:4131",
-        "[::ffff:192.0.2.128]:4141",
-    ]
-    .iter()
-    .map(|addr| addr.parse().unwrap())
-    .collect();
-
-    for _ in 0..ITERATIONS {
-        let serialized = Payload::Peers(addrs.clone()).serialize().unwrap();
-        let corrupted_payload = corrupt_bytes(&serialized);
-
-        let header = MessageHeader::from(corrupted_payload.len());
-
-        node1.write_bytes(&header.as_bytes()).await;
-        node1.write_bytes(&corrupted_payload).await;
-    }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn fuzzing_corrupted_ping_pre_handshake() {
-    // tracing_subscriber::fmt::init();
-
-    let node_setup = TestSetup {
-        consensus_setup: None,
-        ..Default::default()
-    };
-
-    let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
-
-    for _ in 0..ITERATIONS {
-        let serialized = Payload::Ping(thread_rng().gen()).serialize().unwrap();
-        let corrupted_payload = corrupt_bytes(&serialized);
-
-        let header = MessageHeader::from(corrupted_payload.len());
-
-        let mut stream = TcpStream::connect(node_addr).await.unwrap();
-        let _ = stream.write_all(&header.as_bytes()).await;
-        let _ = stream.write_all(&corrupted_payload).await;
-    }
-
-    assert_eq!(node.peer_book.read().number_of_connected_peers(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn fuzzing_corrupted_ping_post_handshake() {
-    // tracing_subscriber::fmt::init();
-
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
-
-    tokio::spawn(async move {
-        loop {
-            let _ = node2.read_payload().await;
-        }
-    });
-
-    for _ in 0..ITERATIONS {
-        let serialized = Payload::Ping(thread_rng().gen()).serialize().unwrap();
-        let corrupted_payload = corrupt_bytes(&serialized);
-
-        let header = MessageHeader::from(corrupted_payload.len());
-
-        node1.write_bytes(&header.as_bytes()).await;
-        node1.write_bytes(&corrupted_payload).await;
     }
 }
