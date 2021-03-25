@@ -56,7 +56,7 @@ async fn fuzzing_zeroes_pre_handshake() {
     let mut stream = TcpStream::connect(node_addr).await.unwrap();
     wait_until!(1, node.peer_book.read().number_of_connecting_peers() == 1);
 
-    let _ = stream.write_all(&vec![0u8; 64]).await;
+    let _ = stream.write_all(&[0u8; 64]).await;
     wait_until!(1, node.peer_book.read().number_of_connecting_peers() == 0);
 }
 
@@ -70,7 +70,7 @@ async fn fuzzing_zeroes_post_handshake() {
     let (node, fake_node) = handshaken_node_and_peer(node_setup).await;
     wait_until!(1, node.peer_book.read().number_of_connected_peers() == 1);
 
-    fake_node.write_bytes(&vec![0u8; 64]).await;
+    fake_node.write_bytes(&[0u8; 64]).await;
     wait_until!(1, node.peer_book.read().number_of_connected_peers() == 0);
 }
 
