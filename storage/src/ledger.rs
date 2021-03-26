@@ -133,7 +133,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
 
                 for (commitment_key, index_value) in storage.get_col(COL_COMMITMENT)? {
                     let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
-                    let index = bytes_to_u32(index_value.to_vec()) as usize;
+                    let index = bytes_to_u32(&index_value) as usize;
 
                     cm_and_indices.push((commitment, index));
                 }
@@ -144,7 +144,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
                 let merkle_tree = MerkleTree::new(ledger_parameters.clone(), commitments)?;
 
                 Ok(Self {
-                    current_block_height: AtomicU32::new(bytes_to_u32(val)),
+                    current_block_height: AtomicU32::new(bytes_to_u32(&val)),
                     storage,
                     cm_merkle_tree: RwLock::new(merkle_tree),
                     ledger_parameters,
@@ -178,7 +178,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
                 .storage
                 .get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?
                 .ok_or_else(|| StorageError::Message("can't determine current block height".into()))?;
-            let new_current_block_height = bytes_to_u32(current_block_height_bytes);
+            let new_current_block_height = bytes_to_u32(&current_block_height_bytes);
             let current_block_height = self.get_current_block_height();
 
             // If the new block height is greater than the stored block height,

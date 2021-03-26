@@ -28,7 +28,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
-            Some(cm_index_bytes) => Ok(bytes_to_u32(cm_index_bytes) as usize),
+            Some(cm_index_bytes) => Ok(bytes_to_u32(&cm_index_bytes) as usize),
             None => Ok(0),
         }
     }
@@ -36,7 +36,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the current serial number index
     pub fn current_sn_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_SN_INDEX.as_bytes())? {
-            Some(sn_index_bytes) => Ok(bytes_to_u32(sn_index_bytes) as usize),
+            Some(sn_index_bytes) => Ok(bytes_to_u32(&sn_index_bytes) as usize),
             None => Ok(0),
         }
     }
@@ -44,7 +44,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the current memo index
     pub fn current_memo_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_MEMO_INDEX.as_bytes())? {
-            Some(memo_index_bytes) => Ok(bytes_to_u32(memo_index_bytes) as usize),
+            Some(memo_index_bytes) => Ok(bytes_to_u32(&memo_index_bytes) as usize),
             None => Ok(0),
         }
     }
@@ -111,7 +111,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         let mut old_cm_and_indices = vec![];
         for (commitment_key, index_value) in self.storage.get_col(COL_COMMITMENT)? {
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
-            let index = bytes_to_u32(index_value.to_vec()) as usize;
+            let index = bytes_to_u32(&index_value) as usize;
 
             old_cm_and_indices.push((commitment, index));
         }
