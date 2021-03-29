@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters};
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -105,29 +105,35 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Build a new commitment merkle tree from the stored commitments
-    pub fn build_merkle_tree(
+    pub fn rebuild_merkle_tree(
         &self,
         additional_cms: Vec<(T::Commitment, usize)>,
-    ) -> Result<MerkleTree<P>, StorageError> {
-        // TODO (raychu86) make this more efficient
-        let mut cm_and_indices = additional_cms;
+    ) -> Result<(), StorageError> {
+        let mut new_cm_and_indices = additional_cms;
 
+        let mut old_cm_and_indices = vec![];
         for (commitment_key, index_value) in self.storage.get_col(COL_COMMITMENT)? {
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
             let index = bytes_to_u32(index_value.to_vec()) as usize;
 
-            cm_and_indices.push((commitment, index));
+            old_cm_and_indices.push((commitment, index));
         }
 
-        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
-        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+        old_cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
+        new_cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
 
-        Ok(MerkleTree::new(self.ledger_parameters.clone(), &commitments)?)
+        let old_commitments = old_cm_and_indices.into_iter().map(|(cm, _)| cm);
+        let new_commitments = new_cm_and_indices.into_iter().map(|(cm, _)| cm);
+
+        let mut locked_tree = self.cm_merkle_tree.write();
+        locked_tree.rebuild(old_commitments, new_commitments)?;
+
+        Ok(())
     }
 
     /// Rebuild the stored merkle tree with the current stored commitments
     pub fn update_merkle_tree(&self) -> Result<(), StorageError> {
-        *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
+        self.rebuild_merkle_tree(vec![])?;
 
         let update_current_digest = DatabaseTransaction(vec![Op::Insert {
             col: COL_META,

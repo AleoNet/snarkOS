@@ -56,8 +56,8 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
         .map(|storage| storage)
         .map_err(|err| LedgerError::Message(err.to_string()))?;
 
-    let leaves: Vec<[u8; 32]> = vec![];
-    let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
+    let leaves: &[[u8; 32]] = &[];
+    let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), leaves.iter())?;
 
     Ok(Ledger {
         current_block_height: Default::default(),
