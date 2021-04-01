@@ -136,6 +136,12 @@ rustc_version = "0.2"
   version = "0.14"
   optional = true
 
+[features]
+default = []
+compile_capnp_schema = [ "capnpc" ]
+# This feature flag is used to disable `target-cpu=native` in `.cargo/config`.
+noconfig = []
+
 [profile.release]
 opt-level = 3
 lto = "thin"
@@ -158,7 +164,3 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
-
-[features]
-default = [ ]
-compile_capnp_schema = [ "capnpc" ]

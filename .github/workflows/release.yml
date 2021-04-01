@@ -25,7 +25,7 @@ jobs:
 
       - name: Build snarkOS
         run: |
-          cargo build --all --release && strip target/release/snarkos
+          cargo build --all --release --features noconfig && strip target/release/snarkos
 
       - id: get_version
         uses: battila7/get-version-action@v2
@@ -65,7 +65,7 @@ jobs:
 
       - name: Build snarkOS
         run: |
-          cargo build --all --release && strip target/release/snarkos
+          cargo build --all --release --features noconfig && strip target/release/snarkos
 
       - id: get_version
         uses: battila7/get-version-action@v2
@@ -106,7 +106,7 @@ jobs:
 
       - name: Build snarkOS
         run: |
-          cargo build --all --release
+          cargo build --all --release --features noconfig
 
       - id: get_version
         uses: battila7/get-version-action@v2
