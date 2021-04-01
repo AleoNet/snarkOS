@@ -54,7 +54,31 @@ pub use miner::Miner;
 pub mod memory_pool;
 pub use memory_pool::MemoryPool;
 
+pub mod parameters;
+pub use parameters::*;
+
 use snarkos_storage::Ledger;
 use snarkvm_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
+use snarkvm_objects::{AleoAmount, BlockHeader, BlockHeaderHash};
 
 pub type MerkleTreeLedger<S> = Ledger<Tx, CommitmentMerkleParameters, S>;
+
+/// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
+pub fn get_block_reward(block_num: u32) -> AleoAmount {
+    let expected_blocks_per_hour: u32 = 100;
+    let num_years = 4;
+    let block_segments = num_years * 365 * 24 * expected_blocks_per_hour;
+
+    let aleo_denonimation = AleoAmount::COIN;
+    let initial_reward = 150i64 * aleo_denonimation;
+
+    // The block reward halves at most 2 times - minimum is 37.5 ALEO after 8 years.
+    let num_halves = u32::min(block_num / block_segments, 2);
+    let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
+
+    AleoAmount::from_bytes(reward)
+}
+
+pub fn is_genesis(block_header: &BlockHeader) -> bool {
+    block_header.previous_block_hash == BlockHeaderHash([0u8; 32])
+}

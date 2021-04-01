@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::ConsensusParameters;
+use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
+use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{instantiated::Components, DPCComponents};
 use snarkvm_objects::{Network, Transaction, TransactionError};
@@ -23,7 +24,10 @@ use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
-use std::io::{Read, Result as IoResult, Write};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    sync::Arc,
+};
 
 mod e2e;
 pub use e2e::*;
@@ -31,7 +35,7 @@ pub use e2e::*;
 mod fixture;
 pub use fixture::*;
 
-pub static TEST_CONSENSUS: Lazy<ConsensusParameters> = Lazy::new(|| {
+pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
     let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerSNARKVerificationKeyCRH as CRH>::Parameters = FromBytes::read(InnerSNARKVKCRHParameters::load_bytes().unwrap().as_slice()).unwrap();
 
     let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerSNARKVerificationKeyCRH =
@@ -128,5 +132,20 @@ impl FromBytes for TestTx {
     #[inline]
     fn read<R: Read>(mut _reader: R) -> IoResult<Self> {
         Ok(Self)
+    }
+}
+
+pub fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
+    create_test_consensus_from_ledger(Arc::new(FIXTURE_VK.ledger()))
+}
+
+pub fn create_test_consensus_from_ledger(
+    ledger: Arc<MerkleTreeLedger<LedgerStorage>>,
+) -> snarkos_consensus::Consensus<LedgerStorage> {
+    snarkos_consensus::Consensus {
+        ledger,
+        memory_pool: Default::default(),
+        parameters: TEST_CONSENSUS_PARAMS.clone(),
+        public_parameters: FIXTURE.parameters.clone(),
     }
 }

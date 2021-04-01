@@ -90,15 +90,7 @@ impl<S: Storage> Consensus<S> {
         );
 
         // Verify the block and insert it into the storage.
-        let is_valid_block = self
-            .consensus_parameters()
-            .receive_block(
-                &self.dpc_parameters(),
-                &self.storage(),
-                &mut self.memory_pool().lock(),
-                &block_struct,
-            )
-            .is_ok();
+        let is_valid_block = self.consensus.receive_block(&block_struct).is_ok();
 
         // This is a new block, send it to our peers.
         if let Some(connected_peers) = connected_peers {

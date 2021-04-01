@@ -113,10 +113,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Enable the consensus layer if the node is not a bootstrapper.
     if !config.node.is_bootnode {
         let storage = Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?);
-        let memory_pool = Arc::new(Mutex::new(MemoryPool::from_storage(&storage)?));
+        let memory_pool = Mutex::new(MemoryPool::from_storage(&storage)?);
 
         info!("Loading Aleo parameters...");
-        let dpc_parameters = Arc::new(PublicParameters::<Components>::load(!config.miner.is_miner)?);
+        let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
         info!("Loading complete.");
 
         // Fetch the set of valid inner circuit IDs.
@@ -130,21 +130,25 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
 
         // Set the initial consensus parameters.
-        let consensus_params = Arc::new(ConsensusParameters {
+        let consensus_params = ConsensusParameters {
             max_block_size: 1_000_000_000usize,
             max_nonce: u32::max_value(),
             target_block_time: 10i64,
             network_id: Network::from_network_id(config.aleo.network_id),
             verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
             authorized_inner_snark_ids,
+        };
+
+        let consensus = Arc::new(snarkos_consensus::Consensus {
+            ledger: storage,
+            memory_pool,
+            parameters: consensus_params,
+            public_parameters: dpc_parameters,
         });
 
         let consensus = Consensus::new(
             node.clone(),
-            storage,
-            memory_pool,
-            consensus_params,
-            dpc_parameters,
+            consensus,
             config.miner.is_miner,
             Duration::from_secs(config.p2p.block_sync_interval.into()),
             Duration::from_secs(config.p2p.mempool_interval.into()),
@@ -161,7 +165,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(miner_address, environment.clone(), node.clone()).spawn();
+                MinerInstance::new(miner_address, node.clone()).spawn();
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -172,7 +176,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc && !is_storage_in_memory {
         // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-        let secondary_storage = MerkleTreeLedger::open_secondary_at_path(path.clone())?;
+        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
 
         start_rpc_server(
             config.rpc.port,

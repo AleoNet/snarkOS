@@ -26,7 +26,7 @@ mod consensus_integration {
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<Tx>, parent_header: &BlockHeader) {
-        let consensus = Arc::new(TEST_CONSENSUS.clone());
+        let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus());
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = Miner::new(miner_address, consensus.clone());
 
@@ -43,6 +43,7 @@ mod consensus_integration {
 
         // ensure that our POSW proof passes
         consensus
+            .parameters
             .verify_header(&header, parent_header, &merkle_root, &pedersen_merkle_root)
             .unwrap();
     }

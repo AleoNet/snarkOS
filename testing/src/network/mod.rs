@@ -25,7 +25,7 @@ pub mod sync;
 
 pub mod topology;
 
-use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
+use crate::consensus::FIXTURE;
 
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 use snarkos_storage::LedgerStorage;
@@ -144,12 +144,11 @@ impl Default for TestSetup {
 }
 
 pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Consensus<LedgerStorage> {
+    let consensus = Arc::new(crate::consensus::create_test_consensus());
+
     Consensus::new(
         node,
-        Arc::new(FIXTURE_VK.ledger()),
-        Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-        Arc::new(TEST_CONSENSUS.clone()),
-        Arc::new(FIXTURE.parameters.clone()),
+        consensus,
         setup.is_miner,
         Duration::from_secs(setup.block_sync_interval),
         Duration::from_secs(setup.tx_sync_interval),
@@ -184,7 +183,7 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
 
     if is_miner {
         let miner_address = FIXTURE.test_accounts[0].address.clone();
-        MinerInstance::new(miner_address, node.environment.clone(), node.clone()).spawn();
+        MinerInstance::new(miner_address, node.clone()).spawn();
     }
 
     node

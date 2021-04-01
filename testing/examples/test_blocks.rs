@@ -17,13 +17,12 @@
 #[macro_use]
 extern crate tracing;
 
-use snarkos_consensus::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Miner};
+use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::{consensus::*, network::TestBlocks};
 use snarkvm_dpc::{
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
     Account,
     AccountAddress,
-    DPCScheme,
     Program,
     Record,
 };
@@ -34,36 +33,31 @@ use rand::Rng;
 use std::{fs::File, path::PathBuf, sync::Arc};
 
 fn mine_block<S: Storage>(
-    miner: &Miner,
-    ledger: &MerkleTreeLedger<S>,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
-    consensus: &ConsensusParameters,
-    memory_pool: &mut MemoryPool<Tx>,
+    miner: &Miner<S>,
     txs: Vec<Tx>,
 ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
     info!("Mining block!");
 
     let transactions = DPCTransactions(txs);
 
-    let (previous_block_header, transactions, coinbase_records) =
-        miner.establish_block(&parameters, ledger, &transactions)?;
+    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
 
     let header = miner.find_block(&transactions, &previous_block_header)?;
 
     let block = Block { header, transactions };
 
-    let old_block_height = ledger.get_current_block_height();
+    let old_block_height = miner.consensus.ledger.get_current_block_height();
 
     // add it to the chain
-    consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
+    miner.consensus.receive_block(&block)?;
 
-    let new_block_height = ledger.get_current_block_height();
+    let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     // Duplicate blocks dont do anything
-    consensus.receive_block(&parameters, ledger, memory_pool, &block)?;
+    miner.consensus.receive_block(&block)?;
 
-    let new_block_height = ledger.get_current_block_height();
+    let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     Ok((block, coinbase_records))
@@ -73,9 +67,7 @@ fn mine_block<S: Storage>(
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
 fn send<R: Rng, S: Storage>(
-    ledger: &MerkleTreeLedger<S>,
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
-    consensus: &ConsensusParameters,
+    consensus: &Consensus<S>,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,
     receiver: &AccountAddress<Components>,
@@ -100,7 +92,6 @@ fn send<R: Rng, S: Storage>(
 
     let from = vec![from.private_key.clone(); NUM_INPUT_RECORDS];
     consensus.create_transaction(
-        parameters,
         inputs,
         from,
         to,
@@ -110,43 +101,34 @@ fn send<R: Rng, S: Storage>(
         values,
         output,
         memo,
-        &ledger,
         rng,
     )
 }
 
 fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
-    info!("Creating parameters");
-    let parameters = &FIXTURE.parameters;
-    info!("Creating ledger");
-    let ledger = FIXTURE.ledger();
     info!("Creating test account");
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
     info!("Creating consensus");
-    let consensus = Arc::new(TEST_CONSENSUS.clone());
+    let consensus = Arc::new(crate::create_test_consensus());
 
     // setup the miner
     info!("Creating miner");
     let miner = Miner::new(miner_acc.address.clone(), consensus.clone());
     info!("Creating memory pool");
-    let mut memory_pool = MemoryPool::new();
 
     let mut txs = vec![];
     let mut blocks = vec![];
 
     for i in 0..n {
         // mine an empty block
-        let (block, coinbase_records) =
-            mine_block(&miner, &ledger, &parameters, &consensus, &mut memory_pool, txs.clone())?;
+        let (block, coinbase_records) = mine_block(&miner, txs.clone())?;
 
         txs.clear();
         let mut memo = [0u8; 32];
         memo[0] = i as u8;
         // make a tx which spends 10 to the BaseDPCComponents receiver
         let (_records, tx) = send(
-            &ledger,
-            &parameters,
             &consensus,
             &miner_acc,
             coinbase_records.clone(),

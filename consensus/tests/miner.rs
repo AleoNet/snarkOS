@@ -45,7 +45,7 @@ mod miner {
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<TestTx>, parent_header: &BlockHeader) {
-        let consensus = Arc::new(TEST_CONSENSUS.clone());
+        let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus());
         let mut rng = XorShiftRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
 
         let (_, miner_address) = keygen(&mut rng);
@@ -58,6 +58,7 @@ mod miner {
 
         // ensure that our POSW proof passes
         consensus
+            .parameters
             .verify_header(&header, parent_header, &merkle_root, &pedersen_merkle_root)
             .unwrap();
     }

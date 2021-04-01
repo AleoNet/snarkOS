@@ -76,11 +76,9 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&*transaction) {
             let insertion = {
-                let parameters = self.dpc_parameters();
                 let storage = self.storage();
-                let consensus = self.consensus_parameters();
 
-                if !consensus.verify_transaction(parameters, &tx, storage)? {
+                if !self.consensus.verify_transaction(&tx)? {
                     error!("Received a transaction that was invalid");
                     return Ok(());
                 }

@@ -27,7 +27,7 @@ use snarkvm_objects::Storage;
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 /// Starts a local JSON-RPC HTTP server at rpc_port in a new thread.
 /// Rpc failures will error on the thread level but not affect the main network server.
@@ -35,7 +35,7 @@ use std::net::SocketAddr;
 #[allow(clippy::too_many_arguments)]
 pub async fn start_rpc_server<S: Storage + Send + Sync + 'static>(
     rpc_port: u16,
-    secondary_storage: MerkleTreeLedger<S>,
+    secondary_storage: Arc<MerkleTreeLedger<S>>,
     node_server: Node<S>,
     username: Option<String>,
     password: Option<String>,

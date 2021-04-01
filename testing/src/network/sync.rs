@@ -109,13 +109,8 @@ async fn block_responder_side() {
     // insert block into node
     let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
     node.expect_consensus()
-        .consensus_parameters()
-        .receive_block(
-            node.expect_consensus().dpc_parameters(),
-            &node.expect_consensus().storage(),
-            &mut node.expect_consensus().memory_pool().lock(),
-            &block_struct_1,
-        )
+        .consensus
+        .receive_block(&block_struct_1)
         .unwrap();
 
     // send a GetSync with an empty vec as only the genesis block is in the ledger
@@ -187,16 +182,7 @@ async fn block_two_node() {
     assert_eq!(blocks.len(), NUM_BLOCKS);
 
     for block in blocks {
-        node_alice
-            .expect_consensus()
-            .consensus_parameters()
-            .receive_block(
-                node_alice.expect_consensus().dpc_parameters(),
-                &node_alice.expect_consensus().storage(),
-                &mut node_alice.expect_consensus().memory_pool().lock(),
-                &block,
-            )
-            .unwrap();
+        node_alice.expect_consensus().consensus.receive_block(&block).unwrap();
     }
 
     let setup = TestSetup {
