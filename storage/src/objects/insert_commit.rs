@@ -250,11 +250,11 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
 
         // Update the best block number
 
-        let is_genesis = block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
-            && self.get_current_block_height() == 0
-            && self.is_empty();
-
         let height = self.get_current_block_height();
+
+        let is_genesis =
+            block.header.previous_block_hash == BlockHeaderHash([0u8; 32]) && height == 0 && self.is_empty();
+
         let mut new_best_block_number = 0;
         if !is_genesis {
             new_best_block_number = height + 1;
@@ -280,8 +280,8 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         });
 
         // Rebuild the new commitment merkle tree
-        let new_merkle_tree = self.build_merkle_tree(transaction_cms)?;
-        let new_digest = new_merkle_tree.root();
+        self.rebuild_merkle_tree(transaction_cms)?;
+        let new_digest = self.cm_merkle_tree.read().root();
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
@@ -293,8 +293,6 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
             value: to_bytes![new_digest]?.to_vec(),
         });
-
-        *self.cm_merkle_tree.write() = new_merkle_tree;
 
         self.storage.batch(database_transaction)?;
 

@@ -122,9 +122,9 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
                 }
 
                 cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
-                let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+                let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm);
 
-                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
+                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), commitments)?;
 
                 Ok(Self {
                     current_block_height: AtomicU32::new(bytes_to_u32(val)),
@@ -175,7 +175,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
                 // the secondary instance requires it.
                 if update_merkle_tree {
                     // Update the Merkle tree of the secondary instance.
-                    *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
+                    self.rebuild_merkle_tree(vec![])?;
                 }
             }
         }
