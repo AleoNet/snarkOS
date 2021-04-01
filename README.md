@@ -25,7 +25,7 @@
 
 ## 1. Overview
 
-__snarkOS__ is a decentralized operating system for private applications. It forms the backbone of [Aleo](https://aleo.org/) and 
+__snarkOS__ is a decentralized operating system for private applications. It forms the backbone of [Aleo](https://aleo.org/) and
 enables applications to verify and store state in a publicly verifiable manner.
 
 ## 2. Quick Start
@@ -83,7 +83,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ##### Windows
-  
+
 Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
 and follow the on-screen instructions.
 
@@ -114,7 +114,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ##### Windows
-  
+
 Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
 and follow the on-screen instructions.
 
@@ -143,15 +143,15 @@ snarkos
 #### Docker build
 ```bash
 docker build -t snarkos:latest .
-``` 
-or 
+```
+or
 ```bash
 docker-compose build
 ```
 
 #### Docker run
 ``` bash
-docker run -d -p 4131:4131 --name snarkos snarkos 
+docker run -d -p 4131:4131 --name snarkos snarkos
 ```
 or
 ```bash
@@ -173,7 +173,7 @@ To start a mining node, run:
 snarkos --is-miner
 ```
 
-To run a node with custom settings, refer to the full list of options and flags available 
+To run a node with custom settings, refer to the full list of options and flags available
 in the CLI.
 
 ### 3.2 Command Line Interface
@@ -181,7 +181,7 @@ in the CLI.
 Full list of CLI flags and options can be viewed with `snarkos --help`:
 
 ```
-snarkOS 1.1.4
+snarkOS <version>
 Run an Aleo node (include -h for more options)
 
 USAGE:
@@ -223,13 +223,13 @@ snarkos --connect "<IP ADDRESS>"
 
 ### 3.3 Configuration File
 
-A `config.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time. 
-Updating this `config.toml` file allows node operators to specify default settings for the node without 
+A `config.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time.
+Updating this `config.toml` file allows node operators to specify default settings for the node without
 having to specify additional information in the CLI.
 
 ## 4. JSON-RPC Interface
 
-By default, snarkOS 1.1.4 a JSON-RPC server to allow external interfacing with the Aleo network. Documentation of the RPC endpoints can be found [here](rpc/README.md)
+By default, snarkOS launches a JSON-RPC server to allow external interfacing with the Aleo network. Documentation of the RPC endpoints can be found [here](rpc/README.md)
 
 ## 5. Additional Information
 
