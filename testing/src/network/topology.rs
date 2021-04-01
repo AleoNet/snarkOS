@@ -99,7 +99,7 @@ async fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
 
     // Start the rest of the nodes with the core node as the bootnode.
     let bootnodes = vec![hub_address];
-    for i in 1..nodes.len() {
-        nodes[i].environment.bootnodes = bootnodes.clone();
+    for node in nodes.iter_mut().skip(1) {
+        node.environment.bootnodes = bootnodes.clone();
     }
 }

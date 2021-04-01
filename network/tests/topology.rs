@@ -75,8 +75,8 @@ async fn spawn_nodes_in_a_line() {
     );
 
     // All other nodes should have two.
-    for i in 1..(nodes.len() - 1) {
-        wait_until!(5, nodes[i].peer_book.read().number_of_connected_peers() == 2);
+    for node in nodes.iter().take(nodes.len() - 1).skip(1) {
+        wait_until!(5, node.peer_book.read().number_of_connected_peers() == 2);
     }
 }
 
