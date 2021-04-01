@@ -27,9 +27,7 @@ pub struct MemDb {
 }
 
 impl Storage for MemDb {
-    fn in_memory(&self) -> bool {
-        true
-    }
+    const IN_MEMORY: bool = true;
 
     fn open(_path: Option<&Path>, _secondary_path: Option<&Path>) -> Result<Self, StorageError> {
         // the paths are just ignored
@@ -84,9 +82,5 @@ impl Storage for MemDb {
     fn try_catch_up_with_primary(&self) -> Result<(), StorageError> {
         // used only in Ledger::catch_up_secondary, doesn't cause an early return
         Err(StorageError::Message("MemDb has no secondary instance".into()))
-    }
-
-    fn destroy(&self) -> Result<(), StorageError> {
-        Ok(()) // nothing to do here: the Drop impl takes care of the associated in-memory objects
     }
 }

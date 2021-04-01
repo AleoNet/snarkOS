@@ -23,19 +23,19 @@ rocksdb_storage = ["rocksdb"]
 mem_storage = []
 
 [dependencies.snarkvm-algorithms]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.snarkvm-dpc]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.snarkvm-objects]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.snarkvm-parameters]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.snarkvm-utilities]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.snarkos-parameters]
 path = "../parameters"
@@ -71,7 +71,7 @@ version = "1.0"
 path = "../consensus"
 
 [dev-dependencies.snarkvm-curves]
-version = "0.2.1"
+version = "0.2.2"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"

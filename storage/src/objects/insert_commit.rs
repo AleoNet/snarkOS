@@ -252,9 +252,8 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
 
         let height = self.get_current_block_height();
 
-        let is_genesis = block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
-            && height == 0
-            && self.is_empty();
+        let is_genesis =
+            block.header.previous_block_hash == BlockHeaderHash([0u8; 32]) && height == 0 && self.is_empty();
 
         let mut new_best_block_number = 0;
         if !is_genesis {

@@ -105,10 +105,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Build a new commitment merkle tree from the stored commitments
-    pub fn rebuild_merkle_tree(
-        &self,
-        additional_cms: Vec<(T::Commitment, usize)>,
-    ) -> Result<(), StorageError> {
+    pub fn rebuild_merkle_tree(&self, additional_cms: Vec<(T::Commitment, usize)>) -> Result<(), StorageError> {
         let mut new_cm_and_indices = additional_cms;
 
         let mut old_cm_and_indices = vec![];
