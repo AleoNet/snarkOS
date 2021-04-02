@@ -70,7 +70,7 @@ pub trait CLI {
 
         App::new(Self::NAME)
             .about(Self::ABOUT)
-            .version("1.1.4")// TODO (raychu86) Add auto fill for crate version
+            .version(env!("CARGO_PKG_VERSION"))
             .settings(&[
                 AppSettings::ColoredHelp,
                 //                AppSettings::DisableHelpSubcommand,

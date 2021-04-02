@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, Ledger, COL_BLOCK_HEADER};
-use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkvm_objects::{Block, BlockHeader, BlockHeaderHash};
+use crate::{Ledger, COL_BLOCK_HEADER};
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, Storage, Transaction};
 use snarkvm_utilities::FromBytes;
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Returns true if the block for the given block header hash exists.
     pub fn block_hash_exists(&self, block_hash: &BlockHeaderHash) -> bool {
         if self.is_empty() {

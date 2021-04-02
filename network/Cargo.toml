@@ -18,22 +18,16 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkvm-dpc]
-version = "0.0.5"
-
-[dependencies.snarkvm-errors]
-version = "0.0.5"
-
-[dependencies.snarkvm-models]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkvm-objects]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
@@ -65,6 +59,9 @@ version = "0.14"
 [dependencies.chrono]
 version = "0.4"
 features = [ "serde" ]
+
+[dependencies.derivative]
+version = "2"
 
 [dependencies.hex]
 version = "0.4.2"
@@ -110,6 +107,9 @@ version = "0.2"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"
+
+[dev-dependencies.peak_alloc]
+version = "0.1.0"
 
 [build-dependencies]
 rustc_version = "0.2"

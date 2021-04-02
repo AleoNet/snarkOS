@@ -25,7 +25,7 @@ jobs:
 
       - name: Build snarkOS
         run: |
-          cargo build --all --release && strip target/release/snarkos
+          cargo build --all --release --features noconfig && strip target/release/snarkos
 
       - id: get_version
         uses: battila7/get-version-action@v2
@@ -65,7 +65,7 @@ jobs:
 
       - name: Build snarkOS
         run: |
-          cargo build --all --release && strip target/release/snarkos
+          cargo build --all --release --features noconfig && strip target/release/snarkos
 
       - id: get_version
         uses: battila7/get-version-action@v2
@@ -104,27 +104,31 @@ jobs:
           override: true
           components: rustfmt
 
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "11"
+          directory: ${{ runner.temp }}/llvm
+
+      - name: Set LIBCLANG_PATH
+        run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
+
       - name: Build snarkOS
         run: |
-          cargo build --all --release
+          cargo build --all --release --features noconfig
 
       - id: get_version
         uses: battila7/get-version-action@v2
 
       - name: Zip
         run: |
-          mkdir tempdir
-          mv target/release/snarkos tempdir
-          cd tempdir
-          Compress-Archive aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-gnu.zip snarkos
-          cd ..
-          mv aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-gnu.zip .
+          Compress-Archive target/release/snarkos.exe aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-msvc.zip
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-gnu.zip
+            aleo-testnet1-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-msvc.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

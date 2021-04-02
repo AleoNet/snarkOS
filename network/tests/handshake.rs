@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::{message::*, Node, Version};
+use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{test_node, write_message_to_stream, TestSetup},
     wait_until,
@@ -146,7 +147,7 @@ async fn handshake_initiator_side() {
     assert_eq!(peer_book.number_of_connected_peers(), 1);
 }
 
-async fn assert_node_rejected_message(node: &Node, peer_stream: &mut TcpStream) {
+async fn assert_node_rejected_message(node: &Node<LedgerStorage>, peer_stream: &mut TcpStream) {
     // read the response from the stream
     let mut buffer = String::new();
     let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();

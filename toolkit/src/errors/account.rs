@@ -20,9 +20,9 @@ pub enum PrivateKeyError {
     Crate(&'static str, String),
 }
 
-impl From<snarkvm_errors::objects::account::AccountError> for PrivateKeyError {
-    fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        PrivateKeyError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
+impl From<snarkvm_dpc::AccountError> for PrivateKeyError {
+    fn from(error: snarkvm_dpc::AccountError) -> Self {
+        PrivateKeyError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 
@@ -38,9 +38,9 @@ pub enum ViewKeyError {
     Crate(&'static str, String),
 }
 
-impl From<snarkvm_errors::objects::account::AccountError> for ViewKeyError {
-    fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        ViewKeyError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
+impl From<snarkvm_dpc::AccountError> for ViewKeyError {
+    fn from(error: snarkvm_dpc::AccountError) -> Self {
+        ViewKeyError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 
@@ -56,9 +56,9 @@ pub enum AddressError {
     Crate(&'static str, String),
 }
 
-impl From<snarkvm_errors::objects::account::AccountError> for AddressError {
-    fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        AddressError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
+impl From<snarkvm_dpc::AccountError> for AddressError {
+    fn from(error: snarkvm_dpc::AccountError) -> Self {
+        AddressError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 

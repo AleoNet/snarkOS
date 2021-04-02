@@ -13,10 +13,9 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
-include = [ "Cargo.toml", "snarkos", "README.md", "LICENSE.md" ]
+include = [ "Cargo.toml", "snarkos", "README.md", "LICENSE.md", "build.rs" ]
 license = "GPL-3.0"
 edition = "2018"
-build = "build.rs"
 
 [workspace]
 members = [
@@ -39,23 +38,21 @@ path = "snarkos/lib.rs"
 name = "snarkos"
 path = "snarkos/main.rs"
 
+[dependencies.snarkvm-algorithms]
+version = "0.2.2"
+default-features = false
+
 [dependencies.snarkvm-dpc]
-version = "0.0.5"
-
-[dependencies.snarkvm-errors]
-version = "0.0.5"
-
-[dependencies.snarkvm-models]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkvm-objects]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkvm-posw]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkos-consensus]
 path = "./consensus"
@@ -71,6 +68,7 @@ version = "1.2.0"
 
 [dependencies.snarkos-storage]
 path = "./storage"
+features = ["rocksdb_storage"]
 version = "1.2.0"
 
 [dependencies.anyhow]
@@ -95,7 +93,7 @@ version = "0.11.1"
 version = "0.8"
 
 [dependencies.self_update]
-version = "0.23.0"
+version = "0.26.0"
 features = [
   "archive-zip",
   "compression-zip-bzip2",
@@ -138,6 +136,12 @@ rustc_version = "0.2"
   version = "0.14"
   optional = true
 
+[features]
+default = []
+compile_capnp_schema = [ "capnpc" ]
+# This feature flag is used to disable `target-cpu=native` in `.cargo/config`.
+noconfig = []
+
 [profile.release]
 opt-level = 3
 lto = "thin"
@@ -160,7 +164,3 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
-
-[features]
-default = [ ]
-compile_capnp_schema = [ "capnpc" ]

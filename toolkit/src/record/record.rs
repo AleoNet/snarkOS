@@ -19,13 +19,15 @@ use crate::{
     errors::RecordError,
 };
 
-use snarkvm_dpc::base_dpc::{
-    instantiated::Components,
-    parameters::SystemParameters,
-    record::{DPCRecord, EncryptedRecord, RecordEncryption},
-    DPC,
+use snarkvm_dpc::{
+    base_dpc::{
+        instantiated::Components,
+        parameters::SystemParameters,
+        record::{DPCRecord, EncryptedRecord, RecordEncryption},
+        DPC,
+    },
+    Record as RecordTrait,
 };
-use snarkvm_models::dpc::Record as RecordTrait;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

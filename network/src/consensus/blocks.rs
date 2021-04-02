@@ -16,11 +16,11 @@
 
 use crate::{message::*, peers::PeerInfo, Consensus, NetworkError};
 use snarkos_consensus::error::ConsensusError;
-use snarkvm_objects::{Block, BlockHeaderHash};
+use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
 use std::{collections::HashMap, net::SocketAddr};
 
-impl Consensus {
+impl<S: Storage> Consensus<S> {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
@@ -90,15 +90,7 @@ impl Consensus {
         );
 
         // Verify the block and insert it into the storage.
-        let is_valid_block = self
-            .consensus_parameters()
-            .receive_block(
-                &self.dpc_parameters(),
-                &self.storage(),
-                &mut self.memory_pool().lock(),
-                &block_struct,
-            )
-            .is_ok();
+        let is_valid_block = self.consensus.receive_block(&block_struct).is_ok();
 
         // This is a new block, send it to our peers.
         if let Some(connected_peers) = connected_peers {

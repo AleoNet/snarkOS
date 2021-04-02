@@ -14,17 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, *};
+use crate::*;
 use snarkos_parameters::GenesisBlock;
-use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_models::{
-    algorithms::LoadableMerkleParameters,
-    genesis::Genesis,
-    objects::{LedgerScheme, Transaction},
-    parameters::Parameter,
-};
-use snarkvm_objects::Block;
-use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters};
+use snarkvm_objects::{errors::StorageError, Block, DatabaseTransaction, LedgerScheme, Op, Storage, Transaction};
+use snarkvm_parameters::{traits::genesis::Genesis, LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
 use parking_lot::RwLock;
@@ -32,33 +26,30 @@ use std::{
     fs,
     marker::PhantomData,
     path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 pub type BlockHeight = u32;
 
-pub struct Ledger<T: Transaction, P: LoadableMerkleParameters> {
+pub struct Ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage> {
     pub current_block_height: AtomicU32,
     pub ledger_parameters: P,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
-    pub storage: Arc<Storage>,
+    pub storage: S,
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Open the blockchain storage at a particular path.
     pub fn open_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Self, StorageError> {
-        fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
+        fs::create_dir_all(path.as_ref())?;
 
         Self::load_ledger_state(path, true)
     }
 
     /// Open the blockchain storage at a particular path as a secondary read-only instance.
     pub fn open_secondary_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Self, StorageError> {
-        fs::create_dir_all(path.as_ref()).map_err(|err| StorageError::Message(err.to_string()))?;
+        fs::create_dir_all(path.as_ref())?;
 
         Self::load_ledger_state(path, false)
     }
@@ -79,8 +70,8 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Get the stored old connected peers.
-    pub fn get_peer_book(&self) -> Result<Vec<u8>, StorageError> {
-        self.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())
+    pub fn get_peer_book(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        self.storage.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())
     }
 
     /// Store the connected peers.
@@ -90,12 +81,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             key: KEY_PEER_BOOK.as_bytes().to_vec(),
             value: peers_serialized,
         };
-        self.storage.write(DatabaseTransaction(vec![op]))
-    }
-
-    /// Destroy the storage given a path.
-    pub fn destroy_storage(path: PathBuf) -> Result<(), StorageError> {
-        Storage::destroy_storage(path)
+        self.storage.batch(DatabaseTransaction(vec![op]))
     }
 
     /// Returns a `Ledger` with the latest state loaded from storage at a given path as
@@ -108,8 +94,8 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         let latest_block_number = {
             let storage = match primary {
-                true => Storage::open_cf(path.as_ref(), NUM_COLS)?,
-                false => Storage::open_secondary_cf(path.as_ref(), &secondary_path, NUM_COLS)?,
+                true => S::open(Some(path.as_ref()), None)?,
+                false => S::open(Some(path.as_ref()), Some(&secondary_path))?,
             };
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
@@ -120,15 +106,15 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         match latest_block_number {
             Some(val) => {
                 let storage = match primary {
-                    true => Storage::open_cf(path.as_ref(), NUM_COLS)?,
-                    false => Storage::open_secondary_cf(path.as_ref(), &secondary_path, NUM_COLS)?,
+                    true => S::open(Some(path.as_ref()), None)?,
+                    false => S::open(Some(path.as_ref()), Some(&secondary_path))?,
                 };
 
                 // Build commitment merkle tree
 
                 let mut cm_and_indices = vec![];
 
-                for (commitment_key, index_value) in storage.get_iter(COL_COMMITMENT) {
+                for (commitment_key, index_value) in storage.get_col(COL_COMMITMENT)? {
                     let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
                     let index = bytes_to_u32(index_value.to_vec()) as usize;
 
@@ -136,13 +122,13 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
                 }
 
                 cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
-                let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+                let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm);
 
-                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments)?;
+                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), commitments)?;
 
                 Ok(Self {
                     current_block_height: AtomicU32::new(bytes_to_u32(val)),
-                    storage: Arc::new(storage),
+                    storage,
                     cm_merkle_tree: RwLock::new(merkle_tree),
                     ledger_parameters,
                     _transaction: PhantomData,
@@ -153,7 +139,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
                 let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
 
-                let ledger_storage = Self::new(&path.as_ref().to_path_buf(), ledger_parameters, genesis_block)
+                let ledger_storage = Self::new(Some(&path.as_ref()), ledger_parameters, genesis_block)
                     .expect("Ledger could not be instantiated");
 
                 // If there did not exist a primary ledger at the path,
@@ -170,8 +156,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     /// Attempt to catch the secondary read-only storage instance with the primary instance.
     pub fn catch_up_secondary(&self, update_merkle_tree: bool) -> Result<(), StorageError> {
         // Sync the secondary and primary instances
-        if self.storage.db.try_catch_up_with_primary().is_ok() {
-            let current_block_height_bytes = self.get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?;
+        if self.storage.try_catch_up_with_primary().is_ok() {
+            let current_block_height_bytes = self
+                .storage
+                .get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?
+                .ok_or_else(|| StorageError::Message("can't determine current block height".into()))?;
             let new_current_block_height = bytes_to_u32(current_block_height_bytes);
             let current_block_height = self.get_current_block_height();
 
@@ -186,18 +175,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
                 // the secondary instance requires it.
                 if update_merkle_tree {
                     // Update the Merkle tree of the secondary instance.
-                    *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
+                    self.rebuild_merkle_tree(vec![])?;
                 }
             }
         }
 
         Ok(())
-    }
-
-    /// Retrieve a value given a key.
-    pub(crate) fn get(&self, col: u32, key: &[u8]) -> Result<Vec<u8>, StorageError> {
-        self.storage
-            .get(col, key)?
-            .ok_or_else(|| StorageError::MissingValue(hex::encode(key)))
     }
 }

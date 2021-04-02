@@ -16,8 +16,11 @@
 
 use crate::{account::PrivateKey, errors::SignatureError};
 
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
-use snarkvm_models::{algorithms::SignatureScheme, dpc::DPCComponents};
+use snarkvm_algorithms::SignatureScheme;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    DPCComponents,
+};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

@@ -14,19 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_storage::{key_value::NUM_COLS, storage::Storage, Ledger};
-use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_dpc::base_dpc::{instantiated::*, record_payload::RecordPayload, BaseDPCComponents, DPC};
-use snarkvm_errors::dpc::{DPCError, LedgerError};
-use snarkvm_models::{
-    algorithms::{LoadableMerkleParameters, MerkleParameters, CRH},
-    dpc::{DPCComponents, DPCScheme},
-    objects::{account::AccountScheme, Transaction},
-    parameters::Parameter,
+use snarkos_consensus::{Consensus, ConsensusParameters, MerkleTreeLedger};
+use snarkos_storage::{Ledger, LedgerStorage};
+use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters, MerkleParameters, CRH};
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, record_payload::RecordPayload, DPC},
+    Account,
+    AccountAddress,
+    AccountScheme,
+    DPCComponents,
+    DPCError,
+    DPCScheme,
+    LedgerError,
 };
-use snarkvm_objects::{Account, AccountAddress, Network};
-use snarkvm_parameters::LedgerMerkleTreeParameters;
+use snarkvm_objects::{Network, Storage, Transaction};
+use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -39,37 +41,37 @@ use std::{
     fs::{self, File},
     io::{Result as IoResult, Write},
     marker::PhantomData,
-    path::PathBuf,
+    path::Path,
     str::FromStr,
     sync::Arc,
 };
 
 /// Generate a blank ledger to facilitate generation of the genesis block
-fn empty_ledger<T: Transaction, P: LoadableMerkleParameters>(
+fn empty_ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
     parameters: P,
-    path: &PathBuf,
-) -> Result<Ledger<T, P>, LedgerError> {
+    path: &Path,
+) -> Result<Ledger<T, P, S>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-    let storage = Storage::open_cf(path, NUM_COLS)
+    let storage = S::open(Some(path), None)
         .map(|storage| storage)
         .map_err(|err| LedgerError::Message(err.to_string()))?;
 
-    let leaves: Vec<[u8; 32]> = vec![];
-    let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), &leaves)?;
+    let leaves: &[[u8; 32]] = &[];
+    let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), leaves.iter())?;
 
     Ok(Ledger {
         current_block_height: Default::default(),
-        storage: Arc::new(storage),
+        storage,
         cm_merkle_tree: RwLock::new(cm_merkle_tree),
         ledger_parameters: parameters,
         _transaction: PhantomData,
     })
 }
 
-pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) -> Result<Vec<u8>, DPCError> {
+pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_name: &str) -> Result<Vec<u8>, DPCError> {
     let rng = &mut thread_rng();
 
-    let consensus = ConsensusParameters {
+    let parameters = ConsensusParameters {
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
@@ -77,27 +79,46 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids: vec![],
     };
+    let public_parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(false)?;
 
     let recipient = AccountAddress::<Components>::from_str(&recipient)?;
 
     let crh_parameters = <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes()?[..])
         .expect("read bytes as hash for MerkleParameters in ledger");
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
+
+    // Instantiate an empty ledger
+
     let ledger_parameters = From::from(merkle_tree_hash_parameters);
+    let mut path = std::env::temp_dir();
+    let random_path: usize = rng.gen();
+    path.push(format!("./empty_ledger-{}", random_path));
+    let ledger = Arc::new(empty_ledger::<_, _, S>(ledger_parameters, &path)?);
 
-    let parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::NetworkParameters::load(false)?;
+    let consensus = Consensus {
+        parameters,
+        public_parameters,
+        ledger,
+        memory_pool: Default::default(),
+    };
 
-    let noop_program_vk_hash = parameters
+    let noop_program_vk_hash = consensus
+        .public_parameters
         .system_parameters
         .program_verification_key_crh
-        .hash(&to_bytes![parameters.noop_program_snark_parameters.verification_key]?)?;
+        .hash(&to_bytes![
+            consensus
+                .public_parameters
+                .noop_program_snark_parameters
+                .verification_key
+        ]?)?;
     let noop_program_id = to_bytes![noop_program_vk_hash]?;
 
     // Generate a new account that owns the dummy input records
     let dummy_account = Account::new(
-        &parameters.system_parameters.account_signature,
-        &parameters.system_parameters.account_commitment,
-        &parameters.system_parameters.account_encryption,
+        &consensus.public_parameters.system_parameters.account_signature,
+        &consensus.public_parameters.system_parameters.account_commitment,
+        &consensus.public_parameters.system_parameters.account_encryption,
         rng,
     )?;
 
@@ -106,12 +127,13 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
     let old_account_private_keys = vec![dummy_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
     let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
     for i in 0..Components::NUM_INPUT_RECORDS {
-        let old_sn_nonce = parameters
+        let old_sn_nonce = consensus
+            .public_parameters
             .system_parameters
             .serial_number_nonce
             .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
-            &parameters.system_parameters,
+            &consensus.public_parameters.system_parameters,
             old_sn_nonce.clone(),
             dummy_account.address.clone(),
             true, // The input record is dummy
@@ -141,18 +163,9 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
 
     let memo: [u8; 32] = rng.gen();
 
-    // Instantiate an empty ledger
-
-    let mut path = std::env::temp_dir();
-    let random_path: usize = rng.gen();
-    path.push(format!("./empty_ledger-{}", random_path));
-
-    let ledger = empty_ledger(ledger_parameters, &path)?;
-
     // Generate the transaction
     let (records, transaction) = consensus
         .create_transaction(
-            &parameters,
             old_records,
             old_account_private_keys,
             new_record_owners,
@@ -162,7 +175,6 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
             new_values,
             new_payloads,
             memo,
-            &ledger,
             rng,
         )
         .unwrap();
@@ -177,15 +189,13 @@ pub fn generate(recipient: &str, value: u64, network_id: u8, file_name: &str) ->
         println!("record {}: {:?}\n", i, hex::encode(record_bytes));
     }
 
-    drop(ledger);
-    Ledger::<Tx, <Components as BaseDPCComponents>::MerkleParameters>::destroy_storage(path).unwrap();
     Ok(transaction_bytes)
 }
 
-pub fn store(path: &PathBuf, bytes: &[u8]) -> IoResult<()> {
+pub fn store<P: AsRef<Path>>(path: P, bytes: &[u8]) -> IoResult<()> {
     let mut file = File::create(path)?;
     file.write_all(&bytes)?;
-    drop(file);
+
     Ok(())
 }
 
@@ -202,7 +212,6 @@ pub fn main() {
     let network_id = args[3].parse::<u8>().unwrap();
     let file_name = &args[4];
 
-    let bytes = generate(recipient, balance, network_id, file_name).unwrap();
-    let filename = PathBuf::from(file_name);
-    store(&filename, &bytes).unwrap();
+    let bytes = generate::<LedgerStorage>(recipient, balance, network_id, file_name).unwrap();
+    store(file_name, &bytes).unwrap();
 }

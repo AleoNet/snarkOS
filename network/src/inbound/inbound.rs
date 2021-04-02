@@ -26,7 +26,10 @@ use parking_lot::{Mutex, RwLock};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    task::{self, JoinHandle},
+    task::{
+        JoinHandle,
+        {self},
+    },
 };
 
 /// The map of remote addresses to their active writers.
@@ -36,7 +39,7 @@ pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 #[derive(Debug, Clone)]
 pub struct Inbound {
     /// The producer for sending inbound messages to the server.
-    sender: Sender,
+    pub(crate) sender: Sender,
     /// The consumer for receiving inbound messages to the server.
     receiver: Arc<Mutex<Option<Receiver>>>,
     /// The map of remote addresses to their active read channels.
@@ -70,14 +73,14 @@ impl Inbound {
     pub async fn listen(&self, environment: &mut Environment) -> Result<(), NetworkError> {
         let (listener_address, listener) = if let Some(addr) = environment.local_address() {
             let listener = TcpListener::bind(&addr).await?;
-            (addr, listener)
+            (listener.local_addr()?, listener)
         } else {
             let listener = TcpListener::bind("0.0.0.0:0").await?;
             let listener_address = listener.local_addr()?;
-            environment.set_local_address(listener_address);
             (listener_address, listener)
         };
-        info!("Listening at {}", listener_address);
+        environment.set_local_address(listener_address);
+        info!("Node {:x} listening at {}", environment.name, listener_address);
 
         let inbound = self.clone();
         task::spawn(async move {

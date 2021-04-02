@@ -23,9 +23,12 @@ pub mod encryption;
 #[cfg(test)]
 pub mod sync;
 
-use crate::consensus::{FIXTURE, FIXTURE_VK, TEST_CONSENSUS};
+pub mod topology;
+
+use crate::consensus::FIXTURE;
 
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
+use snarkos_storage::LedgerStorage;
 
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -47,13 +50,18 @@ pub async fn random_bound_address() -> (SocketAddr, TcpListener) {
 /// Uses polling to cut down on time otherwise used by calling `sleep` in tests.
 #[macro_export]
 macro_rules! wait_until {
-    ($limit_secs: expr, $condition: expr) => {
+    ($limit_secs: expr, $condition: expr $(, $sleep_millis: expr)?) => {
         let now = std::time::Instant::now();
         loop {
             if $condition {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+            // Default timout.
+            let sleep_millis = 10;
+            // Set if present in args.
+            $(let sleep_millis = $sleep_millis;)?
+            tokio::time::sleep(std::time::Duration::from_millis(sleep_millis)).await;
             if now.elapsed() > std::time::Duration::from_secs($limit_secs) {
                 panic!("timed out!");
             }
@@ -124,7 +132,7 @@ impl TestSetup {
 impl Default for TestSetup {
     fn default() -> Self {
         Self {
-            socket_address: None,
+            socket_address: "127.0.0.1:0".parse().ok(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
             min_peers: 1,
@@ -135,13 +143,12 @@ impl Default for TestSetup {
     }
 }
 
-pub fn test_consensus(setup: ConsensusSetup, node: Node) -> Consensus {
+pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Consensus<LedgerStorage> {
+    let consensus = Arc::new(crate::consensus::create_test_consensus());
+
     Consensus::new(
         node,
-        Arc::new(FIXTURE_VK.ledger()),
-        Arc::new(Mutex::new(snarkos_consensus::MemoryPool::new())),
-        Arc::new(TEST_CONSENSUS.clone()),
-        Arc::new(FIXTURE.parameters.clone()),
+        consensus,
         setup.is_miner,
         Duration::from_secs(setup.block_sync_interval),
         Duration::from_secs(setup.tx_sync_interval),
@@ -162,7 +169,7 @@ pub fn test_environment(setup: TestSetup) -> Environment {
 }
 
 /// Starts a node with the specified bootnodes.
-pub async fn test_node(setup: TestSetup) -> Node {
+pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let environment = test_environment(setup.clone());
     let mut node = Node::new(environment).await.unwrap();
@@ -175,7 +182,8 @@ pub async fn test_node(setup: TestSetup) -> Node {
     node.start().await.unwrap();
 
     if is_miner {
-        // TODO(ljedrz/nkls): spawn a miner
+        let miner_address = FIXTURE.test_accounts[0].address.clone();
+        MinerInstance::new(miner_address, node.clone()).spawn();
     }
 
     node
@@ -309,11 +317,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     (node0, node1)
 }
 
-pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode) {
-    // start a test node and listen for incoming connections
-    let node = test_node(node_setup).await;
-    let node_listener = node.local_address().unwrap();
-
+pub async fn handshaken_peer(node_listener: SocketAddr) -> FakeNode {
     // set up a fake node (peer), which is basically just a socket
     let mut peer_stream = TcpStream::connect(&node_listener).await.unwrap();
 
@@ -352,7 +356,14 @@ pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode)
 
     let noise = noise.into_transport_mode().unwrap();
 
-    let fake_node = FakeNode::new(peer_stream, peer_addr, noise);
+    FakeNode::new(peer_stream, peer_addr, noise)
+}
+
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node<LedgerStorage>, FakeNode) {
+    // start a test node and listen for incoming connections
+    let node = test_node(node_setup).await;
+    let node_listener = node.local_address().unwrap();
+    let fake_node = handshaken_peer(node_listener).await;
 
     (node, fake_node)
 }

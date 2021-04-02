@@ -15,12 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::error::ConsensusError;
-use snarkos_storage::error::StorageError;
-use snarkvm_errors::{
-    algorithms::CRHError,
-    dpc::DPCError,
-    objects::{AccountError, BlockError, TransactionError},
-};
+use snarkvm_algorithms::errors::CRHError;
+use snarkvm_dpc::{AccountError, DPCError};
+use snarkvm_objects::{BlockError, StorageError, TransactionError};
 
 use std::fmt::Debug;
 
@@ -52,6 +49,9 @@ pub enum RpcError {
 
     #[error("{}", _0)]
     Message(String),
+
+    #[error("The node doesn't have the consensus layer running")]
+    NoConsensus,
 
     #[error("{}", _0)]
     StorageError(StorageError),

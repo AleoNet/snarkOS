@@ -14,15 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, *};
-use snarkvm_errors::objects::BlockError;
-use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkvm_objects::{Block, BlockHeaderHash, DPCTransactions};
+use crate::*;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::{
+    Block,
+    BlockError,
+    BlockHeaderHash,
+    DPCTransactions,
+    DatabaseTransaction,
+    Op,
+    Storage,
+    StorageError,
+    Transaction,
+};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the latest block in the chain.
     pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
         self.get_block_from_block_number(self.get_current_block_height())
@@ -143,7 +152,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             }
         }
 
-        self.storage.write(database_transaction)
+        self.storage.batch(database_transaction)
     }
 
     /// De-commit the latest block and return its header hash.
@@ -227,7 +236,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             key: block_hash.0.to_vec(),
         });
 
-        self.storage.write(database_transaction)?;
+        self.storage.batch(database_transaction)?;
 
         self.current_block_height.fetch_sub(1, Ordering::SeqCst);
 

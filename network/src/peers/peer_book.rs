@@ -20,7 +20,8 @@ use crate::{
 };
 use snarkos_metrics::Metrics;
 use snarkos_storage::Ledger;
-use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::{Storage, Transaction};
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -56,11 +57,13 @@ impl PeerBook {
     /// returns a `NetworkError`.
     ///
     #[inline]
-    pub fn load<T: Transaction, P: LoadableMerkleParameters>(storage: &Ledger<T, P>) -> Result<Self, NetworkError> {
+    pub fn load<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
+        storage: &Ledger<T, P, S>,
+    ) -> Result<Self, NetworkError> {
         // Fetch the peer book from storage.
         match storage.get_peer_book() {
             // Attempt to deserialize it as a peer book.
-            Ok(serialized_peer_book) => Ok(bincode::deserialize(&serialized_peer_book)?),
+            Ok(Some(serialized_peer_book)) => Ok(bincode::deserialize(&serialized_peer_book)?),
             _ => Err(NetworkError::PeerBookFailedToLoad),
         }
     }

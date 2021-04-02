@@ -20,6 +20,7 @@ use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
+use snarkvm_objects::Storage;
 
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -31,17 +32,11 @@ use std::{
 };
 
 // TODO: Remove the inner Arcs, currently these objects are being cloned individually in the miner.
-pub struct Consensus {
+pub struct Consensus<S: Storage> {
     /// The node this consensus is bound to.
-    node: Node,
-    /// The storage system of this node.
-    storage: Arc<MerkleTreeLedger>,
-    /// The memory pool of this node.
-    memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
-    /// The consensus parameters for the associated network ID.
-    consensus_parameters: Arc<ConsensusParameters>,
-    /// The DPC parameters for the associated network ID.
-    dpc_parameters: Arc<PublicParameters<Components>>,
+    node: Node<S>,
+    /// The core consensus objects.
+    pub consensus: Arc<snarkos_consensus::Consensus<S>>,
     /// If `true`, initializes a mining task on this node.
     is_miner: bool,
     /// The interval between each block sync.
@@ -54,24 +49,18 @@ pub struct Consensus {
     is_syncing_blocks: AtomicBool,
 }
 
-impl Consensus {
+impl<S: Storage> Consensus<S> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        node: Node,
-        storage: Arc<MerkleTreeLedger>,
-        memory_pool: Arc<Mutex<MemoryPool<Tx>>>,
-        consensus_parameters: Arc<ConsensusParameters>,
-        dpc_parameters: Arc<PublicParameters<Components>>,
+        node: Node<S>,
+        consensus: Arc<snarkos_consensus::Consensus<S>>,
         is_miner: bool,
         block_sync_interval: Duration,
         transaction_sync_interval: Duration,
     ) -> Self {
         Self {
             node,
-            storage,
-            memory_pool,
-            consensus_parameters,
-            dpc_parameters,
+            consensus,
             is_miner,
             block_sync_interval,
             last_block_sync: RwLock::new(Instant::now()),
@@ -81,32 +70,32 @@ impl Consensus {
     }
 
     #[inline]
-    pub fn node(&self) -> &Node {
+    pub fn node(&self) -> &Node<S> {
         &self.node
     }
 
     /// Returns a reference to the storage system of this node.
     #[inline]
-    pub fn storage(&self) -> &Arc<MerkleTreeLedger> {
-        &self.storage
+    pub fn storage(&self) -> &MerkleTreeLedger<S> {
+        &self.consensus.ledger
     }
 
     /// Returns a reference to the memory pool of this node.
     #[inline]
-    pub fn memory_pool(&self) -> &Arc<Mutex<MemoryPool<Tx>>> {
-        &self.memory_pool
+    pub fn memory_pool(&self) -> &Mutex<MemoryPool<Tx>> {
+        &self.consensus.memory_pool
     }
 
     /// Returns a reference to the consensus parameters of this node.
     #[inline]
-    pub fn consensus_parameters(&self) -> &Arc<ConsensusParameters> {
-        &self.consensus_parameters
+    pub fn consensus_parameters(&self) -> &ConsensusParameters {
+        &self.consensus.parameters
     }
 
     /// Returns a reference to the DPC parameters of this node.
     #[inline]
-    pub fn dpc_parameters(&self) -> &Arc<PublicParameters<Components>> {
-        &self.dpc_parameters
+    pub fn dpc_parameters(&self) -> &PublicParameters<Components> {
+        &self.consensus.public_parameters
     }
 
     /// Returns `true` if this node is a mining node. Otherwise, returns `false`.
@@ -128,7 +117,7 @@ impl Consensus {
     /// Returns the current block height of the ledger from storage.
     #[inline]
     pub fn current_block_height(&self) -> u32 {
-        self.storage.get_current_block_height()
+        self.consensus.ledger.get_current_block_height()
     }
 
     /// Checks whether enough time has elapsed for the node to attempt another block sync.
@@ -148,6 +137,6 @@ impl Consensus {
     }
 
     pub fn max_block_size(&self) -> usize {
-        self.consensus_parameters.max_block_size
+        self.consensus.parameters.max_block_size
     }
 }

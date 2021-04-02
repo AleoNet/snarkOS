@@ -1,5 +1,3 @@
-[target.'cfg(not(target_arch = "wasm32"))']
+[target.'cfg(any(not(target_arch = "wasm32"), feature = "noconfig"))']
 rustflags = ["-C", "target-cpu=native"]
 
-[net]
-git-fetch-with-cli = true

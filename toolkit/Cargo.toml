@@ -26,31 +26,23 @@ path = "benches/account.rs"
 harness = false
 
 [dependencies.snarkvm-algorithms]
-version = "0.0.5"
+version = "0.2.2"
 default-features = false
+features = ["wasm"]
 
 [dependencies.snarkvm-dpc]
-version = "0.0.5"
-default-features = false
-
-[dependencies.snarkvm-errors]
-version = "0.0.5"
-default-features = false
-
-[dependencies.snarkvm-models]
-version = "0.0.5"
+version = "0.2.2"
 default-features = false
 
 [dependencies.snarkvm-objects]
-version = "0.0.5"
+version = "0.2.2"
 default-features = false
 
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
-default-features = false
+version = "0.2.2"
 
 [dependencies.anyhow]
-version = "1.0.37"
+version = "1.0.40"
 
 [dependencies.hex]
 version = "0.4.2"
@@ -67,7 +59,7 @@ features = [ "js" ]
 version = "1.0"
 
 [dependencies.wasm-bindgen]
-version = "0.2.68"
+version = "0.2.73"
 
 [dev-dependencies.criterion]
 version = "0.3.1"
@@ -80,4 +72,4 @@ version = "0.3"
 default-features = false
 
 [dev-dependencies.wasm-bindgen-test]
-version = "0.3.18"
+version = "0.3.23"

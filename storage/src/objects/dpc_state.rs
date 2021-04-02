@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, *};
-use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
+use crate::*;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -24,7 +24,7 @@ use snarkvm_utilities::{
 
 use std::collections::HashSet;
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
@@ -58,11 +58,9 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Get the set of past ledger digests
-    pub fn past_digests(&self) -> Result<HashSet<Vec<u8>>, StorageError> {
-        let mut digests = HashSet::new();
-        for (key, _value) in self.storage.get_iter(COL_DIGEST) {
-            digests.insert(key.to_vec());
-        }
+    pub fn past_digests(&self) -> Result<HashSet<Box<[u8]>>, StorageError> {
+        let keys = self.storage.get_keys(COL_DIGEST)?;
+        let digests = keys.into_iter().collect();
 
         Ok(digests)
     }
@@ -107,29 +105,32 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
     }
 
     /// Build a new commitment merkle tree from the stored commitments
-    pub fn build_merkle_tree(
-        &self,
-        additional_cms: Vec<(T::Commitment, usize)>,
-    ) -> Result<MerkleTree<P>, StorageError> {
-        // TODO (raychu86) make this more efficient
-        let mut cm_and_indices = additional_cms;
+    pub fn rebuild_merkle_tree(&self, additional_cms: Vec<(T::Commitment, usize)>) -> Result<(), StorageError> {
+        let mut new_cm_and_indices = additional_cms;
 
-        for (commitment_key, index_value) in self.storage.get_iter(COL_COMMITMENT) {
+        let mut old_cm_and_indices = vec![];
+        for (commitment_key, index_value) in self.storage.get_col(COL_COMMITMENT)? {
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
             let index = bytes_to_u32(index_value.to_vec()) as usize;
 
-            cm_and_indices.push((commitment, index));
+            old_cm_and_indices.push((commitment, index));
         }
 
-        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
-        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+        old_cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
+        new_cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
 
-        Ok(MerkleTree::new(self.ledger_parameters.clone(), &commitments)?)
+        let old_commitments = old_cm_and_indices.into_iter().map(|(cm, _)| cm);
+        let new_commitments = new_cm_and_indices.into_iter().map(|(cm, _)| cm);
+
+        let mut locked_tree = self.cm_merkle_tree.write();
+        locked_tree.rebuild(old_commitments, new_commitments)?;
+
+        Ok(())
     }
 
     /// Rebuild the stored merkle tree with the current stored commitments
     pub fn update_merkle_tree(&self) -> Result<(), StorageError> {
-        *self.cm_merkle_tree.write() = self.build_merkle_tree(vec![])?;
+        self.rebuild_merkle_tree(vec![])?;
 
         let update_current_digest = DatabaseTransaction(vec![Op::Insert {
             col: COL_META,
@@ -137,6 +138,6 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![self.cm_merkle_tree.read().root()]?.to_vec(),
         }]);
 
-        self.storage.write(update_current_digest)
+        self.storage.batch(update_current_digest)
     }
 }

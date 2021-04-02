@@ -25,7 +25,7 @@ default-features = false
 version = "1.4"
 
 [dependencies.prometheus]
-version = "0.11"
+version = "0.12"
 features = [ "process" ]
 
 [dependencies.tokio]
@@ -36,7 +36,7 @@ features = [ "macros", "rt-multi-thread" ]
 version = "0.3"
 
 [dev-dependencies.snarkvm-derives]
-version = "0.0.5"
+version = "0.2.2"
 
 [dev-dependencies.serial_test]
 version = "0.5.0"

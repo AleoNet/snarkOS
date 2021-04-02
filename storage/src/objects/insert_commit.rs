@@ -14,15 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::StorageError, *};
-use snarkvm_errors::objects::BlockError;
-use snarkvm_models::{algorithms::LoadableMerkleParameters, objects::Transaction};
-use snarkvm_objects::{Block, BlockHeader, BlockHeaderHash};
+use crate::*;
+use snarkvm_algorithms::traits::LoadableMerkleParameters;
+use snarkvm_objects::{
+    Block,
+    BlockError,
+    BlockHeader,
+    BlockHeaderHash,
+    DatabaseTransaction,
+    Op,
+    Storage,
+    StorageError,
+    Transaction,
+};
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 use std::sync::atomic::Ordering;
 
-impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
+impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Commit a transaction to the canon chain
     #[allow(clippy::type_complexity)]
     pub(crate) fn commit_transaction(
@@ -164,7 +173,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![block.transactions]?.to_vec(),
         });
 
-        self.storage.write(database_transaction)?;
+        self.storage.batch(database_transaction)?;
 
         Ok(())
     }
@@ -241,11 +250,11 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
 
         // Update the best block number
 
-        let is_genesis = block.header.previous_block_hash == BlockHeaderHash([0u8; 32])
-            && self.get_current_block_height() == 0
-            && self.is_empty();
-
         let height = self.get_current_block_height();
+
+        let is_genesis =
+            block.header.previous_block_hash == BlockHeaderHash([0u8; 32]) && height == 0 && self.is_empty();
+
         let mut new_best_block_number = 0;
         if !is_genesis {
             new_best_block_number = height + 1;
@@ -271,8 +280,8 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
         });
 
         // Rebuild the new commitment merkle tree
-        let new_merkle_tree = self.build_merkle_tree(transaction_cms)?;
-        let new_digest = new_merkle_tree.root();
+        self.rebuild_merkle_tree(transaction_cms)?;
+        let new_digest = self.cm_merkle_tree.read().root();
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
@@ -285,9 +294,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> Ledger<T, P> {
             value: to_bytes![new_digest]?.to_vec(),
         });
 
-        *self.cm_merkle_tree.write() = new_merkle_tree;
-
-        self.storage.write(database_transaction)?;
+        self.storage.batch(database_transaction)?;
 
         if !is_genesis {
             self.current_block_height.fetch_add(1, Ordering::SeqCst);

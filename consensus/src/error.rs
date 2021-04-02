@@ -14,12 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_storage::error::StorageError;
-use snarkvm_errors::{
-    algorithms::CRHError,
-    dpc::DPCError,
-    objects::{BlockError, TransactionError},
-};
+use snarkvm_algorithms::errors::CRHError;
+use snarkvm_dpc::DPCError;
+use snarkvm_objects::{BlockError, StorageError, TransactionError};
 use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;

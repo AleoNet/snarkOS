@@ -27,26 +27,8 @@ name = "network"
 path = "network/network.rs"
 harness = false
 
-[[bench]]
-name = "posw"
-path = "posw/posw.rs"
-harness = false
-
-[dependencies.snarkvm-curves]
-version = "0.0.5"
-
-[dependencies.snarkvm-marlin]
-version = "0.0.5"
-
-[dependencies.snarkvm-models]
-version = "0.0.5"
-
-[dependencies.snarkvm-posw]
-version = "0.0.5"
-features = [ "test-helpers" ]
-
 [dependencies.snarkvm-utilities]
-version = "0.0.5"
+version = "0.2.2"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"

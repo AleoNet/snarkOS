@@ -15,8 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{account::PrivateKey, errors::ViewKeyError};
-use snarkvm_dpc::base_dpc::{instantiated::Components, parameters::SystemParameters};
-use snarkvm_objects::AccountViewKey;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    AccountViewKey,
+};
 
 use std::{fmt, str::FromStr};
 

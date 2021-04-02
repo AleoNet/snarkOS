@@ -15,18 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::consensus::TestTx;
-pub use snarkos_storage::Ledger;
+pub use snarkos_storage::{Ledger, LedgerStorage};
+use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
-use snarkvm_models::{
-    algorithms::merkle_tree::LoadableMerkleParameters,
-    objects::{LedgerScheme, Transaction},
-};
-use snarkvm_objects::Block;
+use snarkvm_objects::{Block, LedgerScheme, Storage, Transaction};
 
 use rand::{thread_rng, Rng};
-use std::path::PathBuf;
 
-pub type Store = Ledger<TestTx, CommitmentMerkleParameters>;
+pub type Store = Ledger<TestTx, CommitmentMerkleParameters, LedgerStorage>;
 
 pub fn random_storage_path() -> String {
     let random_path: usize = thread_rng().gen();
@@ -34,44 +30,12 @@ pub fn random_storage_path() -> String {
 }
 
 // Initialize a test blockchain given genesis attributes
-pub fn initialize_test_blockchain<T: Transaction, P: LoadableMerkleParameters>(
+pub fn initialize_test_blockchain<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
     parameters: P,
     genesis_block: Block<T>,
-) -> Ledger<T, P> {
+) -> Ledger<T, P, S> {
     let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
-    Ledger::<T, P>::destroy_storage(path.clone()).unwrap();
-
-    Ledger::<T, P>::new(&path, parameters, genesis_block).unwrap()
-}
-
-// Open a test blockchain from stored genesis attributes
-pub fn open_test_blockchain<T: Transaction, P: LoadableMerkleParameters>() -> (Ledger<T, P>, PathBuf) {
-    let mut path = std::env::temp_dir();
-    path.push(random_storage_path());
-
-    Ledger::<T, P>::destroy_storage(path.clone()).unwrap();
-
-    let storage = Ledger::<T, P>::open_at_path(path.clone()).unwrap();
-
-    (storage, path)
-}
-
-pub fn kill_storage<T: Transaction, P: LoadableMerkleParameters>(ledger: Ledger<T, P>) {
-    let path = ledger.storage.db.path().to_owned();
-
-    drop(ledger);
-    Ledger::<T, P>::destroy_storage(path).unwrap();
-}
-
-pub fn kill_storage_async<T: Transaction, P: LoadableMerkleParameters>(path: PathBuf) {
-    Ledger::<T, P>::destroy_storage(path).unwrap();
-}
-
-pub fn kill_storage_sync<T: Transaction, P: LoadableMerkleParameters>(ledger: Ledger<T, P>) {
-    let path = ledger.storage.db.path().to_owned();
-
-    drop(ledger);
-    Ledger::<T, P>::destroy_storage(path).unwrap();
+    Ledger::<T, P, S>::new(Some(&path), parameters, genesis_block).unwrap()
 }

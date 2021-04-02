@@ -26,15 +26,15 @@ impl From<hex::FromHexError> for SignatureError {
     }
 }
 
-impl From<snarkvm_errors::objects::account::AccountError> for SignatureError {
-    fn from(error: snarkvm_errors::objects::account::AccountError) -> Self {
-        SignatureError::Crate("snarkvm_errors::objects::account", format!("{:?}", error))
+impl From<snarkvm_dpc::AccountError> for SignatureError {
+    fn from(error: snarkvm_dpc::AccountError) -> Self {
+        SignatureError::Crate("snarkvm_dpc", format!("{:?}", error))
     }
 }
 
-impl From<snarkvm_errors::algorithms::signature::SignatureError> for SignatureError {
-    fn from(error: snarkvm_errors::algorithms::signature::SignatureError) -> Self {
-        SignatureError::Crate("snarkvm_errors::algorithms::signature", format!("{:?}", error))
+impl From<snarkvm_algorithms::errors::signature::SignatureError> for SignatureError {
+    fn from(error: snarkvm_algorithms::errors::signature::SignatureError) -> Self {
+        SignatureError::Crate("snarkvm_algorithms::errors::signature", format!("{:?}", error))
     }
 }
 

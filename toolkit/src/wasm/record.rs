@@ -18,7 +18,7 @@ use crate::{
     account::{PrivateKey, ViewKey},
     record::Record as RecordNative,
 };
-use snarkvm_models::dpc::Record as RecordTrait;
+use snarkvm_dpc::Record as RecordTrait;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::str::FromStr;

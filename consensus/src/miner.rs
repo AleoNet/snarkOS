@@ -14,90 +14,91 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_storage::Ledger;
-use snarkvm_dpc::base_dpc::{instantiated::*, parameters::PublicParameters, record::DPCRecord};
-use snarkvm_models::{
-    algorithms::{LoadableMerkleParameters, CRH},
-    dpc::{DPCScheme, Record},
-    objects::Transaction,
+use crate::{error::ConsensusError, Consensus};
+use snarkvm_algorithms::CRH;
+use snarkvm_dpc::{
+    base_dpc::{instantiated::*, record::DPCRecord},
+    AccountAddress,
+    DPCScheme,
+    Record,
 };
-use snarkvm_objects::{dpc::DPCTransactions, AccountAddress, Block, BlockHeader};
+use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Storage, Transaction};
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
-use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.
-#[derive(Clone)]
-pub struct Miner {
+pub struct Miner<S: Storage> {
     /// The coinbase address that mining rewards are assigned to.
     address: AccountAddress<Components>,
     /// The consensus parameters for the network of this miner.
-    pub consensus_parameters: Arc<ConsensusParameters>,
+    pub consensus: Arc<Consensus<S>>,
     /// The mining instance that is initialized with a proving key.
     miner: PoswMarlin,
 }
 
-impl Miner {
+impl<S: Storage> Miner<S> {
     /// Creates a new instance of `Miner`.
-    pub fn new(address: AccountAddress<Components>, consensus_parameters: Arc<ConsensusParameters>) -> Self {
+    pub fn new(address: AccountAddress<Components>, consensus: Arc<Consensus<S>>) -> Self {
         Self {
             address,
-            consensus_parameters,
+            consensus,
             // Load the miner with the proving key, this should never fail
             miner: PoswMarlin::load().expect("could not instantiate the miner"),
         }
     }
 
     /// Fetches new transactions from the memory pool.
-    pub async fn fetch_memory_pool_transactions<T: Transaction, P: LoadableMerkleParameters>(
-        storage: &Ledger<T, P>,
-        memory_pool: &Mutex<MemoryPool<T>>,
-        max_size: usize,
-    ) -> Result<DPCTransactions<T>, ConsensusError> {
-        let memory_pool = memory_pool.lock();
-        Ok(memory_pool.get_candidates(&storage, max_size)?)
+    pub fn fetch_memory_pool_transactions(&self) -> Result<DPCTransactions<Tx>, ConsensusError> {
+        let max_block_size = self.consensus.parameters.max_block_size;
+        let memory_pool = self.consensus.memory_pool.lock();
+
+        memory_pool.get_candidates(&self.consensus.ledger, max_block_size)
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
     pub fn add_coinbase_transaction<R: Rng>(
         &self,
-        parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger,
         transactions: &mut DPCTransactions<Tx>,
         rng: &mut R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let program_vk_hash = to_bytes![ProgramVerificationKeyCRH::hash(
-            &parameters.system_parameters.program_verification_key_crh,
-            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
+            &self
+                .consensus
+                .public_parameters
+                .system_parameters
+                .program_verification_key_crh,
+            &to_bytes![
+                self.consensus
+                    .public_parameters
+                    .noop_program_snark_parameters
+                    .verification_key
+            ]?
         )?]?;
 
         let new_birth_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
         let new_death_programs = vec![program_vk_hash.clone(); NUM_OUTPUT_RECORDS];
 
         for transaction in transactions.iter() {
-            if self.consensus_parameters.network_id != transaction.network {
+            if self.consensus.parameters.network_id != transaction.network {
                 return Err(ConsensusError::ConflictingNetworkId(
-                    self.consensus_parameters.network_id.id(),
+                    self.consensus.parameters.network_id.id(),
                     transaction.network.id(),
                 ));
             }
         }
 
-        let (records, tx) = self.consensus_parameters.create_coinbase_transaction(
-            storage.get_current_block_height() + 1,
+        let (records, tx) = self.consensus.create_coinbase_transaction(
+            self.consensus.ledger.get_current_block_height() + 1,
             transactions,
-            parameters,
             program_vk_hash,
             new_birth_programs,
             new_death_programs,
             self.address.clone(),
-            &storage,
             rng,
         )?;
 
@@ -109,22 +110,20 @@ impl Miner {
     #[allow(clippy::type_complexity)]
     pub fn establish_block(
         &self,
-        parameters: &PublicParameters<Components>,
-        storage: &MerkleTreeLedger,
         transactions: &DPCTransactions<Tx>,
     ) -> Result<(BlockHeader, DPCTransactions<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let rng = &mut thread_rng();
         let mut transactions = transactions.clone();
-        let coinbase_records = self.add_coinbase_transaction(parameters, &storage, &mut transactions, rng)?;
+        let coinbase_records = self.add_coinbase_transaction(&mut transactions, rng)?;
 
         // Verify transactions
         assert!(InstantiatedDPC::verify_transactions(
-            parameters,
+            &self.consensus.public_parameters,
             &transactions.0,
-            storage
+            &*self.consensus.ledger,
         )?);
 
-        let previous_block_header = storage.get_latest_block()?.header;
+        let previous_block_header = self.consensus.ledger.get_latest_block()?.header;
 
         Ok((previous_block_header, transactions, coinbase_records))
     }
@@ -140,14 +139,14 @@ impl Miner {
         let (merkle_root_hash, pedersen_merkle_root_hash, subroots) = txids_to_roots(&txids);
 
         let time = Utc::now().timestamp();
-        let difficulty_target = self.consensus_parameters.get_block_difficulty(parent_header, time);
+        let difficulty_target = self.consensus.parameters.get_block_difficulty(parent_header, time);
 
         // TODO: Switch this to use a user-provided RNG
         let (nonce, proof) = self.miner.mine(
             &subroots,
             difficulty_target,
             &mut thread_rng(),
-            self.consensus_parameters.max_nonce,
+            self.consensus.parameters.max_nonce,
         )?;
 
         Ok(BlockHeader {
@@ -163,20 +162,12 @@ impl Miner {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(
-        &self,
-        parameters: &PublicParameters<Components>,
-        storage: &Arc<MerkleTreeLedger>,
-        memory_pool: &Arc<Mutex<MemoryPool<Tx>>>,
-    ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
-        let candidate_transactions =
-            Self::fetch_memory_pool_transactions(&storage, memory_pool, self.consensus_parameters.max_block_size)
-                .await?;
+    pub fn mine_block(&self) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
+        let candidate_transactions = self.fetch_memory_pool_transactions()?;
 
         debug!("The miner is creating a block");
 
-        let (previous_block_header, transactions, coinbase_records) =
-            self.establish_block(parameters, storage, &candidate_transactions)?;
+        let (previous_block_header, transactions, coinbase_records) = self.establish_block(&candidate_transactions)?;
 
         debug!("The miner generated a coinbase transaction");
 
@@ -191,8 +182,7 @@ impl Miner {
 
         let block = Block { header, transactions };
 
-        self.consensus_parameters
-            .receive_block(parameters, storage, &mut memory_pool.lock(), &block)?;
+        self.consensus.receive_block(&block)?;
 
         // Store the non-dummy coinbase records.
         let mut records_to_store = vec![];
@@ -201,7 +191,7 @@ impl Miner {
                 records_to_store.push(record.clone());
             }
         }
-        storage.store_records(&records_to_store)?;
+        self.consensus.ledger.store_records(&records_to_store)?;
 
         Ok((block, coinbase_records))
     }

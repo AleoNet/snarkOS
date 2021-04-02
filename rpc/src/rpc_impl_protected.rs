@@ -24,20 +24,26 @@ use snarkos_toolkit::{
     account::{Address, PrivateKey},
     dpc::{Record, TransactionKernelBuilder},
 };
-use snarkvm_dpc::base_dpc::{
-    encrypted_record::EncryptedRecord,
-    instantiated::{Components, InstantiatedDPC},
-    record::DPCRecord,
-    record_encryption::RecordEncryption,
-    record_payload::RecordPayload,
-    TransactionKernel,
+use snarkvm_algorithms::CRH;
+use snarkvm_dpc::{
+    base_dpc::{
+        encrypted_record::EncryptedRecord,
+        instantiated::{Components, InstantiatedDPC},
+        record::DPCRecord,
+        record_encryption::RecordEncryption,
+        record_payload::RecordPayload,
+        TransactionKernel,
+    },
+    Account,
+    AccountAddress,
+    AccountPrivateKey,
+    AccountScheme,
+    AccountViewKey,
+    DPCComponents,
+    DPCScheme,
+    Record as RecordModel,
 };
-use snarkvm_models::{
-    algorithms::CRH,
-    dpc::{DPCComponents, DPCScheme, Record as RecordModel},
-    objects::AccountScheme,
-};
-use snarkvm_objects::{Account, AccountAddress, AccountPrivateKey, AccountViewKey};
+use snarkvm_objects::Storage;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -52,7 +58,7 @@ type JsonRPCError = jsonrpc_core::Error;
 
 /// The following `*_protected` functions wrap an authentication check around sensitive functions
 /// before being exposed as an RPC endpoint
-impl RpcImpl {
+impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
     /// Validate the authentication header in the request metadata
     pub fn validate_auth(&self, meta: Meta) -> Result<(), JsonRPCError> {
         if let Some(credentials) = &self.credentials {
@@ -286,21 +292,21 @@ impl RpcImpl {
 
 /// Functions that are sensitive and need to be protected with authentication.
 /// The authentication logic is defined in `validate_auth`
-impl ProtectedRpcFunctions for RpcImpl {
+impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     /// Generate a new account private key, account view key, and account address.
     fn create_account(&self) -> Result<RpcAccount, RpcError> {
         let rng = &mut thread_rng();
 
         let account = Account::<Components>::new(
-            self.parameters().account_signature_parameters(),
-            self.parameters().account_commitment_parameters(),
-            self.parameters().account_encryption_parameters(),
+            self.parameters()?.account_signature_parameters(),
+            self.parameters()?.account_commitment_parameters(),
+            self.parameters()?.account_encryption_parameters(),
             rng,
         )?;
 
         let view_key = AccountViewKey::<Components>::from_private_key(
-            self.parameters().account_signature_parameters(),
-            self.parameters().account_commitment_parameters(),
+            self.parameters()?.account_signature_parameters(),
+            self.parameters()?.account_commitment_parameters(),
             &account.private_key,
         )?;
 
@@ -328,11 +334,11 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Fetch birth/death programs
         let program_vk_hash = self
-            .parameters()
+            .parameters()?
             .system_parameters
             .program_verification_key_crh
             .hash(&to_bytes![
-                self.parameters().noop_program_snark_parameters.verification_key
+                self.parameters()?.noop_program_snark_parameters.verification_key
             ]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
@@ -356,21 +362,21 @@ impl ProtectedRpcFunctions for RpcImpl {
         // Fill any unused old_record indices with dummy records
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
-                .parameters()
+                .parameters()?
                 .system_parameters
                 .serial_number_nonce
                 .hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
             let address = AccountAddress::<Components>::from_private_key(
-                self.parameters().account_signature_parameters(),
-                self.parameters().account_commitment_parameters(),
-                self.parameters().account_encryption_parameters(),
+                self.parameters()?.account_signature_parameters(),
+                self.parameters()?.account_commitment_parameters(),
+                self.parameters()?.account_encryption_parameters(),
                 &private_key,
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &self.parameters().system_parameters,
+                &self.parameters()?.system_parameters,
                 old_sn_nonce,
                 address,
                 true, // The input record is dummy
@@ -425,13 +431,8 @@ impl ProtectedRpcFunctions for RpcImpl {
             memo = rng.gen();
         }
 
-        // Because this is a computationally heavy endpoint, we open a
-        // new secondary storage instance to prevent storage bottle-necking.
-        let storage = self.new_secondary_storage_instance()?;
-
         // Generate transaction
-        let (records, transaction) = self.consensus().create_transaction(
-            &self.parameters(),
+        let (records, transaction) = self.consensus_layer()?.consensus.create_transaction(
             old_records,
             old_account_private_keys,
             new_record_owners,
@@ -441,7 +442,6 @@ impl ProtectedRpcFunctions for RpcImpl {
             new_values,
             new_payloads,
             memo,
-            &storage,
             rng,
         )?;
 
@@ -524,19 +524,15 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Construct the program proofs
         let (old_death_program_proofs, new_birth_program_proofs) =
-            ConsensusParameters::generate_program_proofs(&self.parameters(), &transaction_kernel, rng)?;
-
-        // Because this is a computationally heavy endpoint, we open a
-        // new secondary storage instance to prevent storage bottle-necking.
-        let storage = self.new_secondary_storage_instance()?;
+            ConsensusParameters::generate_program_proofs::<_, S>(self.parameters()?, &transaction_kernel, rng)?;
 
         // Online execution to generate a DPC transaction
         let (records, transaction) = InstantiatedDPC::execute_online(
-            &self.parameters(),
+            self.parameters()?,
             transaction_kernel,
             old_death_program_proofs,
             new_birth_program_proofs,
-            &storage,
+            &*self.storage,
             rng,
         )?;
 
@@ -554,7 +550,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
-        let storage = self.storage.read();
+        let storage = &self.storage;
         storage.catch_up_secondary(false)?;
         let record_commitments = storage.get_record_commitments(None)?;
 
@@ -563,7 +559,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns a list of record commitments that are stored on the full node.
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        let storage = self.storage.read();
+        let storage = &self.storage;
         storage.catch_up_secondary(false)?;
         let record_commitments = storage.get_record_commitments(Some(100))?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(hex::encode).collect();
@@ -575,7 +571,6 @@ impl ProtectedRpcFunctions for RpcImpl {
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         match self
             .storage
-            .read()
             .get_record::<DPCRecord<Components>>(&hex::decode(record_commitment)?)?
         {
             Some(record) => {
@@ -597,7 +592,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         // Decrypt the record ciphertext
         let record = RecordEncryption::decrypt_record(
-            &self.parameters().system_parameters,
+            &self.parameters()?.system_parameters,
             &account_view_key,
             &encrypted_record,
         )?;
