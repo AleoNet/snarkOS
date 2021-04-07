@@ -197,6 +197,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             config.rpc.password,
         )
         .await;
+
+        info!("Listening for RPC requests on port {}", config.rpc.port);
     }
 
     // Start the network services
