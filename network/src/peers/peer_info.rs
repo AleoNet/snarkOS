@@ -19,6 +19,7 @@ use crate::NetworkError;
 use chrono::{DateTime, Utc};
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
+use tokio::task;
 
 use std::{
     net::SocketAddr,
@@ -72,6 +73,9 @@ pub struct PeerInfo {
     /// The quality of the connection with the peer.
     #[serde(skip)]
     pub quality: Arc<PeerQuality>,
+    /// The handles for tasks associated exclusively with this peer.
+    #[serde(skip)]
+    tasks: Arc<Mutex<Vec<task::JoinHandle<()>>>>,
 }
 
 impl PeerInfo {
@@ -88,6 +92,7 @@ impl PeerInfo {
             connected_count: 0,
             disconnected_count: 0,
             quality: Default::default(),
+            tasks: Default::default(),
         }
     }
 
@@ -187,6 +192,10 @@ impl PeerInfo {
                 self.last_disconnected = Some(Utc::now());
                 self.disconnected_count += 1;
 
+                for handle in self.tasks.lock().drain(..).rev() {
+                    handle.abort();
+                }
+
                 Ok(())
             }
             PeerStatus::Disconnected | PeerStatus::NeverConnected => {
@@ -194,6 +203,10 @@ impl PeerInfo {
                 Err(NetworkError::PeerAlreadyDisconnected)
             }
         }
+    }
+
+    pub(crate) fn register_task(&self, handle: task::JoinHandle<()>) {
+        self.tasks.lock().push(handle);
     }
 }
 

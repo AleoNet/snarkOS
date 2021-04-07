@@ -169,16 +169,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
         let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
-        // spawn the inbound loop
-        let inbound = self.inbound.clone();
-        tokio::spawn(async move {
-            inbound.listen_for_messages(&mut reader).await;
-        });
-
         // save the outbound channel
         self.outbound.channels.write().insert(remote_address, Arc::new(writer));
 
-        self.peer_book.write().set_connected(remote_address, None)
+        self.peer_book.write().set_connected(remote_address, None)?;
+
+        // spawn the inbound loop
+        let node = self.clone();
+        let conn_listening_task = tokio::spawn(async move {
+            node.listen_for_messages(&mut reader).await;
+        });
+        if let Ok(ref peer) = self.peer_book.read().get_peer(remote_address) {
+            peer.register_task(conn_listening_task);
+        }
+
+        Ok(())
     }
 
     ///
@@ -315,9 +320,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        if let Some(handle) = self.inbound.tasks.lock().remove(&remote_address) {
-            handle.abort();
-        };
         self.outbound.channels.write().remove(&remote_address);
 
         self.peer_book.write().set_disconnected(remote_address)
@@ -353,11 +355,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         // the bootstrapper's job is finished once it's sent its peer a list of peers
         if self.environment.is_bootnode() {
-            let _ = self
-                .inbound
-                .sender
-                .send(Message::new(Direction::Internal, Payload::Disconnect(remote_address)))
-                .await;
+            let _ = self.disconnect_from_peer(remote_address);
         }
     }
 

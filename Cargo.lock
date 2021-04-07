@@ -2627,6 +2627,7 @@ dependencies = [
  "derivative",
  "hex",
  "log",
+ "once_cell",
  "parking_lot",
  "peak_alloc",
  "rand 0.8.3",

@@ -92,8 +92,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
-    let mut environment = Environment::new(
-        Some(socket_address),
+    let environment = Environment::new(
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
@@ -105,7 +104,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(environment.clone()).await?;
+    let mut node = Node::new(environment).await?;
 
     // default to the RocksDb variant first for simplicity
     let is_storage_in_memory = false;
@@ -157,9 +156,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         node.set_consensus(consensus);
     };
 
-    // Establish the address of the node.
-    node.establish_address().await?;
-    environment.set_local_address(node.local_address().unwrap());
+    // Start listening for incoming connections.
+    node.listen(Some(socket_address)).await?;
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {

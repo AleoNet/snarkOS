@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Environment, Receiver, Sender};
+use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use parking_lot::{Mutex, RwLock};
+use snarkvm_objects::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    task::{self, JoinHandle},
+    task,
 };
 
 /// The map of remote addresses to their active writers.
@@ -35,10 +36,8 @@ pub struct Inbound {
     pub(crate) sender: Sender,
     /// The consumer for receiving inbound messages to the server.
     receiver: Arc<Mutex<Option<Receiver>>>,
-    /// The map of remote addresses to their active read channels.
-    channels: Arc<RwLock<Channels>>,
-    /// The tasks dedicated to handling inbound messages.
-    pub(crate) tasks: Arc<Mutex<HashMap<SocketAddr, JoinHandle<()>>>>,
+    /// The map of remote addresses to their active write channels.
+    pub(crate) channels: Arc<RwLock<Channels>>,
 }
 
 impl Inbound {
@@ -50,106 +49,6 @@ impl Inbound {
             sender,
             receiver: Arc::new(Mutex::new(Some(receiver))),
             channels,
-            tasks: Default::default(),
-        }
-    }
-
-    pub async fn listen(&self, environment: &mut Environment) -> Result<task::JoinHandle<()>, NetworkError> {
-        let (listener_address, listener) = if let Some(addr) = environment.local_address() {
-            let listener = TcpListener::bind(&addr).await?;
-            (listener.local_addr()?, listener)
-        } else {
-            let listener = TcpListener::bind("0.0.0.0:0").await?;
-            let listener_address = listener.local_addr()?;
-            (listener_address, listener)
-        };
-        environment.set_local_address(listener_address);
-        info!("Node {:x} listening at {}", environment.name, listener_address);
-
-        let inbound = self.clone();
-        let inbound_handle = task::spawn(async move {
-            loop {
-                match listener.accept().await {
-                    Ok((stream, remote_address)) => {
-                        info!("Got a connection request from {}", remote_address);
-
-                        match inbound
-                            .connection_request(listener_address, remote_address, stream)
-                            .await
-                        {
-                            Ok((channel, mut reader)) => {
-                                // update the remote address to be the peer's listening address
-                                let remote_address = channel.addr;
-                                // Save the channel under the provided remote address
-                                inbound.channels.write().insert(remote_address, Arc::new(channel));
-
-                                let inbound_clone = inbound.clone();
-                                let task = tokio::spawn(async move {
-                                    inbound_clone.listen_for_messages(&mut reader).await;
-                                });
-
-                                inbound.tasks.lock().insert(remote_address, task);
-                            }
-                            Err(e) => {
-                                error!("Failed to accept a connection: {}", e);
-                                // FIXME(ljedrz/nkls): this should be done immediately, bypassing the message channel
-                                let _ = inbound
-                                    .sender
-                                    .send(Message::new(Direction::Internal, Payload::Disconnect(remote_address)))
-                                    .await;
-                            }
-                        }
-                    }
-                    Err(e) => error!("Failed to accept a connection: {}", e),
-                }
-            }
-        });
-
-        Ok(inbound_handle)
-    }
-
-    pub async fn listen_for_messages(&self, reader: &mut ConnReader) {
-        let mut failure_count = 0u8;
-        let mut disconnect_from_peer = false;
-        let mut failure;
-
-        loop {
-            // Reset the failure indicator.
-            failure = false;
-
-            // Read the next message from the channel. This is a blocking operation.
-            let message = match reader.read_message().await {
-                Ok(message) => message,
-                Err(error) => {
-                    Self::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
-
-                    // Determine if we should send a disconnect message.
-                    match disconnect_from_peer {
-                        true => {
-                            // FIXME(ljedrz/nkls): this should be done immediately, bypassing the message channel
-                            self.route(Message::new(Direction::Internal, Payload::Disconnect(reader.addr)))
-                                .await;
-
-                            // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
-                            // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
-                            warn!("Disconnecting from an unreliable peer");
-                            break; // the error has already been handled and reported
-                        }
-                        false => {
-                            // Sleep for 10 seconds
-                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                            continue;
-                        }
-                    }
-                }
-            };
-
-            // Messages are received by a single tokio MPSC receiver with
-            // the message name, bytes, and associated channel.
-            //
-            // The oneshot sender lets the connection task know when the message is handled.
-
-            self.route(message).await
         }
     }
 
@@ -192,6 +91,208 @@ impl Inbound {
             .take()
             .expect("The Inbound Receiver had already been taken!")
     }
+}
+
+impl<S: Storage + Send + Sync + 'static> Node<S> {
+    pub async fn listen(&self, desired_address: Option<SocketAddr>) -> Result<(), NetworkError> {
+        let (listener_address, listener) = if let Some(addr) = desired_address {
+            let listener = TcpListener::bind(&addr).await?;
+            (listener.local_addr()?, listener)
+        } else {
+            let listener = TcpListener::bind("0.0.0.0:0").await?;
+            let listener_address = listener.local_addr()?;
+            (listener_address, listener)
+        };
+        self.environment.set_local_address(listener_address);
+        info!("Node {:x} listening at {}", self.environment.name, listener_address);
+
+        let node = self.clone();
+        let listener_handle = task::spawn(async move {
+            loop {
+                match listener.accept().await {
+                    Ok((stream, remote_address)) => {
+                        info!("Got a connection request from {}", remote_address);
+
+                        match node.connection_request(listener_address, remote_address, stream).await {
+                            Ok((channel, mut reader)) => {
+                                // update the remote address to be the peer's listening address
+                                let remote_address = channel.addr;
+                                // Save the channel under the provided remote address
+                                node.inbound.channels.write().insert(remote_address, Arc::new(channel));
+
+                                let node_clone = node.clone();
+                                let conn_listening_task = tokio::spawn(async move {
+                                    node_clone.listen_for_messages(&mut reader).await;
+                                });
+
+                                if let Ok(ref peer) = node.peer_book.read().get_peer(remote_address) {
+                                    peer.register_task(conn_listening_task);
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to accept a connection: {}", e);
+                                let _ = node.disconnect_from_peer(remote_address);
+                            }
+                        }
+                    }
+                    Err(e) => error!("Failed to accept a connection: {}", e),
+                }
+            }
+        });
+
+        self.register_task(listener_handle);
+
+        Ok(())
+    }
+
+    pub async fn listen_for_messages(&self, reader: &mut ConnReader) {
+        let mut failure_count = 0u8;
+        let mut disconnect_from_peer = false;
+        let mut failure;
+
+        loop {
+            // Reset the failure indicator.
+            failure = false;
+
+            // Read the next message from the channel. This is a blocking operation.
+            let message = match reader.read_message().await {
+                Ok(message) => message,
+                Err(error) => {
+                    Inbound::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+
+                    // Determine if we should send a disconnect message.
+                    match disconnect_from_peer {
+                        true => {
+                            // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
+                            // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
+                            warn!("Disconnecting from an unreliable peer");
+                            let _ = self.disconnect_from_peer(reader.addr);
+                            break; // the error has already been handled and reported
+                        }
+                        false => {
+                            // Sleep for 10 seconds
+                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                            continue;
+                        }
+                    }
+                }
+            };
+
+            // Messages are received by a single tokio MPSC receiver with
+            // the message name, bytes, and associated channel.
+            //
+            // The oneshot sender lets the connection task know when the message is handled.
+
+            self.inbound.route(message).await
+        }
+    }
+
+    pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
+        let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
+
+        if self.environment.is_bootnode() && !(payload == Payload::GetPeers || direction == Direction::Internal) {
+            // the bootstrapper nodes should ignore inbound messages other than GetPeers
+            return Ok(());
+        }
+
+        let source = if let Direction::Inbound(addr) = direction {
+            self.peer_book.read().update_last_seen(addr);
+            Some(addr)
+        } else {
+            None
+        };
+
+        match payload {
+            Payload::Transaction(transaction) => {
+                if let Some(ref consensus) = self.consensus() {
+                    let connected_peers = self.peer_book.read().connected_peers().clone();
+                    consensus
+                        .received_transaction(source.unwrap(), transaction, connected_peers)
+                        .await?;
+                }
+            }
+            Payload::Block(block) => {
+                if let Some(ref consensus) = self.consensus() {
+                    let connected_peers = self.peer_book.read().connected_peers().clone();
+                    consensus
+                        .received_block(source.unwrap(), block, Some(connected_peers))
+                        .await?;
+                }
+            }
+            Payload::SyncBlock(block) => {
+                if let Some(ref consensus) = self.consensus() {
+                    consensus.received_block(source.unwrap(), block, None).await?;
+                    if self.peer_book.read().got_sync_block(source.unwrap()) {
+                        consensus.finished_syncing_blocks();
+                    }
+                }
+            }
+            Payload::GetBlocks(hashes) => {
+                if let Some(ref consensus) = self.consensus() {
+                    if !consensus.is_syncing_blocks() {
+                        consensus.received_get_blocks(source.unwrap(), hashes).await?;
+                    }
+                }
+            }
+            Payload::GetMemoryPool => {
+                if let Some(ref consensus) = self.consensus() {
+                    if !consensus.is_syncing_blocks() {
+                        consensus.received_get_memory_pool(source.unwrap()).await?;
+                    }
+                }
+            }
+            Payload::MemoryPool(mempool) => {
+                if let Some(ref consensus) = self.consensus() {
+                    consensus.received_memory_pool(mempool)?;
+                }
+            }
+            Payload::GetSync(getsync) => {
+                if let Some(ref consensus) = self.consensus() {
+                    if !consensus.is_syncing_blocks() {
+                        consensus.received_get_sync(source.unwrap(), getsync).await?;
+                    }
+                }
+            }
+            Payload::Sync(sync) => {
+                if let Some(ref consensus) = self.consensus() {
+                    self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len());
+                    consensus.received_sync(source.unwrap(), sync).await;
+                }
+            }
+            Payload::GetPeers => {
+                self.send_peers(source.unwrap()).await;
+            }
+            Payload::Peers(peers) => {
+                self.process_inbound_peers(peers);
+            }
+            Payload::Ping(block_height) => {
+                self.outbound
+                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
+                    .await;
+
+                if let Some(ref consensus) = self.consensus() {
+                    if block_height > consensus.current_block_height() + 1
+                        && consensus.should_sync_blocks()
+                        && !self.peer_book.read().is_syncing_blocks(source.unwrap())
+                    {
+                        consensus.register_block_sync_attempt();
+                        trace!("Attempting to sync with {}", source.unwrap());
+                        consensus.update_blocks(source.unwrap()).await;
+                    } else {
+                        consensus.finished_syncing_blocks();
+                    }
+                }
+            }
+            Payload::Pong => {
+                self.peer_book.read().received_pong(source.unwrap());
+            }
+            Payload::Unknown => {
+                warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
+            }
+        }
+
+        Ok(())
+    }
 
     ///
     /// Handles an incoming connection request, performing a secure handshake and establishing packet encryption.
@@ -202,9 +303,7 @@ impl Inbound {
         remote_address: SocketAddr,
         stream: TcpStream,
     ) -> Result<(ConnWriter, ConnReader), NetworkError> {
-        self.sender
-            .send(Message::new(Direction::Internal, Payload::ConnectingTo(remote_address)))
-            .await?;
+        self.peer_book.write().set_connecting(remote_address)?;
 
         let (mut reader, mut writer) = stream.into_split();
 
@@ -251,12 +350,9 @@ impl Inbound {
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
 
-        self.sender
-            .send(Message::new(
-                Direction::Internal,
-                Payload::ConnectedTo(remote_address, Some(remote_listener)),
-            ))
-            .await?;
+        self.peer_book
+            .write()
+            .set_connected(remote_address, Some(remote_listener))?;
 
         let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
         let reader = ConnReader::new(remote_listener, reader, buffer.clone(), Arc::clone(&noise));

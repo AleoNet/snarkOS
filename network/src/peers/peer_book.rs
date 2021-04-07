@@ -236,7 +236,7 @@ impl PeerBook {
     ///
     /// Returns a reference to the peer info of the given address, if it exists.
     ///
-    pub fn get_peer(&mut self, address: SocketAddr) -> Result<&PeerInfo, NetworkError> {
+    pub fn get_peer(&self, address: SocketAddr) -> Result<&PeerInfo, NetworkError> {
         // Check if the address is a connected peer.
         if self.is_connected(address) {
             // Fetch the peer info of the connected peer.

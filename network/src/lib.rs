@@ -130,12 +130,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.consensus.is_some()
     }
 
-    pub async fn establish_address(&mut self) -> Result<task::JoinHandle<()>, NetworkError> {
-        let listener_handle = self.inbound.listen(&mut self.environment).await?;
-
-        Ok(listener_handle)
-    }
-
     pub async fn start_services(&self) {
         let self_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
@@ -185,16 +179,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
-    pub async fn start(&mut self) -> Result<(), NetworkError> {
-        debug!("Initializing the connection server");
-        let listener_handle = self.establish_address().await?;
-        self.register_task(listener_handle);
-        self.start_services().await;
-        debug!("Connection server initialized");
-
-        Ok(())
-    }
-
     pub fn shut_down(&self) {
         debug!("Shutting down");
 
@@ -210,127 +194,5 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     #[inline]
     pub fn local_address(&self) -> Option<SocketAddr> {
         self.environment.local_address()
-    }
-
-    async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
-        let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
-
-        if self.environment.is_bootnode() && !(payload == Payload::GetPeers || direction == Direction::Internal) {
-            // the bootstrapper nodes should ignore inbound messages other than GetPeers
-            return Ok(());
-        }
-
-        let source = if let Direction::Inbound(addr) = direction {
-            self.peer_book.read().update_last_seen(addr);
-            Some(addr)
-        } else {
-            None
-        };
-
-        match payload {
-            Payload::ConnectingTo(remote_address) => {
-                if direction == Direction::Internal {
-                    self.peer_book.write().set_connecting(remote_address)?;
-                }
-            }
-            Payload::ConnectedTo(remote_address, remote_listener) => {
-                if direction == Direction::Internal {
-                    self.peer_book.write().set_connected(remote_address, remote_listener)?;
-                }
-            }
-            Payload::Transaction(transaction) => {
-                if let Some(ref consensus) = self.consensus() {
-                    let connected_peers = self.peer_book.read().connected_peers().clone();
-                    consensus
-                        .received_transaction(source.unwrap(), transaction, connected_peers)
-                        .await?;
-                }
-            }
-            Payload::Block(block) => {
-                if let Some(ref consensus) = self.consensus() {
-                    let connected_peers = self.peer_book.read().connected_peers().clone();
-                    consensus
-                        .received_block(source.unwrap(), block, Some(connected_peers))
-                        .await?;
-                }
-            }
-            Payload::SyncBlock(block) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_block(source.unwrap(), block, None).await?;
-                    if self.peer_book.read().got_sync_block(source.unwrap()) {
-                        consensus.finished_syncing_blocks();
-                    }
-                }
-            }
-            Payload::GetBlocks(hashes) => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_blocks(source.unwrap(), hashes).await?;
-                    }
-                }
-            }
-            Payload::GetMemoryPool => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_memory_pool(source.unwrap()).await?;
-                    }
-                }
-            }
-            Payload::MemoryPool(mempool) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_memory_pool(mempool)?;
-                }
-            }
-            Payload::GetSync(getsync) => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_sync(source.unwrap(), getsync).await?;
-                    }
-                }
-            }
-            Payload::Sync(sync) => {
-                if let Some(ref consensus) = self.consensus() {
-                    self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len());
-                    consensus.received_sync(source.unwrap(), sync).await;
-                }
-            }
-            Payload::Disconnect(addr) => {
-                if direction == Direction::Internal {
-                    self.disconnect_from_peer(addr)?;
-                }
-            }
-            Payload::GetPeers => {
-                self.send_peers(source.unwrap()).await;
-            }
-            Payload::Peers(peers) => {
-                self.process_inbound_peers(peers);
-            }
-            Payload::Ping(block_height) => {
-                self.outbound
-                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
-                    .await;
-
-                if let Some(ref consensus) = self.consensus() {
-                    if block_height > consensus.current_block_height() + 1
-                        && consensus.should_sync_blocks()
-                        && !self.peer_book.read().is_syncing_blocks(source.unwrap())
-                    {
-                        consensus.register_block_sync_attempt();
-                        trace!("Attempting to sync with {}", source.unwrap());
-                        consensus.update_blocks(source.unwrap()).await;
-                    } else {
-                        consensus.finished_syncing_blocks();
-                    }
-                }
-            }
-            Payload::Pong => {
-                self.peer_book.read().received_pong(source.unwrap());
-            }
-            Payload::Unknown => {
-                warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
-            }
-        }
-
-        Ok(())
     }
 }
