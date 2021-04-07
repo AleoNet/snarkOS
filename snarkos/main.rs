@@ -40,7 +40,6 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
 use tokio::runtime::Builder;
-use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -55,7 +54,7 @@ fn initialize_logger(config: &Config) {
             };
 
             // disable undesirable logs
-            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+            let filter = EnvFilter::from_default_env().add_directive("mio=off".parse().unwrap());
 
             // initialize tracing
             tracing_subscriber::fmt()
@@ -214,13 +213,12 @@ fn main() -> Result<(), NodeError> {
 
     let config: Config = ConfigCli::parse(&arguments)?;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
-    let node_span = debug_span!("node");
 
     Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?
-        .block_on(start_server(config).instrument(node_span))?;
+        .block_on(start_server(config))?;
 
     Ok(())
 }
