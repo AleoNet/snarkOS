@@ -16,11 +16,7 @@
 
 use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Environment, Receiver, Sender};
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{atomic::AtomicU64, Arc},
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use parking_lot::{Mutex, RwLock};
 use tokio::{
@@ -41,12 +37,6 @@ pub struct Inbound {
     receiver: Arc<Mutex<Option<Receiver>>>,
     /// The map of remote addresses to their active read channels.
     channels: Arc<RwLock<Channels>>,
-    /// A counter for the number of received responses the handler processes.
-    receive_response_count: Arc<AtomicU64>,
-    /// A counter for the number of received responses that succeeded.
-    receive_success_count: Arc<AtomicU64>,
-    /// A counter for the number of received responses that failed.
-    receive_failure_count: Arc<AtomicU64>,
     /// The tasks dedicated to handling inbound messages.
     pub(crate) tasks: Arc<Mutex<HashMap<SocketAddr, JoinHandle<()>>>>,
 }
@@ -60,9 +50,6 @@ impl Inbound {
             sender,
             receiver: Arc::new(Mutex::new(Some(receiver))),
             channels,
-            receive_response_count: Default::default(),
-            receive_success_count: Default::default(),
-            receive_failure_count: Default::default(),
             tasks: Default::default(),
         }
     }
