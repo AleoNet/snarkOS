@@ -40,7 +40,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
     /// Once a block is found, A block message is sent to all peers.
     /// Calling this function multiple times will spawn additional listeners on separate threads.
     /// Miner threads are asynchronous so the only way to stop them is to kill the runtime they were started in. This may be changed in the future.
-    pub fn spawn(self) {
+    pub fn spawn(self) -> task::JoinHandle<()> {
         task::spawn(async move {
             let local_address = self.node.environment.local_address().unwrap();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
@@ -91,6 +91,6 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     .propagate_block(serialized_block, local_address, &peers)
                     .await;
             }
-        });
+        })
     }
 }

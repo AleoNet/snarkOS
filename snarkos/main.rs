@@ -165,7 +165,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(miner_address, node.clone()).spawn();
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
+                node.register_task(handle);
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -178,14 +179,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         // Open a secondary storage instance to prevent resource sharing and bottle-necking.
         let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
 
-        start_rpc_server(
+        let rpc_handle = start_rpc_server(
             config.rpc.port,
             secondary_storage,
             node.clone(),
             config.rpc.username,
             config.rpc.password,
-        )
-        .await;
+        );
+        node.register_task(rpc_handle);
     }
 
     // Start the network services

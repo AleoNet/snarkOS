@@ -53,7 +53,7 @@ pub use peers::*;
 use crate::ConnWriter;
 use snarkvm_objects::Storage;
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{task, time::sleep};
 
@@ -86,6 +86,8 @@ pub struct Node<S: Storage> {
     pub peer_book: Arc<RwLock<PeerBook>>,
     /// The objects related to consensus.
     pub consensus: Option<Arc<Consensus<S>>>,
+    /// The tasks spawned by the node.
+    tasks: Arc<Mutex<Vec<task::JoinHandle<()>>>>,
 }
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
@@ -102,6 +104,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             outbound,
             peer_book: Default::default(),
             consensus: None,
+            tasks: Default::default(),
         })
     }
 
@@ -127,26 +130,27 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.consensus.is_some()
     }
 
-    pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
-        self.inbound.listen(&mut self.environment).await?;
+    pub async fn establish_address(&mut self) -> Result<task::JoinHandle<()>, NetworkError> {
+        let listener_handle = self.inbound.listen(&mut self.environment).await?;
 
-        Ok(())
+        Ok(listener_handle)
     }
 
     pub async fn start_services(&self) {
         let self_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
-        task::spawn(async move {
+        let incoming_task = task::spawn(async move {
             loop {
                 if let Err(e) = self_clone.process_incoming_messages(&mut receiver).await {
                     error!("Node error: {}", e);
                 }
             }
         });
+        self.register_task(incoming_task);
 
         let self_clone = self.clone();
         let peer_sync_interval = self.environment.peer_sync_interval();
-        task::spawn(async move {
+        let peering_task = task::spawn(async move {
             loop {
                 sleep(peer_sync_interval).await;
                 info!("Updating peers");
@@ -156,13 +160,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
         });
+        self.register_task(peering_task);
 
         if !self.environment.is_bootnode() {
             if let Some(ref consensus) = self.consensus() {
                 let self_clone = self.clone();
                 let consensus = Arc::clone(consensus);
                 let transaction_sync_interval = consensus.transaction_sync_interval();
-                task::spawn(async move {
+                let tx_sync_task = task::spawn(async move {
                     loop {
                         sleep(transaction_sync_interval).await;
 
@@ -175,17 +180,31 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         }
                     }
                 });
+                self.register_task(tx_sync_task);
             }
         }
     }
 
     pub async fn start(&mut self) -> Result<(), NetworkError> {
         debug!("Initializing the connection server");
-        self.establish_address().await?;
+        let listener_handle = self.establish_address().await?;
+        self.register_task(listener_handle);
         self.start_services().await;
         debug!("Connection server initialized");
 
         Ok(())
+    }
+
+    pub fn shut_down(&self) {
+        debug!("Shutting down");
+
+        for handle in self.tasks.lock().drain(..).rev() {
+            handle.abort();
+        }
+    }
+
+    pub fn register_task(&self, handle: task::JoinHandle<()>) {
+        self.tasks.lock().push(handle);
     }
 
     #[inline]

@@ -26,10 +26,7 @@ use parking_lot::{Mutex, RwLock};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    task::{
-        JoinHandle,
-        {self},
-    },
+    task::{self, JoinHandle},
 };
 
 /// The map of remote addresses to their active writers.
@@ -70,7 +67,7 @@ impl Inbound {
         }
     }
 
-    pub async fn listen(&self, environment: &mut Environment) -> Result<(), NetworkError> {
+    pub async fn listen(&self, environment: &mut Environment) -> Result<task::JoinHandle<()>, NetworkError> {
         let (listener_address, listener) = if let Some(addr) = environment.local_address() {
             let listener = TcpListener::bind(&addr).await?;
             (listener.local_addr()?, listener)
@@ -83,7 +80,7 @@ impl Inbound {
         info!("Node {:x} listening at {}", environment.name, listener_address);
 
         let inbound = self.clone();
-        task::spawn(async move {
+        let inbound_handle = task::spawn(async move {
             loop {
                 match listener.accept().await {
                     Ok((stream, remote_address)) => {
@@ -121,7 +118,7 @@ impl Inbound {
             }
         });
 
-        Ok(())
+        Ok(inbound_handle)
     }
 
     pub async fn listen_for_messages(&self, reader: &mut ConnReader) {
