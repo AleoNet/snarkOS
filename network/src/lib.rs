@@ -196,6 +196,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub fn shut_down(&self) {
         debug!("Shutting down");
 
+        for addr in self.connected_addrs() {
+            let _ = self.disconnect_from_peer(addr);
+        }
+
         for handle in self.tasks.lock().drain(..).rev() {
             handle.abort();
         }
@@ -208,5 +212,24 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     #[inline]
     pub fn local_address(&self) -> Option<SocketAddr> {
         self.environment.local_address()
+    }
+}
+
+impl<S: Storage> Drop for InnerNode<S> {
+    // this won't make a difference in regular scenarios, but will be practical for test
+    // purposes, so that there are no lingering tasks
+    fn drop(&mut self) {
+        // since we're going out of scope, we don't care about holding the read lock here
+        // also, the connections are going to be broken automatically, so we only need to
+        // take care of the associated tasks here
+        for peer_info in self.peer_book.read().connected_peers().values() {
+            for handle in peer_info.tasks.lock().drain(..).rev() {
+                handle.abort();
+            }
+        }
+
+        for handle in self.tasks.lock().drain(..).rev() {
+            handle.abort();
+        }
     }
 }

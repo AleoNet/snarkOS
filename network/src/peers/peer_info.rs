@@ -75,7 +75,7 @@ pub struct PeerInfo {
     pub quality: Arc<PeerQuality>,
     /// The handles for tasks associated exclusively with this peer.
     #[serde(skip)]
-    tasks: Mutex<Vec<task::JoinHandle<()>>>,
+    pub tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
 
 impl PeerInfo {
