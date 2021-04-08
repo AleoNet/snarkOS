@@ -95,7 +95,7 @@ impl Inbound {
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn listen(&self) -> Result<(), NetworkError> {
-        let (listener_address, listener) = if let Some(addr) = self.environment.desired_address {
+        let (listener_address, listener) = if let Some(addr) = self.config.desired_address {
             let listener = TcpListener::bind(&addr).await?;
             (listener.local_addr()?, listener)
         } else {
@@ -193,7 +193,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        if self.environment.is_bootnode() && payload != Payload::GetPeers {
+        if self.config.is_bootnode() && payload != Payload::GetPeers {
             // the bootstrapper nodes should ignore inbound messages other than GetPeers
             return Ok(());
         }

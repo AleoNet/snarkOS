@@ -24,7 +24,7 @@ use std::{
 };
 
 /// A core data structure containing the pre-configured parameters for the node.
-pub struct Environment {
+pub struct Config {
     /// The pre-configured desired address of this node.
     pub desired_address: Option<SocketAddr>,
     /// The minimum number of peers required to maintain connections with.
@@ -40,7 +40,7 @@ pub struct Environment {
     peer_sync_interval: Duration,
 }
 
-impl Environment {
+impl Config {
     /// Creates a new instance of `Environment`.
     #[allow(clippy::too_many_arguments)]
     pub fn new(

@@ -32,8 +32,8 @@ extern crate snarkos_metrics;
 pub mod consensus;
 pub use consensus::*;
 
-pub mod environment;
-pub use environment::*;
+pub mod config;
+pub use config::*;
 
 pub mod errors;
 pub use errors::*;

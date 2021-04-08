@@ -40,8 +40,8 @@ impl<S: Storage> Deref for Node<S> {
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
     pub name: u64,
-    /// The parameters and settings of this node.
-    pub environment: Environment,
+    /// The pre-configured parameters of this node.
+    pub config: Config,
     /// The inbound handler of this node.
     pub inbound: Inbound,
     /// The outbound handler of this node.
@@ -58,7 +58,7 @@ pub struct InnerNode<S: Storage> {
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
-    pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
+    pub async fn new(config: Config) -> Result<Self, NetworkError> {
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
         let inbound = Inbound::new(channels.clone());
@@ -67,7 +67,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
             local_address: Default::default(),
-            environment,
+            config,
             inbound,
             outbound,
             peer_book: Default::default(),
@@ -113,7 +113,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.register_task(incoming_task);
 
         let self_clone = self.clone();
-        let peer_sync_interval = self.environment.peer_sync_interval();
+        let peer_sync_interval = self.config.peer_sync_interval();
         let peering_task = task::spawn(async move {
             loop {
                 sleep(peer_sync_interval).await;
@@ -126,7 +126,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         });
         self.register_task(peering_task);
 
-        if !self.environment.is_bootnode() {
+        if !self.config.is_bootnode() {
             if let Some(ref consensus) = self.consensus() {
                 let self_clone = self.clone();
                 let consensus = Arc::clone(consensus);

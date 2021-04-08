@@ -56,7 +56,7 @@ async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Start each node with the previous as a bootnode.
     for node in nodes {
         if let Some(addr) = prev_node {
-            node.environment.bootnodes.write().push(addr);
+            node.config.bootnodes.write().push(addr);
         };
 
         // Assumes the node has an established address.
@@ -71,7 +71,7 @@ async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
 
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
-    nodes.last().unwrap().environment.bootnodes.write().push(first_addr);
+    nodes.last().unwrap().config.bootnodes.write().push(first_addr);
 }
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
@@ -84,11 +84,11 @@ async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
         let random_addrs = local_addresses
             .choose_multiple(
                 &mut rand::thread_rng(),
-                node.environment.minimum_number_of_connected_peers().into(),
+                node.config.minimum_number_of_connected_peers().into(),
             )
             .copied()
             .collect();
-        *node.environment.bootnodes.write() = random_addrs;
+        *node.config.bootnodes.write() = random_addrs;
     }
 }
 
@@ -100,6 +100,6 @@ async fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Start the rest of the nodes with the core node as the bootnode.
     let bootnodes = vec![hub_address];
     for node in nodes.iter_mut().skip(1) {
-        *node.environment.bootnodes.write() = bootnodes.clone();
+        *node.config.bootnodes.write() = bootnodes.clone();
     }
 }
