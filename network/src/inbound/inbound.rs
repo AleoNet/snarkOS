@@ -30,12 +30,12 @@ use tokio::{
 pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 
 /// A stateless component for handling inbound network traffic.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Inbound {
     /// The producer for sending inbound messages to the server.
     pub(crate) sender: Sender,
     /// The consumer for receiving inbound messages to the server.
-    receiver: Arc<Mutex<Option<Receiver>>>,
+    receiver: Mutex<Option<Receiver>>,
     /// The map of remote addresses to their active write channels.
     pub(crate) channels: Arc<RwLock<Channels>>,
 }
@@ -47,7 +47,7 @@ impl Inbound {
 
         Self {
             sender,
-            receiver: Arc::new(Mutex::new(Some(receiver))),
+            receiver: Mutex::new(Some(receiver)),
             channels,
         }
     }

@@ -17,6 +17,7 @@
 use crate::NetworkError;
 
 use once_cell::sync::OnceCell;
+use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use std::{
     net::SocketAddr,
@@ -25,7 +26,6 @@ use std::{
 };
 
 /// A core data structure containing the networking parameters for this node.
-#[derive(Clone)]
 pub struct Environment {
     pub name: u64,
     /// The local address of this node.
@@ -35,7 +35,7 @@ pub struct Environment {
     /// The maximum number of peers permitted to maintain connections with.
     maximum_number_of_connected_peers: u16,
     /// The default bootnodes of the network.
-    pub bootnodes: Vec<SocketAddr>,
+    pub bootnodes: RwLock<Vec<SocketAddr>>,
     /// If `true`, initializes this node as a bootnode and forgoes connecting
     /// to the default bootnodes or saved peers in the peer book.
     is_bootnode: bool,
@@ -70,7 +70,7 @@ impl Environment {
             name,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
-            bootnodes,
+            bootnodes: RwLock::new(bootnodes),
             is_bootnode,
             peer_sync_interval,
         })
@@ -90,10 +90,10 @@ impl Environment {
             .expect("local address was set more than once!");
     }
 
-    /// Returns a reference to the default bootnodes of the network.
+    /// Returns the default bootnodes of the network.
     #[inline]
-    pub fn bootnodes(&self) -> &Vec<SocketAddr> {
-        &self.bootnodes
+    pub fn bootnodes(&self) -> Vec<SocketAddr> {
+        self.bootnodes.read().clone()
     }
 
     /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.

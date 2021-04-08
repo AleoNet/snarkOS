@@ -53,8 +53,9 @@ pub use peers::*;
 use crate::ConnWriter;
 use snarkvm_objects::Storage;
 
+use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, ops::Deref, sync::Arc};
 use tokio::{task, time::sleep};
 
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
@@ -75,19 +76,30 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 // TODO: remove inner Arcs once the Node itself is passed around in an Arc or contains an inner object wrapped in an Arc (causing all the Node's contents that are not to be "cloned around" to be Arced too).
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct Node<S: Storage> {
+pub struct Node<S: Storage>(Arc<InnerNode<S>>);
+
+impl<S: Storage> Deref for Node<S> {
+    type Target = Arc<InnerNode<S>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[doc(hide)]
+pub struct InnerNode<S: Storage> {
     /// The parameters and settings of this node.
     pub environment: Environment,
     /// The inbound handler of this node.
-    inbound: Arc<Inbound>,
+    inbound: Inbound,
     /// The outbound handler of this node.
-    outbound: Arc<Outbound>,
+    outbound: Outbound,
     /// The list of connected and disconnected peers of this node.
-    pub peer_book: Arc<RwLock<PeerBook>>,
+    pub peer_book: RwLock<PeerBook>,
     /// The objects related to consensus.
-    pub consensus: Option<Arc<Consensus<S>>>,
+    pub consensus: OnceCell<Arc<Consensus<S>>>,
     /// The tasks spawned by the node.
-    tasks: Arc<Mutex<Vec<task::JoinHandle<()>>>>,
+    tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
@@ -95,39 +107,41 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
-        let inbound = Arc::new(Inbound::new(channels.clone()));
-        let outbound = Arc::new(Outbound::new(channels));
+        let inbound = Inbound::new(channels.clone());
+        let outbound = Outbound::new(channels);
 
-        Ok(Self {
+        Ok(Self(Arc::new(InnerNode {
             environment,
             inbound,
             outbound,
             peer_book: Default::default(),
-            consensus: None,
+            consensus: Default::default(),
             tasks: Default::default(),
-        })
+        })))
     }
 
     pub fn set_consensus(&mut self, consensus: Consensus<S>) {
-        self.consensus = Some(Arc::new(consensus));
+        if self.consensus.set(Arc::new(consensus)).is_err() {
+            panic!("consensus was set more than once!");
+        }
     }
 
     /// Returns a reference to the consensus objects.
     #[inline]
     pub fn consensus(&self) -> Option<&Arc<Consensus<S>>> {
-        self.consensus.as_ref()
+        self.consensus.get()
     }
 
     /// Returns a reference to the consensus objects, expecting them to be available.
     #[inline]
     pub fn expect_consensus(&self) -> &Consensus<S> {
-        self.consensus.as_ref().expect("no consensus!")
+        self.consensus().expect("no consensus!")
     }
 
     #[inline]
     #[doc(hidden)]
     pub fn has_consensus(&self) -> bool {
-        self.consensus.is_some()
+        self.consensus().is_some()
     }
 
     pub async fn start_services(&self) {
