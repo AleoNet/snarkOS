@@ -190,7 +190,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        if self.environment.is_bootnode() && !(payload == Payload::GetPeers || direction == Direction::Internal) {
+        if self.environment.is_bootnode() && payload != Payload::GetPeers {
             // the bootstrapper nodes should ignore inbound messages other than GetPeers
             return Ok(());
         }

@@ -23,7 +23,6 @@ use std::{fmt, net::SocketAddr};
 pub enum Direction {
     Inbound(SocketAddr),
     Outbound(SocketAddr),
-    Internal,
 }
 
 impl fmt::Display for Direction {
@@ -31,7 +30,6 @@ impl fmt::Display for Direction {
         match self {
             Self::Inbound(addr) => write!(f, "from {}", addr),
             Self::Outbound(addr) => write!(f, "to {}", addr),
-            Self::Internal => write!(f, "<internal>"),
         }
     }
 }
