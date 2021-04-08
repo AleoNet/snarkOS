@@ -386,7 +386,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
-        let local_address = self.environment.local_address().unwrap(); // the address must be known by now
+        let local_address = self.local_address().unwrap(); // the address must be known by now
 
         let number_of_connected_peers = self.peer_book.read().number_of_connected_peers();
         let number_to_connect = self

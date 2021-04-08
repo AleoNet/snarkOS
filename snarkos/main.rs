@@ -86,12 +86,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     print_welcome(&config);
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
-    let socket_address = address.parse::<SocketAddr>()?;
+    let desired_address = address.parse::<SocketAddr>()?;
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
     let environment = Environment::new(
+        Some(desired_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
@@ -162,7 +163,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     };
 
     // Start listening for incoming connections.
-    node.listen(Some(socket_address)).await?;
+    node.listen().await?;
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {

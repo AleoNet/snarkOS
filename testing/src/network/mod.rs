@@ -158,6 +158,7 @@ pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Conse
 /// Returns an `Environment` struct with given arguments
 pub fn test_environment(setup: TestSetup) -> Environment {
     Environment::new(
+        setup.socket_address,
         setup.min_peers,
         setup.max_peers,
         setup.bootnodes,
@@ -178,7 +179,7 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
         node.set_consensus(consensus);
     }
 
-    node.listen(setup.socket_address).await.unwrap();
+    node.listen().await.unwrap();
     node.start_services().await;
 
     if is_miner {

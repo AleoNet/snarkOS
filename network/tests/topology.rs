@@ -37,7 +37,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
         let environment = test_environment(setup.clone());
         let node = Node::new(environment).await.unwrap();
 
-        node.listen(setup.socket_address).await.unwrap();
+        node.listen().await.unwrap();
         nodes.push(node);
     }
 
@@ -206,8 +206,8 @@ async fn binary_star_contact() {
     let bootnode_a = Node::new(environment_a).await.unwrap();
     let bootnode_b = Node::new(environment_b).await.unwrap();
 
-    bootnode_a.listen(bootnode_setup.socket_address).await.unwrap();
-    bootnode_b.listen(bootnode_setup.socket_address).await.unwrap();
+    bootnode_a.listen().await.unwrap();
+    bootnode_b.listen().await.unwrap();
 
     let ba = bootnode_a.local_address().unwrap().to_string();
     let bb = bootnode_b.local_address().unwrap().to_string();

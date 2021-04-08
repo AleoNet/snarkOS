@@ -19,6 +19,7 @@ use snarkvm_objects::Storage;
 
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
+use rand::{thread_rng, Rng};
 use std::{collections::HashMap, net::SocketAddr, ops::Deref, sync::Arc};
 use tokio::{task, time::sleep};
 
@@ -37,6 +38,8 @@ impl<S: Storage> Deref for Node<S> {
 
 #[doc(hide)]
 pub struct InnerNode<S: Storage> {
+    /// The node's random numeric identifier.
+    pub name: u64,
     /// The parameters and settings of this node.
     pub environment: Environment,
     /// The inbound handler of this node.
@@ -47,6 +50,8 @@ pub struct InnerNode<S: Storage> {
     pub peer_book: RwLock<PeerBook>,
     /// The objects related to consensus.
     pub consensus: OnceCell<Arc<Consensus<S>>>,
+    /// Node's local address.
+    pub local_address: OnceCell<SocketAddr>,
     /// The tasks spawned by the node.
     tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
@@ -60,6 +65,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let outbound = Outbound::new(channels);
 
         Ok(Self(Arc::new(InnerNode {
+            name: thread_rng().gen(),
+            local_address: Default::default(),
             environment,
             inbound,
             outbound,
@@ -160,7 +167,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
     #[inline]
     pub fn local_address(&self) -> Option<SocketAddr> {
-        self.environment.local_address()
+        self.local_address.get().copied()
+    }
+
+    /// Sets the local address of the node to the given value.
+    #[inline]
+    pub fn set_local_address(&self, addr: SocketAddr) {
+        self.local_address
+            .set(addr)
+            .expect("local address was set more than once!");
     }
 }
 
