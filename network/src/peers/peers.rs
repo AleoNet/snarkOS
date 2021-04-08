@@ -179,8 +179,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let conn_listening_task = tokio::spawn(async move {
             node.listen_for_messages(&mut reader).await;
         });
+
         if let Ok(ref peer) = self.peer_book.read().get_peer(remote_address) {
             peer.register_task(conn_listening_task);
+        } else {
+            // if the related peer is not found, it means it's already been dropped
+            conn_listening_task.abort();
         }
 
         Ok(())

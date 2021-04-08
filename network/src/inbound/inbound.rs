@@ -127,6 +127,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                                 if let Ok(ref peer) = node.peer_book.read().get_peer(remote_address) {
                                     peer.register_task(conn_listening_task);
+                                } else {
+                                    // if the related peer is not found, it means it's already been dropped
+                                    conn_listening_task.abort();
                                 }
                             }
                             Err(e) => {
