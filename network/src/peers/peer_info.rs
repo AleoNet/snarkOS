@@ -54,7 +54,7 @@ pub struct PeerQuality {
 }
 
 /// A data structure containing information about a peer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// The IP address of this peer.
     address: SocketAddr,
@@ -75,7 +75,7 @@ pub struct PeerInfo {
     pub quality: Arc<PeerQuality>,
     /// The handles for tasks associated exclusively with this peer.
     #[serde(skip)]
-    tasks: Arc<Mutex<Vec<task::JoinHandle<()>>>>,
+    tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
 
 impl PeerInfo {

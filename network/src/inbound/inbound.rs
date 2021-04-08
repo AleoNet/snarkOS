@@ -208,23 +208,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         match payload {
             Payload::Transaction(transaction) => {
                 if let Some(ref consensus) = self.consensus() {
-                    let connected_peers = self.peer_book.read().connected_peers().clone();
-                    consensus
-                        .received_transaction(source.unwrap(), transaction, connected_peers)
-                        .await?;
+                    consensus.received_transaction(source.unwrap(), transaction).await?;
                 }
             }
             Payload::Block(block) => {
                 if let Some(ref consensus) = self.consensus() {
-                    let connected_peers = self.peer_book.read().connected_peers().clone();
-                    consensus
-                        .received_block(source.unwrap(), block, Some(connected_peers))
-                        .await?;
+                    consensus.received_block(source.unwrap(), block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
                 if let Some(ref consensus) = self.consensus() {
-                    consensus.received_block(source.unwrap(), block, None).await?;
+                    consensus.received_block(source.unwrap(), block, false).await?;
                     if self.peer_book.read().got_sync_block(source.unwrap()) {
                         consensus.finished_syncing_blocks();
                     }

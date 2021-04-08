@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, peers::PeerInfo, Consensus, NetworkError};
+use crate::{message::*, Consensus, NetworkError};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_objects::Storage;
@@ -23,7 +23,7 @@ use snarkvm_utilities::{
     to_bytes,
 };
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 impl<S: Storage + Send + Sync + 'static> Consensus<S> {
     ///
@@ -45,19 +45,18 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
         &self,
         transaction_bytes: Vec<u8>,
         transaction_sender: SocketAddr,
-        connected_peers: &HashMap<SocketAddr, PeerInfo>,
     ) -> Result<(), NetworkError> {
         debug!("Propagating a transaction to peers");
 
         let local_address = self.node().local_address().unwrap();
 
-        for remote_address in connected_peers.keys() {
-            if *remote_address != transaction_sender && *remote_address != local_address {
+        for remote_address in self.node().connected_addrs() {
+            if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
                 self.node()
                     .outbound
                     .send_request(Message::new(
-                        Direction::Outbound(*remote_address),
+                        Direction::Outbound(remote_address),
                         Payload::Transaction(transaction_bytes.clone()),
                     ))
                     .await;
@@ -72,7 +71,6 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
         &self,
         source: SocketAddr,
         transaction: Vec<u8>,
-        connected_peers: HashMap<SocketAddr, PeerInfo>,
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&*transaction) {
             let insertion = {
@@ -99,8 +97,7 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
             if let Ok(inserted) = insertion {
                 if inserted.is_some() {
                     info!("Transaction added to memory pool.");
-                    self.propagate_transaction(transaction, source, &connected_peers)
-                        .await?;
+                    self.propagate_transaction(transaction, source).await?;
                 }
             }
         }

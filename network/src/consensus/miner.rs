@@ -78,7 +78,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                 };
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
-                let peers = self.node.peer_book.read().connected_peers().clone();
+
                 let serialized_block = if let Ok(block) = block.serialize() {
                     block
                 } else {
@@ -88,7 +88,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
 
                 self.node
                     .expect_consensus()
-                    .propagate_block(serialized_block, local_address, &peers)
+                    .propagate_block(serialized_block, local_address)
                     .await;
             }
         })

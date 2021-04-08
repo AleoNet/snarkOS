@@ -26,6 +26,13 @@ use tokio::{
     net::TcpStream,
 };
 
+impl<S: Storage> Node<S> {
+    /// Obtain a list of addresses of currently connected peers.
+    pub(crate) fn connected_addrs(&self) -> Vec<SocketAddr> {
+        self.peer_book.read().connected_peers().keys().copied().collect()
+    }
+}
+
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
@@ -65,17 +72,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 number_to_disconnect
             );
 
-            let connected_peers = self.peer_book.read().connected_peers().clone();
-
-            let mut connected = connected_peers
+            let mut connected = self
+                .peer_book
+                .read()
+                .connected_peers()
                 .iter()
-                .map(|(_, peer_info)| peer_info)
+                .map(|(addr, info)| (*addr, info.last_connected()))
                 .collect::<Vec<_>>();
-            connected.sort_unstable_by_key(|info| info.last_connected());
+            connected.sort_unstable_by_key(|(_, info)| *info);
 
             for _ in 0..number_to_disconnect {
-                if let Some(peer_info) = connected.pop() {
-                    let addr = peer_info.address();
+                if let Some((addr, _)) = connected.pop() {
                     let _ = self.disconnect_from_peer(addr);
                 }
             }
@@ -83,9 +90,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         // disconnect from peers after a while, even if they haven't sent a GetPeers
         let now = chrono::Utc::now();
+
+        #[allow(clippy::needless_collect)] // clippy reports a false positive here
         if self.environment.is_bootnode() {
-            for (peer_addr, peer_info) in self.peer_book.read().connected_peers().clone() {
-                if (now - peer_info.last_connected().unwrap()).num_seconds() > 10 {
+            let peers = self
+                .peer_book
+                .read()
+                .connected_peers()
+                .iter()
+                .map(|(addr, info)| (*addr, info.last_connected().unwrap()))
+                .collect::<Vec<_>>();
+
+            for (peer_addr, last_connected) in peers.into_iter() {
+                if (now - last_connected).num_seconds() > 10 {
                     let _ = self.disconnect_from_peer(peer_addr);
                 }
             }
@@ -202,14 +219,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("Connecting to default bootnodes");
 
         // Fetch the current connected peers of this node.
-        let connected_peers = self.peer_book.read().connected_peers().clone();
+        let connected_peers = self.connected_addrs();
 
         // Iterate through each bootnode address and attempt a connection request.
         for bootnode_address in self
             .environment
             .bootnodes()
             .iter()
-            .filter(|addr| !connected_peers.contains_key(addr))
+            .filter(|addr| !connected_peers.contains(addr))
             .copied()
         {
             if let Err(e) = self.initiate_connection(bootnode_address).await {
@@ -251,8 +268,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         } else {
             0
         };
-        let connected_peers = self.peer_book.read().connected_peers().clone();
-        for (remote_address, _) in connected_peers {
+
+        for remote_address in self.connected_addrs() {
             self.peer_book.read().sending_ping(remote_address);
 
             self.outbound
@@ -268,8 +285,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     async fn broadcast_getpeers_requests(&self) {
         trace!("Sending GetPeers requests to connected peers");
 
-        let connected_peers = self.peer_book.read().connected_peers().clone();
-        for (remote_address, _) in connected_peers {
+        for remote_address in self.connected_addrs() {
             self.outbound
                 .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
                 .await;
