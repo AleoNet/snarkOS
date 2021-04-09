@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Node;
+use crate::{Node, State};
 use snarkos_consensus::Miner;
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
 use snarkvm_objects::Storage;
 
-use tokio::task;
+use tokio::{task, time};
 use tracing::*;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance<S: Storage> {
@@ -59,11 +59,25 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
             let mining_failure_threshold = 10;
 
             loop {
+                // don't mine if the node is currently syncing
+                if self.node.state() == State::Syncing {
+                    time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                } else {
+                    self.node.set_state(State::Mining);
+                }
+
                 info!("Starting to mine the next block");
 
                 let (block, _coinbase_records) = match miner.mine_block() {
                     Ok(mined_block) => mined_block,
                     Err(error) => {
+                        // it's possible that the node realized that it needs to sync with a nother one in the
+                        // meantime; don't change to `Idle` if the current status isn't still `Mining`
+                        if self.node.state() == State::Mining {
+                            self.node.set_state(State::Idle);
+                        }
+
                         warn!(
                             "Miner failed to mine a block {} time(s). (error message: {}).",
                             mining_failure_count, error
@@ -81,6 +95,11 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                         }
                     }
                 };
+
+                // see the `Err` path note above
+                if self.node.state() == State::Mining {
+                    self.node.set_state(State::Idle);
+                }
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
 

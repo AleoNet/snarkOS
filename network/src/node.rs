@@ -31,10 +31,10 @@ use std::{
 };
 use tokio::{task, time::sleep};
 
+#[derive(PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum State {
     Idle = 0,
-    Maintenance,
     Mining,
     Syncing,
 }
@@ -75,6 +75,27 @@ pub struct InnerNode<S: Storage> {
     pub local_address: OnceCell<SocketAddr>,
     /// The tasks spawned by the node.
     tasks: Mutex<Vec<task::JoinHandle<()>>>,
+}
+
+impl<S: Storage> Node<S> {
+    /// Returns the current state of the node.
+    #[inline]
+    pub fn state(&self) -> State {
+        match self.state.0.load(Ordering::SeqCst) {
+            0 => State::Idle,
+            1 => State::Mining,
+            2 => State::Syncing,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Changes the current state of the node.
+    #[inline]
+    pub fn set_state(&self, new_state: State) {
+        let code = new_state as u8;
+
+        self.state.0.store(code, Ordering::SeqCst);
+    }
 }
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
@@ -198,26 +219,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.local_address
             .set(addr)
             .expect("local address was set more than once!");
-    }
-
-    /// Returns the current state of the node.
-    #[inline]
-    pub fn state(&self) -> State {
-        match self.state.0.load(Ordering::SeqCst) {
-            0 => State::Idle,
-            1 => State::Maintenance,
-            2 => State::Mining,
-            3 => State::Syncing,
-            _ => unreachable!(),
-        }
-    }
-
-    /// Changes the current state of the node.
-    #[inline]
-    pub fn set_state(&self, new_state: State) {
-        let code = new_state as u8;
-
-        self.state.0.store(code, Ordering::SeqCst);
     }
 }
 

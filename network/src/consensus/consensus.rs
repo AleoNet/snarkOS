@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Node;
+use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
@@ -24,10 +24,7 @@ use snarkvm_objects::Storage;
 
 use parking_lot::{Mutex, RwLock};
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -45,8 +42,6 @@ pub struct Consensus<S: Storage> {
     last_block_sync: RwLock<Instant>,
     /// The interval between each transaction (memory pool) sync.
     transaction_sync_interval: Duration,
-    /// Is the node currently syncing blocks?
-    is_syncing_blocks: AtomicBool,
 }
 
 impl<S: Storage> Consensus<S> {
@@ -65,7 +60,6 @@ impl<S: Storage> Consensus<S> {
             block_sync_interval,
             last_block_sync: RwLock::new(Instant::now()),
             transaction_sync_interval,
-            is_syncing_blocks: Default::default(),
         }
     }
 
@@ -106,12 +100,12 @@ impl<S: Storage> Consensus<S> {
 
     /// Checks whether the node is currently syncing blocks.
     pub fn is_syncing_blocks(&self) -> bool {
-        self.is_syncing_blocks.load(Ordering::SeqCst)
+        self.node.state() == State::Syncing
     }
 
     /// Register that the node is no longer syncing blocks.
     pub fn finished_syncing_blocks(&self) {
-        self.is_syncing_blocks.store(false, Ordering::SeqCst);
+        self.node.set_state(State::Idle);
     }
 
     /// Returns the current block height of the ledger from storage.
@@ -128,7 +122,7 @@ impl<S: Storage> Consensus<S> {
     /// Register that the node attempted to sync blocks.
     pub fn register_block_sync_attempt(&self) {
         *self.last_block_sync.write() = Instant::now();
-        self.is_syncing_blocks.store(true, Ordering::SeqCst);
+        self.node.set_state(State::Syncing);
     }
 
     /// Returns the interval between each transaction (memory pool) sync.
