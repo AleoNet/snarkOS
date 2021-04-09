@@ -20,8 +20,27 @@ use snarkvm_objects::Storage;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use rand::{thread_rng, Rng};
-use std::{collections::HashMap, net::SocketAddr, ops::Deref, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    ops::Deref,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+};
 use tokio::{task, time::sleep};
+
+#[repr(u8)]
+pub enum State {
+    Idle = 0,
+    Maintenance,
+    Mining,
+    Syncing,
+}
+
+#[derive(Default)]
+pub struct StateCode(AtomicU8);
 
 /// A core data structure for operating the networking stack of this node.
 #[derive(Derivative)]
@@ -40,6 +59,8 @@ impl<S: Storage> Deref for Node<S> {
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
     pub name: u64,
+    /// The current state of the node.
+    state: StateCode,
     /// The pre-configured parameters of this node.
     pub config: Config,
     /// The inbound handler of this node.
@@ -66,6 +87,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
+            state: Default::default(),
             local_address: Default::default(),
             config,
             inbound,
@@ -176,6 +198,26 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.local_address
             .set(addr)
             .expect("local address was set more than once!");
+    }
+
+    /// Returns the current state of the node.
+    #[inline]
+    pub fn state(&self) -> State {
+        match self.state.0.load(Ordering::SeqCst) {
+            0 => State::Idle,
+            1 => State::Maintenance,
+            2 => State::Mining,
+            3 => State::Syncing,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Changes the current state of the node.
+    #[inline]
+    pub fn set_state(&self, new_state: State) {
+        let code = new_state as u8;
+
+        self.state.0.store(code, Ordering::SeqCst);
     }
 }
 
