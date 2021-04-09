@@ -343,7 +343,7 @@ impl PeerBook {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
         } else {
-            error!("Peer for expecting_sync_blocks purposes not found!");
+            warn!("Peer for expecting_sync_blocks purposes not found! (probably disconnected)");
         }
     }
 
@@ -352,7 +352,7 @@ impl PeerBook {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.fetch_sub(1, Ordering::SeqCst) == 1
         } else {
-            error!("Peer for got_sync_block purposes not found!");
+            warn!("Peer for got_sync_block purposes not found! (probably disconnected)");
             true
         }
     }
@@ -362,7 +362,7 @@ impl PeerBook {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.load(Ordering::SeqCst) != 0
         } else {
-            error!("Peer for got_sync_block purposes not found!");
+            warn!("Peer for is_syncing_blocks purposes not found! (probably disconnected)");
             false
         }
     }
