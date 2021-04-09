@@ -19,10 +19,10 @@ use snarkos_consensus::Miner;
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
 use snarkvm_objects::Storage;
 
-use tokio::{task, time};
+use tokio::runtime;
 use tracing::*;
 
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance<S: Storage> {
@@ -39,29 +39,28 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
     /// Spawns a new miner on a new thread using MinerInstance parameters.
     /// Once a block is found, A block message is sent to all peers.
     /// Calling this function multiple times will spawn additional listeners on separate threads.
-    /// Miner threads are asynchronous so the only way to stop them is to kill the runtime they were started in. This may be changed in the future.
-    pub fn spawn(self) -> task::JoinHandle<()> {
-        task::spawn(async move {
-            info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
+    pub fn spawn(self, tokio_handle: runtime::Handle) -> thread::JoinHandle<()> {
+        let local_address = self.node.local_address().unwrap();
+        info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
+        let miner = Miner::new(
+            self.miner_address.clone(),
+            Arc::clone(&self.node.expect_consensus().consensus),
+        );
+        info!("Miner instantiated; starting to mine blocks");
 
-            let local_address = self
-                .node
-                .local_address()
-                .expect("tried to spawn a miner before the network was initialized!");
+        let mut mining_failure_count = 0;
+        let mining_failure_threshold = 10;
 
-            let miner = Miner::new(
-                self.miner_address.clone(),
-                Arc::clone(&self.node.expect_consensus().consensus),
-            );
-            info!("Miner instantiated; starting to mine blocks");
-
-            let mut mining_failure_count = 0;
-            let mining_failure_threshold = 10;
-
+        thread::spawn(move || {
             loop {
+                if self.node.is_shutting_down() {
+                    debug!("The node is shutting down, stopping mining");
+                    break;
+                }
+
                 // don't mine if the node is currently syncing
                 if self.node.state() == State::Syncing {
-                    time::sleep(Duration::from_secs(5)).await;
+                    thread::sleep(Duration::from_secs(5));
                     continue;
                 } else {
                     self.node.set_state(State::Mining);
@@ -110,10 +109,12 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     continue;
                 };
 
-                self.node
-                    .expect_consensus()
-                    .propagate_block(serialized_block, local_address)
-                    .await;
+                let node = self.node.clone();
+                tokio_handle.spawn(async move {
+                    node.expect_consensus()
+                        .propagate_block(serialized_block, local_address)
+                        .await;
+                });
             }
         })
     }

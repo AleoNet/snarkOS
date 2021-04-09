@@ -35,6 +35,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
+    runtime,
 };
 use tracing::*;
 
@@ -105,6 +106,7 @@ pub struct TestSetup {
     pub max_peers: u16,
     pub is_bootnode: bool,
     pub bootnodes: Vec<String>,
+    pub tokio_handle: Option<runtime::Handle>,
 }
 
 impl TestSetup {
@@ -116,6 +118,7 @@ impl TestSetup {
         max_peers: u16,
         is_bootnode: bool,
         bootnodes: Vec<String>,
+        tokio_handle: Option<runtime::Handle>,
     ) -> Self {
         Self {
             socket_address,
@@ -125,6 +128,7 @@ impl TestSetup {
             max_peers,
             is_bootnode,
             bootnodes,
+            tokio_handle,
         }
     }
 }
@@ -139,6 +143,7 @@ impl Default for TestSetup {
             max_peers: 100,
             is_bootnode: false,
             bootnodes: vec![],
+            tokio_handle: None,
         }
     }
 }
@@ -183,8 +188,9 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     node.start_services().await;
 
     if is_miner {
+        let tokio_handle = setup.tokio_handle.unwrap();
         let miner_address = FIXTURE.test_accounts[0].address.clone();
-        MinerInstance::new(miner_address, node.clone()).spawn();
+        MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
     }
 
     node

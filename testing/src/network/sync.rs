@@ -146,24 +146,29 @@ async fn block_responder_side() {
     assert_eq!(block, block_struct_1);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[test]
 #[ignore]
-async fn block_propagation() {
+fn block_propagation() {
+    let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
             is_miner: true,
             ..Default::default()
         }),
+        tokio_handle: Some(rt.handle().clone()),
         ..Default::default()
     };
 
-    let (_node, mut peer) = handshaken_node_and_peer(setup).await;
+    rt.block_on(async move {
+        let (_node, mut peer) = handshaken_node_and_peer(setup).await;
 
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Block(..)));
+        let payload = peer.read_payload().await.unwrap();
+        assert!(matches!(payload, Payload::Block(..)));
 
-    // TODO: shutdown the miner task, currently there is no good way to do this. This test will
-    // currently hang after the assertion.
+        // TODO: shutdown the miner task, currently there is no good way to do this. This test will
+        // currently hang after the assertion.
+    });
 }
 
 #[tokio::test]
