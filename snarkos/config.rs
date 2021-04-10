@@ -106,7 +106,7 @@ impl Default for Config {
                 is_bootnode: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
-                verbose: 3,
+                verbose: 2,
             },
             miner: Miner {
                 is_miner: false,
