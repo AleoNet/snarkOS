@@ -32,7 +32,7 @@ use snarkvm_dpc::{
     base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
     AccountAddress,
 };
-use snarkvm_objects::Network;
+use snarkvm_objects::{Network, Storage};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
@@ -40,7 +40,6 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
 use tokio::runtime::Builder;
-use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -48,14 +47,14 @@ fn initialize_logger(config: &Config) {
         0 => {}
         verbosity => {
             match verbosity {
-                1 => std::env::set_var("RUST_LOG", "trace"),
+                1 => std::env::set_var("RUST_LOG", "info"),
                 2 => std::env::set_var("RUST_LOG", "debug"),
                 3 => std::env::set_var("RUST_LOG", "trace"),
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
 
             // disable undesirable logs
-            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+            let filter = EnvFilter::from_default_env().add_directive("mio=off".parse().unwrap());
 
             // initialize tracing
             tracing_subscriber::fmt()
@@ -92,8 +91,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
-    let mut environment = Environment::new(
-        Some(socket_address),
+    let environment = Environment::new(
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
@@ -105,14 +103,20 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(environment.clone()).await?;
+    let mut node = Node::new(environment).await?;
 
-    // default to the RocksDb variant first for simplicity
-    let is_storage_in_memory = false;
+    let is_storage_in_memory = LedgerStorage::IN_MEMORY;
+
+    let storage = if is_storage_in_memory {
+        Arc::new(MerkleTreeLedger::<LedgerStorage>::new_empty(
+            None::<std::path::PathBuf>,
+        )?)
+    } else {
+        Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
+    };
 
     // Enable the consensus layer if the node is not a bootstrapper.
     if !config.node.is_bootnode {
-        let storage = Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?);
         let memory_pool = Mutex::new(MemoryPool::from_storage(&storage)?);
 
         info!("Loading Aleo parameters...");
@@ -140,7 +144,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         };
 
         let consensus = Arc::new(snarkos_consensus::Consensus {
-            ledger: storage,
+            ledger: Arc::clone(&storage),
             memory_pool,
             parameters: consensus_params,
             public_parameters: dpc_parameters,
@@ -157,15 +161,15 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         node.set_consensus(consensus);
     };
 
-    // Establish the address of the node.
-    node.establish_address().await?;
-    environment.set_local_address(node.local_address().unwrap());
+    // Start listening for incoming connections.
+    node.listen(Some(socket_address)).await?;
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(miner_address, node.clone()).spawn();
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
+                node.register_task(handle);
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -174,18 +178,25 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     // Start RPC thread, if the RPC configuration is enabled.
-    if config.rpc.json_rpc && !is_storage_in_memory {
-        // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
+    if config.rpc.json_rpc {
+        let secondary_storage = if is_storage_in_memory {
+            // In-memory storage doesn't require a secondary instance.
+            storage
+        } else {
+            // Open a secondary storage instance to prevent resource sharing and bottle-necking.
+            Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?)
+        };
 
-        start_rpc_server(
+        let rpc_handle = start_rpc_server(
             config.rpc.port,
             secondary_storage,
             node.clone(),
             config.rpc.username,
             config.rpc.password,
-        )
-        .await;
+        );
+        node.register_task(rpc_handle);
+
+        info!("Listening for RPC requests on port {}", config.rpc.port);
     }
 
     // Start the network services
@@ -201,13 +212,12 @@ fn main() -> Result<(), NodeError> {
 
     let config: Config = ConfigCli::parse(&arguments)?;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
-    let node_span = debug_span!("node");
 
     Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?
-        .block_on(start_server(config).instrument(node_span))?;
+        .block_on(start_server(config))?;
 
     Ok(())
 }

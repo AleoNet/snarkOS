@@ -65,13 +65,9 @@ pub fn render_welcome(config: &Config) -> String {
         i => format!("testnet{}", i),
     };
     if is_miner {
-        output += &format!("Starting a mining node on {}.\n\n", network).bold().to_string();
+        output += &format!("Starting a mining node on {}.\n", network).bold().to_string();
     } else {
-        output += &format!("Starting a client node on {}.\n\n", network).bold().to_string();
-    }
-
-    if config.rpc.json_rpc {
-        output += &format!("Listening for RPC requests on port {}\n", config.rpc.port);
+        output += &format!("Starting a client node on {}.\n", network).bold().to_string();
     }
 
     output

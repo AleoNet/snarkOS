@@ -23,7 +23,6 @@ use std::{fmt, net::SocketAddr};
 pub enum Direction {
     Inbound(SocketAddr),
     Outbound(SocketAddr),
-    Internal,
 }
 
 impl fmt::Display for Direction {
@@ -31,7 +30,6 @@ impl fmt::Display for Direction {
         match self {
             Self::Inbound(addr) => write!(f, "from {}", addr),
             Self::Outbound(addr) => write!(f, "to {}", addr),
-            Self::Internal => write!(f, "<internal>"),
         }
     }
 }
@@ -92,16 +90,6 @@ pub enum Payload {
     // a placeholder indicating the introduction of a new payload type; used for forward compatibility
     #[doc(hidden)]
     Unknown,
-
-    /* internal messages */
-    #[doc(hidden)]
-    ConnectedTo(SocketAddr, Option<SocketAddr>),
-    #[doc(hidden)]
-    ConnectingTo(SocketAddr),
-    // TODO: used internally, but can also be used to allow a clean disconnect for connected peers on shutdown
-    // add a doc if this is introduced
-    #[doc(hidden)]
-    Disconnect(SocketAddr),
 }
 
 impl fmt::Display for Payload {
@@ -119,9 +107,6 @@ impl fmt::Display for Payload {
             Self::Sync(..) => "sync",
             Self::SyncBlock(..) => "syncblock",
             Self::Transaction(..) => "transaction",
-            Self::ConnectedTo(..) => "connectedto",
-            Self::ConnectingTo(..) => "connectingto",
-            Self::Disconnect(..) => "disconnect",
             Self::Unknown => "unknown",
         };
 
