@@ -32,7 +32,7 @@ use snarkvm_dpc::{
     base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
     AccountAddress,
 };
-use snarkvm_objects::Network;
+use snarkvm_objects::{Network, Storage};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
@@ -40,7 +40,6 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
 use tokio::runtime::Builder;
-use tracing_futures::Instrument;
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -55,7 +54,7 @@ fn initialize_logger(config: &Config) {
             };
 
             // disable undesirable logs
-            let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+            let filter = EnvFilter::from_default_env().add_directive("mio=off".parse().unwrap());
 
             // initialize tracing
             tracing_subscriber::fmt()
@@ -107,12 +106,18 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // before any other object (miner, RPC) needs to use it.
     let mut node = Node::new(environment.clone()).await?;
 
-    // default to the RocksDb variant first for simplicity
-    let is_storage_in_memory = false;
+    let is_storage_in_memory = LedgerStorage::IN_MEMORY;
+
+    let storage = if is_storage_in_memory {
+        Arc::new(MerkleTreeLedger::<LedgerStorage>::new_empty(
+            None::<std::path::PathBuf>,
+        )?)
+    } else {
+        Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
+    };
 
     // Enable the consensus layer if the node is not a bootstrapper.
     if !config.node.is_bootnode {
-        let storage = Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?);
         let memory_pool = Mutex::new(MemoryPool::from_storage(&storage)?);
 
         info!("Loading Aleo parameters...");
@@ -140,7 +145,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         };
 
         let consensus = Arc::new(snarkos_consensus::Consensus {
-            ledger: storage,
+            ledger: Arc::clone(&storage),
             memory_pool,
             parameters: consensus_params,
             public_parameters: dpc_parameters,
@@ -174,9 +179,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     // Start RPC thread, if the RPC configuration is enabled.
-    if config.rpc.json_rpc && !is_storage_in_memory {
-        // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-        let secondary_storage = Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?);
+    if config.rpc.json_rpc {
+        let secondary_storage = if is_storage_in_memory {
+            // In-memory storage doesn't require a secondary instance.
+            storage
+        } else {
+            // Open a secondary storage instance to prevent resource sharing and bottle-necking.
+            Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?)
+        };
 
         start_rpc_server(
             config.rpc.port,
@@ -186,6 +196,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             config.rpc.password,
         )
         .await;
+
+        info!("Listening for RPC requests on port {}", config.rpc.port);
     }
 
     // Start the network services
@@ -201,13 +213,12 @@ fn main() -> Result<(), NodeError> {
 
     let config: Config = ConfigCli::parse(&arguments)?;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
-    let node_span = debug_span!("node");
 
     Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?
-        .block_on(start_server(config).instrument(node_span))?;
+        .block_on(start_server(config))?;
 
     Ok(())
 }
