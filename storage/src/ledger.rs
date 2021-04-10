@@ -40,6 +40,23 @@ pub struct Ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage> {
 }
 
 impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+    /// Create a fresh blockchain, optionally at the specified path.
+    /// Warning: if specified, any existing storage at that location is removed.
+    pub fn new_empty<PATH: AsRef<Path>>(path: Option<PATH>) -> Result<Self, StorageError> {
+        if let Some(ref path) = path {
+            let _ = fs::remove_dir_all(path);
+
+            Self::open_at_path(path)
+        } else {
+            let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
+            let ledger_parameters = P::from(crh);
+
+            let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
+
+            Ok(Self::new(None, ledger_parameters, genesis_block).expect("Ledger could not be instantiated"))
+        }
+    }
+
     /// Open the blockchain storage at a particular path.
     pub fn open_at_path<PATH: AsRef<Path>>(path: PATH) -> Result<Self, StorageError> {
         fs::create_dir_all(path.as_ref())?;
