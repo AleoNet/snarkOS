@@ -47,7 +47,7 @@ fn initialize_logger(config: &Config) {
         0 => {}
         verbosity => {
             match verbosity {
-                1 => std::env::set_var("RUST_LOG", "trace"),
+                1 => std::env::set_var("RUST_LOG", "info"),
                 2 => std::env::set_var("RUST_LOG", "debug"),
                 3 => std::env::set_var("RUST_LOG", "trace"),
                 _ => std::env::set_var("RUST_LOG", "info"),
