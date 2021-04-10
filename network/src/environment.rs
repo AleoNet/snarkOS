@@ -16,6 +16,8 @@
 
 use crate::NetworkError;
 
+use once_cell::sync::OnceCell;
+use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use std::{
     net::SocketAddr,
@@ -24,17 +26,16 @@ use std::{
 };
 
 /// A core data structure containing the networking parameters for this node.
-#[derive(Clone)]
 pub struct Environment {
     pub name: u64,
     /// The local address of this node.
-    local_address: Option<SocketAddr>,
+    local_address: OnceCell<SocketAddr>,
     /// The minimum number of peers required to maintain connections with.
     minimum_number_of_connected_peers: u16,
     /// The maximum number of peers permitted to maintain connections with.
     maximum_number_of_connected_peers: u16,
     /// The default bootnodes of the network.
-    pub bootnodes: Vec<SocketAddr>,
+    pub bootnodes: RwLock<Vec<SocketAddr>>,
     /// If `true`, initializes this node as a bootnode and forgoes connecting
     /// to the default bootnodes or saved peers in the peer book.
     is_bootnode: bool,
@@ -46,7 +47,6 @@ impl Environment {
     /// Creates a new instance of `Environment`.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        local_address: Option<SocketAddr>,
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
         bootnodes_addresses: Vec<String>,
@@ -66,11 +66,11 @@ impl Environment {
         let name = rng.gen();
 
         Ok(Self {
+            local_address: Default::default(),
             name,
-            local_address,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
-            bootnodes,
+            bootnodes: RwLock::new(bootnodes),
             is_bootnode,
             peer_sync_interval,
         })
@@ -79,19 +79,21 @@ impl Environment {
     /// Returns the local address of the node.
     #[inline]
     pub fn local_address(&self) -> Option<SocketAddr> {
-        self.local_address
+        self.local_address.get().copied()
     }
 
     /// Sets the local address of the node to the given value.
     #[inline]
-    pub fn set_local_address(&mut self, addr: SocketAddr) {
-        self.local_address = Some(addr);
+    pub fn set_local_address(&self, addr: SocketAddr) {
+        self.local_address
+            .set(addr)
+            .expect("local address was set more than once!");
     }
 
-    /// Returns a reference to the default bootnodes of the network.
+    /// Returns the default bootnodes of the network.
     #[inline]
-    pub fn bootnodes(&self) -> &Vec<SocketAddr> {
-        &self.bootnodes
+    pub fn bootnodes(&self) -> Vec<SocketAddr> {
+        self.bootnodes.read().clone()
     }
 
     /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.

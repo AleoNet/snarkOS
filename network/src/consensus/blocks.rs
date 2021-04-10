@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, peers::PeerInfo, Consensus, NetworkError};
+use crate::{message::*, Consensus, NetworkError};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 impl<S: Storage> Consensus<S> {
     ///
@@ -43,21 +43,16 @@ impl<S: Storage> Consensus<S> {
     }
 
     /// Broadcast block to connected peers
-    pub async fn propagate_block(
-        &self,
-        block_bytes: Vec<u8>,
-        block_miner: SocketAddr,
-        connected_peers: &HashMap<SocketAddr, PeerInfo>,
-    ) {
+    pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
         debug!("Propagating a block to peers");
 
-        for remote_address in connected_peers.keys() {
-            if *remote_address != block_miner {
+        for remote_address in self.node().connected_addrs() {
+            if remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
                 self.node()
                     .outbound
                     .send_request(Message::new(
-                        Direction::Outbound(*remote_address),
+                        Direction::Outbound(remote_address),
                         Payload::Block(block_bytes.clone()),
                     ))
                     .await;
@@ -70,7 +65,7 @@ impl<S: Storage> Consensus<S> {
         &self,
         remote_address: SocketAddr,
         block: Vec<u8>,
-        connected_peers: Option<HashMap<SocketAddr, PeerInfo>>,
+        is_block_new: bool,
     ) -> Result<(), NetworkError> {
         let block_size = block.len();
         let max_block_size = self.max_block_size();
@@ -93,10 +88,8 @@ impl<S: Storage> Consensus<S> {
         let is_valid_block = self.consensus.receive_block(&block_struct).is_ok();
 
         // This is a new block, send it to our peers.
-        if let Some(connected_peers) = connected_peers {
-            if is_valid_block && !self.is_syncing_blocks() {
-                self.propagate_block(block, remote_address, &connected_peers).await;
-            }
+        if is_block_new && is_valid_block && !self.is_syncing_blocks() {
+            self.propagate_block(block, remote_address).await;
         }
 
         Ok(())

@@ -26,6 +26,7 @@ use snarkos_network::Node;
 use snarkvm_objects::Storage;
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
+use tokio::task;
 
 use std::{net::SocketAddr, sync::Arc};
 
@@ -33,13 +34,13 @@ use std::{net::SocketAddr, sync::Arc};
 /// Rpc failures will error on the thread level but not affect the main network server.
 /// This may be changed in the future to give the node more control of the rpc server.
 #[allow(clippy::too_many_arguments)]
-pub async fn start_rpc_server<S: Storage + Send + Sync + 'static>(
+pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
     rpc_port: u16,
     secondary_storage: Arc<MerkleTreeLedger<S>>,
     node_server: Node<S>,
     username: Option<String>,
     password: Option<String>,
-) {
+) -> task::JoinHandle<()> {
     let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse().unwrap();
 
     let credentials = match (username, password) {
@@ -69,5 +70,5 @@ pub async fn start_rpc_server<S: Storage + Send + Sync + 'static>(
 
     tokio::task::spawn(async move {
         server.wait();
-    });
+    })
 }

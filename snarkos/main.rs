@@ -91,8 +91,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
-    let mut environment = Environment::new(
-        Some(socket_address),
+    let environment = Environment::new(
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
@@ -104,7 +103,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(environment.clone()).await?;
+    let mut node = Node::new(environment).await?;
 
     let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 
@@ -162,15 +161,15 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         node.set_consensus(consensus);
     };
 
-    // Establish the address of the node.
-    node.establish_address().await?;
-    environment.set_local_address(node.local_address().unwrap());
+    // Start listening for incoming connections.
+    node.listen(Some(socket_address)).await?;
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                MinerInstance::new(miner_address, node.clone()).spawn();
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
+                node.register_task(handle);
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -188,14 +187,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?)
         };
 
-        start_rpc_server(
+        let rpc_handle = start_rpc_server(
             config.rpc.port,
             secondary_storage,
             node.clone(),
             config.rpc.username,
             config.rpc.password,
-        )
-        .await;
+        );
+        node.register_task(rpc_handle);
 
         info!("Listening for RPC requests on port {}", config.rpc.port);
     }

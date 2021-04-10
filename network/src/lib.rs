@@ -53,8 +53,9 @@ pub use peers::*;
 use crate::ConnWriter;
 use snarkvm_objects::Storage;
 
-use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use once_cell::sync::OnceCell;
+use parking_lot::{Mutex, RwLock};
+use std::{collections::HashMap, net::SocketAddr, ops::Deref, sync::Arc};
 use tokio::{task, time::sleep};
 
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
@@ -75,17 +76,30 @@ pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
 // TODO: remove inner Arcs once the Node itself is passed around in an Arc or contains an inner object wrapped in an Arc (causing all the Node's contents that are not to be "cloned around" to be Arced too).
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct Node<S: Storage> {
+pub struct Node<S: Storage>(Arc<InnerNode<S>>);
+
+impl<S: Storage> Deref for Node<S> {
+    type Target = Arc<InnerNode<S>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[doc(hide)]
+pub struct InnerNode<S: Storage> {
     /// The parameters and settings of this node.
     pub environment: Environment,
     /// The inbound handler of this node.
-    inbound: Arc<Inbound>,
+    inbound: Inbound,
     /// The outbound handler of this node.
-    outbound: Arc<Outbound>,
+    outbound: Outbound,
     /// The list of connected and disconnected peers of this node.
-    pub peer_book: Arc<RwLock<PeerBook>>,
+    pub peer_book: RwLock<PeerBook>,
     /// The objects related to consensus.
-    pub consensus: Option<Arc<Consensus<S>>>,
+    pub consensus: OnceCell<Arc<Consensus<S>>>,
+    /// The tasks spawned by the node.
+    tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
@@ -93,60 +107,58 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn new(environment: Environment) -> Result<Self, NetworkError> {
         let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
-        let inbound = Arc::new(Inbound::new(channels.clone()));
-        let outbound = Arc::new(Outbound::new(channels));
+        let inbound = Inbound::new(channels.clone());
+        let outbound = Outbound::new(channels);
 
-        Ok(Self {
+        Ok(Self(Arc::new(InnerNode {
             environment,
             inbound,
             outbound,
             peer_book: Default::default(),
-            consensus: None,
-        })
+            consensus: Default::default(),
+            tasks: Default::default(),
+        })))
     }
 
     pub fn set_consensus(&mut self, consensus: Consensus<S>) {
-        self.consensus = Some(Arc::new(consensus));
+        if self.consensus.set(Arc::new(consensus)).is_err() {
+            panic!("consensus was set more than once!");
+        }
     }
 
     /// Returns a reference to the consensus objects.
     #[inline]
     pub fn consensus(&self) -> Option<&Arc<Consensus<S>>> {
-        self.consensus.as_ref()
+        self.consensus.get()
     }
 
     /// Returns a reference to the consensus objects, expecting them to be available.
     #[inline]
     pub fn expect_consensus(&self) -> &Consensus<S> {
-        self.consensus.as_ref().expect("no consensus!")
+        self.consensus().expect("no consensus!")
     }
 
     #[inline]
     #[doc(hidden)]
     pub fn has_consensus(&self) -> bool {
-        self.consensus.is_some()
-    }
-
-    pub async fn establish_address(&mut self) -> Result<(), NetworkError> {
-        self.inbound.listen(&mut self.environment).await?;
-
-        Ok(())
+        self.consensus().is_some()
     }
 
     pub async fn start_services(&self) {
         let self_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
-        task::spawn(async move {
+        let incoming_task = task::spawn(async move {
             loop {
                 if let Err(e) = self_clone.process_incoming_messages(&mut receiver).await {
                     error!("Node error: {}", e);
                 }
             }
         });
+        self.register_task(incoming_task);
 
         let self_clone = self.clone();
         let peer_sync_interval = self.environment.peer_sync_interval();
-        task::spawn(async move {
+        let peering_task = task::spawn(async move {
             loop {
                 sleep(peer_sync_interval).await;
                 info!("Updating peers");
@@ -156,13 +168,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
         });
+        self.register_task(peering_task);
 
         if !self.environment.is_bootnode() {
             if let Some(ref consensus) = self.consensus() {
                 let self_clone = self.clone();
                 let consensus = Arc::clone(consensus);
                 let transaction_sync_interval = consensus.transaction_sync_interval();
-                task::spawn(async move {
+                let tx_sync_task = task::spawn(async move {
                     loop {
                         sleep(transaction_sync_interval).await;
 
@@ -175,143 +188,48 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         }
                     }
                 });
+                self.register_task(tx_sync_task);
             }
         }
     }
 
-    pub async fn start(&mut self) -> Result<(), NetworkError> {
-        debug!("Initializing the connection server");
-        self.establish_address().await?;
-        self.start_services().await;
-        debug!("Connection server initialized");
+    pub fn shut_down(&self) {
+        debug!("Shutting down");
 
-        Ok(())
+        for addr in self.connected_addrs() {
+            let _ = self.disconnect_from_peer(addr);
+        }
+
+        for handle in self.tasks.lock().drain(..).rev() {
+            handle.abort();
+        }
+    }
+
+    pub fn register_task(&self, handle: task::JoinHandle<()>) {
+        self.tasks.lock().push(handle);
     }
 
     #[inline]
     pub fn local_address(&self) -> Option<SocketAddr> {
         self.environment.local_address()
     }
+}
 
-    async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
-        let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
-
-        if self.environment.is_bootnode() && !(payload == Payload::GetPeers || direction == Direction::Internal) {
-            // the bootstrapper nodes should ignore inbound messages other than GetPeers
-            return Ok(());
-        }
-
-        let source = if let Direction::Inbound(addr) = direction {
-            self.peer_book.read().update_last_seen(addr);
-            Some(addr)
-        } else {
-            None
-        };
-
-        match payload {
-            Payload::ConnectingTo(remote_address) => {
-                if direction == Direction::Internal {
-                    self.peer_book.write().set_connecting(remote_address)?;
-                }
-            }
-            Payload::ConnectedTo(remote_address, remote_listener) => {
-                if direction == Direction::Internal {
-                    self.peer_book.write().set_connected(remote_address, remote_listener)?;
-                }
-            }
-            Payload::Transaction(transaction) => {
-                if let Some(ref consensus) = self.consensus() {
-                    let connected_peers = self.peer_book.read().connected_peers().clone();
-                    consensus
-                        .received_transaction(source.unwrap(), transaction, connected_peers)
-                        .await?;
-                }
-            }
-            Payload::Block(block) => {
-                if let Some(ref consensus) = self.consensus() {
-                    let connected_peers = self.peer_book.read().connected_peers().clone();
-                    consensus
-                        .received_block(source.unwrap(), block, Some(connected_peers))
-                        .await?;
-                }
-            }
-            Payload::SyncBlock(block) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_block(source.unwrap(), block, None).await?;
-                    if self.peer_book.read().got_sync_block(source.unwrap()) {
-                        consensus.finished_syncing_blocks();
-                    }
-                }
-            }
-            Payload::GetBlocks(hashes) => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_blocks(source.unwrap(), hashes).await?;
-                    }
-                }
-            }
-            Payload::GetMemoryPool => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_memory_pool(source.unwrap()).await?;
-                    }
-                }
-            }
-            Payload::MemoryPool(mempool) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_memory_pool(mempool)?;
-                }
-            }
-            Payload::GetSync(getsync) => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_sync(source.unwrap(), getsync).await?;
-                    }
-                }
-            }
-            Payload::Sync(sync) => {
-                if let Some(ref consensus) = self.consensus() {
-                    self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len());
-                    consensus.received_sync(source.unwrap(), sync).await;
-                }
-            }
-            Payload::Disconnect(addr) => {
-                if direction == Direction::Internal {
-                    self.disconnect_from_peer(addr)?;
-                }
-            }
-            Payload::GetPeers => {
-                self.send_peers(source.unwrap()).await;
-            }
-            Payload::Peers(peers) => {
-                self.process_inbound_peers(peers);
-            }
-            Payload::Ping(block_height) => {
-                self.outbound
-                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
-                    .await;
-
-                if let Some(ref consensus) = self.consensus() {
-                    if block_height > consensus.current_block_height() + 1
-                        && consensus.should_sync_blocks()
-                        && !self.peer_book.read().is_syncing_blocks(source.unwrap())
-                    {
-                        consensus.register_block_sync_attempt();
-                        trace!("Attempting to sync with {}", source.unwrap());
-                        consensus.update_blocks(source.unwrap()).await;
-                    } else {
-                        consensus.finished_syncing_blocks();
-                    }
-                }
-            }
-            Payload::Pong => {
-                self.peer_book.read().received_pong(source.unwrap());
-            }
-            Payload::Unknown => {
-                warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
+impl<S: Storage> Drop for InnerNode<S> {
+    // this won't make a difference in regular scenarios, but will be practical for test
+    // purposes, so that there are no lingering tasks
+    fn drop(&mut self) {
+        // since we're going out of scope, we don't care about holding the read lock here
+        // also, the connections are going to be broken automatically, so we only need to
+        // take care of the associated tasks here
+        for peer_info in self.peer_book.read().connected_peers().values() {
+            for handle in peer_info.tasks.lock().drain(..).rev() {
+                handle.abort();
             }
         }
 
-        Ok(())
+        for handle in self.tasks.lock().drain(..).rev() {
+            handle.abort();
+        }
     }
 }
