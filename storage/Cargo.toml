@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-storage"
-version = "1.2.0"
+version = "1.3.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Storage for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -18,9 +18,9 @@ license = "GPL-3.0"
 edition = "2018"
 
 [features]
-default = ["rocksdb_storage"]
-rocksdb_storage = ["rocksdb"]
-mem_storage = []
+default = [ "rocksdb_storage" ]
+rocksdb_storage = [ "rocksdb" ]
+mem_storage = [ ]
 
 [dependencies.snarkvm-algorithms]
 version = "0.2.2"
@@ -39,7 +39,7 @@ version = "0.2.2"
 
 [dependencies.snarkos-parameters]
 path = "../parameters"
-version = "1.2.0"
+version = "1.3.0"
 
 [dependencies.anyhow]
 version = "1.0.40"

@@ -1,6 +1,6 @@
 [package]
 name = "snarkos"
-version = "1.2.0"
+version = "1.3.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -13,7 +13,13 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
-include = [ "Cargo.toml", "snarkos", "README.md", "LICENSE.md", "build.rs" ]
+include = [
+  "Cargo.toml",
+  "snarkos",
+  "README.md",
+  "LICENSE.md",
+  "build.rs"
+]
 license = "GPL-3.0"
 edition = "2018"
 
@@ -56,20 +62,20 @@ version = "0.2.2"
 
 [dependencies.snarkos-consensus]
 path = "./consensus"
-version = "1.2.0"
+version = "1.3.0"
 
 [dependencies.snarkos-network]
 path = "./network"
-version = "1.2.0"
+version = "1.3.0"
 
 [dependencies.snarkos-rpc]
 path = "./rpc"
-version = "1.2.0"
+version = "1.3.0"
 
 [dependencies.snarkos-storage]
 path = "./storage"
-features = ["rocksdb_storage"]
-version = "1.2.0"
+features = [ "rocksdb_storage" ]
+version = "1.3.0"
 
 [dependencies.anyhow]
 version = "1.0"
@@ -137,10 +143,9 @@ rustc_version = "0.2"
   optional = true
 
 [features]
-default = []
+default = [ ]
 compile_capnp_schema = [ "capnpc" ]
-# This feature flag is used to disable `target-cpu=native` in `.cargo/config`.
-noconfig = []
+noconfig = [ ]
 
 [profile.release]
 opt-level = 3
