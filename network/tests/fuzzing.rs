@@ -23,7 +23,13 @@ use snarkos_testing::{
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-use std::net::SocketAddr;
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 pub const ITERATIONS: usize = 5000;
 pub const CORRUPTION_PROBABILITY: f64 = 0.1;
@@ -101,9 +107,15 @@ async fn fuzzing_valid_header_post_handshake() {
     // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let write_finished = Arc::new(AtomicBool::new(false));
+    let should_exit = Arc::clone(&write_finished);
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
+            if should_exit.load(Ordering::Relaxed) {
+                break;
+            }
+
             let _ = node2.read_payload().await;
         }
     });
@@ -115,6 +127,9 @@ async fn fuzzing_valid_header_post_handshake() {
         node1.write_bytes(&(random_len as u32).to_be_bytes()).await;
         node1.write_bytes(&random_payload).await;
     }
+
+    write_finished.store(true, Ordering::Relaxed);
+    handle.await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -143,9 +158,15 @@ async fn fuzzing_post_handshake() {
     // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let write_finished = Arc::new(AtomicBool::new(false));
+    let should_exit = Arc::clone(&write_finished);
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
+            if should_exit.load(Ordering::Relaxed) {
+                break;
+            }
+
             let _ = node2.read_payload().await;
         }
     });
@@ -156,6 +177,9 @@ async fn fuzzing_post_handshake() {
 
         node1.write_bytes(&random_bytes).await;
     }
+
+    write_finished.store(true, Ordering::Relaxed);
+    handle.await.unwrap();
 }
 
 #[tokio::test]
@@ -190,9 +214,15 @@ async fn fuzzing_corrupted_version_post_handshake() {
     // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let write_finished = Arc::new(AtomicBool::new(false));
+    let should_exit = Arc::clone(&write_finished);
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
+            if should_exit.load(Ordering::Relaxed) {
+                break;
+            }
+
             let _ = node2.read_payload().await;
         }
     });
@@ -207,6 +237,9 @@ async fn fuzzing_corrupted_version_post_handshake() {
         node1.write_bytes(&header.as_bytes()).await;
         node1.write_bytes(&corrupted_version).await;
     }
+
+    write_finished.store(true, Ordering::Relaxed);
+    handle.await.unwrap();
 }
 
 #[tokio::test]
@@ -246,9 +279,15 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
     // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let write_finished = Arc::new(AtomicBool::new(false));
+    let should_exit = Arc::clone(&write_finished);
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
+            if should_exit.load(Ordering::Relaxed) {
+                break;
+            }
+
             let _ = node2.read_payload().await;
         }
     });
@@ -265,6 +304,9 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
             node1.write_bytes(&corrupted_payload).await;
         }
     }
+
+    write_finished.store(true, Ordering::Relaxed);
+    handle.await.unwrap();
 }
 
 // Using a multi-threaded rt for this test notably improves performance.
@@ -326,9 +368,15 @@ async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let write_finished = Arc::new(AtomicBool::new(false));
+    let should_exit = Arc::clone(&write_finished);
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
+            if should_exit.load(Ordering::Relaxed) {
+                break;
+            }
+
             let _ = node2.read_payload().await;
         }
     });
@@ -368,6 +416,9 @@ async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
             node1.write_bytes(&corrupted_payload).await;
         }
     }
+
+    write_finished.store(true, Ordering::Relaxed);
+    handle.await.unwrap();
 }
 
 #[tokio::test]
@@ -410,9 +461,15 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
     // tracing_subscriber::fmt::init();
 
     let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let write_finished = Arc::new(AtomicBool::new(false));
+    let should_exit = Arc::clone(&write_finished);
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
+            if should_exit.load(Ordering::Relaxed) {
+                break;
+            }
+
             let _ = node2.read_payload().await;
         }
     });
@@ -435,4 +492,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
             node1.write_bytes(&corrupted_payload).await;
         }
     }
+
+    write_finished.store(true, Ordering::Relaxed);
+    handle.await.unwrap();
 }
