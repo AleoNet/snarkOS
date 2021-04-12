@@ -252,9 +252,9 @@ checksum = "ee33f13b9419d35f9ae6e0ee2e5ef6bd059a4d0da2fda16a88ddaf57dfe9acca"
 
 [[package]]
 name = "capnpc"
-version = "0.14.2"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76c50eb1605fb64e5cbf9a22c244ea4136516f1aa38ee8e2c8f94a080370521e"
+checksum = "50c8a9d317b4818641686784227e08ee161d0dbd0c2a06f0355f107df263f549"
 dependencies = [
  "capnp",
 ]
