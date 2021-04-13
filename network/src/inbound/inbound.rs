@@ -68,10 +68,6 @@ impl Inbound {
 
             // Determine if we should disconnect.
             *disconnect_from_peer = error.is_fatal() || *failure_count >= 10;
-
-            if *disconnect_from_peer {
-                debug!("Should disconnect from peer");
-            }
         } else {
             debug!("A connection errored again in the same loop (error message: {})", error);
         }
