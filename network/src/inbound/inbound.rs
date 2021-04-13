@@ -177,11 +177,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             };
 
-            // Respond to Ping messages immediately in order not to skew latency calculation on peer's side.
-            if matches!(message.payload, Payload::Ping(..)) {
-                self.outbound
-                    .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
-                    .await;
+            // Handle Ping/Pong messages immediately in order not to skew latency calculation.
+            match &message.payload {
+                Payload::Ping(..) => {
+                    self.outbound
+                        .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
+                        .await;
+                }
+                Payload::Pong => {
+                    self.peer_book.read().received_pong(reader.addr);
+                }
+                _ => {}
             }
 
             // Messages are queued in a single tokio MPSC receiver.
@@ -275,7 +281,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::Pong => {
-                self.peer_book.read().received_pong(source.unwrap());
+                // already handled with priority in Inbound::listen_for_messages
             }
             Payload::Unknown => {
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
