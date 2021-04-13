@@ -114,9 +114,10 @@ impl<S: Storage> Consensus<S> {
         self.consensus.ledger.get_current_block_height()
     }
 
-    /// Checks whether enough time has elapsed for the node to attempt another block sync.
-    pub fn should_sync_blocks(&self) -> bool {
-        !self.is_syncing_blocks() && self.last_block_sync.read().elapsed() > self.block_sync_interval
+    /// Checks whether the conditions for the node to attempt another block sync are met.
+    pub fn should_sync_blocks(&self, peer_block_height: u32) -> bool {
+        peer_block_height > self.current_block_height() + 1
+            && self.last_block_sync.read().elapsed() > self.block_sync_interval
     }
 
     /// Register that the node attempted to sync blocks.

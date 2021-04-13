@@ -252,8 +252,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Sync(sync) => {
                 if let Some(ref consensus) = self.consensus() {
-                    self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len());
-                    consensus.received_sync(source.unwrap(), sync).await;
+                    if self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len()) {
+                        consensus.received_sync(source.unwrap(), sync).await;
+                    }
                 }
             }
             Payload::GetPeers => {
@@ -268,10 +269,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     .await;
 
                 if let Some(ref consensus) = self.consensus() {
-                    if block_height > consensus.current_block_height() + 1
-                        && consensus.should_sync_blocks()
+                    if !consensus.is_syncing_blocks()
+                        && consensus.should_sync_blocks(block_height)
                         && !self.peer_book.read().is_syncing_blocks(source.unwrap())
                     {
+                        self.peer_book.write().cancel_any_ongoing_syncing();
                         consensus.register_block_sync_attempt();
                         trace!("Attempting to sync with {}", source.unwrap());
                         consensus.update_blocks(source.unwrap()).await;

@@ -31,7 +31,7 @@ use std::{
 };
 use tokio::{task, time::sleep};
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum State {
     Idle = 0,

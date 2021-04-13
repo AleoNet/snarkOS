@@ -339,11 +339,13 @@ impl PeerBook {
     }
 
     /// Registers that the given number of blocks is expected as part of syncing with a peer.
-    pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) {
+    pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) -> bool {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
+            true
         } else {
             warn!("Peer for expecting_sync_blocks purposes not found! (probably disconnected)");
+            false
         }
     }
 
@@ -364,6 +366,20 @@ impl PeerBook {
         } else {
             warn!("Peer for is_syncing_blocks purposes not found! (probably disconnected)");
             false
+        }
+    }
+
+    /// Cancels any expected sync block counts from all peers.
+    pub fn cancel_any_ongoing_syncing(&mut self) {
+        for peer_info in self.connected_peers.values_mut() {
+            let missing_sync_blocks = peer_info.quality.remaining_sync_blocks.swap(0, Ordering::SeqCst);
+            if missing_sync_blocks != 0 {
+                warn!(
+                    "Was expecting {} more sync blocks from {}",
+                    missing_sync_blocks,
+                    peer_info.address(),
+                );
+            }
         }
     }
 }

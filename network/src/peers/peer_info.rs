@@ -24,7 +24,7 @@ use tokio::task;
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU16, AtomicU64, AtomicU8},
+        atomic::{AtomicBool, AtomicU16, AtomicU64, AtomicU8, Ordering},
         Arc,
     },
     time::Instant,
@@ -190,6 +190,8 @@ impl PeerInfo {
                 self.status = PeerStatus::Disconnected;
 
                 self.last_disconnected = Some(Utc::now());
+                self.quality.expecting_pong.store(false, Ordering::SeqCst);
+                self.quality.remaining_sync_blocks.store(0, Ordering::SeqCst);
                 self.disconnected_count += 1;
 
                 for handle in self.tasks.lock().drain(..).rev() {
