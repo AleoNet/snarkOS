@@ -24,6 +24,7 @@ use snarkvm_objects::Storage;
 
 use parking_lot::{Mutex, RwLock};
 use std::{
+    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -120,8 +121,9 @@ impl<S: Storage> Consensus<S> {
             && self.last_block_sync.read().elapsed() > self.block_sync_interval
     }
 
-    /// Register that the node attempted to sync blocks.
-    pub fn register_block_sync_attempt(&self) {
+    /// Register that the node attempted to sync blocks with the given peer.
+    pub fn register_block_sync_attempt(&self, provider: SocketAddr) {
+        trace!("Attempting to sync with {}", provider);
         *self.last_block_sync.write() = Instant::now();
         self.node.set_state(State::Syncing);
     }

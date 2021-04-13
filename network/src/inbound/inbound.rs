@@ -269,8 +269,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         && !self.peer_book.read().is_syncing_blocks(source.unwrap())
                     {
                         self.peer_book.write().cancel_any_ongoing_syncing();
-                        consensus.register_block_sync_attempt();
-                        trace!("Attempting to sync with {}", source.unwrap());
+                        consensus.register_block_sync_attempt(source.unwrap());
                         consensus.update_blocks(source.unwrap()).await;
                     }
                 }
