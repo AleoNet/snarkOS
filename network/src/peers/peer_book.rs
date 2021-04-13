@@ -306,7 +306,7 @@ impl PeerBook {
         if let Some(ref quality) = self.peer_quality(addr) {
             *quality.last_seen.write() = Some(chrono::Utc::now());
         } else {
-            warn!("Attempted to update state of a peer that's not connected: {}", addr);
+            trace!("Attempted to update state of a peer that's not connected: {}", addr);
         }
     }
 
@@ -365,7 +365,7 @@ impl PeerBook {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.load(Ordering::SeqCst) != 0
         } else {
-            warn!("Peer for is_syncing_blocks purposes not found! (probably disconnected)");
+            trace!("Peer for is_syncing_blocks purposes not found! (probably disconnected)");
             false
         }
     }
