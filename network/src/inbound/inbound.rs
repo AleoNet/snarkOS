@@ -324,14 +324,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
         let len = reader.read_exact(&mut buf[..len]).await?;
         noise.read_message(&buf[..len], &mut buffer)?;
-        trace!("received e (XX handshake part 1/3)");
+        trace!("received e (XX handshake part 1/3) from {}", remote_address);
 
         // -> e, ee, s, es
         let own_version = Version::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
         let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
-        trace!("sent e, ee, s, es (XX handshake part 2/3)");
+        trace!("sent e, ee, s, es (XX handshake part 2/3) to {}", remote_address);
 
         // <- s, se, psk
         reader.read_exact(&mut buf[..1]).await?;
@@ -342,7 +342,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let len = reader.read_exact(&mut buf[..len]).await?;
         let len = noise.read_message(&buf[..len], &mut buffer)?;
         let peer_version = Version::deserialize(&buffer[..len])?;
-        trace!("received s, se, psk (XX handshake part 3/3)");
+        trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
 
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
