@@ -327,6 +327,7 @@ impl PeerBook {
             if quality.expecting_pong.load(Ordering::SeqCst) {
                 let ping_sent = quality.last_ping_sent.lock().unwrap();
                 let rtt = ping_sent.elapsed().as_millis() as u64;
+                trace!("RTT for {} is {}ms", source, rtt);
                 quality.rtt_ms.store(rtt, Ordering::SeqCst);
                 quality.expecting_pong.store(false, Ordering::SeqCst);
             } else {

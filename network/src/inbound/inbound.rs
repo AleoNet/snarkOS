@@ -181,11 +181,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             };
 
-            // Messages are received by a single tokio MPSC receiver with
-            // the message name, bytes, and associated channel.
-            //
-            // The oneshot sender lets the connection task know when the message is handled.
+            // Respond to Ping messages immediately in order not to skew latency calculation on peer's side.
+            if matches!(message.payload, Payload::Ping(..)) {
+                self.outbound
+                    .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
+                    .await;
+            }
 
+            // Messages are queued in a single tokio MPSC receiver.
             self.inbound.route(message).await
         }
     }
@@ -264,10 +267,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 self.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
-                self.outbound
-                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
-                    .await;
-
                 if let Some(ref consensus) = self.consensus() {
                     if !consensus.is_syncing_blocks()
                         && consensus.should_sync_blocks(block_height)
