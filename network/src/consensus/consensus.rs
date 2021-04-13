@@ -125,7 +125,6 @@ impl<S: Storage> Consensus<S> {
     pub fn register_block_sync_attempt(&self, provider: SocketAddr) {
         trace!("Attempting to sync with {}", provider);
         *self.last_block_sync.write() = Instant::now();
-        self.node.set_state(State::Syncing);
     }
 
     /// Returns the interval between each transaction (memory pool) sync.

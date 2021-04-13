@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender};
+use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -224,6 +224,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::SyncBlock(block) => {
                 if let Some(ref consensus) = self.consensus() {
                     consensus.received_block(source.unwrap(), block, false).await?;
+
+                    // since we confirmed that the block is a valid sync block, we can
+                    // set the node's status to Syncing
+                    consensus.node().set_state(State::Syncing);
+
+                    // update the peer and possibly finish the sync process
                     if self.peer_book.read().got_sync_block(source.unwrap()) {
                         consensus.finished_syncing_blocks();
                     }
