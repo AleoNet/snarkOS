@@ -371,7 +371,7 @@ impl PeerBook {
     }
 
     /// Cancels any expected sync block counts from all peers.
-    pub fn cancel_any_ongoing_syncing(&mut self) {
+    pub fn cancel_any_unfinished_syncing(&mut self) {
         for peer_info in self.connected_peers.values_mut() {
             let missing_sync_blocks = peer_info.quality.remaining_sync_blocks.swap(0, Ordering::SeqCst);
             if missing_sync_blocks != 0 {

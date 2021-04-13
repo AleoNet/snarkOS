@@ -276,11 +276,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Ping(block_height) => {
                 if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks()
-                        && consensus.should_sync_blocks(block_height)
-                        && !self.peer_book.read().is_syncing_blocks(source.unwrap())
-                    {
-                        self.peer_book.write().cancel_any_ongoing_syncing();
+                    if !consensus.is_syncing_blocks() && consensus.should_sync_blocks(block_height) {
+                        self.peer_book.write().cancel_any_unfinished_syncing();
                         consensus.register_block_sync_attempt(source.unwrap());
                         consensus.update_blocks(source.unwrap()).await;
                     }
