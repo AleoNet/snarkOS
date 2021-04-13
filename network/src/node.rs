@@ -170,6 +170,24 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.register_task(peering_task);
 
         if !self.config.is_bootnode() {
+            let self_clone = self.clone();
+            let state_mgmt_task = task::spawn(async move {
+                loop {
+                    sleep(std::time::Duration::from_secs(5)).await;
+
+                    // make sure that the node doesn't remain in a sync state without peers
+                    if self_clone.state() == State::Syncing
+                        && self_clone.peer_book.read().number_of_connected_peers() == 0
+                    {
+                        self_clone.set_state(State::Idle);
+                    }
+
+                    // report node's current state
+                    trace!("Node state: {:?}", self_clone.state());
+                }
+            });
+            self.register_task(state_mgmt_task);
+
             if let Some(ref consensus) = self.consensus() {
                 let self_clone = self.clone();
                 let consensus = Arc::clone(consensus);

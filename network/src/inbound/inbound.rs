@@ -272,8 +272,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         consensus.register_block_sync_attempt();
                         trace!("Attempting to sync with {}", source.unwrap());
                         consensus.update_blocks(source.unwrap()).await;
-                    } else {
-                        consensus.finished_syncing_blocks();
                     }
                 }
             }
