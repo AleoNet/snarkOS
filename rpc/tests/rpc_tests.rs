@@ -22,7 +22,7 @@ mod rpc_tests {
     use snarkos_storage::LedgerStorage;
     use snarkos_testing::{
         consensus::*,
-        network::{test_environment, ConsensusSetup, TestSetup},
+        network::{test_config, ConsensusSetup, TestSetup},
     };
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Transaction;
@@ -37,7 +37,7 @@ mod rpc_tests {
     use std::{net::SocketAddr, sync::Arc, time::Duration};
 
     async fn initialize_test_rpc(ledger: Arc<MerkleTreeLedger<LedgerStorage>>) -> Rpc {
-        let environment = test_environment(TestSetup::default());
+        let environment = test_config(TestSetup::default());
         let mut node = Node::new(environment).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
         let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus_from_ledger(

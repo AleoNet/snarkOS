@@ -16,20 +16,17 @@
 
 use crate::NetworkError;
 
-use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
-use rand::{thread_rng, Rng};
 use std::{
     net::SocketAddr,
     time::Duration,
     {self},
 };
 
-/// A core data structure containing the networking parameters for this node.
-pub struct Environment {
-    pub name: u64,
-    /// The local address of this node.
-    local_address: OnceCell<SocketAddr>,
+/// A core data structure containing the pre-configured parameters for the node.
+pub struct Config {
+    /// The pre-configured desired address of this node.
+    pub desired_address: Option<SocketAddr>,
     /// The minimum number of peers required to maintain connections with.
     minimum_number_of_connected_peers: u16,
     /// The maximum number of peers permitted to maintain connections with.
@@ -43,10 +40,11 @@ pub struct Environment {
     peer_sync_interval: Duration,
 }
 
-impl Environment {
+impl Config {
     /// Creates a new instance of `Environment`.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        desired_address: Option<SocketAddr>,
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
         bootnodes_addresses: Vec<String>,
@@ -61,33 +59,14 @@ impl Environment {
             }
         }
 
-        // Generate the node name.
-        let mut rng = thread_rng();
-        let name = rng.gen();
-
         Ok(Self {
-            local_address: Default::default(),
-            name,
+            desired_address,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
             bootnodes: RwLock::new(bootnodes),
             is_bootnode,
             peer_sync_interval,
         })
-    }
-
-    /// Returns the local address of the node.
-    #[inline]
-    pub fn local_address(&self) -> Option<SocketAddr> {
-        self.local_address.get().copied()
-    }
-
-    /// Sets the local address of the node to the given value.
-    #[inline]
-    pub fn set_local_address(&self, addr: SocketAddr) {
-        self.local_address
-            .set(addr)
-            .expect("local address was set more than once!");
     }
 
     /// Returns the default bootnodes of the network.

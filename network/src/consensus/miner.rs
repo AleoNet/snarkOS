@@ -42,8 +42,13 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
     /// Miner threads are asynchronous so the only way to stop them is to kill the runtime they were started in. This may be changed in the future.
     pub fn spawn(self) -> task::JoinHandle<()> {
         task::spawn(async move {
-            let local_address = self.node.environment.local_address().unwrap();
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
+
+            let local_address = self
+                .node
+                .local_address()
+                .expect("tried to spawn a miner before the network was initialized!");
+
             let miner = Miner::new(
                 self.miner_address.clone(),
                 Arc::clone(&self.node.expect_consensus().consensus),

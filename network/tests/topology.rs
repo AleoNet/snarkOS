@@ -18,7 +18,7 @@ use snarkos_network::Node;
 use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{
-        test_environment,
+        test_config,
         test_node,
         topology::{connect_nodes, Topology},
         TestSetup,
@@ -34,10 +34,10 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
     let mut nodes = Vec::with_capacity(n);
 
     for _ in 0..n {
-        let environment = test_environment(setup.clone());
+        let environment = test_config(setup.clone());
         let node = Node::new(environment).await.unwrap();
 
-        node.listen(setup.socket_address).await.unwrap();
+        node.listen().await.unwrap();
         nodes.push(node);
     }
 
@@ -201,13 +201,13 @@ async fn binary_star_contact() {
         is_bootnode: true,
         ..Default::default()
     };
-    let environment_a = test_environment(bootnode_setup.clone());
-    let environment_b = test_environment(bootnode_setup.clone());
+    let environment_a = test_config(bootnode_setup.clone());
+    let environment_b = test_config(bootnode_setup.clone());
     let bootnode_a = Node::new(environment_a).await.unwrap();
     let bootnode_b = Node::new(environment_b).await.unwrap();
 
-    bootnode_a.listen(bootnode_setup.socket_address).await.unwrap();
-    bootnode_b.listen(bootnode_setup.socket_address).await.unwrap();
+    bootnode_a.listen().await.unwrap();
+    bootnode_b.listen().await.unwrap();
 
     let ba = bootnode_a.local_address().unwrap().to_string();
     let bb = bootnode_b.local_address().unwrap().to_string();

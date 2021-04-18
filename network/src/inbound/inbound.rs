@@ -94,8 +94,8 @@ impl Inbound {
 }
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
-    pub async fn listen(&self, desired_address: Option<SocketAddr>) -> Result<(), NetworkError> {
-        let (listener_address, listener) = if let Some(addr) = desired_address {
+    pub async fn listen(&self) -> Result<(), NetworkError> {
+        let (listener_address, listener) = if let Some(addr) = self.config.desired_address {
             let listener = TcpListener::bind(&addr).await?;
             (listener.local_addr()?, listener)
         } else {
@@ -103,8 +103,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let listener_address = listener.local_addr()?;
             (listener_address, listener)
         };
-        self.environment.set_local_address(listener_address);
-        info!("Node {:x} listening at {}", self.environment.name, listener_address);
+        self.set_local_address(listener_address);
+        info!("Node {:x} listening at {}", self.name, listener_address);
 
         let node = self.clone();
         let listener_handle = task::spawn(async move {
@@ -193,7 +193,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        if self.environment.is_bootnode() && payload != Payload::GetPeers {
+        if self.config.is_bootnode() && payload != Payload::GetPeers {
             // the bootstrapper nodes should ignore inbound messages other than GetPeers
             return Ok(());
         }

@@ -24,7 +24,7 @@ use snarkos::{
     errors::NodeError,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{environment::Environment, Consensus, MinerInstance, Node};
+use snarkos_network::{config::Config as NodeConfig, Consensus, MinerInstance, Node};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
@@ -86,12 +86,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     print_welcome(&config);
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
-    let socket_address = address.parse::<SocketAddr>()?;
+    let desired_address = address.parse::<SocketAddr>()?;
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
-    let environment = Environment::new(
+    let node_config = NodeConfig::new(
+        Some(desired_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
@@ -103,7 +104,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(environment).await?;
+    let mut node = Node::new(node_config).await?;
 
     let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 
@@ -162,7 +163,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     };
 
     // Start listening for incoming connections.
-    node.listen(Some(socket_address)).await?;
+    node.listen().await?;
 
     // Start the miner task if mining configuration is enabled.
     if config.miner.is_miner {
