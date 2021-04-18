@@ -67,7 +67,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the block number given a block hash.
     pub fn get_block_number(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
         match self.storage.get(COL_BLOCK_LOCATOR, &block_hash.0)? {
-            Some(block_num_bytes) => Ok(bytes_to_u32(block_num_bytes)),
+            Some(block_num_bytes) => Ok(bytes_to_u32(&block_num_bytes)),
             None => Err(StorageError::MissingBlockNumber(block_hash.to_string())),
         }
     }

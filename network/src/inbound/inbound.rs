@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender};
+use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -68,10 +68,6 @@ impl Inbound {
 
             // Determine if we should disconnect.
             *disconnect_from_peer = error.is_fatal() || *failure_count >= 10;
-
-            if *disconnect_from_peer {
-                debug!("Should disconnect from peer");
-            }
         } else {
             debug!("A connection errored again in the same loop (error message: {})", error);
         }
@@ -181,11 +177,20 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             };
 
-            // Messages are received by a single tokio MPSC receiver with
-            // the message name, bytes, and associated channel.
-            //
-            // The oneshot sender lets the connection task know when the message is handled.
+            // Handle Ping/Pong messages immediately in order not to skew latency calculation.
+            match &message.payload {
+                Payload::Ping(..) => {
+                    self.outbound
+                        .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
+                        .await;
+                }
+                Payload::Pong => {
+                    self.peer_book.read().received_pong(reader.addr);
+                }
+                _ => {}
+            }
 
+            // Messages are queued in a single tokio MPSC receiver.
             self.inbound.route(message).await
         }
     }
@@ -219,6 +224,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::SyncBlock(block) => {
                 if let Some(ref consensus) = self.consensus() {
                     consensus.received_block(source.unwrap(), block, false).await?;
+
+                    // since we confirmed that the block is a valid sync block, we can
+                    // set the node's status to Syncing
+                    consensus.node().set_state(State::Syncing);
+
+                    // update the peer and possibly finish the sync process
                     if self.peer_book.read().got_sync_block(source.unwrap()) {
                         consensus.finished_syncing_blocks();
                     }
@@ -252,8 +263,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Sync(sync) => {
                 if let Some(ref consensus) = self.consensus() {
-                    self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len());
-                    consensus.received_sync(source.unwrap(), sync).await;
+                    if self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len()) {
+                        consensus.received_sync(source.unwrap(), sync).await;
+                    }
                 }
             }
             Payload::GetPeers => {
@@ -263,25 +275,16 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 self.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
-                self.outbound
-                    .send_request(Message::new(Direction::Outbound(source.unwrap()), Payload::Pong))
-                    .await;
-
                 if let Some(ref consensus) = self.consensus() {
-                    if block_height > consensus.current_block_height() + 1
-                        && consensus.should_sync_blocks()
-                        && !self.peer_book.read().is_syncing_blocks(source.unwrap())
-                    {
-                        consensus.register_block_sync_attempt();
-                        trace!("Attempting to sync with {}", source.unwrap());
+                    if !consensus.is_syncing_blocks() && consensus.should_sync_blocks(block_height) {
+                        self.peer_book.write().cancel_any_unfinished_syncing();
+                        consensus.register_block_sync_attempt(source.unwrap());
                         consensus.update_blocks(source.unwrap()).await;
-                    } else {
-                        consensus.finished_syncing_blocks();
                     }
                 }
             }
             Payload::Pong => {
-                self.peer_book.read().received_pong(source.unwrap());
+                // already handled with priority in Inbound::listen_for_messages
             }
             Payload::Unknown => {
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
@@ -324,14 +327,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
         let len = reader.read_exact(&mut buf[..len]).await?;
         noise.read_message(&buf[..len], &mut buffer)?;
-        trace!("received e (XX handshake part 1/3)");
+        trace!("received e (XX handshake part 1/3) from {}", remote_address);
 
         // -> e, ee, s, es
         let own_version = Version::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
         let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
-        trace!("sent e, ee, s, es (XX handshake part 2/3)");
+        trace!("sent e, ee, s, es (XX handshake part 2/3) to {}", remote_address);
 
         // <- s, se, psk
         reader.read_exact(&mut buf[..1]).await?;
@@ -342,7 +345,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let len = reader.read_exact(&mut buf[..len]).await?;
         let len = noise.read_message(&buf[..len], &mut buffer)?;
         let peer_version = Version::deserialize(&buffer[..len])?;
-        trace!("received s, se, psk (XX handshake part 3/3)");
+        trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
 
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));

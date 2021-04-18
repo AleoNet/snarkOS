@@ -20,8 +20,27 @@ use snarkvm_objects::Storage;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use rand::{thread_rng, Rng};
-use std::{collections::HashMap, net::SocketAddr, ops::Deref, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    ops::Deref,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+};
 use tokio::{task, time::sleep};
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum State {
+    Idle = 0,
+    Mining,
+    Syncing,
+}
+
+#[derive(Default)]
+pub struct StateCode(AtomicU8);
 
 /// A core data structure for operating the networking stack of this node.
 #[derive(Derivative)]
@@ -40,6 +59,8 @@ impl<S: Storage> Deref for Node<S> {
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
     pub name: u64,
+    /// The current state of the node.
+    state: StateCode,
     /// The pre-configured parameters of this node.
     pub config: Config,
     /// The inbound handler of this node.
@@ -56,6 +77,27 @@ pub struct InnerNode<S: Storage> {
     tasks: Mutex<Vec<task::JoinHandle<()>>>,
 }
 
+impl<S: Storage> Node<S> {
+    /// Returns the current state of the node.
+    #[inline]
+    pub fn state(&self) -> State {
+        match self.state.0.load(Ordering::SeqCst) {
+            0 => State::Idle,
+            1 => State::Mining,
+            2 => State::Syncing,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Changes the current state of the node.
+    #[inline]
+    pub fn set_state(&self, new_state: State) {
+        let code = new_state as u8;
+
+        self.state.0.store(code, Ordering::SeqCst);
+    }
+}
+
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
@@ -66,6 +108,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
+            state: Default::default(),
             local_address: Default::default(),
             config,
             inbound,
@@ -127,6 +170,24 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.register_task(peering_task);
 
         if !self.config.is_bootnode() {
+            let self_clone = self.clone();
+            let state_mgmt_task = task::spawn(async move {
+                loop {
+                    sleep(std::time::Duration::from_secs(5)).await;
+
+                    // make sure that the node doesn't remain in a sync state without peers
+                    if self_clone.state() == State::Syncing
+                        && self_clone.peer_book.read().number_of_connected_peers() == 0
+                    {
+                        self_clone.set_state(State::Idle);
+                    }
+
+                    // report node's current state
+                    trace!("Node state: {:?}", self_clone.state());
+                }
+            });
+            self.register_task(state_mgmt_task);
+
             if let Some(ref consensus) = self.consensus() {
                 let self_clone = self.clone();
                 let consensus = Arc::clone(consensus);

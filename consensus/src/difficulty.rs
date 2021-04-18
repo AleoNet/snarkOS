@@ -38,8 +38,8 @@ pub fn naive_retarget(
         x *= parent_diff;
         x = parent_diff - x;
 
-        println!("old difficulty        {:#x}", parent_difficulty);
-        println!("new difficulty        {:#x}", x as u64);
+        trace!("old difficulty        {:#x}", parent_difficulty);
+        trace!("new difficulty        {:#x}", x as u64);
 
         x as u64
     }
@@ -91,8 +91,8 @@ pub fn ethereum_retarget(block_timestamp: i64, parent_timestamp: i64, parent_dif
     x *= y;
     x += parent_diff;
 
-    println!("old difficulty        {:#x}", parent_difficulty);
-    println!("new difficulty        {:#x}", x as u64);
+    trace!("old difficulty        {:#x}", parent_difficulty);
+    trace!("new difficulty        {:#x}", x as u64);
 
     x as u64
 }

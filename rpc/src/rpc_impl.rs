@@ -307,12 +307,9 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
 
     /// Returns data about the node.
     fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
-        // FIXME(ljedrz): actually check if syncing
-        let is_syncing = false;
-
         Ok(NodeInfo {
             is_miner: self.consensus_layer()?.is_miner(),
-            is_syncing,
+            is_syncing: self.consensus_layer()?.is_syncing_blocks(),
         })
     }
 

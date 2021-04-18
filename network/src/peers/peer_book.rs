@@ -306,7 +306,7 @@ impl PeerBook {
         if let Some(ref quality) = self.peer_quality(addr) {
             *quality.last_seen.write() = Some(chrono::Utc::now());
         } else {
-            warn!("Attempted to update state of a peer that's not connected: {}", addr);
+            trace!("Attempted to update state of a peer that's not connected: {}", addr);
         }
     }
 
@@ -327,6 +327,7 @@ impl PeerBook {
             if quality.expecting_pong.load(Ordering::SeqCst) {
                 let ping_sent = quality.last_ping_sent.lock().unwrap();
                 let rtt = ping_sent.elapsed().as_millis() as u64;
+                trace!("RTT for {} is {}ms", source, rtt);
                 quality.rtt_ms.store(rtt, Ordering::SeqCst);
                 quality.expecting_pong.store(false, Ordering::SeqCst);
             } else {
@@ -339,11 +340,13 @@ impl PeerBook {
     }
 
     /// Registers that the given number of blocks is expected as part of syncing with a peer.
-    pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) {
+    pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) -> bool {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
+            true
         } else {
-            error!("Peer for expecting_sync_blocks purposes not found!");
+            warn!("Peer for expecting_sync_blocks purposes not found! (probably disconnected)");
+            false
         }
     }
 
@@ -352,7 +355,7 @@ impl PeerBook {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.fetch_sub(1, Ordering::SeqCst) == 1
         } else {
-            error!("Peer for got_sync_block purposes not found!");
+            warn!("Peer for got_sync_block purposes not found! (probably disconnected)");
             true
         }
     }
@@ -362,8 +365,22 @@ impl PeerBook {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.load(Ordering::SeqCst) != 0
         } else {
-            error!("Peer for got_sync_block purposes not found!");
+            trace!("Peer for is_syncing_blocks purposes not found! (probably disconnected)");
             false
+        }
+    }
+
+    /// Cancels any expected sync block counts from all peers.
+    pub fn cancel_any_unfinished_syncing(&mut self) {
+        for peer_info in self.connected_peers.values_mut() {
+            let missing_sync_blocks = peer_info.quality.remaining_sync_blocks.swap(0, Ordering::SeqCst);
+            if missing_sync_blocks != 0 {
+                warn!(
+                    "Was expecting {} more sync blocks from {}",
+                    missing_sync_blocks,
+                    peer_info.address(),
+                );
+            }
         }
     }
 }
