@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![allow(clippy::upper_case_acronyms)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts, trivial_numeric_casts)]
 #![deny(unused_qualifications, variant_size_differences, stable_features, unreachable_pub)]
 #![deny(non_shorthand_field_patterns, unused_attributes, unused_extern_crates)]
