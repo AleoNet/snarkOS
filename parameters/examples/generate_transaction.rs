@@ -52,9 +52,7 @@ fn empty_ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
     path: &Path,
 ) -> Result<Ledger<T, P, S>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-    let storage = S::open(Some(path), None)
-        .map(|storage| storage)
-        .map_err(|err| LedgerError::Message(err.to_string()))?;
+    let storage = S::open(Some(path), None).map_err(|err| LedgerError::Message(err.to_string()))?;
 
     let leaves: &[[u8; 32]] = &[];
     let cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), leaves.iter())?;
@@ -134,7 +132,7 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
             .hash(&[64u8 + (i as u8); 1])?;
         let old_record = DPC::generate_record(
             &consensus.public_parameters.system_parameters,
-            old_sn_nonce.clone(),
+            old_sn_nonce,
             dummy_account.address.clone(),
             true, // The input record is dummy
             0,

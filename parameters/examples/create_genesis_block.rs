@@ -33,7 +33,7 @@ use chrono::Utc;
 use std::{
     fs::File,
     io::{Result as IoResult, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
@@ -56,7 +56,7 @@ pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
     Ok(genesis_header.serialize().to_vec())
 }
 
-pub fn store(path: &PathBuf, bytes: &[u8]) -> IoResult<()> {
+pub fn store(path: &Path, bytes: &[u8]) -> IoResult<()> {
     let mut file = File::create(path)?;
     file.write_all(&bytes)?;
     drop(file);

@@ -46,7 +46,7 @@ mod rpc_tests {
 
         let node_consensus = snarkos_network::Consensus::new(
             node.clone(),
-            consensus.clone(),
+            consensus,
             consensus_setup.is_miner,
             Duration::from_secs(consensus_setup.block_sync_interval),
             Duration::from_secs(consensus_setup.tx_sync_interval),
