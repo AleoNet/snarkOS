@@ -56,7 +56,7 @@ impl<S: Storage> Deref for Node<S> {
     }
 }
 
-#[doc(hide)]
+#[doc(hidden)]
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
     pub name: u64,
