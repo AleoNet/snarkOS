@@ -149,7 +149,11 @@ async fn block_responder_side() {
 #[test]
 #[ignore]
 fn block_propagation() {
-    let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_io()
+        .enable_time()
+        .build()
+        .unwrap();
 
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
@@ -163,11 +167,10 @@ fn block_propagation() {
     rt.block_on(async move {
         let (_node, mut peer) = handshaken_node_and_peer(setup).await;
 
-        let payload = peer.read_payload().await.unwrap();
-        assert!(matches!(payload, Payload::Block(..)));
-
-        // TODO: shutdown the miner task, currently there is no good way to do this. This test will
-        // currently hang after the assertion.
+        wait_until!(60, {
+            let payload = peer.read_payload().await.unwrap();
+            matches!(payload, Payload::Block(..))
+        });
     });
 }
 
