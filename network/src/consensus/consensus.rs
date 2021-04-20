@@ -40,7 +40,7 @@ pub struct Consensus<S: Storage> {
     /// The interval between each block sync.
     block_sync_interval: Duration,
     /// The last time a block sync was initiated.
-    last_block_sync: RwLock<Instant>,
+    last_block_sync: RwLock<Option<Instant>>,
     /// The interval between each transaction (memory pool) sync.
     transaction_sync_interval: Duration,
 }
@@ -59,7 +59,7 @@ impl<S: Storage> Consensus<S> {
             consensus,
             is_miner,
             block_sync_interval,
-            last_block_sync: RwLock::new(Instant::now()),
+            last_block_sync: Default::default(),
             transaction_sync_interval,
         }
     }
@@ -118,13 +118,17 @@ impl<S: Storage> Consensus<S> {
     /// Checks whether the conditions for the node to attempt another block sync are met.
     pub fn should_sync_blocks(&self, peer_block_height: u32) -> bool {
         peer_block_height > self.current_block_height() + 1
-            && self.last_block_sync.read().elapsed() > self.block_sync_interval
+            && if let Some(ref timestamp) = *self.last_block_sync.read() {
+                timestamp.elapsed() > self.block_sync_interval
+            } else {
+                true
+            }
     }
 
     /// Register that the node attempted to sync blocks with the given peer.
     pub fn register_block_sync_attempt(&self, provider: SocketAddr) {
         trace!("Attempting to sync with {}", provider);
-        *self.last_block_sync.write() = Instant::now();
+        *self.last_block_sync.write() = Some(Instant::now());
     }
 
     /// Returns the interval between each transaction (memory pool) sync.
