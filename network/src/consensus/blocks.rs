@@ -88,7 +88,7 @@ impl<S: Storage> Consensus<S> {
         let is_valid_block = self.consensus.receive_block(&block_struct).is_ok();
 
         // This is a new block, send it to our peers.
-        if is_block_new && is_valid_block && !self.is_syncing_blocks() {
+        if is_block_new && is_valid_block {
             self.propagate_block(block, remote_address).await;
         }
 
