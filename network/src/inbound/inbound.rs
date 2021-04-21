@@ -230,13 +230,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 if let Some(ref consensus) = self.consensus() {
                     consensus.received_block(source.unwrap(), block, false).await?;
 
-                    // since we confirmed that the block is a valid sync block, we can
-                    // set the node's status to Syncing
-                    consensus.node().set_state(State::Syncing);
-
                     // update the peer and possibly finish the sync process
                     if self.peer_book.read().got_sync_block(source.unwrap()) {
                         consensus.finished_syncing_blocks();
+                    } else {
+                        // since we confirmed that the block is a valid sync block
+                        // and we're expecting more blocks from the peer, we can set
+                        // the node's status to Syncing
+                        consensus.node().set_state(State::Syncing);
                     }
                 }
             }
