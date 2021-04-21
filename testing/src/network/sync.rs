@@ -44,6 +44,10 @@ async fn block_initiator_side() {
     };
     let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
+    // check if the peer has received an automatic Ping message from the node
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Ping(..)));
+
     // wait for the block_sync_interval to "expire"
     sleep(Duration::from_secs(1)).await;
 
@@ -106,6 +110,10 @@ async fn block_responder_side() {
     // handshake between a fake node and a full node
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
 
+    // check if the peer has received an automatic Ping message from the node
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Ping(..)));
+
     // insert block into node
     let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
     node.expect_consensus()
@@ -146,24 +154,32 @@ async fn block_responder_side() {
     assert_eq!(block, block_struct_1);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[test]
 #[ignore]
-async fn block_propagation() {
+fn block_propagation() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_io()
+        .enable_time()
+        .build()
+        .unwrap();
+
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
             is_miner: true,
             ..Default::default()
         }),
+        tokio_handle: Some(rt.handle().clone()),
         ..Default::default()
     };
 
-    let (_node, mut peer) = handshaken_node_and_peer(setup).await;
+    rt.block_on(async move {
+        let (_node, mut peer) = handshaken_node_and_peer(setup).await;
 
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Block(..)));
-
-    // TODO: shutdown the miner task, currently there is no good way to do this. This test will
-    // currently hang after the assertion.
+        wait_until!(60, {
+            let payload = peer.read_payload().await.unwrap();
+            matches!(payload, Payload::Block(..))
+        });
+    });
 }
 
 #[tokio::test]
@@ -215,6 +231,10 @@ async fn transaction_initiator_side() {
     };
     let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
+    // check if the peer has received an automatic Ping message from the node
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Ping(..)));
+
     // check GetMemoryPool message was received
     let payload = peer.read_payload().await.unwrap();
     assert!(matches!(payload, Payload::GetMemoryPool));
@@ -243,6 +263,10 @@ async fn transaction_initiator_side() {
 async fn transaction_responder_side() {
     // handshake between a fake node and a full node
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
+
+    // check if the peer has received an automatic Ping message from the node
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Ping(..)));
 
     // insert transaction into node
     let mut memory_pool = node.expect_consensus().memory_pool().lock();

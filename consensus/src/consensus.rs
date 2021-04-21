@@ -95,7 +95,7 @@ impl<S: Storage> Consensus<S> {
                 self.parameters
                     .verify_header(&block.header, &parent_block.header, &merkle_root, &pedersen_merkle_root)
             {
-                println!("header failed to verify: {:?}", err);
+                error!("block header failed to verify: {:?}", err);
                 return Ok(false);
             }
         }
@@ -116,15 +116,15 @@ impl<S: Storage> Consensus<S> {
 
         // Check that there is only 1 coinbase transaction
         if coinbase_transaction_count > 1 {
-            println!("error - multiple coinbase transactions");
+            error!("multiple coinbase transactions");
             return Ok(false);
         }
 
         // Check that the block value balances are correct
         let expected_block_reward = crate::get_block_reward(self.ledger.len() as u32).0;
         if total_value_balance.0 + expected_block_reward != 0 {
-            println!("total_value_balance: {:?}", total_value_balance);
-            println!("expected_block_reward: {:?}", expected_block_reward);
+            trace!("total_value_balance: {:?}", total_value_balance);
+            trace!("expected_block_reward: {:?}", expected_block_reward);
 
             return Ok(false);
         }

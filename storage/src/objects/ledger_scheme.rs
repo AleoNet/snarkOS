@@ -50,7 +50,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
         }?;
 
         if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())? {
-            if bytes_to_u32(block_num) != 0 {
+            if bytes_to_u32(&block_num) != 0 {
                 return Err(LedgerError::ExistingDatabase.into());
             }
         }

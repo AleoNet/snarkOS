@@ -24,7 +24,7 @@ use snarkos::{
     errors::NodeError,
 };
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{environment::Environment, Consensus, MinerInstance, Node};
+use snarkos_network::{config::Config as NodeConfig, Consensus, MinerInstance, Node};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
@@ -39,7 +39,7 @@ use snarkvm_utilities::{to_bytes, ToBytes};
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Handle};
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -80,18 +80,19 @@ fn print_welcome(config: &Config) {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: Config) -> anyhow::Result<()> {
+async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()> {
     initialize_logger(&config);
 
     print_welcome(&config);
 
     let address = format! {"{}:{}", config.node.ip, config.node.port};
-    let socket_address = address.parse::<SocketAddr>()?;
+    let desired_address = address.parse::<SocketAddr>()?;
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
-    let environment = Environment::new(
+    let node_config = NodeConfig::new(
+        Some(desired_address),
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
@@ -103,7 +104,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(environment).await?;
+    let mut node = Node::new(node_config).await?;
 
     let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 
@@ -162,20 +163,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     };
 
     // Start listening for incoming connections.
-    node.listen(Some(socket_address)).await?;
-
-    // Start the miner task if mining configuration is enabled.
-    if config.miner.is_miner {
-        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
-            Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
-                node.register_task(handle);
-            }
-            Err(_) => info!(
-                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
-            ),
-        }
-    }
+    node.listen().await?;
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
@@ -202,6 +190,20 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start the network services
     node.start_services().await;
 
+    // Start the miner task if mining configuration is enabled.
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    if config.miner.is_miner {
+        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+            Ok(miner_address) => {
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
+                node.register_thread(handle);
+            }
+            Err(_) => info!(
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
+            ),
+        }
+    }
+
     std::future::pending::<()>().await;
 
     Ok(())
@@ -213,11 +215,13 @@ fn main() -> Result<(), NodeError> {
     let config: Config = ConfigCli::parse(&arguments)?;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
 
-    Builder::new_multi_thread()
+    let runtime = Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
-        .build()?
-        .block_on(start_server(config))?;
+        .build()?;
+    let handle = runtime.handle().clone();
+
+    runtime.block_on(start_server(config, handle))?;
 
     Ok(())
 }

@@ -22,7 +22,7 @@ mod protected_rpc_tests {
     use snarkos_storage::LedgerStorage;
     use snarkos_testing::{
         consensus::*,
-        network::{test_environment, ConsensusSetup, TestSetup},
+        network::{test_config, ConsensusSetup, TestSetup},
     };
 
     use snarkvm_dpc::{
@@ -78,7 +78,7 @@ mod protected_rpc_tests {
             password: TEST_PASSWORD.to_string(),
         };
 
-        let environment = test_environment(TestSetup::default());
+        let environment = test_config(TestSetup::default());
         let mut node = Node::new(environment).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
         let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus_from_ledger(

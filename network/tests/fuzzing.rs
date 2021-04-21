@@ -31,7 +31,7 @@ use std::{
     },
 };
 
-pub const ITERATIONS: usize = 5000;
+pub const ITERATIONS: usize = 1000;
 pub const CORRUPTION_PROBABILITY: f64 = 0.1;
 
 fn corrupt_bytes(serialized: &[u8]) -> Vec<u8> {
@@ -57,7 +57,7 @@ async fn fuzzing_zeroes_pre_handshake() {
         ..Default::default()
     };
     let node = test_node(node_setup).await;
-    let node_addr = node.environment.local_address().unwrap();
+    let node_addr = node.local_address().unwrap();
 
     let mut stream = TcpStream::connect(node_addr).await.unwrap();
     wait_until!(1, node.peer_book.read().number_of_connecting_peers() == 1);
@@ -90,7 +90,7 @@ async fn fuzzing_valid_header_pre_handshake() {
         ..Default::default()
     };
     let node = test_node(node_setup).await;
-    let node_addr = node.environment.local_address().unwrap();
+    let node_addr = node.local_address().unwrap();
 
     for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1..(64 * 1024));
@@ -142,7 +142,7 @@ async fn fuzzing_pre_handshake() {
         ..Default::default()
     };
     let node = test_node(node_setup).await;
-    let node_addr = node.environment.local_address().unwrap();
+    let node_addr = node.local_address().unwrap();
 
     for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1..(64 * 1024));

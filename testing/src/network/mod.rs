@@ -35,6 +35,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
+    runtime,
 };
 use tracing::*;
 
@@ -105,6 +106,7 @@ pub struct TestSetup {
     pub max_peers: u16,
     pub is_bootnode: bool,
     pub bootnodes: Vec<String>,
+    pub tokio_handle: Option<runtime::Handle>,
 }
 
 impl TestSetup {
@@ -116,6 +118,7 @@ impl TestSetup {
         max_peers: u16,
         is_bootnode: bool,
         bootnodes: Vec<String>,
+        tokio_handle: Option<runtime::Handle>,
     ) -> Self {
         Self {
             socket_address,
@@ -125,6 +128,7 @@ impl TestSetup {
             max_peers,
             is_bootnode,
             bootnodes,
+            tokio_handle,
         }
     }
 }
@@ -139,6 +143,7 @@ impl Default for TestSetup {
             max_peers: 100,
             is_bootnode: false,
             bootnodes: vec![],
+            tokio_handle: None,
         }
     }
 }
@@ -155,9 +160,10 @@ pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Conse
     )
 }
 
-/// Returns an `Environment` struct with given arguments
-pub fn test_environment(setup: TestSetup) -> Environment {
-    Environment::new(
+/// Returns a `Config` struct based on the given `TestSetup`.
+pub fn test_config(setup: TestSetup) -> Config {
+    Config::new(
+        setup.socket_address,
         setup.min_peers,
         setup.max_peers,
         setup.bootnodes,
@@ -170,20 +176,21 @@ pub fn test_environment(setup: TestSetup) -> Environment {
 /// Starts a node with the specified bootnodes.
 pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
-    let environment = test_environment(setup.clone());
-    let mut node = Node::new(environment).await.unwrap();
+    let config = test_config(setup.clone());
+    let mut node = Node::new(config).await.unwrap();
 
     if let Some(consensus_setup) = setup.consensus_setup {
         let consensus = test_consensus(consensus_setup, node.clone());
         node.set_consensus(consensus);
     }
 
-    node.listen(setup.socket_address).await.unwrap();
+    node.listen().await.unwrap();
     node.start_services().await;
 
     if is_miner {
+        let tokio_handle = setup.tokio_handle.unwrap();
         let miner_address = FIXTURE.test_accounts[0].address.clone();
-        MinerInstance::new(miner_address, node.clone()).spawn();
+        MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
     }
 
     node

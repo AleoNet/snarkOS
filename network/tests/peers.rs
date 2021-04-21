@@ -30,6 +30,10 @@ async fn peer_initiator_side() {
     };
     let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
+    // check if the peer has received an automatic Ping message from the node
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Ping(..)));
+
     // check if the peer has received the GetPeers message from the node
     let payload = peer.read_payload().await.unwrap();
     assert!(matches!(payload, Payload::GetPeers));
@@ -49,6 +53,10 @@ async fn peer_responder_side() {
         ..Default::default()
     };
     let (_node, mut peer) = handshaken_node_and_peer(setup).await;
+
+    // check if the peer has received an automatic Ping message from the node
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Ping(..)));
 
     // send GetPeers message
     peer.write_message(&Payload::GetPeers).await;

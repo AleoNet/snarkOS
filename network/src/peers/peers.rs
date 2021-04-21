@@ -47,9 +47,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         );
 
         // Check that this node is not a bootnode.
-        if !self.environment.is_bootnode() {
+        if !self.config.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
-            let min_peers = self.environment.minimum_number_of_connected_peers() as usize;
+            let min_peers = self.config.minimum_number_of_connected_peers() as usize;
             if number_of_connected_peers < min_peers {
                 // Attempt to connect to the default bootnodes of the network.
                 self.connect_to_bootnodes().await;
@@ -64,7 +64,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Check if this node server is above the permitted number of connected peers.
-        let max_peers = self.environment.maximum_number_of_connected_peers() as usize;
+        let max_peers = self.config.maximum_number_of_connected_peers() as usize;
         if number_of_connected_peers > max_peers {
             let number_to_disconnect = number_of_connected_peers - max_peers;
             trace!(
@@ -92,7 +92,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let now = chrono::Utc::now();
 
         #[allow(clippy::needless_collect)] // clippy reports a false positive here
-        if self.environment.is_bootnode() {
+        if self.config.is_bootnode() {
             let peers = self
                 .peer_book
                 .read()
@@ -109,7 +109,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         if number_of_connected_peers != 0 {
-            if !self.environment.is_bootnode() {
+            if !self.config.is_bootnode() {
                 // Send a `Ping` to every connected peer.
                 self.broadcast_pings().await;
             }
@@ -162,7 +162,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let len = noise.write_message(&[], &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
-        trace!("sent e (XX handshake part 1/3)");
+        trace!("sent e (XX handshake part 1/3) to {}", remote_address);
 
         // <- e, ee, s, es
         reader.read_exact(&mut buf[..1]).await?;
@@ -173,14 +173,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let len = reader.read_exact(&mut buf[..len]).await?;
         let len = noise.read_message(&buf[..len], &mut buffer)?;
         let _peer_version = Version::deserialize(&buffer[..len])?;
-        trace!("received e, ee, s, es (XX handshake part 2/3)");
+        trace!("received e, ee, s, es (XX handshake part 2/3) from {}", remote_address);
 
         // -> s, se, psk
         let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
         let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
-        trace!("sent s, se, psk (XX handshake part 3/3)");
+        trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
         let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
         let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
@@ -204,6 +204,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             conn_listening_task.abort();
         }
 
+        trace!("Connected to {}", remote_address);
+
         Ok(())
     }
 
@@ -223,7 +225,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         // Iterate through each bootnode address and attempt a connection request.
         for bootnode_address in self
-            .environment
+            .config
             .bootnodes()
             .iter()
             .filter(|addr| !connected_peers.contains(addr))
@@ -349,7 +351,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
-        let peers = if !self.environment.is_bootnode() {
+        let peers = if !self.config.is_bootnode() {
             self.peer_book
                 .read()
                 .connected_peers()
@@ -374,7 +376,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .await;
 
         // the bootstrapper's job is finished once it's sent its peer a list of peers
-        if self.environment.is_bootnode() {
+        if self.config.is_bootnode() {
             let _ = self.disconnect_from_peer(remote_address);
         }
     }
@@ -386,11 +388,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Process all of the peers sent in the message,
         // by informing the peer book of that we found peers.
-        let local_address = self.environment.local_address().unwrap(); // the address must be known by now
+        let local_address = self.local_address().unwrap(); // the address must be known by now
 
         let number_of_connected_peers = self.peer_book.read().number_of_connected_peers();
         let number_to_connect = self
-            .environment
+            .config
             .maximum_number_of_connected_peers()
             .saturating_sub(number_of_connected_peers);
 
@@ -413,7 +415,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let num_connecting = peer_book.number_of_connecting_peers() as usize;
         drop(peer_book);
 
-        let max_peers = self.environment.maximum_number_of_connected_peers() as usize;
+        let max_peers = self.config.maximum_number_of_connected_peers() as usize;
 
         if num_connected >= max_peers || num_connected + num_connecting >= max_peers {
             warn!("Max number of connections ({}) reached", max_peers);

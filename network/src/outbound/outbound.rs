@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ConnWriter, Message, NetworkError};
+use crate::{ConnWriter, Direction, Message, NetworkError, Node, Payload};
+
+use snarkvm_objects::Storage;
 
 use std::{
     collections::HashMap,
@@ -75,11 +77,12 @@ impl Outbound {
     }
 
     async fn send(&self, request: &Message) {
+        let target_addr = request.receiver();
         // Fetch the outbound channel.
-        let channel = match self.outbound_channel(request.receiver()) {
+        let channel = match self.outbound_channel(target_addr) {
             Ok(channel) => channel,
-            Err(error) => {
-                warn!("Failed to send a {}: {}", request, error);
+            Err(_) => {
+                warn!("Failed to send a {} to {}: peer is disconnected", request, target_addr);
                 return;
             }
         };
@@ -90,9 +93,29 @@ impl Outbound {
                 self.send_success_count.fetch_add(1, Ordering::SeqCst);
             }
             Err(error) => {
-                warn!("Failed to send a {}: {}", request, error);
+                warn!("Failed to send a {} to {}: {}", request, target_addr, error);
                 self.send_failure_count.fetch_add(1, Ordering::SeqCst);
             }
         }
+    }
+}
+
+impl<S: Storage + Send + Sync + 'static> Node<S> {
+    pub async fn send_ping(&self, remote_address: SocketAddr) {
+        // consider peering tests that don't use the consensus layer
+        let current_block_height = if let Some(ref consensus) = self.consensus() {
+            consensus.current_block_height()
+        } else {
+            0
+        };
+
+        self.peer_book.read().sending_ping(remote_address);
+
+        self.outbound
+            .send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::Ping(current_block_height),
+            ))
+            .await;
     }
 }
