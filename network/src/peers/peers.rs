@@ -204,6 +204,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             conn_listening_task.abort();
         }
 
+        trace!("Connected to {}", remote_address);
+
         Ok(())
     }
 

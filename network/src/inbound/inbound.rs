@@ -121,6 +121,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                     node_clone.listen_for_messages(&mut reader).await;
                                 });
 
+                                trace!("Connected to {}", remote_address);
+
+                                // immediately send a ping to provide the peer with our block height
+                                node.send_ping(remote_address).await;
+
                                 if let Ok(ref peer) = node.peer_book.read().get_peer(remote_address) {
                                     peer.register_task(conn_listening_task);
                                 } else {

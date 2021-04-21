@@ -23,8 +23,13 @@ use snarkos_testing::network::{blocks::*, handshaken_node_and_peer, TestSetup};
 fn providing_sync_blocks(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
+    let test_setup = TestSetup {
+        tokio_handle: Some(rt.handle().clone()),
+        ..Default::default()
+    };
+
     // prepare the block provider node and a fake requester node
-    let (provider, requester) = rt.block_on(handshaken_node_and_peer(TestSetup::default()));
+    let (provider, requester) = rt.block_on(handshaken_node_and_peer(test_setup));
     let requester = tokio::sync::Mutex::new(requester);
 
     const NUM_BLOCKS: usize = 10;

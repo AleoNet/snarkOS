@@ -25,9 +25,10 @@ use std::{
     net::SocketAddr,
     ops::Deref,
     sync::{
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
+    thread,
 };
 use tokio::{task, time::sleep};
 
@@ -75,6 +76,10 @@ pub struct InnerNode<S: Storage> {
     pub local_address: OnceCell<SocketAddr>,
     /// The tasks spawned by the node.
     tasks: Mutex<Vec<task::JoinHandle<()>>>,
+    /// The threads spawned by the node.
+    threads: Mutex<Vec<thread::JoinHandle<()>>>,
+    /// An indicator of whether the node is shutting down.
+    shutting_down: AtomicBool,
 }
 
 impl<S: Storage> Node<S> {
@@ -116,6 +121,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             peer_book: Default::default(),
             consensus: Default::default(),
             tasks: Default::default(),
+            threads: Default::default(),
+            shutting_down: Default::default(),
         })))
     }
 
@@ -217,6 +224,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let _ = self.disconnect_from_peer(addr);
         }
 
+        for handle in self.threads.lock().drain(..).rev() {
+            let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
+        }
+
         for handle in self.tasks.lock().drain(..).rev() {
             handle.abort();
         }
@@ -226,9 +237,18 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.tasks.lock().push(handle);
     }
 
+    pub fn register_thread(&self, handle: thread::JoinHandle<()>) {
+        self.threads.lock().push(handle);
+    }
+
     #[inline]
     pub fn local_address(&self) -> Option<SocketAddr> {
         self.local_address.get().copied()
+    }
+
+    #[inline]
+    pub fn is_shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::Relaxed)
     }
 
     /// Sets the local address of the node to the given value.
@@ -251,6 +271,10 @@ impl<S: Storage> Drop for InnerNode<S> {
             for handle in peer_info.tasks.lock().drain(..).rev() {
                 handle.abort();
             }
+        }
+
+        for handle in self.threads.lock().drain(..).rev() {
+            let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
         }
 
         for handle in self.tasks.lock().drain(..).rev() {

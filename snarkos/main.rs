@@ -39,7 +39,7 @@ use snarkvm_utilities::{to_bytes, ToBytes};
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Handle};
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -80,7 +80,7 @@ fn print_welcome(config: &Config) {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: Config) -> anyhow::Result<()> {
+async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()> {
     initialize_logger(&config);
 
     print_welcome(&config);
@@ -195,8 +195,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
-                node.register_task(handle);
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
+                node.register_thread(handle);
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
@@ -215,11 +215,13 @@ fn main() -> Result<(), NodeError> {
     let config: Config = ConfigCli::parse(&arguments)?;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
 
-    Builder::new_multi_thread()
+    let runtime = Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
-        .build()?
-        .block_on(start_server(config))?;
+        .build()?;
+    let handle = runtime.handle().clone();
+
+    runtime.block_on(start_server(config, handle))?;
 
     Ok(())
 }
