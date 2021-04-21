@@ -165,19 +165,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start listening for incoming connections.
     node.listen().await?;
 
-    // Start the miner task if mining configuration is enabled.
-    if config.miner.is_miner {
-        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
-            Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
-                node.register_task(handle);
-            }
-            Err(_) => info!(
-                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
-            ),
-        }
-    }
-
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
         let secondary_storage = if is_storage_in_memory {
@@ -202,6 +189,20 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start the network services
     node.start_services().await;
+
+    // Start the miner task if mining configuration is enabled.
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    if config.miner.is_miner {
+        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+            Ok(miner_address) => {
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
+                node.register_task(handle);
+            }
+            Err(_) => info!(
+                "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
+            ),
+        }
+    }
 
     std::future::pending::<()>().await;
 

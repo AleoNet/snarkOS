@@ -159,12 +159,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let peer_sync_interval = self.config.peer_sync_interval();
         let peering_task = task::spawn(async move {
             loop {
-                sleep(peer_sync_interval).await;
                 info!("Updating peers");
 
                 if let Err(e) = self_clone.update_peers().await {
                     error!("Peer update error: {}", e);
                 }
+                sleep(peer_sync_interval).await;
             }
         });
         self.register_task(peering_task);
