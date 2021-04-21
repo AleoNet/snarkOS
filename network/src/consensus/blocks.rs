@@ -101,7 +101,7 @@ impl<S: Storage> Consensus<S> {
         remote_address: SocketAddr,
         header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
-        for hash in header_hashes {
+        for hash in header_hashes.into_iter().take(crate::MAX_BLOCK_SYNC_COUNT as usize) {
             let block = self.storage().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.
