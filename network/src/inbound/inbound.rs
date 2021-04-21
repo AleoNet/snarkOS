@@ -268,7 +268,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Sync(sync) => {
                 if let Some(ref consensus) = self.consensus() {
-                    if self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len()) {
+                    if !sync.is_empty() && self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len()) {
                         consensus.received_sync(source.unwrap(), sync).await;
                     }
                 }
