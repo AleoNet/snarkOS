@@ -115,14 +115,14 @@ impl<S: Storage> Consensus<S> {
         self.consensus.ledger.get_current_block_height()
     }
 
-    /// Checks whether the conditions for the node to attempt another block sync are met.
-    pub fn should_sync_blocks(&self, peer_block_height: u32) -> bool {
-        peer_block_height > self.current_block_height() + 1
-            && if let Some(ref timestamp) = *self.last_block_sync.read() {
-                timestamp.elapsed() > self.block_sync_interval
-            } else {
-                true
-            }
+    /// Checks whether any previous sync attempt has expired.
+    pub fn has_block_sync_expired(&self) -> bool {
+        if let Some(ref timestamp) = *self.last_block_sync.read() {
+            timestamp.elapsed() > self.block_sync_interval
+        } else {
+            // this means it's the very first sync attempt
+            true
+        }
     }
 
     /// Register that the node attempted to sync blocks with the given peer.
