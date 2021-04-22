@@ -230,13 +230,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 if let Some(ref consensus) = self.consensus() {
                     consensus.received_block(source.unwrap(), block, false).await?;
 
-                    // since we confirmed that the block is a valid sync block, we can
-                    // set the node's status to Syncing
-                    consensus.node().set_state(State::Syncing);
-
                     // update the peer and possibly finish the sync process
                     if self.peer_book.read().got_sync_block(source.unwrap()) {
                         consensus.finished_syncing_blocks();
+                    } else {
+                        // since we confirmed that the block is a valid sync block
+                        // and we're expecting more blocks from the peer, we can set
+                        // the node's status to Syncing
+                        consensus.node().set_state(State::Syncing);
                     }
                 }
             }
@@ -268,7 +269,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Sync(sync) => {
                 if let Some(ref consensus) = self.consensus() {
-                    if self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len()) {
+                    if !sync.is_empty() && self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len()) {
                         consensus.received_sync(source.unwrap(), sync).await;
                     }
                 }
@@ -281,10 +282,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Ping(block_height) => {
                 if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() && consensus.should_sync_blocks(block_height) {
-                        self.peer_book.write().cancel_any_unfinished_syncing();
-                        consensus.register_block_sync_attempt(source.unwrap());
-                        consensus.update_blocks(source.unwrap()).await;
+                    if block_height > consensus.current_block_height() + 1 {
+                        // if the node is syncing, check if that sync attempt hasn't expired
+                        if !consensus.is_syncing_blocks() || consensus.has_block_sync_expired() {
+                            // cancel any possibly ongoing sync attempts
+                            self.set_state(State::Idle);
+                            self.peer_book.write().cancel_any_unfinished_syncing();
+
+                            // begin a new sync attempt
+                            consensus.register_block_sync_attempt(source.unwrap());
+                            consensus.update_blocks(source.unwrap()).await;
+                        }
                     }
                 }
             }

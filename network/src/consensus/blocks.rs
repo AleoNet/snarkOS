@@ -88,7 +88,7 @@ impl<S: Storage> Consensus<S> {
         let is_valid_block = self.consensus.receive_block(&block_struct).is_ok();
 
         // This is a new block, send it to our peers.
-        if is_block_new && is_valid_block && !self.is_syncing_blocks() {
+        if is_block_new && is_valid_block {
             self.propagate_block(block, remote_address).await;
         }
 
@@ -101,7 +101,7 @@ impl<S: Storage> Consensus<S> {
         remote_address: SocketAddr,
         header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
-        for hash in header_hashes {
+        for hash in header_hashes.into_iter().take(crate::MAX_BLOCK_SYNC_COUNT as usize) {
             let block = self.storage().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.

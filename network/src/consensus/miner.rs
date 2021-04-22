@@ -60,7 +60,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
 
                 // don't mine if the node is currently syncing
                 if self.node.state() == State::Syncing {
-                    thread::sleep(Duration::from_secs(5));
+                    thread::sleep(Duration::from_secs(15));
                     continue;
                 } else {
                     self.node.set_state(State::Mining);
