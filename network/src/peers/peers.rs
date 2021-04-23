@@ -17,13 +17,14 @@
 use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
 use snarkvm_objects::Storage;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
 use rand::seq::IteratorRandom;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    task,
 };
 
 impl<S: Storage> Node<S> {
@@ -142,66 +143,93 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.peer_book.write().set_connecting(remote_address)?;
 
-        // open the connection
-        let stream = TcpStream::connect(remote_address).await?;
-        let (mut reader, mut writer) = stream.into_split();
-
-        let builder = snow::Builder::with_resolver(
-            crate::HANDSHAKE_PATTERN
-                .parse()
-                .expect("Invalid noise handshake pattern!"),
-            Box::new(snow::resolvers::SodiumResolver),
-        );
-        let static_key = builder.generate_keypair()?.private;
-        let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
-        let mut noise = noise_builder.build_initiator()?;
-        let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
-        let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
-
-        // -> e
-        let len = noise.write_message(&[], &mut buffer)?;
-        writer.write_all(&[len as u8]).await?;
-        writer.write_all(&buffer[..len]).await?;
-        trace!("sent e (XX handshake part 1/3) to {}", remote_address);
-
-        // <- e, ee, s, es
-        reader.read_exact(&mut buf[..1]).await?;
-        let len = buf[0] as usize;
-        if len == 0 {
-            return Err(NetworkError::InvalidHandshake);
-        }
-        let len = reader.read_exact(&mut buf[..len]).await?;
-        let len = noise.read_message(&buf[..len], &mut buffer)?;
-        let _peer_version = Version::deserialize(&buffer[..len])?;
-        trace!("received e, ee, s, es (XX handshake part 2/3) from {}", remote_address);
-
-        // -> s, se, psk
-        let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
-        let len = noise.write_message(&own_version, &mut buffer)?;
-        writer.write_all(&[len as u8]).await?;
-        writer.write_all(&buffer[..len]).await?;
-        trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
-
-        let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
-        let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
-        let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
-
-        // save the outbound channel
-        self.outbound.channels.write().insert(remote_address, Arc::new(writer));
-
-        self.peer_book.write().set_connected(remote_address, None)?;
-
-        // spawn the inbound loop
+        // spawn a task that will be subject to a deadline
         let node = self.clone();
-        let conn_listening_task = tokio::spawn(async move {
-            node.listen_for_messages(&mut reader).await;
+        let handshake_task = task::spawn(async move {
+            // open the connection
+            let stream = TcpStream::connect(remote_address).await?;
+            let (mut reader, mut writer) = stream.into_split();
+
+            let builder = snow::Builder::with_resolver(
+                crate::HANDSHAKE_PATTERN
+                    .parse()
+                    .expect("Invalid noise handshake pattern!"),
+                Box::new(snow::resolvers::SodiumResolver),
+            );
+            let static_key = builder.generate_keypair()?.private;
+            let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
+            let mut noise = noise_builder.build_initiator()?;
+            let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
+            let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
+
+            // -> e
+            let len = noise.write_message(&[], &mut buffer)?;
+            writer.write_all(&[len as u8]).await?;
+            writer.write_all(&buffer[..len]).await?;
+            trace!("sent e (XX handshake part 1/3) to {}", remote_address);
+
+            // <- e, ee, s, es
+            reader.read_exact(&mut buf[..1]).await?;
+            let len = buf[0] as usize;
+            if len == 0 {
+                return Err(NetworkError::InvalidHandshake);
+            }
+            let len = reader.read_exact(&mut buf[..len]).await?;
+            let len = noise.read_message(&buf[..len], &mut buffer)?;
+            let _peer_version = Version::deserialize(&buffer[..len])?;
+            trace!("received e, ee, s, es (XX handshake part 2/3) from {}", remote_address);
+
+            // -> s, se, psk
+            let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
+            let len = noise.write_message(&own_version, &mut buffer)?;
+            writer.write_all(&[len as u8]).await?;
+            writer.write_all(&buffer[..len]).await?;
+            trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
+
+            let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
+            let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
+            let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
+
+            // save the outbound channel
+            node.outbound.channels.write().insert(remote_address, Arc::new(writer));
+
+            node.peer_book.write().set_connected(remote_address, None)?;
+
+            // spawn the inbound loop
+            let node_clone = node.clone();
+            let conn_listening_task = tokio::spawn(async move {
+                node_clone.listen_for_messages(&mut reader).await;
+            });
+
+            if let Ok(ref peer) = node.peer_book.read().get_peer(remote_address) {
+                peer.register_task(conn_listening_task);
+            } else {
+                // if the related peer is not found, it means it's already been dropped
+                conn_listening_task.abort();
+            }
+
+            Ok(())
         });
 
-        if let Ok(ref peer) = self.peer_book.read().get_peer(remote_address) {
-            peer.register_task(conn_listening_task);
-        } else {
-            // if the related peer is not found, it means it's already been dropped
-            conn_listening_task.abort();
+        // check if the handshake doesn't time out
+        match tokio::time::timeout(
+            Duration::from_secs(crate::HANDSHAKE_TIME_LIMIT_SECS as u64),
+            handshake_task,
+        )
+        .await
+        {
+            // the Result layers are: <timeout result>(<task join result>(<block result>)); JoinHandleError is returned
+            // as NetworkError::InvalidHandshake, since there's not much to salvage there
+            Ok(Ok(Ok(_))) => {}
+            Ok(Ok(e)) => {
+                return e;
+            }
+            Ok(Err(_)) => {
+                return Err(NetworkError::InvalidHandshake);
+            }
+            Err(_) => {
+                return Err(NetworkError::HandshakeTimeout);
+            }
         }
 
         trace!("Connected to {}", remote_address);
@@ -231,10 +259,13 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .filter(|addr| !connected_peers.contains(addr))
             .copied()
         {
-            if let Err(e) = self.initiate_connection(bootnode_address).await {
-                warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                let _ = self.disconnect_from_peer(bootnode_address);
-            }
+            let node = self.clone();
+            task::spawn(async move {
+                if let Err(e) = node.initiate_connection(bootnode_address).await {
+                    warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                    let _ = node.disconnect_from_peer(bootnode_address);
+                }
+            });
         }
     }
 
@@ -253,10 +284,13 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .choose_multiple(&mut rand::thread_rng(), count);
 
         for remote_address in random_peers {
-            if let Err(e) = self.initiate_connection(remote_address).await {
-                trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
-                let _ = self.disconnect_from_peer(remote_address);
-            }
+            let node = self.clone();
+            task::spawn(async move {
+                if let Err(e) = node.initiate_connection(remote_address).await {
+                    trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
+                    let _ = node.disconnect_from_peer(remote_address);
+                }
+            });
         }
     }
 
