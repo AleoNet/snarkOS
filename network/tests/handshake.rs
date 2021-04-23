@@ -272,3 +272,26 @@ async fn handshake_timeout_initiator_side() {
         node.peer_book.read().number_of_connecting_peers() == 0
     );
 }
+
+#[tokio::test]
+async fn handshake_timeout_responder_side() {
+    // start the node
+    let setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    // set up a "peer" that won't perform a valid handshake
+    let _fake_peer = TcpStream::connect(node_addr).await.unwrap();
+
+    // the node should initally accept the connection
+    wait_until!(3, node.peer_book.read().number_of_connecting_peers() == 1 as u16);
+
+    // but since it won't conclude the handshake, it should be dropped after the handshake deadline
+    wait_until!(
+        snarkos_network::HANDSHAKE_TIME_LIMIT_SECS as u64,
+        node.peer_book.read().number_of_connecting_peers() == 0
+    );
+}
