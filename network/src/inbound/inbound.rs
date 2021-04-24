@@ -210,28 +210,28 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         let source = if let Direction::Inbound(addr) = direction {
             self.peer_book.read().update_last_seen(addr);
-            Some(addr)
+            addr
         } else {
-            None
+            unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
 
         match payload {
             Payload::Transaction(transaction) => {
                 if let Some(ref consensus) = self.consensus() {
-                    consensus.received_transaction(source.unwrap(), transaction).await?;
+                    consensus.received_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {
                 if let Some(ref consensus) = self.consensus() {
-                    consensus.received_block(source.unwrap(), block, true).await?;
+                    consensus.received_block(source, block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
                 if let Some(ref consensus) = self.consensus() {
-                    consensus.received_block(source.unwrap(), block, false).await?;
+                    consensus.received_block(source, block, false).await?;
 
                     // update the peer and possibly finish the sync process
-                    if self.peer_book.read().got_sync_block(source.unwrap()) {
+                    if self.peer_book.read().got_sync_block(source) {
                         consensus.finished_syncing_blocks();
                     } else {
                         // since we confirmed that the block is a valid sync block
@@ -244,14 +244,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::GetBlocks(hashes) => {
                 if let Some(ref consensus) = self.consensus() {
                     if !consensus.is_syncing_blocks() {
-                        consensus.received_get_blocks(source.unwrap(), hashes).await?;
+                        consensus.received_get_blocks(source, hashes).await?;
                     }
                 }
             }
             Payload::GetMemoryPool => {
                 if let Some(ref consensus) = self.consensus() {
                     if !consensus.is_syncing_blocks() {
-                        consensus.received_get_memory_pool(source.unwrap()).await?;
+                        consensus.received_get_memory_pool(source).await?;
                     }
                 }
             }
@@ -263,19 +263,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::GetSync(getsync) => {
                 if let Some(ref consensus) = self.consensus() {
                     if !consensus.is_syncing_blocks() {
-                        consensus.received_get_sync(source.unwrap(), getsync).await?;
+                        consensus.received_get_sync(source, getsync).await?;
                     }
                 }
             }
             Payload::Sync(sync) => {
                 if let Some(ref consensus) = self.consensus() {
-                    if !sync.is_empty() && self.peer_book.read().expecting_sync_blocks(source.unwrap(), sync.len()) {
-                        consensus.received_sync(source.unwrap(), sync).await;
+                    if !sync.is_empty() && self.peer_book.read().expecting_sync_blocks(source, sync.len()) {
+                        consensus.received_sync(source, sync).await;
                     }
                 }
             }
             Payload::GetPeers => {
-                self.send_peers(source.unwrap()).await;
+                self.send_peers(source).await;
             }
             Payload::Peers(peers) => {
                 self.process_inbound_peers(peers);
@@ -290,8 +290,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             self.peer_book.write().cancel_any_unfinished_syncing();
 
                             // begin a new sync attempt
-                            consensus.register_block_sync_attempt(source.unwrap());
-                            consensus.update_blocks(source.unwrap()).await;
+                            consensus.register_block_sync_attempt(source);
+                            consensus.update_blocks(source).await;
                         }
                     }
                 }
