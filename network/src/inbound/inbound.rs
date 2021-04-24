@@ -43,7 +43,7 @@ pub struct Inbound {
 impl Inbound {
     pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
         // Initialize the sender and receiver.
-        let (sender, receiver) = tokio::sync::mpsc::channel(1024);
+        let (sender, receiver) = tokio::sync::mpsc::channel(64 * 1024);
 
         Self {
             sender,
