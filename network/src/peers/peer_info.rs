@@ -24,7 +24,7 @@ use tokio::task;
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU16, AtomicU64, AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU64, Ordering},
         Arc,
     },
     time::Instant,
@@ -48,7 +48,7 @@ pub struct PeerQuality {
     /// The time it took to send a `Ping` to the peer and for it to respond with a `Pong`.
     pub rtt_ms: AtomicU64,
     /// The number of failures associated with the peer; grounds for dismissal.
-    pub failures: AtomicU8,
+    pub failures: AtomicU32,
     /// The number of remaining blocs to sync with.
     pub remaining_sync_blocks: AtomicU16,
 }

@@ -17,7 +17,10 @@
 use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
 use snarkvm_objects::Storage;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+};
 
 use parking_lot::Mutex;
 use rand::seq::IteratorRandom;
@@ -45,6 +48,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             number_of_connected_peers,
             if number_of_connected_peers == 1 { "" } else { "s" }
         );
+
+        // Drop peers whose RTT is too high or have too many failures.
+        for (addr, peer_quality) in self
+            .peer_book
+            .read()
+            .connected_peers()
+            .iter()
+            .map(|(addr, info)| (*addr, Arc::clone(&info.quality)))
+        {
+            if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1000 || peer_quality.failures.load(Ordering::Relaxed) > 10
+            {
+                warn!("Peer {} has a low quality score; disconnecting.", addr);
+                let _ = self.disconnect_from_peer(addr);
+            }
+        }
 
         // Check that this node is not a bootnode.
         if !self.config.is_bootnode() {
