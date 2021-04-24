@@ -158,7 +158,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // Reset the failure indicator.
             failure = false;
 
-            // Read the next message from the channel. This is a blocking operation.
+            // Read the next message from the channel.
             let message = match reader.read_message().await {
                 Ok(message) => message,
                 Err(error) => {
