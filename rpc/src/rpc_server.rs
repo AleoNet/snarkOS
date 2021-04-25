@@ -68,7 +68,7 @@ pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
         .start_http(&rpc_server)
         .expect("couldn't start the RPC server!");
 
-    tokio::task::spawn_blocking(|| {
+    tokio::task::spawn(async move {
         server.wait();
     })
 }
