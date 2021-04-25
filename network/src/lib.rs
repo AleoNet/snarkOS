@@ -55,6 +55,7 @@ pub use peers::*;
 
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
 pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
+pub const HANDSHAKE_TIME_LIMIT_SECS: u8 = 5;
 pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 pub const NOISE_BUF_LEN: usize = 65535;
 pub const NOISE_TAG_LEN: usize = 16;

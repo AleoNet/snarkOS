@@ -51,7 +51,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
         let mut mining_failure_count = 0;
         let mining_failure_threshold = 10;
 
-        thread::spawn(move || {
+        let mining_thread = thread::Builder::new().name("snarkOS_miner".into()).spawn(move || {
             loop {
                 if self.node.is_shutting_down() {
                     debug!("The node is shutting down, stopping mining");
@@ -116,6 +116,8 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                         .await;
                 });
             }
-        })
+        });
+
+        mining_thread.expect("failed to spawn the miner thread")
     }
 }

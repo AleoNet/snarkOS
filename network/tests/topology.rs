@@ -26,9 +26,9 @@ use snarkos_testing::{
     wait_until,
 };
 
-const N: usize = 50;
+const N: usize = 25;
 const MIN_PEERS: u16 = 5;
-const MAX_PEERS: u16 = 10;
+const MAX_PEERS: u16 = 30;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
     let mut nodes = Vec::with_capacity(n);
