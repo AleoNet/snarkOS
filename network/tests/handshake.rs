@@ -235,3 +235,63 @@ async fn reject_non_version_messages_before_handshake() {
     write_message_to_stream(Payload::Transaction(transaction), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 }
+
+#[tokio::test]
+async fn handshake_timeout_initiator_side() {
+    const NUM_BOOTSTRAPPERS: usize = 5;
+
+    // set up bootnodes that won't perform a valid handshake
+    let mut failing_bootnodes = Vec::with_capacity(NUM_BOOTSTRAPPERS);
+    for _ in 0..NUM_BOOTSTRAPPERS {
+        failing_bootnodes.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    }
+
+    // start the node
+    let setup = TestSetup {
+        consensus_setup: None,
+        bootnodes: failing_bootnodes
+            .iter()
+            .map(|l| {
+                let addr = l.local_addr().unwrap();
+                format!("{}:{}", addr.ip(), addr.port())
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
+
+    // the node should start connecting to all the configured bootnodes
+    wait_until!(
+        3,
+        node.peer_book.read().number_of_connecting_peers() == NUM_BOOTSTRAPPERS as u16
+    );
+
+    // but since they won't reply, it should drop them after the handshake deadline
+    wait_until!(
+        snarkos_network::HANDSHAKE_TIME_LIMIT_SECS as u64 + 1,
+        node.peer_book.read().number_of_connecting_peers() == 0
+    );
+}
+
+#[tokio::test]
+async fn handshake_timeout_responder_side() {
+    // start the node
+    let setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    // set up a "peer" that won't perform a valid handshake
+    let _fake_peer = TcpStream::connect(node_addr).await.unwrap();
+
+    // the node should initally accept the connection
+    wait_until!(3, node.peer_book.read().number_of_connecting_peers() == 1 as u16);
+
+    // but since it won't conclude the handshake, it should be dropped after the handshake deadline
+    wait_until!(
+        snarkos_network::HANDSHAKE_TIME_LIMIT_SECS as u64 + 1,
+        node.peer_book.read().number_of_connecting_peers() == 0
+    );
+}

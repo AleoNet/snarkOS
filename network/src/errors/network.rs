@@ -26,6 +26,7 @@ pub enum NetworkError {
     BlockError(BlockError),
     CapnProto(capnp::Error),
     ConsensusError(ConsensusError),
+    HandshakeTimeout,
     Io(std::io::Error),
     InvalidHandshake,
     MessageTooBig(usize),

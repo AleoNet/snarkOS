@@ -16,7 +16,7 @@
 
 use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use parking_lot::{Mutex, RwLock};
 use snarkvm_objects::Storage;
@@ -109,8 +109,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     Ok((stream, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
-                        match node.connection_request(listener_address, remote_address, stream).await {
-                            Ok((channel, mut reader)) => {
+                        let handshake_result = tokio::time::timeout(
+                            Duration::from_secs(crate::HANDSHAKE_TIME_LIMIT_SECS as u64),
+                            node.connection_request(listener_address, remote_address, stream),
+                        )
+                        .await;
+
+                        match handshake_result {
+                            Ok(Ok((channel, mut reader))) => {
                                 // update the remote address to be the peer's listening address
                                 let remote_address = channel.addr;
                                 // Save the channel under the provided remote address
@@ -133,8 +139,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                     conn_listening_task.abort();
                                 }
                             }
-                            Err(e) => {
+                            Ok(Err(e)) => {
                                 error!("Failed to accept a connection: {}", e);
+                                let _ = node.disconnect_from_peer(remote_address);
+                            }
+                            Err(_) => {
+                                error!("Failed to accept a connection: the handshake timed out");
                                 let _ = node.disconnect_from_peer(remote_address);
                             }
                         }
