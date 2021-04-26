@@ -109,7 +109,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             0
         };
 
-        self.peer_book.read().sending_ping(remote_address);
+        self.peer_book.sending_ping(remote_address);
 
         self.outbound
             .send_request(Message::new(

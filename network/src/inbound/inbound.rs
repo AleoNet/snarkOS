@@ -132,7 +132,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 // immediately send a ping to provide the peer with our block height
                                 node.send_ping(remote_address).await;
 
-                                if let Ok(ref peer) = node.peer_book.read().get_peer(remote_address) {
+                                if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
                                     peer.register_task(conn_listening_task);
                                 } else {
                                     // if the related peer is not found, it means it's already been dropped
@@ -200,7 +200,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         .await;
                 }
                 Payload::Pong => {
-                    self.peer_book.read().received_pong(reader.addr);
+                    self.peer_book.received_pong(reader.addr);
                 }
                 _ => {}
             }
@@ -219,7 +219,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         let source = if let Direction::Inbound(addr) = direction {
-            self.peer_book.read().update_last_seen(addr);
+            self.peer_book.update_last_seen(addr);
             addr
         } else {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
@@ -241,7 +241,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     consensus.received_block(source, block, false).await?;
 
                     // update the peer and possibly finish the sync process
-                    if self.peer_book.read().got_sync_block(source) {
+                    if self.peer_book.got_sync_block(source) {
                         consensus.finished_syncing_blocks();
                     } else {
                         // since we confirmed that the block is a valid sync block
@@ -279,7 +279,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Sync(sync) => {
                 if let Some(ref consensus) = self.consensus() {
-                    if !sync.is_empty() && self.peer_book.read().expecting_sync_blocks(source, sync.len()) {
+                    if !sync.is_empty() && self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         consensus.received_sync(source, sync).await;
                     }
                 }
@@ -297,7 +297,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         if !consensus.is_syncing_blocks() || consensus.has_block_sync_expired() {
                             // cancel any possibly ongoing sync attempts
                             self.set_state(State::Idle);
-                            self.peer_book.write().cancel_any_unfinished_syncing();
+                            self.peer_book.cancel_any_unfinished_syncing();
 
                             // begin a new sync attempt
                             consensus.register_block_sync_attempt(source);
@@ -326,7 +326,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         remote_address: SocketAddr,
         stream: TcpStream,
     ) -> Result<(ConnWriter, ConnReader), NetworkError> {
-        self.peer_book.write().set_connecting(remote_address)?;
+        self.peer_book.set_connecting(remote_address)?;
 
         let (mut reader, mut writer) = stream.into_split();
 
@@ -373,9 +373,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
 
-        self.peer_book
-            .write()
-            .set_connected(remote_address, Some(remote_listener))?;
+        self.peer_book.set_connected(remote_address, Some(remote_listener))?;
 
         let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
         let reader = ConnReader::new(remote_listener, reader, buffer.clone(), Arc::clone(&noise));
