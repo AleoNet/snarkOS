@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, Version};
+use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, SerializedPeerBook, Version};
 use snarkvm_objects::Storage;
 
 use std::{
@@ -34,7 +34,7 @@ use tokio::{
 impl<S: Storage> Node<S> {
     /// Obtain a list of addresses of currently connected peers.
     pub(crate) fn connected_addrs(&self) -> Vec<SocketAddr> {
-        self.peer_book.read().connected_peers().keys().copied().collect()
+        self.peer_book.connected_peers().keys().copied().collect()
     }
 }
 
@@ -44,20 +44,22 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     pub(crate) async fn update_peers(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
-        let number_of_connected_peers = self.peer_book.read().number_of_connected_peers() as usize;
+        let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
+        let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
+
         trace!(
-            "Connected to {} peer{}",
+            "Connected to {} peer{}, connecting to {}",
             number_of_connected_peers,
-            if number_of_connected_peers == 1 { "" } else { "s" }
+            if number_of_connected_peers == 1 { "" } else { "s" },
+            number_of_connecting_peers
         );
 
         // Drop peers whose RTT is too high or have too many failures.
         for (addr, peer_quality) in self
             .peer_book
-            .read()
             .connected_peers()
             .iter()
-            .map(|(addr, info)| (*addr, Arc::clone(&info.quality)))
+            .map(|(addr, info)| (*addr, &info.quality))
         {
             if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1000 || peer_quality.failures.load(Ordering::Relaxed) > 10
             {
@@ -70,7 +72,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if !self.config.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
             let min_peers = self.config.minimum_number_of_connected_peers() as usize;
-            if number_of_connected_peers < min_peers {
+            if number_of_connected_peers + number_of_connecting_peers < min_peers {
                 // Attempt to connect to the default bootnodes of the network.
                 self.connect_to_bootnodes().await;
 
@@ -94,7 +96,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
             let mut connected = self
                 .peer_book
-                .read()
                 .connected_peers()
                 .iter()
                 .map(|(addr, info)| (*addr, info.last_connected()))
@@ -111,17 +112,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // disconnect from peers after a while, even if they haven't sent a GetPeers
         let now = chrono::Utc::now();
 
-        #[allow(clippy::needless_collect)] // clippy reports a false positive here
         if self.config.is_bootnode() {
             let peers = self
                 .peer_book
-                .read()
                 .connected_peers()
-                .iter()
-                .map(|(addr, info)| (*addr, info.last_connected().unwrap()))
-                .collect::<Vec<_>>();
+                .into_iter()
+                .map(|(addr, info)| (addr, info.last_connected().unwrap()));
 
-            for (peer_addr, last_connected) in peers.into_iter() {
+            for (peer_addr, last_connected) in peers {
                 if (now - last_connected).num_seconds() > 10 {
                     let _ = self.disconnect_from_peer(peer_addr);
                 }
@@ -153,14 +151,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         {
             return Err(NetworkError::SelfConnectAttempt);
         }
-        if self.peer_book.read().is_connecting(remote_address) {
+        if self.peer_book.is_connecting(remote_address) {
             return Err(NetworkError::PeerAlreadyConnecting);
         }
-        if self.peer_book.read().is_connected(remote_address) {
+        if self.peer_book.is_connected(remote_address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
-        self.peer_book.write().set_connecting(remote_address)?;
+        self.peer_book.set_connecting(remote_address)?;
 
         // spawn a task that will be subject to a deadline
         let node = self.clone();
@@ -212,7 +210,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // save the outbound channel
             node.outbound.channels.write().insert(remote_address, Arc::new(writer));
 
-            node.peer_book.write().set_connected(remote_address, None)?;
+            node.peer_book.set_connected(remote_address, None)?;
 
             // spawn the inbound loop
             let node_clone = node.clone();
@@ -220,7 +218,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 node_clone.listen_for_messages(&mut reader).await;
             });
 
-            if let Ok(ref peer) = node.peer_book.read().get_peer(remote_address) {
+            if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
                 peer.register_task(conn_listening_task);
             } else {
                 // if the related peer is not found, it means it's already been dropped
@@ -295,7 +293,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Iterate through a selection of random peers and attempt to connect.
         let random_peers = self
             .peer_book
-            .read()
             .disconnected_peers()
             .iter()
             .map(|(k, _)| k)
@@ -325,7 +322,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         };
 
         for remote_address in self.connected_addrs() {
-            self.peer_book.read().sending_ping(remote_address);
+            self.peer_book.sending_ping(remote_address);
 
             self.outbound
                 .send_request(Message::new(
@@ -370,7 +367,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     #[inline]
     fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
         // Serialize the peer book.
-        let serialized_peer_book = bincode::serialize(&*self.peer_book.read())?;
+        let serialized_peer_book = bincode::serialize(&SerializedPeerBook::from(&self.peer_book))?;
 
         // TODO: the peer book should be stored outside of consensus
         if let Some(ref consensus) = self.consensus() {
@@ -387,17 +384,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     #[inline]
     pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        debug!("Disconnecting from {}", remote_address);
+        debug!("Disconnecting from {} (if not disconnected yet)", remote_address);
 
         if let Some(ref consensus) = self.consensus() {
-            if self.peer_book.read().is_syncing_blocks(remote_address) {
+            if self.peer_book.is_syncing_blocks(remote_address) {
                 consensus.finished_syncing_blocks();
             }
         }
 
         self.outbound.channels.write().remove(&remote_address);
 
-        self.peer_book.write().set_disconnected(remote_address)
+        let result = self.peer_book.set_disconnected(remote_address);
+        debug!("Set {} as disconnected", remote_address);
+        result
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
@@ -406,7 +405,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Broadcast the sanitized list of connected peers back to requesting peer.
         let peers = if !self.config.is_bootnode() {
             self.peer_book
-                .read()
                 .connected_peers()
                 .iter()
                 .map(|(k, _)| k)
@@ -415,7 +413,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
         } else {
             self.peer_book
-                .read()
                 .disconnected_peers()
                 .iter()
                 .map(|(k, _)| k)
@@ -443,7 +440,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // by informing the peer book of that we found peers.
         let local_address = self.local_address().unwrap(); // the address must be known by now
 
-        let number_of_connected_peers = self.peer_book.read().number_of_connected_peers();
+        let number_of_connected_peers = self.peer_book.number_of_connected_peers();
         let number_to_connect = self
             .config
             .maximum_number_of_connected_peers()
@@ -458,20 +455,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            self.peer_book.write().add_peer(peer_address);
+            self.peer_book.add_peer(peer_address);
         }
     }
 
-    fn can_connect(&self) -> bool {
-        let peer_book = self.peer_book.read();
-        let num_connected = peer_book.number_of_connected_peers() as usize;
-        let num_connecting = peer_book.number_of_connecting_peers() as usize;
-        drop(peer_book);
+    pub fn can_connect(&self) -> bool {
+        let num_connected = self.peer_book.number_of_connected_peers() as usize;
+        let num_connecting = self.peer_book.number_of_connecting_peers() as usize;
 
         let max_peers = self.config.maximum_number_of_connected_peers() as usize;
 
         if num_connected >= max_peers || num_connected + num_connecting >= max_peers {
-            warn!("Max number of connections ({}) reached", max_peers);
+            warn!(
+                "Max number of connections ({} connecting, {} connected; max: {}) reached",
+                num_connecting, num_connected, max_peers
+            );
             false
         } else {
             true

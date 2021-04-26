@@ -43,7 +43,7 @@ async fn peer_initiator_side() {
     peer.write_message(&Payload::Peers(vec![addr])).await;
 
     // check the address has been added to the disconnected list in the peer book
-    wait_until!(5, node.peer_book.read().is_disconnected(addr));
+    wait_until!(5, node.peer_book.is_disconnected(addr));
 }
 
 #[tokio::test]
@@ -87,10 +87,10 @@ async fn triangle() {
     let node_charlie = test_node(setup(vec![addr_bob.to_string()])).await;
 
     let triangle_is_formed = || {
-        node_charlie.peer_book.read().is_connected(addr_alice)
-            && node_alice.peer_book.read().number_of_connected_peers() == 2
-            && node_bob.peer_book.read().number_of_connected_peers() == 2
-            && node_charlie.peer_book.read().number_of_connected_peers() == 2
+        node_charlie.peer_book.is_connected(addr_alice)
+            && node_alice.peer_book.number_of_connected_peers() == 2
+            && node_bob.peer_book.number_of_connected_peers() == 2
+            && node_charlie.peer_book.number_of_connected_peers() == 2
     };
 
     // Make sure C connects to A => peer propagation works.

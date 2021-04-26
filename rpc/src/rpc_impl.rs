@@ -292,7 +292,7 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
     /// Fetch the number of connected peers this node has.
     fn get_connection_count(&self) -> Result<usize, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let number = self.node.peer_book.read().number_of_connected_peers();
+        let number = self.node.peer_book.number_of_connected_peers();
 
         Ok(number as usize)
     }
@@ -300,7 +300,7 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
     /// Returns this nodes connected peers.
     fn get_peer_info(&self) -> Result<PeerInfo, RpcError> {
         // Create a temporary tokio runtime to make an asynchronous function call
-        let peers = self.node.peer_book.read().connected_peers().keys().copied().collect();
+        let peers = self.node.peer_book.connected_peers().keys().copied().collect();
 
         Ok(PeerInfo { peers })
     }

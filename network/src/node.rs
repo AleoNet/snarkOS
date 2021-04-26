@@ -69,7 +69,7 @@ pub struct InnerNode<S: Storage> {
     /// The outbound handler of this node.
     pub outbound: Outbound,
     /// The list of connected and disconnected peers of this node.
-    pub peer_book: RwLock<PeerBook>,
+    pub peer_book: PeerBook,
     /// The objects related to consensus.
     pub consensus: OnceCell<Arc<Consensus<S>>>,
     /// Node's local address.
@@ -183,9 +183,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     sleep(std::time::Duration::from_secs(5)).await;
 
                     // make sure that the node doesn't remain in a sync state without peers
-                    if self_clone.state() == State::Syncing
-                        && self_clone.peer_book.read().number_of_connected_peers() == 0
-                    {
+                    if self_clone.state() == State::Syncing && self_clone.peer_book.number_of_connected_peers() == 0 {
                         self_clone.set_state(State::Idle);
                     }
 
@@ -207,7 +205,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             info!("Updating transactions");
 
                             // select last seen node as block sync node
-                            let sync_node = self_clone.peer_book.read().last_seen();
+                            let sync_node = self_clone.peer_book.last_seen();
                             consensus.update_transactions(sync_node).await;
                         }
                     }
@@ -267,7 +265,7 @@ impl<S: Storage> Drop for InnerNode<S> {
         // since we're going out of scope, we don't care about holding the read lock here
         // also, the connections are going to be broken automatically, so we only need to
         // take care of the associated tasks here
-        for peer_info in self.peer_book.read().connected_peers().values() {
+        for peer_info in self.peer_book.connected_peers().values() {
             for handle in peer_info.tasks.lock().drain(..).rev() {
                 handle.abort();
             }
