@@ -391,7 +391,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.outbound.channels.write().remove(&remote_address);
 
-        self.peer_book.set_disconnected(remote_address)
+        let result = self.peer_book.set_disconnected(remote_address);
+        debug!("Set {} as disconnected", remote_address);
+        result
         // TODO (howardwu): Attempt to blindly send disconnect message to peer.
     }
 
