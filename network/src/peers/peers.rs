@@ -45,10 +45,13 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub(crate) async fn update_peers(&self) -> Result<(), NetworkError> {
         // Fetch the number of connected peers.
         let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
+        let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
+
         trace!(
-            "Connected to {} peer{}",
+            "Connected to {} peer{}, connecting to {}",
             number_of_connected_peers,
-            if number_of_connected_peers == 1 { "" } else { "s" }
+            if number_of_connected_peers == 1 { "" } else { "s" },
+            number_of_connecting_peers
         );
 
         // Drop peers whose RTT is too high or have too many failures.
@@ -69,7 +72,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if !self.config.is_bootnode() {
             // Check if this node server is below the permitted number of connected peers.
             let min_peers = self.config.minimum_number_of_connected_peers() as usize;
-            if number_of_connected_peers < min_peers {
+            if number_of_connected_peers + number_of_connecting_peers < min_peers {
                 // Attempt to connect to the default bootnodes of the network.
                 self.connect_to_bootnodes().await;
 
@@ -456,14 +459,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
-    fn can_connect(&self) -> bool {
+    pub fn can_connect(&self) -> bool {
         let num_connected = self.peer_book.number_of_connected_peers() as usize;
         let num_connecting = self.peer_book.number_of_connecting_peers() as usize;
 
         let max_peers = self.config.maximum_number_of_connected_peers() as usize;
 
         if num_connected >= max_peers || num_connected + num_connecting >= max_peers {
-            warn!("Max number of connections ({}) reached", max_peers);
+            warn!(
+                "Max number of connections ({} connecting, {} connected; max: {}) reached",
+                num_connecting, num_connected, max_peers
+            );
             false
         } else {
             true
