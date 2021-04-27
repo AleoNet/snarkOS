@@ -242,7 +242,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        info!("Connected to {}", remote_address);
+        match self.config.bootnodes().contains(&remote_address) {
+            true => info!("Connected to bootnode {}", remote_address),
+            false => info!("Connected to peer {}", remote_address),
+        };
 
         Ok(())
     }
@@ -271,7 +274,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         {
             let node = self.clone();
             task::spawn(async move {
-                info!("Connecting to bootnode {}", bootnode_address);
+                debug!("Connecting to bootnode {}...", bootnode_address);
 
                 if let Err(e) = node.initiate_connection(bootnode_address).await {
                     warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
@@ -313,7 +316,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for remote_address in random_peers {
             let node = self.clone();
             task::spawn(async move {
-                info!("Connecting to peer {}", remote_address);
+                debug!("Connecting to peer {}...", remote_address);
 
                 if let Err(e) = node.initiate_connection(remote_address).await {
                     trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
