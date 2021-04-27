@@ -200,61 +200,59 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         });
         self.register_task(peering_task);
 
-        if !self.config.is_bootnode() {
+        let node_clone = self.clone();
+        let state_tracking_task = task::spawn(async move {
+            loop {
+                sleep(std::time::Duration::from_secs(5)).await;
+
+                // Make sure that the node doesn't remain in a sync state without peers.
+                if node_clone.state() == State::Syncing && node_clone.peer_book.number_of_connected_peers() == 0 {
+                    node_clone.set_state(State::Idle);
+                }
+
+                // Report node's current state.
+                trace!("Node state: {:?}", node_clone.state());
+            }
+        });
+        self.register_task(state_tracking_task);
+
+        if let Some(ref sync) = self.sync() {
             let node_clone = self.clone();
-            let state_tracking_task = task::spawn(async move {
+            let bootnodes = self.config.bootnodes();
+            let sync = Arc::clone(sync);
+            let mempool_sync_interval = sync.mempool_sync_interval();
+            let sync_task = task::spawn(async move {
                 loop {
-                    sleep(std::time::Duration::from_secs(5)).await;
+                    sleep(mempool_sync_interval).await;
 
-                    // Make sure that the node doesn't remain in a sync state without peers.
-                    if node_clone.state() == State::Syncing && node_clone.peer_book.number_of_connected_peers() == 0 {
-                        node_clone.set_state(State::Idle);
+                    if !sync.is_syncing_blocks() {
+                        // The order of preference for the sync node is as follows:
+                        //   1. Iterate (in declared order) through the bootnodes:
+                        //      a. Check if this node is connected to the specified bootnode in the peer book.
+                        //      b. Select the specified bootnode as the sync node if this node is connected to it.
+                        //   2. If this node is not connected to any bootnode,
+                        //      then select the last seen peer as the sync node.
+
+                        // Step 1.
+                        let mut sync_node = None;
+                        for bootnode in bootnodes.iter() {
+                            if node_clone.peer_book.is_connected(*bootnode) {
+                                sync_node = Some(*bootnode);
+                                break;
+                            }
+                        }
+
+                        // Step 2.
+                        if sync_node.is_none() {
+                            // Select last seen node as block sync node.
+                            sync_node = node_clone.peer_book.last_seen();
+                        }
+
+                        sync.update_memory_pool(sync_node).await;
                     }
-
-                    // Report node's current state.
-                    trace!("Node state: {:?}", node_clone.state());
                 }
             });
-            self.register_task(state_tracking_task);
-
-            if let Some(ref sync) = self.sync() {
-                let node_clone = self.clone();
-                let bootnodes = self.config.bootnodes();
-                let sync = Arc::clone(sync);
-                let mempool_sync_interval = sync.mempool_sync_interval();
-                let sync_task = task::spawn(async move {
-                    loop {
-                        sleep(mempool_sync_interval).await;
-
-                        if !sync.is_syncing_blocks() {
-                            // The order of preference for the sync node is as follows:
-                            //   1. Iterate (in declared order) through the bootnodes:
-                            //      a. Check if this node is connected to the specified bootnode in the peer book.
-                            //      b. Select the specified bootnode as the sync node if this node is connected to it.
-                            //   2. If this node is not connected to any bootnode,
-                            //      then select the last seen peer as the sync node.
-
-                            // Step 1.
-                            let mut sync_node = None;
-                            for bootnode in bootnodes.iter() {
-                                if node_clone.peer_book.is_connected(*bootnode) {
-                                    sync_node = Some(*bootnode);
-                                    break;
-                                }
-                            }
-
-                            // Step 2.
-                            if sync_node.is_none() {
-                                // Select last seen node as block sync node.
-                                sync_node = node_clone.peer_book.last_seen();
-                            }
-
-                            sync.update_memory_pool(sync_node).await;
-                        }
-                    }
-                });
-                self.register_task(sync_task);
-            }
+            self.register_task(sync_task);
         }
     }
 
