@@ -175,24 +175,24 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     pub async fn start_services(&self) {
-        let self_clone = self.clone();
+        let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
         let incoming_task = task::spawn(async move {
             loop {
-                if let Err(e) = self_clone.process_incoming_messages(&mut receiver).await {
+                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
                     error!("Node error: {}", e);
                 }
             }
         });
         self.register_task(incoming_task);
 
-        let self_clone = self.clone();
+        let node_clone = self.clone();
         let peer_sync_interval = self.config.peer_sync_interval();
         let peering_task = task::spawn(async move {
             loop {
                 info!("Updating peers");
 
-                if let Err(e) = self_clone.update_peers().await {
+                if let Err(e) = node_clone.update_peers().await {
                     error!("Peer update error: {}", e);
                 }
                 sleep(peer_sync_interval).await;
@@ -201,40 +201,40 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.register_task(peering_task);
 
         if !self.config.is_bootnode() {
-            let self_clone = self.clone();
-            let state_mgmt_task = task::spawn(async move {
+            let node_clone = self.clone();
+            let state_tracking_task = task::spawn(async move {
                 loop {
                     sleep(std::time::Duration::from_secs(5)).await;
 
-                    // make sure that the node doesn't remain in a sync state without peers
-                    if self_clone.state() == State::Syncing && self_clone.peer_book.number_of_connected_peers() == 0 {
-                        self_clone.set_state(State::Idle);
+                    // Make sure that the node doesn't remain in a sync state without peers.
+                    if node_clone.state() == State::Syncing && node_clone.peer_book.number_of_connected_peers() == 0 {
+                        node_clone.set_state(State::Idle);
                     }
 
-                    // report node's current state
-                    trace!("Node state: {:?}", self_clone.state());
+                    // Report node's current state.
+                    trace!("Node state: {:?}", node_clone.state());
                 }
             });
-            self.register_task(state_mgmt_task);
+            self.register_task(state_tracking_task);
 
             if let Some(ref consensus) = self.consensus() {
-                let self_clone = self.clone();
+                let node_clone = self.clone();
                 let consensus = Arc::clone(consensus);
                 let transaction_sync_interval = consensus.transaction_sync_interval();
-                let tx_sync_task = task::spawn(async move {
+                let sync_task = task::spawn(async move {
                     loop {
                         sleep(transaction_sync_interval).await;
 
                         if !consensus.is_syncing_blocks() {
                             info!("Updating transactions");
 
-                            // select last seen node as block sync node
-                            let sync_node = self_clone.peer_book.last_seen();
+                            // Select last seen node as block sync node.
+                            let sync_node = node_clone.peer_book.last_seen();
                             consensus.update_transactions(sync_node).await;
                         }
                     }
                 });
-                self.register_task(tx_sync_task);
+                self.register_task(sync_task);
             }
         }
     }
