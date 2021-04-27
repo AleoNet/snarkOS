@@ -90,9 +90,6 @@ async fn spawn_nodes_in_a_ring() {
     for node in &nodes {
         wait_until!(5, node.peer_book.number_of_connected_peers() == 2);
     }
-
-    let metrics = NetworkMetrics::new(&nodes);
-    dbg!(metrics);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -331,10 +328,11 @@ fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
 // 3. centrality measurements:
 //
 //      - degree centrality (covered by the number of connected peers)
+//      - eigenvector centrality (would be useful in support of density measurements)
 //
 //      (TODO):
-//      - eigenvector centrality (would be useful in support of density measurements)
-//      - betweenness centrality (good for detecting clusters)
+//      - betweenness centrality
+//      - Fiedler vector
 
 fn network_density(nodes: &[Node<LedgerStorage>]) -> f64 {
     let connections = total_connection_count(nodes);
@@ -362,7 +360,7 @@ fn degree_centrality(nodes: &[Node<LedgerStorage>]) -> BTreeMap<SocketAddr, u16>
         .map(|node| {
             (
                 node.local_address().unwrap(),
-                node.peer_book.read().number_of_connected_peers(),
+                node.peer_book.number_of_connected_peers(),
             )
         })
         .collect()
@@ -388,7 +386,7 @@ fn eigenvector_centrality(nodes: &[Node<LedgerStorage>]) -> BTreeMap<SocketAddr,
         .collect();
 
     for node in nodes {
-        node.peer_book.read().connected_peers().keys().for_each(|addr| {
+        node.peer_book.connected_peers().keys().for_each(|addr| {
             // Addresses must be present.
             let node_m = index.get(&node.local_address().unwrap()).unwrap();
             let peer_n = index.get(&addr).unwrap();
@@ -403,18 +401,15 @@ fn eigenvector_centrality(nodes: &[Node<LedgerStorage>]) -> BTreeMap<SocketAddr,
     // We only target the highest part of the spectrum as the largest eigenvalue's corresponding
     // eigenvector is the measurument we are after.
     let spectrum_target = SpectrumTarget::Highest;
-    // Iteratoin count is set based on this paper:
+    // Iteration count is set based on this paper:
     // https://sites.math.washington.edu/~morrow/498_13/eigenvalues3.pdf, which demonstrated
     // convergence of the highest eigenvalue to six decimal places for 1000 by 1000 matrix after 25
     // iterations.
-    // TODO: Algo seems to converge before diverging?
     let lanczos = HermitianLanczos::new(matrix.clone(), 25, spectrum_target).unwrap();
     let highest_eigenvector = DVector::from(lanczos.eigenvectors.column(0));
 
     // The eigenvector is a relative score of node importance (normalised by the norm), to obtain an absolute score for each
     // node, we normalise so that the sum of the components are equal to 1.
-    // TODO: we may want to normalise so the sum is equal to the number of nodes instead? This
-    // would make it comparable across different network sizes.
     let sum = highest_eigenvector.sum() / n as f64;
     let normalised = highest_eigenvector.unscale(sum);
 
