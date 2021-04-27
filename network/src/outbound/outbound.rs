@@ -82,7 +82,7 @@ impl Outbound {
         let channel = match self.outbound_channel(target_addr) {
             Ok(channel) => channel,
             Err(_) => {
-                warn!("Failed to send a {} to {}: peer is disconnected", request, target_addr);
+                warn!("Failed to send a {}: peer is disconnected", request);
                 return;
             }
         };
@@ -93,7 +93,7 @@ impl Outbound {
                 self.send_success_count.fetch_add(1, Ordering::SeqCst);
             }
             Err(error) => {
-                warn!("Failed to send a {} to {}: {}", request, target_addr, error);
+                warn!("Failed to send a {}: {}", request, error);
                 self.send_failure_count.fetch_add(1, Ordering::SeqCst);
             }
         }
