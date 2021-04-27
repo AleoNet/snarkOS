@@ -61,7 +61,7 @@ pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 pub const NOISE_BUF_LEN: usize = 65535;
 pub const NOISE_TAG_LEN: usize = 16;
 /// The maximum number of block hashes that can be requested or provided in a single batch.
-pub const MAX_BLOCK_SYNC_COUNT: u32 = 250;
+pub const MAX_BLOCK_SYNC_COUNT: u32 = 1000;
 /// The maximum number of peers shared at once in response to a `GetPeers` message.
 pub const SHARED_PEER_COUNT: usize = 25;
 

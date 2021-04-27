@@ -43,7 +43,7 @@ pub enum State {
 #[derive(Default)]
 pub struct StateCode(AtomicU8);
 
-#[doc(hide)]
+/// The internal state of a node.
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
     pub name: u64,

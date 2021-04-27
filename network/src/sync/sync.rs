@@ -25,7 +25,6 @@ use snarkvm_objects::Storage;
 
 use parking_lot::{Mutex, RwLock};
 use std::{
-    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
