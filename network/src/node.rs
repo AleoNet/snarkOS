@@ -19,7 +19,7 @@ use snarkvm_objects::Storage;
 
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use rand::{thread_rng, Rng};
+use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -263,41 +263,41 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let block_sync_interval = sync_clone.block_sync_interval();
             let sync_block_task = task::spawn(async move {
                 loop {
-                    if !sync_clone.is_syncing_blocks() {
+                    if !sync_clone.is_syncing_blocks() || sync_clone.has_block_sync_expired() {
                         // The order of preference for the sync node is as follows:
-                        // Iterate (in declared order) through all connected nodes
-                        // and select the node with the highest block height.
+                        // Pick a random peer of all the connected ones that claim
+                        // to have a longer chain.
 
-                        let mut sync_node = None;
-                        let mut max_block_height = 0u32;
+                        let mut prospect_sync_nodes = Vec::new();
+                        let my_height = sync_clone.current_block_height();
 
                         for (peer, info) in sync_clone.node().peer_book.connected_peers().iter() {
                             // Fetch the current block height of this connected peer.
-                            let current_block_height = info.block_height();
+                            let peer_block_height = info.block_height();
 
-                            if current_block_height > max_block_height {
-                                sync_node = Some(*peer);
-                                max_block_height = current_block_height;
+                            if peer_block_height > my_height + 1 {
+                                prospect_sync_nodes.push((*peer, peer_block_height));
                             }
                         }
 
-                        // Log the sync job as a trace.
-                        if let Some(sync_node) = sync_node {
+                        let random_sync_peer = prospect_sync_nodes.choose(&mut rand::thread_rng());
+                        if let Some((sync_node, peer_height)) = random_sync_peer {
+                            // Log the sync job as a trace.
                             trace!(
-                                "Preparing to sync from {} with a block height of {}",
+                                "Preparing to sync from {} with a block height of {} (mine: {}, {} peers with a greater height)",
                                 sync_node,
-                                max_block_height
+                                peer_height,
+                                my_height,
+                                prospect_sync_nodes.len()
                             );
-                        }
 
-                        if max_block_height > sync_clone.current_block_height() + 1 {
                             // Cancel any possibly ongoing sync attempts.
                             sync_clone.node().set_state(State::Idle);
                             sync_clone.node().peer_book.cancel_any_unfinished_syncing();
 
                             // Begin a new sync attempt.
                             sync_clone.register_block_sync_attempt();
-                            sync_clone.update_blocks(sync_node).await;
+                            sync_clone.update_blocks(Some(*sync_node)).await;
                         }
                     }
 
