@@ -267,7 +267,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                 loop {
                     sleep(block_sync_interval).await;
 
-                    if !sync_clone.is_syncing_blocks() || sync_clone.has_block_sync_expired() {
+                    // if !sync_clone.is_syncing_blocks() || sync_clone.has_block_sync_expired() {
+                    if !sync_clone.is_syncing_blocks() {
                         // The order of preference for the sync node is as follows:
                         // Iterate (in declared order) through all connected nodes
                         // and select the node with the highest block height.

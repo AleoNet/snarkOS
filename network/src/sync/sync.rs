@@ -116,6 +116,7 @@ impl<S: Storage> Sync<S> {
         self.consensus.ledger.get_current_block_height()
     }
 
+    /// TODO (howardwu): Delete me after deprecating/stablizing new sync logic.
     /// Checks whether any previous sync attempt has expired.
     pub fn has_block_sync_expired(&self) -> bool {
         if let Some(ref timestamp) = *self.last_block_sync.read() {
