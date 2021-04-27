@@ -430,23 +430,31 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // TODO (howardwu): Simplify this and parallelize this with Rayon.
         // Broadcast the sanitized list of connected peers back to requesting peer.
-        let peers = if !self.config.is_bootnode() {
-            self.peer_book
-                .connected_peers()
-                .iter()
-                .map(|(k, _)| k)
-                .filter(|&addr| *addr != remote_address)
-                .copied()
-                .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
-        } else {
-            self.peer_book
-                .disconnected_peers()
-                .iter()
-                .map(|(k, _)| k)
-                .filter(|&addr| *addr != remote_address)
-                .copied()
-                .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
-        };
+        let peers = self
+            .peer_book
+            .connected_peers()
+            .iter()
+            .map(|(k, _)| k)
+            .filter(|&addr| *addr != remote_address)
+            .copied()
+            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
+        // let peers = if !self.config.is_bootnode() {
+        //     self.peer_book
+        //         .connected_peers()
+        //         .iter()
+        //         .map(|(k, _)| k)
+        //         .filter(|&addr| *addr != remote_address)
+        //         .copied()
+        //         .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
+        // } else {
+        //     self.peer_book
+        //         .disconnected_peers()
+        //         .iter()
+        //         .map(|(k, _)| k)
+        //         .filter(|&addr| *addr != remote_address)
+        //         .copied()
+        //         .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
+        // };
 
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
