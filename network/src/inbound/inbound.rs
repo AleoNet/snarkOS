@@ -247,16 +247,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::GetBlocks(hashes) => {
                 if let Some(ref sync) = self.sync() {
-                    if !sync.is_syncing_blocks() {
-                        sync.received_get_blocks(source, hashes).await?;
-                    }
+                    sync.received_get_blocks(source, hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
                 if let Some(ref sync) = self.sync() {
-                    if !sync.is_syncing_blocks() {
-                        sync.received_get_memory_pool(source).await?;
-                    }
+                    sync.received_get_memory_pool(source).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {

@@ -263,6 +263,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// either connnecting to or already connected to.
     ///
     async fn connect_to_bootnodes(&self) {
+        // Local address must be known by now.
+        let own_address = self.local_address().unwrap();
+
         // Fetch the current connecting and connected peers of this node.
         let connecting_peers = self.connecting_peers();
         let connected_peers = self.connected_peers();
@@ -272,7 +275,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .config
             .bootnodes()
             .iter()
-            .filter(|peer| !connecting_peers.contains(peer) && !connected_peers.contains(peer))
+            .filter(|peer| **peer != own_address && !connecting_peers.contains(peer) && !connected_peers.contains(peer))
             .copied()
         {
             let node = self.clone();
@@ -291,6 +294,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// Broadcasts a connection request to all disconnected peers.
     ///
     async fn connect_to_disconnected_peers(&self) {
+        // Local address must be known by now.
+        let own_address = self.local_address().unwrap();
+
         // Fetch the number of connected and connecting peers.
         let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
         let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
@@ -313,6 +319,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .disconnected_peers()
             .iter()
             .map(|(k, _)| k)
+            .filter(|peer| **peer != own_address)
             .copied()
             .choose_multiple(&mut rand::thread_rng(), count);
 
