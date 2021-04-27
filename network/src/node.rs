@@ -265,8 +265,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let block_sync_interval = sync_clone.block_sync_interval();
             let sync_block_task = task::spawn(async move {
                 loop {
-                    sleep(block_sync_interval).await;
-
                     if !sync_clone.is_syncing_blocks() {
                         // The order of preference for the sync node is as follows:
                         // Iterate (in declared order) through all connected nodes
@@ -304,6 +302,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             sync_clone.update_blocks(sync_node).await;
                         }
                     }
+
+                    sleep(block_sync_interval).await;
                 }
             });
             self.register_task(sync_block_task);
