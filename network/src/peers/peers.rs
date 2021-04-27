@@ -422,14 +422,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Remove the peer from the channel.
-        if self.outbound.channels.write().remove(&remote_address).is_some() {
-            // Set the peer as disconnected in the peer book.
-            let result = self.peer_book.set_disconnected(remote_address);
-            debug!("Disconnected from {}", remote_address);
-            result
-        } else {
-            Ok(())
-        }
+        self.outbound.channels.write().remove(&remote_address);
+
+        // Set the peer as disconnected in the peer book.
+        let result = self.peer_book.set_disconnected(remote_address);
+        trace!("Disconnected from {}", remote_address);
+        result
     }
 
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
