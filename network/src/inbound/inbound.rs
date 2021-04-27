@@ -191,10 +191,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             {
                 // Handle Ping/Pong messages immediately in order not to skew latency calculation.
                 match &message.payload {
-                    Payload::Ping(..) => {
+                    Payload::Ping(block_height) => {
                         self.outbound
                             .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
                             .await;
+                        self.peer_book.received_ping(reader.addr, *block_height);
                     }
                     Payload::Pong => {
                         self.peer_book.received_pong(reader.addr);

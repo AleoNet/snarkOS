@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::NetworkError;
+use snarkos_storage::BlockHeight;
 
 use chrono::{DateTime, Utc};
 use parking_lot::{Mutex, RwLock};
@@ -39,6 +40,8 @@ pub enum PeerStatus {
 
 #[derive(Debug, Default)]
 pub struct PeerQuality {
+    /// The current block height of this peer.
+    pub block_height: RwLock<BlockHeight>,
     /// The timestamp of when the peer has been seen last.
     pub last_seen: RwLock<Option<DateTime<Utc>>>,
     /// An indicator of whether a `Pong` message is currently expected from this peer.
@@ -49,7 +52,7 @@ pub struct PeerQuality {
     pub rtt_ms: AtomicU64,
     /// The number of failures associated with the peer; grounds for dismissal.
     pub failures: AtomicU32,
-    /// The number of remaining blocs to sync with.
+    /// The number of remaining blocks to sync with.
     pub remaining_sync_blocks: AtomicU16,
 }
 
@@ -110,6 +113,14 @@ impl PeerInfo {
     #[inline]
     pub fn status(&self) -> PeerStatus {
         self.status
+    }
+
+    ///
+    /// Returns the current block height of this peer.
+    ///
+    #[inline]
+    pub fn block_height(&self) -> BlockHeight {
+        *self.quality.block_height.read()
     }
 
     ///

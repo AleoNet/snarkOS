@@ -19,7 +19,7 @@ use crate::{
     NetworkError,
 };
 use snarkos_metrics::Metrics;
-use snarkos_storage::Ledger;
+use snarkos_storage::{BlockHeight, Ledger};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::{Storage, Transaction};
 
@@ -336,6 +336,18 @@ impl PeerBook {
         } else {
             // shouldn't occur, but just in case
             warn!("Tried to send a Ping to an unknown peer: {}!", target);
+        }
+    }
+
+    /// Handles an incoming `Ping` message.
+    pub fn received_ping(&self, source: SocketAddr, block_height: BlockHeight) {
+        if let Some(ref quality) = self.peer_quality(source) {
+            *quality.block_height.write() = block_height;
+        } else {
+            trace!(
+                "Attempted to update block height of a peer that's not connected: {}",
+                source
+            );
         }
     }
 

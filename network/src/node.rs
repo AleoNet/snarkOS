@@ -220,13 +220,13 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let bootnodes = self.config.bootnodes();
 
             let node_clone = self.clone();
-            let sync = Arc::clone(sync);
-            let mempool_sync_interval = sync.mempool_sync_interval();
+            let sync_clone = Arc::clone(sync);
+            let mempool_sync_interval = sync_clone.mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
                 loop {
                     sleep(mempool_sync_interval).await;
 
-                    if !sync.is_syncing_blocks() {
+                    if !sync_clone.is_syncing_blocks() {
                         // The order of preference for the sync node is as follows:
                         //   1. Iterate (in declared order) through the bootnodes:
                         //      a. Check if this node is connected to the specified bootnode in the peer book.
@@ -249,7 +249,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             sync_node = node_clone.peer_book.last_seen();
                         }
 
-                        sync.update_memory_pool(sync_node).await;
+                        sync_clone.update_memory_pool(sync_node).await;
                     }
                 }
             });
