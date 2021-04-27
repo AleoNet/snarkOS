@@ -128,7 +128,7 @@ impl Default for Config {
                     .collect::<Vec<String>>(),
                 mempool_sync_interval: 15,
                 peer_sync_interval: 10,
-                block_sync_interval: 60,
+                block_sync_interval: 15,
                 min_peers: 7,
                 max_peers: 25,
             },
