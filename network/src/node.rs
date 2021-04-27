@@ -18,7 +18,7 @@ use crate::*;
 use snarkvm_objects::Storage;
 
 use once_cell::sync::OnceCell;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use std::{
     collections::HashMap,
@@ -30,7 +30,7 @@ use std::{
     },
     thread,
 };
-use tokio::{task, time::sleep};
+use tokio::{sync::RwLock, task, time::sleep};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]

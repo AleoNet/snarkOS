@@ -27,7 +27,7 @@ use std::{
     },
 };
 
-use parking_lot::RwLock;
+use tokio::sync::RwLock;
 
 /// The map of remote addresses to their active write channels.
 type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
@@ -67,10 +67,11 @@ impl Outbound {
     /// Establishes an outbound channel to the given remote address, if it does not exist.
     ///
     #[inline]
-    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
+    async fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
         Ok(self
             .channels
             .read()
+            .await
             .get(&remote_address)
             .ok_or(NetworkError::OutboundChannelMissing)?
             .clone())
@@ -79,7 +80,7 @@ impl Outbound {
     async fn send(&self, request: &Message) {
         let target_addr = request.receiver();
         // Fetch the outbound channel.
-        let channel = match self.outbound_channel(target_addr) {
+        let channel = match self.outbound_channel(target_addr).await {
             Ok(channel) => channel,
             Err(_) => {
                 warn!("Failed to send a {}: peer is disconnected", request);
