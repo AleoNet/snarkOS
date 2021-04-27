@@ -24,10 +24,18 @@ impl<S: Storage> Sync<S> {
     ///
     /// Sends a `GetSync` request to the given sync node.
     ///
-    pub async fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = self.storage().get_block_locator_hashes();
+    pub async fn update_blocks(&self, sync_node: Option<SocketAddr>) {
+        if let Some(sync_node) = sync_node {
+            let block_locator_hashes = match self.storage().get_block_locator_hashes() {
+                Ok(block_locator_hashes) => block_locator_hashes,
+                _ => {
+                    error!("Unable to get block locator hashes from storage");
+                    return;
+                }
+            };
 
-        if let Ok(block_locator_hashes) = block_locator_hashes {
+            info!("Updating blocks from {}", sync_node);
+
             // Send a GetSync to the selected sync node.
             self.node()
                 .outbound

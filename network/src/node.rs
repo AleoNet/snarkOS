@@ -227,6 +227,11 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                     sleep(mempool_sync_interval).await;
 
                     if !sync_clone.is_syncing_blocks() {
+                        // TODO (howardwu): Add some random sync nodes beyond this approach
+                        //  to ensure some diversity in mempool state that is fetched.
+                        //  For now, this is acceptable because we propogate the mempool to
+                        //  all of our connected peers anyways.
+
                         // The order of preference for the sync node is as follows:
                         //   1. Iterate (in declared order) through the bootnodes:
                         //      a. Check if this node is connected to the specified bootnode in the peer book.
@@ -254,6 +259,45 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                 }
             });
             self.register_task(sync_mempool_task);
+
+            let node_clone = self.clone();
+            let sync_clone = Arc::clone(sync);
+            let block_sync_interval = sync_clone.block_sync_interval();
+            let sync_block_task = task::spawn(async move {
+                loop {
+                    sleep(block_sync_interval).await;
+
+                    if !sync_clone.is_syncing_blocks() || sync_clone.has_block_sync_expired() {
+                        // The order of preference for the sync node is as follows:
+                        // Iterate (in declared order) through all connected nodes
+                        // and select the node with the highest block height.
+
+                        let mut sync_node = None;
+                        let mut max_block_height = 0u32;
+
+                        for (peer, info) in node_clone.peer_book.connected_peers().iter() {
+                            // Fetch the current block height of this connected peer.
+                            let current_block_height = info.block_height();
+
+                            if current_block_height > max_block_height {
+                                sync_node = Some(*peer);
+                                max_block_height = current_block_height;
+                            }
+                        }
+
+                        if max_block_height > sync_clone.current_block_height() + 1 {
+                            // Cancel any possibly ongoing sync attempts.
+                            node_clone.set_state(State::Idle);
+                            node_clone.peer_book.cancel_any_unfinished_syncing();
+
+                            // Begin a new sync attempt.
+                            sync_clone.register_block_sync_attempt();
+                            sync_clone.update_blocks(sync_node).await;
+                        }
+                    }
+                }
+            });
+            self.register_task(sync_block_task);
         }
     }
 

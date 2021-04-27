@@ -324,7 +324,7 @@ impl PeerBook {
         if let Some(ref quality) = self.peer_quality(addr) {
             *quality.last_seen.write() = Some(chrono::Utc::now());
         } else {
-            trace!("Attempted to update state of a peer that's not connected: {}", addr);
+            warn!("Tried updating state of a peer that's not connected: {}", addr);
         }
     }
 
@@ -344,10 +344,7 @@ impl PeerBook {
         if let Some(ref quality) = self.peer_quality(source) {
             *quality.block_height.write() = block_height;
         } else {
-            trace!(
-                "Attempted to update block height of a peer that's not connected: {}",
-                source
-            );
+            warn!("Tried updating block height of a peer that's not connected: {}", source);
         }
     }
 

@@ -126,9 +126,8 @@ impl<S: Storage> Sync<S> {
         }
     }
 
-    /// Register that the node attempted to sync blocks with the given peer.
-    pub fn register_block_sync_attempt(&self, provider: SocketAddr) {
-        trace!("Attempting to sync with {}", provider);
+    /// Register that the node attempted to sync blocks.
+    pub fn register_block_sync_attempt(&self) {
         *self.last_block_sync.write() = Some(Instant::now());
     }
 

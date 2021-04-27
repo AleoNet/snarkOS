@@ -206,7 +206,7 @@ OPTIONS:
         --rpc-password <rpc-password>            Specify a password for rpc authentication
         --rpc-port <rpc-port>                    Specify the port the json rpc server is run on
         --rpc-username <rpc-username>            Specify a username for rpc authentication
-        --verbose <verbose>                      Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2]
+        --verbose <verbose>                      Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2, 3]
 ```
 
 #### Examples

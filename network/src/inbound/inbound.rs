@@ -282,24 +282,27 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::Peers(peers) => {
                 self.process_inbound_peers(peers);
             }
-            Payload::Ping(block_height) => {
-                if let Some(ref sync) = self.sync() {
-                    if block_height > sync.current_block_height() + 1 {
-                        // If the node is syncing, check if that sync attempt hasn't expired.
-                        if !sync.is_syncing_blocks() || sync.has_block_sync_expired() {
-                            // Cancel any possibly ongoing sync attempts.
-                            self.set_state(State::Idle);
-                            self.peer_book.cancel_any_unfinished_syncing();
+            Payload::Ping(_block_height) => {
+                // Skip as this case is already handled with priority in Inbound::listen_for_messages
 
-                            // Begin a new sync attempt.
-                            sync.register_block_sync_attempt(source);
-                            sync.update_blocks(source).await;
-                        }
-                    }
-                }
+                // TODO (howardwu): Delete me after stabilizing new sync logic for blocks.
+                // if let Some(ref sync) = self.sync() {
+                //     if block_height > sync.current_block_height() + 1 {
+                //         // If the node is syncing, check if that sync attempt hasn't expired.
+                //         if !sync.is_syncing_blocks() || sync.has_block_sync_expired() {
+                //             // Cancel any possibly ongoing sync attempts.
+                //             self.set_state(State::Idle);
+                //             self.peer_book.cancel_any_unfinished_syncing();
+                //
+                //             // Begin a new sync attempt.
+                //             sync.register_block_sync_attempt(source);
+                //             sync.update_blocks(source).await;
+                //         }
+                //     }
+                // }
             }
             Payload::Pong => {
-                // already handled with priority in Inbound::listen_for_messages
+                // Skip as this case is already handled with priority in Inbound::listen_for_messages
             }
             Payload::Unknown => {
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
