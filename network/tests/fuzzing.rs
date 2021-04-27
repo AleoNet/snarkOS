@@ -31,7 +31,7 @@ use std::{
     },
 };
 
-pub const ITERATIONS: usize = 1000;
+pub const ITERATIONS: usize = 500;
 pub const CORRUPTION_PROBABILITY: f64 = 0.1;
 
 fn corrupt_bytes(serialized: &[u8]) -> Vec<u8> {

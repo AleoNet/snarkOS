@@ -51,7 +51,7 @@ jobs:
           cache_key: snarkos-stable-cache
       - run:
           name: Build and run tests
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: >
             RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
       - persist_to_workspace:
@@ -84,7 +84,7 @@ jobs:
           cache_key: snarkos-nightly-cache
       - run:
           name: Build and test
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction
       - clear_environment:
           cache_key: snarkos-nightly-cache
