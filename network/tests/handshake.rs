@@ -265,7 +265,7 @@ async fn handshake_timeout_initiator_side() {
 
     // but since they won't reply, it should drop them after the handshake deadline
     wait_until!(
-        snarkos_network::HANDSHAKE_TIME_LIMIT_SECS as u64 + 1,
+        snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 + 1,
         node.peer_book.number_of_connecting_peers() == 0
     );
 }
@@ -288,7 +288,7 @@ async fn handshake_timeout_responder_side() {
 
     // but since it won't conclude the handshake, it should be dropped after the handshake deadline
     wait_until!(
-        snarkos_network::HANDSHAKE_TIME_LIMIT_SECS as u64 + 1,
+        snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 + 1,
         node.peer_book.number_of_connecting_peers() == 0
     );
 }

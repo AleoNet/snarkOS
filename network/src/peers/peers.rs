@@ -153,6 +153,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.peer_book.set_connecting(remote_address)?;
 
+        // Fetch the bootnodes and determine if address is a bootnode.
+        let bootnodes = self.config.bootnodes();
+        let is_connecting_peer_bootnode = bootnodes.contains(&remote_address);
+
         // Spawn a task that will be subject to a deadline.
         let node = self.clone();
         let handshake_task = task::spawn(async move {
@@ -222,12 +226,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         });
 
         // Check if the handshake doesn't time out.
-        match tokio::time::timeout(
-            Duration::from_secs(crate::HANDSHAKE_TIME_LIMIT_SECS as u64),
-            handshake_task,
-        )
-        .await
-        {
+        let timeout = match is_connecting_peer_bootnode {
+            true => Duration::from_secs(crate::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64),
+            false => Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
+        };
+        match tokio::time::timeout(timeout, handshake_task).await {
             // the Result layers are: <timeout result>(<task join result>(<block result>)); JoinHandleError is returned
             // as NetworkError::InvalidHandshake, since there's not much to salvage there
             Ok(Ok(Ok(_))) => {}
@@ -242,7 +245,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        match self.config.bootnodes().contains(&remote_address) {
+        match is_connecting_peer_bootnode {
             true => info!("Connected to bootnode {}", remote_address),
             false => info!("Connected to peer {}", remote_address),
         };
