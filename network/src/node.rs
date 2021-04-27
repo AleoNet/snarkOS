@@ -219,7 +219,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         if let Some(ref sync) = self.sync() {
             let bootnodes = self.config.bootnodes();
 
-            let node_clone = self.clone();
             let sync_clone = Arc::clone(sync);
             let mempool_sync_interval = sync_clone.mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
@@ -242,7 +241,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                         // Step 1.
                         let mut sync_node = None;
                         for bootnode in bootnodes.iter() {
-                            if node_clone.peer_book.is_connected(*bootnode) {
+                            if sync_clone.node().peer_book.is_connected(*bootnode) {
                                 sync_node = Some(*bootnode);
                                 break;
                             }
@@ -251,7 +250,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                         // Step 2.
                         if sync_node.is_none() {
                             // Select last seen node as block sync node.
-                            sync_node = node_clone.peer_book.last_seen();
+                            sync_node = sync_clone.node().peer_book.last_seen();
                         }
 
                         sync_clone.update_memory_pool(sync_node).await;
@@ -260,7 +259,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             });
             self.register_task(sync_mempool_task);
 
-            let node_clone = self.clone();
             let sync_clone = Arc::clone(sync);
             let block_sync_interval = sync_clone.block_sync_interval();
             let sync_block_task = task::spawn(async move {
@@ -273,7 +271,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                         let mut sync_node = None;
                         let mut max_block_height = 0u32;
 
-                        for (peer, info) in node_clone.peer_book.connected_peers().iter() {
+                        for (peer, info) in sync_clone.node().peer_book.connected_peers().iter() {
                             // Fetch the current block height of this connected peer.
                             let current_block_height = info.block_height();
 
@@ -294,8 +292,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
                         if max_block_height > sync_clone.current_block_height() + 1 {
                             // Cancel any possibly ongoing sync attempts.
-                            node_clone.set_state(State::Idle);
-                            node_clone.peer_book.cancel_any_unfinished_syncing();
+                            sync_clone.node().set_state(State::Idle);
+                            sync_clone.node().peer_book.cancel_any_unfinished_syncing();
 
                             // Begin a new sync attempt.
                             sync_clone.register_block_sync_attempt();

@@ -24,10 +24,7 @@ use crate::{
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::PathBuf};
 
 /// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
