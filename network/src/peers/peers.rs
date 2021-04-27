@@ -310,13 +310,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         trace!("Connecting to {} disconnected peers", cmp::min(count, self.peer_book.disconnected_peers().len()));
 
+        let bootnodes = self.config.bootnodes();
+
         // Iterate through a selection of random peers and attempt to connect.
         let random_peers = self
             .peer_book
             .disconnected_peers()
             .iter()
             .map(|(k, _)| k)
-            .filter(|peer| **peer != own_address)
+            .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
             .copied()
             .choose_multiple(&mut rand::thread_rng(), count);
 
