@@ -266,9 +266,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::GetSync(getsync) => {
                 if let Some(ref sync) = self.sync() {
-                    if !sync.is_syncing_blocks() {
-                        sync.received_get_sync(source, getsync).await?;
-                    }
+                    sync.received_get_sync(source, getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
