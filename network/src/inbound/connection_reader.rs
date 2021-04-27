@@ -81,7 +81,11 @@ impl ConnReader {
         }
         let payload = Payload::deserialize(&self.buffer[..decrypted_len])?;
 
-        debug!("Received a '{}' message from {}", payload, self.addr);
+        // If message is a `SyncBlock` message, log it as a trace.
+        match payload {
+            Payload::SyncBlock(_) => trace!("Received a '{}' message from {}", payload, self.addr),
+            _ => debug!("Received a '{}' message from {}", payload, self.addr),
+        }
 
         Ok(Message::new(Direction::Inbound(self.addr), payload))
     }
