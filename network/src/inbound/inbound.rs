@@ -52,27 +52,6 @@ impl Inbound {
         }
     }
 
-    /// Logs the failure and determines whether to disconnect from a peer.
-    fn handle_failure(
-        failure: &mut bool,
-        failure_count: &mut u8,
-        disconnect_from_peer: &mut bool,
-        error: NetworkError,
-    ) {
-        // Only increment failure_count if we haven't seen a failure yet.
-        if !*failure {
-            // Update the state to reflect a new failure.
-            *failure = true;
-            *failure_count += 1;
-            error!("Network error: {}", error);
-
-            // Determine if we should disconnect.
-            *disconnect_from_peer = error.is_fatal() || *failure_count >= 10;
-        } else {
-            debug!("A connection errored again in the same loop (error message: {})", error);
-        }
-    }
-
     #[inline]
     pub(crate) async fn route(&self, response: Message) {
         if let Err(err) = self.sender.send(response).await {
@@ -90,6 +69,7 @@ impl Inbound {
 }
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
+    /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
         let (listener_address, listener) = if let Some(addr) = self.config.desired_address {
             let listener = TcpListener::bind(&addr).await?;
@@ -100,7 +80,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             (listener_address, listener)
         };
         self.set_local_address(listener_address);
-        info!("This node ({:x}) is listening at {}", self.name, listener_address);
+        info!("Initializing listener for node ({:x})", self.name);
+
+        info!("Listening for nodes at {}", listener_address);
 
         let node = self.clone();
         let listener_handle = task::spawn(async move {
@@ -109,6 +91,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     Ok((stream, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
+                        // Wait a maximum timeout limit for a connection request.
                         let handshake_result = tokio::time::timeout(
                             Duration::from_secs(crate::HANDSHAKE_TIME_LIMIT_SECS as u64),
                             node.connection_request(listener_address, remote_address, stream),
@@ -117,9 +100,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                         match handshake_result {
                             Ok(Ok((channel, mut reader))) => {
-                                // update the remote address to be the peer's listening address
+                                // Update the remote address to be the peer's listening address.
                                 let remote_address = channel.addr;
-                                // Save the channel under the provided remote address
+                                // Save the channel under the provided remote address.
                                 node.inbound.channels.write().insert(remote_address, Arc::new(channel));
 
                                 let node_clone = node.clone();
@@ -129,7 +112,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                                 trace!("Connected to {}", remote_address);
 
-                                // immediately send a ping to provide the peer with our block height
+                                // Immediately send a ping to provide the peer with our block height.
                                 node.send_ping(remote_address).await;
 
                                 if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
@@ -140,11 +123,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 }
                             }
                             Ok(Err(e)) => {
-                                error!("Failed to accept a connection: {}", e);
+                                error!("Failed to accept a connection request: {}", e);
                                 let _ = node.disconnect_from_peer(remote_address);
                             }
                             Err(_) => {
-                                error!("Failed to accept a connection: the handshake timed out");
+                                error!("Failed to accept a connection request: the handshake timed out");
                                 let _ = node.disconnect_from_peer(remote_address);
                             }
                         }
@@ -159,29 +142,30 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         Ok(())
     }
 
+    /// This method handles new inbound messages from connected nodes.
     pub async fn listen_for_messages(&self, reader: &mut ConnReader) {
         let mut failure_count = 0u8;
-        let mut disconnect_from_peer = false;
-        let mut failure;
 
         loop {
-            // Reset the failure indicator.
-            failure = false;
-
             // Read the next message from the channel.
             let message = match reader.read_message().await {
                 Ok(message) => message,
                 Err(error) => {
-                    Inbound::handle_failure(&mut failure, &mut failure_count, &mut disconnect_from_peer, error);
+                    // Log the failure and increment the failure count.
+                    error!("A network error occurred while listening for messages: {}", error);
+                    failure_count += 1;
+
+                    // Determine if we should disconnect.
+                    let disconnect_from_peer = error.is_fatal() || failure_count >= 10;
 
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
-                            // TODO (howardwu): Remove this and rearchitect how disconnects are handled using the peer manager.
                             // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
                             warn!("Disconnecting from an unreliable peer");
                             let _ = self.disconnect_from_peer(reader.addr);
-                            break; // the error has already been handled and reported
+                            // The error has been handled and reported, we may now safely break.
+                            break;
                         }
                         false => {
                             // Sleep for 10 seconds
