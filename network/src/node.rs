@@ -43,19 +43,6 @@ pub enum State {
 #[derive(Default)]
 pub struct StateCode(AtomicU8);
 
-/// A core data structure for operating the networking stack of this node.
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct Node<S: Storage>(Arc<InnerNode<S>>);
-
-impl<S: Storage> Deref for Node<S> {
-    type Target = Arc<InnerNode<S>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[doc(hide)]
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
@@ -80,6 +67,42 @@ pub struct InnerNode<S: Storage> {
     threads: Mutex<Vec<thread::JoinHandle<()>>>,
     /// An indicator of whether the node is shutting down.
     shutting_down: AtomicBool,
+}
+
+impl<S: Storage> Drop for InnerNode<S> {
+    // this won't make a difference in regular scenarios, but will be practical for test
+    // purposes, so that there are no lingering tasks
+    fn drop(&mut self) {
+        // since we're going out of scope, we don't care about holding the read lock here
+        // also, the connections are going to be broken automatically, so we only need to
+        // take care of the associated tasks here
+        for peer_info in self.peer_book.connected_peers().values() {
+            for handle in peer_info.tasks.lock().drain(..).rev() {
+                handle.abort();
+            }
+        }
+
+        for handle in self.threads.lock().drain(..).rev() {
+            let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
+        }
+
+        for handle in self.tasks.lock().drain(..).rev() {
+            handle.abort();
+        }
+    }
+}
+
+/// A core data structure for operating the networking stack of this node.
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct Node<S: Storage>(Arc<InnerNode<S>>);
+
+impl<S: Storage> Deref for Node<S> {
+    type Target = Arc<InnerNode<S>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl<S: Storage> Node<S> {
@@ -256,28 +279,5 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.local_address
             .set(addr)
             .expect("local address was set more than once!");
-    }
-}
-
-impl<S: Storage> Drop for InnerNode<S> {
-    // this won't make a difference in regular scenarios, but will be practical for test
-    // purposes, so that there are no lingering tasks
-    fn drop(&mut self) {
-        // since we're going out of scope, we don't care about holding the read lock here
-        // also, the connections are going to be broken automatically, so we only need to
-        // take care of the associated tasks here
-        for peer_info in self.peer_book.connected_peers().values() {
-            for handle in peer_info.tasks.lock().drain(..).rev() {
-                handle.abort();
-            }
-        }
-
-        for handle in self.threads.lock().drain(..).rev() {
-            let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
-        }
-
-        for handle in self.tasks.lock().drain(..).rev() {
-            handle.abort();
-        }
     }
 }
