@@ -420,9 +420,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     #[inline]
     pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        if let Some(ref consensus) = self.sync() {
+        if let Some(ref sync) = self.sync() {
             if self.peer_book.is_syncing_blocks(remote_address) {
-                consensus.finished_syncing_blocks();
+                sync.finished_syncing_blocks();
             }
         }
 
