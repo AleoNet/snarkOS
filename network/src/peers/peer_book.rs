@@ -39,7 +39,7 @@ impl From<&PeerBook> for SerializedPeerBook {
     fn from(book: &PeerBook) -> Self {
         let mut peers = book.connected_peers();
         peers.extend(book.disconnected_peers().into_iter());
-        let peers = peers.into_iter().map(|(_, info)| info).collect();
+        let peers = peers.into_iter().map(|(_, info)| info).filter(|info| !info.address().ip().is_loopback()).collect();
 
         SerializedPeerBook(peers)
     }
@@ -48,7 +48,7 @@ impl From<&PeerBook> for SerializedPeerBook {
 impl From<SerializedPeerBook> for PeerBook {
     fn from(book: SerializedPeerBook) -> Self {
         PeerBook {
-            disconnected_peers: RwLock::new(book.0.into_iter().map(|info| (info.address(), info)).collect()),
+            disconnected_peers: RwLock::new(book.0.into_iter().filter(|info| !info.address().ip().is_loopback()).map(|info| (info.address(), info)).collect()),
             ..Default::default()
         }
     }
