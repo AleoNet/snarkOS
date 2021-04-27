@@ -100,7 +100,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             (listener_address, listener)
         };
         self.set_local_address(listener_address);
-        info!("Node {:x} listening at {}", self.name, listener_address);
+        info!("This node ({:x}) is listening at {}", self.name, listener_address);
 
         let node = self.clone();
         let listener_handle = task::spawn(async move {
