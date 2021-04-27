@@ -151,7 +151,19 @@ impl Config {
         let mut config_path = snarkos_path.clone();
         config_path.push("config.toml");
 
-        if !Path::exists(&config_path) {
+        // TODO (howardwu): Revert to this logic after testnet, when configs stabilize.
+        // if !Path::exists(&config_path) {
+        //     // Create a new default `config.toml` file if it doesn't already exist
+        //     fs::create_dir_all(&snarkos_path)?;
+        //
+        //     let default_config_string = toml::to_string(&Config::default())?;
+        //
+        //     fs::write(&config_path, default_config_string)?;
+        // }
+
+        // TODO (howardwu): Revisit this.
+        // For now, override the config.toml file each time.
+        {
             // Create a new default `config.toml` file if it doesn't already exist
             fs::create_dir_all(&snarkos_path)?;
 
