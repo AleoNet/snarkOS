@@ -82,10 +82,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.set_local_address(listener_address);
         info!("Initializing listener for node ({:x})", self.name);
 
-        info!("Listening for nodes at {}", listener_address);
-
         let node = self.clone();
         let listener_handle = task::spawn(async move {
+            info!("Listening for nodes at {}", listener_address);
+
             loop {
                 match listener.accept().await {
                     Ok((stream, remote_address)) => {
@@ -106,7 +106,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 node.inbound.channels.write().insert(remote_address, Arc::new(channel));
 
                                 let node_clone = node.clone();
-                                let conn_listening_task = tokio::spawn(async move {
+                                let peer_listening_task = tokio::spawn(async move {
                                     node_clone.listen_for_messages(&mut reader).await;
                                 });
 
@@ -116,10 +116,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 node.send_ping(remote_address).await;
 
                                 if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
-                                    peer.register_task(conn_listening_task);
+                                    peer.register_task(peer_listening_task);
                                 } else {
-                                    // if the related peer is not found, it means it's already been dropped
-                                    conn_listening_task.abort();
+                                    // If the related peer is not found, it means it's already been dropped.
+                                    peer_listening_task.abort();
                                 }
                             }
                             Ok(Err(e)) => {
