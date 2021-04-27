@@ -417,7 +417,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Remove the peer from the channel.
-        if let Some(_) = self.outbound.channels.write().remove(&remote_address) {
+        if self.outbound.channels.write().remove(&remote_address).is_some() {
             // Set the peer as disconnected in the peer book.
             let result = self.peer_book.set_disconnected(remote_address);
             debug!("Disconnected from {}", remote_address);
@@ -438,23 +438,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .filter(|&addr| *addr != remote_address)
             .copied()
             .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
-        // let peers = if !self.config.is_bootnode() {
-        //     self.peer_book
-        //         .connected_peers()
-        //         .iter()
-        //         .map(|(k, _)| k)
-        //         .filter(|&addr| *addr != remote_address)
-        //         .copied()
-        //         .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
-        // } else {
-        //     self.peer_book
-        //         .disconnected_peers()
-        //         .iter()
-        //         .map(|(k, _)| k)
-        //         .filter(|&addr| *addr != remote_address)
-        //         .copied()
-        //         .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
-        // };
 
         self.outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
