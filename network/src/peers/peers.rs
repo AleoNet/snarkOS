@@ -32,7 +32,12 @@ use tokio::{
 };
 
 impl<S: Storage> Node<S> {
-    /// Obtain a list of addresses of currently connected peers.
+    /// Obtain a list of addresses of connecting peers for this node.
+    pub(crate) fn connecting_peers(&self) -> Vec<SocketAddr> {
+        self.peer_book.connecting_peers().into_iter().collect()
+    }
+
+    /// Obtain a list of addresses of connected peers for this node.
     pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.peer_book.connected_peers().keys().copied().collect()
     }
@@ -237,7 +242,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        trace!("Connected to {}", remote_address);
+        info!("Connected to {}", remote_address);
 
         Ok(())
     }
@@ -248,12 +253,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// This function attempts to reconnect this node server with any bootnode peer
     /// that this node may have failed to connect to.
     ///
-    /// This function filters out any bootnode peers the node server is already connected to.
+    /// This function filters out any bootnode peers the node server is
+    /// either connnecting to or already connected to.
     ///
     async fn connect_to_bootnodes(&self) {
-        trace!("Connecting to default bootnodes");
-
-        // Fetch the current connected peers of this node.
+        // Fetch the current connecting and connected peers of this node.
+        let connecting_peers = self.connecting_peers();
         let connected_peers = self.connected_peers();
 
         // Iterate through each bootnode address and attempt a connection request.
@@ -261,11 +266,13 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .config
             .bootnodes()
             .iter()
-            .filter(|addr| !connected_peers.contains(addr))
+            .filter(|peer| !connecting_peers.contains(peer) && !connected_peers.contains(peer))
             .copied()
         {
             let node = self.clone();
             task::spawn(async move {
+                info!("Connecting to bootnode {}", bootnode_address);
+
                 if let Err(e) = node.initiate_connection(bootnode_address).await {
                     warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
                     let _ = node.disconnect_from_peer(bootnode_address);
@@ -274,7 +281,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
+    ///
     /// Broadcasts a connection request to all disconnected peers.
+    ///
     async fn connect_to_disconnected_peers(&self) {
         // Fetch the number of connected and connecting peers.
         let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
@@ -304,6 +313,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for remote_address in random_peers {
             let node = self.clone();
             task::spawn(async move {
+                info!("Connecting to peer {}", remote_address);
+
                 if let Err(e) = node.initiate_connection(remote_address).await {
                     trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
                     let _ = node.disconnect_from_peer(remote_address);
