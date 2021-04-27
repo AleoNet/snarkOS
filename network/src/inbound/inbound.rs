@@ -176,21 +176,24 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             };
 
-            // Handle Ping/Pong messages immediately in order not to skew latency calculation.
-            match &message.payload {
-                Payload::Ping(..) => {
-                    self.outbound
-                        .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
-                        .await;
+            // Route the message to the inbound handler of this node.
+            {
+                // Handle Ping/Pong messages immediately in order not to skew latency calculation.
+                match &message.payload {
+                    Payload::Ping(..) => {
+                        self.outbound
+                            .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
+                            .await;
+                    }
+                    Payload::Pong => {
+                        self.peer_book.received_pong(reader.addr);
+                    }
+                    _ => {}
                 }
-                Payload::Pong => {
-                    self.peer_book.received_pong(reader.addr);
-                }
-                _ => {}
-            }
 
-            // Messages are queued in a single tokio MPSC receiver.
-            self.inbound.route(message).await
+                // Messages are queued in a single tokio MPSC receiver.
+                self.inbound.route(message).await
+            }
         }
     }
 
@@ -224,7 +227,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 if let Some(ref sync) = self.sync() {
                     sync.received_block(source, block, false).await?;
 
-                    // update the peer and possibly finish the sync process
+                    // Update the peer and possibly finish the sync process.
                     if self.peer_book.got_sync_block(source) {
                         sync.finished_syncing_blocks();
                     } else {

@@ -31,6 +31,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     ///
     pub async fn update_memory_pool(&self, sync_node: Option<SocketAddr>) {
         if let Some(sync_node) = sync_node {
+            info!("Updating memory pool from {}", sync_node);
+
             self.node()
                 .outbound
                 .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool))

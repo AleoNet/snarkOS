@@ -219,6 +219,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
             if let Some(ref sync) = self.sync() {
                 let node_clone = self.clone();
+                let bootnodes = self.config.bootnodes();
                 let sync = Arc::clone(sync);
                 let mempool_sync_interval = sync.mempool_sync_interval();
                 let sync_task = task::spawn(async move {
@@ -226,10 +227,28 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                         sleep(mempool_sync_interval).await;
 
                         if !sync.is_syncing_blocks() {
-                            info!("Updating memory pool");
+                            // The order of preference for the sync node is as follows:
+                            //   1. Iterate (in declared order) through the bootnodes:
+                            //      a. Check if this node is connected to the specified bootnode in the peer book.
+                            //      b. Select the specified bootnode as the sync node if this node is connected to it.
+                            //   2. If this node is not connected to any bootnode,
+                            //      then select the last seen peer as the sync node.
 
-                            // Select last seen node as block sync node.
-                            let sync_node = node_clone.peer_book.last_seen();
+                            // Step 1.
+                            let mut sync_node = None;
+                            for bootnode in bootnodes.iter() {
+                                if node_clone.peer_book.is_connected(*bootnode) {
+                                    sync_node = Some(*bootnode);
+                                    break;
+                                }
+                            }
+
+                            // Step 2.
+                            if sync_node.is_none() {
+                                // Select last seen node as block sync node.
+                                sync_node = node_clone.peer_book.last_seen();
+                            }
+
                             sync.update_memory_pool(sync_node).await;
                         }
                     }
