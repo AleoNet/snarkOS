@@ -217,11 +217,12 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         self.register_task(state_tracking_task);
 
         if let Some(ref sync) = self.sync() {
-            let node_clone = self.clone();
             let bootnodes = self.config.bootnodes();
+
+            let node_clone = self.clone();
             let sync = Arc::clone(sync);
             let mempool_sync_interval = sync.mempool_sync_interval();
-            let sync_task = task::spawn(async move {
+            let sync_mempool_task = task::spawn(async move {
                 loop {
                     sleep(mempool_sync_interval).await;
 
@@ -252,7 +253,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                     }
                 }
             });
-            self.register_task(sync_task);
+            self.register_task(sync_mempool_task);
         }
     }
 

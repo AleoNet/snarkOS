@@ -286,13 +286,13 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::Ping(block_height) => {
                 if let Some(ref sync) = self.sync() {
                     if block_height > sync.current_block_height() + 1 {
-                        // if the node is syncing, check if that sync attempt hasn't expired
+                        // If the node is syncing, check if that sync attempt hasn't expired.
                         if !sync.is_syncing_blocks() || sync.has_block_sync_expired() {
-                            // cancel any possibly ongoing sync attempts
+                            // Cancel any possibly ongoing sync attempts.
                             self.set_state(State::Idle);
                             self.peer_book.cancel_any_unfinished_syncing();
 
-                            // begin a new sync attempt
+                            // Begin a new sync attempt.
                             sync.register_block_sync_attempt(source);
                             sync.update_blocks(source).await;
                         }

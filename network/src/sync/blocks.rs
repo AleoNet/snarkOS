@@ -22,7 +22,7 @@ use std::net::SocketAddr;
 
 impl<S: Storage> Sync<S> {
     ///
-    /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
+    /// Sends a `GetSync` request to the given sync node.
     ///
     pub async fn update_blocks(&self, sync_node: SocketAddr) {
         let block_locator_hashes = self.storage().get_block_locator_hashes();

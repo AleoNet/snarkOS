@@ -31,7 +31,7 @@ use std::{
 
 /// The sync handler of this node.
 pub struct Sync<S: Storage> {
-    /// The node this sync is bound to.
+    /// The node this sync handler is bound to.
     node: Node<S>,
     /// The core sync objects.
     pub consensus: Arc<snarkos_consensus::Consensus<S>>,
@@ -129,6 +129,11 @@ impl<S: Storage> Sync<S> {
     pub fn register_block_sync_attempt(&self, provider: SocketAddr) {
         trace!("Attempting to sync with {}", provider);
         *self.last_block_sync.write() = Some(Instant::now());
+    }
+
+    /// Returns the interval between each block sync.
+    pub fn block_sync_interval(&self) -> Duration {
+        self.block_sync_interval
     }
 
     /// Returns the interval between each memory pool sync.
