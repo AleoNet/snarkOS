@@ -240,9 +240,6 @@ impl Config {
 
     fn is_bootnode(&mut self, argument: bool) {
         self.node.is_bootnode = argument;
-        if argument {
-            self.p2p.bootnodes = vec![];
-        }
     }
 
     fn is_miner(&mut self, argument: bool) {
