@@ -285,6 +285,15 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             }
                         }
 
+                        // Log the sync job as a trace.
+                        if let Some(sync_node) = sync_node {
+                            trace!(
+                                "Preparing to sync from {} with a block height of {}",
+                                sync_node,
+                                max_block_height
+                            );
+                        }
+
                         if max_block_height > sync_clone.current_block_height() + 1 {
                             // Cancel any possibly ongoing sync attempts.
                             node_clone.set_state(State::Idle);
@@ -307,6 +316,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         for addr in self.connected_peers() {
             let _ = self.disconnect_from_peer(addr);
         }
+
+        // Store the peer book to storage.
+        let _ = self.save_peer_book_to_storage();
 
         for handle in self.threads.lock().drain(..).rev() {
             let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));

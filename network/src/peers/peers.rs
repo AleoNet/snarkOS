@@ -401,7 +401,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// and proceeds to serialize the peer book into a byte vector for storage.
     ///
     #[inline]
-    fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
+    pub(crate) fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {
         // Serialize the peer book.
         let serialized_peer_book = bincode::serialize(&SerializedPeerBook::from(&self.peer_book))?;
 
