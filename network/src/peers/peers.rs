@@ -54,6 +54,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             number_of_connecting_peers
         );
 
+        // Fetch the bootnodes.
+        let bootnodes = self.config.bootnodes();
+
         // Drop peers whose RTT is too high or have too many failures.
         for (addr, peer_quality) in self
             .peer_book
@@ -61,6 +64,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .iter()
             .map(|(addr, info)| (*addr, &info.quality))
         {
+            // Skip this check if the peer is a bootnode.
+            if bootnodes.contains(&addr) {
+                continue;
+            }
+
             if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1000 || peer_quality.failures.load(Ordering::Relaxed) > 10
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
@@ -68,69 +76,50 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
+        // Check if this node server is below the permitted number of connected peers.
+        let min_peers = self.config.minimum_number_of_connected_peers() as usize;
+        if number_of_connected_peers + number_of_connecting_peers < min_peers {
+            // Attempt to connect to the default bootnodes of the network.
+            self.connect_to_bootnodes().await;
+
+            // Attempt to connect to each disconnected peer saved in the peer book.
+            self.connect_to_disconnected_peers(min_peers - number_of_connected_peers)
+                .await;
+
+            // Broadcast a `GetPeers` message to request for more peers.
+            self.broadcast_getpeers_requests().await;
+        }
+
         // Check that this node is not a bootnode.
         if !self.config.is_bootnode() {
-            // Check if this node server is below the permitted number of connected peers.
-            let min_peers = self.config.minimum_number_of_connected_peers() as usize;
-            if number_of_connected_peers + number_of_connecting_peers < min_peers {
-                // Attempt to connect to the default bootnodes of the network.
-                self.connect_to_bootnodes().await;
+            // Check if this node server is above the permitted number of connected peers.
+            let max_peers = self.config.maximum_number_of_connected_peers() as usize;
+            if number_of_connected_peers > max_peers {
+                let number_to_disconnect = number_of_connected_peers - max_peers;
+                trace!(
+                    "Disconnecting from the most recent {} peers to maintain their permitted number",
+                    number_to_disconnect
+                );
 
-                // Attempt to connect to each disconnected peer saved in the peer book.
-                self.connect_to_disconnected_peers(min_peers - number_of_connected_peers)
-                    .await;
+                let mut connected = self
+                    .peer_book
+                    .connected_peers()
+                    .iter()
+                    .map(|(addr, info)| (*addr, info.last_connected()))
+                    .collect::<Vec<_>>();
+                connected.sort_unstable_by_key(|(_, info)| *info);
 
-                // Broadcast a `GetPeers` message to request for more peers.
-                self.broadcast_getpeers_requests().await;
-            }
-        }
-
-        // Check if this node server is above the permitted number of connected peers.
-        let max_peers = self.config.maximum_number_of_connected_peers() as usize;
-        if number_of_connected_peers > max_peers {
-            let number_to_disconnect = number_of_connected_peers - max_peers;
-            trace!(
-                "Disconnecting from the most recent {} peers to maintain their permitted number",
-                number_to_disconnect
-            );
-
-            let mut connected = self
-                .peer_book
-                .connected_peers()
-                .iter()
-                .map(|(addr, info)| (*addr, info.last_connected()))
-                .collect::<Vec<_>>();
-            connected.sort_unstable_by_key(|(_, info)| *info);
-
-            for _ in 0..number_to_disconnect {
-                if let Some((addr, _)) = connected.pop() {
-                    let _ = self.disconnect_from_peer(addr);
-                }
-            }
-        }
-
-        // disconnect from peers after a while, even if they haven't sent a GetPeers
-        let now = chrono::Utc::now();
-
-        if self.config.is_bootnode() {
-            let peers = self
-                .peer_book
-                .connected_peers()
-                .into_iter()
-                .map(|(addr, info)| (addr, info.last_connected().unwrap()));
-
-            for (peer_addr, last_connected) in peers {
-                if (now - last_connected).num_seconds() > 10 {
-                    let _ = self.disconnect_from_peer(peer_addr);
+                for _ in 0..number_to_disconnect {
+                    if let Some((addr, _)) = connected.pop() {
+                        let _ = self.disconnect_from_peer(addr);
+                    }
                 }
             }
         }
 
         if number_of_connected_peers != 0 {
-            if !self.config.is_bootnode() {
-                // Send a `Ping` to every connected peer.
-                self.broadcast_pings().await;
-            }
+            // Send a `Ping` to every connected peer.
+            self.broadcast_pings().await;
 
             // Store the peer book to storage.
             self.save_peer_book_to_storage()?;
