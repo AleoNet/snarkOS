@@ -86,13 +86,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let listener_handle = task::spawn(async move {
             info!("Listening for nodes at {}", listener_address);
 
+            let bootnodes = node.config.bootnodes();
+
             loop {
                 match listener.accept().await {
                     Ok((stream, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
                         // Wait a maximum timeout limit for a connection request.
-                        let bootnodes = node.config.bootnodes();
                         let timeout = match bootnodes.contains(&remote_address) {
                             true => Duration::from_secs(crate::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64),
                             false => Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
