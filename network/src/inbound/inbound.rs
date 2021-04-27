@@ -158,7 +158,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 Ok(message) => message,
                 Err(error) => {
                     // Log the failure and increment the failure count.
-                    error!("A network error occurred while listening for messages: {}", error);
+                    error!("Unable to read message from {}: {}", reader.addr, error);
                     failure_count += 1;
 
                     // Increment the fatal count if the error is a fatal error.
@@ -173,7 +173,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     match disconnect_from_peer {
                         true => {
                             // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
-                            warn!("Disconnecting from an unreliable peer");
+                            warn!("Disconnecting from {} (unreliable)", reader.addr);
                             let _ = self.disconnect_from_peer(reader.addr);
                             // The error has been handled and reported, we may now safely break.
                             break;
