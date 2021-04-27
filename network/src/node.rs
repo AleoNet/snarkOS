@@ -106,10 +106,11 @@ impl<S: Storage> Node<S> {
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
-        let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
-        let inbound = Inbound::new(channels.clone());
-        let outbound = Outbound::new(channels);
+        let (inbound, outbound) = {
+            let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
+            (Inbound::new(channels.clone()), Outbound::new(channels))
+        };
 
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
