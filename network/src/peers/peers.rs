@@ -18,6 +18,7 @@ use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, SerializedPe
 use snarkvm_objects::Storage;
 
 use std::{
+    cmp,
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
     time::Duration,
@@ -307,7 +308,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Set the number of peers to attempt a connection to.
         let count = min_peers - number_of_peers;
 
-        trace!("Connecting to {} disconnected peers", count);
+        trace!("Connecting to {} disconnected peers", cmp::min(count, self.peer_book.disconnected_peers().len()));
 
         // Iterate through a selection of random peers and attempt to connect.
         let random_peers = self
