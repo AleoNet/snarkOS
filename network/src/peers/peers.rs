@@ -129,11 +129,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        let own_address = self.local_address().unwrap(); // must be known by now
-        if !self.can_connect() {
-            // Don't connect if max number of connections has been reached.
+        // Local address must be known by now.
+        let own_address = self.local_address().unwrap();
+
+        // If this node is not a bootnode,
+        // then don't connect if maximum number of connections has been reached.
+        if !self.config.is_bootnode() && !self.can_connect() {
             return Err(NetworkError::TooManyConnections);
         }
+
         if remote_address == own_address
             || ((remote_address.ip().is_unspecified() || remote_address.ip().is_loopback())
                 && remote_address.port() == own_address.port())
@@ -149,7 +153,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.peer_book.set_connecting(remote_address)?;
 
-        // spawn a task that will be subject to a deadline
+        // Spawn a task that will be subject to a deadline.
         let node = self.clone();
         let handshake_task = task::spawn(async move {
             // open the connection
@@ -217,7 +221,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Ok(())
         });
 
-        // check if the handshake doesn't time out
+        // Check if the handshake doesn't time out.
         match tokio::time::timeout(
             Duration::from_secs(crate::HANDSHAKE_TIME_LIMIT_SECS as u64),
             handshake_task,
