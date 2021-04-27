@@ -196,7 +196,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         self.outbound
                             .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
                             .await;
-                        self.peer_book.received_ping(reader.addr, *block_height);
                     }
                     Payload::Pong => {
                         self.peer_book.received_pong(reader.addr);
@@ -279,8 +278,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::Peers(peers) => {
                 self.process_inbound_peers(peers);
             }
-            Payload::Ping(_block_height) => {
-                // Skip as this case is already handled with priority in Inbound::listen_for_messages
+            Payload::Ping(block_height) => {
+                self.peer_book.received_ping(source, block_height);
 
                 // TODO (howardwu): Delete me after stabilizing new sync logic for blocks.
                 // if let Some(ref sync) = self.sync() {
