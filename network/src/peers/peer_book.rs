@@ -341,7 +341,7 @@ impl PeerBook {
     /// Handles an incoming `Ping` message.
     pub fn received_ping(&self, source: SocketAddr, block_height: BlockHeight) {
         if let Some(ref quality) = self.peer_quality(source) {
-            *quality.block_height.write() = block_height;
+            quality.block_height.store(block_height, Ordering::SeqCst);
         } else {
             warn!("Tried updating block height of a peer that's not connected: {}", source);
         }
