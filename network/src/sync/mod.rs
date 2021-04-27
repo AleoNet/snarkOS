@@ -20,6 +20,7 @@ pub use blocks::*;
 pub mod memory_pool;
 pub use memory_pool::*;
 
+// TODO (howardwu): Move this out of network/sync. It should be on a much higher level.
 pub mod miner;
 pub use miner::*;
 
