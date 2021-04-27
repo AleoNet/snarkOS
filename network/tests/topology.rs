@@ -35,7 +35,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
 
     for _ in 0..n {
         let environment = test_config(setup.clone());
-        let node = Node::new(environment).await.unwrap();
+        let node = Node::new(environment, Default::default()).await.unwrap();
 
         node.listen().await.unwrap();
         nodes.push(node);
