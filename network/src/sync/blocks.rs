@@ -46,7 +46,7 @@ impl<S: Storage> Sync<S> {
     pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
         debug!("Propagating a block to peers");
 
-        for remote_address in self.node().connected_addrs() {
+        for remote_address in self.node().connected_peers() {
             if remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
                 self.node()

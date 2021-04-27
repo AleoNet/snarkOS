@@ -259,7 +259,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     pub fn shut_down(&self) {
         debug!("Shutting down");
 
-        for addr in self.connected_addrs() {
+        for addr in self.connected_peers() {
             let _ = self.disconnect_from_peer(addr);
         }
 

@@ -54,7 +54,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
 
         let local_address = self.node().local_address().unwrap();
 
-        for remote_address in self.node().connected_addrs() {
+        for remote_address in self.node().connected_peers() {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
                 self.node()

@@ -33,7 +33,7 @@ use tokio::{
 
 impl<S: Storage> Node<S> {
     /// Obtain a list of addresses of currently connected peers.
-    pub(crate) fn connected_addrs(&self) -> Vec<SocketAddr> {
+    pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.peer_book.connected_peers().keys().copied().collect()
     }
 }
@@ -43,7 +43,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
     pub(crate) async fn update_peers(&self) -> Result<(), NetworkError> {
-        // Fetch the number of connected peers.
+        // Fetch the number of connected and connecting peers.
         let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
         let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
 
@@ -76,19 +76,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        // Check if this node server is below the permitted number of connected peers.
-        let min_peers = self.config.minimum_number_of_connected_peers() as usize;
-        if number_of_connected_peers + number_of_connecting_peers < min_peers {
-            // Attempt to connect to the default bootnodes of the network.
-            self.connect_to_bootnodes().await;
+        // Attempt to connect to the default bootnodes of the network.
+        self.connect_to_bootnodes().await;
 
-            // Attempt to connect to each disconnected peer saved in the peer book.
-            self.connect_to_disconnected_peers(min_peers - number_of_connected_peers)
-                .await;
+        // Attempt to connect to each disconnected peer saved in the peer book.
+        self.connect_to_disconnected_peers().await;
 
-            // Broadcast a `GetPeers` message to request for more peers.
-            self.broadcast_getpeers_requests().await;
-        }
+        // Broadcast a `GetPeers` message to request for more peers.
+        self.broadcast_getpeers_requests().await;
 
         // Check that this node is not a bootnode.
         if !self.config.is_bootnode() {
@@ -259,7 +254,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("Connecting to default bootnodes");
 
         // Fetch the current connected peers of this node.
-        let connected_peers = self.connected_addrs();
+        let connected_peers = self.connected_peers();
 
         // Iterate through each bootnode address and attempt a connection request.
         for bootnode_address in self
@@ -280,8 +275,22 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     /// Broadcasts a connection request to all disconnected peers.
-    async fn connect_to_disconnected_peers(&self, count: usize) {
-        trace!("Connecting to disconnected peers");
+    async fn connect_to_disconnected_peers(&self) {
+        // Fetch the number of connected and connecting peers.
+        let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
+        let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
+        let number_of_peers = number_of_connected_peers + number_of_connecting_peers;
+
+        // Check if this node server is below the permitted number of connected peers.
+        let min_peers = self.config.minimum_number_of_connected_peers() as usize;
+        if number_of_peers >= min_peers {
+            return;
+        }
+
+        // Set the number of peers to attempt a connection to.
+        let count = min_peers - number_of_peers;
+
+        trace!("Connecting to {} disconnected peers", count);
 
         // Iterate through a selection of random peers and attempt to connect.
         let random_peers = self
@@ -303,34 +312,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
-    /// Broadcasts a `Ping` message to all connected peers.
-    async fn broadcast_pings(&self) {
-        trace!("Broadcasting Ping messages");
-
-        // consider peering tests that don't use the sync layer
-        let current_block_height = if let Some(ref sync) = self.sync() {
-            sync.current_block_height()
-        } else {
-            0
-        };
-
-        for remote_address in self.connected_addrs() {
-            self.peer_book.sending_ping(remote_address);
-
-            self.outbound
-                .send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::Ping(current_block_height),
-                ))
-                .await;
-        }
-    }
-
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     async fn broadcast_getpeers_requests(&self) {
-        trace!("Sending GetPeers requests to connected peers");
+        // Fetch the number of connected and connecting peers.
+        let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
+        let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
 
-        for remote_address in self.connected_addrs() {
+        // Check if this node server is below the permitted number of connected peers.
+        let min_peers = self.config.minimum_number_of_connected_peers() as usize;
+        if number_of_connected_peers + number_of_connecting_peers >= min_peers {
+            return;
+        }
+
+        trace!("Sending `GetPeers` requests to connected peers");
+
+        for remote_address in self.connected_peers() {
             self.outbound
                 .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
                 .await;
@@ -346,6 +342,29 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             //     // Disconnect from the peer if the channel is not active.
             //     self.disconnect_from_peer(&remote_address).await?;
             // }
+        }
+    }
+
+    /// Broadcasts a `Ping` message to all connected peers.
+    async fn broadcast_pings(&self) {
+        trace!("Broadcasting `Ping` messages");
+
+        // Consider peering tests that don't use the sync layer.
+        let current_block_height = if let Some(ref sync) = self.sync() {
+            sync.current_block_height()
+        } else {
+            0
+        };
+
+        for remote_address in self.connected_peers() {
+            self.peer_book.sending_ping(remote_address);
+
+            self.outbound
+                .send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::Ping(current_block_height),
+                ))
+                .await;
         }
     }
 
@@ -371,26 +390,27 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         Ok(())
     }
 
-    /// TODO (howardwu): Add logic to remove the active channels
-    ///  and handshakes of the peer from this struct.
-    /// Sets the given remote address in the peer book as disconnected from this node server.
+    ///
+    /// Removes the given remote address channel and sets the peer in the peer book
+    /// as disconnected from this node server.
     ///
     #[inline]
     pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-        debug!("Disconnecting from {} (if not disconnected yet)", remote_address);
-
         if let Some(ref consensus) = self.sync() {
             if self.peer_book.is_syncing_blocks(remote_address) {
                 consensus.finished_syncing_blocks();
             }
         }
 
-        self.outbound.channels.write().remove(&remote_address);
-
-        let result = self.peer_book.set_disconnected(remote_address);
-        debug!("Set {} as disconnected", remote_address);
-        result
-        // TODO (howardwu): Attempt to blindly send disconnect message to peer.
+        // Remove the peer from the channel.
+        if let Some(_) = self.outbound.channels.write().remove(&remote_address) {
+            // Set the peer as disconnected in the peer book.
+            let result = self.peer_book.set_disconnected(remote_address);
+            debug!("Disconnected from {}", remote_address);
+            result
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
