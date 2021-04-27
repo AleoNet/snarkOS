@@ -268,7 +268,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Sync(sync) => {
                 if let Some(ref sync_handler) = self.sync() {
-                    if !sync.is_empty() && self.peer_book.expecting_sync_blocks(source, sync.len()) {
+                    if sync.is_empty() {
+                        trace!("{} doesn't have sync blocks to share", source);
+                    } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         sync_handler.received_sync(source, sync).await;
                     }
                 }
