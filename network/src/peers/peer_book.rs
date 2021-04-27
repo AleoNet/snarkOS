@@ -368,7 +368,7 @@ impl PeerBook {
     /// Registers that the given number of blocks is expected as part of syncing with a peer.
     pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) -> bool {
         if let Some(ref pq) = self.peer_quality(addr) {
-            pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
+            pq.remaining_sync_blocks.store(count as u32, Ordering::SeqCst);
             true
         } else {
             warn!("Peer for expecting_sync_blocks purposes not found! (probably disconnected)");
