@@ -116,13 +116,13 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
         Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
     };
 
-    // Enable the sync layer if the node is not a bootstrapper.
-    if !config.node.is_bootnode {
+    // Enable the sync layer.
+    {
         let memory_pool = Mutex::new(MemoryPool::from_storage(&storage)?);
 
-        info!("Loading Aleo parameters...");
+        debug!("Loading Aleo parameters...");
         let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
-        info!("Loading complete.");
+        info!("Loaded Aleo parameters");
 
         // Fetch the set of valid inner circuit IDs.
         let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
@@ -160,7 +160,7 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
         );
 
         node.set_sync(sync);
-    };
+    }
 
     // Start listening for incoming connections.
     node.listen().await?;
