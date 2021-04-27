@@ -24,7 +24,7 @@ use snarkos::{
     errors::NodeError,
 };
 use snarkos_consensus::{Consensus, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
+use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, PeerBook, Sync};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
@@ -101,11 +101,6 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
 
-    // Construct the node instance. Note this does not start the network services.
-    // This is done early on, so that the local address can be discovered
-    // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config).await?;
-
     let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 
     let storage = if is_storage_in_memory {
@@ -115,6 +110,14 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
     } else {
         Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
     };
+
+    // Load the peer book.
+    let peer_book = PeerBook::load(&storage);
+
+    // Construct the node instance. Note this does not start the network services.
+    // This is done early on, so that the local address can be discovered
+    // before any other object (miner, RPC) needs to use it.
+    let mut node = Node::new(node_config, peer_book).await?;
 
     // Enable the sync layer.
     {

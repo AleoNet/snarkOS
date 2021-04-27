@@ -397,8 +397,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     /// Stores the current peer book to the given storage object.
     ///
-    /// This function checks that this node is not connected to itself,
-    /// and proceeds to serialize the peer book into a byte vector for storage.
+    /// This function serializes the peer book into a byte vector for storage.
     ///
     #[inline]
     pub(crate) fn save_peer_book_to_storage(&self) -> Result<(), NetworkError> {

@@ -32,19 +32,6 @@ use std::{
     time::Instant,
 };
 
-///
-/// A data structure for storing the history of all peers with this node server.
-///
-#[derive(Debug, Default)]
-pub struct PeerBook {
-    /// The map of the addresses currently being handshaken with.
-    connecting_peers: RwLock<HashSet<SocketAddr>>,
-    /// The map of connected peers to their metadata.
-    connected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
-    /// The map of disconnected peers to their metadata.
-    disconnected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
-}
-
 #[derive(Deserialize, Serialize)]
 pub struct SerializedPeerBook(Vec<PeerInfo>);
 
@@ -67,6 +54,19 @@ impl From<SerializedPeerBook> for PeerBook {
     }
 }
 
+///
+/// A data structure for storing the history of all peers with this node server.
+///
+#[derive(Debug, Default)]
+pub struct PeerBook {
+    /// The map of the addresses currently being handshaken with.
+    connecting_peers: RwLock<HashSet<SocketAddr>>,
+    /// The map of connected peers to their metadata.
+    connected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
+    /// The map of disconnected peers to their metadata.
+    disconnected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
+}
+
 impl PeerBook {
     // TODO (howardwu): Implement manual serializers and deserializers to prevent forward breakage
     //  when the PeerBook or PeerInfo struct fields change.
@@ -77,19 +77,18 @@ impl PeerBook {
     /// and attempts to deserialize it as an instance of `PeerBook`.
     ///
     /// If the peer book does not exist in storage or fails to deserialize properly,
-    /// returns a `NetworkError`.
+    /// returns a new instance of PeerBook.
     ///
     #[inline]
-    pub fn load<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
-        storage: &Ledger<T, P, S>,
-    ) -> Result<Self, NetworkError> {
+    pub fn load<T: Transaction, P: LoadableMerkleParameters, S: Storage>(storage: &Ledger<T, P, S>) -> Self {
         // Fetch the peer book from storage.
         match storage.get_peer_book() {
             // Attempt to deserialize it as a peer book.
-            Ok(Some(serialized_peer_book)) => Ok(PeerBook::from(bincode::deserialize::<SerializedPeerBook>(
-                &serialized_peer_book,
-            )?)),
-            _ => Err(NetworkError::PeerBookFailedToLoad),
+            Ok(Some(serialized_peer_book)) => match bincode::deserialize::<SerializedPeerBook>(&serialized_peer_book) {
+                Ok(peer_book) => PeerBook::from(peer_book),
+                _ => Default::default(),
+            },
+            _ => Default::default(),
         }
     }
 
