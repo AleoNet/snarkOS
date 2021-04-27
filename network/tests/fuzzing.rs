@@ -496,3 +496,34 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
     write_finished.store(true, Ordering::Relaxed);
     handle.await.unwrap();
 }
+
+#[tokio::test]
+async fn connection_request_spam() {
+    const NUM_ATTEMPTS: usize = 100;
+
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    let sockets = Arc::new(parking_lot::Mutex::new(Vec::with_capacity(NUM_ATTEMPTS)));
+
+    for _ in 0..NUM_ATTEMPTS {
+        let socks = sockets.clone();
+        tokio::task::spawn(async move {
+            if let Ok(socket) = TcpStream::connect(node_addr).await {
+                socks.lock().push(socket);
+            }
+        });
+    }
+
+    wait_until!(1, node.peer_book.number_of_connecting_peers() > 0);
+
+    wait_until!(
+        snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 * 2,
+        node.peer_book.number_of_connecting_peers() == 0
+    );
+}
