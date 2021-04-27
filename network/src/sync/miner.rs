@@ -44,7 +44,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
         info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
         let miner = Miner::new(
             self.miner_address.clone(),
-            Arc::clone(&self.node.expect_consensus().consensus),
+            Arc::clone(&self.node.expect_sync().consensus),
         );
         info!("Miner instantiated; starting to mine blocks");
 
@@ -111,7 +111,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
 
                 let node = self.node.clone();
                 tokio_handle.spawn(async move {
-                    node.expect_consensus()
+                    node.expect_sync()
                         .propagate_block(serialized_block, local_address)
                         .await;
                 });

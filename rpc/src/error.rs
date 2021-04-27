@@ -50,7 +50,7 @@ pub enum RpcError {
     #[error("{}", _0)]
     Message(String),
 
-    #[error("The node doesn't have the consensus layer running")]
+    #[error("The node doesn't have the sync layer running")]
     NoConsensus,
 
     #[error("{}", _0)]

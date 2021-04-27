@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, Consensus, NetworkError};
+use crate::{message::*, NetworkError, Sync};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_objects::Storage;
@@ -25,7 +25,7 @@ use snarkvm_utilities::{
 
 use std::net::SocketAddr;
 
-impl<S: Storage + Send + Sync + 'static> Consensus<S> {
+impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     ///
     /// Triggers the transaction sync with a selected peer.
     ///

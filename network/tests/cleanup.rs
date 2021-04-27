@@ -27,7 +27,7 @@ async fn check_node_cleanup() {
     #[global_allocator]
     static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
-    // Start a node without consensus.
+    // Start a node without sync.
     let setup = TestSetup {
         consensus_setup: None,
         ..Default::default()

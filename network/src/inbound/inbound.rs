@@ -211,60 +211,60 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         match payload {
             Payload::Transaction(transaction) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_transaction(source, transaction).await?;
+                if let Some(ref sync) = self.sync() {
+                    sync.received_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_block(source, block, true).await?;
+                if let Some(ref sync) = self.sync() {
+                    sync.received_block(source, block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_block(source, block, false).await?;
+                if let Some(ref sync) = self.sync() {
+                    sync.received_block(source, block, false).await?;
 
                     // update the peer and possibly finish the sync process
                     if self.peer_book.got_sync_block(source) {
-                        consensus.finished_syncing_blocks();
+                        sync.finished_syncing_blocks();
                     } else {
                         // since we confirmed that the block is a valid sync block
                         // and we're expecting more blocks from the peer, we can set
                         // the node's status to Syncing
-                        consensus.node().set_state(State::Syncing);
+                        sync.node().set_state(State::Syncing);
                     }
                 }
             }
             Payload::GetBlocks(hashes) => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_blocks(source, hashes).await?;
+                if let Some(ref sync) = self.sync() {
+                    if !sync.is_syncing_blocks() {
+                        sync.received_get_blocks(source, hashes).await?;
                     }
                 }
             }
             Payload::GetMemoryPool => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_memory_pool(source).await?;
+                if let Some(ref sync) = self.sync() {
+                    if !sync.is_syncing_blocks() {
+                        sync.received_get_memory_pool(source).await?;
                     }
                 }
             }
             Payload::MemoryPool(mempool) => {
-                if let Some(ref consensus) = self.consensus() {
-                    consensus.received_memory_pool(mempool)?;
+                if let Some(ref sync) = self.sync() {
+                    sync.received_memory_pool(mempool)?;
                 }
             }
             Payload::GetSync(getsync) => {
-                if let Some(ref consensus) = self.consensus() {
-                    if !consensus.is_syncing_blocks() {
-                        consensus.received_get_sync(source, getsync).await?;
+                if let Some(ref sync) = self.sync() {
+                    if !sync.is_syncing_blocks() {
+                        sync.received_get_sync(source, getsync).await?;
                     }
                 }
             }
             Payload::Sync(sync) => {
-                if let Some(ref consensus) = self.consensus() {
+                if let Some(ref sync_handler) = self.sync() {
                     if !sync.is_empty() && self.peer_book.expecting_sync_blocks(source, sync.len()) {
-                        consensus.received_sync(source, sync).await;
+                        sync_handler.received_sync(source, sync).await;
                     }
                 }
             }
@@ -275,17 +275,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 self.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
-                if let Some(ref consensus) = self.consensus() {
-                    if block_height > consensus.current_block_height() + 1 {
+                if let Some(ref sync) = self.sync() {
+                    if block_height > sync.current_block_height() + 1 {
                         // if the node is syncing, check if that sync attempt hasn't expired
-                        if !consensus.is_syncing_blocks() || consensus.has_block_sync_expired() {
+                        if !sync.is_syncing_blocks() || sync.has_block_sync_expired() {
                             // cancel any possibly ongoing sync attempts
                             self.set_state(State::Idle);
                             self.peer_book.cancel_any_unfinished_syncing();
 
                             // begin a new sync attempt
-                            consensus.register_block_sync_attempt(source);
-                            consensus.update_blocks(source).await;
+                            sync.register_block_sync_attempt(source);
+                            sync.update_blocks(source).await;
                         }
                     }
                 }

@@ -15,18 +15,18 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_sidechain {
-    use snarkos_testing::consensus::*;
+    use snarkos_testing::sync::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Block;
     use snarkvm_utilities::bytes::FromBytes;
 
     // Receive two new blocks out of order.
     // Like the test above, except block 2 is received first as an orphan with no parent.
-    // The consensus mechanism should push the orphan into storage until block 1 is received.
+    // The sync mechanism should push the orphan into storage until block 1 is received.
     // After block 1 is received, block 2 should be fetched from storage and added to the chain.
     #[test]
     fn new_out_of_order() {
-        let consensus = snarkos_testing::consensus::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus();
 
         let old_block_height = consensus.ledger.get_current_block_height();
 
@@ -50,7 +50,7 @@ mod consensus_sidechain {
     // Treat the first block received as the canonical chain but store and keep the rejected sidechain block in storage.
     #[test]
     fn reject() {
-        let consensus = snarkos_testing::consensus::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
         let block_1_side = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
@@ -79,7 +79,7 @@ mod consensus_sidechain {
     // Receive blocks from a sidechain that overtakes our current canonical chain.
     #[test]
     fn accept() {
-        let consensus = snarkos_testing::consensus::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
         let block_1_side = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
@@ -110,7 +110,7 @@ mod consensus_sidechain {
     // Receive blocks from a sidechain (out of order) that overtakes our current canonical chain.
     #[test]
     fn fork_out_of_order() {
-        let consensus = snarkos_testing::consensus::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
         let block_2_canon = Block::<Tx>::read(&BLOCK_2[..]).unwrap();

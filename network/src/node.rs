@@ -49,6 +49,8 @@ pub struct InnerNode<S: Storage> {
     pub name: u64,
     /// The current state of the node.
     state: StateCode,
+    /// The local address of this node.
+    pub local_address: OnceCell<SocketAddr>,
     /// The pre-configured parameters of this node.
     pub config: Config,
     /// The inbound handler of this node.
@@ -57,10 +59,8 @@ pub struct InnerNode<S: Storage> {
     pub outbound: Outbound,
     /// The list of connected and disconnected peers of this node.
     pub peer_book: PeerBook,
-    /// The objects related to consensus.
-    pub consensus: OnceCell<Arc<Consensus<S>>>,
-    /// Node's local address.
-    pub local_address: OnceCell<SocketAddr>,
+    /// The sync handler of this node.
+    pub sync: OnceCell<Arc<Sync<S>>>,
     /// The tasks spawned by the node.
     tasks: Mutex<Vec<task::JoinHandle<()>>>,
     /// The threads spawned by the node.
@@ -126,7 +126,7 @@ impl<S: Storage> Node<S> {
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> Node<S> {
+impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
         // Create the inbound and outbound handlers.
@@ -143,35 +143,35 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             inbound,
             outbound,
             peer_book: Default::default(),
-            consensus: Default::default(),
+            sync: Default::default(),
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),
         })))
     }
 
-    pub fn set_consensus(&mut self, consensus: Consensus<S>) {
-        if self.consensus.set(Arc::new(consensus)).is_err() {
-            panic!("consensus was set more than once!");
+    pub fn set_sync(&mut self, sync: Sync<S>) {
+        if self.sync.set(Arc::new(sync)).is_err() {
+            panic!("sync was set more than once!");
         }
     }
 
-    /// Returns a reference to the consensus objects.
+    /// Returns a reference to the sync objects.
     #[inline]
-    pub fn consensus(&self) -> Option<&Arc<Consensus<S>>> {
-        self.consensus.get()
+    pub fn sync(&self) -> Option<&Arc<Sync<S>>> {
+        self.sync.get()
     }
 
-    /// Returns a reference to the consensus objects, expecting them to be available.
+    /// Returns a reference to the sync objects, expecting them to be available.
     #[inline]
-    pub fn expect_consensus(&self) -> &Consensus<S> {
-        self.consensus().expect("no consensus!")
+    pub fn expect_sync(&self) -> &Sync<S> {
+        self.sync().expect("no sync!")
     }
 
     #[inline]
     #[doc(hidden)]
-    pub fn has_consensus(&self) -> bool {
-        self.consensus().is_some()
+    pub fn has_sync(&self) -> bool {
+        self.sync().is_some()
     }
 
     pub async fn start_services(&self) {
@@ -217,20 +217,20 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             });
             self.register_task(state_tracking_task);
 
-            if let Some(ref consensus) = self.consensus() {
+            if let Some(ref sync) = self.sync() {
                 let node_clone = self.clone();
-                let consensus = Arc::clone(consensus);
-                let transaction_sync_interval = consensus.transaction_sync_interval();
+                let sync = Arc::clone(sync);
+                let transaction_sync_interval = sync.transaction_sync_interval();
                 let sync_task = task::spawn(async move {
                     loop {
                         sleep(transaction_sync_interval).await;
 
-                        if !consensus.is_syncing_blocks() {
+                        if !sync.is_syncing_blocks() {
                             info!("Updating transactions");
 
                             // Select last seen node as block sync node.
                             let sync_node = node_clone.peer_book.last_seen();
-                            consensus.update_transactions(sync_node).await;
+                            sync.update_transactions(sync_node).await;
                         }
                     }
                 });

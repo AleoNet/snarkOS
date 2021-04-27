@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, Consensus, NetworkError};
+use crate::{message::*, NetworkError, Sync};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
 use std::net::SocketAddr;
 
-impl<S: Storage> Consensus<S> {
+impl<S: Storage> Sync<S> {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///

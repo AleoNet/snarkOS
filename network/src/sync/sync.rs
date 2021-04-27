@@ -29,11 +29,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-// TODO: Remove the inner Arcs, currently these objects are being cloned individually in the miner.
-pub struct Consensus<S: Storage> {
-    /// The node this consensus is bound to.
+/// The sync handler of this node.
+pub struct Sync<S: Storage> {
+    /// The node this sync is bound to.
     node: Node<S>,
-    /// The core consensus objects.
+    /// The core sync objects.
     pub consensus: Arc<snarkos_consensus::Consensus<S>>,
     /// If `true`, initializes a mining task on this node.
     is_miner: bool,
@@ -45,7 +45,7 @@ pub struct Consensus<S: Storage> {
     transaction_sync_interval: Duration,
 }
 
-impl<S: Storage> Consensus<S> {
+impl<S: Storage> Sync<S> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         node: Node<S>,
@@ -81,7 +81,7 @@ impl<S: Storage> Consensus<S> {
         &self.consensus.memory_pool
     }
 
-    /// Returns a reference to the consensus parameters of this node.
+    /// Returns a reference to the sync parameters of this node.
     #[inline]
     pub fn consensus_parameters(&self) -> &ConsensusParameters {
         &self.consensus.parameters

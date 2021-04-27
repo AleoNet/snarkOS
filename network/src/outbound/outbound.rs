@@ -102,9 +102,9 @@ impl Outbound {
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn send_ping(&self, remote_address: SocketAddr) {
-        // Consider peering tests that don't use the consensus layer.
-        let current_block_height = if let Some(ref consensus) = self.consensus() {
-            consensus.current_block_height()
+        // Consider peering tests that don't use the sync layer.
+        let current_block_height = if let Some(ref sync) = self.sync() {
+            sync.current_block_height()
         } else {
             0
         };

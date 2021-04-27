@@ -25,7 +25,7 @@ pub mod sync;
 
 pub mod topology;
 
-use crate::consensus::FIXTURE;
+use crate::sync::FIXTURE;
 
 use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
 use snarkos_storage::LedgerStorage;
@@ -148,10 +148,10 @@ impl Default for TestSetup {
     }
 }
 
-pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Consensus<LedgerStorage> {
-    let consensus = Arc::new(crate::consensus::create_test_consensus());
+pub fn test_consensus(setup: ConsensusSetup, node: Node<LedgerStorage>) -> Sync<LedgerStorage> {
+    let consensus = Arc::new(crate::sync::create_test_consensus());
 
-    Consensus::new(
+    Sync::new(
         node,
         consensus,
         setup.is_miner,
@@ -181,7 +181,7 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
 
     if let Some(consensus_setup) = setup.consensus_setup {
         let consensus = test_consensus(consensus_setup, node.clone());
-        node.set_consensus(consensus);
+        node.set_sync(consensus);
     }
 
     node.listen().await.unwrap();

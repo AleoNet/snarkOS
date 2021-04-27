@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod consensus;
-pub use consensus::*;
-
 pub mod blocks;
 pub use blocks::*;
 
@@ -25,3 +22,6 @@ pub use miner::*;
 
 pub mod transactions;
 pub use transactions::*;
+
+pub mod sync;
+pub use sync::*;

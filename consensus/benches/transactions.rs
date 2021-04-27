@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_testing::consensus::*;
+use snarkos_testing::sync::*;
 use snarkvm_objects::{dpc::DPCTransactions, merkle_root};
 use snarkvm_posw::txids_to_roots;
 

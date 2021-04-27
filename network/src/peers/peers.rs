@@ -314,9 +314,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     async fn broadcast_pings(&self) {
         trace!("Broadcasting Ping messages");
 
-        // consider peering tests that don't use the consensus layer
-        let current_block_height = if let Some(ref consensus) = self.consensus() {
-            consensus.current_block_height()
+        // consider peering tests that don't use the sync layer
+        let current_block_height = if let Some(ref sync) = self.sync() {
+            sync.current_block_height()
         } else {
             0
         };
@@ -369,8 +369,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Serialize the peer book.
         let serialized_peer_book = bincode::serialize(&SerializedPeerBook::from(&self.peer_book))?;
 
-        // TODO: the peer book should be stored outside of consensus
-        if let Some(ref consensus) = self.consensus() {
+        // TODO: the peer book should be stored outside of sync
+        if let Some(ref consensus) = self.sync() {
             // Save the serialized peer book to storage.
             consensus.storage().save_peer_book_to_storage(serialized_peer_book)?;
         }
@@ -386,7 +386,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         debug!("Disconnecting from {} (if not disconnected yet)", remote_address);
 
-        if let Some(ref consensus) = self.consensus() {
+        if let Some(ref consensus) = self.sync() {
             if self.peer_book.is_syncing_blocks(remote_address) {
                 consensus.finished_syncing_blocks();
             }

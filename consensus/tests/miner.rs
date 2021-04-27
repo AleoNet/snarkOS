@@ -16,7 +16,7 @@
 
 mod miner {
     use snarkos_consensus::Miner;
-    use snarkos_testing::consensus::*;
+    use snarkos_testing::sync::*;
     use snarkvm_algorithms::traits::{
         commitment::CommitmentScheme,
         encryption::EncryptionScheme,
@@ -45,7 +45,7 @@ mod miner {
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<TestTx>, parent_header: &BlockHeader) {
-        let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus());
+        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
         let mut rng = XorShiftRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
 
         let (_, miner_address) = keygen(&mut rng);
