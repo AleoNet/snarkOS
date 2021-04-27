@@ -89,7 +89,8 @@ pub struct Miner {
 pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
-    pub mempool_interval: u8,
+    #[serde(alias = "mempool_interval")]
+    pub mempool_sync_interval: u8,
     pub block_sync_interval: u16,
     pub peer_sync_interval: u16,
     pub min_peers: u16,
@@ -124,7 +125,7 @@ impl Default for Config {
                     .iter()
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
-                mempool_interval: 15,
+                mempool_sync_interval: 15,
                 peer_sync_interval: 10,
                 block_sync_interval: 60,
                 min_peers: 7,
@@ -281,7 +282,7 @@ impl Config {
 
     fn mempool_interval(&mut self, argument: Option<u8>) {
         if let Some(interval) = argument {
-            self.p2p.mempool_interval = interval
+            self.p2p.mempool_sync_interval = interval
         }
     }
 

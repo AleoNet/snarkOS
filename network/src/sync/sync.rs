@@ -39,10 +39,10 @@ pub struct Sync<S: Storage> {
     is_miner: bool,
     /// The interval between each block sync.
     block_sync_interval: Duration,
+    /// The interval between each memory pool sync.
+    mempool_sync_interval: Duration,
     /// The last time a block sync was initiated.
     last_block_sync: RwLock<Option<Instant>>,
-    /// The interval between each transaction (memory pool) sync.
-    transaction_sync_interval: Duration,
 }
 
 impl<S: Storage> Sync<S> {
@@ -52,15 +52,15 @@ impl<S: Storage> Sync<S> {
         consensus: Arc<snarkos_consensus::Consensus<S>>,
         is_miner: bool,
         block_sync_interval: Duration,
-        transaction_sync_interval: Duration,
+        mempool_sync_interval: Duration,
     ) -> Self {
         Self {
             node,
             consensus,
             is_miner,
             block_sync_interval,
+            mempool_sync_interval,
             last_block_sync: Default::default(),
-            transaction_sync_interval,
         }
     }
 
@@ -131,9 +131,9 @@ impl<S: Storage> Sync<S> {
         *self.last_block_sync.write() = Some(Instant::now());
     }
 
-    /// Returns the interval between each transaction (memory pool) sync.
-    pub fn transaction_sync_interval(&self) -> Duration {
-        self.transaction_sync_interval
+    /// Returns the interval between each memory pool sync.
+    pub fn mempool_sync_interval(&self) -> Duration {
+        self.mempool_sync_interval
     }
 
     pub fn max_block_size(&self) -> usize {

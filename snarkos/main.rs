@@ -156,7 +156,7 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
             consensus,
             config.miner.is_miner,
             Duration::from_secs(config.p2p.block_sync_interval.into()),
-            Duration::from_secs(config.p2p.mempool_interval.into()),
+            Duration::from_secs(config.p2p.mempool_sync_interval.into()),
         );
 
         node.set_sync(sync);

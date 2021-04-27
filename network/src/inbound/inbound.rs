@@ -212,7 +212,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         match payload {
             Payload::Transaction(transaction) => {
                 if let Some(ref sync) = self.sync() {
-                    sync.received_transaction(source, transaction).await?;
+                    sync.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {

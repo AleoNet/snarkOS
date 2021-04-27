@@ -17,11 +17,11 @@
 pub mod blocks;
 pub use blocks::*;
 
+pub mod memory_pool;
+pub use memory_pool::*;
+
 pub mod miner;
 pub use miner::*;
-
-pub mod transactions;
-pub use transactions::*;
 
 pub mod sync;
 pub use sync::*;
