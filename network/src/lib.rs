@@ -53,6 +53,7 @@ pub use peers::*;
 pub mod sync;
 pub use sync::*;
 
+pub const BLOCK_SYNC_EXPIRATION_SECS: u8 = 60;
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
 pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
 pub const HANDSHAKE_BOOTNODE_TIMEOUT_SECS: u8 = 30;
