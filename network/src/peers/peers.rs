@@ -344,14 +344,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     async fn broadcast_getpeers_requests(&self) {
-        // Fetch the number of connected and connecting peers.
-        let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
-        let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
+        // Check that this node is not a bootnode.
+        if !self.config.is_bootnode() {
+            // Fetch the number of connected and connecting peers.
+            let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
+            let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
 
-        // Check if this node server is below the permitted number of connected peers.
-        let min_peers = self.config.minimum_number_of_connected_peers() as usize;
-        if number_of_connected_peers + number_of_connecting_peers >= min_peers {
-            return;
+            // Check if this node server is below the permitted number of connected peers.
+            let min_peers = self.config.minimum_number_of_connected_peers() as usize;
+            if number_of_connected_peers + number_of_connecting_peers >= min_peers {
+                return;
+            }
         }
 
         trace!("Sending `GetPeers` requests to connected peers");
