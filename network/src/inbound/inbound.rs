@@ -18,11 +18,12 @@ use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Rece
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use snarkvm_objects::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
+    sync::mpsc::channel,
     task,
 };
 
@@ -36,22 +37,21 @@ pub struct Inbound {
     pub(crate) sender: Sender,
     /// The consumer for receiving inbound messages to the server.
     receiver: Mutex<Option<Receiver>>,
-    /// The map of remote addresses to their active write channels.
-    pub(crate) channels: Arc<RwLock<Channels>>,
 }
 
-impl Inbound {
-    pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
+impl Default for Inbound {
+    fn default() -> Self {
         // Initialize the sender and receiver.
         let (sender, receiver) = tokio::sync::mpsc::channel(64 * 1024);
 
         Self {
             sender,
             receiver: Mutex::new(Some(receiver)),
-            channels,
         }
     }
+}
 
+impl Inbound {
     #[inline]
     pub(crate) async fn route(&self, response: Message) {
         if let Err(err) = self.sender.send(response).await {
@@ -105,16 +105,30 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         .await;
 
                         match handshake_result {
-                            Ok(Ok((channel, mut reader))) => {
+                            Ok(Ok((mut writer, mut reader, remote_listener))) => {
                                 // Update the remote address to be the peer's listening address.
-                                let remote_address = channel.addr;
-                                // Save the channel under the provided remote address.
-                                node.inbound.channels.write().insert(remote_address, Arc::new(channel));
+                                let remote_address = writer.addr;
 
+                                // Create a channel dedicated to sending messages to the connection.
+                                let (sender, receiver) = channel(1024);
+
+                                // Listen for inbound messages.
                                 let node_clone = node.clone();
-                                let peer_listening_task = tokio::spawn(async move {
-                                    node_clone.listen_for_messages(&mut reader).await;
+                                let peer_reading_task = tokio::spawn(async move {
+                                    node_clone.listen_for_inbound_messages(&mut reader).await;
                                 });
+
+                                // Listen for outbound messages.
+                                let node_clone = node.clone();
+                                let peer_writing_task = tokio::spawn(async move {
+                                    node_clone.listen_for_outbound_messages(receiver, &mut writer).await;
+                                });
+
+                                // Save the channel under the provided remote address.
+                                node.outbound.channels.write().insert(remote_address, sender);
+
+                                // Finally, mark the peer as connected.
+                                node.peer_book.set_connected(remote_address, Some(remote_listener));
 
                                 trace!("Connected to {}", remote_address);
 
@@ -122,10 +136,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 node.send_ping(remote_address).await;
 
                                 if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
-                                    peer.register_task(peer_listening_task);
+                                    peer.register_task(peer_reading_task);
+                                    peer.register_task(peer_writing_task);
                                 } else {
                                     // If the related peer is not found, it means it's already been dropped.
-                                    peer_listening_task.abort();
+                                    peer_reading_task.abort();
+                                    peer_writing_task.abort();
                                 }
                             }
                             Ok(Err(e)) => {
@@ -148,10 +164,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         Ok(())
     }
 
-    /// This method handles new inbound messages from connected nodes.
-    pub async fn listen_for_messages(&self, reader: &mut ConnReader) {
+    /// This method handles new inbound messages from a single connected node.
+    pub async fn listen_for_inbound_messages(&self, reader: &mut ConnReader) {
         let mut failure_count = 0u8;
-        let mut fatal_count = 0u8;
 
         loop {
             // Read the next message from the channel.
@@ -162,13 +177,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     error!("Unable to read message from {}: {}", reader.addr, error);
                     failure_count += 1;
 
-                    // Increment the fatal count if the error is a fatal error.
-                    if error.is_fatal() {
-                        fatal_count += 1;
-                    }
-
                     // Determine if we should disconnect.
-                    let disconnect_from_peer = fatal_count >= 2 || failure_count >= 10;
+                    let disconnect_from_peer = error.is_fatal() || failure_count >= 10;
 
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
@@ -319,7 +329,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         listener_address: SocketAddr,
         remote_address: SocketAddr,
         stream: TcpStream,
-    ) -> Result<(ConnWriter, ConnReader), NetworkError> {
+    ) -> Result<(ConnWriter, ConnReader, SocketAddr), NetworkError> {
         self.peer_book.set_connecting(remote_address)?;
 
         let (mut reader, mut writer) = stream.into_split();
@@ -367,12 +377,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
 
-        self.peer_book.set_connected(remote_address, Some(remote_listener))?;
-
         let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
         let reader = ConnReader::new(remote_listener, reader, buffer.clone(), Arc::clone(&noise));
         let writer = ConnWriter::new(remote_listener, writer, buffer, noise);
 
-        Ok((writer, reader))
+        Ok((writer, reader, remote_listener))
     }
 }
