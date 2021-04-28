@@ -33,10 +33,10 @@ use parking_lot::RwLock;
 type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 
 /// A core data structure for handling outbound network traffic.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Outbound {
     /// The map of remote addresses to their active write channels.
-    pub(crate) channels: Arc<RwLock<Channels>>,
+    pub(crate) channels: RwLock<Channels>,
     /// The monotonic counter for the number of send requests that succeeded.
     send_success_count: AtomicU64,
     /// The monotonic counter for the number of send requests that failed.
@@ -44,14 +44,6 @@ pub struct Outbound {
 }
 
 impl Outbound {
-    pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
-        Self {
-            channels,
-            send_success_count: Default::default(),
-            send_failure_count: Default::default(),
-        }
-    }
-
     ///
     /// Sends the given request to the address associated with it.
     ///

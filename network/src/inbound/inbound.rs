@@ -18,7 +18,7 @@ use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Rece
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use snarkvm_objects::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -36,22 +36,21 @@ pub struct Inbound {
     pub(crate) sender: Sender,
     /// The consumer for receiving inbound messages to the server.
     receiver: Mutex<Option<Receiver>>,
-    /// The map of remote addresses to their active write channels.
-    pub(crate) channels: Arc<RwLock<Channels>>,
 }
 
-impl Inbound {
-    pub fn new(channels: Arc<RwLock<Channels>>) -> Self {
+impl Default for Inbound {
+    fn default() -> Self {
         // Initialize the sender and receiver.
         let (sender, receiver) = tokio::sync::mpsc::channel(64 * 1024);
 
         Self {
             sender,
             receiver: Mutex::new(Some(receiver)),
-            channels,
         }
     }
+}
 
+impl Inbound {
     #[inline]
     pub(crate) async fn route(&self, response: Message) {
         if let Err(err) = self.sender.send(response).await {
@@ -109,7 +108,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 // Update the remote address to be the peer's listening address.
                                 let remote_address = channel.addr;
                                 // Save the channel under the provided remote address.
-                                node.inbound.channels.write().insert(remote_address, Arc::new(channel));
+                                node.outbound.channels.write().insert(remote_address, Arc::new(channel));
 
                                 let node_clone = node.clone();
                                 let peer_listening_task = tokio::spawn(async move {
