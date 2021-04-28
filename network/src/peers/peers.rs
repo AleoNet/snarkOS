@@ -161,6 +161,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.peer_book.set_connecting(remote_address)?;
 
+        debug!("Connecting to {}...", remote_address);
+
         // Fetch the bootnodes and determine if address is a bootnode.
         let bootnodes = self.config.bootnodes();
         let is_connecting_peer_bootnode = bootnodes.contains(&remote_address);
@@ -295,11 +297,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         {
             let node = self.clone();
             task::spawn(async move {
-                debug!("Connecting to bootnode {}...", bootnode_address);
-
-                if let Err(e) = node.initiate_connection(bootnode_address).await {
-                    warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                    let _ = node.disconnect_from_peer(bootnode_address);
+                match node.initiate_connection(bootnode_address).await {
+                    Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
+                        // no issue here, already connecting
+                    }
+                    Err(e @ NetworkError::TooManyConnections) | Err(e @ NetworkError::SelfConnectAttempt) => {
+                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                        // the connection hasn't been established, no need to disconnect
+                    }
+                    Err(e) => {
+                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                        let _ = node.disconnect_from_peer(bootnode_address);
+                    }
+                    Ok(_) => {}
                 }
             });
         }
@@ -365,11 +375,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for remote_address in random_peers {
             let node = self.clone();
             task::spawn(async move {
-                debug!("Connecting to peer {}...", remote_address);
-
-                if let Err(e) = node.initiate_connection(remote_address).await {
-                    trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
-                    let _ = node.disconnect_from_peer(remote_address);
+                match node.initiate_connection(remote_address).await {
+                    Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
+                        // no issue here, already connecting
+                    }
+                    Err(e @ NetworkError::TooManyConnections) | Err(e @ NetworkError::SelfConnectAttempt) => {
+                        warn!("Couldn't connect to peer {}: {}", remote_address, e);
+                        // the connection hasn't been established, no need to disconnect
+                    }
+                    Err(e) => {
+                        warn!("Couldn't connect to peer {}: {}", remote_address, e);
+                        let _ = node.disconnect_from_peer(remote_address);
+                    }
+                    Ok(_) => {}
                 }
             });
         }
