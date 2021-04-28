@@ -315,9 +315,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let _ = self.disconnect_from_peer(addr);
         }
 
-        // Store the peer book to storage.
-        let _ = self.save_peer_book_to_storage();
-
         for handle in self.threads.lock().drain(..).rev() {
             let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
         }

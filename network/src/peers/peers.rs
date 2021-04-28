@@ -117,9 +117,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if number_of_connected_peers != 0 {
             // Send a `Ping` to every connected peer.
             self.broadcast_pings().await;
-
-            // Store the peer book to storage.
-            self.save_peer_book_to_storage()?;
         }
 
         Ok(())
