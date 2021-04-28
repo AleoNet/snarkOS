@@ -295,36 +295,55 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
-        // Fetch the number of connected and connecting peers.
-        let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
-        let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
-        let number_of_peers = number_of_connected_peers + number_of_connecting_peers;
+        // If this node is a bootnode, attempt to connect to all disconnected peers.
+        // If this node is not a bootnode, attempt to satisfy the minimum number of peer connections.
+        let random_peers = if !self.config.is_bootnode() {
+            // Fetch the number of connected and connecting peers.
+            let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
+            let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
+            let number_of_peers = number_of_connected_peers + number_of_connecting_peers;
 
-        // Check if this node server is below the permitted number of connected peers.
-        let min_peers = self.config.minimum_number_of_connected_peers() as usize;
-        if number_of_peers >= min_peers {
-            return;
-        }
+            // Check if this node server is below the permitted number of connected peers.
+            let min_peers = self.config.minimum_number_of_connected_peers() as usize;
+            if number_of_peers >= min_peers {
+                return;
+            }
 
-        // Set the number of peers to attempt a connection to.
-        let count = min_peers - number_of_peers;
+            // Set the number of peers to attempt a connection to.
+            let count = min_peers - number_of_peers;
 
-        trace!(
-            "Connecting to {} disconnected peers",
-            cmp::min(count, self.peer_book.disconnected_peers().len())
-        );
+            trace!(
+                "Connecting to {} disconnected peers",
+                cmp::min(count, self.peer_book.disconnected_peers().len())
+            );
 
-        let bootnodes = self.config.bootnodes();
+            let bootnodes = self.config.bootnodes();
 
-        // Iterate through a selection of random peers and attempt to connect.
-        let random_peers = self
-            .peer_book
-            .disconnected_peers()
-            .iter()
-            .map(|(k, _)| k)
-            .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
-            .copied()
-            .choose_multiple(&mut rand::thread_rng(), count);
+            // Iterate through a selection of random peers and attempt to connect.
+            self.peer_book
+                .disconnected_peers()
+                .iter()
+                .map(|(k, _)| k)
+                .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
+                .copied()
+                .choose_multiple(&mut rand::thread_rng(), count)
+        } else {
+            trace!(
+                "Connecting to {} disconnected peers",
+                self.peer_book.disconnected_peers().len()
+            );
+
+            let bootnodes = self.config.bootnodes();
+
+            // Iterate through a selection of random peers and attempt to connect.
+            self.peer_book
+                .disconnected_peers()
+                .iter()
+                .map(|(k, _)| k)
+                .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
+                .copied()
+                .collect()
+        };
 
         for remote_address in random_peers {
             let node = self.clone();
