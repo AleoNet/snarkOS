@@ -21,16 +21,14 @@ use snarkvm_objects::Storage;
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use parking_lot::RwLock;
+use tokio::sync::mpsc::{error::TrySendError, Receiver, Sender};
 
 /// The map of remote addresses to their active write channels.
-type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
+type Channels = HashMap<SocketAddr, Sender<Message>>;
 
 /// A core data structure for handling outbound network traffic.
 #[derive(Debug, Default)]
@@ -54,22 +52,24 @@ impl Outbound {
     pub async fn send_request(&self, request: Message) {
         let target_addr = request.receiver();
         // Fetch the outbound channel.
-        let channel = match self.outbound_channel(target_addr).await {
-            Ok(channel) => channel,
+        match self.outbound_channel(target_addr) {
+            Ok(channel) => match channel.try_send(request) {
+                Ok(()) => {}
+                Err(TrySendError::Full(request)) => {
+                    warn!(
+                        "Couldn't send a {} to {}: the send channel is full",
+                        request, target_addr
+                    );
+                }
+                Err(TrySendError::Closed(request)) => {
+                    error!(
+                        "Couldn't send a {} to {}: the send channel is closed",
+                        request, target_addr
+                    );
+                }
+            },
             Err(_) => {
                 warn!("Failed to send a {}: peer is disconnected", request);
-                return;
-            }
-        };
-
-        // Write the request to the outbound channel.
-        match channel.write_message(&request.payload).await {
-            Ok(_) => {
-                self.send_success_count.fetch_add(1, Ordering::SeqCst);
-            }
-            Err(error) => {
-                warn!("Failed to send a {}: {}", request, error);
-                self.send_failure_count.fetch_add(1, Ordering::SeqCst);
             }
         }
     }
@@ -78,7 +78,7 @@ impl Outbound {
     /// Establishes an outbound channel to the given remote address, if it does not exist.
     ///
     #[inline]
-    async fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
+    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Sender<Message>, NetworkError> {
         Ok(self
             .channels
             .read()
@@ -105,5 +105,23 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 Payload::Ping(current_block_height),
             ))
             .await;
+    }
+
+    /// This method handles new outbound messages to a single connected node.
+    pub async fn listen_for_outbound_messages(&self, mut receiver: Receiver<Message>, writer: &mut ConnWriter) {
+        loop {
+            // Read the next message queued to be sent.
+            if let Some(message) = receiver.recv().await {
+                match writer.write_message(&message.payload).await {
+                    Ok(_) => {
+                        self.outbound.send_success_count.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Err(error) => {
+                        warn!("Failed to send a {}: {}", message, error);
+                        self.outbound.send_failure_count.fetch_add(1, Ordering::SeqCst);
+                    }
+                }
+            }
+        }
     }
 }

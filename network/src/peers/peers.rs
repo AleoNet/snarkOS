@@ -29,6 +29,7 @@ use rand::seq::IteratorRandom;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    sync::mpsc::channel,
     task,
 };
 
@@ -208,25 +209,36 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
             let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
-            let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
+            let mut writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
-            // save the outbound channel
-            node.outbound.channels.write().insert(remote_address, Arc::new(writer));
-
-            node.peer_book.set_connected(remote_address, None)?;
+            // Create a channel dedicated to sending messages to the connection.
+            let (sender, receiver) = channel(1024);
 
             // spawn the inbound loop
             let node_clone = node.clone();
-            let conn_listening_task = tokio::spawn(async move {
+            let conn_reading_task = tokio::spawn(async move {
                 node_clone.listen_for_inbound_messages(&mut reader).await;
             });
 
+            // Listen for outbound messages.
+            let node_clone = node.clone();
+            let conn_writing_task = tokio::spawn(async move {
+                node_clone.listen_for_outbound_messages(receiver, &mut writer).await;
+            });
+
+            // Save the channel under the provided remote address.
+            node.outbound.channels.write().insert(remote_address, sender);
+
+            node.peer_book.set_connected(remote_address, None);
+
             if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
-                peer.register_task(conn_listening_task);
+                peer.register_task(conn_reading_task);
+                peer.register_task(conn_writing_task);
             } else {
                 // if the related peer is not found, it means it's already been dropped
-                conn_listening_task.abort();
+                conn_reading_task.abort();
+                conn_writing_task.abort();
             }
 
             Ok(())

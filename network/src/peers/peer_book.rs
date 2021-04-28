@@ -189,7 +189,7 @@ impl PeerBook {
     ///
     /// Adds the given address to the connected peers in the `PeerBook`.
     ///
-    pub fn set_connected(&self, address: SocketAddr, listener: Option<SocketAddr>) -> Result<(), NetworkError> {
+    pub fn set_connected(&self, address: SocketAddr, listener: Option<SocketAddr>) {
         // If listener.is_some(), then it's different than the address; otherwise it's just the address param.
         let listener = if let Some(addr) = listener { addr } else { address };
 
@@ -205,14 +205,12 @@ impl PeerBook {
         self.connecting_peers.write().remove(&address);
 
         // Update the peer info to connected.
-        peer_info.set_connected()?;
+        peer_info.set_connected();
 
         // Add the address into the connected peers.
         let success = self.connected_peers.write().insert(listener, peer_info).is_none();
         // On success, increment the connected peer count.
         connected_peers_inc!(success);
-
-        Ok(())
     }
 
     ///

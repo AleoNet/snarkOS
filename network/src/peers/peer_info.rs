@@ -174,17 +174,15 @@ impl PeerInfo {
     ///
     /// Updates the peer to connected.
     ///
-    pub(crate) fn set_connected(&mut self) -> Result<(), NetworkError> {
+    pub(crate) fn set_connected(&mut self) {
         if self.status() != PeerStatus::Connected {
             // Set the state of this peer to connected.
             self.status = PeerStatus::Connected;
 
             self.last_connected = Some(Utc::now());
             self.connected_count += 1;
-
-            Ok(())
         } else {
-            Err(NetworkError::PeerAlreadyConnected)
+            trace!("Peer {} was set as connected more than once", self.address);
         }
     }
 
