@@ -28,7 +28,6 @@ use snarkos_testing::{
 
 use std::{collections::BTreeMap, net::SocketAddr, ops::Sub};
 
-use eigenvalues::{algorithms::lanczos::HermitianLanczos, SpectrumTarget};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 
 const N: usize = 25;
@@ -283,6 +282,7 @@ struct NetworkMetrics {
 }
 
 impl NetworkMetrics {
+    /// Returns the network metrics for the state described by the node list.
     fn new(nodes: &[Node<LedgerStorage>]) -> Self {
         let node_count = nodes.len();
         let connection_count = total_connection_count(nodes);
@@ -300,7 +300,6 @@ impl NetworkMetrics {
         let degree_matrix = degree_matrix(&index, &nodes);
         let adjacency_matrix = adjacency_matrix(&index, &nodes);
         let laplacian_matrix = degree_matrix.clone().sub(adjacency_matrix.clone());
-        println!("{}", laplacian_matrix);
 
         let degree_centrality = degree_centrality(&index, degree_matrix.clone());
         let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix.clone());
@@ -335,8 +334,18 @@ impl NetworkMetrics {
 /// Centrality measurements of a node.
 #[derive(Debug)]
 struct NodeCentrality {
+    /// Connection count of the node.
     degree_centrality: u16,
+    /// A measure of the relative importance of the node in the network.
+    ///
+    /// Summing the values of each node adds up to the number of nodes in the network. This was
+    /// done to allow comparison between different network topologies irrespective of node count.
     eigenvector_centrality: f64,
+    /// This value is extracted from the Fiedler eigenvector corresponding to the second smallest
+    /// eigenvalue of the Laplacian matrix of the network.
+    ///
+    /// The network can be partitioned on the basis of these values (positive, negative and when
+    /// relevant close to zero).
     fiedler_value: f64,
 }
 
@@ -461,7 +470,6 @@ fn fiedler(index: &BTreeMap<SocketAddr, usize>, laplacian_matrix: DMatrix<f64>) 
     // Compute the eigenvectors and corresponding eigenvalues and sort in ascending order.
     let ascending = true;
     let pairs = sorted_eigenvalue_vector_pairs(laplacian_matrix, ascending);
-    dbg!(&pairs);
 
     // Second-smallest eigenvalue is the Fiedler value (algebraic connectivity), the associated
     // eigenvector is the Fiedler vector.
@@ -481,7 +489,6 @@ fn fiedler(index: &BTreeMap<SocketAddr, usize>, laplacian_matrix: DMatrix<f64>) 
 fn sorted_eigenvalue_vector_pairs(matrix: DMatrix<f64>, ascending: bool) -> Vec<(f64, DVector<f64>)> {
     // Compute eigenvalues and eigenvectors.
     let eigen = SymmetricEigen::new(matrix);
-    dbg!(&eigen.eigenvalues);
 
     // Map eigenvalues to their eigenvectors.
     let mut pairs: Vec<(f64, DVector<f64>)> = eigen
