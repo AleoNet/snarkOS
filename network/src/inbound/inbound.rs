@@ -110,7 +110,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 // Update the remote address to be the peer's listening address.
                                 let remote_address = channel.addr;
                                 // Save the channel under the provided remote address.
-                                node.inbound.channels.write().await.insert(remote_address, Arc::new(channel));
+                                node.inbound
+                                    .channels
+                                    .write()
+                                    .await
+                                    .insert(remote_address, Arc::new(channel));
 
                                 let node_clone = node.clone();
                                 let peer_listening_task = tokio::spawn(async move {

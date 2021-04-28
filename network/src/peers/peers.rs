@@ -202,7 +202,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
             // save the outbound channel
-            node.outbound.channels.write().await.insert(remote_address, Arc::new(writer));
+            node.outbound
+                .channels
+                .write()
+                .await
+                .insert(remote_address, Arc::new(writer));
 
             node.peer_book.set_connected(remote_address, None)?;
 
@@ -308,7 +312,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Set the number of peers to attempt a connection to.
         let count = min_peers - number_of_peers;
 
-        trace!("Connecting to {} disconnected peers", cmp::min(count, self.peer_book.disconnected_peers().len()));
+        trace!(
+            "Connecting to {} disconnected peers",
+            cmp::min(count, self.peer_book.disconnected_peers().len())
+        );
 
         let bootnodes = self.config.bootnodes();
 
