@@ -93,10 +93,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Attempt to connect to the default bootnodes of the network.
-        self.connect_to_bootnodes().await;
+        self.connect_to_bootnodes();
 
         // Attempt to connect to each disconnected peer saved in the peer book.
-        self.connect_to_disconnected_peers().await;
+        self.connect_to_disconnected_peers();
 
         // Broadcast a `GetPeers` message to request for more peers.
         self.broadcast_getpeers_requests().await;
@@ -283,7 +283,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// This function filters out any bootnode peers the node server is
     /// either connnecting to or already connected to.
     ///
-    async fn connect_to_bootnodes(&self) {
+    fn connect_to_bootnodes(&self) {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
@@ -318,7 +318,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     /// Broadcasts a connection request to all disconnected peers.
     ///
-    async fn connect_to_disconnected_peers(&self) {
+    fn connect_to_disconnected_peers(&self) {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
