@@ -24,7 +24,7 @@ use snarkos::{
     errors::NodeError,
 };
 use snarkos_consensus::{Consensus, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, PeerBook, Sync};
+use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
