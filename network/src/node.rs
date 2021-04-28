@@ -128,7 +128,7 @@ impl<S: Storage> Node<S> {
 
 impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config, peer_book: PeerBook) -> Result<Self, NetworkError> {
+    pub async fn new(config: Config) -> Result<Self, NetworkError> {
         // Create the inbound and outbound handlers.
         let (inbound, outbound) = {
             let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
@@ -142,7 +142,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             config,
             inbound,
             outbound,
-            peer_book,
+            peer_book: Default::default(),
             sync: Default::default(),
             tasks: Default::default(),
             threads: Default::default(),
