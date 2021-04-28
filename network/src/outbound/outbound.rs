@@ -52,23 +52,6 @@ impl Outbound {
     ///
     #[inline]
     pub async fn send_request(&self, request: Message) {
-        self.send(&request).await
-    }
-
-    ///
-    /// Establishes an outbound channel to the given remote address, if it does not exist.
-    ///
-    #[inline]
-    async fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
-        Ok(self
-            .channels
-            .read()
-            .get(&remote_address)
-            .ok_or(NetworkError::OutboundChannelMissing)?
-            .clone())
-    }
-
-    async fn send(&self, request: &Message) {
         let target_addr = request.receiver();
         // Fetch the outbound channel.
         let channel = match self.outbound_channel(target_addr).await {
@@ -89,6 +72,19 @@ impl Outbound {
                 self.send_failure_count.fetch_add(1, Ordering::SeqCst);
             }
         }
+    }
+
+    ///
+    /// Establishes an outbound channel to the given remote address, if it does not exist.
+    ///
+    #[inline]
+    async fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
+        Ok(self
+            .channels
+            .read()
+            .get(&remote_address)
+            .ok_or(NetworkError::OutboundChannelMissing)?
+            .clone())
     }
 }
 
