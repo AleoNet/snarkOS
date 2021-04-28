@@ -79,15 +79,30 @@ impl<S: Storage> Sync<S> {
         let max_block_size = self.max_block_size();
 
         if block_size > max_block_size {
+            error!(
+                "Received block from {} that is too big ({} > {})",
+                remote_address, block_size, max_block_size
+            );
             return Err(NetworkError::ConsensusError(ConsensusError::BlockTooLarge(
                 block_size,
                 max_block_size,
             )));
         }
 
-        let block_struct = Block::deserialize(&block)?;
+        let block_struct = match Block::deserialize(&block) {
+            Ok(block) => block,
+            Err(error) => {
+                error!(
+                    "Failed to deserialize received block from {}: {}",
+                    remote_address, error
+                );
+                return Err(error.into());
+            }
+        };
+
         info!(
-            "Received block from epoch {} with hash {:?}",
+            "Received block from {} of epoch {} with hash {:?}",
+            remote_address,
             block_struct.header.time,
             hex::encode(block_struct.header.get_hash().0)
         );
