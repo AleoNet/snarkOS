@@ -123,11 +123,8 @@ version = "0.2"
 [dev-dependencies.snarkos-testing]
 path = "../testing"
 
-[dev-dependencies.eigenvalues]
-version = "0.4"
-
 [dev-dependencies.nalgebra]
-version = "0.24"
+version = "0.26"
 
 [dev-dependencies.peak_alloc]
 version = "0.1.0"
