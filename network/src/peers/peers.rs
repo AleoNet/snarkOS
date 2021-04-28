@@ -339,6 +339,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // Set the number of peers to attempt a connection to.
             let count = min_peers - number_of_peers;
 
+            if count == 0 {
+                return;
+            }
+
             trace!(
                 "Connecting to {} disconnected peers",
                 cmp::min(count, self.peer_book.disconnected_peers().len())
@@ -355,16 +359,18 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 .copied()
                 .choose_multiple(&mut rand::thread_rng(), count)
         } else {
-            trace!(
-                "Connecting to {} disconnected peers",
-                self.peer_book.disconnected_peers().len()
-            );
+            let disconnected_peers = self.peer_book.disconnected_peers();
+
+            if disconnected_peers.is_empty() {
+                return;
+            }
+
+            trace!("Connecting to {} disconnected peers", disconnected_peers.len());
 
             let bootnodes = self.config.bootnodes();
 
             // Iterate through a selection of random peers and attempt to connect.
-            self.peer_book
-                .disconnected_peers()
+            disconnected_peers
                 .iter()
                 .map(|(k, _)| k)
                 .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
