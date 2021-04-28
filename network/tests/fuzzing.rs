@@ -73,7 +73,7 @@ async fn fuzzing_zeroes_post_handshake() {
         is_bootnode: true,
         ..Default::default()
     };
-    let (node, fake_node) = handshaken_node_and_peer(node_setup).await;
+    let (node, mut fake_node) = handshaken_node_and_peer(node_setup).await;
     wait_until!(1, node.peer_book.number_of_connected_peers() == 1);
 
     fake_node.write_bytes(&[0u8; 64]).await;
@@ -106,7 +106,7 @@ async fn fuzzing_valid_header_pre_handshake() {
 async fn fuzzing_valid_header_post_handshake() {
     // tracing_subscriber::fmt::init();
 
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let (mut node1, mut node2) = spawn_2_fake_nodes().await;
     let write_finished = Arc::new(AtomicBool::new(false));
     let should_exit = Arc::clone(&write_finished);
 
@@ -157,7 +157,7 @@ async fn fuzzing_pre_handshake() {
 async fn fuzzing_post_handshake() {
     // tracing_subscriber::fmt::init();
 
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let (mut node1, mut node2) = spawn_2_fake_nodes().await;
     let write_finished = Arc::new(AtomicBool::new(false));
     let should_exit = Arc::clone(&write_finished);
 
@@ -213,7 +213,7 @@ async fn fuzzing_corrupted_version_pre_handshake() {
 async fn fuzzing_corrupted_version_post_handshake() {
     // tracing_subscriber::fmt::init();
 
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let (mut node1, mut node2) = spawn_2_fake_nodes().await;
     let write_finished = Arc::new(AtomicBool::new(false));
     let should_exit = Arc::clone(&write_finished);
 
@@ -278,7 +278,7 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
 async fn fuzzing_corrupted_empty_payloads_post_handshake() {
     // tracing_subscriber::fmt::init();
 
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let (mut node1, mut node2) = spawn_2_fake_nodes().await;
     let write_finished = Arc::new(AtomicBool::new(false));
     let should_exit = Arc::clone(&write_finished);
 
@@ -367,7 +367,7 @@ async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
 async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     // tracing_subscriber::fmt::init();
 
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let (mut node1, mut node2) = spawn_2_fake_nodes().await;
     let write_finished = Arc::new(AtomicBool::new(false));
     let should_exit = Arc::clone(&write_finished);
 
@@ -460,7 +460,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
 async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
     // tracing_subscriber::fmt::init();
 
-    let (node1, mut node2) = spawn_2_fake_nodes().await;
+    let (mut node1, mut node2) = spawn_2_fake_nodes().await;
     let write_finished = Arc::new(AtomicBool::new(false));
     let should_exit = Arc::clone(&write_finished);
 

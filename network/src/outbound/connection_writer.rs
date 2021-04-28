@@ -17,7 +17,7 @@
 use crate::{errors::NetworkError, message::*};
 
 use parking_lot::Mutex;
-use tokio::{io::AsyncWriteExt, net::tcp::OwnedWriteHalf, sync::Mutex as AsyncMutex};
+use tokio::{io::AsyncWriteExt, net::tcp::OwnedWriteHalf};
 
 use std::{net::SocketAddr, sync::Arc};
 
@@ -26,8 +26,8 @@ use std::{net::SocketAddr, sync::Arc};
 #[derive(Debug)]
 pub struct ConnWriter {
     pub addr: SocketAddr,
-    pub writer: AsyncMutex<OwnedWriteHalf>,
-    buffer: AsyncMutex<Box<[u8]>>,
+    pub writer: OwnedWriteHalf,
+    buffer: Box<[u8]>,
     noise: Arc<Mutex<snow::TransportState>>,
 }
 
@@ -40,18 +40,17 @@ impl ConnWriter {
     ) -> Self {
         Self {
             addr,
-            writer: AsyncMutex::new(writer),
-            buffer: AsyncMutex::new(buffer),
+            writer,
+            buffer,
             noise,
         }
     }
 
     /// Writes a message consisting of a header and payload.
-    pub async fn write_message(&self, payload: &Payload) -> Result<(), NetworkError> {
+    pub async fn write_message(&mut self, payload: &Payload) -> Result<(), NetworkError> {
         let serialized_payload = Payload::serialize(payload)?;
 
         {
-            let mut buffer = self.buffer.lock().await;
             let mut encrypted_len = 0;
             let mut processed_len = 0;
 
@@ -62,14 +61,16 @@ impl ConnWriter {
                 );
                 let chunk = &serialized_payload[processed_len..][..chunk_len];
 
-                encrypted_len += self.noise.lock().write_message(chunk, &mut buffer[encrypted_len..])?;
+                encrypted_len += self
+                    .noise
+                    .lock()
+                    .write_message(chunk, &mut self.buffer[encrypted_len..])?;
                 processed_len += chunk_len;
             }
 
             let header = MessageHeader::from(encrypted_len);
-            let mut writer = self.writer.lock().await;
-            writer.write_all(&header.as_bytes()[..]).await?;
-            writer.write_all(&buffer[..encrypted_len]).await?;
+            self.writer.write_all(&header.as_bytes()[..]).await?;
+            self.writer.write_all(&self.buffer[..encrypted_len]).await?;
         }
 
         // If message is a `SyncBlock` message, log it as a trace.

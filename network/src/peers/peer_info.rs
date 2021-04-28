@@ -241,7 +241,7 @@ mod tests {
         let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
 
-        peer_info.set_connected().unwrap();
+        peer_info.set_connected();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connected, peer_info.status());
         assert_eq!(1, peer_info.connected_count());
@@ -272,14 +272,14 @@ mod tests {
         let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
         let mut peer_info = PeerInfo::new(address);
 
-        peer_info.set_connected().unwrap();
+        peer_info.set_connected();
         peer_info.set_disconnected().unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
         assert_eq!(1, peer_info.connected_count());
         assert_eq!(1, peer_info.disconnected_count());
 
-        assert!(peer_info.set_connected().is_ok());
+        peer_info.set_connected();
 
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connected, peer_info.status());
