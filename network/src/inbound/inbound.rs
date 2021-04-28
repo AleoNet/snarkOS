@@ -112,7 +112,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                                 let node_clone = node.clone();
                                 let peer_listening_task = tokio::spawn(async move {
-                                    node_clone.listen_for_messages(&mut reader).await;
+                                    node_clone.listen_for_inbound_messages(&mut reader).await;
                                 });
 
                                 trace!("Connected to {}", remote_address);
@@ -147,8 +147,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         Ok(())
     }
 
-    /// This method handles new inbound messages from connected nodes.
-    pub async fn listen_for_messages(&self, reader: &mut ConnReader) {
+    /// This method handles new inbound messages from a single connected node.
+    pub async fn listen_for_inbound_messages(&self, reader: &mut ConnReader) {
         let mut failure_count = 0u8;
         let mut fatal_count = 0u8;
 

@@ -219,7 +219,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // spawn the inbound loop
             let node_clone = node.clone();
             let conn_listening_task = tokio::spawn(async move {
-                node_clone.listen_for_messages(&mut reader).await;
+                node_clone.listen_for_inbound_messages(&mut reader).await;
             });
 
             if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
