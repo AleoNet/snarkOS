@@ -72,7 +72,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .filter(|(addr, _)| !bootnodes.contains(addr)) // Skip this check if the peer is a bootnode.
             .map(|(addr, info)| (*addr, &info.quality))
         {
-            if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1000 || peer_quality.failures.load(Ordering::Relaxed) > 10
+            if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1500 || peer_quality.failures.load(Ordering::Relaxed) > 10
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
                 let _ = self.disconnect_from_peer(addr);
