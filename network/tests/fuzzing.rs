@@ -31,7 +31,7 @@ use std::{
     },
 };
 
-pub const ITERATIONS: usize = 500;
+pub const ITERATIONS: usize = 1000;
 pub const CORRUPTION_PROBABILITY: f64 = 0.1;
 
 fn corrupt_bytes(serialized: &[u8]) -> Vec<u8> {
@@ -80,7 +80,7 @@ async fn fuzzing_zeroes_post_handshake() {
     wait_until!(1, node.peer_book.number_of_connected_peers() == 0);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_valid_header_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -102,7 +102,7 @@ async fn fuzzing_valid_header_pre_handshake() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_valid_header_post_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -132,7 +132,7 @@ async fn fuzzing_valid_header_post_handshake() {
     handle.await.unwrap();
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -153,7 +153,7 @@ async fn fuzzing_pre_handshake() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_post_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -310,7 +310,7 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
 }
 
 // Using a multi-threaded rt for this test notably improves performance.
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -363,7 +363,7 @@ async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
 }
 
 // Using a multi-threaded rt for this test notably improves performance.
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     // tracing_subscriber::fmt::init();
 
