@@ -223,8 +223,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let mempool_sync_interval = sync_clone.mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
                 loop {
-                    sleep(mempool_sync_interval).await;
-
                     if !sync_clone.is_syncing_blocks() {
                         // TODO (howardwu): Add some random sync nodes beyond this approach
                         //  to ensure some diversity in mempool state that is fetched.
@@ -255,6 +253,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
                         sync_clone.update_memory_pool(sync_node).await;
                     }
+
+                    sleep(mempool_sync_interval).await;
                 }
             });
             self.register_task(sync_mempool_task);
