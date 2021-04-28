@@ -39,7 +39,7 @@ impl From<&PeerBook> for SerializedPeerBook {
     fn from(book: &PeerBook) -> Self {
         let mut peers = book.connected_peers();
         peers.extend(book.disconnected_peers().into_iter());
-        let peers = peers.into_iter().map(|(_, info)| info).collect();
+        let peers = peers.into_iter().map(|(_, info)| info).filter(|info| !info.address().ip().is_loopback()).collect();
 
         SerializedPeerBook(peers)
     }
@@ -48,7 +48,7 @@ impl From<&PeerBook> for SerializedPeerBook {
 impl From<SerializedPeerBook> for PeerBook {
     fn from(book: SerializedPeerBook) -> Self {
         PeerBook {
-            disconnected_peers: RwLock::new(book.0.into_iter().map(|info| (info.address(), info)).collect()),
+            disconnected_peers: RwLock::new(book.0.into_iter().filter(|info| !info.address().ip().is_loopback()).map(|info| (info.address(), info)).collect()),
             ..Default::default()
         }
     }
@@ -341,7 +341,7 @@ impl PeerBook {
     /// Handles an incoming `Ping` message.
     pub fn received_ping(&self, source: SocketAddr, block_height: BlockHeight) {
         if let Some(ref quality) = self.peer_quality(source) {
-            *quality.block_height.write() = block_height;
+            quality.block_height.store(block_height, Ordering::SeqCst);
         } else {
             warn!("Tried updating block height of a peer that's not connected: {}", source);
         }

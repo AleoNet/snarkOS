@@ -18,6 +18,7 @@ use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, SerializedPe
 use snarkvm_objects::Storage;
 
 use std::{
+    cmp,
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
     time::Duration,
@@ -201,7 +202,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
             // save the outbound channel
-            node.outbound.channels.write().insert(remote_address, Arc::new(writer));
+            node.outbound.channels.write().await.insert(remote_address, Arc::new(writer));
 
             node.peer_book.set_connected(remote_address, None)?;
 
@@ -307,7 +308,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Set the number of peers to attempt a connection to.
         let count = min_peers - number_of_peers;
 
-        trace!("Connecting to {} disconnected peers", count);
+        trace!("Connecting to {} disconnected peers", cmp::min(count, self.peer_book.disconnected_peers().len()));
+
+        let bootnodes = self.config.bootnodes();
 
         // Iterate through a selection of random peers and attempt to connect.
         let random_peers = self
@@ -315,7 +318,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .disconnected_peers()
             .iter()
             .map(|(k, _)| k)
-            .filter(|peer| **peer != own_address)
+            .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
             .copied()
             .choose_multiple(&mut rand::thread_rng(), count);
 
@@ -414,7 +417,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) async fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         if let Some(ref sync) = self.sync() {
             if self.peer_book.is_syncing_blocks(remote_address) {
                 sync.finished_syncing_blocks();
@@ -422,7 +425,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Remove the peer from the channel.
-        self.outbound.channels.write().remove(&remote_address);
+        self.outbound.channels.write().await.remove(&remote_address);
 
         // Set the peer as disconnected in the peer book.
         let result = self.peer_book.set_disconnected(remote_address);

@@ -119,7 +119,7 @@ impl<S: Storage> Sync<S> {
     /// Checks whether any previous sync attempt has expired.
     pub fn has_block_sync_expired(&self) -> bool {
         if let Some(ref timestamp) = *self.last_block_sync.read() {
-            timestamp.elapsed() > self.block_sync_interval
+            timestamp.elapsed() > Duration::from_secs(60)
         } else {
             // this means it's the very first sync attempt
             true

@@ -18,11 +18,12 @@ use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Rece
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use snarkvm_objects::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
+    sync::RwLock,
     task,
 };
 
@@ -109,7 +110,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 // Update the remote address to be the peer's listening address.
                                 let remote_address = channel.addr;
                                 // Save the channel under the provided remote address.
-                                node.inbound.channels.write().insert(remote_address, Arc::new(channel));
+                                node.inbound.channels.write().await.insert(remote_address, Arc::new(channel));
 
                                 let node_clone = node.clone();
                                 let peer_listening_task = tokio::spawn(async move {
@@ -267,7 +268,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::Sync(sync) => {
                 if let Some(ref sync_handler) = self.sync() {
-                    if !sync.is_empty() && self.peer_book.expecting_sync_blocks(source, sync.len()) {
+                    if sync.is_empty() {
+                        trace!("{} doesn't have sync blocks to share", source);
+                    } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         sync_handler.received_sync(source, sync).await;
                     }
                 }

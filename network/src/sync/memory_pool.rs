@@ -118,8 +118,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
         let transactions = {
             let mut txs = vec![];
 
-            let memory_pool = self.memory_pool().lock();
-            for entry in memory_pool.transactions.values() {
+            let mempool = self.memory_pool().lock().transactions.clone();
+            for entry in mempool.values() {
                 if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                     txs.push(transaction_bytes);
                 }

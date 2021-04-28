@@ -41,7 +41,7 @@ pub enum PeerStatus {
 #[derive(Debug, Default)]
 pub struct PeerQuality {
     /// The current block height of this peer.
-    pub block_height: RwLock<BlockHeight>,
+    pub block_height: AtomicU32,
     /// The timestamp of when the peer has been seen last.
     pub last_seen: RwLock<Option<DateTime<Utc>>>,
     /// An indicator of whether a `Pong` message is currently expected from this peer.
@@ -120,7 +120,7 @@ impl PeerInfo {
     ///
     #[inline]
     pub fn block_height(&self) -> BlockHeight {
-        *self.quality.block_height.read()
+        self.quality.block_height.load(Ordering::SeqCst)
     }
 
     ///
