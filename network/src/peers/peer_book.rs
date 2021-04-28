@@ -219,10 +219,10 @@ impl PeerBook {
     /// Removes the given address from the connecting and connected peers in this `PeerBook`,
     /// and adds the given address to the disconnected peers in this `PeerBook`.
     ///
-    pub fn set_disconnected(&self, address: SocketAddr) -> Result<(), NetworkError> {
+    pub fn set_disconnected(&self, address: SocketAddr) -> Result<bool, NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
         if self.connecting_peers.write().remove(&address).is_some() {
-            return Ok(());
+            return Ok(true);
         }
 
         // Case 2 - The given address is a connected peer, attempt to disconnect.
@@ -235,10 +235,10 @@ impl PeerBook {
             // On success, decrement the connected peer count.
             connected_peers_dec!(success);
 
-            return Ok(());
+            return Ok(true);
         }
 
-        Ok(())
+        Ok(false)
     }
 
     ///
