@@ -14,20 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, Consensus, NetworkError};
+use crate::{message::*, NetworkError, Sync};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
 use std::net::SocketAddr;
 
-impl<S: Storage> Consensus<S> {
+impl<S: Storage> Sync<S> {
     ///
-    /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
+    /// Sends a `GetSync` request to the given sync node.
     ///
-    pub async fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = self.storage().get_block_locator_hashes();
+    pub async fn update_blocks(&self, sync_node: Option<SocketAddr>) {
+        if let Some(sync_node) = sync_node {
+            let block_locator_hashes = match self.storage().get_block_locator_hashes() {
+                Ok(block_locator_hashes) => block_locator_hashes,
+                _ => {
+                    error!("Unable to get block locator hashes from storage");
+                    return;
+                }
+            };
 
-        if let Ok(block_locator_hashes) = block_locator_hashes {
+            info!("Updating blocks from {}", sync_node);
+
             // Send a GetSync to the selected sync node.
             self.node()
                 .outbound
@@ -46,7 +54,7 @@ impl<S: Storage> Consensus<S> {
     pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
         debug!("Propagating a block to peers");
 
-        for remote_address in self.node().connected_addrs() {
+        for remote_address in self.node().connected_peers() {
             if remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
                 self.node()
@@ -71,15 +79,30 @@ impl<S: Storage> Consensus<S> {
         let max_block_size = self.max_block_size();
 
         if block_size > max_block_size {
+            error!(
+                "Received block from {} that is too big ({} > {})",
+                remote_address, block_size, max_block_size
+            );
             return Err(NetworkError::ConsensusError(ConsensusError::BlockTooLarge(
                 block_size,
                 max_block_size,
             )));
         }
 
-        let block_struct = Block::deserialize(&block)?;
+        let block_struct = match Block::deserialize(&block) {
+            Ok(block) => block,
+            Err(error) => {
+                error!(
+                    "Failed to deserialize received block from {}: {}",
+                    remote_address, error
+                );
+                return Err(error.into());
+            }
+        };
+
         info!(
-            "Received block from epoch {} with hash {:?}",
+            "Received block from {} of epoch {} with hash {:?}",
+            remote_address,
             block_struct.header.time,
             hex::encode(block_struct.header.get_hash().0)
         );

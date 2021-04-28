@@ -19,7 +19,7 @@ use snarkvm_objects::Storage;
 
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
-use rand::{thread_rng, Rng};
+use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -43,6 +43,55 @@ pub enum State {
 #[derive(Default)]
 pub struct StateCode(AtomicU8);
 
+/// The internal state of a node.
+pub struct InnerNode<S: Storage> {
+    /// The node's random numeric identifier.
+    pub name: u64,
+    /// The current state of the node.
+    state: StateCode,
+    /// The local address of this node.
+    pub local_address: OnceCell<SocketAddr>,
+    /// The pre-configured parameters of this node.
+    pub config: Config,
+    /// The inbound handler of this node.
+    pub inbound: Inbound,
+    /// The outbound handler of this node.
+    pub outbound: Outbound,
+    /// The list of connected and disconnected peers of this node.
+    pub peer_book: PeerBook,
+    /// The sync handler of this node.
+    pub sync: OnceCell<Arc<Sync<S>>>,
+    /// The tasks spawned by the node.
+    tasks: Mutex<Vec<task::JoinHandle<()>>>,
+    /// The threads spawned by the node.
+    threads: Mutex<Vec<thread::JoinHandle<()>>>,
+    /// An indicator of whether the node is shutting down.
+    shutting_down: AtomicBool,
+}
+
+impl<S: Storage> Drop for InnerNode<S> {
+    // this won't make a difference in regular scenarios, but will be practical for test
+    // purposes, so that there are no lingering tasks
+    fn drop(&mut self) {
+        // since we're going out of scope, we don't care about holding the read lock here
+        // also, the connections are going to be broken automatically, so we only need to
+        // take care of the associated tasks here
+        for peer_info in self.peer_book.connected_peers().values() {
+            for handle in peer_info.tasks.lock().drain(..).rev() {
+                handle.abort();
+            }
+        }
+
+        for handle in self.threads.lock().drain(..).rev() {
+            let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
+        }
+
+        for handle in self.tasks.lock().drain(..).rev() {
+            handle.abort();
+        }
+    }
+}
+
 /// A core data structure for operating the networking stack of this node.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
@@ -54,32 +103,6 @@ impl<S: Storage> Deref for Node<S> {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
-}
-
-#[doc(hide)]
-pub struct InnerNode<S: Storage> {
-    /// The node's random numeric identifier.
-    pub name: u64,
-    /// The current state of the node.
-    state: StateCode,
-    /// The pre-configured parameters of this node.
-    pub config: Config,
-    /// The inbound handler of this node.
-    pub inbound: Inbound,
-    /// The outbound handler of this node.
-    pub outbound: Outbound,
-    /// The list of connected and disconnected peers of this node.
-    pub peer_book: PeerBook,
-    /// The objects related to consensus.
-    pub consensus: OnceCell<Arc<Consensus<S>>>,
-    /// Node's local address.
-    pub local_address: OnceCell<SocketAddr>,
-    /// The tasks spawned by the node.
-    tasks: Mutex<Vec<task::JoinHandle<()>>>,
-    /// The threads spawned by the node.
-    threads: Mutex<Vec<thread::JoinHandle<()>>>,
-    /// An indicator of whether the node is shutting down.
-    shutting_down: AtomicBool,
 }
 
 impl<S: Storage> Node<S> {
@@ -103,13 +126,14 @@ impl<S: Storage> Node<S> {
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> Node<S> {
+impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
-        let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
         // Create the inbound and outbound handlers.
-        let inbound = Inbound::new(channels.clone());
-        let outbound = Outbound::new(channels);
+        let (inbound, outbound) = {
+            let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
+            (Inbound::new(channels.clone()), Outbound::new(channels))
+        };
 
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
@@ -119,56 +143,56 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             inbound,
             outbound,
             peer_book: Default::default(),
-            consensus: Default::default(),
+            sync: Default::default(),
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),
         })))
     }
 
-    pub fn set_consensus(&mut self, consensus: Consensus<S>) {
-        if self.consensus.set(Arc::new(consensus)).is_err() {
-            panic!("consensus was set more than once!");
+    pub fn set_sync(&mut self, sync: Sync<S>) {
+        if self.sync.set(Arc::new(sync)).is_err() {
+            panic!("sync was set more than once!");
         }
     }
 
-    /// Returns a reference to the consensus objects.
+    /// Returns a reference to the sync objects.
     #[inline]
-    pub fn consensus(&self) -> Option<&Arc<Consensus<S>>> {
-        self.consensus.get()
+    pub fn sync(&self) -> Option<&Arc<Sync<S>>> {
+        self.sync.get()
     }
 
-    /// Returns a reference to the consensus objects, expecting them to be available.
+    /// Returns a reference to the sync objects, expecting them to be available.
     #[inline]
-    pub fn expect_consensus(&self) -> &Consensus<S> {
-        self.consensus().expect("no consensus!")
+    pub fn expect_sync(&self) -> &Sync<S> {
+        self.sync().expect("no sync!")
     }
 
     #[inline]
     #[doc(hidden)]
-    pub fn has_consensus(&self) -> bool {
-        self.consensus().is_some()
+    pub fn has_sync(&self) -> bool {
+        self.sync().is_some()
     }
 
     pub async fn start_services(&self) {
-        let self_clone = self.clone();
+        let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
         let incoming_task = task::spawn(async move {
             loop {
-                if let Err(e) = self_clone.process_incoming_messages(&mut receiver).await {
+                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
                     error!("Node error: {}", e);
                 }
             }
         });
         self.register_task(incoming_task);
 
-        let self_clone = self.clone();
+        let node_clone = self.clone();
         let peer_sync_interval = self.config.peer_sync_interval();
         let peering_task = task::spawn(async move {
             loop {
                 info!("Updating peers");
 
-                if let Err(e) = self_clone.update_peers().await {
+                if let Err(e) = node_clone.update_peers().await {
                     error!("Peer update error: {}", e);
                 }
                 sleep(peer_sync_interval).await;
@@ -176,49 +200,118 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         });
         self.register_task(peering_task);
 
-        if !self.config.is_bootnode() {
-            let self_clone = self.clone();
-            let state_mgmt_task = task::spawn(async move {
-                loop {
-                    sleep(std::time::Duration::from_secs(5)).await;
+        let node_clone = self.clone();
+        let state_tracking_task = task::spawn(async move {
+            loop {
+                sleep(std::time::Duration::from_secs(5)).await;
 
-                    // make sure that the node doesn't remain in a sync state without peers
-                    if self_clone.state() == State::Syncing && self_clone.peer_book.number_of_connected_peers() == 0 {
-                        self_clone.set_state(State::Idle);
+                // Make sure that the node doesn't remain in a sync state without peers.
+                if node_clone.state() == State::Syncing && node_clone.peer_book.number_of_connected_peers() == 0 {
+                    node_clone.set_state(State::Idle);
+                }
+
+                // Report node's current state.
+                trace!("Node state: {:?}", node_clone.state());
+            }
+        });
+        self.register_task(state_tracking_task);
+
+        if let Some(ref sync) = self.sync() {
+            let bootnodes = self.config.bootnodes();
+
+            let sync_clone = Arc::clone(sync);
+            let mempool_sync_interval = sync_clone.mempool_sync_interval();
+            let sync_mempool_task = task::spawn(async move {
+                loop {
+                    if !sync_clone.is_syncing_blocks() {
+                        // TODO (howardwu): Add some random sync nodes beyond this approach
+                        //  to ensure some diversity in mempool state that is fetched.
+                        //  For now, this is acceptable because we propogate the mempool to
+                        //  all of our connected peers anyways.
+
+                        // The order of preference for the sync node is as follows:
+                        //   1. Iterate (in declared order) through the bootnodes:
+                        //      a. Check if this node is connected to the specified bootnode in the peer book.
+                        //      b. Select the specified bootnode as the sync node if this node is connected to it.
+                        //   2. If this node is not connected to any bootnode,
+                        //      then select the last seen peer as the sync node.
+
+                        // Step 1.
+                        let mut sync_node = None;
+                        for bootnode in bootnodes.iter() {
+                            if sync_clone.node().peer_book.is_connected(*bootnode) {
+                                sync_node = Some(*bootnode);
+                                break;
+                            }
+                        }
+
+                        // Step 2.
+                        if sync_node.is_none() {
+                            // Select last seen node as block sync node.
+                            sync_node = sync_clone.node().peer_book.last_seen();
+                        }
+
+                        sync_clone.update_memory_pool(sync_node).await;
                     }
 
-                    // report node's current state
-                    trace!("Node state: {:?}", self_clone.state());
+                    sleep(mempool_sync_interval).await;
                 }
             });
-            self.register_task(state_mgmt_task);
+            self.register_task(sync_mempool_task);
 
-            if let Some(ref consensus) = self.consensus() {
-                let self_clone = self.clone();
-                let consensus = Arc::clone(consensus);
-                let transaction_sync_interval = consensus.transaction_sync_interval();
-                let tx_sync_task = task::spawn(async move {
-                    loop {
-                        sleep(transaction_sync_interval).await;
+            let sync_clone = Arc::clone(sync);
+            let block_sync_interval = sync_clone.block_sync_interval();
+            let sync_block_task = task::spawn(async move {
+                loop {
+                    if !sync_clone.is_syncing_blocks() || sync_clone.has_block_sync_expired() {
+                        // The order of preference for the sync node is as follows:
+                        // Pick a random peer of all the connected ones that claim
+                        // to have a longer chain.
 
-                        if !consensus.is_syncing_blocks() {
-                            info!("Updating transactions");
+                        let mut prospect_sync_nodes = Vec::new();
+                        let my_height = sync_clone.current_block_height();
 
-                            // select last seen node as block sync node
-                            let sync_node = self_clone.peer_book.last_seen();
-                            consensus.update_transactions(sync_node).await;
+                        for (peer, info) in sync_clone.node().peer_book.connected_peers().iter() {
+                            // Fetch the current block height of this connected peer.
+                            let peer_block_height = info.block_height();
+
+                            if peer_block_height > my_height + 1 {
+                                prospect_sync_nodes.push((*peer, peer_block_height));
+                            }
+                        }
+
+                        let random_sync_peer = prospect_sync_nodes.choose(&mut rand::thread_rng());
+                        if let Some((sync_node, peer_height)) = random_sync_peer {
+                            // Log the sync job as a trace.
+                            trace!(
+                                "Preparing to sync from {} with a block height of {} (mine: {}, {} peers with a greater height)",
+                                sync_node,
+                                peer_height,
+                                my_height,
+                                prospect_sync_nodes.len()
+                            );
+
+                            // Cancel any possibly ongoing sync attempts.
+                            sync_clone.node().set_state(State::Idle);
+                            sync_clone.node().peer_book.cancel_any_unfinished_syncing();
+
+                            // Begin a new sync attempt.
+                            sync_clone.register_block_sync_attempt();
+                            sync_clone.update_blocks(Some(*sync_node)).await;
                         }
                     }
-                });
-                self.register_task(tx_sync_task);
-            }
+
+                    sleep(block_sync_interval).await;
+                }
+            });
+            self.register_task(sync_block_task);
         }
     }
 
     pub fn shut_down(&self) {
         debug!("Shutting down");
 
-        for addr in self.connected_addrs() {
+        for addr in self.connected_peers() {
             let _ = self.disconnect_from_peer(addr);
         }
 
@@ -255,28 +348,5 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.local_address
             .set(addr)
             .expect("local address was set more than once!");
-    }
-}
-
-impl<S: Storage> Drop for InnerNode<S> {
-    // this won't make a difference in regular scenarios, but will be practical for test
-    // purposes, so that there are no lingering tasks
-    fn drop(&mut self) {
-        // since we're going out of scope, we don't care about holding the read lock here
-        // also, the connections are going to be broken automatically, so we only need to
-        // take care of the associated tasks here
-        for peer_info in self.peer_book.connected_peers().values() {
-            for handle in peer_info.tasks.lock().drain(..).rev() {
-                handle.abort();
-            }
-        }
-
-        for handle in self.threads.lock().drain(..).rev() {
-            let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
-        }
-
-        for handle in self.tasks.lock().drain(..).rev() {
-            handle.abort();
-        }
     }
 }

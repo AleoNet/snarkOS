@@ -29,9 +29,6 @@ extern crate tracing;
 #[macro_use]
 extern crate snarkos_metrics;
 
-pub mod consensus;
-pub use consensus::*;
-
 pub mod config;
 pub use config::*;
 
@@ -53,14 +50,19 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
+pub mod sync;
+pub use sync::*;
+
+pub const BLOCK_SYNC_EXPIRATION_SECS: u8 = 60;
 pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
 pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
-pub const HANDSHAKE_TIME_LIMIT_SECS: u8 = 5;
+pub const HANDSHAKE_BOOTNODE_TIMEOUT_SECS: u8 = 30;
+pub const HANDSHAKE_PEER_TIMEOUT_SECS: u8 = 5;
 pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 pub const NOISE_BUF_LEN: usize = 65535;
 pub const NOISE_TAG_LEN: usize = 16;
 /// The maximum number of block hashes that can be requested or provided in a single batch.
-pub const MAX_BLOCK_SYNC_COUNT: u32 = 250;
+pub const MAX_BLOCK_SYNC_COUNT: u32 = 64;
 /// The maximum number of peers shared at once in response to a `GetPeers` message.
 pub const SHARED_PEER_COUNT: usize = 25;
 

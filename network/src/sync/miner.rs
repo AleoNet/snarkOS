@@ -44,7 +44,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
         info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
         let miner = Miner::new(
             self.miner_address.clone(),
-            Arc::clone(&self.node.expect_consensus().consensus),
+            Arc::clone(&self.node.expect_sync().consensus),
         );
         info!("Miner instantiated; starting to mine blocks");
 
@@ -58,7 +58,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     break;
                 }
 
-                // don't mine if the node is currently syncing
+                // Don't mine if the node is currently syncing.
                 if self.node.state() == State::Syncing {
                     thread::sleep(Duration::from_secs(15));
                     continue;
@@ -71,8 +71,8 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                 let (block, _coinbase_records) = match miner.mine_block() {
                     Ok(mined_block) => mined_block,
                     Err(error) => {
-                        // it's possible that the node realized that it needs to sync with a nother one in the
-                        // meantime; don't change to `Idle` if the current status isn't still `Mining`
+                        // It's possible that the node realized that it needs to sync with another one in the
+                        // meantime; don't change to `Idle` if the current status isn't still `Mining`.
                         if self.node.state() == State::Mining {
                             self.node.set_state(State::Idle);
                         }
@@ -95,7 +95,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     }
                 };
 
-                // see the `Err` path note above
+                // See the `Err` path note above.
                 if self.node.state() == State::Mining {
                     self.node.set_state(State::Idle);
                 }
@@ -111,7 +111,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
 
                 let node = self.node.clone();
                 tokio_handle.spawn(async move {
-                    node.expect_consensus()
+                    node.expect_sync()
                         .propagate_block(serialized_block, local_address)
                         .await;
                 });

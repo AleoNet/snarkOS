@@ -67,7 +67,7 @@ impl Outbound {
     /// Establishes an outbound channel to the given remote address, if it does not exist.
     ///
     #[inline]
-    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
+    async fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Arc<ConnWriter>, NetworkError> {
         Ok(self
             .channels
             .read()
@@ -79,10 +79,10 @@ impl Outbound {
     async fn send(&self, request: &Message) {
         let target_addr = request.receiver();
         // Fetch the outbound channel.
-        let channel = match self.outbound_channel(target_addr) {
+        let channel = match self.outbound_channel(target_addr).await {
             Ok(channel) => channel,
             Err(_) => {
-                warn!("Failed to send a {} to {}: peer is disconnected", request, target_addr);
+                warn!("Failed to send a {}: peer is disconnected", request);
                 return;
             }
         };
@@ -93,7 +93,7 @@ impl Outbound {
                 self.send_success_count.fetch_add(1, Ordering::SeqCst);
             }
             Err(error) => {
-                warn!("Failed to send a {} to {}: {}", request, target_addr, error);
+                warn!("Failed to send a {}: {}", request, error);
                 self.send_failure_count.fetch_add(1, Ordering::SeqCst);
             }
         }
@@ -102,9 +102,9 @@ impl Outbound {
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn send_ping(&self, remote_address: SocketAddr) {
-        // consider peering tests that don't use the consensus layer
-        let current_block_height = if let Some(ref consensus) = self.consensus() {
-            consensus.current_block_height()
+        // Consider peering tests that don't use the sync layer.
+        let current_block_height = if let Some(ref sync) = self.sync() {
+            sync.current_block_height()
         } else {
             0
         };

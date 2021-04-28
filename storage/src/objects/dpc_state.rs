@@ -122,8 +122,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         let old_commitments = old_cm_and_indices.into_iter().map(|(cm, _)| cm);
         let new_commitments = new_cm_and_indices.into_iter().map(|(cm, _)| cm);
 
-        let mut locked_tree = self.cm_merkle_tree.write();
-        locked_tree.rebuild(old_commitments, new_commitments)?;
+        self.cm_merkle_tree.write().rebuild(old_commitments, new_commitments)?;
 
         Ok(())
     }

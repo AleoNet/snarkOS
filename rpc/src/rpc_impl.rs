@@ -20,7 +20,7 @@
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{Consensus, Node};
+use snarkos_network::{Node, Sync};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
@@ -62,7 +62,7 @@ pub struct RpcInner<S: Storage> {
     pub(crate) node: Node<S>,
 }
 
-impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
+impl<S: Storage + Send + core::marker::Sync + 'static> RpcImpl<S> {
     /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(storage: Arc<MerkleTreeLedger<S>>, credentials: Option<RpcCredentials>, node: Node<S>) -> Self {
         Self(Arc::new(RpcInner {
@@ -72,24 +72,24 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         }))
     }
 
-    pub fn consensus_layer(&self) -> Result<&Arc<Consensus<S>>, RpcError> {
-        self.node.consensus().ok_or(RpcError::NoConsensus)
+    pub fn sync_handler(&self) -> Result<&Arc<Sync<S>>, RpcError> {
+        self.node.sync().ok_or(RpcError::NoConsensus)
     }
 
     pub fn consensus_parameters(&self) -> Result<&ConsensusParameters, RpcError> {
-        Ok(self.consensus_layer()?.consensus_parameters())
+        Ok(self.sync_handler()?.consensus_parameters())
     }
 
-    pub fn parameters(&self) -> Result<&PublicParameters<Components>, RpcError> {
-        Ok(self.consensus_layer()?.dpc_parameters())
+    pub fn dpc_parameters(&self) -> Result<&PublicParameters<Components>, RpcError> {
+        Ok(self.sync_handler()?.dpc_parameters())
     }
 
     pub fn memory_pool(&self) -> Result<&Mutex<MemoryPool<Tx>>, RpcError> {
-        Ok(self.consensus_layer()?.memory_pool())
+        Ok(self.sync_handler()?.memory_pool())
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
+impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<S> {
     /// Returns information about a block from a block hash.
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError> {
         let block_hash = hex::decode(&block_hash_string)?;
@@ -251,7 +251,7 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
 
         storage.catch_up_secondary(false)?;
 
-        if !self.consensus_layer()?.consensus.verify_transaction(&transaction)? {
+        if !self.sync_handler()?.consensus.verify_transaction(&transaction)? {
             // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
             return Ok("Transaction did not verify".into());
         }
@@ -286,7 +286,7 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
 
         storage.catch_up_secondary(false)?;
 
-        Ok(self.consensus_layer()?.consensus.verify_transaction(&transaction)?)
+        Ok(self.sync_handler()?.consensus.verify_transaction(&transaction)?)
     }
 
     /// Fetch the number of connected peers this node has.
@@ -308,12 +308,12 @@ impl<S: Storage + Send + Sync + 'static> RpcFunctions for RpcImpl<S> {
     /// Returns data about the node.
     fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
         Ok(NodeInfo {
-            is_miner: self.consensus_layer()?.is_miner(),
-            is_syncing: self.consensus_layer()?.is_syncing_blocks(),
+            is_miner: self.sync_handler()?.is_miner(),
+            is_syncing: self.sync_handler()?.is_syncing_blocks(),
         })
     }
 
-    /// Returns the current mempool and consensus information known by this node.
+    /// Returns the current mempool and sync information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
         let storage = &self.storage;
         storage.catch_up_secondary(false)?;

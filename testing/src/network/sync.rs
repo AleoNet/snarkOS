@@ -17,8 +17,8 @@
 use tokio::time::sleep;
 
 use crate::{
-    consensus::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
     network::{handshaken_node_and_peer, test_node, ConsensusSetup, TestSetup},
+    sync::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
     wait_until,
 };
 
@@ -91,18 +91,8 @@ async fn block_initiator_side() {
     peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
-    wait_until!(
-        1,
-        node.expect_consensus()
-            .storage()
-            .block_hash_exists(&block_1_header_hash)
-    );
-    wait_until!(
-        1,
-        node.expect_consensus()
-            .storage()
-            .block_hash_exists(&block_2_header_hash)
-    );
+    wait_until!(1, node.expect_sync().storage().block_hash_exists(&block_1_header_hash));
+    wait_until!(1, node.expect_sync().storage().block_hash_exists(&block_2_header_hash));
 }
 
 #[tokio::test]
@@ -116,10 +106,7 @@ async fn block_responder_side() {
 
     // insert block into node
     let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
-    node.expect_consensus()
-        .consensus
-        .receive_block(&block_struct_1)
-        .unwrap();
+    node.expect_sync().consensus.receive_block(&block_struct_1).unwrap();
 
     // send a GetSync with an empty vec as only the genesis block is in the ledger
     let get_sync = Payload::GetSync(vec![]);
@@ -198,7 +185,7 @@ async fn block_two_node() {
     assert_eq!(blocks.len(), NUM_BLOCKS);
 
     for block in blocks {
-        node_alice.expect_consensus().consensus.receive_block(&block).unwrap();
+        node_alice.expect_sync().consensus.receive_block(&block).unwrap();
     }
 
     let setup = TestSetup {
@@ -213,10 +200,7 @@ async fn block_two_node() {
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(
-        30,
-        node_bob.expect_consensus().current_block_height() as usize == NUM_BLOCKS
-    );
+    wait_until!(30, node_bob.expect_sync().current_block_height() as usize == NUM_BLOCKS);
 }
 
 #[tokio::test]
@@ -255,8 +239,8 @@ async fn transaction_initiator_side() {
     };
 
     // Verify the transactions have been stored in the node's memory pool
-    wait_until!(1, node.expect_consensus().memory_pool().lock().contains(&entry_1));
-    wait_until!(1, node.expect_consensus().memory_pool().lock().contains(&entry_2));
+    wait_until!(1, node.expect_sync().memory_pool().lock().contains(&entry_1));
+    wait_until!(1, node.expect_sync().memory_pool().lock().contains(&entry_2));
 }
 
 #[tokio::test]
@@ -269,8 +253,8 @@ async fn transaction_responder_side() {
     assert!(matches!(payload, Payload::Ping(..)));
 
     // insert transaction into node
-    let mut memory_pool = node.expect_consensus().memory_pool().lock();
-    let storage = node.expect_consensus().storage();
+    let mut memory_pool = node.expect_sync().memory_pool().lock();
+    let storage = node.expect_sync().storage();
 
     let entry_1 = Entry {
         size_in_bytes: TRANSACTION_1.len(),
@@ -315,8 +299,8 @@ async fn transaction_two_node() {
     let alice_address = node_alice.local_address().unwrap();
 
     // insert transaction into node_alice
-    let mut memory_pool = node_alice.expect_consensus().memory_pool().lock();
-    let storage = node_alice.expect_consensus().storage();
+    let mut memory_pool = node_alice.expect_sync().memory_pool().lock();
+    let storage = node_alice.expect_sync().storage();
 
     let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
     let size = TRANSACTION_1.len();
@@ -342,5 +326,5 @@ async fn transaction_two_node() {
     let node_bob = test_node(setup).await;
 
     // check transaction is present in bob's memory pool
-    wait_until!(5, node_bob.expect_consensus().memory_pool().lock().contains(&entry));
+    wait_until!(5, node_bob.expect_sync().memory_pool().lock().contains(&entry));
 }

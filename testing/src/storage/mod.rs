@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::consensus::TestTx;
+use crate::sync::TestTx;
 pub use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;

@@ -245,7 +245,7 @@ impl<T: Transaction> Default for MemoryPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_testing::consensus::*;
+    use snarkos_testing::sync::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Block;
 

@@ -16,6 +16,7 @@
 
 use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_storage::BlockHeight;
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
@@ -24,43 +25,42 @@ use snarkvm_objects::Storage;
 
 use parking_lot::{Mutex, RwLock};
 use std::{
-    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-// TODO: Remove the inner Arcs, currently these objects are being cloned individually in the miner.
-pub struct Consensus<S: Storage> {
-    /// The node this consensus is bound to.
+/// The sync handler of this node.
+pub struct Sync<S: Storage> {
+    /// The node this sync handler is bound to.
     node: Node<S>,
-    /// The core consensus objects.
+    /// The core sync objects.
     pub consensus: Arc<snarkos_consensus::Consensus<S>>,
     /// If `true`, initializes a mining task on this node.
     is_miner: bool,
     /// The interval between each block sync.
     block_sync_interval: Duration,
+    /// The interval between each memory pool sync.
+    mempool_sync_interval: Duration,
     /// The last time a block sync was initiated.
     last_block_sync: RwLock<Option<Instant>>,
-    /// The interval between each transaction (memory pool) sync.
-    transaction_sync_interval: Duration,
 }
 
-impl<S: Storage> Consensus<S> {
+impl<S: Storage> Sync<S> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         node: Node<S>,
         consensus: Arc<snarkos_consensus::Consensus<S>>,
         is_miner: bool,
         block_sync_interval: Duration,
-        transaction_sync_interval: Duration,
+        mempool_sync_interval: Duration,
     ) -> Self {
         Self {
             node,
             consensus,
             is_miner,
             block_sync_interval,
+            mempool_sync_interval,
             last_block_sync: Default::default(),
-            transaction_sync_interval,
         }
     }
 
@@ -81,7 +81,7 @@ impl<S: Storage> Consensus<S> {
         &self.consensus.memory_pool
     }
 
-    /// Returns a reference to the consensus parameters of this node.
+    /// Returns a reference to the sync parameters of this node.
     #[inline]
     pub fn consensus_parameters(&self) -> &ConsensusParameters {
         &self.consensus.parameters
@@ -111,29 +111,33 @@ impl<S: Storage> Consensus<S> {
 
     /// Returns the current block height of the ledger from storage.
     #[inline]
-    pub fn current_block_height(&self) -> u32 {
+    pub fn current_block_height(&self) -> BlockHeight {
         self.consensus.ledger.get_current_block_height()
     }
 
     /// Checks whether any previous sync attempt has expired.
     pub fn has_block_sync_expired(&self) -> bool {
         if let Some(ref timestamp) = *self.last_block_sync.read() {
-            timestamp.elapsed() > self.block_sync_interval
+            timestamp.elapsed() > Duration::from_secs(crate::BLOCK_SYNC_EXPIRATION_SECS as u64)
         } else {
             // this means it's the very first sync attempt
             true
         }
     }
 
-    /// Register that the node attempted to sync blocks with the given peer.
-    pub fn register_block_sync_attempt(&self, provider: SocketAddr) {
-        trace!("Attempting to sync with {}", provider);
+    /// Register that the node attempted to sync blocks.
+    pub fn register_block_sync_attempt(&self) {
         *self.last_block_sync.write() = Some(Instant::now());
     }
 
-    /// Returns the interval between each transaction (memory pool) sync.
-    pub fn transaction_sync_interval(&self) -> Duration {
-        self.transaction_sync_interval
+    /// Returns the interval between each block sync.
+    pub fn block_sync_interval(&self) -> Duration {
+        self.block_sync_interval
+    }
+
+    /// Returns the interval between each memory pool sync.
+    pub fn mempool_sync_interval(&self) -> Duration {
+        self.mempool_sync_interval
     }
 
     pub fn max_block_size(&self) -> usize {

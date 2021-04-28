@@ -19,31 +19,18 @@ use crate::{
     NetworkError,
 };
 use snarkos_metrics::Metrics;
-use snarkos_storage::Ledger;
+use snarkos_storage::{BlockHeight, Ledger};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::{Storage, Transaction};
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
     time::Instant,
 };
-
-///
-/// A data structure for storing the history of all peers with this node server.
-///
-#[derive(Debug, Default)]
-pub struct PeerBook {
-    /// The map of the addresses currently being handshaken with.
-    connecting_peers: RwLock<HashSet<SocketAddr>>,
-    /// The map of connected peers to their metadata.
-    connected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
-    /// The map of disconnected peers to their metadata.
-    disconnected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
-}
 
 #[derive(Deserialize, Serialize)]
 pub struct SerializedPeerBook(Vec<PeerInfo>);
@@ -52,7 +39,11 @@ impl From<&PeerBook> for SerializedPeerBook {
     fn from(book: &PeerBook) -> Self {
         let mut peers = book.connected_peers();
         peers.extend(book.disconnected_peers().into_iter());
-        let peers = peers.into_iter().map(|(_, info)| info).collect();
+        let peers = peers
+            .into_iter()
+            .map(|(_, info)| info)
+            .filter(|info| !info.address().ip().is_loopback())
+            .collect();
 
         SerializedPeerBook(peers)
     }
@@ -61,10 +52,29 @@ impl From<&PeerBook> for SerializedPeerBook {
 impl From<SerializedPeerBook> for PeerBook {
     fn from(book: SerializedPeerBook) -> Self {
         PeerBook {
-            disconnected_peers: RwLock::new(book.0.into_iter().map(|info| (info.address(), info)).collect()),
+            disconnected_peers: RwLock::new(
+                book.0
+                    .into_iter()
+                    .filter(|info| !info.address().ip().is_loopback())
+                    .map(|info| (info.address(), info))
+                    .collect(),
+            ),
             ..Default::default()
         }
     }
+}
+
+///
+/// A data structure for storing the history of all peers with this node server.
+///
+#[derive(Debug, Default)]
+pub struct PeerBook {
+    /// The map of the addresses currently being handshaken with.
+    connecting_peers: RwLock<HashMap<SocketAddr, Instant>>,
+    /// The map of connected peers to their metadata.
+    connected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
+    /// The map of disconnected peers to their metadata.
+    disconnected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
 }
 
 impl PeerBook {
@@ -77,19 +87,18 @@ impl PeerBook {
     /// and attempts to deserialize it as an instance of `PeerBook`.
     ///
     /// If the peer book does not exist in storage or fails to deserialize properly,
-    /// returns a `NetworkError`.
+    /// returns a new instance of PeerBook.
     ///
     #[inline]
-    pub fn load<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
-        storage: &Ledger<T, P, S>,
-    ) -> Result<Self, NetworkError> {
+    pub fn load<T: Transaction, P: LoadableMerkleParameters, S: Storage>(storage: &Ledger<T, P, S>) -> Self {
         // Fetch the peer book from storage.
         match storage.get_peer_book() {
             // Attempt to deserialize it as a peer book.
-            Ok(Some(serialized_peer_book)) => Ok(PeerBook::from(bincode::deserialize::<SerializedPeerBook>(
-                &serialized_peer_book,
-            )?)),
-            _ => Err(NetworkError::PeerBookFailedToLoad),
+            Ok(Some(serialized_peer_book)) => match bincode::deserialize::<SerializedPeerBook>(&serialized_peer_book) {
+                Ok(peer_book) => PeerBook::from(peer_book),
+                _ => Default::default(),
+            },
+            _ => Default::default(),
         }
     }
 
@@ -98,7 +107,7 @@ impl PeerBook {
     ///
     #[inline]
     pub fn is_connecting(&self, address: SocketAddr) -> bool {
-        self.connecting_peers.read().contains(&address)
+        self.connecting_peers.read().contains_key(&address)
     }
 
     ///
@@ -145,7 +154,7 @@ impl PeerBook {
     /// Returns a reference to the connecting peers in this peer book.
     ///
     #[inline]
-    pub fn connecting_peers(&self) -> HashSet<SocketAddr> {
+    pub fn connecting_peers(&self) -> HashMap<SocketAddr, Instant> {
         self.connecting_peers.read().clone()
     }
 
@@ -172,7 +181,7 @@ impl PeerBook {
         if self.is_connected(address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
-        self.connecting_peers.write().insert(address);
+        self.connecting_peers.write().insert(address, Instant::now());
 
         Ok(())
     }
@@ -210,10 +219,10 @@ impl PeerBook {
     /// Removes the given address from the connecting and connected peers in this `PeerBook`,
     /// and adds the given address to the disconnected peers in this `PeerBook`.
     ///
-    pub fn set_disconnected(&self, address: SocketAddr) -> Result<(), NetworkError> {
+    pub fn set_disconnected(&self, address: SocketAddr) -> Result<bool, NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
-        if self.connecting_peers.write().remove(&address) {
-            return Ok(());
+        if self.connecting_peers.write().remove(&address).is_some() {
+            return Ok(true);
         }
 
         // Case 2 - The given address is a connected peer, attempt to disconnect.
@@ -226,10 +235,10 @@ impl PeerBook {
             // On success, decrement the connected peer count.
             connected_peers_dec!(success);
 
-            return Ok(());
+            return Ok(true);
         }
 
-        Ok(())
+        Ok(false)
     }
 
     ///
@@ -324,7 +333,7 @@ impl PeerBook {
         if let Some(ref quality) = self.peer_quality(addr) {
             *quality.last_seen.write() = Some(chrono::Utc::now());
         } else {
-            trace!("Attempted to update state of a peer that's not connected: {}", addr);
+            warn!("Tried updating state of a peer that's not connected: {}", addr);
         }
     }
 
@@ -336,6 +345,15 @@ impl PeerBook {
         } else {
             // shouldn't occur, but just in case
             warn!("Tried to send a Ping to an unknown peer: {}!", target);
+        }
+    }
+
+    /// Handles an incoming `Ping` message.
+    pub fn received_ping(&self, source: SocketAddr, block_height: BlockHeight) {
+        if let Some(ref quality) = self.peer_quality(source) {
+            quality.block_height.store(block_height, Ordering::SeqCst);
+        } else {
+            warn!("Tried updating block height of a peer that's not connected: {}", source);
         }
     }
 
@@ -360,7 +378,7 @@ impl PeerBook {
     /// Registers that the given number of blocks is expected as part of syncing with a peer.
     pub fn expecting_sync_blocks(&self, addr: SocketAddr, count: usize) -> bool {
         if let Some(ref pq) = self.peer_quality(addr) {
-            pq.remaining_sync_blocks.store(count as u16, Ordering::SeqCst);
+            pq.remaining_sync_blocks.store(count as u32, Ordering::SeqCst);
             true
         } else {
             warn!("Peer for expecting_sync_blocks purposes not found! (probably disconnected)");

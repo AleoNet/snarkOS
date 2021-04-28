@@ -18,7 +18,7 @@
 extern crate tracing;
 
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
-use snarkos_testing::{consensus::*, network::TestBlocks};
+use snarkos_testing::{network::TestBlocks, sync::*};
 use snarkvm_dpc::{
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
     Account,
@@ -109,7 +109,7 @@ fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     info!("Creating test account");
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
-    info!("Creating consensus");
+    info!("Creating sync");
     let consensus = Arc::new(crate::create_test_consensus());
 
     // setup the miner
