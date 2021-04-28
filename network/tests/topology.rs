@@ -29,7 +29,7 @@ use snarkos_testing::{
 use std::{collections::BTreeMap, net::SocketAddr, ops::Sub};
 
 use eigenvalues::{algorithms::lanczos::HermitianLanczos, SpectrumTarget};
-use nalgebra::{DMatrix, DVector};
+use nalgebra::{DMatrix, DVector, SymmetricEigen};
 
 const N: usize = 25;
 const MIN_PEERS: u16 = 5;
@@ -77,9 +77,6 @@ async fn spawn_nodes_in_a_line() {
     for node in nodes.iter().take(nodes.len() - 1).skip(1) {
         wait_until!(5, node.peer_book.number_of_connected_peers() == 2);
     }
-
-    let metrics = NetworkMetrics::new(&nodes);
-    dbg!(metrics);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -257,15 +254,31 @@ async fn binary_star_contact() {
     nodes.push(solo);
 
     wait_until!(10, network_density(&nodes) >= 0.05);
+
+    let metrics = NetworkMetrics::new(&nodes);
+    dbg!(metrics);
 }
 
+/// Network topology measurements.
 #[derive(Debug)]
 struct NetworkMetrics {
+    /// The total node count of the network.
     node_count: usize,
+    /// The total connection count for the network.
     connection_count: usize,
+    /// The network density.
+    ///
+    /// This is defined as actual connections divided by the total number of possible connections.
     density: f64,
-    // degree_matrix: DMatrix,
-    // adjacency_matrix: DMatrix,
+    /// The algebraic connectivity of the network.
+    ///
+    /// This is the value of the Fiedler eigenvalue, the second-smallest eigenvalue of the network's
+    /// Laplacian matrix.
+    algebraic_connectivity: f64,
+    /// Node centrality measurements mapped to each node's address.
+    ///
+    /// Includes degree centrality, eigenvector centrality (the relative importance of a node in
+    /// the network) and Fiedler vector (describes a possible partitioning of the network).
     centrality: BTreeMap<SocketAddr, NodeCentrality>,
 }
 
@@ -275,7 +288,7 @@ impl NetworkMetrics {
         let connection_count = total_connection_count(nodes);
         let density = network_density(&nodes);
 
-        // Create an index of nodes to introduce some notion of order the rows and columns will follow.
+        // Create an index of nodes to introduce some notion of order the rows and columns all matrices will follow.
         let index: BTreeMap<SocketAddr, usize> = nodes
             .iter()
             .map(|node| node.local_address().unwrap())
@@ -283,13 +296,17 @@ impl NetworkMetrics {
             .map(|(i, addr)| (addr, i))
             .collect();
 
+        // Not stored on the struct but can be pretty inspected with `println!`.
         let degree_matrix = degree_matrix(&index, &nodes);
         let adjacency_matrix = adjacency_matrix(&index, &nodes);
         let laplacian_matrix = degree_matrix.clone().sub(adjacency_matrix.clone());
+        println!("{}", laplacian_matrix);
 
         let degree_centrality = degree_centrality(&index, degree_matrix.clone());
         let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix.clone());
+        let (algebraic_connectivity, fiedler_vector_indexed) = fiedler(&index, laplacian_matrix);
 
+        // Create the `NodeCentrality` instances for each node.
         let centrality: BTreeMap<SocketAddr, NodeCentrality> = nodes
             .iter()
             .map(|node| {
@@ -298,7 +315,8 @@ impl NetworkMetrics {
                 // nodes.
                 let dc = degree_centrality.get(&addr).unwrap();
                 let ec = eigenvector_centrality.get(&addr).unwrap();
-                let nc = NodeCentrality::new(*dc, *ec);
+                let fv = fiedler_vector_indexed.get(&addr).unwrap();
+                let nc = NodeCentrality::new(*dc, *ec, *fv);
 
                 (addr, nc)
             })
@@ -308,26 +326,31 @@ impl NetworkMetrics {
             node_count,
             connection_count,
             density,
+            algebraic_connectivity,
             centrality,
         }
     }
 }
 
+/// Centrality measurements of a node.
 #[derive(Debug)]
 struct NodeCentrality {
     degree_centrality: u16,
     eigenvector_centrality: f64,
+    fiedler_value: f64,
 }
 
 impl NodeCentrality {
-    fn new(degree_centrality: u16, eigenvector_centrality: f64) -> Self {
+    fn new(degree_centrality: u16, eigenvector_centrality: f64, fiedler_value: f64) -> Self {
         Self {
             degree_centrality,
             eigenvector_centrality,
+            fiedler_value,
         }
     }
 }
 
+/// Returns the total connection count of the network.
 fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
     let mut count = 0;
 
@@ -338,19 +361,7 @@ fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
     (count / 2).into()
 }
 
-// Topology metrics
-//
-// 1. node count
-// 2. density
-// 3. centrality measurements:
-//
-//      - degree centrality (covered by the number of connected peers)
-//      - eigenvector centrality (would be useful in support of density measurements)
-//
-//      (TODO):
-//      - betweenness centrality
-//      - Fiedler vector
-
+/// Returns the network density.
 fn network_density(nodes: &[Node<LedgerStorage>]) -> f64 {
     let connections = total_connection_count(nodes);
     calculate_density(nodes.len() as f64, connections as f64)
@@ -363,6 +374,7 @@ fn calculate_density(n: f64, ac: f64) -> f64 {
     ac / pc
 }
 
+/// Returns the degree matrix for the network with values ordered by the index.
 fn degree_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorage>]) -> DMatrix<f64> {
     let n = nodes.len();
     let mut matrix = DMatrix::<f64>::zeros(n, n);
@@ -379,6 +391,7 @@ fn degree_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorag
     matrix
 }
 
+/// Returns the adjacency matrix for the network with values ordered by the index.
 fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorage>]) -> DMatrix<f64> {
     let n = nodes.len();
     let mut matrix = DMatrix::<f64>::zeros(n, n);
@@ -398,6 +411,7 @@ fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerSto
     matrix
 }
 
+/// Returns the difference between the highest and lowest degree centrality in the network.
 // TODO: could use degree matrix.
 fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
     let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
@@ -407,6 +421,9 @@ fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
     max - min
 }
 
+/// Returns the degree centrality of a node.
+///
+/// This is defined as the connection count of the node.
 fn degree_centrality(index: &BTreeMap<SocketAddr, usize>, degree_matrix: DMatrix<f64>) -> BTreeMap<SocketAddr, u16> {
     let diag = degree_matrix.diagonal();
     index
@@ -416,29 +433,20 @@ fn degree_centrality(index: &BTreeMap<SocketAddr, usize>, degree_matrix: DMatrix
         .collect()
 }
 
+/// Returns the eigenvalue centrality of each node in the network.
 fn eigenvector_centrality(
     index: &BTreeMap<SocketAddr, usize>,
     adjacency_matrix: DMatrix<f64>,
 ) -> BTreeMap<SocketAddr, f64> {
-    // We only target the highest part of the spectrum as the largest eigenvalue's corresponding
-    // eigenvector is the measurument we are after.
-    let spectrum_target = SpectrumTarget::Highest;
-    // Iteration count is set based on this paper:
-    // https://sites.math.washington.edu/~morrow/498_13/eigenvalues3.pdf, which demonstrated
-    // convergence of the highest eigenvalue to six decimal places for 1000 by 1000 matrix after 25
-    // iterations.
-    let lanczos = HermitianLanczos::new(adjacency_matrix, 25, spectrum_target).unwrap();
-    let highest_eigenvector = DVector::from(lanczos.eigenvectors.column(0));
+    // Compute the eigenvectors and corresponding eigenvalues and sort in descending order.
+    let ascending = false;
+    let eigenvalue_vector_pairs = sorted_eigenvalue_vector_pairs(adjacency_matrix, ascending);
+    let (_highest_eigenvalue, highest_eigenvector) = &eigenvalue_vector_pairs[0];
 
     // The eigenvector is a relative score of node importance (normalised by the norm), to obtain an absolute score for each
     // node, we normalise so that the sum of the components are equal to 1.
     let sum = highest_eigenvector.sum() / index.len() as f64;
     let normalised = highest_eigenvector.unscale(sum);
-
-    // TODO: bench implementations, in theory Lanczos should be faster.
-    // println!("Computed eigenvalues:\n{}", lanczos.eigenvalues);
-    // println!("Highest eigenvector:\n{}", highest_eigenvector);
-    // println!("Normalised\n:{}", normalised);
 
     // Map addresses to their eigenvalue centrality.
     index
@@ -446,4 +454,51 @@ fn eigenvector_centrality(
         .zip(normalised.column(0).iter())
         .map(|(addr, ec)| (*addr, *ec))
         .collect()
+}
+
+/// Returns the fiedler values for each node in the network.
+fn fiedler(index: &BTreeMap<SocketAddr, usize>, laplacian_matrix: DMatrix<f64>) -> (f64, BTreeMap<SocketAddr, f64>) {
+    // Compute the eigenvectors and corresponding eigenvalues and sort in ascending order.
+    let ascending = true;
+    let pairs = sorted_eigenvalue_vector_pairs(laplacian_matrix, ascending);
+    dbg!(&pairs);
+
+    // Second-smallest eigenvalue is the Fiedler value (algebraic connectivity), the associated
+    // eigenvector is the Fiedler vector.
+    let (algebraic_connectivity, fiedler_vector) = &pairs[1];
+
+    // Map addresses to their Fiedler values.
+    let fiedler_values_indexed = index
+        .keys()
+        .zip(fiedler_vector.column(0).iter())
+        .map(|(addr, fiedler_value)| (*addr, *fiedler_value))
+        .collect();
+
+    (*algebraic_connectivity, fiedler_values_indexed)
+}
+
+/// Computes the eiegenvalues and corresponding eigenvalues from the supplied symmetric matrix.
+fn sorted_eigenvalue_vector_pairs(matrix: DMatrix<f64>, ascending: bool) -> Vec<(f64, DVector<f64>)> {
+    // Compute eigenvalues and eigenvectors.
+    let eigen = SymmetricEigen::new(matrix);
+    dbg!(&eigen.eigenvalues);
+
+    // Map eigenvalues to their eigenvectors.
+    let mut pairs: Vec<(f64, DVector<f64>)> = eigen
+        .eigenvalues
+        .iter()
+        .zip(eigen.eigenvectors.column_iter())
+        .map(|(value, vector)| (*value, vector.clone_owned()))
+        .collect();
+
+    // Sort eigenvalue-vector pairs in descending order.
+    pairs.sort_unstable_by(|(a, _), (b, _)| {
+        if ascending {
+            a.partial_cmp(b).unwrap()
+        } else {
+            b.partial_cmp(a).unwrap()
+        }
+    });
+
+    pairs
 }
