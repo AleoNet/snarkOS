@@ -26,7 +26,7 @@ use snarkvm_objects::{Storage, Transaction};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
     time::Instant,
@@ -70,7 +70,7 @@ impl From<SerializedPeerBook> for PeerBook {
 #[derive(Debug, Default)]
 pub struct PeerBook {
     /// The map of the addresses currently being handshaken with.
-    connecting_peers: RwLock<HashSet<SocketAddr>>,
+    connecting_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The map of connected peers to their metadata.
     connected_peers: RwLock<HashMap<SocketAddr, PeerInfo>>,
     /// The map of disconnected peers to their metadata.
@@ -107,7 +107,7 @@ impl PeerBook {
     ///
     #[inline]
     pub fn is_connecting(&self, address: SocketAddr) -> bool {
-        self.connecting_peers.read().contains(&address)
+        self.connecting_peers.read().contains_key(&address)
     }
 
     ///
@@ -154,7 +154,7 @@ impl PeerBook {
     /// Returns a reference to the connecting peers in this peer book.
     ///
     #[inline]
-    pub fn connecting_peers(&self) -> HashSet<SocketAddr> {
+    pub fn connecting_peers(&self) -> HashMap<SocketAddr, Instant> {
         self.connecting_peers.read().clone()
     }
 
@@ -181,7 +181,7 @@ impl PeerBook {
         if self.is_connected(address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
-        self.connecting_peers.write().insert(address);
+        self.connecting_peers.write().insert(address, Instant::now());
 
         Ok(())
     }
@@ -221,7 +221,7 @@ impl PeerBook {
     ///
     pub fn set_disconnected(&self, address: SocketAddr) -> Result<(), NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
-        if self.connecting_peers.write().remove(&address) {
+        if self.connecting_peers.write().remove(&address).is_some() {
             return Ok(());
         }
 
