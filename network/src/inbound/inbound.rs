@@ -167,7 +167,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// This method handles new inbound messages from a single connected node.
     pub async fn listen_for_inbound_messages(&self, reader: &mut ConnReader) {
         let mut failure_count = 0u8;
-        let mut fatal_count = 0u8;
 
         loop {
             // Read the next message from the channel.
@@ -178,13 +177,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     error!("Unable to read message from {}: {}", reader.addr, error);
                     failure_count += 1;
 
-                    // Increment the fatal count if the error is a fatal error.
-                    if error.is_fatal() {
-                        fatal_count += 1;
-                    }
-
                     // Determine if we should disconnect.
-                    let disconnect_from_peer = fatal_count >= 2 || failure_count >= 10;
+                    let disconnect_from_peer = error.is_fatal() || failure_count >= 10;
 
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {

@@ -484,7 +484,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) async fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         if let Some(ref sync) = self.sync() {
             if self.peer_book.is_syncing_blocks(remote_address) {
                 sync.finished_syncing_blocks();
