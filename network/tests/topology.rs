@@ -26,7 +26,10 @@ use snarkos_testing::{
     wait_until,
 };
 
-use std::{collections::BTreeMap, net::SocketAddr};
+use std::{collections::BTreeMap, net::SocketAddr, ops::Sub};
+
+use eigenvalues::{algorithms::lanczos::HermitianLanczos, SpectrumTarget};
+use nalgebra::{DMatrix, DVector};
 
 const N: usize = 25;
 const MIN_PEERS: u16 = 5;
@@ -74,6 +77,9 @@ async fn spawn_nodes_in_a_line() {
     for node in nodes.iter().take(nodes.len() - 1).skip(1) {
         wait_until!(5, node.peer_book.number_of_connected_peers() == 2);
     }
+
+    let metrics = NetworkMetrics::new(&nodes);
+    dbg!(metrics);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -258,6 +264,7 @@ struct NetworkMetrics {
     node_count: usize,
     connection_count: usize,
     density: f64,
+    // degree_matrix: DMatrix,
     // adjacency_matrix: DMatrix,
     centrality: BTreeMap<SocketAddr, NodeCentrality>,
 }
@@ -268,8 +275,20 @@ impl NetworkMetrics {
         let connection_count = total_connection_count(nodes);
         let density = network_density(&nodes);
 
-        let degree_centrality = degree_centrality(&nodes);
-        let eigenvector_centrality = eigenvector_centrality(&nodes);
+        // Create an index of nodes to introduce some notion of order the rows and columns will follow.
+        let index: BTreeMap<SocketAddr, usize> = nodes
+            .iter()
+            .map(|node| node.local_address().unwrap())
+            .enumerate()
+            .map(|(i, addr)| (addr, i))
+            .collect();
+
+        let degree_matrix = degree_matrix(&index, &nodes);
+        let adjacency_matrix = adjacency_matrix(&index, &nodes);
+        let laplacian_matrix = degree_matrix.clone().sub(adjacency_matrix.clone());
+
+        let degree_centrality = degree_centrality(&index, degree_matrix.clone());
+        let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix.clone());
 
         let centrality: BTreeMap<SocketAddr, NodeCentrality> = nodes
             .iter()
@@ -298,8 +317,6 @@ impl NetworkMetrics {
 struct NodeCentrality {
     degree_centrality: u16,
     eigenvector_centrality: f64,
-    // betweenness centrality
-    // fiedler (algebraic connectivity)?
 }
 
 impl NodeCentrality {
@@ -346,6 +363,42 @@ fn calculate_density(n: f64, ac: f64) -> f64 {
     ac / pc
 }
 
+fn degree_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorage>]) -> DMatrix<f64> {
+    let n = nodes.len();
+    let mut matrix = DMatrix::<f64>::zeros(n, n);
+
+    for node in nodes {
+        let n = node.peer_book.number_of_connected_peers();
+        // Address must be present.
+        // Get the index for the and set the number of connected peers. The degree matrix is
+        // diagonal.
+        let node_n = index.get(&node.local_address().unwrap()).unwrap();
+        matrix[(*node_n, *node_n)] = n as f64;
+    }
+
+    matrix
+}
+
+fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorage>]) -> DMatrix<f64> {
+    let n = nodes.len();
+    let mut matrix = DMatrix::<f64>::zeros(n, n);
+
+    // Compute the adjacency matrix. As our network is an undirected graph, the adjacency matrix is
+    // symmetric.
+    for node in nodes {
+        node.peer_book.connected_peers().keys().for_each(|addr| {
+            // Addresses must be present.
+            // Get the indices for each node, progressing row by row to construct the matrix.
+            let node_m = index.get(&node.local_address().unwrap()).unwrap();
+            let peer_n = index.get(&addr).unwrap();
+            matrix[(*node_m, *peer_n)] = 1.0;
+        });
+    }
+
+    matrix
+}
+
+// TODO: could use degree matrix.
 fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
     let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
     let min = dc.clone().min().unwrap();
@@ -354,50 +407,19 @@ fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
     max - min
 }
 
-fn degree_centrality(nodes: &[Node<LedgerStorage>]) -> BTreeMap<SocketAddr, u16> {
-    nodes
-        .iter()
-        .map(|node| {
-            (
-                node.local_address().unwrap(),
-                node.peer_book.number_of_connected_peers(),
-            )
-        })
+fn degree_centrality(index: &BTreeMap<SocketAddr, usize>, degree_matrix: DMatrix<f64>) -> BTreeMap<SocketAddr, u16> {
+    let diag = degree_matrix.diagonal();
+    index
+        .keys()
+        .zip(diag.iter())
+        .map(|(addr, dc)| (*addr, *dc as u16))
         .collect()
 }
 
-fn eigenvector_centrality(nodes: &[Node<LedgerStorage>]) -> BTreeMap<SocketAddr, f64> {
-    use eigenvalues::{algorithms::lanczos::HermitianLanczos, SpectrumTarget};
-    use nalgebra::{DMatrix, DVector};
-
-    // Compute the adjacency matrix. As our network is an undirected graph, the adjacency matrix is
-    // symmetric. We could also optimise the construction of the matrix by building only the upper
-    // triangle.
-    // Create a null symmetric matrix of dim N.
-    let n = nodes.len();
-    let mut matrix = DMatrix::<f64>::zeros(n, n);
-
-    // Create an index of nodes to introduce some notion of order the rows and columns will follow.
-    let index: BTreeMap<SocketAddr, usize> = nodes
-        .iter()
-        .map(|node| node.local_address().unwrap())
-        .enumerate()
-        .map(|(i, addr)| (addr, i))
-        .collect();
-
-    for node in nodes {
-        node.peer_book.connected_peers().keys().for_each(|addr| {
-            // Addresses must be present.
-            let node_m = index.get(&node.local_address().unwrap()).unwrap();
-            let peer_n = index.get(&addr).unwrap();
-            matrix[(*node_m, *peer_n)] = 1.0;
-        });
-    }
-
-    // TODO: sanity check the adjacency matrix is symmetric.
-
-    println!("Matrix:\n{}", matrix);
-
+fn eigenvector_centrality(
+    index: &BTreeMap<SocketAddr, usize>,
+    adjacency_matrix: DMatrix<f64>,
+) -> BTreeMap<SocketAddr, f64> {
     // We only target the highest part of the spectrum as the largest eigenvalue's corresponding
     // eigenvector is the measurument we are after.
     let spectrum_target = SpectrumTarget::Highest;
@@ -405,18 +427,18 @@ fn eigenvector_centrality(nodes: &[Node<LedgerStorage>]) -> BTreeMap<SocketAddr,
     // https://sites.math.washington.edu/~morrow/498_13/eigenvalues3.pdf, which demonstrated
     // convergence of the highest eigenvalue to six decimal places for 1000 by 1000 matrix after 25
     // iterations.
-    let lanczos = HermitianLanczos::new(matrix.clone(), 25, spectrum_target).unwrap();
+    let lanczos = HermitianLanczos::new(adjacency_matrix, 25, spectrum_target).unwrap();
     let highest_eigenvector = DVector::from(lanczos.eigenvectors.column(0));
 
     // The eigenvector is a relative score of node importance (normalised by the norm), to obtain an absolute score for each
     // node, we normalise so that the sum of the components are equal to 1.
-    let sum = highest_eigenvector.sum() / n as f64;
+    let sum = highest_eigenvector.sum() / index.len() as f64;
     let normalised = highest_eigenvector.unscale(sum);
 
     // TODO: bench implementations, in theory Lanczos should be faster.
-    println!("Computed eigenvalues:\n{}", lanczos.eigenvalues);
-    println!("Highest eigenvector:\n{}", highest_eigenvector);
-    println!("Normalised\n:{}", normalised);
+    // println!("Computed eigenvalues:\n{}", lanczos.eigenvalues);
+    // println!("Highest eigenvector:\n{}", highest_eigenvector);
+    // println!("Normalised\n:{}", normalised);
 
     // Map addresses to their eigenvalue centrality.
     index
