@@ -123,9 +123,9 @@ impl Default for Config {
                     .iter()
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
-                mempool_sync_interval: 18,
-                peer_sync_interval: 12,
-                block_sync_interval: 6,
+                mempool_sync_interval: 12,
+                peer_sync_interval: 8,
+                block_sync_interval: 4,
                 min_peers: 7,
                 max_peers: 25,
             },
