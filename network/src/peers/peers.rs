@@ -460,7 +460,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .await;
     }
 
-    /// A miner has sent their list of peer addresses.
+    /// A node has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
     pub(crate) fn process_inbound_peers(&self, peers: Vec<SocketAddr>) {
@@ -470,10 +470,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let local_address = self.local_address().unwrap(); // the address must be known by now
 
         let number_of_connected_peers = self.peer_book.number_of_connected_peers();
-        let number_to_connect = self
-            .config
-            .maximum_number_of_connected_peers()
-            .saturating_sub(number_of_connected_peers);
+        let number_to_connect = if self.config.is_bootnode() {
+            // If this node is a bootnode, catalogue all of the peers for bootstrapping purposes.
+            number_of_connected_peers
+        } else {
+            self.config
+                .maximum_number_of_connected_peers()
+                .saturating_sub(number_of_connected_peers)
+        };
 
         for peer_address in peers
             .iter()
