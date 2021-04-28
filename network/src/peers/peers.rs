@@ -212,11 +212,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
             // save the outbound channel
-            node.outbound
-                .channels
-                .write()
-                .await
-                .insert(remote_address, Arc::new(writer));
+            node.outbound.channels.write().insert(remote_address, Arc::new(writer));
 
             node.peer_book.set_connected(remote_address, None)?;
 
@@ -460,7 +456,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Remove the peer from the channel.
-        self.outbound.channels.write().await.remove(&remote_address);
+        self.outbound.channels.write().remove(&remote_address);
 
         // Set the peer as disconnected in the peer book.
         let result = self.peer_book.set_disconnected(remote_address);

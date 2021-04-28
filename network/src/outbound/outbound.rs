@@ -27,7 +27,7 @@ use std::{
     },
 };
 
-use tokio::sync::RwLock;
+use parking_lot::RwLock;
 
 /// The map of remote addresses to their active write channels.
 type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
@@ -71,7 +71,6 @@ impl Outbound {
         Ok(self
             .channels
             .read()
-            .await
             .get(&remote_address)
             .ok_or(NetworkError::OutboundChannelMissing)?
             .clone())
