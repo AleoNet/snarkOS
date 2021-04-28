@@ -70,7 +70,7 @@ mod protected_rpc_tests {
         }
     }
 
-    async fn initialize_test_rpc(
+    fn initialize_test_rpc(
         ledger: Arc<MerkleTreeLedger<LedgerStorage>>,
     ) -> (MetaIoHandler<Meta>, Arc<Consensus<LedgerStorage>>) {
         let credentials = RpcCredentials {
@@ -79,7 +79,7 @@ mod protected_rpc_tests {
         };
 
         let environment = test_config(TestSetup::default());
-        let mut node = Node::new(environment).await.unwrap();
+        let mut node = Node::new(environment).unwrap();
         let consensus_setup = ConsensusSetup::default();
         let consensus = Arc::new(snarkos_testing::sync::create_test_consensus_from_ledger(ledger.clone()));
 
@@ -101,11 +101,11 @@ mod protected_rpc_tests {
         (io, consensus)
     }
 
-    #[tokio::test]
-    async fn test_rpc_authentication() {
+    #[test]
+    fn test_rpc_authentication() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = invalid_authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage);
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -117,13 +117,13 @@ mod protected_rpc_tests {
         assert_eq!(extracted["error"]["message"], expected_result);
     }
 
-    #[tokio::test]
-    async fn test_rpc_fetch_record_commitment_count() {
+    #[test]
+    fn test_rpc_fetch_record_commitment_count() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage);
 
         let method = "getrecordcommitmentcount".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -134,13 +134,13 @@ mod protected_rpc_tests {
         assert_eq!(extracted["result"], 1);
     }
 
-    #[tokio::test]
-    async fn test_rpc_fetch_record_commitments() {
+    #[test]
+    fn test_rpc_fetch_record_commitments() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage);
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -155,13 +155,13 @@ mod protected_rpc_tests {
         assert_eq!(extracted["result"], expected_result);
     }
 
-    #[tokio::test]
-    async fn test_rpc_get_raw_record() {
+    #[test]
+    fn test_rpc_get_raw_record() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage);
 
         let method = "getrawrecord".to_string();
         let params = hex::encode(to_bytes![DATA.records_1[0].commitment()].unwrap());
@@ -178,11 +178,11 @@ mod protected_rpc_tests {
         assert_eq!(extracted["result"], expected_result);
     }
 
-    #[tokio::test]
-    async fn test_rpc_decode_record() {
+    #[test]
+    fn test_rpc_decode_record() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage);
 
         let record = &DATA.records_1[0];
 
@@ -218,11 +218,11 @@ mod protected_rpc_tests {
         assert_eq!(commitment_randomness, record_info["commitment_randomness"]);
     }
 
-    #[tokio::test]
-    async fn test_rpc_decrypt_record() {
+    #[test]
+    fn test_rpc_decrypt_record() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage);
 
         let system_parameters = &FIXTURE_VK.parameters.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
@@ -263,12 +263,12 @@ mod protected_rpc_tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_rpc_create_raw_transaction() {
+    #[test]
+    fn test_rpc_create_raw_transaction() {
         let storage = Arc::new(FIXTURE.ledger());
         let meta = authentication();
 
-        let (rpc, consensus) = initialize_test_rpc(storage).await;
+        let (rpc, consensus) = initialize_test_rpc(storage);
 
         consensus.receive_block(&DATA.block_1).unwrap();
 
@@ -315,12 +315,12 @@ mod protected_rpc_tests {
         let _transaction: Tx = FromBytes::read(&transaction_bytes[..]).unwrap();
     }
 
-    #[tokio::test]
-    async fn test_rpc_create_transaction_kernel() {
+    #[test]
+    fn test_rpc_create_transaction_kernel() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
 
-        let (rpc, consensus) = initialize_test_rpc(storage).await;
+        let (rpc, consensus) = initialize_test_rpc(storage);
 
         consensus.receive_block(&DATA.block_1).unwrap();
 
@@ -362,12 +362,12 @@ mod protected_rpc_tests {
             FromBytes::read(&transaction_kernel_bytes[..]).unwrap();
     }
 
-    #[tokio::test]
-    async fn test_rpc_create_transaction() {
+    #[test]
+    fn test_rpc_create_transaction() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
 
-        let (rpc, consensus) = initialize_test_rpc(storage).await;
+        let (rpc, consensus) = initialize_test_rpc(storage);
 
         consensus.receive_block(&DATA.block_1).unwrap();
 
@@ -400,11 +400,11 @@ mod protected_rpc_tests {
         let _transaction: Tx = FromBytes::read(&transaction_bytes[..]).unwrap();
     }
 
-    #[tokio::test]
-    async fn test_create_account() {
+    #[test]
+    fn test_create_account() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let (rpc, _consensus) = initialize_test_rpc(storage);
 
         let method = "createaccount".to_string();
 

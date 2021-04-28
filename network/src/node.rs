@@ -127,7 +127,7 @@ impl<S: Storage> Node<S> {
 
 impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config) -> Result<Self, NetworkError> {
+    pub fn new(config: Config) -> Result<Self, NetworkError> {
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
             state: Default::default(),
@@ -167,7 +167,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         self.sync().is_some()
     }
 
-    pub async fn start_services(&self) {
+    pub fn start_services(&self) {
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
         let incoming_task = task::spawn(async move {
@@ -183,11 +183,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let peer_sync_interval = self.config.peer_sync_interval();
         let peering_task = task::spawn(async move {
             loop {
-                info!("Updating peers");
+                node_clone.update_peers();
 
-                if let Err(e) = node_clone.update_peers().await {
-                    error!("Peer update error: {}", e);
-                }
                 sleep(peer_sync_interval).await;
             }
         });
@@ -244,7 +241,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             sync_node = sync_clone.node().peer_book.last_seen();
                         }
 
-                        sync_clone.update_memory_pool(sync_node).await;
+                        sync_clone.update_memory_pool(sync_node);
                     }
 
                     sleep(mempool_sync_interval).await;
@@ -290,7 +287,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
                             // Begin a new sync attempt.
                             sync_clone.register_block_sync_attempt();
-                            sync_clone.update_blocks(Some(*sync_node)).await;
+                            sync_clone.update_blocks(Some(*sync_node));
                         }
                     }
 

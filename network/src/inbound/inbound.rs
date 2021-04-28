@@ -23,7 +23,7 @@ use snarkvm_objects::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::mpsc::channel,
+    sync::mpsc::{channel, error::TrySendError},
     task,
 };
 
@@ -53,9 +53,15 @@ impl Default for Inbound {
 
 impl Inbound {
     #[inline]
-    pub(crate) async fn route(&self, response: Message) {
-        if let Err(err) = self.sender.send(response).await {
-            error!("Failed to route a response for a message: {}", err);
+    pub(crate) fn route(&self, message: Message) {
+        match self.sender.try_send(message) {
+            Ok(()) => {}
+            Err(TrySendError::Full(message)) => {
+                error!("Failed to route a {}: the queue is full", message);
+            }
+            Err(TrySendError::Closed(message)) => {
+                error!("Failed to route a {}: the queue is closed", message);
+            }
         }
     }
 
@@ -133,7 +139,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 trace!("Connected to {}", remote_address);
 
                                 // Immediately send a ping to provide the peer with our block height.
-                                node.send_ping(remote_address).await;
+                                node.send_ping(remote_address);
 
                                 if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
                                     peer.register_task(peer_reading_task);
@@ -204,8 +210,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 match &message.payload {
                     Payload::Ping(..) => {
                         self.outbound
-                            .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
-                            .await;
+                            .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong));
                     }
                     Payload::Pong => {
                         self.peer_book.received_pong(reader.addr);
@@ -214,7 +219,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
 
                 // Messages are queued in a single tokio MPSC receiver.
-                self.inbound.route(message).await
+                self.inbound.route(message)
             }
         }
     }
@@ -232,17 +237,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         match payload {
             Payload::Transaction(transaction) => {
                 if let Some(ref sync) = self.sync() {
-                    sync.received_memory_pool_transaction(source, transaction).await?;
+                    sync.received_memory_pool_transaction(source, transaction)?;
                 }
             }
             Payload::Block(block) => {
                 if let Some(ref sync) = self.sync() {
-                    sync.received_block(source, block, true).await?;
+                    sync.received_block(source, block, true)?;
                 }
             }
             Payload::SyncBlock(block) => {
                 if let Some(ref sync) = self.sync() {
-                    sync.received_block(source, block, false).await?;
+                    sync.received_block(source, block, false)?;
 
                     // Update the peer and possibly finish the sync process.
                     if self.peer_book.got_sync_block(source) {
@@ -257,12 +262,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::GetBlocks(hashes) => {
                 if let Some(ref sync) = self.sync() {
-                    sync.received_get_blocks(source, hashes).await?;
+                    sync.received_get_blocks(source, hashes)?;
                 }
             }
             Payload::GetMemoryPool => {
                 if let Some(ref sync) = self.sync() {
-                    sync.received_get_memory_pool(source).await?;
+                    sync.received_get_memory_pool(source);
                 }
             }
             Payload::MemoryPool(mempool) => {
@@ -272,7 +277,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             Payload::GetSync(getsync) => {
                 if let Some(ref sync) = self.sync() {
-                    sync.received_get_sync(source, getsync).await?;
+                    sync.received_get_sync(source, getsync)?;
                 }
             }
             Payload::Sync(sync) => {
@@ -281,12 +286,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         trace!("{} doesn't have sync blocks to share", source);
                     } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         trace!("Received {} sync block hashes from {}", sync.len(), source);
-                        sync_handler.received_sync(source, sync).await;
+                        sync_handler.received_sync(source, sync);
                     }
                 }
             }
             Payload::GetPeers => {
-                self.send_peers(source).await;
+                self.send_peers(source);
             }
             Payload::Peers(peers) => {
                 self.process_inbound_peers(peers);

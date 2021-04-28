@@ -35,7 +35,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
 
     for _ in 0..n {
         let environment = test_config(setup.clone());
-        let node = Node::new(environment).await.unwrap();
+        let node = Node::new(environment).unwrap();
 
         node.listen().await.unwrap();
         nodes.push(node);
@@ -49,7 +49,7 @@ async fn start_nodes(nodes: &[Node<LedgerStorage>]) {
         // Nodes are started with a slight delay to avoid having peering intervals in phase (this
         // is the hypothetical worst case scenario).
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        node.start_services().await;
+        node.start_services();
     }
 }
 
@@ -197,8 +197,8 @@ async fn binary_star_contact() {
     };
     let environment_a = test_config(bootnode_setup.clone());
     let environment_b = test_config(bootnode_setup.clone());
-    let bootnode_a = Node::new(environment_a).await.unwrap();
-    let bootnode_b = Node::new(environment_b).await.unwrap();
+    let bootnode_a = Node::new(environment_a).unwrap();
+    let bootnode_b = Node::new(environment_b).unwrap();
 
     bootnode_a.listen().await.unwrap();
     bootnode_b.listen().await.unwrap();

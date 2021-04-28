@@ -177,7 +177,7 @@ pub fn test_config(setup: TestSetup) -> Config {
 pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let config = test_config(setup.clone());
-    let mut node = Node::new(config).await.unwrap();
+    let mut node = Node::new(config).unwrap();
 
     if let Some(consensus_setup) = setup.consensus_setup {
         let consensus = test_consensus(consensus_setup, node.clone());
@@ -185,12 +185,11 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     }
 
     node.listen().await.unwrap();
-    node.start_services().await;
+    node.start_services();
 
     if is_miner {
-        let tokio_handle = setup.tokio_handle.unwrap();
         let miner_address = FIXTURE.test_accounts[0].address.clone();
-        MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
+        MinerInstance::new(miner_address, node.clone()).spawn();
     }
 
     node

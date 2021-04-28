@@ -39,7 +39,7 @@ use snarkvm_utilities::{to_bytes, ToBytes};
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
-use tokio::runtime::{Builder, Handle};
+use tokio::runtime::Builder;
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -80,7 +80,7 @@ fn print_welcome(config: &Config) {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()> {
+async fn start_server(config: Config) -> anyhow::Result<()> {
     initialize_logger(&config);
 
     print_welcome(&config);
@@ -104,7 +104,7 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config).await?;
+    let mut node = Node::new(node_config)?;
 
     let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 
@@ -188,14 +188,14 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
     }
 
     // Start the network services
-    node.start_services().await;
+    node.start_services();
 
     // Start the miner task if mining configuration is enabled.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
                 node.register_thread(handle);
             }
             Err(_) => info!(
@@ -219,9 +219,8 @@ fn main() -> Result<(), NodeError> {
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?;
-    let handle = runtime.handle().clone();
 
-    runtime.block_on(start_server(config, handle))?;
+    runtime.block_on(start_server(config))?;
 
     Ok(())
 }
