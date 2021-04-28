@@ -275,7 +275,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     if sync.is_empty() {
                         trace!("{} doesn't have sync blocks to share", source);
                     } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
-                        trace!("Received {} sync blocks from {}", sync.len(), source);
+                        trace!("Received {} sync block hashes from {}", sync.len(), source);
                         sync_handler.received_sync(source, sync).await;
                     }
                 }
