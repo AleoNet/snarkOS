@@ -390,16 +390,8 @@ impl PeerBook {
             pq.remaining_sync_blocks.fetch_sub(1, Ordering::SeqCst) == 1
         } else {
             warn!("Peer for got_sync_block purposes not found! (probably disconnected)");
-            true
-        }
-    }
-
-    /// Checks whether the current peer is involved in a block syncing process.
-    pub fn is_syncing_blocks(&self, addr: SocketAddr) -> bool {
-        if let Some(ref pq) = self.peer_quality(addr) {
-            pq.remaining_sync_blocks.load(Ordering::SeqCst) != 0
-        } else {
-            trace!("Peer for is_syncing_blocks purposes not found! (probably disconnected)");
+            // We might still be processing queued sync blocks; the sync expiry mechanism
+            // will handle going into the `Idle` state if the batch is incomplete.
             false
         }
     }

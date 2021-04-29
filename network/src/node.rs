@@ -195,11 +195,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             loop {
                 sleep(std::time::Duration::from_secs(5)).await;
 
-                // Make sure that the node doesn't remain in a sync state without peers.
-                if node_clone.state() == State::Syncing && node_clone.peer_book.number_of_connected_peers() == 0 {
-                    node_clone.set_state(State::Idle);
-                }
-
                 // Report node's current state.
                 trace!("Node state: {:?}", node_clone.state());
             }
