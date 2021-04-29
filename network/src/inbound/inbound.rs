@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender};
+use crate::{errors::NetworkError, message::*, Cache, ConnReader, ConnWriter, Node, Receiver, Sender};
 
 use std::{
     collections::HashMap,
@@ -229,7 +229,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
-    pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
+    pub async fn process_incoming_messages(
+        &self,
+        receiver: &mut Receiver,
+        cache: &mut Cache,
+    ) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         self.stats.queues.inbound.fetch_sub(1, Ordering::SeqCst);
@@ -240,6 +244,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         } else {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
+
+        // Check if the message hasn't already been processed recently if it's a `Block`.
+        if matches!(payload, Payload::Block(..)) && cache.contains(&payload) {
+            return Ok(());
+        }
 
         match payload {
             Payload::Transaction(transaction) => {
