@@ -276,6 +276,9 @@ struct NetworkMetrics {
     /// This is the value of the Fiedler eigenvalue, the second-smallest eigenvalue of the network's
     /// Laplacian matrix.
     algebraic_connectivity: f64,
+    /// The difference between the node with the largest connection count and the node with the
+    /// lowest.
+    degree_centrality_delta: u16,
     /// Node centrality measurements mapped to each node's address.
     ///
     /// Includes degree centrality, eigenvector centrality (the relative importance of a node in
@@ -304,6 +307,7 @@ impl NetworkMetrics {
         let laplacian_matrix = degree_matrix.clone().sub(adjacency_matrix.clone());
 
         let degree_centrality = degree_centrality(&index, degree_matrix.clone());
+        let degree_centrality_delta = degree_centrality_delta(&nodes);
         let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix.clone());
         let (algebraic_connectivity, fiedler_vector_indexed) = fiedler(&index, laplacian_matrix);
 
@@ -328,6 +332,7 @@ impl NetworkMetrics {
             connection_count,
             density,
             algebraic_connectivity,
+            degree_centrality_delta,
             centrality,
         }
     }
@@ -469,7 +474,7 @@ fn eigenvector_centrality(
         .collect()
 }
 
-/// Returns the fiedler values for each node in the network.
+/// Returns the Fiedler values for each node in the network.
 fn fiedler(index: &BTreeMap<SocketAddr, usize>, laplacian_matrix: DMatrix<f64>) -> (f64, BTreeMap<SocketAddr, f64>) {
     // Compute the eigenvectors and corresponding eigenvalues and sort in ascending order.
     let ascending = true;
