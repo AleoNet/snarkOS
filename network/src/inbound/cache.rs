@@ -14,11 +14,36 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod cache;
-pub use cache::*;
+use crate::Payload;
 
-pub mod connection_reader;
-pub use connection_reader::ConnReader;
+use circular_queue::CircularQueue;
+use fxhash::hash64;
 
-pub mod inbound;
-pub use inbound::*;
+pub struct Cache {
+    queue: CircularQueue<u64>,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self {
+            queue: CircularQueue::with_capacity(64),
+        }
+    }
+}
+
+impl Cache {
+    pub fn contains(&mut self, payload: &Payload) -> bool {
+        let hash = if let Payload::Block(bytes) = payload {
+            hash64(&bytes)
+        } else {
+            unreachable!("Only blocks are cached for now");
+        };
+
+        if self.queue.iter().any(|&e| e == hash) {
+            true
+        } else {
+            self.queue.push(hash);
+            false
+        }
+    }
+}

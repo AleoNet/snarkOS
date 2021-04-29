@@ -60,8 +60,14 @@ version = "0.14"
 version = "0.4"
 features = [ "serde" ]
 
+[dependencies.circular-queue]
+version = "0.2"
+
 [dependencies.derivative]
 version = "2"
+
+[dependencies.fxhash]
+version = "0.2"
 
 [dependencies.hex]
 version = "0.4.2"

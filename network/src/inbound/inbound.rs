@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
+use crate::{errors::NetworkError, message::*, Cache, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
@@ -224,7 +224,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
-    pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
+    pub async fn process_incoming_messages(
+        &self,
+        receiver: &mut Receiver,
+        cache: &mut Cache,
+    ) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         let source = if let Direction::Inbound(addr) = direction {
@@ -236,6 +240,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Update the peer's timestamp, unless it's a `SyncBlock` (as they come in batches).
         if !matches!(payload, Payload::SyncBlock(..)) {
             self.peer_book.update_last_seen(source);
+        }
+
+        // Check if the block hasn't already been processed recently.
+        if matches!(payload, Payload::Block(..)) && cache.contains(&payload) {
+            return Ok(());
         }
 
         match payload {
