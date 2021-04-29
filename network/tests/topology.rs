@@ -306,9 +306,9 @@ impl NetworkMetrics {
         let adjacency_matrix = adjacency_matrix(&index, &nodes);
         let laplacian_matrix = degree_matrix.clone().sub(adjacency_matrix.clone());
 
-        let degree_centrality = degree_centrality(&index, degree_matrix.clone());
+        let degree_centrality = degree_centrality(&index, degree_matrix);
         let degree_centrality_delta = degree_centrality_delta(&nodes);
-        let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix.clone());
+        let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix);
         let (algebraic_connectivity, fiedler_vector_indexed) = fiedler(&index, laplacian_matrix);
 
         // Create the `NodeCentrality` instances for each node.
