@@ -17,8 +17,5 @@
 pub mod cache;
 pub use cache::*;
 
-pub mod connection_reader;
-pub use connection_reader::ConnReader;
-
 pub mod inbound;
 pub use inbound::*;

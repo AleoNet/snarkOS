@@ -39,7 +39,6 @@ use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
-use parking_lot::Mutex;
 use tokio::runtime;
 use tracing_subscriber::EnvFilter;
 
@@ -114,12 +113,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             None::<std::path::PathBuf>,
         )?)
     } else {
+        info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
         Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
     };
+    info!("Storage finished loading");
 
     // Enable the sync layer.
     {
-        let memory_pool = Mutex::new(MemoryPool::from_storage(&storage)?);
+        let memory_pool = MemoryPool::from_storage(&storage).await?;
 
         debug!("Loading Aleo parameters...");
         let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
@@ -203,7 +204,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
                 let handle = MinerInstance::new(miner_address, node.clone()).spawn();
-                node.register_thread(handle);
+                node.register_task(handle);
             }
             Err(_) => info!(
                 "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."

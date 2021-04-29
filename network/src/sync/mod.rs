@@ -26,3 +26,5 @@ pub use miner::*;
 
 pub mod sync;
 pub use sync::*;
+
+pub mod master;

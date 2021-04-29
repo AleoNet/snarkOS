@@ -105,7 +105,11 @@ async fn block_responder_side() {
 
     // insert block into node
     let block_struct_1 = snarkvm_dpc::Block::deserialize(&BLOCK_1).unwrap();
-    node.expect_sync().consensus.receive_block(&block_struct_1).unwrap();
+    node.expect_sync()
+        .consensus
+        .receive_block(&block_struct_1)
+        .await
+        .unwrap();
 
     // send a GetSync with an empty vec as only the genesis block is in the ledger
     let get_sync = Payload::GetSync(vec![]);
@@ -184,7 +188,7 @@ async fn block_two_node() {
     assert_eq!(blocks.len(), NUM_BLOCKS);
 
     for block in blocks {
-        node_alice.expect_sync().consensus.receive_block(&block).unwrap();
+        node_alice.expect_sync().consensus.receive_block(&block).await.unwrap();
     }
 
     let setup = TestSetup {
@@ -238,8 +242,8 @@ async fn transaction_initiator_side() {
     };
 
     // Verify the transactions have been stored in the node's memory pool
-    wait_until!(1, node.expect_sync().memory_pool().lock().contains(&entry_1));
-    wait_until!(1, node.expect_sync().memory_pool().lock().contains(&entry_2));
+    wait_until!(1, node.expect_sync().memory_pool().contains(&entry_1));
+    wait_until!(1, node.expect_sync().memory_pool().contains(&entry_2));
 }
 
 #[tokio::test]
@@ -252,7 +256,7 @@ async fn transaction_responder_side() {
     assert!(matches!(payload, Payload::Ping(..)));
 
     // insert transaction into node
-    let mut memory_pool = node.expect_sync().memory_pool().lock();
+    let memory_pool = node.expect_sync().memory_pool();
     let storage = node.expect_sync().storage();
 
     let entry_1 = Entry {
@@ -265,11 +269,8 @@ async fn transaction_responder_side() {
         transaction: Tx::read(&TRANSACTION_2[..]).unwrap(),
     };
 
-    memory_pool.insert(&storage, entry_1).unwrap().unwrap();
-    memory_pool.insert(&storage, entry_2).unwrap().unwrap();
-
-    // drop the locks to avoid deadlocks
-    drop(memory_pool);
+    memory_pool.insert(&storage, entry_1).await.unwrap().unwrap();
+    memory_pool.insert(&storage, entry_2).await.unwrap().unwrap();
 
     // send a GetMemoryPool message
     let get_memory_pool = Payload::GetMemoryPool;
@@ -298,7 +299,7 @@ async fn transaction_two_node() {
     let alice_address = node_alice.local_address().unwrap();
 
     // insert transaction into node_alice
-    let mut memory_pool = node_alice.expect_sync().memory_pool().lock();
+    let memory_pool = node_alice.expect_sync().memory_pool();
     let storage = node_alice.expect_sync().storage();
 
     let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -308,10 +309,7 @@ async fn transaction_two_node() {
         transaction: transaction.clone(),
     };
 
-    memory_pool.insert(&storage, entry.clone()).unwrap().unwrap();
-
-    // drop the locks to avoid deadlocks
-    drop(memory_pool);
+    memory_pool.insert(&storage, entry.clone()).await.unwrap().unwrap();
 
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
@@ -325,5 +323,5 @@ async fn transaction_two_node() {
     let node_bob = test_node(setup).await;
 
     // check transaction is present in bob's memory pool
-    wait_until!(5, node_bob.expect_sync().memory_pool().lock().contains(&entry));
+    wait_until!(5, node_bob.expect_sync().memory_pool().contains(&entry));
 }

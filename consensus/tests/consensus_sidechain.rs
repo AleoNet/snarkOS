@@ -25,8 +25,8 @@ mod consensus_sidechain {
     // Like the test above, except block 2 is received first as an orphan with no parent.
     // The sync mechanism should push the orphan into storage until block 1 is received.
     // After block 1 is received, block 2 should be fetched from storage and added to the chain.
-    #[test]
-    fn new_out_of_order() {
+    #[tokio::test]
+    async fn new_out_of_order() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let old_block_height = consensus.ledger.get_current_block_height();
@@ -34,12 +34,12 @@ mod consensus_sidechain {
         // Find second block
 
         let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
-        consensus.receive_block(&block_2).unwrap();
+        consensus.receive_block(&block_2).await.unwrap();
 
         // Find first block
 
         let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        consensus.receive_block(&block_1).unwrap();
+        consensus.receive_block(&block_1).await.unwrap();
 
         // Check balances after both blocks
 
@@ -49,8 +49,8 @@ mod consensus_sidechain {
 
     // Receive two blocks that reference the same parent.
     // Treat the first block received as the canonical chain but store and keep the rejected sidechain block in storage.
-    #[test]
-    fn reject() {
+    #[tokio::test]
+    async fn reject() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
@@ -60,11 +60,11 @@ mod consensus_sidechain {
 
         // 1. Receive canonchain block 1.
 
-        consensus.receive_block(&block_1_canon).unwrap();
+        consensus.receive_block(&block_1_canon).await.unwrap();
 
         // 2. Receive sidechain block 1.
 
-        consensus.receive_block(&block_1_side).unwrap();
+        consensus.receive_block(&block_1_side).await.unwrap();
 
         let new_block_height = consensus.ledger.get_current_block_height();
 
@@ -78,8 +78,8 @@ mod consensus_sidechain {
     }
 
     // Receive blocks from a sidechain that overtakes our current canonical chain.
-    #[test]
-    fn accept() {
+    #[tokio::test]
+    async fn accept() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
@@ -90,7 +90,7 @@ mod consensus_sidechain {
 
         let mut old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_canon).unwrap();
+        consensus.receive_block(&block_1_canon).await.unwrap();
 
         let mut new_block_height = consensus.ledger.get_current_block_height();
 
@@ -100,8 +100,8 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_side).unwrap();
-        consensus.receive_block(&block_2_side).unwrap();
+        consensus.receive_block(&block_1_side).await.unwrap();
+        consensus.receive_block(&block_2_side).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -109,8 +109,8 @@ mod consensus_sidechain {
     }
 
     // Receive blocks from a sidechain (out of order) that overtakes our current canonical chain.
-    #[test]
-    fn fork_out_of_order() {
+    #[tokio::test]
+    async fn fork_out_of_order() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
@@ -122,7 +122,7 @@ mod consensus_sidechain {
 
         let mut old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_2_canon).unwrap();
+        consensus.receive_block(&block_2_canon).await.unwrap();
 
         let mut new_block_height = consensus.ledger.get_current_block_height();
 
@@ -132,7 +132,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_side).unwrap();
+        consensus.receive_block(&block_1_side).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -142,7 +142,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_canon).unwrap();
+        consensus.receive_block(&block_1_canon).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -152,7 +152,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_2_side).unwrap();
+        consensus.receive_block(&block_2_side).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 

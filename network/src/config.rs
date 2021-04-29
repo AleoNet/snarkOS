@@ -16,9 +16,10 @@
 
 use crate::NetworkError;
 
-use parking_lot::RwLock;
+use arc_swap::ArcSwap;
 use std::{
     net::SocketAddr,
+    sync::Arc,
     time::Duration,
     {self},
 };
@@ -32,7 +33,7 @@ pub struct Config {
     /// The maximum number of peers permitted to maintain connections with.
     maximum_number_of_connected_peers: u16,
     /// The default bootnodes of the network.
-    pub bootnodes: RwLock<Vec<SocketAddr>>,
+    pub bootnodes: ArcSwap<Vec<SocketAddr>>,
     /// If `true`, initializes this node as a bootnode and forgoes connecting
     /// to the default bootnodes or saved peers in the peer book.
     is_bootnode: bool,
@@ -63,7 +64,7 @@ impl Config {
             desired_address,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
-            bootnodes: RwLock::new(bootnodes),
+            bootnodes: ArcSwap::new(Arc::new(bootnodes)),
             is_bootnode,
             peer_sync_interval,
         })
@@ -71,8 +72,8 @@ impl Config {
 
     /// Returns the default bootnodes of the network.
     #[inline]
-    pub fn bootnodes(&self) -> Vec<SocketAddr> {
-        self.bootnodes.read().clone()
+    pub fn bootnodes(&self) -> Arc<Vec<SocketAddr>> {
+        self.bootnodes.load_full()
     }
 
     /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.

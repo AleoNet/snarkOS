@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use arc_swap::ArcSwap;
 use snarkos_consensus::{Consensus, ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters, MerkleParameters, CRH};
@@ -37,7 +38,6 @@ use snarkvm_utilities::{
     to_bytes,
 };
 
-use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use std::{
     fs::{self, File},
@@ -64,7 +64,7 @@ fn empty_ledger<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage>(
     Ok(Ledger {
         current_block_height: Default::default(),
         storage,
-        cm_merkle_tree: RwLock::new(cm_merkle_tree),
+        cm_merkle_tree: ArcSwap::new(Arc::new(cm_merkle_tree)),
         ledger_parameters: parameters,
         _transaction: PhantomData,
     })
