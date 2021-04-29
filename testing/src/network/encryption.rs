@@ -22,7 +22,7 @@ use rand::{distributions::Standard, thread_rng, Rng};
 
 #[tokio::test]
 async fn encrypt_and_decrypt_a_big_payload() {
-    let (node0, mut node1) = spawn_2_fake_nodes().await;
+    let (mut node0, mut node1) = spawn_2_fake_nodes().await;
 
     // account for the overhead of serialization and noise tags
     let block_size = snarkos_network::MAX_MESSAGE_SIZE / 2;
@@ -47,7 +47,7 @@ async fn encrypt_and_decrypt_a_big_payload() {
 
 #[tokio::test]
 async fn encrypt_and_decrypt_small_payloads() {
-    let (node0, mut node1) = spawn_2_fake_nodes().await;
+    let (mut node0, mut node1) = spawn_2_fake_nodes().await;
 
     let mut rng = thread_rng();
 

@@ -29,6 +29,7 @@ use rand::seq::IteratorRandom;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    sync::mpsc::channel,
     task,
 };
 
@@ -71,7 +72,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .filter(|(addr, _)| !bootnodes.contains(addr)) // Skip this check if the peer is a bootnode.
             .map(|(addr, info)| (*addr, &info.quality))
         {
-            if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1000 || peer_quality.failures.load(Ordering::Relaxed) > 10
+            if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1500 || peer_quality.failures.load(Ordering::Relaxed) > 10
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
                 let _ = self.disconnect_from_peer(addr);
@@ -92,10 +93,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Attempt to connect to the default bootnodes of the network.
-        self.connect_to_bootnodes().await;
+        self.connect_to_bootnodes();
 
         // Attempt to connect to each disconnected peer saved in the peer book.
-        self.connect_to_disconnected_peers().await;
+        self.connect_to_disconnected_peers();
 
         // Broadcast a `GetPeers` message to request for more peers.
         self.broadcast_getpeers_requests().await;
@@ -160,6 +161,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.peer_book.set_connecting(remote_address)?;
 
+        debug!("Connecting to {}...", remote_address);
+
         // Fetch the bootnodes and determine if address is a bootnode.
         let bootnodes = self.config.bootnodes();
         let is_connecting_peer_bootnode = bootnodes.contains(&remote_address);
@@ -208,25 +211,36 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
             let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
-            let writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
+            let mut writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
-            // save the outbound channel
-            node.outbound.channels.write().insert(remote_address, Arc::new(writer));
-
-            node.peer_book.set_connected(remote_address, None)?;
+            // Create a channel dedicated to sending messages to the connection.
+            let (sender, receiver) = channel(1024);
 
             // spawn the inbound loop
             let node_clone = node.clone();
-            let conn_listening_task = tokio::spawn(async move {
-                node_clone.listen_for_messages(&mut reader).await;
+            let conn_reading_task = tokio::spawn(async move {
+                node_clone.listen_for_inbound_messages(&mut reader).await;
             });
 
+            // Listen for outbound messages.
+            let node_clone = node.clone();
+            let conn_writing_task = tokio::spawn(async move {
+                node_clone.listen_for_outbound_messages(receiver, &mut writer).await;
+            });
+
+            // Save the channel under the provided remote address.
+            node.outbound.channels.write().insert(remote_address, sender);
+
+            node.peer_book.set_connected(remote_address, None);
+
             if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
-                peer.register_task(conn_listening_task);
+                peer.register_task(conn_reading_task);
+                peer.register_task(conn_writing_task);
             } else {
                 // if the related peer is not found, it means it's already been dropped
-                conn_listening_task.abort();
+                conn_reading_task.abort();
+                conn_writing_task.abort();
             }
 
             Ok(())
@@ -269,7 +283,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// This function filters out any bootnode peers the node server is
     /// either connnecting to or already connected to.
     ///
-    async fn connect_to_bootnodes(&self) {
+    fn connect_to_bootnodes(&self) {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
@@ -283,11 +297,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         {
             let node = self.clone();
             task::spawn(async move {
-                debug!("Connecting to bootnode {}...", bootnode_address);
-
-                if let Err(e) = node.initiate_connection(bootnode_address).await {
-                    warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                    let _ = node.disconnect_from_peer(bootnode_address);
+                match node.initiate_connection(bootnode_address).await {
+                    Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
+                        // no issue here, already connecting
+                    }
+                    Err(e @ NetworkError::TooManyConnections) | Err(e @ NetworkError::SelfConnectAttempt) => {
+                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                        // the connection hasn't been established, no need to disconnect
+                    }
+                    Err(e) => {
+                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                        let _ = node.disconnect_from_peer(bootnode_address);
+                    }
+                    Ok(_) => {}
                 }
             });
         }
@@ -296,7 +318,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     /// Broadcasts a connection request to all disconnected peers.
     ///
-    async fn connect_to_disconnected_peers(&self) {
+    fn connect_to_disconnected_peers(&self) {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
@@ -317,6 +339,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // Set the number of peers to attempt a connection to.
             let count = min_peers - number_of_peers;
 
+            if count == 0 {
+                return;
+            }
+
             trace!(
                 "Connecting to {} disconnected peers",
                 cmp::min(count, self.peer_book.disconnected_peers().len())
@@ -333,16 +359,18 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 .copied()
                 .choose_multiple(&mut rand::thread_rng(), count)
         } else {
-            trace!(
-                "Connecting to {} disconnected peers",
-                self.peer_book.disconnected_peers().len()
-            );
+            let disconnected_peers = self.peer_book.disconnected_peers();
+
+            if disconnected_peers.is_empty() {
+                return;
+            }
+
+            trace!("Connecting to {} disconnected peers", disconnected_peers.len());
 
             let bootnodes = self.config.bootnodes();
 
             // Iterate through a selection of random peers and attempt to connect.
-            self.peer_book
-                .disconnected_peers()
+            disconnected_peers
                 .iter()
                 .map(|(k, _)| k)
                 .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
@@ -353,11 +381,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for remote_address in random_peers {
             let node = self.clone();
             task::spawn(async move {
-                debug!("Connecting to peer {}...", remote_address);
-
-                if let Err(e) = node.initiate_connection(remote_address).await {
-                    trace!("Couldn't connect to the disconnected peer {}: {}", remote_address, e);
-                    let _ = node.disconnect_from_peer(remote_address);
+                match node.initiate_connection(remote_address).await {
+                    Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
+                        // no issue here, already connecting
+                    }
+                    Err(e @ NetworkError::TooManyConnections) | Err(e @ NetworkError::SelfConnectAttempt) => {
+                        warn!("Couldn't connect to peer {}: {}", remote_address, e);
+                        // the connection hasn't been established, no need to disconnect
+                    }
+                    Err(e) => {
+                        warn!("Couldn't connect to peer {}: {}", remote_address, e);
+                        let _ = node.disconnect_from_peer(remote_address);
+                    }
+                    Ok(_) => {}
                 }
             });
         }
@@ -448,7 +484,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) async fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         if let Some(ref sync) = self.sync() {
             if self.peer_book.is_syncing_blocks(remote_address) {
                 sync.finished_syncing_blocks();

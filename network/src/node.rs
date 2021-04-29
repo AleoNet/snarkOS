@@ -18,10 +18,9 @@ use crate::*;
 use snarkvm_objects::Storage;
 
 use once_cell::sync::OnceCell;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::{
-    collections::HashMap,
     net::SocketAddr,
     ops::Deref,
     sync::{
@@ -129,19 +128,13 @@ impl<S: Storage> Node<S> {
 impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
-        // Create the inbound and outbound handlers.
-        let (inbound, outbound) = {
-            let channels: Arc<RwLock<HashMap<SocketAddr, Arc<ConnWriter>>>> = Default::default();
-            (Inbound::new(channels.clone()), Outbound::new(channels))
-        };
-
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
             state: Default::default(),
             local_address: Default::default(),
             config,
-            inbound,
-            outbound,
+            inbound: Default::default(),
+            outbound: Default::default(),
             peer_book: Default::default(),
             sync: Default::default(),
             tasks: Default::default(),

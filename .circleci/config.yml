@@ -53,7 +53,7 @@ jobs:
           name: Build and run tests
           no_output_timeout: 60m
           command: >
-            RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction --skip fuzzing_zeroes_pre_handshake --skip fuzzing_zeroes_post_handshake --skip reject_non_version_messages_before_handshake --skip handshake_timeout_responder_side --skip handshake_timeout_initiator_side
+            RUST_MIN_STACK=8388608 cargo test --all -- --skip test_rpc_create_raw_transaction
       - persist_to_workspace:
           root: ~/
           paths: project/
@@ -85,7 +85,7 @@ jobs:
       - run:
           name: Build and test
           no_output_timeout: 60m
-          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip startup_handshake_stored_peers --skip test_rpc_create_raw_transaction --skip fuzzing_zeroes_pre_handshake --skip fuzzing_zeroes_post_handshake --skip reject_non_version_messages_before_handshake --skip handshake_timeout_responder_side --skip handshake_timeout_initiator_side
+          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip test_rpc_create_raw_transaction
       - clear_environment:
           cache_key: snarkos-nightly-cache
 workflows:

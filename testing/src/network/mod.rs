@@ -229,13 +229,13 @@ impl FakeNode {
         Ok(message.payload)
     }
 
-    pub async fn write_message(&self, payload: &Payload) {
+    pub async fn write_message(&mut self, payload: &Payload) {
         self.writer.write_message(payload).await.unwrap();
         debug!("wrote a message containing a {} to the stream", payload);
     }
 
-    pub async fn write_bytes(&self, bytes: &[u8]) {
-        self.writer.writer.lock().await.write_all(bytes).await.unwrap();
+    pub async fn write_bytes(&mut self, bytes: &[u8]) {
+        self.writer.writer.write_all(bytes).await.unwrap();
         debug!("wrote {}B to the stream", bytes.len());
     }
 }
