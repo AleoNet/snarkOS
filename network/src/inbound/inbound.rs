@@ -228,11 +228,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         let source = if let Direction::Inbound(addr) = direction {
-            self.peer_book.update_last_seen(addr);
             addr
         } else {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
+
+        // Update the peer's timestamp, unless it's a `SyncBlock` (as they come in batches).
+        if !matches!(payload, Payload::SyncBlock(..)) {
+            self.peer_book.update_last_seen(source);
+        }
 
         match payload {
             Payload::Transaction(transaction) => {
