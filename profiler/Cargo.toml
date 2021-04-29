@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-profiler"
-version = "1.3.2"
+version = "1.3.3"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Profiler for a decentralized operating system"
 homepage = "https://aleo.org"
