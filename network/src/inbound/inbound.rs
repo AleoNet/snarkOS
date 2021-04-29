@@ -42,7 +42,7 @@ pub struct Inbound {
 impl Default for Inbound {
     fn default() -> Self {
         // Initialize the sender and receiver.
-        let (sender, receiver) = tokio::sync::mpsc::channel(64 * 1024);
+        let (sender, receiver) = tokio::sync::mpsc::channel(crate::INBOUND_CHANNEL_DEPTH);
 
         Self {
             sender,
@@ -116,7 +116,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 let remote_address = writer.addr;
 
                                 // Create a channel dedicated to sending messages to the connection.
-                                let (sender, receiver) = channel(1024);
+                                let (sender, receiver) = channel(crate::OUTBOUND_CHANNEL_DEPTH);
 
                                 // Listen for inbound messages.
                                 let node_clone = node.clone();

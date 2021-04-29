@@ -80,6 +80,11 @@ pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 /// The maximum number of peers shared at once in response to a `GetPeers` message.
 pub const SHARED_PEER_COUNT: usize = 25;
 
+/// The depth of the common inbound channel.
+pub const INBOUND_CHANNEL_DEPTH: usize = 64 * 1024;
+/// The depth of the per-connection outbound channels.
+pub const OUTBOUND_CHANNEL_DEPTH: usize = 4096;
+
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
 pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
