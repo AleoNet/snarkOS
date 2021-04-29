@@ -35,7 +35,7 @@ use std::sync::Arc;
 pub struct Miner<S: Storage> {
     /// The coinbase address that mining rewards are assigned to.
     address: AccountAddress<Components>,
-    /// The consensus parameters for the network of this miner.
+    /// The sync parameters for the network of this miner.
     pub consensus: Arc<Consensus<S>>,
     /// The mining instance that is initialized with a proving key.
     miner: PoswMarlin,

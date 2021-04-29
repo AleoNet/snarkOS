@@ -21,8 +21,8 @@ mod rpc_tests {
     use snarkos_rpc::*;
     use snarkos_storage::LedgerStorage;
     use snarkos_testing::{
-        consensus::*,
         network::{test_config, ConsensusSetup, TestSetup},
+        sync::*,
     };
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::Transaction;
@@ -40,18 +40,16 @@ mod rpc_tests {
         let environment = test_config(TestSetup::default());
         let mut node = Node::new(environment).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
-        let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus_from_ledger(
-            ledger.clone(),
-        ));
+        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus_from_ledger(ledger.clone()));
 
-        let node_consensus = snarkos_network::Consensus::new(
+        let node_consensus = snarkos_network::Sync::new(
             node.clone(),
             consensus.clone(),
             consensus_setup.is_miner,
             Duration::from_secs(consensus_setup.block_sync_interval),
             Duration::from_secs(consensus_setup.tx_sync_interval),
         );
-        node.set_consensus(node_consensus);
+        node.set_sync(node_consensus);
 
         Rpc::new(RpcImpl::new(ledger, None, node).to_delegate())
     }

@@ -16,7 +16,7 @@
 
 mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, Miner};
-    use snarkos_testing::consensus::*;
+    use snarkos_testing::sync::*;
     use snarkvm_dpc::{
         base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
         DPCScheme,
@@ -34,7 +34,7 @@ mod consensus_dpc {
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
         let mut rng = FIXTURE.rng.clone();
 
-        let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus());
+        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
         let miner = Miner::new(miner_acc.address, consensus.clone());
 
         println!("Creating block with coinbase transaction");

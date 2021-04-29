@@ -29,9 +29,6 @@ extern crate tracing;
 #[macro_use]
 extern crate snarkos_metrics;
 
-pub mod consensus;
-pub use consensus::*;
-
 pub mod config;
 pub use config::*;
 
@@ -53,13 +50,33 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
-pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
-pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
-pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
-pub const NOISE_BUF_LEN: usize = 65535;
-pub const NOISE_TAG_LEN: usize = 16;
+pub mod sync;
+pub use sync::*;
+
 /// The maximum number of block hashes that can be requested or provided in a single batch.
-pub const MAX_BLOCK_SYNC_COUNT: u32 = 250;
+pub const MAX_BLOCK_SYNC_COUNT: u32 = 64;
+/// The maximum amount of time allowed to process a single batch of sync blocks. It should be aligned
+/// with `MAX_BLOCK_SYNC_COUNT`.
+pub const BLOCK_SYNC_EXPIRATION_SECS: u8 = 30;
+
+/// The noise handshake pattern.
+pub const HANDSHAKE_PATTERN: &str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
+/// The pre-shared key for the noise handshake.
+pub const HANDSHAKE_PSK: &[u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
+/// The spec-compliant size of the noise buffer.
+pub const NOISE_BUF_LEN: usize = 65535;
+/// The spec-compliant size of the noise tag field.
+pub const NOISE_TAG_LEN: usize = 16;
+
+/// The maximum amount of time in which a handshake with a bootnode can conclude before dropping the
+/// connection; it should be no greater than the `peer_sync_interval`.
+pub const HANDSHAKE_BOOTNODE_TIMEOUT_SECS: u8 = 10;
+/// The maximum amount of time in which a handshake with a regular node can conclude before dropping the
+/// connection; it should be no greater than the `peer_sync_interval`.
+pub const HANDSHAKE_PEER_TIMEOUT_SECS: u8 = 5;
+
+/// The maximum size of a message that can be transmitted in the network.
+pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 /// The maximum number of peers shared at once in response to a `GetPeers` message.
 pub const SHARED_PEER_COUNT: usize = 25;
 

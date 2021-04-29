@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
-use snarkos_testing::consensus::*;
+use snarkos_testing::sync::*;
 use snarkvm_dpc::{
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
     Account,
@@ -32,7 +32,7 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 fn setup_test_data() -> Result<TestData, ConsensusError> {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
-    let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus());
+    let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
 
     // setup the miner
     let miner = Miner::new(miner_acc.address.clone(), consensus.clone());

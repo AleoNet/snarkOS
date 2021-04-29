@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, Consensus, NetworkError};
+use crate::{message::*, NetworkError, Sync};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_objects::Storage;
@@ -25,32 +25,36 @@ use snarkvm_utilities::{
 
 use std::net::SocketAddr;
 
-impl<S: Storage + Send + Sync + 'static> Consensus<S> {
+impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     ///
-    /// Triggers the transaction sync with a selected peer.
+    /// Triggers the memory pool sync with a selected peer.
     ///
-    pub async fn update_transactions(&self, sync_node: Option<SocketAddr>) {
+    pub async fn update_memory_pool(&self, sync_node: Option<SocketAddr>) {
         if let Some(sync_node) = sync_node {
+            info!("Updating memory pool from {}", sync_node);
+
             self.node()
                 .outbound
                 .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool))
                 .await;
         } else {
-            debug!("No sync node is registered, transactions could not be synced");
+            debug!("No sync node is registered, memory pool could not be synced");
         }
     }
 
-    /// Broadcast transaction to connected peers
-    pub(crate) async fn propagate_transaction(
+    ///
+    /// Broadcast memory pool transaction to connected peers.
+    ///
+    pub(crate) async fn propagate_memory_pool_transaction(
         &self,
         transaction_bytes: Vec<u8>,
         transaction_sender: SocketAddr,
     ) -> Result<(), NetworkError> {
-        debug!("Propagating a transaction to peers");
+        debug!("Propagating a memory pool transaction to connected peers");
 
         let local_address = self.node().local_address().unwrap();
 
-        for remote_address in self.node().connected_addrs() {
+        for remote_address in self.node().connected_peers() {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
                 self.node()
@@ -66,8 +70,11 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
         Ok(())
     }
 
-    /// Verify a transaction, add it to the memory pool, propagate it to peers.
-    pub(crate) async fn received_transaction(
+    ///
+    /// Verifies a received memory pool transaction, adds it to the memory pool,
+    /// and propagates it to peers.
+    ///
+    pub(crate) async fn received_memory_pool_transaction(
         &self,
         source: SocketAddr,
         transaction: Vec<u8>,
@@ -97,7 +104,7 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
             if let Ok(inserted) = insertion {
                 if inserted.is_some() {
                     info!("Transaction added to memory pool.");
-                    self.propagate_transaction(transaction, source).await?;
+                    self.propagate_memory_pool_transaction(transaction, source).await?;
                 }
             }
         }
@@ -111,8 +118,8 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
         let transactions = {
             let mut txs = vec![];
 
-            let memory_pool = self.memory_pool().lock();
-            for entry in memory_pool.transactions.values() {
+            let mempool = self.memory_pool().lock().transactions.clone();
+            for entry in mempool.values() {
                 if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                     txs.push(transaction_bytes);
                 }
@@ -155,7 +162,7 @@ impl<S: Storage + Send + Sync + 'static> Consensus<S> {
             }
         }
 
-        //  Cleanse and store transactions once batch has been received.
+        // Cleanse and store transactions once batch has been received.
         debug!("Cleansing memory pool transactions in database");
         memory_pool
             .cleanse(&storage)

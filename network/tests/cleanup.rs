@@ -27,7 +27,7 @@ async fn check_node_cleanup() {
     #[global_allocator]
     static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
-    // Start a node without consensus.
+    // Start a node without sync.
     let setup = TestSetup {
         consensus_setup: None,
         ..Default::default()
@@ -42,11 +42,11 @@ async fn check_node_cleanup() {
     for i in 0u16..4096 {
         // Connect a peer.
         let peer = handshaken_peer(node.local_address().unwrap()).await;
-        wait_until!(5, node.peer_book.read().number_of_connected_peers() == 1);
+        wait_until!(5, node.peer_book.number_of_connected_peers() == 1);
 
         // Drop the peer stream.
         drop(peer);
-        wait_until!(5, node.peer_book.read().number_of_connected_peers() == 0);
+        wait_until!(5, node.peer_book.number_of_connected_peers() == 0);
 
         // Register heap bump after the connection was dropped.
         let curr_peak = PEAK_ALLOC.peak_usage();

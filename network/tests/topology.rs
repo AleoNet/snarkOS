@@ -26,9 +26,9 @@ use snarkos_testing::{
     wait_until,
 };
 
-const N: usize = 50;
+const N: usize = 25;
 const MIN_PEERS: u16 = 5;
-const MAX_PEERS: u16 = 10;
+const MAX_PEERS: u16 = 30;
 
 async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
     let mut nodes = Vec::with_capacity(n);
@@ -65,18 +65,12 @@ async fn spawn_nodes_in_a_line() {
     start_nodes(&nodes).await;
 
     // First and Last nodes should have 1 connected peer.
-    wait_until!(
-        5,
-        nodes.first().unwrap().peer_book.read().number_of_connected_peers() == 1
-    );
-    wait_until!(
-        5,
-        nodes.last().unwrap().peer_book.read().number_of_connected_peers() == 1
-    );
+    wait_until!(5, nodes.first().unwrap().peer_book.number_of_connected_peers() == 1);
+    wait_until!(5, nodes.last().unwrap().peer_book.number_of_connected_peers() == 1);
 
     // All other nodes should have two.
     for node in nodes.iter().take(nodes.len() - 1).skip(1) {
-        wait_until!(5, node.peer_book.read().number_of_connected_peers() == 2);
+        wait_until!(5, node.peer_book.number_of_connected_peers() == 2);
     }
 }
 
@@ -92,7 +86,7 @@ async fn spawn_nodes_in_a_ring() {
     start_nodes(&nodes).await;
 
     for node in &nodes {
-        wait_until!(5, node.peer_book.read().number_of_connected_peers() == 2);
+        wait_until!(5, node.peer_book.number_of_connected_peers() == 2);
     }
 }
 
@@ -108,7 +102,7 @@ async fn spawn_nodes_in_a_star() {
     start_nodes(&nodes).await;
 
     let hub = nodes.first().unwrap();
-    wait_until!(10, hub.peer_book.read().number_of_connected_peers() as usize == N - 1);
+    wait_until!(10, hub.peer_book.number_of_connected_peers() as usize == N - 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -261,7 +255,7 @@ fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
     let mut count = 0;
 
     for node in nodes {
-        count += node.peer_book.read().number_of_connected_peers()
+        count += node.peer_book.number_of_connected_peers()
     }
 
     (count / 2).into()
@@ -292,9 +286,7 @@ fn calculate_density(n: f64, ac: f64) -> f64 {
 }
 
 fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
-    let dc = nodes
-        .iter()
-        .map(|node| node.peer_book.read().number_of_connected_peers());
+    let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
     let min = dc.clone().min().unwrap();
     let max = dc.max().unwrap();
 

@@ -5,7 +5,7 @@
 <p align="center">
     <a href="https://circleci.com/gh/AleoHQ/snarkOS"><img src="https://circleci.com/gh/AleoHQ/snarkOS.svg?style=svg&circle-token=6e9ad6d39d95350544f352d34e0e5c62ef54db26"></a>
     <a href="https://codecov.io/gh/AleoHQ/snarkOS"><img src="https://codecov.io/gh/AleoHQ/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
-    <a href="https://discord.gg/6WG7Bck"><img src="https://img.shields.io/discord/700454073459015690?logo=discord"/></a>
+    <a href="https://discord.gg/5v2ynrw2ds"><img src="https://img.shields.io/discord/700454073459015690?logo=discord"/></a>
 </p>
 
 ## <a name='TableofContents'></a>Table of Contents
@@ -206,7 +206,7 @@ OPTIONS:
         --rpc-password <rpc-password>            Specify a password for rpc authentication
         --rpc-port <rpc-port>                    Specify the port the json rpc server is run on
         --rpc-username <rpc-username>            Specify a username for rpc authentication
-        --verbose <verbose>                      Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2]
+        --verbose <verbose>                      Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2, 3]
 ```
 
 #### Examples

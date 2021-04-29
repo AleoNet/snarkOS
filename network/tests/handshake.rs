@@ -59,7 +59,7 @@ async fn handshake_responder_side() {
     let mut buffer: Box<[u8]> = vec![0u8; snarkos_network::NOISE_BUF_LEN].into();
     let mut buf = [0u8; snarkos_network::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
 
-    wait_until!(1, node.peer_book.read().is_connecting(peer_address));
+    wait_until!(1, node.peer_book.is_connecting(peer_address));
 
     // -> e
     let len = noise.write_message(&[], &mut buffer).unwrap();
@@ -81,10 +81,9 @@ async fn handshake_responder_side() {
 
     // the node should now have register the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
-    let peer_book = node.peer_book.read();
-    assert!(peer_book.is_connected(peer_address));
-    assert_eq!(peer_book.number_of_connecting_peers(), 0);
-    assert_eq!(peer_book.number_of_connected_peers(), 1);
+    assert!(node.peer_book.is_connected(peer_address));
+    assert_eq!(node.peer_book.number_of_connecting_peers(), 0);
+    assert_eq!(node.peer_book.number_of_connected_peers(), 1);
 }
 
 #[tokio::test]
@@ -106,7 +105,7 @@ async fn handshake_initiator_side() {
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
 
-    wait_until!(1, node.peer_book.read().is_connecting(peer_address));
+    wait_until!(1, node.peer_book.is_connecting(peer_address));
 
     let builder = snow::Builder::with_resolver(
         snarkos_network::HANDSHAKE_PATTERN.parse().unwrap(),
@@ -141,10 +140,9 @@ async fn handshake_initiator_side() {
 
     // the node should now have registered the peer as 'connected'
     sleep(Duration::from_millis(200)).await;
-    let peer_book = node.peer_book.read();
-    assert!(peer_book.is_connected(peer_address));
-    assert_eq!(peer_book.number_of_connecting_peers(), 0);
-    assert_eq!(peer_book.number_of_connected_peers(), 1);
+    assert!(node.peer_book.is_connected(peer_address));
+    assert_eq!(node.peer_book.number_of_connecting_peers(), 0);
+    assert_eq!(node.peer_book.number_of_connected_peers(), 1);
 }
 
 async fn assert_node_rejected_message(node: &Node<LedgerStorage>, peer_stream: &mut TcpStream) {
@@ -157,9 +155,8 @@ async fn assert_node_rejected_message(node: &Node<LedgerStorage>, peer_stream: &
     assert!(buffer.is_empty());
 
     // check the node's state hasn't been altered by the message
-    let peer_book = node.peer_book.read();
-    wait_until!(1, !peer_book.is_connecting(peer_stream.local_addr().unwrap()));
-    assert_eq!(peer_book.number_of_connected_peers(), 0);
+    wait_until!(1, !node.peer_book.is_connecting(peer_stream.local_addr().unwrap()));
+    assert_eq!(node.peer_book.number_of_connected_peers(), 0);
 }
 
 #[tokio::test]
@@ -234,4 +231,64 @@ async fn reject_non_version_messages_before_handshake() {
     let transaction = vec![0u8, 10];
     write_message_to_stream(Payload::Transaction(transaction), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
+}
+
+#[tokio::test]
+async fn handshake_timeout_initiator_side() {
+    const NUM_BOOTSTRAPPERS: usize = 5;
+
+    // set up bootnodes that won't perform a valid handshake
+    let mut failing_bootnodes = Vec::with_capacity(NUM_BOOTSTRAPPERS);
+    for _ in 0..NUM_BOOTSTRAPPERS {
+        failing_bootnodes.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    }
+
+    // start the node
+    let setup = TestSetup {
+        consensus_setup: None,
+        bootnodes: failing_bootnodes
+            .iter()
+            .map(|l| {
+                let addr = l.local_addr().unwrap();
+                format!("{}:{}", addr.ip(), addr.port())
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
+
+    // the node should start connecting to all the configured bootnodes
+    wait_until!(
+        3,
+        node.peer_book.number_of_connecting_peers() == NUM_BOOTSTRAPPERS as u16
+    );
+
+    // but since they won't reply, it should drop them after the handshake deadline
+    wait_until!(
+        snarkos_network::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64 + 1,
+        node.peer_book.number_of_connecting_peers() == 0
+    );
+}
+
+#[tokio::test]
+async fn handshake_timeout_responder_side() {
+    // start the node
+    let setup = TestSetup {
+        consensus_setup: None,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    // set up a "peer" that won't perform a valid handshake
+    let _fake_peer = TcpStream::connect(node_addr).await.unwrap();
+
+    // the node should initally accept the connection
+    wait_until!(3, node.peer_book.number_of_connecting_peers() == 1 as u16);
+
+    // but since it won't conclude the handshake, it should be dropped after the handshake deadline
+    wait_until!(
+        snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 + 1,
+        node.peer_book.number_of_connecting_peers() == 0
+    );
 }

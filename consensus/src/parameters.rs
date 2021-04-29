@@ -32,7 +32,7 @@ use rand::Rng;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
-/// A data structure containing the consensus parameters for a specified network on this node.
+/// A data structure containing the sync parameters for a specified network on this node.
 #[derive(Clone, Debug)]
 pub struct ConsensusParameters {
     /// The network ID that these parameters correspond to.
@@ -43,7 +43,7 @@ pub struct ConsensusParameters {
     pub max_nonce: u32,
     /// The anticipated number of seconds for finding a new block.
     pub target_block_time: i64,
-    /// The PoSW consensus verifier (read-only mode, no proving key loaded).
+    /// The PoSW sync verifier (read-only mode, no proving key loaded).
     pub verifier: PoswMarlin,
     /// The authorized inner SNARK IDs.
     pub authorized_inner_snark_ids: Vec<Vec<u8>>,
@@ -175,7 +175,7 @@ mod tests {
     use super::*;
     use crate::get_block_reward;
     use rand::{thread_rng, Rng};
-    use snarkos_testing::consensus::DATA;
+    use snarkos_testing::sync::DATA;
     use snarkvm_objects::{BlockHeaderHash, PedersenMerkleRootHash};
 
     #[test]

@@ -16,7 +16,7 @@
 
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
-    use snarkos_testing::consensus::*;
+    use snarkos_testing::sync::*;
     use snarkvm_dpc::base_dpc::instantiated::Tx;
     use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
     use snarkvm_posw::txids_to_roots;
@@ -26,7 +26,7 @@ mod consensus_integration {
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     fn test_find_block(transactions: &DPCTransactions<Tx>, parent_header: &BlockHeader) {
-        let consensus = Arc::new(snarkos_testing::consensus::create_test_consensus());
+        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = Miner::new(miner_address, consensus.clone());
 

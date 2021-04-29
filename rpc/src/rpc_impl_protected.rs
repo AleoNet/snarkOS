@@ -298,15 +298,15 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let rng = &mut thread_rng();
 
         let account = Account::<Components>::new(
-            self.parameters()?.account_signature_parameters(),
-            self.parameters()?.account_commitment_parameters(),
-            self.parameters()?.account_encryption_parameters(),
+            self.dpc_parameters()?.account_signature_parameters(),
+            self.dpc_parameters()?.account_commitment_parameters(),
+            self.dpc_parameters()?.account_encryption_parameters(),
             rng,
         )?;
 
         let view_key = AccountViewKey::<Components>::from_private_key(
-            self.parameters()?.account_signature_parameters(),
-            self.parameters()?.account_commitment_parameters(),
+            self.dpc_parameters()?.account_signature_parameters(),
+            self.dpc_parameters()?.account_commitment_parameters(),
             &account.private_key,
         )?;
 
@@ -334,11 +334,11 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         // Fetch birth/death programs
         let program_vk_hash = self
-            .parameters()?
+            .dpc_parameters()?
             .system_parameters
             .program_verification_key_crh
             .hash(&to_bytes![
-                self.parameters()?.noop_program_snark_parameters.verification_key
+                self.dpc_parameters()?.noop_program_snark_parameters.verification_key
             ]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
@@ -362,21 +362,21 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         // Fill any unused old_record indices with dummy records
         while old_records.len() < Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self
-                .parameters()?
+                .dpc_parameters()?
                 .system_parameters
                 .serial_number_nonce
                 .hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
             let address = AccountAddress::<Components>::from_private_key(
-                self.parameters()?.account_signature_parameters(),
-                self.parameters()?.account_commitment_parameters(),
-                self.parameters()?.account_encryption_parameters(),
+                self.dpc_parameters()?.account_signature_parameters(),
+                self.dpc_parameters()?.account_commitment_parameters(),
+                self.dpc_parameters()?.account_encryption_parameters(),
                 &private_key,
             )?;
 
             let dummy_record = InstantiatedDPC::generate_record(
-                &self.parameters()?.system_parameters,
+                &self.dpc_parameters()?.system_parameters,
                 old_sn_nonce,
                 address,
                 true, // The input record is dummy
@@ -432,7 +432,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         }
 
         // Generate transaction
-        let (records, transaction) = self.consensus_layer()?.consensus.create_transaction(
+        let (records, transaction) = self.sync_handler()?.consensus.create_transaction(
             old_records,
             old_account_private_keys,
             new_record_owners,
@@ -524,11 +524,11 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         // Construct the program proofs
         let (old_death_program_proofs, new_birth_program_proofs) =
-            ConsensusParameters::generate_program_proofs::<_, S>(self.parameters()?, &transaction_kernel, rng)?;
+            ConsensusParameters::generate_program_proofs::<_, S>(self.dpc_parameters()?, &transaction_kernel, rng)?;
 
         // Online execution to generate a DPC transaction
         let (records, transaction) = InstantiatedDPC::execute_online(
-            self.parameters()?,
+            self.dpc_parameters()?,
             transaction_kernel,
             old_death_program_proofs,
             new_birth_program_proofs,
@@ -592,7 +592,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         // Decrypt the record ciphertext
         let record = RecordEncryption::decrypt_record(
-            &self.parameters()?.system_parameters,
+            &self.dpc_parameters()?.system_parameters,
             &account_view_key,
             &encrypted_record,
         )?;

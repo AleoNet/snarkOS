@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod consensus;
-pub use consensus::*;
-
 pub mod blocks;
 pub use blocks::*;
 
+pub mod memory_pool;
+pub use memory_pool::*;
+
+// TODO (howardwu): Move this out of network/sync. It should be on a much higher level.
 pub mod miner;
 pub use miner::*;
 
-pub mod transactions;
-pub use transactions::*;
+pub mod sync;
+pub use sync::*;

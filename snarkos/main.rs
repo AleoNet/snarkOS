@@ -23,8 +23,8 @@ use snarkos::{
     display::render_welcome,
     errors::NodeError,
 };
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{config::Config as NodeConfig, Consensus, MinerInstance, Node};
+use snarkos_consensus::{Consensus, ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
@@ -74,7 +74,7 @@ fn print_welcome(config: &Config) {
 ///
 /// 1. Creates new storage database or uses existing.
 /// 2. Creates new memory pool or uses existing from storage.
-/// 3. Creates consensus parameters.
+/// 3. Creates sync parameters.
 /// 4. Creates network server.
 /// 5. Starts rpc server thread.
 /// 6. Starts miner thread.
@@ -116,13 +116,13 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
         Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
     };
 
-    // Enable the consensus layer if the node is not a bootstrapper.
-    if !config.node.is_bootnode {
+    // Enable the sync layer.
+    {
         let memory_pool = Mutex::new(MemoryPool::from_storage(&storage)?);
 
-        info!("Loading Aleo parameters...");
+        debug!("Loading Aleo parameters...");
         let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
-        info!("Loading complete.");
+        info!("Loaded Aleo parameters");
 
         // Fetch the set of valid inner circuit IDs.
         let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
@@ -134,7 +134,7 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
 
         let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
 
-        // Set the initial consensus parameters.
+        // Set the initial sync parameters.
         let consensus_params = ConsensusParameters {
             max_block_size: 1_000_000_000usize,
             max_nonce: u32::max_value(),
@@ -144,23 +144,23 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
             authorized_inner_snark_ids,
         };
 
-        let consensus = Arc::new(snarkos_consensus::Consensus {
+        let consensus = Arc::new(Consensus {
             ledger: Arc::clone(&storage),
             memory_pool,
             parameters: consensus_params,
             public_parameters: dpc_parameters,
         });
 
-        let consensus = Consensus::new(
+        let sync = Sync::new(
             node.clone(),
             consensus,
             config.miner.is_miner,
             Duration::from_secs(config.p2p.block_sync_interval.into()),
-            Duration::from_secs(config.p2p.mempool_interval.into()),
+            Duration::from_secs(config.p2p.mempool_sync_interval.into()),
         );
 
-        node.set_consensus(consensus);
-    };
+        node.set_sync(sync);
+    }
 
     // Start listening for incoming connections.
     node.listen().await?;

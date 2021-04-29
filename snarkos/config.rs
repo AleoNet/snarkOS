@@ -24,15 +24,13 @@ use crate::{
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::PathBuf};
 
 /// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
 pub const TESTNET_BOOTNODES: &[&str] = &[
+    "50.18.83.123:4131",
     "50.18.246.201:4131",
     "138.197.232.178:4131",
     "64.225.91.42:4131",
@@ -89,7 +87,8 @@ pub struct Miner {
 pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
-    pub mempool_interval: u8,
+    #[serde(alias = "mempool_interval")]
+    pub mempool_sync_interval: u8,
     pub block_sync_interval: u16,
     pub peer_sync_interval: u16,
     pub min_peers: u16,
@@ -124,9 +123,9 @@ impl Default for Config {
                     .iter()
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
-                mempool_interval: 5,
-                peer_sync_interval: 10,
-                block_sync_interval: 60,
+                mempool_sync_interval: 12,
+                peer_sync_interval: 15,
+                block_sync_interval: 4,
                 min_peers: 7,
                 max_peers: 25,
             },
@@ -149,7 +148,19 @@ impl Config {
         let mut config_path = snarkos_path.clone();
         config_path.push("config.toml");
 
-        if !Path::exists(&config_path) {
+        // TODO (howardwu): Revert to this logic after testnet, when configs stabilize.
+        // if !Path::exists(&config_path) {
+        //     // Create a new default `config.toml` file if it doesn't already exist
+        //     fs::create_dir_all(&snarkos_path)?;
+        //
+        //     let default_config_string = toml::to_string(&Config::default())?;
+        //
+        //     fs::write(&config_path, default_config_string)?;
+        // }
+
+        // TODO (howardwu): Revisit this.
+        // For now, override the config.toml file each time.
+        {
             // Create a new default `config.toml` file if it doesn't already exist
             fs::create_dir_all(&snarkos_path)?;
 
@@ -238,9 +249,6 @@ impl Config {
 
     fn is_bootnode(&mut self, argument: bool) {
         self.node.is_bootnode = argument;
-        if argument {
-            self.p2p.bootnodes = vec![];
-        }
     }
 
     fn is_miner(&mut self, argument: bool) {
@@ -281,7 +289,7 @@ impl Config {
 
     fn mempool_interval(&mut self, argument: Option<u8>) {
         if let Some(interval) = argument {
-            self.p2p.mempool_interval = interval
+            self.p2p.mempool_sync_interval = interval
         }
     }
 
