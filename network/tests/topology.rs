@@ -254,8 +254,10 @@ async fn binary_star_contact() {
 
     wait_until!(10, network_density(&nodes) >= 0.05);
 
+    // Computing the metrics for this ignored case, interesting to inspect, especially Fiedler
+    // partitioning as we have a graph with two clusters both centered around the bootnodes.
     let metrics = NetworkMetrics::new(&nodes);
-    dbg!(metrics);
+    assert_eq!(metrics.node_count, 51);
 }
 
 /// Network topology measurements.
@@ -421,7 +423,9 @@ fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerSto
 }
 
 /// Returns the difference between the highest and lowest degree centrality in the network.
-// TODO: could use degree matrix.
+// This could use the degree matrix, though as this is used extensively in tests and checked
+// repeatedly until it reaches a certain value, we want to keep its calculation decoupled from the
+// `NetworkMetrics`.
 fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
     let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
     let min = dc.clone().min().unwrap();
@@ -485,7 +489,7 @@ fn fiedler(index: &BTreeMap<SocketAddr, usize>, laplacian_matrix: DMatrix<f64>) 
     (*algebraic_connectivity, fiedler_values_indexed)
 }
 
-/// Computes the eiegenvalues and corresponding eigenvalues from the supplied symmetric matrix.
+/// Computes the eigenvalues and corresponding eigenvalues from the supplied symmetric matrix.
 fn sorted_eigenvalue_vector_pairs(matrix: DMatrix<f64>, ascending: bool) -> Vec<(f64, DVector<f64>)> {
     // Compute eigenvalues and eigenvectors.
     let eigen = SymmetricEigen::new(matrix);
