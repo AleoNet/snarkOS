@@ -48,8 +48,8 @@ mod consensus_integration {
             .unwrap();
     }
 
-    #[test]
-    fn find_valid_block() {
+    #[tokio::test]
+    async fn find_valid_block() {
         let transactions = DPCTransactions(vec![
             DATA.block_1.transactions.0[0].clone(),
             DATA.block_2.transactions.0[0].clone(),

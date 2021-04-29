@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
+use arc_swap::ArcSwap;
 use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
 use snarkvm_dpc::LedgerError;
 use snarkvm_objects::{Block, LedgerScheme, Storage, Transaction};
@@ -23,7 +24,6 @@ use snarkvm_utilities::{
     to_bytes,
 };
 
-use parking_lot::RwLock;
 use std::{fs, marker::PhantomData, path::Path, sync::Arc};
 
 impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for Ledger<T, P, S> {
@@ -61,7 +61,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
         let ledger_storage = Self {
             current_block_height: Default::default(),
             storage,
-            cm_merkle_tree: RwLock::new(empty_cm_merkle_tree),
+            cm_merkle_tree: ArcSwap::new(Arc::new(empty_cm_merkle_tree)),
             ledger_parameters: parameters,
             _transaction: PhantomData,
         };
@@ -111,7 +111,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
     /// for a given commitment, if it exists in the ledger.
     fn prove_cm(&self, cm: &Self::Commitment) -> anyhow::Result<Self::MerklePath> {
         let cm_index = self.get_cm_index(&to_bytes![cm]?)?.ok_or(LedgerError::InvalidCmIndex)?;
-        let result = self.cm_merkle_tree.read().generate_proof(cm_index, cm)?;
+        let result = self.cm_merkle_tree.load().generate_proof(cm_index, cm)?;
 
         Ok(result)
     }

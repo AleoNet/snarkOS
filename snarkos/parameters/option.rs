@@ -80,7 +80,7 @@ pub const NETWORK: OptionType = (
 );
 
 pub const RPC_IP: OptionType = (
-    "[rpc-ip] -i --rpc-ip=[rpc-ip] 'Specify the ip of the RPC server'",
+    "[rpc-ip] --rpc-ip=[rpc-ip] 'Specify the ip of the RPC server'",
     &[],
     &[],
     &[],

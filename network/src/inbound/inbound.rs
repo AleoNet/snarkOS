@@ -14,21 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, stats, Cache, ConnReader, ConnWriter, Node, Receiver, Sender, State};
+use crate::{errors::NetworkError, message::*, stats, Cache, Node, Receiver, Sender, State};
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::time::Duration;
 
-use parking_lot::Mutex;
 use snarkvm_objects::Storage;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
-    sync::mpsc::error::TrySendError,
+    net::TcpListener,
+    sync::{mpsc::error::TrySendError, Mutex},
     task,
 };
-
-/// The map of remote addresses to their active writers.
-pub type Channels = HashMap<SocketAddr, Arc<ConnWriter>>;
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug)]
@@ -53,9 +48,10 @@ impl Default for Inbound {
 
 impl Inbound {
     #[inline]
-    pub(crate) fn take_receiver(&self) -> Receiver {
+    pub(crate) async fn take_receiver(&self) -> Receiver {
         self.receiver
             .lock()
+            .await
             .take()
             .expect("The Inbound Receiver had already been taken!")
     }
@@ -77,36 +73,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             loop {
                 match listener.accept().await {
                     Ok((stream, remote_address)) => {
-                        info!("Got a connection request from {}", remote_address);
-
                         if !node_clone.can_connect() {
-                            metrics::increment_counter!(stats::CONNECTIONS_ALL_REJECTED);
                             continue;
                         }
-
-                        let node = node_clone.clone();
-                        task::spawn(async move {
-                            // Wait a maximum timeout limit for a connection request.
-                            let handshake_result = tokio::time::timeout(
-                                Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
-                                node.connection_request(own_listener_address, remote_address, stream),
-                            )
-                            .await;
-
-                            match handshake_result {
-                                Ok(Ok(remote_listener)) => {
-                                    // Immediately send a ping to provide the peer with our block height.
-                                    node.send_ping(remote_listener);
-                                }
-                                Ok(Err(e)) => {
-                                    error!("Failed to accept a connection request: {}", e);
-                                    node.disconnect_from_peer(remote_address);
-                                    metrics::increment_counter!(stats::HANDSHAKES_FAILURES_RESP);
-                                }
-                                Err(_) => {
-                                    error!("Failed to accept a connection request: the handshake timed out");
-                                    node.disconnect_from_peer(remote_address);
-                                    metrics::increment_counter!(stats::HANDSHAKES_TIMEOUTS_RESP);
+                        let node_clone = node_clone.clone();
+                        tokio::spawn(async move {
+                            match node_clone
+                                .peer_book
+                                .receive_connection(node_clone.clone(), remote_address, stream)
+                                .await
+                            {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    error!("Failed to receive a connection: {}", e);
                                 }
                             }
                         });
@@ -125,58 +104,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         Ok(())
     }
 
-    /// This method handles new inbound messages from a single connected node.
-    pub async fn listen_for_inbound_messages(&self, reader: &mut ConnReader) {
-        let mut failure_count = 0u8;
-
-        loop {
-            // Read the next message from the channel.
-            let message = match reader.read_message().await {
-                Ok(message) => message,
-                Err(error) => {
-                    // Log the failure and increment the failure count.
-                    error!("Unable to read message from {}: {}", reader.addr, error);
-                    failure_count += 1;
-
-                    // Determine if we should disconnect.
-                    let disconnect_from_peer = error.is_fatal() || failure_count >= 10;
-
-                    // Determine if we should send a disconnect message.
-                    match disconnect_from_peer {
-                        true => {
-                            warn!("Disconnecting from {} (unreliable)", reader.addr);
-                            self.disconnect_from_peer(reader.addr);
-                            // The error has been handled and reported, we may now safely break.
-                            break;
-                        }
-                        false => {
-                            // Sleep for 10 seconds
-                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                            continue;
-                        }
-                    }
-                }
-            };
-
-            // Route the message to the inbound handler of this node.
-            {
-                // Handle Ping/Pong messages immediately in order not to skew latency calculation.
-                match &message.payload {
-                    Payload::Ping(..) => {
-                        self.send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong));
-                    }
-                    Payload::Pong => {
-                        self.peer_book.received_pong(reader.addr);
-                    }
-                    _ => {}
-                }
-
-                // Messages are queued in a single tokio MPSC receiver.
-                self.route(message)
-            }
-        }
-    }
-
     pub async fn process_incoming_messages(
         &self,
         receiver: &mut Receiver,
@@ -192,8 +119,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
 
-        self.peer_book.register_message(source);
-
         // Check if the message hasn't already been processed recently if it's a `Block`.
         // The node should also reject them while syncing, as it is bound to receive them later.
         if matches!(payload, Payload::Block(..)) && (self.state() == State::Syncing || cache.contains(&payload)) {
@@ -205,25 +130,27 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(stats::INBOUND_TRANSACTIONS);
 
                 if self.sync().is_some() {
-                    self.received_memory_pool_transaction(source, transaction)?;
+                    self.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {
                 metrics::increment_counter!(stats::INBOUND_BLOCKS);
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, true)?;
+                    self.received_block(source, block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
                 metrics::increment_counter!(stats::INBOUND_SYNCBLOCKS);
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, false)?;
+                    self.received_block(source, block, false).await?;
 
                     // Update the peer and possibly finish the sync process.
-                    if self.peer_book.got_sync_block(source) {
-                        self.finished_syncing_blocks();
+                    if let Some(peer) = self.peer_book.get_peer_handle(source) {
+                        if peer.got_sync_block().await {
+                            self.finished_syncing_blocks();
+                        }
                     }
                 }
             }
@@ -231,28 +158,28 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(stats::INBOUND_GETBLOCKS);
 
                 if self.sync().is_some() {
-                    self.received_get_blocks(source, hashes)?;
+                    self.received_get_blocks(source, hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
                 metrics::increment_counter!(stats::INBOUND_GETMEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_get_memory_pool(source);
+                    self.received_get_memory_pool(source).await;
                 }
             }
             Payload::MemoryPool(mempool) => {
                 metrics::increment_counter!(stats::INBOUND_MEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_memory_pool(mempool)?;
+                    self.received_memory_pool(mempool).await?;
                 }
             }
             Payload::GetSync(getsync) => {
                 metrics::increment_counter!(stats::INBOUND_GETSYNC);
 
                 if self.sync().is_some() {
-                    self.received_get_sync(source, getsync)?;
+                    self.received_get_sync(source, getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
@@ -262,32 +189,32 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     if sync.is_empty() {
                         // An empty `Sync` is unexpected, as `GetSync` requests are only
                         // sent to peers that declare a greater block height.
-                        self.peer_book.register_failure(source);
                         warn!("{} doesn't have sync blocks to share", source);
-                    } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
-                        trace!("Received {} sync block hashes from {}", sync.len(), source);
-                        self.received_sync(source, sync);
+                        if let Some(peer) = self.peer_book.get_peer_handle(source) {
+                            peer.soft_fail().await;
+                        }
+                    } else {
+                        if let Some(peer) = self.peer_book.get_peer_handle(source) {
+                            trace!("Received {} sync block hashes from {}", sync.len(), source);
+                            peer.expecting_sync_blocks(sync.len() as u32).await;
+                            self.received_sync(source, sync).await;
+                        }
                     }
                 }
             }
             Payload::GetPeers => {
                 metrics::increment_counter!(stats::INBOUND_GETPEERS);
 
-                self.send_peers(source);
+                self.send_peers(source).await;
             }
             Payload::Peers(peers) => {
                 metrics::increment_counter!(stats::INBOUND_PEERS);
 
-                self.process_inbound_peers(peers);
+                self.process_inbound_peers(peers).await;
             }
-            Payload::Ping(block_height) => {
-                metrics::increment_counter!(stats::INBOUND_PINGS);
-
-                self.peer_book.received_ping(source, block_height);
-            }
-            Payload::Pong => {
-                metrics::increment_counter!(stats::INBOUND_PONGS);
-                // Skip as this case is already handled with priority in Inbound::listen_for_messages
+            Payload::Ping(_) | Payload::Pong => {
+                // Skip as this case is already handled with priority in inbound_handler
+                unreachable!()
             }
             Payload::Unknown => {
                 metrics::increment_counter!(stats::INBOUND_UNKNOWN);
@@ -296,81 +223,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         Ok(())
-    }
-
-    ///
-    /// Handles an incoming connection request, performing a secure handshake and establishing packet encryption.
-    ///
-    pub async fn connection_request(
-        &self,
-        own_listener_address: SocketAddr,
-        remote_address: SocketAddr,
-        stream: TcpStream,
-    ) -> Result<SocketAddr, NetworkError> {
-        self.peer_book.set_connecting(remote_address)?;
-
-        let (mut reader, mut writer) = stream.into_split();
-
-        let builder = snow::Builder::with_resolver(
-            crate::HANDSHAKE_PATTERN
-                .parse()
-                .expect("Invalid noise handshake pattern!"),
-            Box::new(snow::resolvers::SodiumResolver),
-        );
-        let static_key = builder.generate_keypair()?.private;
-        let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
-        let mut noise = noise_builder.build_responder()?;
-        let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE].into();
-        let mut buf = [0u8; crate::NOISE_BUF_LEN]; // a temporary intermediate buffer to decrypt from
-
-        // <- e
-        reader.read_exact(&mut buf[..1]).await?;
-        let len = buf[0] as usize;
-        if len == 0 {
-            return Err(NetworkError::InvalidHandshake);
-        }
-        let len = reader.read_exact(&mut buf[..len]).await?;
-        noise.read_message(&buf[..len], &mut buffer)?;
-        trace!("received e (XX handshake part 1/3) from {}", remote_address);
-
-        // -> e, ee, s, es
-        let own_version = Version::serialize(&Version::new(
-            crate::PROTOCOL_VERSION,
-            own_listener_address.port(),
-            self.id,
-        ))
-        .unwrap();
-        let len = noise.write_message(&own_version, &mut buffer)?;
-        writer.write_all(&[len as u8]).await?;
-        writer.write_all(&buffer[..len]).await?;
-        trace!("sent e, ee, s, es (XX handshake part 2/3) to {}", remote_address);
-
-        // <- s, se, psk
-        reader.read_exact(&mut buf[..1]).await?;
-        let len = buf[0] as usize;
-        if len == 0 {
-            return Err(NetworkError::InvalidHandshake);
-        }
-        let len = reader.read_exact(&mut buf[..len]).await?;
-        let len = noise.read_message(&buf[..len], &mut buffer)?;
-        let peer_version = Version::deserialize(&buffer[..len])?;
-        trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
-
-        if peer_version.node_id == self.id {
-            return Err(NetworkError::SelfConnectAttempt);
-        }
-        if peer_version.version != crate::PROTOCOL_VERSION {
-            return Err(NetworkError::InvalidHandshake);
-        }
-
-        // the remote listening address
-        let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
-
-        self.set_connected(remote_address, remote_listener, noise, buffer, reader, writer)?;
-
-        metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_RESP);
-
-        Ok(remote_listener)
     }
 
     #[inline]

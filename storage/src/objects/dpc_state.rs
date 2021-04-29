@@ -22,7 +22,7 @@ use snarkvm_utilities::{
     to_bytes,
 };
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the current commitment index
@@ -53,7 +53,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     pub fn current_digest(&self) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes())? {
             Some(current_digest) => Ok(current_digest),
-            None => Ok(to_bytes![self.cm_merkle_tree.read().root()].unwrap()),
+            None => Ok(to_bytes![self.cm_merkle_tree.load().root()].unwrap()),
         }
     }
 
@@ -122,12 +122,9 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         let old_commitments = old_cm_and_indices.into_iter().map(|(cm, _)| cm);
         let new_commitments = new_cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
 
-        let new_tree = {
-            self.cm_merkle_tree
-                .read()
-                .rebuild(old_commitments, &new_commitments[..])?
-        };
-        *self.cm_merkle_tree.write() = new_tree;
+        let merkle = self.cm_merkle_tree.load();
+        self.cm_merkle_tree
+            .store(Arc::new(merkle.rebuild(old_commitments, &new_commitments[..])?));
 
         Ok(())
     }
@@ -139,7 +136,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         let update_current_digest = DatabaseTransaction(vec![Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![self.cm_merkle_tree.read().root()]?.to_vec(),
+            value: to_bytes![self.cm_merkle_tree.load().root()]?.to_vec(),
         }]);
 
         self.storage.batch(update_current_digest)

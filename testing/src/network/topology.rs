@@ -17,7 +17,7 @@
 use snarkos_network::Node;
 use snarkos_storage::LedgerStorage;
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 pub enum Topology {
     /// Each node - except the last one - connects to the next one in a linear fashion.
@@ -56,7 +56,9 @@ async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Start each node with the previous as a bootnode.
     for node in nodes {
         if let Some(addr) = prev_node {
-            node.config.bootnodes.write().push(addr);
+            let mut bootnodes = (&**node.config.bootnodes.load()).clone();
+            bootnodes.push(addr);
+            node.config.bootnodes.store(Arc::new(bootnodes));
         };
 
         // Assumes the node has an established address.
@@ -71,7 +73,10 @@ async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
 
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
-    nodes.last().unwrap().config.bootnodes.write().push(first_addr);
+    let bootnodes = &nodes.last().unwrap().config.bootnodes;
+    let mut bootnodes_handle = (&**bootnodes.load()).clone();
+    bootnodes_handle.push(first_addr);
+    bootnodes.store(Arc::new(bootnodes_handle));
 }
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
@@ -88,7 +93,7 @@ async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
             )
             .copied()
             .collect();
-        *node.config.bootnodes.write() = random_addrs;
+        node.config.bootnodes.store(Arc::new(random_addrs));
     }
 }
 
@@ -100,6 +105,6 @@ async fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Start the rest of the nodes with the core node as the bootnode.
     let bootnodes = vec![hub_address];
     for node in nodes.iter_mut().skip(1) {
-        *node.config.bootnodes.write() = bootnodes.clone();
+        node.config.bootnodes.store(Arc::new(bootnodes.clone()));
     }
 }

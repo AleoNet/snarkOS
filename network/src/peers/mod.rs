@@ -20,5 +20,5 @@ pub use peers::*;
 pub mod peer_book;
 pub use peer_book::*;
 
-pub mod peer_info;
-pub use peer_info::*;
+pub mod peer;
+pub use peer::*;

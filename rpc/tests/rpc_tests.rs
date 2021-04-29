@@ -234,7 +234,8 @@ mod rpc_tests {
         verify_transaction_info(TRANSACTION_1.to_vec(), transaction_info);
     }
 
-    #[tokio::test]
+    // multithreaded necessary due to use of non-async jsonrpc & internal use of async
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_send_raw_transaction() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(storage).await;

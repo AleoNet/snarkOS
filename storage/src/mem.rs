@@ -18,8 +18,7 @@ use crate::NUM_COLS;
 use snarkvm_objects::{DatabaseTransaction, Op, Storage, StorageError};
 
 use parking_lot::RwLock;
-
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path}; // only used for testing
 
 #[allow(clippy::type_complexity)]
 pub struct MemDb {

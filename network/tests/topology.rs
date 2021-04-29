@@ -69,12 +69,12 @@ async fn spawn_nodes_in_a_line() {
     start_nodes(&nodes).await;
 
     // First and Last nodes should have 1 connected peer.
-    wait_until!(5, nodes.first().unwrap().peer_book.number_of_connected_peers() == 1);
-    wait_until!(5, nodes.last().unwrap().peer_book.number_of_connected_peers() == 1);
+    wait_until!(5, nodes.first().unwrap().peer_book.get_active_peer_count() == 1);
+    wait_until!(5, nodes.last().unwrap().peer_book.get_active_peer_count() == 1);
 
     // All other nodes should have two.
     for node in nodes.iter().take(nodes.len() - 1).skip(1) {
-        wait_until!(5, node.peer_book.number_of_connected_peers() == 2);
+        wait_until!(5, node.peer_book.get_active_peer_count() == 2);
     }
 }
 
@@ -90,7 +90,7 @@ async fn spawn_nodes_in_a_ring() {
     start_nodes(&nodes).await;
 
     for node in &nodes {
-        wait_until!(5, node.peer_book.number_of_connected_peers() == 2);
+        wait_until!(5, node.peer_book.get_active_peer_count() == 2);
     }
 }
 
@@ -106,7 +106,7 @@ async fn spawn_nodes_in_a_star() {
     start_nodes(&nodes).await;
 
     let hub = nodes.first().unwrap();
-    wait_until!(10, hub.peer_book.number_of_connected_peers() as usize == N - 1);
+    wait_until!(10, hub.peer_book.get_active_peer_count() as usize == N - 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -371,10 +371,10 @@ fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
     let mut count = 0;
 
     for node in nodes {
-        count += node.peer_book.number_of_connected_peers()
+        count += node.peer_book.get_active_peer_count()
     }
 
-    (count / 2).into()
+    (count / 2) as usize
 }
 
 /// Returns the network density.
@@ -396,7 +396,7 @@ fn degree_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorag
     let mut matrix = DMatrix::<f64>::zeros(n, n);
 
     for node in nodes {
-        let n = node.peer_book.number_of_connected_peers();
+        let n = node.peer_book.get_active_peer_count();
         // Address must be present.
         // Get the index for the and set the number of connected peers. The degree matrix is
         // diagonal.
@@ -415,7 +415,7 @@ fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerSto
     // Compute the adjacency matrix. As our network is an undirected graph, the adjacency matrix is
     // symmetric.
     for node in nodes {
-        node.peer_book.connected_peers().keys().for_each(|addr| {
+        node.peer_book.connected_peers().into_iter().for_each(|addr| {
             // Addresses must be present.
             // Get the indices for each node, progressing row by row to construct the matrix.
             let node_m = index.get(&node.local_address().unwrap()).unwrap();
@@ -432,11 +432,11 @@ fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerSto
 // repeatedly until it reaches a certain value, we want to keep its calculation decoupled from the
 // `NetworkMetrics`.
 fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
-    let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
+    let dc = nodes.iter().map(|node| node.peer_book.get_active_peer_count());
     let min = dc.clone().min().unwrap();
     let max = dc.max().unwrap();
 
-    max - min
+    (max - min) as u16
 }
 
 /// Returns the degree centrality of a node.

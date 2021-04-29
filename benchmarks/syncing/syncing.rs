@@ -36,7 +36,8 @@ fn providing_sync_blocks(c: &mut Criterion) {
 
     let blocks = TestBlocks::load(NUM_BLOCKS);
     for block in &blocks.0 {
-        provider.expect_sync().consensus.receive_block(&block).unwrap();
+        rt.block_on(provider.expect_sync().consensus.receive_block(&block))
+            .unwrap()
     }
     assert_eq!(provider.expect_sync().current_block_height() as usize, NUM_BLOCKS);
 
@@ -46,10 +47,12 @@ fn providing_sync_blocks(c: &mut Criterion) {
             requester.lock().await.write_message(&get_sync).await;
 
             // requester obtains hashes
-            let hashes = if let Payload::Sync(hashes) = requester.lock().await.read_payload().await.unwrap() {
-                hashes
-            } else {
-                unreachable!();
+            let hashes = match requester.lock().await.read_payload().await.unwrap() {
+                Payload::Sync(hashes) => hashes,
+                Payload::Ping(_) => return,
+                x => {
+                    panic!("unexpected payload: {:?}", x);
+                }
             };
 
             let get_blocks = Payload::GetBlocks(hashes);

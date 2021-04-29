@@ -28,8 +28,8 @@ mod consensus_dpc {
 
     use std::sync::Arc;
 
-    #[test]
-    fn base_dpc_multiple_transactions() {
+    #[tokio::test]
+    async fn base_dpc_multiple_transactions() {
         let program = FIXTURE.program.clone();
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
         let mut rng = FIXTURE.rng.clone();
@@ -58,7 +58,7 @@ mod consensus_dpc {
         assert_eq!(coinbase_records[1].value(), 0);
 
         println!("Verifying and receiving the block");
-        consensus.receive_block(&block).unwrap();
+        consensus.receive_block(&block).await.unwrap();
         assert_eq!(consensus.ledger.len(), 2);
 
         // Add new block spending records from the previous block
@@ -132,7 +132,7 @@ mod consensus_dpc {
 
         println!("Verify and receive the block with the new payment transaction");
 
-        consensus.receive_block(&new_block).unwrap();
+        consensus.receive_block(&new_block).await.unwrap();
 
         assert_eq!(consensus.ledger.len(), 3);
 

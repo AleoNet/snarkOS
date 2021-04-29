@@ -14,23 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/version.md"))]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub struct Version {
-    /// The version number of the sender's node server.
-    pub version: u64,
-    /// The listening port of the sender.
-    pub listening_port: u16,
-    /// The node id of the sender.
-    pub node_id: u64,
-}
+mod cipher;
+mod connector;
+mod handshake;
+mod network;
+pub mod peer;
+mod peer_events;
+pub mod peer_quality;
+mod receiver;
 
-impl Version {
-    pub fn new(version: u64, listening_port: u16, node_id: u64) -> Self {
-        Self {
-            version,
-            listening_port,
-            node_id,
-        }
-    }
-}
+mod inbound_handler;
+mod outbound_handler;
+
+pub use outbound_handler::*;
+pub use peer::*;
+pub use peer_quality::*;
+// used in integration tests
+#[doc(hidden)]
+pub use cipher::Cipher;
+#[doc(hidden)]
+pub use network::*;
+pub use peer_events::*;

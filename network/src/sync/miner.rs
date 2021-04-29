@@ -15,16 +15,18 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{stats, Node, State};
+use futures::executor::block_on;
 use snarkos_consensus::Miner;
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
 use snarkvm_objects::Storage;
 
+use tokio::task;
 use tracing::*;
 
 use std::{sync::Arc, thread, time::Duration};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
-pub struct MinerInstance<S: Storage> {
+pub struct MinerInstance<S: Storage + core::marker::Sync + Send> {
     miner_address: AccountAddress<Components>,
     node: Node<S>,
 }
@@ -38,7 +40,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
     /// Spawns a new miner on a new thread using MinerInstance parameters.
     /// Once a block is found, A block message is sent to all peers.
     /// Calling this function multiple times will spawn additional listeners on separate threads.
-    pub fn spawn(self) -> thread::JoinHandle<()> {
+    pub fn spawn(self) -> task::JoinHandle<()> {
         let local_address = self.node.local_address().unwrap();
         info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
         let miner = Miner::new(
@@ -50,7 +52,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
         let mut mining_failure_count = 0;
         let mining_failure_threshold = 10;
 
-        let mining_thread = thread::Builder::new().name("snarkOS_miner".into()).spawn(move || {
+        task::spawn_blocking(move || {
             loop {
                 if self.node.is_shutting_down() {
                     debug!("The node is shutting down, stopping mining");
@@ -67,7 +69,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
 
                 info!("Starting to mine the next block");
 
-                let (block, _coinbase_records) = match miner.mine_block() {
+                let (block, _coinbase_records) = match block_on(miner.mine_block()) {
                     Ok(mined_block) => mined_block,
                     Err(error) => {
                         // It's possible that the node realized that it needs to sync with another one in the
@@ -110,10 +112,8 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     continue;
                 };
 
-                self.node.propagate_block(serialized_block, local_address);
+                block_on(self.node.propagate_block(serialized_block, local_address));
             }
-        });
-
-        mining_thread.expect("failed to spawn the miner thread")
+        })
     }
 }

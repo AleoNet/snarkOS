@@ -15,13 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
+use arc_swap::ArcSwap;
 use snarkos_parameters::GenesisBlock;
 use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters};
 use snarkvm_objects::{errors::StorageError, Block, DatabaseTransaction, LedgerScheme, Op, Storage, Transaction};
 use snarkvm_parameters::{traits::genesis::Genesis, LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
-use parking_lot::RwLock;
 use std::{
     fs,
     marker::PhantomData,
@@ -37,7 +37,7 @@ pub type BlockHeight = u32;
 pub struct Ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage> {
     pub current_block_height: AtomicU32,
     pub ledger_parameters: Arc<P>,
-    pub cm_merkle_tree: RwLock<MerkleTree<P>>,
+    pub cm_merkle_tree: ArcSwap<MerkleTree<P>>,
     pub storage: S,
     pub _transaction: PhantomData<T>,
 }
@@ -151,7 +151,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
                 Ok(Self {
                     current_block_height: AtomicU32::new(bytes_to_u32(&val)),
                     storage,
-                    cm_merkle_tree: RwLock::new(merkle_tree),
+                    cm_merkle_tree: ArcSwap::new(Arc::new(merkle_tree)),
                     ledger_parameters,
                     _transaction: PhantomData,
                 })

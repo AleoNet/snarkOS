@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use snarkos_consensus::MerkleTreeLedger;
 use snarkvm_algorithms::{MerkleParameters, CRH};
 use snarkvm_dpc::{
@@ -27,7 +29,6 @@ use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
 use rand::Rng;
-use std::sync::Arc;
 
 pub fn setup_or_load_parameters<R: Rng, S: Storage>(
     verify_only: bool,

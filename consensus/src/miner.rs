@@ -55,9 +55,10 @@ impl<S: Storage> Miner<S> {
     /// Fetches new transactions from the memory pool.
     pub fn fetch_memory_pool_transactions(&self) -> Result<DPCTransactions<Tx>, ConsensusError> {
         let max_block_size = self.consensus.parameters.max_block_size;
-        let memory_pool = self.consensus.memory_pool.lock();
 
-        memory_pool.get_candidates(&self.consensus.ledger, max_block_size)
+        self.consensus
+            .memory_pool
+            .get_candidates(&self.consensus.ledger, max_block_size)
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
@@ -162,7 +163,7 @@ impl<S: Storage> Miner<S> {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub fn mine_block(&self) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
+    pub async fn mine_block(&self) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
         let candidate_transactions = self.fetch_memory_pool_transactions()?;
 
         debug!("The miner is creating a block");
@@ -182,7 +183,7 @@ impl<S: Storage> Miner<S> {
 
         let block = Block { header, transactions };
 
-        self.consensus.receive_block(&block)?;
+        self.consensus.receive_block(&block).await?;
 
         // Store the non-dummy coinbase records.
         let mut records_to_store = vec![];

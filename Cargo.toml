@@ -99,9 +99,6 @@ version = "0.15"
 version = "0.4"
 optional = true
 
-[dependencies.parking_lot]
-version = "0.11.1"
-
 [dependencies.rand]
 version = "0.8"
 
@@ -145,9 +142,9 @@ version = "0.11.2"
 [build-dependencies]
 rustc_version = "0.3"
 
-  [build-dependencies.capnpc]
-  version = "0.14"
-  optional = true
+[build-dependencies.capnpc]
+version = "0.14"
+optional = true
 
 [features]
 default = [ ]
@@ -170,6 +167,7 @@ debug-assertions = false
 
 [profile.dev]
 opt-level = 0
+incremental = true
 
 [profile.test]
 opt-level = 3

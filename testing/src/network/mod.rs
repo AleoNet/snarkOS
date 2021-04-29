@@ -27,14 +27,13 @@ pub mod topology;
 
 use crate::sync::FIXTURE;
 
-use snarkos_network::{connection_reader::ConnReader, connection_writer::ConnWriter, errors::*, *};
+use snarkos_network::{errors::*, *};
 use snarkos_storage::LedgerStorage;
 
-use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
+    net::{tcp::OwnedReadHalf, TcpListener, TcpStream},
     runtime,
 };
 use tracing::*;
@@ -199,27 +198,35 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
 }
 
 pub struct FakeNode {
-    reader: ConnReader,
-    writer: ConnWriter,
+    network: PeerNetwork,
+    reader: PeerReader<OwnedReadHalf>,
 }
 
 impl FakeNode {
-    pub fn new(stream: TcpStream, peer_addr: SocketAddr, noise: snow::TransportState) -> Self {
-        let buffer = vec![0u8; snarkos_network::MAX_MESSAGE_SIZE].into_boxed_slice();
-        let noise = Arc::new(Mutex::new(noise));
+    pub fn new(stream: TcpStream, _peer_addr: SocketAddr, noise: snow::TransportState) -> Self {
         let (reader, writer) = stream.into_split();
 
-        let reader = ConnReader::new(peer_addr, reader, buffer.clone(), noise.clone());
+        let mut network = PeerNetwork {
+            reader: Some(reader),
+            writer,
+            cipher: Cipher::new(
+                noise,
+                vec![0u8; MAX_MESSAGE_SIZE + 4096].into(),
+                vec![0u8; NOISE_BUF_LEN].into(),
+            ),
+        };
 
-        let writer = ConnWriter::new(peer_addr, writer, buffer, noise);
+        let reader = network.take_reader();
 
-        Self { reader, writer }
+        Self { network, reader }
     }
 
     pub async fn read_payload(&mut self) -> Result<Payload, NetworkError> {
-        let message = match self.reader.read_message().await {
+        let raw = self.reader.read_raw_payload().await?;
+        let message = match self.network.read_payload(raw) {
             Ok(msg) => {
-                debug!("read a {}", msg.payload);
+                let msg = Payload::deserialize(msg)?;
+                debug!("read a {}", msg);
                 msg
             }
             Err(e) => {
@@ -228,16 +235,16 @@ impl FakeNode {
             }
         };
 
-        Ok(message.payload)
+        Ok(message)
     }
 
     pub async fn write_message(&mut self, payload: &Payload) {
-        self.writer.write_message(payload).await.unwrap();
+        self.network.write_payload(payload).await.unwrap();
         debug!("wrote a message containing a {} to the stream", payload);
     }
 
     pub async fn write_bytes(&mut self, bytes: &[u8]) {
-        self.writer.writer.write_all(bytes).await.unwrap();
+        self.network.writer.write_all(bytes).await.unwrap();
         debug!("wrote {}B to the stream", bytes.len());
     }
 }

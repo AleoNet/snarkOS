@@ -42,9 +42,6 @@ pub use message::*;
 pub mod node;
 pub use node::*;
 
-pub mod outbound;
-pub use outbound::*;
-
 pub mod peers;
 pub use peers::*;
 
@@ -53,6 +50,9 @@ pub use stats::*;
 
 pub mod sync;
 pub use sync::*;
+
+mod drop_join;
+pub use drop_join::*;
 
 /// The maximum number of block hashes that can be requested or provided in a single batch.
 pub const MAX_BLOCK_SYNC_COUNT: u32 = 64;

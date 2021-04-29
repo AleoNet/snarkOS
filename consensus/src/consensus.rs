@@ -33,7 +33,6 @@ use snarkvm_objects::{AleoAmount, Block, DPCTransactions, LedgerScheme, Storage}
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
-use parking_lot::Mutex;
 use rand::Rng;
 
 use std::sync::Arc;
@@ -42,7 +41,7 @@ pub struct Consensus<S: Storage> {
     pub parameters: ConsensusParameters,
     pub public_parameters: PublicParameters<Components>,
     pub ledger: Arc<MerkleTreeLedger<S>>,
-    pub memory_pool: Mutex<MemoryPool<Tx>>,
+    pub memory_pool: MemoryPool<Tx>,
 }
 
 impl<S: Storage> Consensus<S> {
@@ -134,7 +133,7 @@ impl<S: Storage> Consensus<S> {
     }
 
     /// Receive a block from an external source and process it based on ledger state.
-    pub fn receive_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
+    pub async fn receive_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
         // Block is an unknown orphan
         if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
@@ -143,7 +142,7 @@ impl<S: Storage> Consensus<S> {
             // 1) The block is a genesis block, or
             // 2) The block is unknown and does not correspond with the canon chain.
             if crate::is_genesis(&block.header) && self.ledger.is_empty() {
-                self.process_block(&block)?;
+                self.process_block(&block).await?;
             } else {
                 self.ledger.insert_only(block)?;
             }
@@ -157,14 +156,14 @@ impl<S: Storage> Consensus<S> {
                 BlockPath::CanonChain(block_height) => {
                     debug!("Processing a block that is on canon chain. Height {}", block_height);
 
-                    self.process_block(block)?;
+                    self.process_block(block).await?;
 
                     // Attempt to fast forward the block state if the node already stores
                     // the children of the new canon block.
                     let (_, child_path) = self.ledger.longest_child_path(block.header.get_hash())?;
                     for child_block_hash in child_path {
                         let new_block = self.ledger.get_block(&child_block_hash)?;
-                        self.process_block(&new_block)?;
+                        self.process_block(&new_block).await?;
                     }
                 }
                 BlockPath::SideChain(side_chain_path) => {
@@ -188,10 +187,10 @@ impl<S: Storage> Consensus<S> {
                         if !side_chain_path.path.is_empty() {
                             for block_hash in side_chain_path.path {
                                 if block_hash == block.header.get_hash() {
-                                    self.process_block(&block)?
+                                    self.process_block(&block).await?
                                 } else {
                                     let new_block = self.ledger.get_block(&block_hash)?;
-                                    self.process_block(&new_block)?;
+                                    self.process_block(&new_block).await?;
                                 }
                             }
                         }
@@ -210,7 +209,7 @@ impl<S: Storage> Consensus<S> {
     /// 1. Verify that the block header is valid.
     /// 2. Verify that the transactions are valid.
     /// 3. Insert/canonize block.
-    pub fn process_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
+    pub async fn process_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
         if self.ledger.is_canon(&block.header.get_hash()) {
             return Ok(());
         }
@@ -224,9 +223,8 @@ impl<S: Storage> Consensus<S> {
         self.ledger.insert_and_commit(block)?;
 
         // 3. Remove transactions from the mempool
-        let mut memory_pool = self.memory_pool.lock();
         for transaction_id in block.transactions.to_transaction_ids()? {
-            memory_pool.remove_by_hash(&transaction_id)?;
+            self.memory_pool.remove_by_hash(&transaction_id).await?;
         }
 
         Ok(())

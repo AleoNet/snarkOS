@@ -32,7 +32,7 @@ use tracing_subscriber::EnvFilter;
 use rand::Rng;
 use std::{fs::File, path::PathBuf, sync::Arc};
 
-fn mine_block<S: Storage>(
+async fn mine_block<S: Storage>(
     miner: &Miner<S>,
     txs: Vec<Tx>,
 ) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
@@ -49,13 +49,13 @@ fn mine_block<S: Storage>(
     let old_block_height = miner.consensus.ledger.get_current_block_height();
 
     // add it to the chain
-    miner.consensus.receive_block(&block)?;
+    miner.consensus.receive_block(&block).await?;
 
     let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     // Duplicate blocks dont do anything
-    miner.consensus.receive_block(&block)?;
+    miner.consensus.receive_block(&block).await.ok(); // throws a duplicate error -- seemingly intentional
 
     let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
@@ -105,7 +105,7 @@ fn send<R: Rng, S: Storage>(
     )
 }
 
-fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
+async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     info!("Creating test account");
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
@@ -122,7 +122,7 @@ fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
 
     for i in 0..n {
         // mine an empty block
-        let (block, coinbase_records) = mine_block(&miner, txs.clone())?;
+        let (block, coinbase_records) = mine_block(&miner, txs.clone()).await?;
 
         txs.clear();
         let mut memo = [0u8; 32];
@@ -145,15 +145,16 @@ fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     Ok(TestBlocks::new(blocks))
 }
 
-pub fn main() {
-    let filter = EnvFilter::from_default_env().add_directive("tokio_reactor=off".parse().unwrap());
+#[tokio::main]
+pub async fn main() {
+    let filter = EnvFilter::from_default_env();
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_target(false)
         .init();
 
     info!("Setting up test data");
-    let test_blocks = mine_blocks(10).unwrap();
+    let test_blocks = mine_blocks(100).await.unwrap();
 
     let file = std::io::BufWriter::new(File::create(PathBuf::from("test_blocks")).expect("could not open file"));
     test_blocks.write(file).expect("could not write to file");
