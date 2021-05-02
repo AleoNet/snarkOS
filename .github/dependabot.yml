@@ -1,0 +1,119 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "10:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: bech32
+    versions:
+    - ">= 0.7.a, < 0.8"
+  - dependency-name: digest
+    versions:
+    - ">= 0.9.a, < 0.10"
+  - dependency-name: rocksdb
+    versions:
+    - ">= 0.14.a, < 0.15"
+  - dependency-name: rocksdb
+    versions:
+    - 0.16.0
+  - dependency-name: curl
+    versions:
+    - 0.4.36
+  - dependency-name: tokio
+    versions:
+    - 1.1.0
+    - 1.5.0
+  - dependency-name: bincode
+    versions:
+    - 1.3.3
+  - dependency-name: capnp
+    versions:
+    - 0.14.1
+  - dependency-name: capnpc
+    versions:
+    - 0.14.3
+  - dependency-name: futures-util
+    versions:
+    - 0.3.14
+  - dependency-name: anyhow
+    versions:
+    - 1.0.39
+  - dependency-name: wasm-bindgen-test
+    versions:
+    - 0.3.22
+  - dependency-name: wasm-bindgen
+    versions:
+    - 0.2.72
+  - dependency-name: snarkvm-derives
+    versions:
+    - 0.0.6
+    - 0.2.1
+  - dependency-name: snarkvm-utilities
+    versions:
+    - 0.0.6
+    - 0.2.1
+  - dependency-name: csv
+    versions:
+    - 1.1.6
+  - dependency-name: snarkvm-dpc
+    versions:
+    - 0.0.6
+  - dependency-name: once_cell
+    versions:
+    - 1.7.2
+  - dependency-name: snarkvm-marlin
+    versions:
+    - 0.0.6
+  - dependency-name: snarkvm-curves
+    versions:
+    - 0.0.6
+  - dependency-name: snarkvm-objects
+    versions:
+    - 0.0.6
+  - dependency-name: snarkvm-parameters
+    versions:
+    - 0.0.6
+  - dependency-name: snarkvm-errors
+    versions:
+    - 0.0.6
+  - dependency-name: snarkvm-models
+    versions:
+    - 0.0.6
+  - dependency-name: snarkvm-posw
+    versions:
+    - 0.0.6
+  - dependency-name: snarkvm-algorithms
+    versions:
+    - 0.0.6
+  - dependency-name: jsonrpc-derive
+    versions:
+    - 17.0.0
+  - dependency-name: jsonrpc-core
+    versions:
+    - 17.0.0
+  - dependency-name: jsonrpc-test
+    versions:
+    - 17.0.0
+  - dependency-name: jsonrpc-http-server
+    versions:
+    - 17.0.0
+  - dependency-name: jsonrpc-core-client
+    versions:
+    - 17.0.0
+  - dependency-name: tracing
+    versions:
+    - 0.1.23
+    - 0.1.24
+    - 0.1.25
+  - dependency-name: rand_xorshift
+    versions:
+    - 0.3.0
+  - dependency-name: rand_chacha
+    versions:
+    - 0.3.0
+  - dependency-name: tokio-test
+    versions:
+    - 0.4.0
