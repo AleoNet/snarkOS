@@ -187,11 +187,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             let len = reader.read_exact(&mut buf[..len]).await?;
             let len = noise.read_message(&buf[..len], &mut buffer)?;
-            let _peer_version = Version::deserialize(&buffer[..len])?;
+            let peer_version = Version::deserialize(&buffer[..len])?;
             trace!("received e, ee, s, es (XX handshake part 2/3) from {}", remote_address);
 
+            if peer_version.node_id == node.id {
+                return Err(NetworkError::SelfConnectAttempt);
+            }
+
             // -> s, se, psk
-            let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
+            let own_version = Version::serialize(&Version::new(1u64, own_address.port(), node.id)).unwrap();
             let len = noise.write_message(&own_version, &mut buffer)?;
             writer.write_all(&[len as u8]).await?;
             writer.write_all(&buffer[..len]).await?;

@@ -99,6 +99,7 @@ impl Default for ConsensusSetup {
 
 #[derive(Clone)]
 pub struct TestSetup {
+    pub node_id: u64,
     pub socket_address: Option<SocketAddr>,
     pub consensus_setup: Option<ConsensusSetup>,
     pub peer_sync_interval: u64,
@@ -111,6 +112,7 @@ pub struct TestSetup {
 
 impl TestSetup {
     pub fn new(
+        node_id: u64,
         socket_address: Option<SocketAddr>,
         consensus_setup: Option<ConsensusSetup>,
         peer_sync_interval: u64,
@@ -121,6 +123,7 @@ impl TestSetup {
         tokio_handle: Option<runtime::Handle>,
     ) -> Self {
         Self {
+            node_id,
             socket_address,
             consensus_setup,
             peer_sync_interval,
@@ -136,6 +139,7 @@ impl TestSetup {
 impl Default for TestSetup {
     fn default() -> Self {
         Self {
+            node_id: u64::MAX,
             socket_address: "127.0.0.1:0".parse().ok(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
@@ -290,7 +294,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     node1_noise.read_message(&buf[..len], &mut buffer).unwrap();
 
     // -> e, ee, s, es (node1)
-    let version = Version::serialize(&Version::new(1u64, node1_addr.port())).unwrap();
+    let version = Version::serialize(&Version::new(1u64, node1_addr.port(), 1)).unwrap();
     let len = node1_noise.write_message(&version, &mut buffer).unwrap();
     node1_stream.write_all(&[len as u8]).await.unwrap();
     node1_stream.write_all(&buffer[..len]).await.unwrap();
@@ -303,7 +307,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     let _version = Version::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk (node0)
-    let peer_version = Version::serialize(&Version::new(1u64, node0_addr.port())).unwrap();
+    let peer_version = Version::serialize(&Version::new(1u64, node0_addr.port(), 0)).unwrap();
     let len = node0_noise.write_message(&peer_version, &mut buffer).unwrap();
     node0_stream.write_all(&[len as u8]).await.unwrap();
     node0_stream.write_all(&buffer[..len]).await.unwrap();
@@ -356,7 +360,7 @@ pub async fn handshaken_peer(node_listener: SocketAddr) -> FakeNode {
     let _node_version = Version::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk
-    let peer_version = Version::serialize(&Version::new(1u64, peer_addr.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let peer_version = Version::serialize(&Version::new(1u64, peer_addr.port(), 0)).unwrap(); // TODO (raychu86): Establish a formal node version.
     let len = noise.write_message(&peer_version, &mut buffer).unwrap();
     peer_stream.write_all(&[len as u8]).await.unwrap();
     peer_stream.write_all(&buffer[..len]).await.unwrap();

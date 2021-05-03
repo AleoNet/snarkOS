@@ -45,7 +45,7 @@ pub struct StateCode(AtomicU8);
 /// The internal state of a node.
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
-    pub name: u64,
+    pub id: u64,
     /// The current state of the node.
     state: StateCode,
     /// The local address of this node.
@@ -131,7 +131,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
         Ok(Self(Arc::new(InnerNode {
-            name: thread_rng().gen(),
+            id: thread_rng().gen(),
             state: Default::default(),
             stats: Default::default(),
             local_address: Default::default(),
