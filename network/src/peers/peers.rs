@@ -499,22 +499,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // by informing the peer book of that we found peers.
         let local_address = self.local_address().unwrap(); // the address must be known by now
 
-        let number_of_connected_peers = self.peer_book.number_of_connected_peers();
-        let number_to_connect = if self.config.is_bootnode() {
-            // If this node is a bootnode, catalogue all of the peers for bootstrapping purposes.
-            number_of_connected_peers
-        } else {
-            self.config
-                .maximum_number_of_connected_peers()
-                .saturating_sub(number_of_connected_peers)
-        };
-
-        for peer_address in peers
-            .iter()
-            .take(number_to_connect as usize)
-            .filter(|&peer_addr| *peer_addr != local_address)
-            .copied()
-        {
+        for peer_address in peers.into_iter().filter(|&peer_addr| peer_addr != local_address) {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
