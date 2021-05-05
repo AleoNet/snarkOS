@@ -28,6 +28,8 @@ pub struct Stats {
     pub connections: ConnectionStats,
     /// Stats related to the node's handshakes.
     pub handshakes: HandshakeStats,
+    /// Stats related to the node's queues.
+    pub queues: QueueStats,
 
     /// The number of mined blocks.
     pub blocks_mined: AtomicU32,
@@ -39,9 +41,6 @@ pub struct InboundStats {
     pub all_successes: AtomicU64,
     /// The number of inbound messages that couldn't be processed.
     pub all_failures: AtomicU64,
-
-    /// The current number of messages queued in the inbound channel.
-    pub queued_messages: AtomicU64,
 
     /// The number of all received `Block` messages.
     pub blocks: AtomicU64,
@@ -101,4 +100,12 @@ pub struct HandshakeStats {
     pub timeouts_init: AtomicU64,
     /// The number of handshake timeouts as the responder.
     pub timeouts_resp: AtomicU64,
+}
+
+#[derive(Default)]
+pub struct QueueStats {
+    /// The number of messages queued in the common inbound channel.
+    pub inbound: AtomicU32,
+    /// The number of messages queued in the individual outbound channels.
+    pub outbound: AtomicU32,
 }

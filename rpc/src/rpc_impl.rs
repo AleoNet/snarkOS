@@ -323,8 +323,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 all_successes: self.node.stats.inbound.all_successes.load(Ordering::Relaxed),
                 all_failures: self.node.stats.inbound.all_failures.load(Ordering::Relaxed),
 
-                queued_messages: self.node.stats.inbound.queued_messages.load(Ordering::SeqCst),
-
                 blocks: self.node.stats.inbound.blocks.load(Ordering::Relaxed),
                 getblocks: self.node.stats.inbound.getblocks.load(Ordering::Relaxed),
                 getmemorypool: self.node.stats.inbound.getmemorypool.load(Ordering::Relaxed),
@@ -357,6 +355,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 failures_resp: self.node.stats.handshakes.failures_resp.load(Ordering::Relaxed),
                 timeouts_init: self.node.stats.handshakes.timeouts_init.load(Ordering::Relaxed),
                 timeouts_resp: self.node.stats.handshakes.timeouts_resp.load(Ordering::Relaxed),
+            },
+            queues: NodeQueueStats {
+                inbound: self.node.stats.queues.inbound.load(Ordering::SeqCst),
+                outbound: self.node.stats.queues.outbound.load(Ordering::SeqCst),
             },
 
             blocks_mined: self.node.stats.blocks_mined.load(Ordering::Relaxed),

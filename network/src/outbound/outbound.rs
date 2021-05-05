@@ -61,7 +61,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Fetch the outbound channel.
         match self.outbound.outbound_channel(target_addr) {
             Ok(channel) => match channel.try_send(request) {
-                Ok(()) => {}
+                Ok(()) => {
+                    self.stats.queues.outbound.fetch_add(1, Ordering::SeqCst);
+                }
                 Err(TrySendError::Full(request)) => {
                     warn!(
                         "Couldn't send a {} to {}: the send channel is full",
@@ -106,6 +108,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         loop {
             // Read the next message queued to be sent.
             if let Some(message) = receiver.recv().await {
+                self.stats.queues.outbound.fetch_sub(1, Ordering::SeqCst);
+
                 match writer.write_message(&message.payload).await {
                     Ok(_) => {
                         self.stats.outbound.all_successes.fetch_add(1, Ordering::Relaxed);

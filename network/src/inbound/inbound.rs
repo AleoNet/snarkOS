@@ -222,7 +222,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        self.stats.inbound.queued_messages.fetch_sub(1, Ordering::SeqCst);
+        self.stats.queues.inbound.fetch_sub(1, Ordering::SeqCst);
 
         let source = if let Direction::Inbound(addr) = direction {
             self.peer_book.update_last_seen(addr);
@@ -417,7 +417,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if let Err(err) = self.inbound.sender.send(response).await {
             error!("Failed to route a response for a message: {}", err);
         } else {
-            self.stats.inbound.queued_messages.fetch_add(1, Ordering::SeqCst);
+            self.stats.queues.inbound.fetch_add(1, Ordering::SeqCst);
         }
     }
 }

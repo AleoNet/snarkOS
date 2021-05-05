@@ -140,6 +140,8 @@ pub struct NodeStats {
     pub connections: NodeConnectionStats,
     /// Stats related to the node's handshakes.
     pub handshakes: NodeHandshakeStats,
+    /// Stats related to the node's queues.
+    pub queues: NodeQueueStats,
 
     /// The number of blocks the node has mined.
     pub blocks_mined: u32,
@@ -153,9 +155,6 @@ pub struct NodeInboundStats {
     pub all_successes: u64,
     /// The number of inbound messages that couldn't be processed.
     pub all_failures: u64,
-
-    /// The current number of messages queued in the inbound channel.
-    pub queued_messages: u64,
 
     /// The number of all received `Block` messages.
     pub blocks: u64,
@@ -221,6 +220,14 @@ pub struct NodeHandshakeStats {
     pub timeouts_init: u64,
     /// The number of handshake timeouts as the responder.
     pub timeouts_resp: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeQueueStats {
+    /// The number of messages queued in the common inbound channel.
+    pub inbound: u32,
+    /// The number of messages queued in the individual outbound channels.
+    pub outbound: u32,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
