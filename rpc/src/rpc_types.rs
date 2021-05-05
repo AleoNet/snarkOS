@@ -201,6 +201,8 @@ pub struct NodeConnectionStats {
     pub connected_peers: u16,
     /// Number of currently connecting peers.
     pub connecting_peers: u16,
+    /// Number of known disconnected peers.
+    pub disconnected_peers: u16,
 }
 
 /// Returned value for the `getpeerinfo` rpc call

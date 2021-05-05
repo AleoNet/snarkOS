@@ -348,6 +348,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 all_initiated: self.node.stats.connections.all_initiated.load(Ordering::Relaxed),
                 connected_peers: self.node.peer_book.number_of_connected_peers(),
                 connecting_peers: self.node.peer_book.number_of_connecting_peers(),
+                disconnected_peers: self.node.peer_book.number_of_disconnected_peers(),
             },
 
             blocks_mined: self.node.stats.blocks_mined.load(Ordering::Relaxed),
