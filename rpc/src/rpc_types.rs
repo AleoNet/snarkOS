@@ -140,6 +140,9 @@ pub struct NodeStats {
 
     /// The number of inbound items queued to be processed
     pub inbound_channel_items: u64,
+
+    /// The number of connection requests the node has received
+    pub inbound_connection_requests: u64,
 }
 
 /// Returned value for the `getpeerinfo` rpc call

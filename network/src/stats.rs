@@ -24,4 +24,6 @@ pub struct Stats {
     pub send_failure_count: AtomicU64,
     /// The current number of items in the inbound channel.
     pub inbound_channel_items: AtomicU64,
+    /// The number of all connection requests the node has received.
+    pub inbound_connection_requests: AtomicU64,
 }

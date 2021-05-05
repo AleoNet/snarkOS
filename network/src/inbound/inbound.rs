@@ -154,6 +154,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
                 }
+                node.stats.inbound_connection_requests.fetch_add(1, Ordering::Relaxed);
             }
         });
 

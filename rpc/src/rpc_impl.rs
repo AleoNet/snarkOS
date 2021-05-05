@@ -322,6 +322,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             send_success_count: self.node.stats.send_success_count.load(Ordering::Relaxed),
             send_failure_count: self.node.stats.send_failure_count.load(Ordering::Relaxed),
             inbound_channel_items: self.node.stats.inbound_channel_items.load(Ordering::SeqCst),
+            inbound_connection_requests: self.node.stats.inbound_connection_requests.load(Ordering::Relaxed),
         })
     }
 

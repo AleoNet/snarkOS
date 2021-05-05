@@ -6,11 +6,12 @@ None
 
 ### Response
 
-|         Parameter       | Type |                     Description                    |
-|:-----------------------:|:----:|:--------------------------------------------------:|
-| `send_success_count`    | u64  | The number of successfully sent messages           |
-| `send_failure_count`    | u64  | The number of failures to send messages            |
-| `inbound_channel_items` | u64  | The number of inbound items queued to be processed |
+|            Parameter          | Type |                        Description                      |
+|:-----------------------------:|:----:|:-------------------------------------------------------:|
+| `send_success_count`          | u64  | The number of successfully sent messages                |
+| `send_failure_count`          | u64  | The number of failures to send messages                 |
+| `inbound_channel_items`       | u64  | The number of inbound items queued to be processed      |
+| `inbound_connection_requests` | u64  | The number of connection requests the node has received |
 
 ### Example
 ```ignore
