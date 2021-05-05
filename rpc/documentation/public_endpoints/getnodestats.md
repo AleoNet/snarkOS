@@ -16,6 +16,7 @@ None
 | `number_of_connected_peers`    | u16  | The number of currently connected peers                 |
 | `number_of_connecting_peers`   | u16  | The number of currently connecting peers                |
 | `blocks_mined`                 | u32  | The number of blocks the node has mined                 |
+| `block_height`                 | u32  | The current block height of the node                    |
 
 ### Example
 ```ignore

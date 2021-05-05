@@ -155,6 +155,9 @@ pub struct NodeStats {
 
     /// The number of blocks the node has mined.
     pub blocks_mined: u32,
+
+    /// The current block height of the node.
+    pub block_height: u32,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
