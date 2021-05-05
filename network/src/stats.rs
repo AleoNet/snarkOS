@@ -16,6 +16,8 @@
 
 use std::sync::atomic::{AtomicU32, AtomicU64};
 
+// TODO: make members private and make gathering of stats feature-gated and possibly
+// interchangeable with prometheus metrics.
 #[derive(Default)]
 pub struct Stats {
     /// The monotonic counter for the number of send requests that succeeded.
@@ -34,4 +36,31 @@ pub struct Stats {
     pub outbound_connection_requests: AtomicU64,
     /// The number of mined blocks.
     pub blocks_mined: AtomicU32,
+
+    /// The number of all received `Block` messages.
+    pub recv_blocks: AtomicU64,
+    /// The number of all received `GetBlocks` messages.
+    pub recv_getblocks: AtomicU64,
+    /// The number of all received `GetMemoryPool` messages.
+    pub recv_getmemorypool: AtomicU64,
+    /// The number of all received `GetPeers` messages.
+    pub recv_getpeers: AtomicU64,
+    /// The number of all received `GetSync` messages.
+    pub recv_getsync: AtomicU64,
+    /// The number of all received `MemoryPool` messages.
+    pub recv_memorypool: AtomicU64,
+    /// The number of all received `Peers` messages.
+    pub recv_peers: AtomicU64,
+    /// The number of all received `Ping` messages.
+    pub recv_pings: AtomicU64,
+    /// The number of all received `Pong` messages.
+    pub recv_pongs: AtomicU64,
+    /// The number of all received `Sync` messages.
+    pub recv_syncs: AtomicU64,
+    /// The number of all received `SyncBlock` messages.
+    pub recv_syncblocks: AtomicU64,
+    /// The number of all received `Transaction` messages.
+    pub recv_transactions: AtomicU64,
+    /// The number of all received `Unknown` messages.
+    pub recv_unknown: AtomicU64,
 }

@@ -330,6 +330,20 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             number_of_connecting_peers: self.node.peer_book.number_of_connecting_peers(),
             blocks_mined: self.node.stats.blocks_mined.load(Ordering::Relaxed),
             block_height: self.node.sync().map(|sync| sync.current_block_height()).unwrap_or(0),
+
+            recv_blocks: self.node.stats.recv_blocks.load(Ordering::Relaxed),
+            recv_getblocks: self.node.stats.recv_getblocks.load(Ordering::Relaxed),
+            recv_getmemorypool: self.node.stats.recv_getmemorypool.load(Ordering::Relaxed),
+            recv_getpeers: self.node.stats.recv_getpeers.load(Ordering::Relaxed),
+            recv_getsync: self.node.stats.recv_getsync.load(Ordering::Relaxed),
+            recv_memorypool: self.node.stats.recv_memorypool.load(Ordering::Relaxed),
+            recv_peers: self.node.stats.recv_peers.load(Ordering::Relaxed),
+            recv_pings: self.node.stats.recv_pings.load(Ordering::Relaxed),
+            recv_pongs: self.node.stats.recv_pongs.load(Ordering::Relaxed),
+            recv_syncs: self.node.stats.recv_syncs.load(Ordering::Relaxed),
+            recv_syncblocks: self.node.stats.recv_syncblocks.load(Ordering::Relaxed),
+            recv_transactions: self.node.stats.recv_transactions.load(Ordering::Relaxed),
+            recv_unknown: self.node.stats.recv_unknown.load(Ordering::Relaxed),
         })
     }
 

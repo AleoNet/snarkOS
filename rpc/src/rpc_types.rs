@@ -164,6 +164,45 @@ pub struct NodeStats {
 
     /// The current block height of the node.
     pub block_height: u32,
+
+    /// The number of all received `Block` messages.
+    pub recv_blocks: u64,
+
+    /// The number of all received `GetBlocks` messages.
+    pub recv_getblocks: u64,
+
+    /// The number of all received `GetMemoryPool` messages.
+    pub recv_getmemorypool: u64,
+
+    /// The number of all received `GetPeers` messages.
+    pub recv_getpeers: u64,
+
+    /// The number of all received `GetSync` messages.
+    pub recv_getsync: u64,
+
+    /// The number of all received `MemoryPool` messages.
+    pub recv_memorypool: u64,
+
+    /// The number of all received `Peers` messages.
+    pub recv_peers: u64,
+
+    /// The number of all received `Ping` messages.
+    pub recv_pings: u64,
+
+    /// The number of all received `Pong` messages.
+    pub recv_pongs: u64,
+
+    /// The number of all received `Sync` messages.
+    pub recv_syncs: u64,
+
+    /// The number of all received `SyncBlock` messages.
+    pub recv_syncblocks: u64,
+
+    /// The number of all received `Transaction` messages.
+    pub recv_transactions: u64,
+
+    /// The number of all received `Unknown` messages.
+    pub recv_unknown: u64,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
