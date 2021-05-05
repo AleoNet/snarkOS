@@ -22,7 +22,11 @@ use snarkvm_objects::Storage;
 use tokio::runtime;
 use tracing::*;
 
-use std::{sync::Arc, thread, time::Duration};
+use std::{
+    sync::{atomic::Ordering, Arc},
+    thread,
+    time::Duration,
+};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance<S: Storage> {
@@ -99,6 +103,8 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                 if self.node.state() == State::Mining {
                     self.node.set_state(State::Idle);
                 }
+
+                self.node.stats.blocks_mined.fetch_add(1, Ordering::Relaxed);
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
 

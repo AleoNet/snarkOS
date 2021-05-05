@@ -152,6 +152,9 @@ pub struct NodeStats {
 
     /// Number of currently connecting peers.
     pub number_of_connecting_peers: u16,
+
+    /// The number of blocks the node has mined.
+    pub blocks_mined: u32,
 }
 
 /// Returned value for the `getpeerinfo` rpc call

@@ -15,6 +15,7 @@ None
 | `outbound_connection_requests` | u64  | The number of connection requests the node has made     |
 | `number_of_connected_peers`    | u16  | The number of currently connected peers                 |
 | `number_of_connecting_peers`   | u16  | The number of currently connecting peers                |
+| `blocks_mined`                 | u32  | The number of blocks the node has mined                 |
 
 ### Example
 ```ignore

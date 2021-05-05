@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU32, AtomicU64};
 
 #[derive(Default)]
 pub struct Stats {
@@ -28,4 +28,6 @@ pub struct Stats {
     pub inbound_connection_requests: AtomicU64,
     /// The number of outbound connection requests.
     pub outbound_connection_requests: AtomicU64,
+    /// The number of mined blocks.
+    pub blocks_mined: AtomicU32,
 }
