@@ -22,6 +22,10 @@ pub struct Stats {
     pub send_success_count: AtomicU64,
     /// The monotonic counter for the number of send requests that failed.
     pub send_failure_count: AtomicU64,
+    /// The number of successfully processed inbound messages.
+    pub recv_success_count: AtomicU64,
+    /// The number of inbound messages that couldn't be processed.
+    pub recv_failure_count: AtomicU64,
     /// The current number of items in the inbound channel.
     pub inbound_channel_items: AtomicU64,
     /// The number of all connection requests the node has received.

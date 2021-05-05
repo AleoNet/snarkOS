@@ -138,6 +138,12 @@ pub struct NodeStats {
     /// The number of failures to send messages
     pub send_failure_count: u64,
 
+    /// The number of successfully processed inbound messages.
+    pub recv_success_count: u64,
+
+    /// The number of inbound messages that couldn't be processed.
+    pub recv_failure_count: u64,
+
     /// The number of inbound items queued to be processed
     pub inbound_channel_items: u64,
 
