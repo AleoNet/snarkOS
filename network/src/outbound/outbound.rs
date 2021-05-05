@@ -67,16 +67,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         "Couldn't send a {} to {}: the send channel is full",
                         request, target_addr
                     );
+                    self.stats.send_failure_count.fetch_add(1, Ordering::Relaxed);
                 }
                 Err(TrySendError::Closed(request)) => {
                     error!(
                         "Couldn't send a {} to {}: the send channel is closed",
                         request, target_addr
                     );
+                    self.stats.send_failure_count.fetch_add(1, Ordering::Relaxed);
                 }
             },
             Err(_) => {
                 warn!("Failed to send a {}: peer is disconnected", request);
+                self.stats.send_failure_count.fetch_add(1, Ordering::Relaxed);
             }
         }
     }
