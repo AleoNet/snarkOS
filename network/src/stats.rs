@@ -22,4 +22,6 @@ pub struct Stats {
     pub send_success_count: AtomicU64,
     /// The monotonic counter for the number of send requests that failed.
     pub send_failure_count: AtomicU64,
+    /// The current number of items in the inbound channel.
+    pub inbound_channel_items: AtomicU64,
 }

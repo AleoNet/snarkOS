@@ -16,7 +16,12 @@
 
 use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 
 use parking_lot::Mutex;
 use snarkvm_objects::Storage;
@@ -214,6 +219,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
+        self.stats.inbound_channel_items.fetch_sub(1, Ordering::SeqCst);
+
         let source = if let Direction::Inbound(addr) = direction {
             self.peer_book.update_last_seen(addr);
             addr
@@ -380,6 +387,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub(crate) async fn route(&self, response: Message) {
         if let Err(err) = self.inbound.sender.send(response).await {
             error!("Failed to route a response for a message: {}", err);
+        } else {
+            self.stats.inbound_channel_items.fetch_add(1, Ordering::SeqCst);
         }
     }
 }
