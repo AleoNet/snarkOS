@@ -24,6 +24,7 @@ None
 | `inbound.all_successes`          | u64  | The number of successfully processed inbound messages             |
 | `inbound.all_failures`           | u64  | The number of inbound messages that couldn't be processed         |
 | `inbound.blocks`                 | u64  | The number of all received Block messages                         |
+| `inbound.getblocks`              | u64  | The number of all received GetBlocks messages                     |
 | `inbound.getmemorypool`          | u64  | The number of all received GetMemoryPool messages                 |
 | `inbound.getpeers`               | u64  | The number of all received GetPeers messages                      |
 | `inbound.getsync`                | u64  | The number of all received GetSync messages                       |
