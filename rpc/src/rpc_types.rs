@@ -129,6 +129,19 @@ pub struct NodeInfo {
     pub is_syncing: bool,
 }
 
+/// Returned value for the `getnodestats` rpc call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeStats {
+    /// The number of successfully sent messages
+    pub send_success_count: u64,
+
+    /// The number of failures to send messages
+    pub send_failure_count: u64,
+
+    /// The number of inbound items queued to be processed
+    pub inbound_channel_items: u64,
+}
+
 /// Returned value for the `getpeerinfo` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerInfo {

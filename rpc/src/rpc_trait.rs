@@ -74,6 +74,10 @@ pub trait RpcFunctions {
     #[rpc(name = "getnodeinfo")]
     fn get_node_info(&self) -> Result<NodeInfo, RpcError>;
 
+    #[cfg_attr(nightly, doc(include = "../documentation/public_endpoints/getnodestats.md"))]
+    #[rpc(name = "getnodestats")]
+    fn get_node_stats(&self) -> Result<NodeStats, RpcError>;
+
     #[cfg_attr(nightly, doc(include = "../documentation/public_endpoints/getblocktemplate.md"))]
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;

@@ -1,0 +1,18 @@
+Returns statistics related to the node.
+
+### Arguments
+
+None
+
+### Response
+
+|         Parameter       | Type |                     Description                    |
+|:-----------------------:|:----:|:--------------------------------------------------:|
+| `send_success_count`    | u64  | The number of successfully sent messages           |
+| `send_failure_count`    | u64  | The number of failures to send messages            |
+| `inbound_channel_items` | u64  | The number of inbound items queued to be processed |
+
+### Example
+```ignore
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getnodestats", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+```

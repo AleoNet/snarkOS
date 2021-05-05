@@ -35,7 +35,10 @@ use snarkvm_utilities::{
 use chrono::Utc;
 use parking_lot::Mutex;
 
-use std::{ops::Deref, sync::Arc};
+use std::{
+    ops::Deref,
+    sync::{atomic::Ordering, Arc},
+};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -310,6 +313,15 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         Ok(NodeInfo {
             is_miner: self.sync_handler()?.is_miner(),
             is_syncing: self.sync_handler()?.is_syncing_blocks(),
+        })
+    }
+
+    /// Returns statistics related to the node.
+    fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
+        Ok(NodeStats {
+            send_success_count: self.node.stats.send_success_count.load(Ordering::Relaxed),
+            send_failure_count: self.node.stats.send_failure_count.load(Ordering::Relaxed),
+            inbound_channel_items: self.node.stats.inbound_channel_items.load(Ordering::SeqCst),
         })
     }
 
