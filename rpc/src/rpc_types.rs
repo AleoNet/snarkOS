@@ -138,6 +138,8 @@ pub struct NodeStats {
     pub outbound: NodeOutboundStats,
     /// Stats related to the node's connections.
     pub connections: NodeConnectionStats,
+    /// Stats related to the node's handshakes.
+    pub handshakes: NodeHandshakeStats,
 
     /// The number of blocks the node has mined.
     pub blocks_mined: u32,
@@ -203,6 +205,22 @@ pub struct NodeConnectionStats {
     pub connecting_peers: u16,
     /// Number of known disconnected peers.
     pub disconnected_peers: u16,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeHandshakeStats {
+    /// The number of failed handshakes as the initiator.
+    pub failures_init: u64,
+    /// The number of failed handshakes as the responder.
+    pub failures_resp: u64,
+    /// The number of successful handshakes as the initiator.
+    pub successes_init: u64,
+    /// The number of successful handshakes as the responder.
+    pub successes_resp: u64,
+    /// The number of handshake timeouts as the initiator.
+    pub timeouts_init: u64,
+    /// The number of handshake timeouts as the responder.
+    pub timeouts_resp: u64,
 }
 
 /// Returned value for the `getpeerinfo` rpc call

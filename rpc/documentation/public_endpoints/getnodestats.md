@@ -15,6 +15,12 @@ None
 | `connections.connected_peers`    | u16  | The number of currently connected peers                   |
 | `connections.connecting_peers`   | u16  | The number of currently connecting peers                  |
 | `connections.disconnected_peers` | u16  | The number of known disconnected peers                    |
+| `handshakes.failures_init`       | u64  | The number of failed handshakes as the initiator          |
+| `handshakes.failures_resp`       | u64  | The number of failed handshakes as the responder          |
+| `handshakes.successes_init`      | u64  | The number of successful handshakes as the initiator      |
+| `handshakes.successes_resp`      | u64  | The number of successful handshakes as the responder      |
+| `handshakes.timeouts_init`       | u64  | The number of handshake timeouts as the initiator         |
+| `handshakes.timeouts_resp`       | u64  | The number of handshake timeouts as the responder         |
 | `inbound.all_successes`          | u64  | The number of successfully processed inbound messages     |
 | `inbound.all_failures`           | u64  | The number of inbound messages that couldn't be processed |
 | `inbound.queued_messages`        | u64  | The number of inbound messages queued to be processed     |

@@ -145,10 +145,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             Ok(Err(e)) => {
                                 error!("Failed to accept a connection request: {}", e);
                                 let _ = node.disconnect_from_peer(remote_address);
+                                node.stats.handshakes.failures_resp.fetch_add(1, Ordering::Relaxed);
                             }
                             Err(_) => {
                                 error!("Failed to accept a connection request: the handshake timed out");
                                 let _ = node.disconnect_from_peer(remote_address);
+                                node.stats.handshakes.timeouts_resp.fetch_add(1, Ordering::Relaxed);
                             }
                         }
                     }
@@ -397,6 +399,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let len = noise.read_message(&buf[..len], &mut buffer)?;
         let peer_version = Version::deserialize(&buffer[..len])?;
         trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
+
+        self.stats.handshakes.successes_resp.fetch_add(1, Ordering::Relaxed);
 
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));

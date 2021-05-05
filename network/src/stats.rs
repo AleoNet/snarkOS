@@ -26,6 +26,8 @@ pub struct Stats {
     pub outbound: OutboundStats,
     /// Stats related to the node's connections.
     pub connections: ConnectionStats,
+    /// Stats related to the node's handshakes.
+    pub handshakes: HandshakeStats,
 
     /// The number of mined blocks.
     pub blocks_mined: AtomicU32,
@@ -83,4 +85,20 @@ pub struct ConnectionStats {
     pub all_accepted: AtomicU64,
     /// The number of all connections the node has initiated.
     pub all_initiated: AtomicU64,
+}
+
+#[derive(Default)]
+pub struct HandshakeStats {
+    /// The number of failed handshakes as the initiator.
+    pub failures_init: AtomicU64,
+    /// The number of failed handshakes as the responder.
+    pub failures_resp: AtomicU64,
+    /// The number of successful handshakes as the initiator.
+    pub successes_init: AtomicU64,
+    /// The number of successful handshakes as the responder.
+    pub successes_resp: AtomicU64,
+    /// The number of handshake timeouts as the initiator.
+    pub timeouts_init: AtomicU64,
+    /// The number of handshake timeouts as the responder.
+    pub timeouts_resp: AtomicU64,
 }

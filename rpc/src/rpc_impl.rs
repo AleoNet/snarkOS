@@ -350,6 +350,14 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 connecting_peers: self.node.peer_book.number_of_connecting_peers(),
                 disconnected_peers: self.node.peer_book.number_of_disconnected_peers(),
             },
+            handshakes: NodeHandshakeStats {
+                successes_init: self.node.stats.handshakes.successes_init.load(Ordering::Relaxed),
+                successes_resp: self.node.stats.handshakes.successes_resp.load(Ordering::Relaxed),
+                failures_init: self.node.stats.handshakes.failures_init.load(Ordering::Relaxed),
+                failures_resp: self.node.stats.handshakes.failures_resp.load(Ordering::Relaxed),
+                timeouts_init: self.node.stats.handshakes.timeouts_init.load(Ordering::Relaxed),
+                timeouts_resp: self.node.stats.handshakes.timeouts_resp.load(Ordering::Relaxed),
+            },
 
             blocks_mined: self.node.stats.blocks_mined.load(Ordering::Relaxed),
             block_height: self.node.sync().map(|sync| sync.current_block_height()).unwrap_or(0),

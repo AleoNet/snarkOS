@@ -212,6 +212,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             writer.write_all(&buffer[..len]).await?;
             trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
+            node.stats.handshakes.successes_init.fetch_add(1, Ordering::Relaxed);
+
             let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
             let mut writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
@@ -261,9 +263,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 return e;
             }
             Ok(Err(_)) => {
+                self.stats.handshakes.failures_init.fetch_add(1, Ordering::Relaxed);
                 return Err(NetworkError::InvalidHandshake);
             }
             Err(_) => {
+                self.stats.handshakes.timeouts_init.fetch_add(1, Ordering::Relaxed);
                 return Err(NetworkError::HandshakeTimeout);
             }
         }
