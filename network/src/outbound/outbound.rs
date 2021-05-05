@@ -18,11 +18,7 @@ use crate::{ConnWriter, Direction, Message, NetworkError, Node, Payload};
 
 use snarkvm_objects::Storage;
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::{collections::HashMap, net::SocketAddr, sync::atomic::Ordering};
 
 use parking_lot::RwLock;
 use tokio::sync::mpsc::{error::TrySendError, Receiver, Sender};
@@ -35,10 +31,6 @@ type Channels = HashMap<SocketAddr, Sender<Message>>;
 pub struct Outbound {
     /// The map of remote addresses to their active write channels.
     pub(crate) channels: RwLock<Channels>,
-    /// The monotonic counter for the number of send requests that succeeded.
-    send_success_count: AtomicU64,
-    /// The monotonic counter for the number of send requests that failed.
-    send_failure_count: AtomicU64,
 }
 
 impl Outbound {
@@ -114,11 +106,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             if let Some(message) = receiver.recv().await {
                 match writer.write_message(&message.payload).await {
                     Ok(_) => {
-                        self.outbound.send_success_count.fetch_add(1, Ordering::SeqCst);
+                        self.stats.send_success_count.fetch_add(1, Ordering::Relaxed);
                     }
                     Err(error) => {
                         warn!("Failed to send a {}: {}", message, error);
-                        self.outbound.send_failure_count.fetch_add(1, Ordering::SeqCst);
+                        self.stats.send_failure_count.fetch_add(1, Ordering::Relaxed);
                     }
                 }
             }

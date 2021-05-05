@@ -50,6 +50,9 @@ pub use outbound::*;
 pub mod peers;
 pub use peers::*;
 
+pub mod stats;
+pub use stats::*;
+
 pub mod sync;
 pub use sync::*;
 

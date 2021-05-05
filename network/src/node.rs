@@ -58,6 +58,8 @@ pub struct InnerNode<S: Storage> {
     pub outbound: Outbound,
     /// The list of connected and disconnected peers of this node.
     pub peer_book: PeerBook,
+    /// A collection of node's statistics.
+    pub stats: Stats,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync<S>>>,
     /// The tasks spawned by the node.
@@ -131,6 +133,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         Ok(Self(Arc::new(InnerNode {
             name: thread_rng().gen(),
             state: Default::default(),
+            stats: Default::default(),
             local_address: Default::default(),
             config,
             inbound: Default::default(),
