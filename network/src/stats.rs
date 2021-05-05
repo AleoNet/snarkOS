@@ -26,4 +26,6 @@ pub struct Stats {
     pub inbound_channel_items: AtomicU64,
     /// The number of all connection requests the node has received.
     pub inbound_connection_requests: AtomicU64,
+    /// The number of outbound connection requests.
+    pub outbound_connection_requests: AtomicU64,
 }

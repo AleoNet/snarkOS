@@ -159,6 +159,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
+        self.stats.outbound_connection_requests.fetch_add(1, Ordering::Relaxed);
+
         self.peer_book.set_connecting(remote_address)?;
 
         debug!("Connecting to {}...", remote_address);

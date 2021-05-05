@@ -143,6 +143,9 @@ pub struct NodeStats {
 
     /// The number of connection requests the node has received
     pub inbound_connection_requests: u64,
+
+    /// The number of connection requests the node has made
+    pub outbound_connection_requests: u64,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
