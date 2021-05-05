@@ -18,7 +18,7 @@ use crate::{message::*, NetworkError, Sync};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::atomic::Ordering};
 
 impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
     ///
@@ -106,10 +106,22 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         );
 
         // Verify the block and insert it into the storage.
-        let is_valid_block = self.consensus.receive_block(&block_struct).is_ok();
+        let block_validity = self.consensus.receive_block(&block_struct);
+
+        if let Err(ConsensusError::PreExistingBlock) = block_validity {
+            if is_block_new {
+                self.node().stats.misc.duplicate_blocks.fetch_add(1, Ordering::Relaxed);
+            } else {
+                self.node()
+                    .stats
+                    .misc
+                    .duplicate_sync_blocks
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+        }
 
         // This is a new block, send it to our peers.
-        if is_block_new && is_valid_block {
+        if is_block_new && block_validity.is_ok() {
             self.propagate_block(block, remote_address).await;
         }
 

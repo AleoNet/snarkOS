@@ -8,8 +8,6 @@ None
 
 |             Parameter            | Type |                             Description                           |
 |:--------------------------------:|:----:|:-----------------------------------------------------------------:|
-| `block_height`                   | u32  | The current block height of the node                              |
-| `blocks_mined`                   | u32  | The number of blocks the node has mined                           |
 | `connections.all_accepted`       | u64  | The number of connection requests the node has received           |
 | `connections.all_initiated`      | u64  | The number of connection requests the node has made               |
 | `connections.connected_peers`    | u16  | The number of currently connected peers                           |
@@ -36,6 +34,10 @@ None
 | `inbound.syncblocks`             | u64  | The number of all received SyncBlock messages                     |
 | `inbound.transactions`           | u64  | The number of all received Transaction messages                   |
 | `inbound.unknown`                | u64  | The number of all received Unknown messages                       |
+| `misc.block_height`              | u32  | The current block height of the node                              |
+| `misc.blocks_mined`              | u32  | The number of blocks the node has mined                           |
+| `misc.duplicate_blocks`          | u64  | The number of duplicate blocks received                           |
+| `misc.duplicate_sync_blocks`     | u64  | The number of duplicate sync blocks received                      |
 | `outbound.all_successes`         | u64  | The number of successfully sent messages                          |
 | `outbound.all_failures`          | u64  | The number of failures to send messages                           |
 | `queues.inbound`                 | u32  | The number of messages queued in the common inbound channel       |

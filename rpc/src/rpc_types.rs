@@ -142,11 +142,8 @@ pub struct NodeStats {
     pub handshakes: NodeHandshakeStats,
     /// Stats related to the node's queues.
     pub queues: NodeQueueStats,
-
-    /// The number of blocks the node has mined.
-    pub blocks_mined: u32,
-    /// The current block height of the node.
-    pub block_height: u32,
+    /// Miscellaneous stats related to the node.
+    pub misc: NodeMiscStats,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -228,6 +225,18 @@ pub struct NodeQueueStats {
     pub inbound: u32,
     /// The number of messages queued in the individual outbound channels.
     pub outbound: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeMiscStats {
+    /// The current block height of the node.
+    pub block_height: u32,
+    /// The number of blocks the node has mined.
+    pub blocks_mined: u32,
+    /// The number of duplicate blocks received.
+    pub duplicate_blocks: u64,
+    /// The number of duplicate sync blocks received.
+    pub duplicate_sync_blocks: u64,
 }
 
 /// Returned value for the `getpeerinfo` rpc call

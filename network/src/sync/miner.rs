@@ -104,7 +104,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     self.node.set_state(State::Idle);
                 }
 
-                self.node.stats.blocks_mined.fetch_add(1, Ordering::Relaxed);
+                self.node.stats.misc.blocks_mined.fetch_add(1, Ordering::Relaxed);
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
 

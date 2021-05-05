@@ -30,9 +30,8 @@ pub struct Stats {
     pub handshakes: HandshakeStats,
     /// Stats related to the node's queues.
     pub queues: QueueStats,
-
-    /// The number of mined blocks.
-    pub blocks_mined: AtomicU32,
+    /// Miscellaneous stats related to the node.
+    pub misc: MiscStats,
 }
 
 #[derive(Default)]
@@ -108,4 +107,14 @@ pub struct QueueStats {
     pub inbound: AtomicU32,
     /// The number of messages queued in the individual outbound channels.
     pub outbound: AtomicU32,
+}
+
+#[derive(Default)]
+pub struct MiscStats {
+    /// The number of mined blocks.
+    pub blocks_mined: AtomicU32,
+    /// The number of duplicate blocks received.
+    pub duplicate_blocks: AtomicU64,
+    /// The number of duplicate sync blocks received.
+    pub duplicate_sync_blocks: AtomicU64,
 }

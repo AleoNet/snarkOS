@@ -360,9 +360,12 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 inbound: self.node.stats.queues.inbound.load(Ordering::SeqCst),
                 outbound: self.node.stats.queues.outbound.load(Ordering::SeqCst),
             },
-
-            blocks_mined: self.node.stats.blocks_mined.load(Ordering::Relaxed),
-            block_height: self.node.sync().map(|sync| sync.current_block_height()).unwrap_or(0),
+            misc: NodeMiscStats {
+                block_height: self.node.sync().map(|sync| sync.current_block_height()).unwrap_or(0),
+                blocks_mined: self.node.stats.misc.blocks_mined.load(Ordering::Relaxed),
+                duplicate_blocks: self.node.stats.misc.duplicate_blocks.load(Ordering::Relaxed),
+                duplicate_sync_blocks: self.node.stats.misc.duplicate_sync_blocks.load(Ordering::Relaxed),
+            },
         })
     }
 
