@@ -417,8 +417,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("Sending `GetPeers` requests to connected peers");
 
         for remote_address in self.connected_peers() {
-            self.outbound
-                .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
+            self.send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
                 .await;
 
             // // Fetch the connection channel.
@@ -449,12 +448,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for remote_address in self.connected_peers() {
             self.peer_book.sending_ping(remote_address);
 
-            self.outbound
-                .send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::Ping(current_block_height),
-                ))
-                .await;
+            self.send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::Ping(current_block_height),
+            ))
+            .await;
         }
     }
 
@@ -515,8 +513,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .copied()
             .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
 
-        self.outbound
-            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
+        self.send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
             .await;
     }
 

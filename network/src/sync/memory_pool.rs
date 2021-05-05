@@ -34,7 +34,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
             info!("Updating memory pool from {}", sync_node);
 
             self.node()
-                .outbound
                 .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool))
                 .await;
         } else {
@@ -58,7 +57,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
                 self.node()
-                    .outbound
                     .send_request(Message::new(
                         Direction::Outbound(remote_address),
                         Payload::Transaction(transaction_bytes.clone()),
@@ -131,7 +129,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
             self.node()
-                .outbound
                 .send_request(Message::new(
                     Direction::Outbound(remote_address),
                     Payload::MemoryPool(transactions),

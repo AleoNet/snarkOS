@@ -35,16 +35,31 @@ pub struct Outbound {
 
 impl Outbound {
     ///
+    /// Establishes an outbound channel to the given remote address, if it does not exist.
+    ///
+    #[inline]
+    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Sender<Message>, NetworkError> {
+        Ok(self
+            .channels
+            .read()
+            .get(&remote_address)
+            .ok_or(NetworkError::OutboundChannelMissing)?
+            .clone())
+    }
+}
+
+impl<S: Storage + Send + Sync + 'static> Node<S> {
+    ///
     /// Sends the given request to the address associated with it.
     ///
-    /// Creates or fetches an existing channel with the remote address,
-    /// and attempts to send the given request to them.
+    /// Fetches an existing channel with the remote address,
+    /// and attempts to send the given request to it.
     ///
     #[inline]
     pub async fn send_request(&self, request: Message) {
         let target_addr = request.receiver();
         // Fetch the outbound channel.
-        match self.outbound_channel(target_addr) {
+        match self.outbound.outbound_channel(target_addr) {
             Ok(channel) => match channel.try_send(request) {
                 Ok(()) => {}
                 Err(TrySendError::Full(request)) => {
@@ -66,21 +81,6 @@ impl Outbound {
         }
     }
 
-    ///
-    /// Establishes an outbound channel to the given remote address, if it does not exist.
-    ///
-    #[inline]
-    fn outbound_channel(&self, remote_address: SocketAddr) -> Result<Sender<Message>, NetworkError> {
-        Ok(self
-            .channels
-            .read()
-            .get(&remote_address)
-            .ok_or(NetworkError::OutboundChannelMissing)?
-            .clone())
-    }
-}
-
-impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn send_ping(&self, remote_address: SocketAddr) {
         // Consider peering tests that don't use the sync layer.
         let current_block_height = if let Some(ref sync) = self.sync() {
@@ -91,12 +91,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.peer_book.sending_ping(remote_address);
 
-        self.outbound
-            .send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::Ping(current_block_height),
-            ))
-            .await;
+        self.send_request(Message::new(
+            Direction::Outbound(remote_address),
+            Payload::Ping(current_block_height),
+        ))
+        .await;
     }
 
     /// This method handles new outbound messages to a single connected node.

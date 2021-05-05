@@ -203,8 +203,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 // Handle Ping/Pong messages immediately in order not to skew latency calculation.
                 match &message.payload {
                     Payload::Ping(..) => {
-                        self.outbound
-                            .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
+                        self.send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
                             .await;
                     }
                     Payload::Pong => {
