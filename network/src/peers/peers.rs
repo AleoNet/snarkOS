@@ -21,7 +21,7 @@ use std::{
     cmp,
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use parking_lot::Mutex;
@@ -34,11 +34,6 @@ use tokio::{
 };
 
 impl<S: Storage> Node<S> {
-    /// Obtain a list of addresses of connecting peers for this node.
-    pub(crate) fn connecting_peers(&self) -> Vec<(SocketAddr, Instant)> {
-        self.peer_book.connecting_peers().into_iter().collect()
-    }
-
     /// Obtain a list of addresses of connected peers for this node.
     pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.peer_book.connected_peers().keys().copied().collect()
@@ -76,19 +71,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
                 let _ = self.disconnect_from_peer(addr);
-            }
-        }
-
-        // Drop connections that failed to finalize in time.
-        // FIXME: this cleanup shouldn't be necessary
-        let connecting_peers = self.connecting_peers();
-        if !connecting_peers.is_empty() {
-            let now = Instant::now();
-
-            for (addr, timestamp) in connecting_peers {
-                if now - timestamp > Duration::from_secs(5) {
-                    let _ = self.peer_book.set_disconnected(addr);
-                }
             }
         }
 

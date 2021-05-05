@@ -104,9 +104,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                         match handshake_result {
                             Ok(Ok((mut writer, mut reader, remote_listener))) => {
-                                // Update the remote address to be the peer's listening address.
-                                let remote_address = writer.addr;
-
                                 // Create a channel dedicated to sending messages to the connection.
                                 let (sender, receiver) = channel(1024);
 
@@ -123,17 +120,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 });
 
                                 // Save the channel under the provided remote address.
-                                node.outbound.channels.write().insert(remote_address, sender);
+                                node.outbound.channels.write().insert(remote_listener, sender);
 
                                 // Finally, mark the peer as connected.
                                 node.peer_book.set_connected(remote_address, Some(remote_listener));
 
-                                trace!("Connected to {}", remote_address);
+                                trace!("Connected to {} (listener: {})", remote_address, remote_listener);
 
                                 // Immediately send a ping to provide the peer with our block height.
-                                node.send_ping(remote_address).await;
+                                node.send_ping(remote_listener).await;
 
-                                if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
+                                if let Ok(ref peer) = node.peer_book.get_peer(remote_listener) {
                                     peer.register_task(peer_reading_task);
                                     peer.register_task(peer_writing_task);
                                 } else {
