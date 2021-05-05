@@ -13,6 +13,8 @@ None
 | `inbound_channel_items`        | u64  | The number of inbound items queued to be processed      |
 | `inbound_connection_requests`  | u64  | The number of connection requests the node has received |
 | `outbound_connection_requests` | u64  | The number of connection requests the node has made     |
+| `number_of_connected_peers`    | u16  | The number of currently connected peers                 |
+| `number_of_connecting_peers`   | u16  | The number of currently connecting peers                |
 
 ### Example
 ```ignore

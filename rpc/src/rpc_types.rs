@@ -146,6 +146,12 @@ pub struct NodeStats {
 
     /// The number of connection requests the node has made
     pub outbound_connection_requests: u64,
+
+    /// Number of currently connected peers.
+    pub number_of_connected_peers: u16,
+
+    /// Number of currently connecting peers.
+    pub number_of_connecting_peers: u16,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
