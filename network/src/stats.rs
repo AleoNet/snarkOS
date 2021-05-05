@@ -20,47 +20,67 @@ use std::sync::atomic::{AtomicU32, AtomicU64};
 // interchangeable with prometheus metrics.
 #[derive(Default)]
 pub struct Stats {
-    /// The monotonic counter for the number of send requests that succeeded.
-    pub send_success_count: AtomicU64,
-    /// The monotonic counter for the number of send requests that failed.
-    pub send_failure_count: AtomicU64,
-    /// The number of successfully processed inbound messages.
-    pub recv_success_count: AtomicU64,
-    /// The number of inbound messages that couldn't be processed.
-    pub recv_failure_count: AtomicU64,
-    /// The current number of items in the inbound channel.
-    pub inbound_channel_items: AtomicU64,
-    /// The number of all connection requests the node has received.
-    pub inbound_connection_requests: AtomicU64,
-    /// The number of outbound connection requests.
-    pub outbound_connection_requests: AtomicU64,
+    /// Stats related to messages received by the node.
+    pub inbound: InboundStats,
+    /// Stats related to messages sent by the node.
+    pub outbound: OutboundStats,
+    /// Stats related to the node's connections.
+    pub connections: ConnectionStats,
+
     /// The number of mined blocks.
     pub blocks_mined: AtomicU32,
+}
+
+#[derive(Default)]
+pub struct InboundStats {
+    /// The number of successfully processed inbound messages.
+    pub all_successes: AtomicU64,
+    /// The number of inbound messages that couldn't be processed.
+    pub all_failures: AtomicU64,
+
+    /// The current number of messages queued in the inbound channel.
+    pub queued_messages: AtomicU64,
 
     /// The number of all received `Block` messages.
-    pub recv_blocks: AtomicU64,
+    pub blocks: AtomicU64,
     /// The number of all received `GetBlocks` messages.
-    pub recv_getblocks: AtomicU64,
+    pub getblocks: AtomicU64,
     /// The number of all received `GetMemoryPool` messages.
-    pub recv_getmemorypool: AtomicU64,
+    pub getmemorypool: AtomicU64,
     /// The number of all received `GetPeers` messages.
-    pub recv_getpeers: AtomicU64,
+    pub getpeers: AtomicU64,
     /// The number of all received `GetSync` messages.
-    pub recv_getsync: AtomicU64,
+    pub getsync: AtomicU64,
     /// The number of all received `MemoryPool` messages.
-    pub recv_memorypool: AtomicU64,
+    pub memorypool: AtomicU64,
     /// The number of all received `Peers` messages.
-    pub recv_peers: AtomicU64,
+    pub peers: AtomicU64,
     /// The number of all received `Ping` messages.
-    pub recv_pings: AtomicU64,
+    pub pings: AtomicU64,
     /// The number of all received `Pong` messages.
-    pub recv_pongs: AtomicU64,
+    pub pongs: AtomicU64,
     /// The number of all received `Sync` messages.
-    pub recv_syncs: AtomicU64,
+    pub syncs: AtomicU64,
     /// The number of all received `SyncBlock` messages.
-    pub recv_syncblocks: AtomicU64,
+    pub syncblocks: AtomicU64,
     /// The number of all received `Transaction` messages.
-    pub recv_transactions: AtomicU64,
+    pub transactions: AtomicU64,
     /// The number of all received `Unknown` messages.
-    pub recv_unknown: AtomicU64,
+    pub unknown: AtomicU64,
+}
+
+#[derive(Default)]
+pub struct OutboundStats {
+    /// The number of messages successfully sent by the node.
+    pub all_successes: AtomicU64,
+    /// The number of messages that failed to be sent to peers.
+    pub all_failures: AtomicU64,
+}
+
+#[derive(Default)]
+pub struct ConnectionStats {
+    /// The number of all connections the node has accepted.
+    pub all_accepted: AtomicU64,
+    /// The number of all connections the node has initiated.
+    pub all_initiated: AtomicU64,
 }

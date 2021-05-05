@@ -154,7 +154,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
                 }
-                node.stats.inbound_connection_requests.fetch_add(1, Ordering::Relaxed);
+                node.stats.connections.all_accepted.fetch_add(1, Ordering::Relaxed);
             }
         });
 
@@ -220,7 +220,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        self.stats.inbound_channel_items.fetch_sub(1, Ordering::SeqCst);
+        self.stats.inbound.queued_messages.fetch_sub(1, Ordering::SeqCst);
 
         let source = if let Direction::Inbound(addr) = direction {
             self.peer_book.update_last_seen(addr);
@@ -231,21 +231,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         match payload {
             Payload::Transaction(transaction) => {
-                self.stats.recv_transactions.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.transactions.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {
-                self.stats.recv_blocks.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.blocks.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_block(source, block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
-                self.stats.recv_syncblocks.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.syncblocks.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_block(source, block, false).await?;
@@ -262,35 +262,35 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetBlocks(hashes) => {
-                self.stats.recv_getblocks.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.getblocks.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_blocks(source, hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
-                self.stats.recv_getmemorypool.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.getmemorypool.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_memory_pool(source).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
-                self.stats.recv_memorypool.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.memorypool.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_memory_pool(mempool)?;
                 }
             }
             Payload::GetSync(getsync) => {
-                self.stats.recv_getsync.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.getsync.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_sync(source, getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
-                self.stats.recv_syncs.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.syncs.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(ref sync_handler) = self.sync() {
                     if sync.is_empty() {
@@ -302,17 +302,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetPeers => {
-                self.stats.recv_getpeers.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.getpeers.fetch_add(1, Ordering::Relaxed);
 
                 self.send_peers(source).await;
             }
             Payload::Peers(peers) => {
-                self.stats.recv_peers.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.peers.fetch_add(1, Ordering::Relaxed);
 
                 self.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
-                self.stats.recv_pings.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.pings.fetch_add(1, Ordering::Relaxed);
 
                 self.peer_book.received_ping(source, block_height);
 
@@ -333,11 +333,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 // }
             }
             Payload::Pong => {
-                self.stats.recv_pongs.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.pongs.fetch_add(1, Ordering::Relaxed);
                 // Skip as this case is already handled with priority in Inbound::listen_for_messages
             }
             Payload::Unknown => {
-                self.stats.recv_unknown.fetch_add(1, Ordering::Relaxed);
+                self.stats.inbound.unknown.fetch_add(1, Ordering::Relaxed);
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
             }
         }
@@ -413,7 +413,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if let Err(err) = self.inbound.sender.send(response).await {
             error!("Failed to route a response for a message: {}", err);
         } else {
-            self.stats.inbound_channel_items.fetch_add(1, Ordering::SeqCst);
+            self.stats.inbound.queued_messages.fetch_add(1, Ordering::SeqCst);
         }
     }
 }

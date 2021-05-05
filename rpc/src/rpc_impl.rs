@@ -319,31 +319,39 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns statistics related to the node.
     fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
         Ok(NodeStats {
-            send_success_count: self.node.stats.send_success_count.load(Ordering::Relaxed),
-            send_failure_count: self.node.stats.send_failure_count.load(Ordering::Relaxed),
-            recv_success_count: self.node.stats.recv_success_count.load(Ordering::Relaxed),
-            recv_failure_count: self.node.stats.recv_failure_count.load(Ordering::Relaxed),
-            inbound_channel_items: self.node.stats.inbound_channel_items.load(Ordering::SeqCst),
-            inbound_connection_requests: self.node.stats.inbound_connection_requests.load(Ordering::Relaxed),
-            outbound_connection_requests: self.node.stats.outbound_connection_requests.load(Ordering::Relaxed),
-            number_of_connected_peers: self.node.peer_book.number_of_connected_peers(),
-            number_of_connecting_peers: self.node.peer_book.number_of_connecting_peers(),
+            inbound: NodeInboundStats {
+                all_successes: self.node.stats.inbound.all_successes.load(Ordering::Relaxed),
+                all_failures: self.node.stats.inbound.all_failures.load(Ordering::Relaxed),
+
+                queued_messages: self.node.stats.inbound.queued_messages.load(Ordering::SeqCst),
+
+                blocks: self.node.stats.inbound.blocks.load(Ordering::Relaxed),
+                getblocks: self.node.stats.inbound.getblocks.load(Ordering::Relaxed),
+                getmemorypool: self.node.stats.inbound.getmemorypool.load(Ordering::Relaxed),
+                getpeers: self.node.stats.inbound.getpeers.load(Ordering::Relaxed),
+                getsync: self.node.stats.inbound.getsync.load(Ordering::Relaxed),
+                memorypool: self.node.stats.inbound.memorypool.load(Ordering::Relaxed),
+                peers: self.node.stats.inbound.peers.load(Ordering::Relaxed),
+                pings: self.node.stats.inbound.pings.load(Ordering::Relaxed),
+                pongs: self.node.stats.inbound.pongs.load(Ordering::Relaxed),
+                syncs: self.node.stats.inbound.syncs.load(Ordering::Relaxed),
+                syncblocks: self.node.stats.inbound.syncblocks.load(Ordering::Relaxed),
+                transactions: self.node.stats.inbound.transactions.load(Ordering::Relaxed),
+                unknown: self.node.stats.inbound.unknown.load(Ordering::Relaxed),
+            },
+            outbound: NodeOutboundStats {
+                all_successes: self.node.stats.outbound.all_successes.load(Ordering::Relaxed),
+                all_failures: self.node.stats.outbound.all_failures.load(Ordering::Relaxed),
+            },
+            connections: NodeConnectionStats {
+                all_accepted: self.node.stats.connections.all_accepted.load(Ordering::Relaxed),
+                all_initiated: self.node.stats.connections.all_initiated.load(Ordering::Relaxed),
+                connected_peers: self.node.peer_book.number_of_connected_peers(),
+                connecting_peers: self.node.peer_book.number_of_connecting_peers(),
+            },
+
             blocks_mined: self.node.stats.blocks_mined.load(Ordering::Relaxed),
             block_height: self.node.sync().map(|sync| sync.current_block_height()).unwrap_or(0),
-
-            recv_blocks: self.node.stats.recv_blocks.load(Ordering::Relaxed),
-            recv_getblocks: self.node.stats.recv_getblocks.load(Ordering::Relaxed),
-            recv_getmemorypool: self.node.stats.recv_getmemorypool.load(Ordering::Relaxed),
-            recv_getpeers: self.node.stats.recv_getpeers.load(Ordering::Relaxed),
-            recv_getsync: self.node.stats.recv_getsync.load(Ordering::Relaxed),
-            recv_memorypool: self.node.stats.recv_memorypool.load(Ordering::Relaxed),
-            recv_peers: self.node.stats.recv_peers.load(Ordering::Relaxed),
-            recv_pings: self.node.stats.recv_pings.load(Ordering::Relaxed),
-            recv_pongs: self.node.stats.recv_pongs.load(Ordering::Relaxed),
-            recv_syncs: self.node.stats.recv_syncs.load(Ordering::Relaxed),
-            recv_syncblocks: self.node.stats.recv_syncblocks.load(Ordering::Relaxed),
-            recv_transactions: self.node.stats.recv_transactions.load(Ordering::Relaxed),
-            recv_unknown: self.node.stats.recv_unknown.load(Ordering::Relaxed),
         })
     }
 

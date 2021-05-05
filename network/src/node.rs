@@ -176,10 +176,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let incoming_task = task::spawn(async move {
             loop {
                 if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
-                    node_clone.stats.recv_failure_count.fetch_add(1, Ordering::Relaxed);
+                    node_clone.stats.inbound.all_failures.fetch_add(1, Ordering::Relaxed);
                     error!("Node error: {}", e);
                 } else {
-                    node_clone.stats.recv_success_count.fetch_add(1, Ordering::Relaxed);
+                    node_clone.stats.inbound.all_successes.fetch_add(1, Ordering::Relaxed);
                 }
             }
         });

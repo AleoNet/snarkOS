@@ -132,77 +132,75 @@ pub struct NodeInfo {
 /// Returned value for the `getnodestats` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeStats {
-    /// The number of successfully sent messages
-    pub send_success_count: u64,
-
-    /// The number of failures to send messages
-    pub send_failure_count: u64,
-
-    /// The number of successfully processed inbound messages.
-    pub recv_success_count: u64,
-
-    /// The number of inbound messages that couldn't be processed.
-    pub recv_failure_count: u64,
-
-    /// The number of inbound items queued to be processed
-    pub inbound_channel_items: u64,
-
-    /// The number of connection requests the node has received
-    pub inbound_connection_requests: u64,
-
-    /// The number of connection requests the node has made
-    pub outbound_connection_requests: u64,
-
-    /// Number of currently connected peers.
-    pub number_of_connected_peers: u16,
-
-    /// Number of currently connecting peers.
-    pub number_of_connecting_peers: u16,
+    /// Stats related to messages received by the node.
+    pub inbound: NodeInboundStats,
+    /// Stats related to messages sent by the node.
+    pub outbound: NodeOutboundStats,
+    /// Stats related to the node's connections.
+    pub connections: NodeConnectionStats,
 
     /// The number of blocks the node has mined.
     pub blocks_mined: u32,
-
     /// The current block height of the node.
     pub block_height: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeInboundStats {
+    /// The number of successfully processed inbound messages.
+    pub all_successes: u64,
+    /// The number of inbound messages that couldn't be processed.
+    pub all_failures: u64,
+
+    /// The current number of messages queued in the inbound channel.
+    pub queued_messages: u64,
 
     /// The number of all received `Block` messages.
-    pub recv_blocks: u64,
-
+    pub blocks: u64,
     /// The number of all received `GetBlocks` messages.
-    pub recv_getblocks: u64,
-
+    pub getblocks: u64,
     /// The number of all received `GetMemoryPool` messages.
-    pub recv_getmemorypool: u64,
-
+    pub getmemorypool: u64,
     /// The number of all received `GetPeers` messages.
-    pub recv_getpeers: u64,
-
+    pub getpeers: u64,
     /// The number of all received `GetSync` messages.
-    pub recv_getsync: u64,
-
+    pub getsync: u64,
     /// The number of all received `MemoryPool` messages.
-    pub recv_memorypool: u64,
-
+    pub memorypool: u64,
     /// The number of all received `Peers` messages.
-    pub recv_peers: u64,
-
+    pub peers: u64,
     /// The number of all received `Ping` messages.
-    pub recv_pings: u64,
-
+    pub pings: u64,
     /// The number of all received `Pong` messages.
-    pub recv_pongs: u64,
-
+    pub pongs: u64,
     /// The number of all received `Sync` messages.
-    pub recv_syncs: u64,
-
+    pub syncs: u64,
     /// The number of all received `SyncBlock` messages.
-    pub recv_syncblocks: u64,
-
+    pub syncblocks: u64,
     /// The number of all received `Transaction` messages.
-    pub recv_transactions: u64,
-
+    pub transactions: u64,
     /// The number of all received `Unknown` messages.
-    pub recv_unknown: u64,
+    pub unknown: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeOutboundStats {
+    /// The number of messages successfully sent by the node.
+    pub all_successes: u64,
+    /// The number of messages that failed to be sent to peers.
+    pub all_failures: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeConnectionStats {
+    /// The number of all connections the node has accepted.
+    pub all_accepted: u64,
+    /// The number of all connections the node has initiated.
+    pub all_initiated: u64,
+    /// Number of currently connected peers.
+    pub connected_peers: u16,
+    /// Number of currently connecting peers.
+    pub connecting_peers: u16,
 }
 
 /// Returned value for the `getpeerinfo` rpc call

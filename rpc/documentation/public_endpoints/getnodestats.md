@@ -8,29 +8,29 @@ None
 
 |            Parameter           | Type |                         Description                       |
 |:------------------------------:|:----:|:---------------------------------------------------------:|
-| `send_success_count`           | u64  | The number of successfully sent messages                  |
-| `send_failure_count`           | u64  | The number of failures to send messages                   |
-| `recv_success_count`           | u64  | The number of successfully processed inbound messages     |
-| `recv_failure_count`           | u64  | The number of inbound messages that couldn't be processed |
-| `inbound_channel_items`        | u64  | The number of inbound items queued to be processed        |
-| `inbound_connection_requests`  | u64  | The number of connection requests the node has received   |
-| `outbound_connection_requests` | u64  | The number of connection requests the node has made       |
-| `number_of_connected_peers`    | u16  | The number of currently connected peers                   |
-| `number_of_connecting_peers`   | u16  | The number of currently connecting peers                  |
-| `blocks_mined`                 | u32  | The number of blocks the node has mined                   |
 | `block_height`                 | u32  | The current block height of the node                      |
-| `recv_blocks`                  | u64  | The number of all received Block messages                 |
-| `recv_getmemorypool`           | u64  | The number of all received GetMemoryPool messages         |
-| `recv_getpeers`                | u64  | The number of all received GetPeers messages              |
-| `recv_getsync`                 | u64  | The number of all received GetSync messages               |
-| `recv_memorypool`              | u64  | The number of all received MemoryPool messages            |
-| `recv_peers`                   | u64  | The number of all received Peers messages                 |
-| `recv_pings`                   | u64  | The number of all received Ping messages                  |
-| `recv_pongs`                   | u64  | The number of all received Pong messages                  |
-| `recv_syncs`                   | u64  | The number of all received Sync messages                  |
-| `recv_syncblocks`              | u64  | The number of all received SyncBlock messages             |
-| `recv_transactions`            | u64  | The number of all received Transaction messages           |
-| `recv_unknown`                 | u64  | The number of all received Unknown messages               |
+| `blocks_mined`                 | u32  | The number of blocks the node has mined                   |
+| `connections.all_accepted`     | u64  | The number of connection requests the node has received   |
+| `connections.all_initiated`    | u64  | The number of connection requests the node has made       |
+| `connections.connected_peers`  | u16  | The number of currently connected peers                   |
+| `connections.connecting_peers` | u16  | The number of currently connecting peers                  |
+| `inbound.all_successes`        | u64  | The number of successfully processed inbound messages     |
+| `inbound.all_failures`         | u64  | The number of inbound messages that couldn't be processed |
+| `inbound.queued_messages`      | u64  | The number of inbound items queued to be processed        |
+| `inbound.blocks`               | u64  | The number of all received Block messages                 |
+| `inbound.getmemorypool`        | u64  | The number of all received GetMemoryPool messages         |
+| `inbound.getpeers`             | u64  | The number of all received GetPeers messages              |
+| `inbound.getsync`              | u64  | The number of all received GetSync messages               |
+| `inbound.memorypool`           | u64  | The number of all received MemoryPool messages            |
+| `inbound.peers`                | u64  | The number of all received Peers messages                 |
+| `inbound.pings`                | u64  | The number of all received Ping messages                  |
+| `inbound.pongs`                | u64  | The number of all received Pong messages                  |
+| `inbound.syncs`                | u64  | The number of all received Sync messages                  |
+| `inbound.syncblocks`           | u64  | The number of all received SyncBlock messages             |
+| `inbound.transactions`         | u64  | The number of all received Transaction messages           |
+| `inbound.unknown`              | u64  | The number of all received Unknown messages               |
+| `outbound.all_successes`       | u64  | The number of successfully sent messages                  |
+| `outbound.all_failures`        | u64  | The number of failures to send messages                   |
 
 ### Example
 ```ignore
