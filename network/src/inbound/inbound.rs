@@ -53,13 +53,6 @@ impl Default for Inbound {
 
 impl Inbound {
     #[inline]
-    pub(crate) async fn route(&self, response: Message) {
-        if let Err(err) = self.sender.send(response).await {
-            error!("Failed to route a response for a message: {}", err);
-        }
-    }
-
-    #[inline]
     pub(crate) fn take_receiver(&self) -> Receiver {
         self.receiver
             .lock()
@@ -213,7 +206,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
 
                 // Messages are queued in a single tokio MPSC receiver.
-                self.inbound.route(message).await
+                self.route(message).await
             }
         }
     }
@@ -381,5 +374,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let writer = ConnWriter::new(remote_listener, writer, buffer, noise);
 
         Ok((writer, reader, remote_listener))
+    }
+
+    #[inline]
+    pub(crate) async fn route(&self, response: Message) {
+        if let Err(err) = self.inbound.sender.send(response).await {
+            error!("Failed to route a response for a message: {}", err);
+        }
     }
 }
