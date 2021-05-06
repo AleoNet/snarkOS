@@ -60,6 +60,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let bootnodes = self.config.bootnodes();
 
         // Drop peers whose RTT is too high or have too many failures.
+        let now = chrono::Utc::now();
         for (addr, peer_quality) in self
             .peer_book
             .connected_peers()
@@ -69,7 +70,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         {
             if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1500
                 || peer_quality.failures.load(Ordering::Relaxed) > 10
-                || peer_quality.is_inactive()
+                || peer_quality.is_inactive(now)
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
                 let _ = self.disconnect_from_peer(addr);

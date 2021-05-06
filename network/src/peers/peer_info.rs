@@ -57,9 +57,7 @@ pub struct PeerQuality {
 }
 
 impl PeerQuality {
-    pub fn is_inactive(&self) -> bool {
-        let now = Utc::now();
-
+    pub fn is_inactive(&self, now: DateTime<Utc>) -> bool {
         let last_seen = *self.last_seen.read();
         if let Some(last_seen) = last_seen {
             now - last_seen > chrono::Duration::seconds(crate::MAX_PEER_INACTIVITY_SECS.into())
