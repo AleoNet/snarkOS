@@ -18,11 +18,7 @@ use crate::{ConnWriter, Direction, Message, NetworkError, Node, Payload};
 
 use snarkvm_objects::Storage;
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::{collections::HashMap, net::SocketAddr, sync::atomic::Ordering};
 
 use parking_lot::RwLock;
 use tokio::sync::mpsc::{error::TrySendError, Receiver, Sender};
@@ -35,45 +31,9 @@ type Channels = HashMap<SocketAddr, Sender<Message>>;
 pub struct Outbound {
     /// The map of remote addresses to their active write channels.
     pub(crate) channels: RwLock<Channels>,
-    /// The monotonic counter for the number of send requests that succeeded.
-    send_success_count: AtomicU64,
-    /// The monotonic counter for the number of send requests that failed.
-    send_failure_count: AtomicU64,
 }
 
 impl Outbound {
-    ///
-    /// Sends the given request to the address associated with it.
-    ///
-    /// Creates or fetches an existing channel with the remote address,
-    /// and attempts to send the given request to them.
-    ///
-    #[inline]
-    pub async fn send_request(&self, request: Message) {
-        let target_addr = request.receiver();
-        // Fetch the outbound channel.
-        match self.outbound_channel(target_addr) {
-            Ok(channel) => match channel.try_send(request) {
-                Ok(()) => {}
-                Err(TrySendError::Full(request)) => {
-                    warn!(
-                        "Couldn't send a {} to {}: the send channel is full",
-                        request, target_addr
-                    );
-                }
-                Err(TrySendError::Closed(request)) => {
-                    error!(
-                        "Couldn't send a {} to {}: the send channel is closed",
-                        request, target_addr
-                    );
-                }
-            },
-            Err(_) => {
-                warn!("Failed to send a {}: peer is disconnected", request);
-            }
-        }
-    }
-
     ///
     /// Establishes an outbound channel to the given remote address, if it does not exist.
     ///
@@ -89,6 +49,43 @@ impl Outbound {
 }
 
 impl<S: Storage + Send + Sync + 'static> Node<S> {
+    ///
+    /// Sends the given request to the address associated with it.
+    ///
+    /// Fetches an existing channel with the remote address,
+    /// and attempts to send the given request to it.
+    ///
+    #[inline]
+    pub async fn send_request(&self, request: Message) {
+        let target_addr = request.receiver();
+        // Fetch the outbound channel.
+        match self.outbound.outbound_channel(target_addr) {
+            Ok(channel) => match channel.try_send(request) {
+                Ok(()) => {
+                    self.stats.queues.outbound.fetch_add(1, Ordering::SeqCst);
+                }
+                Err(TrySendError::Full(request)) => {
+                    warn!(
+                        "Couldn't send a {} to {}: the send channel is full",
+                        request, target_addr
+                    );
+                    self.stats.outbound.all_failures.fetch_add(1, Ordering::Relaxed);
+                }
+                Err(TrySendError::Closed(request)) => {
+                    error!(
+                        "Couldn't send a {} to {}: the send channel is closed",
+                        request, target_addr
+                    );
+                    self.stats.outbound.all_failures.fetch_add(1, Ordering::Relaxed);
+                }
+            },
+            Err(_) => {
+                warn!("Failed to send a {}: peer is disconnected", request);
+                self.stats.outbound.all_failures.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
     pub async fn send_ping(&self, remote_address: SocketAddr) {
         // Consider peering tests that don't use the sync layer.
         let current_block_height = if let Some(ref sync) = self.sync() {
@@ -99,12 +96,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         self.peer_book.sending_ping(remote_address);
 
-        self.outbound
-            .send_request(Message::new(
-                Direction::Outbound(remote_address),
-                Payload::Ping(current_block_height),
-            ))
-            .await;
+        self.send_request(Message::new(
+            Direction::Outbound(remote_address),
+            Payload::Ping(current_block_height),
+        ))
+        .await;
     }
 
     /// This method handles new outbound messages to a single connected node.
@@ -112,13 +108,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         loop {
             // Read the next message queued to be sent.
             if let Some(message) = receiver.recv().await {
+                self.stats.queues.outbound.fetch_sub(1, Ordering::SeqCst);
+
                 match writer.write_message(&message.payload).await {
                     Ok(_) => {
-                        self.outbound.send_success_count.fetch_add(1, Ordering::SeqCst);
+                        self.stats.outbound.all_successes.fetch_add(1, Ordering::Relaxed);
                     }
                     Err(error) => {
                         warn!("Failed to send a {}: {}", message, error);
-                        self.outbound.send_failure_count.fetch_add(1, Ordering::SeqCst);
+                        self.stats.outbound.all_failures.fetch_add(1, Ordering::Relaxed);
                     }
                 }
             }

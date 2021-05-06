@@ -35,7 +35,10 @@ use snarkvm_utilities::{
 use chrono::Utc;
 use parking_lot::Mutex;
 
-use std::{ops::Deref, sync::Arc};
+use std::{
+    ops::Deref,
+    sync::{atomic::Ordering, Arc},
+};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -310,6 +313,59 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         Ok(NodeInfo {
             is_miner: self.sync_handler()?.is_miner(),
             is_syncing: self.sync_handler()?.is_syncing_blocks(),
+        })
+    }
+
+    /// Returns statistics related to the node.
+    fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
+        Ok(NodeStats {
+            inbound: NodeInboundStats {
+                all_successes: self.node.stats.inbound.all_successes.load(Ordering::Relaxed),
+                all_failures: self.node.stats.inbound.all_failures.load(Ordering::Relaxed),
+
+                blocks: self.node.stats.inbound.blocks.load(Ordering::Relaxed),
+                getblocks: self.node.stats.inbound.getblocks.load(Ordering::Relaxed),
+                getmemorypool: self.node.stats.inbound.getmemorypool.load(Ordering::Relaxed),
+                getpeers: self.node.stats.inbound.getpeers.load(Ordering::Relaxed),
+                getsync: self.node.stats.inbound.getsync.load(Ordering::Relaxed),
+                memorypool: self.node.stats.inbound.memorypool.load(Ordering::Relaxed),
+                peers: self.node.stats.inbound.peers.load(Ordering::Relaxed),
+                pings: self.node.stats.inbound.pings.load(Ordering::Relaxed),
+                pongs: self.node.stats.inbound.pongs.load(Ordering::Relaxed),
+                syncs: self.node.stats.inbound.syncs.load(Ordering::Relaxed),
+                syncblocks: self.node.stats.inbound.syncblocks.load(Ordering::Relaxed),
+                transactions: self.node.stats.inbound.transactions.load(Ordering::Relaxed),
+                unknown: self.node.stats.inbound.unknown.load(Ordering::Relaxed),
+            },
+            outbound: NodeOutboundStats {
+                all_successes: self.node.stats.outbound.all_successes.load(Ordering::Relaxed),
+                all_failures: self.node.stats.outbound.all_failures.load(Ordering::Relaxed),
+            },
+            connections: NodeConnectionStats {
+                all_accepted: self.node.stats.connections.all_accepted.load(Ordering::Relaxed),
+                all_initiated: self.node.stats.connections.all_initiated.load(Ordering::Relaxed),
+                connected_peers: self.node.peer_book.number_of_connected_peers(),
+                connecting_peers: self.node.peer_book.number_of_connecting_peers(),
+                disconnected_peers: self.node.peer_book.number_of_disconnected_peers(),
+            },
+            handshakes: NodeHandshakeStats {
+                successes_init: self.node.stats.handshakes.successes_init.load(Ordering::Relaxed),
+                successes_resp: self.node.stats.handshakes.successes_resp.load(Ordering::Relaxed),
+                failures_init: self.node.stats.handshakes.failures_init.load(Ordering::Relaxed),
+                failures_resp: self.node.stats.handshakes.failures_resp.load(Ordering::Relaxed),
+                timeouts_init: self.node.stats.handshakes.timeouts_init.load(Ordering::Relaxed),
+                timeouts_resp: self.node.stats.handshakes.timeouts_resp.load(Ordering::Relaxed),
+            },
+            queues: NodeQueueStats {
+                inbound: self.node.stats.queues.inbound.load(Ordering::SeqCst),
+                outbound: self.node.stats.queues.outbound.load(Ordering::SeqCst),
+            },
+            misc: NodeMiscStats {
+                block_height: self.node.sync().map(|sync| sync.current_block_height()).unwrap_or(0),
+                blocks_mined: self.node.stats.misc.blocks_mined.load(Ordering::Relaxed),
+                duplicate_blocks: self.node.stats.misc.duplicate_blocks.load(Ordering::Relaxed),
+                duplicate_sync_blocks: self.node.stats.misc.duplicate_sync_blocks.load(Ordering::Relaxed),
+            },
         })
     }
 

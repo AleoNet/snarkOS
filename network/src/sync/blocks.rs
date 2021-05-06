@@ -18,9 +18,9 @@ use crate::{message::*, NetworkError, Sync};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::atomic::Ordering};
 
-impl<S: Storage> Sync<S> {
+impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
     ///
     /// Sends a `GetSync` request to the given sync node.
     ///
@@ -38,7 +38,6 @@ impl<S: Storage> Sync<S> {
 
             // Send a GetSync to the selected sync node.
             self.node()
-                .outbound
                 .send_request(Message::new(
                     Direction::Outbound(sync_node),
                     Payload::GetSync(block_locator_hashes),
@@ -58,7 +57,6 @@ impl<S: Storage> Sync<S> {
             if remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
                 self.node()
-                    .outbound
                     .send_request(Message::new(
                         Direction::Outbound(remote_address),
                         Payload::Block(block_bytes.clone()),
@@ -108,10 +106,22 @@ impl<S: Storage> Sync<S> {
         );
 
         // Verify the block and insert it into the storage.
-        let is_valid_block = self.consensus.receive_block(&block_struct).is_ok();
+        let block_validity = self.consensus.receive_block(&block_struct);
+
+        if let Err(ConsensusError::PreExistingBlock) = block_validity {
+            if is_block_new {
+                self.node().stats.misc.duplicate_blocks.fetch_add(1, Ordering::Relaxed);
+            } else {
+                self.node()
+                    .stats
+                    .misc
+                    .duplicate_sync_blocks
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+        }
 
         // This is a new block, send it to our peers.
-        if is_block_new && is_valid_block {
+        if is_block_new && block_validity.is_ok() {
             self.propagate_block(block, remote_address).await;
         }
 
@@ -129,7 +139,6 @@ impl<S: Storage> Sync<S> {
 
             // Send a `SyncBlock` message to the connected peer.
             self.node()
-                .outbound
                 .send_request(Message::new(
                     Direction::Outbound(remote_address),
                     Payload::SyncBlock(block.serialize()?),
@@ -180,7 +189,6 @@ impl<S: Storage> Sync<S> {
 
         // send a `Sync` message to the connected peer.
         self.node()
-            .outbound
             .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)))
             .await;
 
@@ -195,7 +203,6 @@ impl<S: Storage> Sync<S> {
                 // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
                 // detect missing blocks and divergence in chain for now.
                 self.node()
-                    .outbound
                     .send_request(Message::new(
                         Direction::Outbound(remote_address),
                         Payload::GetBlocks(batch.to_vec()),

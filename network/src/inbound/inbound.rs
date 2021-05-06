@@ -16,7 +16,12 @@
 
 use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 
 use parking_lot::Mutex;
 use snarkvm_objects::Storage;
@@ -52,13 +57,6 @@ impl Default for Inbound {
 }
 
 impl Inbound {
-    #[inline]
-    pub(crate) async fn route(&self, response: Message) {
-        if let Err(err) = self.sender.send(response).await {
-            error!("Failed to route a response for a message: {}", err);
-        }
-    }
-
     #[inline]
     pub(crate) fn take_receiver(&self) -> Receiver {
         self.receiver
@@ -106,9 +104,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                         match handshake_result {
                             Ok(Ok((mut writer, mut reader, remote_listener))) => {
-                                // Update the remote address to be the peer's listening address.
-                                let remote_address = writer.addr;
-
                                 // Create a channel dedicated to sending messages to the connection.
                                 let (sender, receiver) = channel(1024);
 
@@ -125,17 +120,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 });
 
                                 // Save the channel under the provided remote address.
-                                node.outbound.channels.write().insert(remote_address, sender);
+                                node.outbound.channels.write().insert(remote_listener, sender);
 
                                 // Finally, mark the peer as connected.
                                 node.peer_book.set_connected(remote_address, Some(remote_listener));
 
-                                trace!("Connected to {}", remote_address);
+                                trace!("Connected to {} (listener: {})", remote_address, remote_listener);
 
                                 // Immediately send a ping to provide the peer with our block height.
-                                node.send_ping(remote_address).await;
+                                node.send_ping(remote_listener).await;
 
-                                if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
+                                if let Ok(ref peer) = node.peer_book.get_peer(remote_listener) {
                                     peer.register_task(peer_reading_task);
                                     peer.register_task(peer_writing_task);
                                 } else {
@@ -147,15 +142,18 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             Ok(Err(e)) => {
                                 error!("Failed to accept a connection request: {}", e);
                                 let _ = node.disconnect_from_peer(remote_address);
+                                node.stats.handshakes.failures_resp.fetch_add(1, Ordering::Relaxed);
                             }
                             Err(_) => {
                                 error!("Failed to accept a connection request: the handshake timed out");
                                 let _ = node.disconnect_from_peer(remote_address);
+                                node.stats.handshakes.timeouts_resp.fetch_add(1, Ordering::Relaxed);
                             }
                         }
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
                 }
+                node.stats.connections.all_accepted.fetch_add(1, Ordering::Relaxed);
             }
         });
 
@@ -203,8 +201,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 // Handle Ping/Pong messages immediately in order not to skew latency calculation.
                 match &message.payload {
                     Payload::Ping(..) => {
-                        self.outbound
-                            .send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
+                        self.send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
                             .await;
                     }
                     Payload::Pong => {
@@ -214,13 +211,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
 
                 // Messages are queued in a single tokio MPSC receiver.
-                self.inbound.route(message).await
+                self.route(message).await
             }
         }
     }
 
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
+
+        self.stats.queues.inbound.fetch_sub(1, Ordering::SeqCst);
 
         let source = if let Direction::Inbound(addr) = direction {
             self.peer_book.update_last_seen(addr);
@@ -231,16 +230,22 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         match payload {
             Payload::Transaction(transaction) => {
+                self.stats.inbound.transactions.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync) = self.sync() {
                     sync.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {
+                self.stats.inbound.blocks.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync) = self.sync() {
                     sync.received_block(source, block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
+                self.stats.inbound.syncblocks.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync) = self.sync() {
                     sync.received_block(source, block, false).await?;
 
@@ -256,26 +261,36 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetBlocks(hashes) => {
+                self.stats.inbound.getblocks.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_blocks(source, hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
+                self.stats.inbound.getmemorypool.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_memory_pool(source).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
+                self.stats.inbound.memorypool.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync) = self.sync() {
                     sync.received_memory_pool(mempool)?;
                 }
             }
             Payload::GetSync(getsync) => {
+                self.stats.inbound.getsync.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_sync(source, getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
+                self.stats.inbound.syncs.fetch_add(1, Ordering::Relaxed);
+
                 if let Some(ref sync_handler) = self.sync() {
                     if sync.is_empty() {
                         trace!("{} doesn't have sync blocks to share", source);
@@ -286,12 +301,18 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetPeers => {
+                self.stats.inbound.getpeers.fetch_add(1, Ordering::Relaxed);
+
                 self.send_peers(source).await;
             }
             Payload::Peers(peers) => {
+                self.stats.inbound.peers.fetch_add(1, Ordering::Relaxed);
+
                 self.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
+                self.stats.inbound.pings.fetch_add(1, Ordering::Relaxed);
+
                 self.peer_book.received_ping(source, block_height);
 
                 // TODO (howardwu): Delete me after stabilizing new sync logic for blocks.
@@ -311,9 +332,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 // }
             }
             Payload::Pong => {
+                self.stats.inbound.pongs.fetch_add(1, Ordering::Relaxed);
                 // Skip as this case is already handled with priority in Inbound::listen_for_messages
             }
             Payload::Unknown => {
+                self.stats.inbound.unknown.fetch_add(1, Ordering::Relaxed);
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
             }
         }
@@ -374,6 +397,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let peer_version = Version::deserialize(&buffer[..len])?;
         trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
 
+        self.stats.handshakes.successes_resp.fetch_add(1, Ordering::Relaxed);
+
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
 
@@ -382,5 +407,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let writer = ConnWriter::new(remote_listener, writer, buffer, noise);
 
         Ok((writer, reader, remote_listener))
+    }
+
+    #[inline]
+    pub(crate) async fn route(&self, response: Message) {
+        if let Err(err) = self.inbound.sender.send(response).await {
+            error!("Failed to route a response for a message: {}", err);
+        } else {
+            self.stats.queues.inbound.fetch_add(1, Ordering::SeqCst);
+        }
     }
 }

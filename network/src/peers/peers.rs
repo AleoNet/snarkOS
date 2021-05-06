@@ -21,7 +21,7 @@ use std::{
     cmp,
     net::SocketAddr,
     sync::{atomic::Ordering, Arc},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use parking_lot::Mutex;
@@ -34,11 +34,6 @@ use tokio::{
 };
 
 impl<S: Storage> Node<S> {
-    /// Obtain a list of addresses of connecting peers for this node.
-    pub(crate) fn connecting_peers(&self) -> Vec<(SocketAddr, Instant)> {
-        self.peer_book.connecting_peers().into_iter().collect()
-    }
-
     /// Obtain a list of addresses of connected peers for this node.
     pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.peer_book.connected_peers().keys().copied().collect()
@@ -76,19 +71,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
                 let _ = self.disconnect_from_peer(addr);
-            }
-        }
-
-        // Drop connections that failed to finalize in time.
-        // FIXME: this cleanup shouldn't be necessary
-        let connecting_peers = self.connecting_peers();
-        if !connecting_peers.is_empty() {
-            let now = Instant::now();
-
-            for (addr, timestamp) in connecting_peers {
-                if now - timestamp > Duration::from_secs(5) {
-                    let _ = self.peer_book.set_disconnected(addr);
-                }
             }
         }
 
@@ -159,6 +141,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
+        self.stats.connections.all_initiated.fetch_add(1, Ordering::Relaxed);
+
         self.peer_book.set_connecting(remote_address)?;
 
         debug!("Connecting to {}...", remote_address);
@@ -210,6 +194,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             writer.write_all(&buffer[..len]).await?;
             trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
+            node.stats.handshakes.successes_init.fetch_add(1, Ordering::Relaxed);
+
             let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
             let mut writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
@@ -259,9 +245,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 return e;
             }
             Ok(Err(_)) => {
+                self.stats.handshakes.failures_init.fetch_add(1, Ordering::Relaxed);
                 return Err(NetworkError::InvalidHandshake);
             }
             Err(_) => {
+                self.stats.handshakes.timeouts_init.fetch_add(1, Ordering::Relaxed);
                 return Err(NetworkError::HandshakeTimeout);
             }
         }
@@ -417,8 +405,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("Sending `GetPeers` requests to connected peers");
 
         for remote_address in self.connected_peers() {
-            self.outbound
-                .send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
+            self.send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
                 .await;
 
             // // Fetch the connection channel.
@@ -449,12 +436,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for remote_address in self.connected_peers() {
             self.peer_book.sending_ping(remote_address);
 
-            self.outbound
-                .send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::Ping(current_block_height),
-                ))
-                .await;
+            self.send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::Ping(current_block_height),
+            ))
+            .await;
         }
     }
 
@@ -515,8 +501,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .copied()
             .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
 
-        self.outbound
-            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
+        self.send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
             .await;
     }
 
