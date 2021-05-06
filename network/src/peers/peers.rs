@@ -60,6 +60,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let bootnodes = self.config.bootnodes();
 
         // Drop peers whose RTT is too high or have too many failures.
+        let now = chrono::Utc::now();
         for (addr, peer_quality) in self
             .peer_book
             .connected_peers()
@@ -67,7 +68,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .filter(|(addr, _)| !bootnodes.contains(addr)) // Skip this check if the peer is a bootnode.
             .map(|(addr, info)| (*addr, &info.quality))
         {
-            if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1500 || peer_quality.failures.load(Ordering::Relaxed) > 10
+            if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1500
+                || peer_quality.failures.load(Ordering::Relaxed) > 10
+                || peer_quality.is_inactive(now)
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
                 let _ = self.disconnect_from_peer(addr);
@@ -83,29 +86,31 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Broadcast a `GetPeers` message to request for more peers.
         self.broadcast_getpeers_requests().await;
 
-        // Check that this node is not a bootnode.
-        if !self.config.is_bootnode() {
-            // Check if this node server is above the permitted number of connected peers.
-            let max_peers = self.config.maximum_number_of_connected_peers() as usize;
-            if number_of_connected_peers > max_peers {
-                let number_to_disconnect = number_of_connected_peers - max_peers;
-                trace!(
-                    "Disconnecting from the most recent {} peers to maintain their permitted number",
-                    number_to_disconnect
-                );
+        // Check if this node server is above the permitted number of connected peers.
+        let max_peers = self.config.maximum_number_of_connected_peers() as usize;
+        if number_of_connected_peers > max_peers {
+            let number_to_disconnect = number_of_connected_peers - max_peers;
+            trace!(
+                "Disconnecting from {} peers to maintain their permitted number",
+                number_to_disconnect
+            );
 
-                let mut connected = self
-                    .peer_book
-                    .connected_peers()
-                    .iter()
-                    .map(|(addr, info)| (*addr, info.last_connected()))
-                    .collect::<Vec<_>>();
-                connected.sort_unstable_by_key(|(_, info)| *info);
+            let mut connected = self
+                .peer_book
+                .connected_peers()
+                .iter()
+                .map(|(addr, info)| (*addr, info.last_connected()))
+                .collect::<Vec<_>>();
 
-                for _ in 0..number_to_disconnect {
-                    if let Some((addr, _)) = connected.pop() {
-                        let _ = self.disconnect_from_peer(addr);
-                    }
+            // Bootnodes will disconnect from random peers...
+            if !self.config.is_bootnode() {
+                // ...while regular peers from the most recently connected.
+                connected.sort_unstable_by_key(|(_, last_connected)| *last_connected);
+            }
+
+            for _ in 0..number_to_disconnect {
+                if let Some((addr, _)) = connected.pop() {
+                    let _ = self.disconnect_from_peer(addr);
                 }
             }
         }
@@ -122,9 +127,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
-        // If this node is not a bootnode,
-        // then don't connect if maximum number of connections has been reached.
-        if !self.config.is_bootnode() && !self.can_connect() {
+        // Don't connect if maximum number of connections has been reached.
+        if !self.can_connect() {
             return Err(NetworkError::TooManyConnections);
         }
 
@@ -184,11 +188,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
             let len = reader.read_exact(&mut buf[..len]).await?;
             let len = noise.read_message(&buf[..len], &mut buffer)?;
-            let _peer_version = Version::deserialize(&buffer[..len])?;
+            let peer_version = Version::deserialize(&buffer[..len])?;
             trace!("received e, ee, s, es (XX handshake part 2/3) from {}", remote_address);
 
+            if peer_version.node_id == node.id {
+                return Err(NetworkError::SelfConnectAttempt);
+            }
+
             // -> s, se, psk
-            let own_version = Version::serialize(&Version::new(1u64, own_address.port())).unwrap();
+            let own_version = Version::serialize(&Version::new(1u64, own_address.port(), node.id)).unwrap();
             let len = noise.write_message(&own_version, &mut buffer)?;
             writer.write_all(&[len as u8]).await?;
             writer.write_all(&buffer[..len]).await?;
@@ -312,7 +320,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         // If this node is a bootnode, attempt to connect to all disconnected peers.
         // If this node is not a bootnode, attempt to satisfy the minimum number of peer connections.
-        let random_peers = if !self.config.is_bootnode() {
+        let random_peers = {
             // Fetch the number of connected and connecting peers.
             let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
             let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
@@ -346,24 +354,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
                 .copied()
                 .choose_multiple(&mut rand::thread_rng(), count)
-        } else {
-            let disconnected_peers = self.peer_book.disconnected_peers();
-
-            if disconnected_peers.is_empty() {
-                return;
-            }
-
-            trace!("Connecting to {} disconnected peers", disconnected_peers.len());
-
-            let bootnodes = self.config.bootnodes();
-
-            // Iterate through a selection of random peers and attempt to connect.
-            disconnected_peers
-                .iter()
-                .map(|(k, _)| k)
-                .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
-                .copied()
-                .collect()
         };
 
         for remote_address in random_peers {
@@ -514,22 +504,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // by informing the peer book of that we found peers.
         let local_address = self.local_address().unwrap(); // the address must be known by now
 
-        let number_of_connected_peers = self.peer_book.number_of_connected_peers();
-        let number_to_connect = if self.config.is_bootnode() {
-            // If this node is a bootnode, catalogue all of the peers for bootstrapping purposes.
-            number_of_connected_peers
-        } else {
-            self.config
-                .maximum_number_of_connected_peers()
-                .saturating_sub(number_of_connected_peers)
-        };
-
-        for peer_address in peers
-            .iter()
-            .take(number_to_connect as usize)
-            .filter(|&peer_addr| *peer_addr != local_address)
-            .copied()
-        {
+        for peer_address in peers.into_iter().filter(|&peer_addr| peer_addr != local_address) {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.

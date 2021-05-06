@@ -21,6 +21,56 @@ use snarkos_testing::{
 
 use peak_alloc::PeakAlloc;
 
+// This only tests the connection acceptance side, but the cleanup logic
+// is the same for connection intiation side: when the peer is disconnected,
+// drop tasks dedicated to it.
+#[tokio::test]
+#[ignore]
+async fn check_connection_task_cleanup() {
+    // Start a node without sync.
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 3,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
+
+    // Breach the usual ulimit barriers.
+    for _ in 0..10_000 {
+        // Connect a peer.
+        let peer = handshaken_peer(node.local_address().unwrap()).await;
+        wait_until!(5, node.peer_book.number_of_connected_peers() == 1);
+
+        // Drop the peer stream.
+        drop(peer);
+        wait_until!(5, node.peer_book.number_of_connected_peers() == 0);
+    }
+}
+
+#[tokio::test]
+#[ignore]
+async fn check_inactive_conn_cleanup() {
+    // Start a node without sync.
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 10,
+        ..Default::default()
+    };
+    let node = test_node(setup).await;
+
+    // A connection with a peer that will remain inactive.
+    let _peer = handshaken_peer(node.local_address().unwrap()).await;
+
+    // Wait until the connection is complete.
+    wait_until!(1, node.peer_book.number_of_connected_peers() == 1);
+
+    // The peer should be dropped once `MAX_PEER_INACTIVITY_TIME_SECS` expires.
+    wait_until!(
+        snarkos_network::MAX_PEER_INACTIVITY_SECS as u64 * 2,
+        node.peer_book.number_of_connected_peers() == 0
+    );
+}
+
 #[tokio::test]
 #[ignore]
 async fn check_node_cleanup() {
@@ -38,7 +88,6 @@ async fn check_node_cleanup() {
     let mut peak_heap = PEAK_ALLOC.peak_usage();
     let mut peak_heap_post_1st_conn = 0;
 
-    // Note: `ulimit` will be a limiting factor in how many peer connections can be opened.
     for i in 0u16..4096 {
         // Connect a peer.
         let peer = handshaken_peer(node.local_address().unwrap()).await;

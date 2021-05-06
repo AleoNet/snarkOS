@@ -21,13 +21,16 @@ pub struct Version {
     pub version: u64,
     /// The listening port of the sender.
     pub listening_port: u16,
+    /// The node id of the sender.
+    pub node_id: u64,
 }
 
 impl Version {
-    pub fn new(version: u64, listening_port: u16) -> Self {
+    pub fn new(version: u64, listening_port: u16, node_id: u64) -> Self {
         Self {
             version,
             listening_port,
+            node_id,
         }
     }
 }

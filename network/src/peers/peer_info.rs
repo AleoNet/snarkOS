@@ -56,6 +56,20 @@ pub struct PeerQuality {
     pub remaining_sync_blocks: AtomicU32,
 }
 
+impl PeerQuality {
+    pub fn is_inactive(&self, now: DateTime<Utc>) -> bool {
+        let last_seen = *self.last_seen.read();
+        if let Some(last_seen) = last_seen {
+            now - last_seen > chrono::Duration::seconds(crate::MAX_PEER_INACTIVITY_SECS.into())
+        } else {
+            // Impossible to trigger, as completing a connection
+            // marks the peer with a timestamp. That being said,
+            // it's safest to leave this as `true` for future-proofing.
+            true
+        }
+    }
+}
+
 /// A data structure containing information about a peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerInfo {
@@ -179,7 +193,9 @@ impl PeerInfo {
             // Set the state of this peer to connected.
             self.status = PeerStatus::Connected;
 
-            self.last_connected = Some(Utc::now());
+            let now = Utc::now();
+            self.last_connected = Some(now);
+            *self.quality.last_seen.write() = Some(now);
             self.connected_count += 1;
         } else {
             trace!("Peer {} was set as connected more than once", self.address);

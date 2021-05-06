@@ -75,4 +75,5 @@ struct Payload {
 struct Version {
     version @0 :UInt64;
     listeningPort @1 :UInt16;
+    nodeId @2 :UInt64;
 }

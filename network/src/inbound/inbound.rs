@@ -78,7 +78,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             (listener_address, listener)
         };
         self.set_local_address(listener_address);
-        info!("Initializing listener for node ({:x})", self.name);
+        info!("Initializing listener for node ({:x})", self.id);
 
         let node = self.clone();
         let listener_handle = task::spawn(async move {
@@ -380,7 +380,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("received e (XX handshake part 1/3) from {}", remote_address);
 
         // -> e, ee, s, es
-        let own_version = Version::serialize(&Version::new(1u64, listener_address.port())).unwrap(); // TODO (raychu86): Establish a formal node version.
+        let own_version = Version::serialize(&Version::new(1u64, listener_address.port(), self.id)).unwrap(); // TODO (raychu86): Establish a formal node version.
         let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
@@ -396,6 +396,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let len = noise.read_message(&buf[..len], &mut buffer)?;
         let peer_version = Version::deserialize(&buffer[..len])?;
         trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
+
+        if peer_version.node_id == self.id {
+            return Err(NetworkError::SelfConnectAttempt);
+        }
 
         self.stats.handshakes.successes_resp.fetch_add(1, Ordering::Relaxed);
 

@@ -2457,6 +2457,10 @@ pub mod version {
     pub fn get_listening_port(self) -> u16 {
       self.reader.get_data_field::<u16>(4)
     }
+    #[inline]
+    pub fn get_node_id(self) -> u64 {
+      self.reader.get_data_field::<u64>(2)
+    }
   }
 
   pub struct Builder<'a> { builder: ::capnp::private::layout::StructBuilder<'a> }
@@ -2523,6 +2527,14 @@ pub mod version {
     pub fn set_listening_port(&mut self, value: u16)  {
       self.builder.set_data_field::<u16>(4, value);
     }
+    #[inline]
+    pub fn get_node_id(self) -> u64 {
+      self.builder.get_data_field::<u64>(2)
+    }
+    #[inline]
+    pub fn set_node_id(&mut self, value: u64)  {
+      self.builder.set_data_field::<u64>(2, value);
+    }
   }
 
   pub struct Pipeline { _typeless: ::capnp::any_pointer::Pipeline }
@@ -2535,7 +2547,7 @@ pub mod version {
   }
   mod _private {
     use capnp::private::layout;
-    pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 2, pointers: 0 };
+    pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 3, pointers: 0 };
     pub const TYPE_ID: u64 = 0xf6b9_300e_617a_79e5;
   }
 }
