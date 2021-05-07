@@ -92,12 +92,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         info!("Got a connection request from {}", remote_address);
 
                         // Wait a maximum timeout limit for a connection request.
-                        let timeout = match bootnodes.contains(&remote_address) {
-                            true => Duration::from_secs(crate::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64),
-                            false => Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
-                        };
                         let handshake_result = tokio::time::timeout(
-                            timeout,
+                            Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
                             node.connection_request(listener_address, remote_address, stream),
                         )
                         .await;
