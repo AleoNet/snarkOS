@@ -80,80 +80,93 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.set_local_address(listener_address);
         info!("Initializing listener for node ({:x})", self.id);
 
-        let node = self.clone();
+        let node_clone = self.clone();
         let listener_handle = task::spawn(async move {
             info!("Listening for nodes at {}", listener_address);
-
-            let bootnodes = node.config.bootnodes();
 
             loop {
                 match listener.accept().await {
                     Ok((stream, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
-                        // Wait a maximum timeout limit for a connection request.
-                        let timeout = match bootnodes.contains(&remote_address) {
-                            true => Duration::from_secs(crate::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64),
-                            false => Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
-                        };
-                        let handshake_result = tokio::time::timeout(
-                            timeout,
-                            node.connection_request(listener_address, remote_address, stream),
-                        )
-                        .await;
+                        if !node_clone.can_connect() {
+                            node_clone
+                                .stats
+                                .connections
+                                .all_rejected
+                                .fetch_add(1, Ordering::Relaxed);
+                            continue;
+                        }
 
-                        match handshake_result {
-                            Ok(Ok((mut writer, mut reader, remote_listener))) => {
-                                // Create a channel dedicated to sending messages to the connection.
-                                let (sender, receiver) = channel(1024);
+                        let node = node_clone.clone();
+                        task::spawn(async move {
+                            // Wait a maximum timeout limit for a connection request.
+                            let handshake_result = tokio::time::timeout(
+                                Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
+                                node.connection_request(listener_address, remote_address, stream),
+                            )
+                            .await;
 
-                                // Listen for inbound messages.
-                                let node_clone = node.clone();
-                                let peer_reading_task = tokio::spawn(async move {
-                                    node_clone.listen_for_inbound_messages(&mut reader).await;
-                                });
+                            match handshake_result {
+                                Ok(Ok((mut writer, mut reader, remote_listener))) => {
+                                    // Create a channel dedicated to sending messages to the connection.
+                                    let (sender, receiver) = channel(1024);
 
-                                // Listen for outbound messages.
-                                let node_clone = node.clone();
-                                let peer_writing_task = tokio::spawn(async move {
-                                    node_clone.listen_for_outbound_messages(receiver, &mut writer).await;
-                                });
+                                    // Listen for inbound messages.
+                                    let node_clone = node.clone();
+                                    let peer_reading_task = tokio::spawn(async move {
+                                        node_clone.listen_for_inbound_messages(&mut reader).await;
+                                    });
 
-                                // Save the channel under the provided remote address.
-                                node.outbound.channels.write().insert(remote_listener, sender);
+                                    // Listen for outbound messages.
+                                    let node_clone = node.clone();
+                                    let peer_writing_task = tokio::spawn(async move {
+                                        node_clone.listen_for_outbound_messages(receiver, &mut writer).await;
+                                    });
 
-                                // Finally, mark the peer as connected.
-                                node.peer_book.set_connected(remote_address, Some(remote_listener));
+                                    // Save the channel under the provided remote address.
+                                    node.outbound.channels.write().insert(remote_listener, sender);
 
-                                trace!("Connected to {} (listener: {})", remote_address, remote_listener);
+                                    // Finally, mark the peer as connected.
+                                    node.peer_book.set_connected(remote_address, Some(remote_listener));
 
-                                // Immediately send a ping to provide the peer with our block height.
-                                node.send_ping(remote_listener).await;
+                                    trace!("Connected to {} (listener: {})", remote_address, remote_listener);
 
-                                if let Ok(ref peer) = node.peer_book.get_peer(remote_listener) {
-                                    peer.register_task(peer_reading_task);
-                                    peer.register_task(peer_writing_task);
-                                } else {
-                                    // If the related peer is not found, it means it's already been dropped.
-                                    peer_reading_task.abort();
-                                    peer_writing_task.abort();
+                                    // Immediately send a ping to provide the peer with our block height.
+                                    node.send_ping(remote_listener).await;
+
+                                    if let Ok(ref peer) = node.peer_book.get_peer(remote_listener) {
+                                        peer.register_task(peer_reading_task);
+                                        peer.register_task(peer_writing_task);
+                                    } else {
+                                        // If the related peer is not found, it means it's already been dropped.
+                                        peer_reading_task.abort();
+                                        peer_writing_task.abort();
+                                    }
+                                }
+                                Ok(Err(e)) => {
+                                    error!("Failed to accept a connection request: {}", e);
+                                    let _ = node.disconnect_from_peer(remote_address);
+                                    node.stats.handshakes.failures_resp.fetch_add(1, Ordering::Relaxed);
+                                }
+                                Err(_) => {
+                                    error!("Failed to accept a connection request: the handshake timed out");
+                                    let _ = node.disconnect_from_peer(remote_address);
+                                    node.stats.handshakes.timeouts_resp.fetch_add(1, Ordering::Relaxed);
                                 }
                             }
-                            Ok(Err(e)) => {
-                                error!("Failed to accept a connection request: {}", e);
-                                let _ = node.disconnect_from_peer(remote_address);
-                                node.stats.handshakes.failures_resp.fetch_add(1, Ordering::Relaxed);
-                            }
-                            Err(_) => {
-                                error!("Failed to accept a connection request: the handshake timed out");
-                                let _ = node.disconnect_from_peer(remote_address);
-                                node.stats.handshakes.timeouts_resp.fetch_add(1, Ordering::Relaxed);
-                            }
-                        }
+                        });
+
+                        // add a tiny delay to avoid connecting above the limit
+                        tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
                 }
-                node.stats.connections.all_accepted.fetch_add(1, Ordering::Relaxed);
+                node_clone
+                    .stats
+                    .connections
+                    .all_accepted
+                    .fetch_add(1, Ordering::Relaxed);
             }
         });
 

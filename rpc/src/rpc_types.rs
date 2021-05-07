@@ -195,6 +195,8 @@ pub struct NodeConnectionStats {
     pub all_accepted: u64,
     /// The number of all connections the node has initiated.
     pub all_initiated: u64,
+    /// The number of rejected inbound connection requests.
+    pub all_rejected: u64,
     /// Number of currently connected peers.
     pub connected_peers: u16,
     /// Number of currently connecting peers.

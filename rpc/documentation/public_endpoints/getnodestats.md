@@ -10,6 +10,7 @@ None
 |:--------------------------------:|:----:|:-----------------------------------------------------------------:|
 | `connections.all_accepted`       | u64  | The number of connection requests the node has received           |
 | `connections.all_initiated`      | u64  | The number of connection requests the node has made               |
+| `connections.all_rejected`       | u64  | The number of connection requests the node has rejected           |
 | `connections.connected_peers`    | u16  | The number of currently connected peers                           |
 | `connections.connecting_peers`   | u16  | The number of currently connecting peers                          |
 | `connections.disconnected_peers` | u16  | The number of known disconnected peers                            |
