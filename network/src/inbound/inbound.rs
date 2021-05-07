@@ -28,7 +28,7 @@ use snarkvm_objects::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::mpsc::channel,
+    sync::mpsc::{channel, error::TrySendError},
     task,
 };
 
@@ -47,7 +47,7 @@ pub struct Inbound {
 impl Default for Inbound {
     fn default() -> Self {
         // Initialize the sender and receiver.
-        let (sender, receiver) = tokio::sync::mpsc::channel(64 * 1024);
+        let (sender, receiver) = tokio::sync::mpsc::channel(16 * 1024);
 
         Self {
             sender,
@@ -211,7 +211,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
 
                 // Messages are queued in a single tokio MPSC receiver.
-                self.route(message).await
+                self.route(message)
             }
         }
     }
@@ -414,11 +414,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     #[inline]
-    pub(crate) async fn route(&self, response: Message) {
-        if let Err(err) = self.inbound.sender.send(response).await {
-            error!("Failed to route a response for a message: {}", err);
-        } else {
-            self.stats.queues.inbound.fetch_add(1, Ordering::SeqCst);
+    pub(crate) fn route(&self, response: Message) {
+        match self.inbound.sender.try_send(response) {
+            Err(TrySendError::Full(msg)) => {
+                self.stats.inbound.all_failures.fetch_add(1, Ordering::Relaxed);
+                error!("Failed to route a {}: the inbound channel is full", msg);
+            }
+            Err(TrySendError::Closed(msg)) => {
+                // TODO: this shouldn't happen, but is critical if it does
+                error!("Failed to route a {}: the inbound channel is closed", msg);
+            }
+            Ok(_) => {
+                self.stats.queues.inbound.fetch_add(1, Ordering::SeqCst);
+            }
         }
     }
 }
