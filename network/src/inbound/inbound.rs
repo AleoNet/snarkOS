@@ -89,6 +89,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     Ok((stream, remote_address)) => {
                         info!("Got a connection request from {}", remote_address);
 
+                        if !node_clone.can_connect() {
+                            warn!("Maximum number of connections reached; rejecting {}", remote_address);
+                            continue;
+                        }
+
                         let node = node_clone.clone();
                         task::spawn(async move {
                             // Wait a maximum timeout limit for a connection request.
