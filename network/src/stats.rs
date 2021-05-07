@@ -83,6 +83,8 @@ pub struct ConnectionStats {
     pub all_accepted: AtomicU64,
     /// The number of all connections the node has initiated.
     pub all_initiated: AtomicU64,
+    /// The number of rejected inbound connection requests.
+    pub all_rejected: AtomicU64,
 }
 
 #[derive(Default)]

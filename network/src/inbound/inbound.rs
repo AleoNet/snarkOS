@@ -90,6 +90,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         info!("Got a connection request from {}", remote_address);
 
                         if !node_clone.can_connect() {
+                            node_clone
+                                .stats
+                                .connections
+                                .all_rejected
+                                .fetch_add(1, Ordering::Relaxed);
                             warn!("Maximum number of connections reached; rejecting {}", remote_address);
                             continue;
                         }
