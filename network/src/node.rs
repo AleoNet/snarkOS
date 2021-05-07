@@ -204,11 +204,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             loop {
                 sleep(std::time::Duration::from_secs(5)).await;
 
-                // Make sure that the node doesn't remain in a sync state without peers.
-                if node_clone.state() == State::Syncing && node_clone.peer_book.number_of_connected_peers() == 0 {
-                    node_clone.set_state(State::Idle);
-                }
-
                 // Report node's current state.
                 trace!("Node state: {:?}", node_clone.state());
             }
@@ -262,14 +257,25 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let block_sync_interval = sync_clone.block_sync_interval();
             let sync_block_task = task::spawn(async move {
                 loop {
-                    if !sync_clone.is_syncing_blocks() || sync_clone.has_block_sync_expired() {
-                        // The order of preference for the sync node is as follows:
-                        // Pick a random peer of all the connected ones that claim
-                        // to have a longer chain.
+                    let is_syncing_blocks = sync_clone.is_syncing_blocks();
+                    let is_sync_expired = sync_clone.has_block_sync_expired();
+
+                    // if the node is not currently syncing blocks or an earlier sync attempt has expired,
+                    // consider syncing blocks with a peer who has a longer chain
+                    if !is_syncing_blocks || is_sync_expired {
+                        // if the node's state is `Syncing`, change it to `Idle`, as it means the
+                        // previous attempt has expired - the peer has disconnected or was too slow
+                        // to deliver the batch of sync blocks
+                        if is_syncing_blocks {
+                            debug!("An unfinished block sync has expired.");
+                            sync_clone.node().set_state(State::Idle);
+                        }
 
                         let mut prospect_sync_nodes = Vec::new();
                         let my_height = sync_clone.current_block_height();
 
+                        // Pick a random peer of all the connected ones that claim
+                        // to have a longer chain.
                         for (peer, info) in sync_clone.node().peer_book.connected_peers().iter() {
                             // Fetch the current block height of this connected peer.
                             let peer_block_height = info.block_height();
@@ -291,7 +297,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             );
 
                             // Cancel any possibly ongoing sync attempts.
-                            sync_clone.node().set_state(State::Idle);
                             sync_clone.node().peer_book.cancel_any_unfinished_syncing();
 
                             // Begin a new sync attempt.
