@@ -95,7 +95,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 .connections
                                 .all_rejected
                                 .fetch_add(1, Ordering::Relaxed);
-                            warn!("Maximum number of connections reached; rejecting {}", remote_address);
                             continue;
                         }
 
@@ -157,6 +156,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 }
                             }
                         });
+
+                        // add a tiny delay to avoid connecting above the limit
+                        tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
                 }

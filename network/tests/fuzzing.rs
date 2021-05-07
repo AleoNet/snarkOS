@@ -499,10 +499,12 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
 
 #[tokio::test]
 async fn connection_request_spam() {
-    const NUM_ATTEMPTS: usize = 100;
+    const NUM_ATTEMPTS: usize = 200;
 
+    let max_peers = NUM_ATTEMPTS as u16 / 2;
     let node_setup = TestSetup {
         consensus_setup: None,
+        max_peers,
         ..Default::default()
     };
 
@@ -520,7 +522,7 @@ async fn connection_request_spam() {
         });
     }
 
-    wait_until!(1, node.peer_book.number_of_connecting_peers() > 0);
+    wait_until!(3, node.peer_book.number_of_connecting_peers() == max_peers);
 
     wait_until!(
         snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 * 2,
