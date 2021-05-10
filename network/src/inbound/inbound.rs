@@ -301,7 +301,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                 if let Some(ref sync_handler) = self.sync() {
                     if sync.is_empty() {
-                        trace!("{} doesn't have sync blocks to share", source);
+                        // An empty `Sync` is unexpected, as `GetSync` requests are only
+                        // sent to peers that declare a greater block height.
+                        self.peer_book.register_failure(source);
+                        warn!("{} doesn't have sync blocks to share", source);
                     } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         trace!("Received {} sync block hashes from {}", sync.len(), source);
                         sync_handler.received_sync(source, sync).await;

@@ -411,6 +411,13 @@ impl PeerBook {
             }
         }
     }
+
+    /// Registers a non-critical failure related to a peer.
+    pub fn register_failure(&self, addr: SocketAddr) {
+        if let Some(pq) = self.peer_quality(addr) {
+            pq.failures.fetch_add(1, Ordering::Relaxed);
+        }
+    }
 }
 
 #[cfg(test)]
