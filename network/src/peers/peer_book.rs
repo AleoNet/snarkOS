@@ -406,6 +406,8 @@ impl PeerBook {
                     missing_sync_blocks,
                     peer_info.address(),
                 );
+
+                peer_info.quality.failures.fetch_add(1, Ordering::Relaxed);
             }
         }
     }

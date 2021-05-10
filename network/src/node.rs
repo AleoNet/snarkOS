@@ -301,7 +301,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
                             // Begin a new sync attempt.
                             sync_clone.register_block_sync_attempt();
-                            sync_clone.update_blocks(Some(*sync_node)).await;
+                            sync_clone.update_blocks(*sync_node).await;
                         }
                     }
 

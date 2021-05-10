@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
+use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender};
 
 use std::{
     collections::HashMap,
@@ -322,22 +322,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 self.stats.inbound.pings.fetch_add(1, Ordering::Relaxed);
 
                 self.peer_book.received_ping(source, block_height);
-
-                // TODO (howardwu): Delete me after stabilizing new sync logic for blocks.
-                // if let Some(ref sync) = self.sync() {
-                //     if block_height > sync.current_block_height() + 1 {
-                //         // If the node is syncing, check if that sync attempt hasn't expired.
-                //         if !sync.is_syncing_blocks() || sync.has_block_sync_expired() {
-                //             // Cancel any possibly ongoing sync attempts.
-                //             self.set_state(State::Idle);
-                //             self.peer_book.cancel_any_unfinished_syncing();
-                //
-                //             // Begin a new sync attempt.
-                //             sync.register_block_sync_attempt(source);
-                //             sync.update_blocks(source).await;
-                //         }
-                //     }
-                // }
             }
             Payload::Pong => {
                 self.stats.inbound.pongs.fetch_add(1, Ordering::Relaxed);
