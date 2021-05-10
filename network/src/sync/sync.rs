@@ -128,6 +128,7 @@ impl<S: Storage> Sync<S> {
     /// Register that the node attempted to sync blocks.
     pub fn register_block_sync_attempt(&self) {
         *self.last_block_sync.write() = Some(Instant::now());
+        self.node.set_state(State::Syncing);
     }
 
     /// Returns the interval between each block sync.

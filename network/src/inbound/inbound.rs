@@ -265,11 +265,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     // Update the peer and possibly finish the sync process.
                     if self.peer_book.got_sync_block(source) {
                         sync.finished_syncing_blocks();
-                    } else {
-                        // Since we confirmed that the block is a valid sync block
-                        // and we're expecting more blocks from the peer, we can set
-                        // the node's status to Syncing.
-                        sync.node().set_state(State::Syncing);
                     }
                 }
             }
