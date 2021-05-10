@@ -220,7 +220,7 @@ impl PeerBook {
     pub fn set_disconnected(&self, address: SocketAddr) -> Result<bool, NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
         if self.connecting_peers.write().remove(&address) {
-            return Ok(true);
+            return Ok(false);
         }
 
         // Case 2 - The given address is a connected peer, attempt to disconnect.
