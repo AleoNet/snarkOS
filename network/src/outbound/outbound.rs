@@ -105,19 +105,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
     /// This method handles new outbound messages to a single connected node.
     pub async fn listen_for_outbound_messages(&self, mut receiver: Receiver<Message>, writer: &mut ConnWriter) {
-        loop {
-            // Read the next message queued to be sent.
-            if let Some(message) = receiver.recv().await {
-                self.stats.queues.outbound.fetch_sub(1, Ordering::SeqCst);
+        // Read the next message queued to be sent.
+        while let Some(message) = receiver.recv().await {
+            self.stats.queues.outbound.fetch_sub(1, Ordering::SeqCst);
 
-                match writer.write_message(&message.payload).await {
-                    Ok(_) => {
-                        self.stats.outbound.all_successes.fetch_add(1, Ordering::Relaxed);
-                    }
-                    Err(error) => {
-                        warn!("Failed to send a {}: {}", message, error);
-                        self.stats.outbound.all_failures.fetch_add(1, Ordering::Relaxed);
-                    }
+            match writer.write_message(&message.payload).await {
+                Ok(_) => {
+                    self.stats.outbound.all_successes.fetch_add(1, Ordering::Relaxed);
+                }
+                Err(error) => {
+                    warn!("Failed to send a {}: {}", message, error);
+                    self.stats.outbound.all_failures.fetch_add(1, Ordering::Relaxed);
                 }
             }
         }

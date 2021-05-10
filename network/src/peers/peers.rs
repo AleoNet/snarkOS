@@ -69,7 +69,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .map(|(addr, info)| (*addr, &info.quality))
         {
             if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1500
-                || peer_quality.failures.load(Ordering::Relaxed) > 10
+                || peer_quality.failures.load(Ordering::Relaxed) >= 3
                 || peer_quality.is_inactive(now)
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
@@ -209,7 +209,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
             // Create a channel dedicated to sending messages to the connection.
-            let (sender, receiver) = channel(1024);
+            let (sender, receiver) = channel(crate::OUTBOUND_CHANNEL_DEPTH);
 
             // spawn the inbound loop
             let node_clone = node.clone();
@@ -297,7 +297,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
                         // no issue here, already connecting
                     }
-                    Err(e @ NetworkError::TooManyConnections) | Err(e @ NetworkError::SelfConnectAttempt) => {
+                    Err(e @ NetworkError::TooManyConnections) => {
                         warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
                         // the connection hasn't been established, no need to disconnect
                     }

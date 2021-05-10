@@ -24,29 +24,24 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
     ///
     /// Sends a `GetSync` request to the given sync node.
     ///
-    pub async fn update_blocks(&self, sync_node: Option<SocketAddr>) {
-        if let Some(sync_node) = sync_node {
-            let block_locator_hashes = match self.storage().get_block_locator_hashes() {
-                Ok(block_locator_hashes) => block_locator_hashes,
-                _ => {
-                    error!("Unable to get block locator hashes from storage");
-                    return;
-                }
-            };
+    pub async fn update_blocks(&self, sync_node: SocketAddr) {
+        let block_locator_hashes = match self.storage().get_block_locator_hashes() {
+            Ok(block_locator_hashes) => block_locator_hashes,
+            _ => {
+                error!("Unable to get block locator hashes from storage");
+                return;
+            }
+        };
 
-            info!("Updating blocks from {}", sync_node);
+        info!("Updating blocks from {}", sync_node);
 
-            // Send a GetSync to the selected sync node.
-            self.node()
-                .send_request(Message::new(
-                    Direction::Outbound(sync_node),
-                    Payload::GetSync(block_locator_hashes),
-                ))
-                .await;
-        } else {
-            // If no sync node is available, wait until peers have been established.
-            debug!("No sync node is registered, blocks could not be synced");
-        }
+        // Send a GetSync to the selected sync node.
+        self.node()
+            .send_request(Message::new(
+                Direction::Outbound(sync_node),
+                Payload::GetSync(block_locator_hashes),
+            ))
+            .await;
     }
 
     /// Broadcast block to connected peers

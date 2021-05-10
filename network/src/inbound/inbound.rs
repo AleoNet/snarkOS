@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender, State};
+use crate::{errors::NetworkError, message::*, ConnReader, ConnWriter, Node, Receiver, Sender};
 
 use std::{
     collections::HashMap,
@@ -47,7 +47,7 @@ pub struct Inbound {
 impl Default for Inbound {
     fn default() -> Self {
         // Initialize the sender and receiver.
-        let (sender, receiver) = tokio::sync::mpsc::channel(16 * 1024);
+        let (sender, receiver) = tokio::sync::mpsc::channel(crate::INBOUND_CHANNEL_DEPTH);
 
         Self {
             sender,
@@ -110,7 +110,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             match handshake_result {
                                 Ok(Ok((mut writer, mut reader, remote_listener))) => {
                                     // Create a channel dedicated to sending messages to the connection.
-                                    let (sender, receiver) = channel(1024);
+                                    let (sender, receiver) = channel(crate::OUTBOUND_CHANNEL_DEPTH);
 
                                     // Listen for inbound messages.
                                     let node_clone = node.clone();
@@ -265,11 +265,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     // Update the peer and possibly finish the sync process.
                     if self.peer_book.got_sync_block(source) {
                         sync.finished_syncing_blocks();
-                    } else {
-                        // Since we confirmed that the block is a valid sync block
-                        // and we're expecting more blocks from the peer, we can set
-                        // the node's status to Syncing.
-                        sync.node().set_state(State::Syncing);
                     }
                 }
             }
@@ -306,7 +301,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                 if let Some(ref sync_handler) = self.sync() {
                     if sync.is_empty() {
-                        trace!("{} doesn't have sync blocks to share", source);
+                        // An empty `Sync` is unexpected, as `GetSync` requests are only
+                        // sent to peers that declare a greater block height.
+                        self.peer_book.register_failure(source);
+                        warn!("{} doesn't have sync blocks to share", source);
                     } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         trace!("Received {} sync block hashes from {}", sync.len(), source);
                         sync_handler.received_sync(source, sync).await;
@@ -327,22 +325,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 self.stats.inbound.pings.fetch_add(1, Ordering::Relaxed);
 
                 self.peer_book.received_ping(source, block_height);
-
-                // TODO (howardwu): Delete me after stabilizing new sync logic for blocks.
-                // if let Some(ref sync) = self.sync() {
-                //     if block_height > sync.current_block_height() + 1 {
-                //         // If the node is syncing, check if that sync attempt hasn't expired.
-                //         if !sync.is_syncing_blocks() || sync.has_block_sync_expired() {
-                //             // Cancel any possibly ongoing sync attempts.
-                //             self.set_state(State::Idle);
-                //             self.peer_book.cancel_any_unfinished_syncing();
-                //
-                //             // Begin a new sync attempt.
-                //             sync.register_block_sync_attempt(source);
-                //             sync.update_blocks(source).await;
-                //         }
-                //     }
-                // }
             }
             Payload::Pong => {
                 self.stats.inbound.pongs.fetch_add(1, Ordering::Relaxed);
