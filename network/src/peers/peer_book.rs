@@ -331,7 +331,7 @@ impl PeerBook {
         if let Some(ref quality) = self.peer_quality(addr) {
             *quality.last_seen.write() = Some(chrono::Utc::now());
         } else {
-            warn!("Tried updating state of a peer that's not connected: {}", addr);
+            trace!("Tried updating state of a peer that's not connected: {}", addr);
         }
     }
 
@@ -379,7 +379,7 @@ impl PeerBook {
             pq.remaining_sync_blocks.store(count as u32, Ordering::SeqCst);
             true
         } else {
-            warn!("Peer for expecting_sync_blocks purposes not found! (probably disconnected)");
+            trace!("Peer for expecting_sync_blocks purposes not found! (probably disconnected)");
             false
         }
     }
@@ -389,7 +389,7 @@ impl PeerBook {
         if let Some(ref pq) = self.peer_quality(addr) {
             pq.remaining_sync_blocks.fetch_sub(1, Ordering::SeqCst) == 1
         } else {
-            warn!("Peer for got_sync_block purposes not found! (probably disconnected)");
+            trace!("Peer for got_sync_block purposes not found! (probably disconnected)");
             // We might still be processing queued sync blocks; the sync expiry mechanism
             // will handle going into the `Idle` state if the batch is incomplete.
             false
