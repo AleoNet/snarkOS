@@ -69,7 +69,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .map(|(addr, info)| (*addr, &info.quality))
         {
             if peer_quality.rtt_ms.load(Ordering::Relaxed) > 1500
-                || peer_quality.failures.load(Ordering::Relaxed) > 10
+                || peer_quality.failures.load(Ordering::Relaxed) >= 3
                 || peer_quality.is_inactive(now)
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
