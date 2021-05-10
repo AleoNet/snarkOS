@@ -209,7 +209,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
 
             // Create a channel dedicated to sending messages to the connection.
-            let (sender, receiver) = channel(1024);
+            let (sender, receiver) = channel(crate::OUTBOUND_CHANNEL_DEPTH);
 
             // spawn the inbound loop
             let node_clone = node.clone();
