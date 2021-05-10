@@ -49,7 +49,7 @@ fn initialize_logger(config: &Config) {
             match verbosity {
                 1 => std::env::set_var("RUST_LOG", "info"),
                 2 => std::env::set_var("RUST_LOG", "debug"),
-                3 => std::env::set_var("RUST_LOG", "trace"),
+                3 | 4 => std::env::set_var("RUST_LOG", "trace"),
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
 
@@ -59,7 +59,7 @@ fn initialize_logger(config: &Config) {
             // initialize tracing
             tracing_subscriber::fmt()
                 .with_env_filter(filter)
-                .with_target(false)
+                .with_target(config.node.verbose == 4)
                 .init();
         }
     }
