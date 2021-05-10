@@ -297,7 +297,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
                         // no issue here, already connecting
                     }
-                    Err(e @ NetworkError::TooManyConnections) | Err(e @ NetworkError::SelfConnectAttempt) => {
+                    Err(e @ NetworkError::TooManyConnections) => {
                         warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
                         // the connection hasn't been established, no need to disconnect
                     }
