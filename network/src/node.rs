@@ -17,6 +17,7 @@
 use crate::*;
 use snarkvm_objects::Storage;
 
+use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
@@ -62,6 +63,8 @@ pub struct InnerNode<S: Storage> {
     pub stats: Stats,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync<S>>>,
+    /// The node's start-up timestamp.
+    pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
     tasks: Mutex<Vec<task::JoinHandle<()>>>,
     /// The threads spawned by the node.
@@ -140,6 +143,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             outbound: Default::default(),
             peer_book: Default::default(),
             sync: Default::default(),
+            launched: Utc::now(),
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),
