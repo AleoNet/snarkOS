@@ -174,8 +174,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
         let incoming_task = task::spawn(async move {
+            let mut cache = Cache::default();
+
             loop {
-                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
+                if let Err(e) = node_clone.process_incoming_messages(&mut receiver, &mut cache).await {
                     node_clone.stats.inbound.all_failures.fetch_add(1, Ordering::Relaxed);
                     error!("Node error: {}", e);
                 } else {
