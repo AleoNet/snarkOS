@@ -84,10 +84,10 @@ async fn block_initiator_side() {
     assert!(block_hashes.contains(&block_1_header_hash) && block_hashes.contains(&block_2_header_hash));
 
     // respond with the full blocks
-    let block_1 = Payload::Block(BLOCK_1.to_vec());
+    let block_1 = Payload::SyncBlock(BLOCK_1.to_vec());
     peer.write_message(&block_1).await;
 
-    let block_2 = Payload::Block(BLOCK_2.to_vec());
+    let block_2 = Payload::SyncBlock(BLOCK_2.to_vec());
     peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
