@@ -74,7 +74,8 @@ async fn handshake_responder_side() {
     let _node_version = Version::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk
-    let peer_version = Version::serialize(&Version::new(1u64, peer_address.port(), 0)).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let peer_version =
+        Version::serialize(&Version::new(snarkos_network::PROTOCOL_VERSION, peer_address.port(), 0)).unwrap();
     let len = noise.write_message(&peer_version, &mut buffer).unwrap();
     peer_stream.write_all(&[len as u8]).await.unwrap();
     peer_stream.write_all(&buffer[..len]).await.unwrap();
@@ -126,7 +127,8 @@ async fn handshake_initiator_side() {
     noise.read_message(&buf[..len], &mut buffer).unwrap();
 
     // -> e, ee, s, es
-    let peer_version = Version::serialize(&Version::new(1u64, peer_address.port(), 0)).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let peer_version =
+        Version::serialize(&Version::new(snarkos_network::PROTOCOL_VERSION, peer_address.port(), 0)).unwrap();
     let len = noise.write_message(&peer_version, &mut buffer).unwrap();
     peer_stream.write_all(&[len as u8]).await.unwrap();
     peer_stream.write_all(&buffer[..len]).await.unwrap();

@@ -384,7 +384,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("received e (XX handshake part 1/3) from {}", remote_address);
 
         // -> e, ee, s, es
-        let own_version = Version::serialize(&Version::new(1u64, listener_address.port(), self.id)).unwrap(); // TODO (raychu86): Establish a formal node version.
+        let own_version =
+            Version::serialize(&Version::new(crate::PROTOCOL_VERSION, listener_address.port(), self.id)).unwrap();
         let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
@@ -403,6 +404,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         if peer_version.node_id == self.id {
             return Err(NetworkError::SelfConnectAttempt);
+        }
+        if peer_version.version != crate::PROTOCOL_VERSION {
+            return Err(NetworkError::InvalidHandshake);
         }
 
         self.stats.handshakes.successes_resp.fetch_add(1, Ordering::Relaxed);

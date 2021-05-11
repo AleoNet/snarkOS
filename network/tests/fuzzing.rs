@@ -196,7 +196,12 @@ async fn fuzzing_corrupted_version_pre_handshake() {
 
     for i in 0..ITERATIONS {
         let mut stream = TcpStream::connect(node_addr).await.unwrap();
-        let version = Version::serialize(&Version::new(1u64, stream.local_addr().unwrap().port(), i as u64)).unwrap();
+        let version = Version::serialize(&Version::new(
+            snarkos_network::PROTOCOL_VERSION,
+            stream.local_addr().unwrap().port(),
+            i as u64,
+        ))
+        .unwrap();
 
         let corrupted_version = corrupt_bytes(&version);
 
@@ -227,7 +232,7 @@ async fn fuzzing_corrupted_version_post_handshake() {
         }
     });
 
-    let version = Version::serialize(&Version::new(1, 4141, 0)).unwrap();
+    let version = Version::serialize(&Version::new(snarkos_network::PROTOCOL_VERSION, 4141, 0)).unwrap();
     for _ in 0..ITERATIONS {
         // Replace a random percentage of random bytes at random indices in the serialised message.
         let corrupted_version = corrupt_bytes(&version);

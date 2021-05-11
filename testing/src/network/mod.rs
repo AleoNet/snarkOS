@@ -294,7 +294,7 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     node1_noise.read_message(&buf[..len], &mut buffer).unwrap();
 
     // -> e, ee, s, es (node1)
-    let version = Version::serialize(&Version::new(1u64, node1_addr.port(), 1)).unwrap();
+    let version = Version::serialize(&Version::new(snarkos_network::PROTOCOL_VERSION, node1_addr.port(), 1)).unwrap();
     let len = node1_noise.write_message(&version, &mut buffer).unwrap();
     node1_stream.write_all(&[len as u8]).await.unwrap();
     node1_stream.write_all(&buffer[..len]).await.unwrap();
@@ -307,7 +307,8 @@ pub async fn spawn_2_fake_nodes() -> (FakeNode, FakeNode) {
     let _version = Version::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk (node0)
-    let peer_version = Version::serialize(&Version::new(1u64, node0_addr.port(), 0)).unwrap();
+    let peer_version =
+        Version::serialize(&Version::new(snarkos_network::PROTOCOL_VERSION, node0_addr.port(), 0)).unwrap();
     let len = node0_noise.write_message(&peer_version, &mut buffer).unwrap();
     node0_stream.write_all(&[len as u8]).await.unwrap();
     node0_stream.write_all(&buffer[..len]).await.unwrap();
@@ -360,7 +361,8 @@ pub async fn handshaken_peer(node_listener: SocketAddr) -> FakeNode {
     let _node_version = Version::deserialize(&buffer[..len]).unwrap();
 
     // -> s, se, psk
-    let peer_version = Version::serialize(&Version::new(1u64, peer_addr.port(), 0)).unwrap(); // TODO (raychu86): Establish a formal node version.
+    let peer_version =
+        Version::serialize(&Version::new(snarkos_network::PROTOCOL_VERSION, peer_addr.port(), 0)).unwrap();
     let len = noise.write_message(&peer_version, &mut buffer).unwrap();
     peer_stream.write_all(&[len as u8]).await.unwrap();
     peer_stream.write_all(&buffer[..len]).await.unwrap();
