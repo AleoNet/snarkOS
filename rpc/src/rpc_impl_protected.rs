@@ -52,7 +52,7 @@ use snarkvm_utilities::{
 use itertools::Itertools;
 use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use rand::{thread_rng, Rng};
-use std::{str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 type JsonRPCError = jsonrpc_core::Error;
 
@@ -245,6 +245,23 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         }
     }
 
+    /// Disconnects from the given address
+    pub async fn disconnect_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        let address: SocketAddr = serde_json::from_value(value[0].clone())
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        let _ = self.node.disconnect_from_peer(address);
+
+        Ok(Value::Null)
+    }
+
     /// Expose the protected functions as RPC enpoints
     pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
@@ -284,6 +301,10 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         d.add_method_with_meta("createaccount", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.create_account_protected(params, meta)
+        });
+        d.add_method_with_meta("disconnect", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.disconnect_protected(params, meta)
         });
 
         io.extend_with(d)

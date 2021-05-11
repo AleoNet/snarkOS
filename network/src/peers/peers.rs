@@ -460,7 +460,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// as disconnected from this node server.
     ///
     #[inline]
-    pub(crate) fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
         // Set the peer as disconnected in the peer book.
         let result = self.peer_book.set_disconnected(remote_address);
 
