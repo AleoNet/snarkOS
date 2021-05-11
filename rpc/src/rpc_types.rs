@@ -16,6 +16,7 @@
 
 //! Structures for RPC endpoint requests and responses.
 
+use chrono::{DateTime, Utc};
 use jsonrpc_http_server::jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -127,6 +128,12 @@ pub struct NodeInfo {
 
     /// Flag indicating if the node is currently syncing
     pub is_syncing: bool,
+
+    /// The timestamp of when the node was launched.
+    pub launched: DateTime<Utc>,
+
+    /// The version of the client binary.
+    pub version: String,
 }
 
 /// Returned value for the `getnodestats` rpc call
