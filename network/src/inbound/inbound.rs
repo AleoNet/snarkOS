@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, Cache, ConnReader, ConnWriter, Node, Receiver, Sender};
+use crate::{errors::NetworkError, message::*, Cache, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
 use std::{
     collections::HashMap,
@@ -246,7 +246,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         };
 
         // Check if the message hasn't already been processed recently if it's a `Block`.
-        if matches!(payload, Payload::Block(..)) && cache.contains(&payload) {
+        // The node should also reject them while syncing, as it is bound to receive them later.
+        if matches!(payload, Payload::Block(..)) && (self.state() == State::Syncing || cache.contains(&payload)) {
             return Ok(());
         }
 
