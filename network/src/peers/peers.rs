@@ -194,9 +194,13 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             if peer_version.node_id == node.id {
                 return Err(NetworkError::SelfConnectAttempt);
             }
+            if peer_version.version != crate::PROTOCOL_VERSION {
+                return Err(NetworkError::InvalidHandshake);
+            }
 
             // -> s, se, psk
-            let own_version = Version::serialize(&Version::new(1u64, own_address.port(), node.id)).unwrap();
+            let own_version =
+                Version::serialize(&Version::new(crate::PROTOCOL_VERSION, own_address.port(), node.id)).unwrap();
             let len = noise.write_message(&own_version, &mut buffer)?;
             writer.write_all(&[len as u8]).await?;
             writer.write_all(&buffer[..len]).await?;

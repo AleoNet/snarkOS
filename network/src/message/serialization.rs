@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_version() {
-        let version = Version::new(1, 4141, 0);
+        let version = Version::new(crate::PROTOCOL_VERSION, 4141, 0);
 
         assert_eq!(
             Version::deserialize(&Version::serialize(&version).unwrap()).unwrap(),
