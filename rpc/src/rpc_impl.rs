@@ -314,6 +314,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             is_miner: self.sync_handler()?.is_miner(),
             is_syncing: self.sync_handler()?.is_syncing_blocks(),
             launched: self.node.launched,
+            version: env!("CARGO_PKG_VERSION").into(),
         })
     }
 

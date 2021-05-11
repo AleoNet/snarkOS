@@ -131,6 +131,9 @@ pub struct NodeInfo {
 
     /// The timestamp of when the node was launched.
     pub launched: DateTime<Utc>,
+
+    /// The version of the client binary.
+    pub version: String,
 }
 
 /// Returned value for the `getnodestats` rpc call
