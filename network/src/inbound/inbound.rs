@@ -406,7 +406,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if peer_version.node_id == self.id {
             return Err(NetworkError::SelfConnectAttempt);
         }
-        if peer_version.version != crate::PROTOCOL_VERSION {
+        // FIXME: a temporary exception
+        if remote_address.ip() != "50.18.83.123".parse::<std::net::IpAddr>().unwrap() && peer_version.version != crate::PROTOCOL_VERSION {
             return Err(NetworkError::InvalidHandshake);
         }
 
