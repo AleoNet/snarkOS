@@ -18,7 +18,6 @@ use crate::{
     peers::{PeerInfo, PeerQuality},
     NetworkError,
 };
-use snarkos_metrics::Metrics;
 use snarkos_storage::{BlockHeight, Ledger};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::{Storage, Transaction};
@@ -208,9 +207,7 @@ impl PeerBook {
         peer_info.set_connected();
 
         // Add the address into the connected peers.
-        let success = self.connected_peers.write().insert(listener, peer_info).is_none();
-        // On success, increment the connected peer count.
-        connected_peers_inc!(success);
+        self.connected_peers.write().insert(listener, peer_info);
     }
 
     ///
@@ -229,9 +226,7 @@ impl PeerBook {
             peer_info.set_disconnected()?;
 
             // Add the address into the disconnected peers.
-            let success = self.disconnected_peers.write().insert(address, peer_info).is_none();
-            // On success, decrement the connected peer count.
-            connected_peers_dec!(success);
+            self.disconnected_peers.write().insert(address, peer_info);
 
             return Ok(true);
         }
@@ -290,18 +285,12 @@ impl PeerBook {
     /// This function should only be used in the case that the peer
     /// should be forgotten about permanently.
     ///
-    pub fn remove_peer(&self, address: &SocketAddr) {
-        // Remove the given address from the connecting peers, if it exists.
-        self.connecting_peers.write().remove(address);
+    pub fn remove_peer(&self, address: SocketAddr) {
+        // Disconnect from the peer if currently connected.
+        let _ = self.set_disconnected(address);
 
-        // Remove the given address from the connected peers, if it exists.
-        if self.connected_peers.write().remove(address).is_some() {
-            // Decrement the connected_peer metric as the peer was not yet disconnected.
-            connected_peers_dec!()
-        }
-
-        // Remove the address from the disconnected peers, if it exists.
-        self.disconnected_peers.write().remove(address);
+        // Remove the peer from the list of known peers.
+        self.disconnected_peers.write().remove(&address);
     }
 
     fn peer_quality(&self, addr: SocketAddr) -> Option<Arc<PeerQuality>> {
