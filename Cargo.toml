@@ -169,6 +169,3 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
-
-[build]
-incremental = false # https://github.com/rust-lang/rust/issues/84970
