@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, NetworkError, Sync};
+use crate::{message::*, stats, NetworkError, Sync};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
-use std::{net::SocketAddr, sync::atomic::Ordering};
+use std::net::SocketAddr;
 
 impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
     ///
@@ -105,13 +105,9 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
 
         if let Err(ConsensusError::PreExistingBlock) = block_validity {
             if is_block_new {
-                self.node().stats.misc.duplicate_blocks.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::MISC_DUPLICATE_BLOCKS);
             } else {
-                self.node()
-                    .stats
-                    .misc
-                    .duplicate_sync_blocks
-                    .fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::MISC_DUPLICATE_SYNC_BLOCKS);
             }
         }
 
