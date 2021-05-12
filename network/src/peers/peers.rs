@@ -81,7 +81,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.connect_to_bootnodes();
 
         // Attempt to connect to each disconnected peer saved in the peer book.
-        self.connect_to_disconnected_peers();
+        if !self.config.is_bootnode() {
+            self.connect_to_disconnected_peers();
+        }
 
         // Broadcast a `GetPeers` message to request for more peers.
         self.broadcast_getpeers_requests().await;
