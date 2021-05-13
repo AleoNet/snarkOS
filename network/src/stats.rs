@@ -43,6 +43,9 @@ pub const OUTBOUND_ALL_FAILURES: &str = "snarkos_outbound_all_failures_total";
 pub const CONNECTIONS_ALL_ACCEPTED: &str = "snarkos_connections_all_accepted_total";
 pub const CONNECTIONS_ALL_INITIATED: &str = "snarkos_connections_all_initiated_total";
 pub const CONNECTIONS_ALL_REJECTED: &str = "snarkos_connections_all_rejected_total";
+pub const CONNECTIONS_CONNECTING: &str = "snarkos_connections_connecting_total";
+pub const CONNECTIONS_CONNECTED: &str = "snarkos_connections_connected_total";
+pub const CONNECTIONS_DISCONNECTED: &str = "snarkos_connections_disconnected_total";
 
 pub const HANDSHAKES_FAILURES_INIT: &str = "snarkos_handshakes_failures_init_total";
 pub const HANDSHAKES_FAILURES_RESP: &str = "snarkos_handshakes_failures_resp_total";

@@ -16,6 +16,7 @@
 
 use crate::{
     peers::{PeerInfo, PeerQuality},
+    stats,
     NetworkError,
 };
 use snarkos_storage::{BlockHeight, Ledger};
@@ -181,6 +182,7 @@ impl PeerBook {
             return Err(NetworkError::PeerAlreadyConnected);
         }
         self.connecting_peers.write().insert(address);
+        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
 
         Ok(())
     }
@@ -192,10 +194,13 @@ impl PeerBook {
         // If listener.is_some(), then it's different than the address; otherwise it's just the address param.
         let listener = if let Some(addr) = listener { addr } else { address };
 
-        // Remove the address from the connecting peers, if it exists.
+        // Remove the peer info from the connecting peers, if it exists.
         let mut peer_info = match self.disconnected_peers.write().remove(&listener) {
             // Case 1 - A previously known peer.
-            Some(peer_info) => peer_info,
+            Some(peer_info) => {
+                metrics::decrement_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+                peer_info
+            }
             // Case 2 - A peer that was previously not known.
             None => PeerInfo::new(listener),
         };
@@ -203,11 +208,15 @@ impl PeerBook {
         // Remove the peer's address from the list of connecting peers.
         self.connecting_peers.write().remove(&address);
 
+        metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+
         // Update the peer info to connected.
         peer_info.set_connected();
 
         // Add the address into the connected peers.
         self.connected_peers.write().insert(listener, peer_info);
+
+        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
     }
 
     ///
@@ -217,6 +226,7 @@ impl PeerBook {
     pub fn set_disconnected(&self, address: SocketAddr) -> Result<bool, NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
         if self.connecting_peers.write().remove(&address) {
+            metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
             return Ok(false);
         }
 
@@ -225,8 +235,12 @@ impl PeerBook {
             // Update the peer info to disconnected.
             peer_info.set_disconnected()?;
 
+            metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+
             // Add the address into the disconnected peers.
             self.disconnected_peers.write().insert(address, peer_info);
+
+            metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
 
             return Ok(true);
         }

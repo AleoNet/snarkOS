@@ -111,6 +111,9 @@ fn register_metrics() {
     register_counter!(snarkos_network::CONNECTIONS_ALL_ACCEPTED);
     register_counter!(snarkos_network::CONNECTIONS_ALL_INITIATED);
     register_counter!(snarkos_network::CONNECTIONS_ALL_REJECTED);
+    register_gauge!(snarkos_network::CONNECTIONS_CONNECTING);
+    register_gauge!(snarkos_network::CONNECTIONS_CONNECTED);
+    register_gauge!(snarkos_network::CONNECTIONS_DISCONNECTED);
 
     register_counter!(snarkos_network::HANDSHAKES_FAILURES_INIT);
     register_counter!(snarkos_network::HANDSHAKES_FAILURES_RESP);
