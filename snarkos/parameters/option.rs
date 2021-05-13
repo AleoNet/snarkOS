@@ -79,6 +79,13 @@ pub const NETWORK: OptionType = (
     &[],
 );
 
+pub const RPC_IP: OptionType = (
+    "[rpc-ip] -i --rpc-ip=[rpc-ip] 'Specify the ip of the RPC server'",
+    &[],
+    &[],
+    &[],
+);
+
 pub const RPC_PORT: OptionType = (
     "[rpc-port] --rpc-port=[rpc-port] 'Specify the port the json rpc server is run on'",
     &["no_jsonrpc"],

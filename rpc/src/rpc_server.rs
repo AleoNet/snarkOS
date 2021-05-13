@@ -35,14 +35,12 @@ use std::{net::SocketAddr, sync::Arc};
 /// This may be changed in the future to give the node more control of the rpc server.
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
-    rpc_port: u16,
+    rpc_addr: SocketAddr,
     secondary_storage: Arc<MerkleTreeLedger<S>>,
     node_server: Node<S>,
     username: Option<String>,
     password: Option<String>,
 ) -> task::JoinHandle<()> {
-    let rpc_server: SocketAddr = format!("0.0.0.0:{}", rpc_port).parse().unwrap();
-
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
         _ => None,
@@ -65,7 +63,7 @@ pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
             Meta { auth }
         })
         .threads(1)
-        .start_http(&rpc_server)
+        .start_http(&rpc_addr)
         .expect("couldn't start the RPC server!");
 
     tokio::task::spawn(async move {

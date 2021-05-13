@@ -175,8 +175,12 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
             Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?)
         };
 
+        let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
+            .parse()
+            .expect("Invalid RPC server address!");
+
         let rpc_handle = start_rpc_server(
-            config.rpc.port,
+            rpc_address,
             secondary_storage,
             node.clone(),
             config.rpc.username,
