@@ -311,6 +311,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns data about the node.
     fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
         Ok(NodeInfo {
+            is_bootnode: self.node.config.is_bootnode(),
             is_miner: self.sync_handler()?.is_miner(),
             is_syncing: self.sync_handler()?.is_syncing_blocks(),
             launched: self.node.launched,
