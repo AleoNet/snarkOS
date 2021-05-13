@@ -314,8 +314,8 @@ impl Recorder for Stats {
                 GaugeValue::Increment(value) => {
                     match name.borrow() {
                         // queues
-                        QUEUES_INBOUND => self.queues.inbound.fetch_add(value as u64, Ordering::Relaxed),
-                        QUEUES_OUTBOUND => self.queues.outbound.fetch_add(value as u64, Ordering::Relaxed),
+                        QUEUES_INBOUND => self.queues.inbound.fetch_add(value as u64, Ordering::SeqCst),
+                        QUEUES_OUTBOUND => self.queues.outbound.fetch_add(value as u64, Ordering::SeqCst),
                         _ => {
                             error!("Metrics key {} wasn't assigned an operation and won't work!", key);
                             0
@@ -325,8 +325,8 @@ impl Recorder for Stats {
                 GaugeValue::Decrement(value) => {
                     match name.borrow() {
                         // queues
-                        QUEUES_INBOUND => self.queues.inbound.fetch_sub(value as u64, Ordering::Relaxed),
-                        QUEUES_OUTBOUND => self.queues.outbound.fetch_sub(value as u64, Ordering::Relaxed),
+                        QUEUES_INBOUND => self.queues.inbound.fetch_sub(value as u64, Ordering::SeqCst),
+                        QUEUES_OUTBOUND => self.queues.outbound.fetch_sub(value as u64, Ordering::SeqCst),
                         _ => {
                             error!("Metrics key {} wasn't assigned an operation and won't work!", key);
                             0
