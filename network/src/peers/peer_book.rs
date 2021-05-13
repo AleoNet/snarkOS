@@ -257,10 +257,9 @@ impl PeerBook {
         }
 
         // Add the given address to the map of disconnected peers.
-        self.disconnected_peers
-            .write()
-            .entry(address)
-            .or_insert_with(|| PeerInfo::new(address));
+        self.disconnected_peers.write().insert(address, PeerInfo::new(address));
+
+        metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
 
         debug!("Added {} to the peer book", address);
     }
