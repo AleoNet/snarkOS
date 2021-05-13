@@ -397,7 +397,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             return Err(NetworkError::InvalidHandshake);
         }
 
-        metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_INIT);
+        metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_RESP);
 
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
