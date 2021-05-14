@@ -125,6 +125,7 @@ fn register_metrics() {
     register_gauge!(snarkos_network::QUEUES_INBOUND);
     register_gauge!(snarkos_network::QUEUES_OUTBOUND);
 
+    register_counter!(snarkos_network::MISC_BLOCK_HEIGHT);
     register_counter!(snarkos_network::MISC_BLOCKS_MINED);
     register_counter!(snarkos_network::MISC_DUPLICATE_BLOCKS);
     register_counter!(snarkos_network::MISC_DUPLICATE_SYNC_BLOCKS);
@@ -222,6 +223,9 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
             Duration::from_secs(config.p2p.block_sync_interval.into()),
             Duration::from_secs(config.p2p.mempool_sync_interval.into()),
         );
+
+        // The node can already be at some non-zero height.
+        metrics::counter!(snarkos_network::MISC_BLOCK_HEIGHT, sync.current_block_height() as u64);
 
         node.set_sync(sync);
     }
