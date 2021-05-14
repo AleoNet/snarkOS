@@ -467,17 +467,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// as disconnected from this node server.
     ///
     #[inline]
-    pub fn disconnect_from_peer(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub fn disconnect_from_peer(&self, remote_address: SocketAddr) {
         // Set the peer as disconnected in the peer book.
-        let result = self.peer_book.set_disconnected(remote_address);
+        let was_connected = self.peer_book.set_disconnected(remote_address);
 
         // If the peer was truly disconnected, remove its channel and advise.
-        if let Ok(true) = result {
+        if was_connected {
             self.outbound.channels.write().remove(&remote_address);
             trace!("Disconnected from {}", remote_address);
         }
-
-        result.map(|_| ())
     }
 
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {

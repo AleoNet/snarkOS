@@ -223,17 +223,17 @@ impl PeerBook {
     /// Removes the given address from the connecting and connected peers in this `PeerBook`,
     /// and adds the given address to the disconnected peers in this `PeerBook`.
     ///
-    pub fn set_disconnected(&self, address: SocketAddr) -> Result<bool, NetworkError> {
+    pub fn set_disconnected(&self, address: SocketAddr) -> bool {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
         if self.connecting_peers.write().remove(&address) {
             metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
-            return Ok(false);
+            return false;
         }
 
         // Case 2 - The given address is a connected peer, attempt to disconnect.
         if let Some(mut peer_info) = self.connected_peers.write().remove(&address) {
             // Update the peer info to disconnected.
-            peer_info.set_disconnected()?;
+            peer_info.set_disconnected();
 
             metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
 
@@ -242,10 +242,10 @@ impl PeerBook {
 
             metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
 
-            return Ok(true);
+            return true;
         }
 
-        Ok(false)
+        false
     }
 
     ///
@@ -472,7 +472,7 @@ mod tests {
         assert_eq!(false, peer_book.is_connected(remote_address));
         assert_eq!(true, peer_book.is_disconnected(remote_address));
 
-        peer_book.set_disconnected(remote_address).unwrap();
+        peer_book.set_disconnected(remote_address);
         assert_eq!(false, peer_book.is_connecting(remote_address));
         assert_eq!(false, peer_book.is_connected(remote_address));
         assert_eq!(true, peer_book.is_disconnected(remote_address));
@@ -493,7 +493,7 @@ mod tests {
         assert_eq!(true, peer_book.is_connected(remote_address));
         assert_eq!(false, peer_book.is_disconnected(remote_address));
 
-        peer_book.set_disconnected(remote_address).unwrap();
+        peer_book.set_disconnected(remote_address);
         assert_eq!(false, peer_book.is_connecting(remote_address));
         assert_eq!(false, peer_book.is_connected(remote_address));
         assert_eq!(true, peer_book.is_disconnected(remote_address));
@@ -506,7 +506,7 @@ mod tests {
 
         peer_book.set_connecting(remote_address).unwrap();
         peer_book.set_connected(remote_address, None);
-        peer_book.set_disconnected(remote_address).unwrap();
+        peer_book.set_disconnected(remote_address);
         assert_eq!(false, peer_book.is_connecting(remote_address));
         assert_eq!(false, peer_book.is_connected(remote_address));
         assert_eq!(true, peer_book.is_disconnected(remote_address));
