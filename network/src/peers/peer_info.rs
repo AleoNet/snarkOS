@@ -28,7 +28,7 @@ use std::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -90,9 +90,12 @@ pub struct PeerInfo {
     /// The quality of the connection with the peer.
     #[serde(skip)]
     pub quality: Arc<PeerQuality>,
-    /// The handles for tasks associated exclusively with this peer.
+    /// The handles for tasks associated exclusively with this peer;
+    /// The bool indicates whether it's abortable - otherwise it
+    /// needs to be awaited instead.
     #[serde(skip)]
-    pub tasks: Arc<Mutex<Vec<task::JoinHandle<()>>>>,
+    #[allow(clippy::type_complexity)]
+    pub tasks: Arc<Mutex<Vec<(task::JoinHandle<()>, bool)>>>,
 }
 
 impl PeerInfo {
@@ -219,8 +222,17 @@ impl PeerInfo {
                 self.quality.remaining_sync_blocks.store(0, Ordering::SeqCst);
                 self.disconnected_count += 1;
 
-                for handle in self.tasks.lock().drain(..).rev() {
-                    handle.abort();
+                for (handle, abortable) in self.tasks.lock().drain(..).rev() {
+                    if abortable {
+                        handle.abort();
+                    } else {
+                        task::spawn(async move {
+                            // An arbitrary amount of time to allow the task to shut down cleanly.
+                            if tokio::time::timeout(Duration::from_secs(5), handle).await.is_err() {
+                                warn!("One of the per-connection tasks didn't shut down cleanly");
+                            }
+                        });
+                    }
                 }
 
                 Ok(())
@@ -232,8 +244,8 @@ impl PeerInfo {
         }
     }
 
-    pub(crate) fn register_task(&self, handle: task::JoinHandle<()>) {
-        self.tasks.lock().push(handle);
+    pub(crate) fn register_task(&self, handle: task::JoinHandle<()>, abortable: bool) {
+        self.tasks.lock().push((handle, abortable));
     }
 }
 

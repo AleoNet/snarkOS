@@ -235,8 +235,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             node.peer_book.set_connected(remote_address, None);
 
             if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
-                peer.register_task(conn_reading_task);
-                peer.register_task(conn_writing_task);
+                peer.register_task(conn_reading_task, true);
+                peer.register_task(conn_writing_task, false);
             } else {
                 // if the related peer is not found, it means it's already been dropped
                 conn_reading_task.abort();

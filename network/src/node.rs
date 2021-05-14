@@ -79,7 +79,8 @@ impl<S: Storage> Drop for InnerNode<S> {
         // also, the connections are going to be broken automatically, so we only need to
         // take care of the associated tasks here
         for peer_info in self.peer_book.connected_peers().values() {
-            for handle in peer_info.tasks.lock().drain(..).rev() {
+            for (handle, _abortable) in peer_info.tasks.lock().drain(..).rev() {
+                // We're already shutting down, so always abort.
                 handle.abort();
             }
         }

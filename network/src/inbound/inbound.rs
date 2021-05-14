@@ -127,8 +127,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                     node.send_ping(remote_listener).await;
 
                                     if let Ok(ref peer) = node.peer_book.get_peer(remote_listener) {
-                                        peer.register_task(peer_reading_task);
-                                        peer.register_task(peer_writing_task);
+                                        peer.register_task(peer_reading_task, true);
+                                        peer.register_task(peer_writing_task, false);
                                     } else {
                                         // If the related peer is not found, it means it's already been dropped.
                                         peer_reading_task.abort();
