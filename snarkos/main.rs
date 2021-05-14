@@ -38,6 +38,10 @@ use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
+#[cfg(feature = "prometheus")]
+use metrics_exporter_prometheus::PrometheusBuilder;
+
+use metrics::{register_counter, register_gauge};
 use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle};
 use tracing_subscriber::EnvFilter;
@@ -69,6 +73,63 @@ fn print_welcome(config: &Config) {
     println!("{}", render_welcome(config));
 }
 
+#[cfg(feature = "prometheus")]
+fn initialize_metrics() {
+    let builder = PrometheusBuilder::new();
+    builder
+        .install()
+        .expect("failed to install Prometheus metrics recorder");
+}
+
+#[cfg(not(feature = "prometheus"))]
+fn initialize_metrics() {
+    use snarkos_network::NODE_STATS;
+
+    metrics::set_recorder(&NODE_STATS).expect("couldn't initialize the metrics recorder!");
+}
+
+fn register_metrics() {
+    register_counter!(snarkos_network::INBOUND_ALL_SUCCESSES);
+    register_counter!(snarkos_network::INBOUND_ALL_FAILURES);
+    register_counter!(snarkos_network::INBOUND_BLOCKS);
+    register_counter!(snarkos_network::INBOUND_GETBLOCKS);
+    register_counter!(snarkos_network::INBOUND_GETMEMORYPOOL);
+    register_counter!(snarkos_network::INBOUND_GETPEERS);
+    register_counter!(snarkos_network::INBOUND_GETSYNC);
+    register_counter!(snarkos_network::INBOUND_MEMORYPOOL);
+    register_counter!(snarkos_network::INBOUND_PEERS);
+    register_counter!(snarkos_network::INBOUND_PINGS);
+    register_counter!(snarkos_network::INBOUND_PONGS);
+    register_counter!(snarkos_network::INBOUND_SYNCS);
+    register_counter!(snarkos_network::INBOUND_SYNCBLOCKS);
+    register_counter!(snarkos_network::INBOUND_TRANSACTIONS);
+    register_counter!(snarkos_network::INBOUND_UNKNOWN);
+
+    register_counter!(snarkos_network::OUTBOUND_ALL_SUCCESSES);
+    register_counter!(snarkos_network::OUTBOUND_ALL_FAILURES);
+
+    register_counter!(snarkos_network::CONNECTIONS_ALL_ACCEPTED);
+    register_counter!(snarkos_network::CONNECTIONS_ALL_INITIATED);
+    register_counter!(snarkos_network::CONNECTIONS_ALL_REJECTED);
+    register_gauge!(snarkos_network::CONNECTIONS_CONNECTING);
+    register_gauge!(snarkos_network::CONNECTIONS_CONNECTED);
+    register_gauge!(snarkos_network::CONNECTIONS_DISCONNECTED);
+
+    register_counter!(snarkos_network::HANDSHAKES_FAILURES_INIT);
+    register_counter!(snarkos_network::HANDSHAKES_FAILURES_RESP);
+    register_counter!(snarkos_network::HANDSHAKES_SUCCESSES_INIT);
+    register_counter!(snarkos_network::HANDSHAKES_SUCCESSES_RESP);
+    register_counter!(snarkos_network::HANDSHAKES_TIMEOUTS_INIT);
+    register_counter!(snarkos_network::HANDSHAKES_TIMEOUTS_RESP);
+
+    register_gauge!(snarkos_network::QUEUES_INBOUND);
+    register_gauge!(snarkos_network::QUEUES_OUTBOUND);
+
+    register_counter!(snarkos_network::MISC_BLOCKS_MINED);
+    register_counter!(snarkos_network::MISC_DUPLICATE_BLOCKS);
+    register_counter!(snarkos_network::MISC_DUPLICATE_SYNC_BLOCKS);
+}
+
 ///
 /// Builds a node from configuration parameters.
 ///
@@ -82,6 +143,9 @@ fn print_welcome(config: &Config) {
 ///
 async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()> {
     initialize_logger(&config);
+
+    initialize_metrics();
+    register_metrics();
 
     print_welcome(&config);
 

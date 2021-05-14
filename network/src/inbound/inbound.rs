@@ -14,14 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, Cache, ConnReader, ConnWriter, Node, Receiver, Sender, State};
+use crate::{errors::NetworkError, message::*, stats, Cache, ConnReader, ConnWriter, Node, Receiver, Sender, State};
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{atomic::Ordering, Arc},
-    time::Duration,
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
 use snarkvm_objects::Storage;
@@ -90,11 +85,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         info!("Got a connection request from {}", remote_address);
 
                         if !node_clone.can_connect() {
-                            node_clone
-                                .stats
-                                .connections
-                                .all_rejected
-                                .fetch_add(1, Ordering::Relaxed);
+                            metrics::increment_counter!(stats::CONNECTIONS_ALL_REJECTED);
                             continue;
                         }
 
@@ -147,12 +138,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 Ok(Err(e)) => {
                                     error!("Failed to accept a connection request: {}", e);
                                     let _ = node.disconnect_from_peer(remote_address);
-                                    node.stats.handshakes.failures_resp.fetch_add(1, Ordering::Relaxed);
+                                    metrics::increment_counter!(stats::HANDSHAKES_FAILURES_RESP);
                                 }
                                 Err(_) => {
                                     error!("Failed to accept a connection request: the handshake timed out");
                                     let _ = node.disconnect_from_peer(remote_address);
-                                    node.stats.handshakes.timeouts_resp.fetch_add(1, Ordering::Relaxed);
+                                    metrics::increment_counter!(stats::HANDSHAKES_TIMEOUTS_RESP);
                                 }
                             }
                         });
@@ -162,11 +153,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
                 }
-                node_clone
-                    .stats
-                    .connections
-                    .all_accepted
-                    .fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::CONNECTIONS_ALL_ACCEPTED);
             }
         });
 
@@ -236,7 +223,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        self.stats.queues.inbound.fetch_sub(1, Ordering::SeqCst);
+        metrics::decrement_gauge!(stats::QUEUES_INBOUND, 1.0);
 
         let source = if let Direction::Inbound(addr) = direction {
             self.peer_book.update_last_seen(addr);
@@ -253,21 +240,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         match payload {
             Payload::Transaction(transaction) => {
-                self.stats.inbound.transactions.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_TRANSACTIONS);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {
-                self.stats.inbound.blocks.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_BLOCKS);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_block(source, block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
-                self.stats.inbound.syncblocks.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_SYNCBLOCKS);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_block(source, block, false).await?;
@@ -279,35 +266,35 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetBlocks(hashes) => {
-                self.stats.inbound.getblocks.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_GETBLOCKS);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_blocks(source, hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
-                self.stats.inbound.getmemorypool.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_GETMEMORYPOOL);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_memory_pool(source).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
-                self.stats.inbound.memorypool.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_MEMORYPOOL);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_memory_pool(mempool)?;
                 }
             }
             Payload::GetSync(getsync) => {
-                self.stats.inbound.getsync.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_GETSYNC);
 
                 if let Some(ref sync) = self.sync() {
                     sync.received_get_sync(source, getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
-                self.stats.inbound.syncs.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_SYNCS);
 
                 if let Some(ref sync_handler) = self.sync() {
                     if sync.is_empty() {
@@ -322,26 +309,26 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetPeers => {
-                self.stats.inbound.getpeers.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_GETPEERS);
 
                 self.send_peers(source).await;
             }
             Payload::Peers(peers) => {
-                self.stats.inbound.peers.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_PEERS);
 
                 self.process_inbound_peers(peers);
             }
             Payload::Ping(block_height) => {
-                self.stats.inbound.pings.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_PINGS);
 
                 self.peer_book.received_ping(source, block_height);
             }
             Payload::Pong => {
-                self.stats.inbound.pongs.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_PONGS);
                 // Skip as this case is already handled with priority in Inbound::listen_for_messages
             }
             Payload::Unknown => {
-                self.stats.inbound.unknown.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_UNKNOWN);
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
             }
         }
@@ -410,7 +397,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             return Err(NetworkError::InvalidHandshake);
         }
 
-        self.stats.handshakes.successes_resp.fetch_add(1, Ordering::Relaxed);
+        metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_RESP);
 
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
@@ -426,7 +413,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub(crate) fn route(&self, response: Message) {
         match self.inbound.sender.try_send(response) {
             Err(TrySendError::Full(msg)) => {
-                self.stats.inbound.all_failures.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::INBOUND_ALL_FAILURES);
                 error!("Failed to route a {}: the inbound channel is full", msg);
             }
             Err(TrySendError::Closed(msg)) => {
@@ -434,7 +421,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 error!("Failed to route a {}: the inbound channel is closed", msg);
             }
             Ok(_) => {
-                self.stats.queues.inbound.fetch_add(1, Ordering::SeqCst);
+                metrics::increment_gauge!(stats::QUEUES_INBOUND, 1.0);
             }
         }
     }

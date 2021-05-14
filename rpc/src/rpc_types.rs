@@ -234,17 +234,17 @@ pub struct NodeHandshakeStats {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeQueueStats {
     /// The number of messages queued in the common inbound channel.
-    pub inbound: u32,
+    pub inbound: u64,
     /// The number of messages queued in the individual outbound channels.
-    pub outbound: u32,
+    pub outbound: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeMiscStats {
     /// The current block height of the node.
-    pub block_height: u32,
+    pub block_height: u64,
     /// The number of blocks the node has mined.
-    pub blocks_mined: u32,
+    pub blocks_mined: u64,
     /// The number of duplicate blocks received.
     pub duplicate_blocks: u64,
     /// The number of duplicate sync blocks received.

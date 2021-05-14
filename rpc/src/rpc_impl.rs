@@ -20,7 +20,7 @@
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{Node, Sync};
+use snarkos_network::{Node, Sync, NODE_STATS};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
@@ -323,52 +323,56 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
         Ok(NodeStats {
             inbound: NodeInboundStats {
-                all_successes: self.node.stats.inbound.all_successes.load(Ordering::Relaxed),
-                all_failures: self.node.stats.inbound.all_failures.load(Ordering::Relaxed),
+                all_successes: NODE_STATS.inbound.all_successes.load(Ordering::Relaxed),
+                all_failures: NODE_STATS.inbound.all_failures.load(Ordering::Relaxed),
 
-                blocks: self.node.stats.inbound.blocks.load(Ordering::Relaxed),
-                getblocks: self.node.stats.inbound.getblocks.load(Ordering::Relaxed),
-                getmemorypool: self.node.stats.inbound.getmemorypool.load(Ordering::Relaxed),
-                getpeers: self.node.stats.inbound.getpeers.load(Ordering::Relaxed),
-                getsync: self.node.stats.inbound.getsync.load(Ordering::Relaxed),
-                memorypool: self.node.stats.inbound.memorypool.load(Ordering::Relaxed),
-                peers: self.node.stats.inbound.peers.load(Ordering::Relaxed),
-                pings: self.node.stats.inbound.pings.load(Ordering::Relaxed),
-                pongs: self.node.stats.inbound.pongs.load(Ordering::Relaxed),
-                syncs: self.node.stats.inbound.syncs.load(Ordering::Relaxed),
-                syncblocks: self.node.stats.inbound.syncblocks.load(Ordering::Relaxed),
-                transactions: self.node.stats.inbound.transactions.load(Ordering::Relaxed),
-                unknown: self.node.stats.inbound.unknown.load(Ordering::Relaxed),
+                blocks: NODE_STATS.inbound.blocks.load(Ordering::Relaxed),
+                getblocks: NODE_STATS.inbound.getblocks.load(Ordering::Relaxed),
+                getmemorypool: NODE_STATS.inbound.getmemorypool.load(Ordering::Relaxed),
+                getpeers: NODE_STATS.inbound.getpeers.load(Ordering::Relaxed),
+                getsync: NODE_STATS.inbound.getsync.load(Ordering::Relaxed),
+                memorypool: NODE_STATS.inbound.memorypool.load(Ordering::Relaxed),
+                peers: NODE_STATS.inbound.peers.load(Ordering::Relaxed),
+                pings: NODE_STATS.inbound.pings.load(Ordering::Relaxed),
+                pongs: NODE_STATS.inbound.pongs.load(Ordering::Relaxed),
+                syncs: NODE_STATS.inbound.syncs.load(Ordering::Relaxed),
+                syncblocks: NODE_STATS.inbound.syncblocks.load(Ordering::Relaxed),
+                transactions: NODE_STATS.inbound.transactions.load(Ordering::Relaxed),
+                unknown: NODE_STATS.inbound.unknown.load(Ordering::Relaxed),
             },
             outbound: NodeOutboundStats {
-                all_successes: self.node.stats.outbound.all_successes.load(Ordering::Relaxed),
-                all_failures: self.node.stats.outbound.all_failures.load(Ordering::Relaxed),
+                all_successes: NODE_STATS.outbound.all_successes.load(Ordering::Relaxed),
+                all_failures: NODE_STATS.outbound.all_failures.load(Ordering::Relaxed),
             },
             connections: NodeConnectionStats {
-                all_accepted: self.node.stats.connections.all_accepted.load(Ordering::Relaxed),
-                all_initiated: self.node.stats.connections.all_initiated.load(Ordering::Relaxed),
-                all_rejected: self.node.stats.connections.all_rejected.load(Ordering::Relaxed),
+                all_accepted: NODE_STATS.connections.all_accepted.load(Ordering::Relaxed),
+                all_initiated: NODE_STATS.connections.all_initiated.load(Ordering::Relaxed),
+                all_rejected: NODE_STATS.connections.all_rejected.load(Ordering::Relaxed),
                 connected_peers: self.node.peer_book.number_of_connected_peers(),
                 connecting_peers: self.node.peer_book.number_of_connecting_peers(),
                 disconnected_peers: self.node.peer_book.number_of_disconnected_peers(),
             },
             handshakes: NodeHandshakeStats {
-                successes_init: self.node.stats.handshakes.successes_init.load(Ordering::Relaxed),
-                successes_resp: self.node.stats.handshakes.successes_resp.load(Ordering::Relaxed),
-                failures_init: self.node.stats.handshakes.failures_init.load(Ordering::Relaxed),
-                failures_resp: self.node.stats.handshakes.failures_resp.load(Ordering::Relaxed),
-                timeouts_init: self.node.stats.handshakes.timeouts_init.load(Ordering::Relaxed),
-                timeouts_resp: self.node.stats.handshakes.timeouts_resp.load(Ordering::Relaxed),
+                successes_init: NODE_STATS.handshakes.successes_init.load(Ordering::Relaxed),
+                successes_resp: NODE_STATS.handshakes.successes_resp.load(Ordering::Relaxed),
+                failures_init: NODE_STATS.handshakes.failures_init.load(Ordering::Relaxed),
+                failures_resp: NODE_STATS.handshakes.failures_resp.load(Ordering::Relaxed),
+                timeouts_init: NODE_STATS.handshakes.timeouts_init.load(Ordering::Relaxed),
+                timeouts_resp: NODE_STATS.handshakes.timeouts_resp.load(Ordering::Relaxed),
             },
             queues: NodeQueueStats {
-                inbound: self.node.stats.queues.inbound.load(Ordering::SeqCst),
-                outbound: self.node.stats.queues.outbound.load(Ordering::SeqCst),
+                inbound: NODE_STATS.queues.inbound.load(Ordering::SeqCst),
+                outbound: NODE_STATS.queues.outbound.load(Ordering::SeqCst),
             },
             misc: NodeMiscStats {
-                block_height: self.node.sync().map(|sync| sync.current_block_height()).unwrap_or(0),
-                blocks_mined: self.node.stats.misc.blocks_mined.load(Ordering::Relaxed),
-                duplicate_blocks: self.node.stats.misc.duplicate_blocks.load(Ordering::Relaxed),
-                duplicate_sync_blocks: self.node.stats.misc.duplicate_sync_blocks.load(Ordering::Relaxed),
+                block_height: self
+                    .node
+                    .sync()
+                    .map(|sync| sync.current_block_height() as u64)
+                    .unwrap_or(0),
+                blocks_mined: NODE_STATS.misc.blocks_mined.load(Ordering::Relaxed),
+                duplicate_blocks: NODE_STATS.misc.duplicate_blocks.load(Ordering::Relaxed),
+                duplicate_sync_blocks: NODE_STATS.misc.duplicate_sync_blocks.load(Ordering::Relaxed),
             },
         })
     }

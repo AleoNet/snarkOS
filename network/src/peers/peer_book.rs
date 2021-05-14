@@ -16,9 +16,9 @@
 
 use crate::{
     peers::{PeerInfo, PeerQuality},
+    stats,
     NetworkError,
 };
-use snarkos_metrics::Metrics;
 use snarkos_storage::{BlockHeight, Ledger};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_objects::{Storage, Transaction};
@@ -182,6 +182,7 @@ impl PeerBook {
             return Err(NetworkError::PeerAlreadyConnected);
         }
         self.connecting_peers.write().insert(address);
+        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
 
         Ok(())
     }
@@ -193,10 +194,13 @@ impl PeerBook {
         // If listener.is_some(), then it's different than the address; otherwise it's just the address param.
         let listener = if let Some(addr) = listener { addr } else { address };
 
-        // Remove the address from the connecting peers, if it exists.
+        // Remove the peer info from the connecting peers, if it exists.
         let mut peer_info = match self.disconnected_peers.write().remove(&listener) {
             // Case 1 - A previously known peer.
-            Some(peer_info) => peer_info,
+            Some(peer_info) => {
+                metrics::decrement_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+                peer_info
+            }
             // Case 2 - A peer that was previously not known.
             None => PeerInfo::new(listener),
         };
@@ -204,13 +208,15 @@ impl PeerBook {
         // Remove the peer's address from the list of connecting peers.
         self.connecting_peers.write().remove(&address);
 
+        metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+
         // Update the peer info to connected.
         peer_info.set_connected();
 
         // Add the address into the connected peers.
-        let success = self.connected_peers.write().insert(listener, peer_info).is_none();
-        // On success, increment the connected peer count.
-        connected_peers_inc!(success);
+        self.connected_peers.write().insert(listener, peer_info);
+
+        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
     }
 
     ///
@@ -220,6 +226,7 @@ impl PeerBook {
     pub fn set_disconnected(&self, address: SocketAddr) -> Result<bool, NetworkError> {
         // Case 1 - The given address is a connecting peer, attempt to disconnect.
         if self.connecting_peers.write().remove(&address) {
+            metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
             return Ok(false);
         }
 
@@ -228,10 +235,12 @@ impl PeerBook {
             // Update the peer info to disconnected.
             peer_info.set_disconnected()?;
 
+            metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+
             // Add the address into the disconnected peers.
-            let success = self.disconnected_peers.write().insert(address, peer_info).is_none();
-            // On success, decrement the connected peer count.
-            connected_peers_dec!(success);
+            self.disconnected_peers.write().insert(address, peer_info);
+
+            metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
 
             return Ok(true);
         }
@@ -248,10 +257,9 @@ impl PeerBook {
         }
 
         // Add the given address to the map of disconnected peers.
-        self.disconnected_peers
-            .write()
-            .entry(address)
-            .or_insert_with(|| PeerInfo::new(address));
+        self.disconnected_peers.write().insert(address, PeerInfo::new(address));
+
+        metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
 
         debug!("Added {} to the peer book", address);
     }
@@ -290,18 +298,12 @@ impl PeerBook {
     /// This function should only be used in the case that the peer
     /// should be forgotten about permanently.
     ///
-    pub fn remove_peer(&self, address: &SocketAddr) {
-        // Remove the given address from the connecting peers, if it exists.
-        self.connecting_peers.write().remove(address);
+    pub fn remove_peer(&self, address: SocketAddr) {
+        // Disconnect from the peer if currently connected.
+        let _ = self.set_disconnected(address);
 
-        // Remove the given address from the connected peers, if it exists.
-        if self.connected_peers.write().remove(address).is_some() {
-            // Decrement the connected_peer metric as the peer was not yet disconnected.
-            connected_peers_dec!()
-        }
-
-        // Remove the address from the disconnected peers, if it exists.
-        self.disconnected_peers.write().remove(address);
+        // Remove the peer from the list of known peers.
+        self.disconnected_peers.write().remove(&address);
     }
 
     fn peer_quality(&self, addr: SocketAddr) -> Option<Arc<PeerQuality>> {

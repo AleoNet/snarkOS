@@ -59,8 +59,6 @@ pub struct InnerNode<S: Storage> {
     pub outbound: Outbound,
     /// The list of connected and disconnected peers of this node.
     pub peer_book: PeerBook,
-    /// A collection of node's statistics.
-    pub stats: Stats,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync<S>>>,
     /// The node's start-up timestamp.
@@ -136,7 +134,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         Ok(Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
-            stats: Default::default(),
             local_address: Default::default(),
             config,
             inbound: Default::default(),
@@ -182,10 +179,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
             loop {
                 if let Err(e) = node_clone.process_incoming_messages(&mut receiver, &mut cache).await {
-                    node_clone.stats.inbound.all_failures.fetch_add(1, Ordering::Relaxed);
+                    metrics::increment_counter!(stats::INBOUND_ALL_FAILURES);
                     error!("Node error: {}", e);
                 } else {
-                    node_clone.stats.inbound.all_successes.fetch_add(1, Ordering::Relaxed);
+                    metrics::increment_counter!(stats::INBOUND_ALL_SUCCESSES);
                 }
             }
         });

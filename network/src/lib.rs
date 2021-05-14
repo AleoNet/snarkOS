@@ -26,8 +26,6 @@
 extern crate derivative;
 #[macro_use]
 extern crate tracing;
-#[macro_use]
-extern crate snarkos_metrics;
 
 pub mod config;
 pub use config::*;

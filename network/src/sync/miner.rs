@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Node, State};
+use crate::{stats, Node, State};
 use snarkos_consensus::Miner;
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
 use snarkvm_objects::Storage;
@@ -22,11 +22,7 @@ use snarkvm_objects::Storage;
 use tokio::runtime;
 use tracing::*;
 
-use std::{
-    sync::{atomic::Ordering, Arc},
-    thread,
-    time::Duration,
-};
+use std::{sync::Arc, thread, time::Duration};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance<S: Storage> {
@@ -104,7 +100,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     self.node.set_state(State::Idle);
                 }
 
-                self.node.stats.misc.blocks_mined.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::MISC_BLOCKS_MINED);
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
 

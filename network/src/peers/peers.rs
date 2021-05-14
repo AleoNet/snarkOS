@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, ConnReader, ConnWriter, NetworkError, Node, SerializedPeerBook, Version};
+use crate::{message::*, stats, ConnReader, ConnWriter, NetworkError, Node, SerializedPeerBook, Version};
 use snarkvm_objects::Storage;
 
 use std::{
@@ -147,7 +147,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
-        self.stats.connections.all_initiated.fetch_add(1, Ordering::Relaxed);
+        metrics::increment_counter!(stats::CONNECTIONS_ALL_INITIATED);
 
         self.peer_book.set_connecting(remote_address)?;
 
@@ -208,7 +208,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             writer.write_all(&buffer[..len]).await?;
             trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
-            node.stats.handshakes.successes_init.fetch_add(1, Ordering::Relaxed);
+            metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_INIT);
 
             let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
             let mut writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
@@ -256,14 +256,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // as NetworkError::InvalidHandshake, since there's not much to salvage there
             Ok(Ok(Ok(_))) => {}
             Ok(Ok(e)) => {
+                metrics::increment_counter!(stats::HANDSHAKES_FAILURES_INIT);
                 return e;
             }
             Ok(Err(_)) => {
-                self.stats.handshakes.failures_init.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::HANDSHAKES_FAILURES_INIT);
                 return Err(NetworkError::InvalidHandshake);
             }
             Err(_) => {
-                self.stats.handshakes.timeouts_init.fetch_add(1, Ordering::Relaxed);
+                metrics::increment_counter!(stats::HANDSHAKES_TIMEOUTS_INIT);
                 return Err(NetworkError::HandshakeTimeout);
             }
         }
