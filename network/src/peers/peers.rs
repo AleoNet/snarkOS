@@ -404,18 +404,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for remote_address in self.connected_peers() {
             self.send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
                 .await;
-
-            // // Fetch the connection channel.
-            // if let Some(channel) = self.get_channel(&remote_address) {
-            //     // Broadcast the message over the channel.
-            //     if let Err(_) = channel.write(&GetPeers).await {
-            //         // Disconnect from the peer if the message fails to send.
-            //         self.disconnect_from_peer(&remote_address).await?;
-            //     }
-            // } else {
-            //     // Disconnect from the peer if the channel is not active.
-            //     self.disconnect_from_peer(&remote_address).await?;
-            // }
         }
     }
 
@@ -479,8 +467,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
-        // TODO (howardwu): Simplify this and parallelize this with Rayon.
-        // Broadcast the sanitized list of connected peers back to requesting peer.
+        // Broadcast the sanitized list of connected peers back to the requesting peer.
         let peers = self
             .peer_book
             .connected_peers()
@@ -498,9 +485,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
     pub(crate) fn process_inbound_peers(&self, peers: Vec<SocketAddr>) {
-        // TODO (howardwu): Simplify this and parallelize this with Rayon.
-        // Process all of the peers sent in the message,
-        // by informing the peer book of that we found peers.
         let local_address = self.local_address().unwrap(); // the address must be known by now
 
         for peer_address in peers.into_iter().filter(|&peer_addr| peer_addr != local_address) {

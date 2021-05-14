@@ -181,7 +181,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
-                            // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
                             warn!("Disconnecting from {} (unreliable)", reader.addr);
                             let _ = self.disconnect_from_peer(reader.addr);
                             // The error has been handled and reported, we may now safely break.
