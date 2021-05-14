@@ -87,8 +87,6 @@ pub struct PeerInfo {
     last_disconnected: Option<DateTime<Utc>>,
     /// The number of times we have connected to this peer.
     connected_count: u64,
-    /// The number of times we have disconnected from this peer.
-    disconnected_count: u64,
     /// The quality of the connection with the peer.
     #[serde(skip)]
     pub quality: Arc<PeerQuality>,
@@ -112,7 +110,6 @@ impl PeerInfo {
             last_connected: None,
             last_disconnected: None,
             connected_count: 0,
-            disconnected_count: 0,
             quality: Default::default(),
             tasks: Default::default(),
         }
@@ -183,14 +180,6 @@ impl PeerInfo {
     }
 
     ///
-    /// Returns the number of times we have disconnected from this peer.
-    ///
-    #[inline]
-    pub fn disconnected_count(&self) -> u64 {
-        self.disconnected_count
-    }
-
-    ///
     /// Updates the peer to connected.
     ///
     pub(crate) fn set_connected(&mut self) {
@@ -222,7 +211,6 @@ impl PeerInfo {
                 self.last_disconnected = Some(Utc::now());
                 self.quality.expecting_pong.store(false, Ordering::SeqCst);
                 self.quality.remaining_sync_blocks.store(0, Ordering::SeqCst);
-                self.disconnected_count += 1;
 
                 for (handle, abortable) in self.tasks.lock().drain(..).rev() {
                     if abortable {
@@ -263,7 +251,6 @@ mod tests {
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
         assert_eq!(0, peer_info.connected_count());
-        assert_eq!(0, peer_info.disconnected_count());
     }
 
     #[test]
@@ -275,13 +262,11 @@ mod tests {
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connected, peer_info.status());
         assert_eq!(1, peer_info.connected_count());
-        assert_eq!(0, peer_info.disconnected_count());
 
         peer_info.set_disconnected().unwrap();
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
         assert_eq!(1, peer_info.connected_count());
-        assert_eq!(1, peer_info.disconnected_count());
     }
 
     #[test]
@@ -294,7 +279,6 @@ mod tests {
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::NeverConnected, peer_info.status());
         assert_eq!(0, peer_info.connected_count());
-        assert_eq!(0, peer_info.disconnected_count());
     }
 
     #[test]
@@ -307,13 +291,11 @@ mod tests {
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Disconnected, peer_info.status());
         assert_eq!(1, peer_info.connected_count());
-        assert_eq!(1, peer_info.disconnected_count());
 
         peer_info.set_connected();
 
         assert_eq!(address, peer_info.address());
         assert_eq!(PeerStatus::Connected, peer_info.status());
         assert_eq!(2, peer_info.connected_count());
-        assert_eq!(1, peer_info.disconnected_count());
     }
 }
