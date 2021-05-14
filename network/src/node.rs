@@ -320,7 +320,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         debug!("Shutting down");
 
         for addr in self.connected_peers() {
-            let _ = self.disconnect_from_peer(addr);
+            self.disconnect_from_peer(addr);
         }
 
         for handle in self.threads.lock().drain(..).rev() {

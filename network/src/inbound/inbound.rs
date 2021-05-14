@@ -137,12 +137,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 }
                                 Ok(Err(e)) => {
                                     error!("Failed to accept a connection request: {}", e);
-                                    let _ = node.disconnect_from_peer(remote_address);
+                                    node.disconnect_from_peer(remote_address);
                                     metrics::increment_counter!(stats::HANDSHAKES_FAILURES_RESP);
                                 }
                                 Err(_) => {
                                     error!("Failed to accept a connection request: the handshake timed out");
-                                    let _ = node.disconnect_from_peer(remote_address);
+                                    node.disconnect_from_peer(remote_address);
                                     metrics::increment_counter!(stats::HANDSHAKES_TIMEOUTS_RESP);
                                 }
                             }
@@ -182,7 +182,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     match disconnect_from_peer {
                         true => {
                             warn!("Disconnecting from {} (unreliable)", reader.addr);
-                            let _ = self.disconnect_from_peer(reader.addr);
+                            self.disconnect_from_peer(reader.addr);
                             // The error has been handled and reported, we may now safely break.
                             break;
                         }

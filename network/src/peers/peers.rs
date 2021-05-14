@@ -73,7 +73,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 || peer_quality.is_inactive(now)
             {
                 warn!("Peer {} has a low quality score; disconnecting.", addr);
-                let _ = self.disconnect_from_peer(addr);
+                self.disconnect_from_peer(addr);
             }
         }
 
@@ -112,7 +112,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
             for _ in 0..number_to_disconnect {
                 if let Some((addr, _)) = connected.pop() {
-                    let _ = self.disconnect_from_peer(addr);
+                    self.disconnect_from_peer(addr);
                 }
             }
         }
@@ -310,7 +310,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     }
                     Err(e) => {
                         warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                        let _ = node.disconnect_from_peer(bootnode_address);
+                        node.disconnect_from_peer(bootnode_address);
                     }
                     Ok(_) => {}
                 }
@@ -376,7 +376,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     }
                     Err(e) => {
                         warn!("Couldn't connect to peer {}: {}", remote_address, e);
-                        let _ = node.disconnect_from_peer(remote_address);
+                        node.disconnect_from_peer(remote_address);
                     }
                     Ok(_) => {}
                 }
