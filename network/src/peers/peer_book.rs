@@ -329,9 +329,10 @@ impl PeerBook {
     /// Updates the last seen timestamp of this peer to the current time.
     ///
     #[inline]
-    pub fn update_last_seen(&self, addr: SocketAddr) {
-        if let Some(ref quality) = self.peer_quality(addr) {
+    pub fn register_message(&self, addr: SocketAddr) {
+        if let Some(quality) = self.peer_quality(addr) {
             *quality.last_seen.write() = Some(chrono::Utc::now());
+            quality.num_messages_received.fetch_add(1, Ordering::Relaxed);
         } else {
             trace!("Tried updating state of a peer that's not connected: {}", addr);
         }

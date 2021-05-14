@@ -54,6 +54,8 @@ pub struct PeerQuality {
     pub failures: AtomicU32,
     /// The number of remaining blocks to sync with.
     pub remaining_sync_blocks: AtomicU32,
+    /// The number of messages received from the peer.
+    pub num_messages_received: AtomicU64,
 }
 
 impl PeerQuality {

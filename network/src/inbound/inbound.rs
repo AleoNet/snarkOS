@@ -226,11 +226,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         metrics::decrement_gauge!(stats::QUEUES_INBOUND, 1.0);
 
         let source = if let Direction::Inbound(addr) = direction {
-            self.peer_book.update_last_seen(addr);
             addr
         } else {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
+
+        self.peer_book.register_message(source);
 
         // Check if the message hasn't already been processed recently if it's a `Block`.
         // The node should also reject them while syncing, as it is bound to receive them later.
