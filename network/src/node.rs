@@ -79,7 +79,8 @@ impl<S: Storage> Drop for InnerNode<S> {
         // also, the connections are going to be broken automatically, so we only need to
         // take care of the associated tasks here
         for peer_info in self.peer_book.connected_peers().values() {
-            for handle in peer_info.tasks.lock().drain(..).rev() {
+            for (handle, _abortable) in peer_info.tasks.lock().drain(..).rev() {
+                // We're already shutting down, so always abort.
                 handle.abort();
             }
         }
@@ -194,9 +195,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             loop {
                 info!("Updating peers");
 
-                if let Err(e) = node_clone.update_peers().await {
-                    error!("Peer update error: {}", e);
-                }
+                node_clone.update_peers();
+
                 sleep(peer_sync_interval).await;
             }
         });
@@ -248,7 +248,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             sync_node = sync_clone.node().peer_book.last_seen();
                         }
 
-                        sync_clone.update_memory_pool(sync_node).await;
+                        sync_clone.update_memory_pool(sync_node);
                     }
 
                     sleep(mempool_sync_interval).await;
@@ -304,7 +304,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
                             // Begin a new sync attempt.
                             sync_clone.register_block_sync_attempt();
-                            sync_clone.update_blocks(*sync_node).await;
+                            sync_clone.update_blocks(*sync_node);
                         }
                     }
 
@@ -319,7 +319,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         debug!("Shutting down");
 
         for addr in self.connected_peers() {
-            let _ = self.disconnect_from_peer(addr);
+            self.disconnect_from_peer(addr);
         }
 
         for handle in self.threads.lock().drain(..).rev() {

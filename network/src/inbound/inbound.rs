@@ -124,11 +124,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                     trace!("Connected to {} (listener: {})", remote_address, remote_listener);
 
                                     // Immediately send a ping to provide the peer with our block height.
-                                    node.send_ping(remote_listener).await;
+                                    node.send_ping(remote_listener);
 
                                     if let Ok(ref peer) = node.peer_book.get_peer(remote_listener) {
-                                        peer.register_task(peer_reading_task);
-                                        peer.register_task(peer_writing_task);
+                                        peer.register_task(peer_reading_task, true);
+                                        peer.register_task(peer_writing_task, false);
                                     } else {
                                         // If the related peer is not found, it means it's already been dropped.
                                         peer_reading_task.abort();
@@ -137,12 +137,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                                 }
                                 Ok(Err(e)) => {
                                     error!("Failed to accept a connection request: {}", e);
-                                    let _ = node.disconnect_from_peer(remote_address);
+                                    node.disconnect_from_peer(remote_address);
                                     metrics::increment_counter!(stats::HANDSHAKES_FAILURES_RESP);
                                 }
                                 Err(_) => {
                                     error!("Failed to accept a connection request: the handshake timed out");
-                                    let _ = node.disconnect_from_peer(remote_address);
+                                    node.disconnect_from_peer(remote_address);
                                     metrics::increment_counter!(stats::HANDSHAKES_TIMEOUTS_RESP);
                                 }
                             }
@@ -181,9 +181,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     // Determine if we should send a disconnect message.
                     match disconnect_from_peer {
                         true => {
-                            // TODO (howardwu): Implement a handler so the node does not lose state of undetected disconnects.
                             warn!("Disconnecting from {} (unreliable)", reader.addr);
-                            let _ = self.disconnect_from_peer(reader.addr);
+                            self.disconnect_from_peer(reader.addr);
                             // The error has been handled and reported, we may now safely break.
                             break;
                         }
@@ -201,8 +200,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 // Handle Ping/Pong messages immediately in order not to skew latency calculation.
                 match &message.payload {
                     Payload::Ping(..) => {
-                        self.send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong))
-                            .await;
+                        self.send_request(Message::new(Direction::Outbound(reader.addr), Payload::Pong));
                     }
                     Payload::Pong => {
                         self.peer_book.received_pong(reader.addr);
@@ -226,11 +224,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         metrics::decrement_gauge!(stats::QUEUES_INBOUND, 1.0);
 
         let source = if let Direction::Inbound(addr) = direction {
-            self.peer_book.update_last_seen(addr);
             addr
         } else {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
+
+        self.peer_book.register_message(source);
 
         // Check if the message hasn't already been processed recently if it's a `Block`.
         // The node should also reject them while syncing, as it is bound to receive them later.
@@ -243,21 +242,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(stats::INBOUND_TRANSACTIONS);
 
                 if let Some(ref sync) = self.sync() {
-                    sync.received_memory_pool_transaction(source, transaction).await?;
+                    sync.received_memory_pool_transaction(source, transaction)?;
                 }
             }
             Payload::Block(block) => {
                 metrics::increment_counter!(stats::INBOUND_BLOCKS);
 
                 if let Some(ref sync) = self.sync() {
-                    sync.received_block(source, block, true).await?;
+                    sync.received_block(source, block, true)?;
                 }
             }
             Payload::SyncBlock(block) => {
                 metrics::increment_counter!(stats::INBOUND_SYNCBLOCKS);
 
                 if let Some(ref sync) = self.sync() {
-                    sync.received_block(source, block, false).await?;
+                    sync.received_block(source, block, false)?;
 
                     // Update the peer and possibly finish the sync process.
                     if self.peer_book.got_sync_block(source) {
@@ -269,14 +268,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(stats::INBOUND_GETBLOCKS);
 
                 if let Some(ref sync) = self.sync() {
-                    sync.received_get_blocks(source, hashes).await?;
+                    sync.received_get_blocks(source, hashes)?;
                 }
             }
             Payload::GetMemoryPool => {
                 metrics::increment_counter!(stats::INBOUND_GETMEMORYPOOL);
 
                 if let Some(ref sync) = self.sync() {
-                    sync.received_get_memory_pool(source).await?;
+                    sync.received_get_memory_pool(source);
                 }
             }
             Payload::MemoryPool(mempool) => {
@@ -290,7 +289,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(stats::INBOUND_GETSYNC);
 
                 if let Some(ref sync) = self.sync() {
-                    sync.received_get_sync(source, getsync).await?;
+                    sync.received_get_sync(source, getsync)?;
                 }
             }
             Payload::Sync(sync) => {
@@ -304,14 +303,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         warn!("{} doesn't have sync blocks to share", source);
                     } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         trace!("Received {} sync block hashes from {}", sync.len(), source);
-                        sync_handler.received_sync(source, sync).await;
+                        sync_handler.received_sync(source, sync);
                     }
                 }
             }
             Payload::GetPeers => {
                 metrics::increment_counter!(stats::INBOUND_GETPEERS);
 
-                self.send_peers(source).await;
+                self.send_peers(source);
             }
             Payload::Peers(peers) => {
                 metrics::increment_counter!(stats::INBOUND_PEERS);

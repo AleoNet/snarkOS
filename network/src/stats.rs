@@ -57,6 +57,7 @@ pub const HANDSHAKES_TIMEOUTS_RESP: &str = "snarkos_handshakes_timeouts_resp_tot
 pub const QUEUES_INBOUND: &str = "snarkos_queues_inbound_total";
 pub const QUEUES_OUTBOUND: &str = "snarkos_queues_outbound_total";
 
+pub const MISC_BLOCK_HEIGHT: &str = "snarkos_misc_block_height_total";
 pub const MISC_BLOCKS_MINED: &str = "snarkos_misc_blocks_mined_total";
 pub const MISC_DUPLICATE_BLOCKS: &str = "snarkos_misc_duplicate_blocks_total";
 pub const MISC_DUPLICATE_SYNC_BLOCKS: &str = "snarkos_misc_duplicate_sync_blocks_total";

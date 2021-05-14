@@ -29,13 +29,12 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     ///
     /// Triggers the memory pool sync with a selected peer.
     ///
-    pub async fn update_memory_pool(&self, sync_node: Option<SocketAddr>) {
+    pub fn update_memory_pool(&self, sync_node: Option<SocketAddr>) {
         if let Some(sync_node) = sync_node {
             info!("Updating memory pool from {}", sync_node);
 
             self.node()
-                .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool))
-                .await;
+                .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
         } else {
             debug!("No sync node is registered, memory pool could not be synced");
         }
@@ -44,11 +43,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     ///
     /// Broadcast memory pool transaction to connected peers.
     ///
-    pub(crate) async fn propagate_memory_pool_transaction(
-        &self,
-        transaction_bytes: Vec<u8>,
-        transaction_sender: SocketAddr,
-    ) -> Result<(), NetworkError> {
+    pub(crate) fn propagate_memory_pool_transaction(&self, transaction_bytes: Vec<u8>, transaction_sender: SocketAddr) {
         debug!("Propagating a memory pool transaction to connected peers");
 
         let local_address = self.node().local_address().unwrap();
@@ -56,23 +51,19 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
         for remote_address in self.node().connected_peers() {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
-                self.node()
-                    .send_request(Message::new(
-                        Direction::Outbound(remote_address),
-                        Payload::Transaction(transaction_bytes.clone()),
-                    ))
-                    .await;
+                self.node().send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::Transaction(transaction_bytes.clone()),
+                ));
             }
         }
-
-        Ok(())
     }
 
     ///
     /// Verifies a received memory pool transaction, adds it to the memory pool,
     /// and propagates it to peers.
     ///
-    pub(crate) async fn received_memory_pool_transaction(
+    pub(crate) fn received_memory_pool_transaction(
         &self,
         source: SocketAddr,
         transaction: Vec<u8>,
@@ -102,7 +93,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
             if let Ok(inserted) = insertion {
                 if inserted.is_some() {
                     info!("Transaction added to memory pool.");
-                    self.propagate_memory_pool_transaction(transaction, source).await?;
+                    self.propagate_memory_pool_transaction(transaction, source);
                 }
             }
         }
@@ -111,7 +102,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     }
 
     /// A peer has requested our memory pool transactions.
-    pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
+    pub(crate) fn received_get_memory_pool(&self, remote_address: SocketAddr) {
         // TODO (howardwu): This should have been written with Rayon - it is easily parallelizable.
         let transactions = {
             let mut txs = vec![];
@@ -128,15 +119,11 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
 
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
-            self.node()
-                .send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::MemoryPool(transactions),
-                ))
-                .await;
+            self.node().send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::MemoryPool(transactions),
+            ));
         }
-
-        Ok(())
     }
 
     /// A peer has sent us their memory pool transactions.

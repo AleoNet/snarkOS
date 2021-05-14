@@ -56,7 +56,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// and attempts to send the given request to it.
     ///
     #[inline]
-    pub async fn send_request(&self, request: Message) {
+    pub fn send_request(&self, request: Message) {
         let target_addr = request.receiver();
         // Fetch the outbound channel.
         match self.outbound.outbound_channel(target_addr) {
@@ -86,7 +86,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
-    pub async fn send_ping(&self, remote_address: SocketAddr) {
+    pub fn send_ping(&self, remote_address: SocketAddr) {
         // Consider peering tests that don't use the sync layer.
         let current_block_height = if let Some(ref sync) = self.sync() {
             sync.current_block_height()
@@ -99,8 +99,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         self.send_request(Message::new(
             Direction::Outbound(remote_address),
             Payload::Ping(current_block_height),
-        ))
-        .await;
+        ));
     }
 
     /// This method handles new outbound messages to a single connected node.
