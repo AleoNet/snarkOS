@@ -140,14 +140,6 @@ impl PeerInfo {
     }
 
     ///
-    /// Returns the timestamp of the first seen instance of this peer.
-    ///
-    #[inline]
-    pub fn first_seen(&self) -> Option<DateTime<Utc>> {
-        self.first_seen
-    }
-
-    ///
     /// Returns the timestamp of the last seen instance of this peer.
     ///
     #[inline]
@@ -188,6 +180,9 @@ impl PeerInfo {
             self.status = PeerStatus::Connected;
 
             let now = Utc::now();
+            if self.first_seen.is_none() {
+                self.first_seen = Some(now);
+            }
             self.last_connected = Some(now);
             *self.quality.last_seen.write() = Some(now);
             self.connected_count += 1;
