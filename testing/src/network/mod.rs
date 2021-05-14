@@ -192,9 +192,8 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     node.start_services().await;
 
     if is_miner {
-        let tokio_handle = setup.tokio_handle.unwrap();
         let miner_address = FIXTURE.test_accounts[0].address.clone();
-        MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
+        MinerInstance::new(miner_address, node.clone()).spawn();
     }
 
     node

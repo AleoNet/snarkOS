@@ -44,7 +44,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
-    pub(crate) async fn update_peers(&self) -> Result<(), NetworkError> {
+    pub(crate) fn update_peers(&self) {
         // Fetch the number of connected and connecting peers.
         let number_of_connected_peers = self.peer_book.number_of_connected_peers() as usize;
         let number_of_connecting_peers = self.peer_book.number_of_connecting_peers() as usize;
@@ -86,7 +86,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
 
         // Broadcast a `GetPeers` message to request for more peers.
-        self.broadcast_getpeers_requests().await;
+        self.broadcast_getpeers_requests();
 
         // Check if this node server is above the permitted number of connected peers.
         let max_peers = self.config.maximum_number_of_connected_peers() as usize;
@@ -119,10 +119,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         if number_of_connected_peers != 0 {
             // Send a `Ping` to every connected peer.
-            self.broadcast_pings().await;
+            self.broadcast_pings();
         }
-
-        Ok(())
     }
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
@@ -385,7 +383,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
-    async fn broadcast_getpeers_requests(&self) {
+    fn broadcast_getpeers_requests(&self) {
         // Check that this node is not a bootnode.
         if !self.config.is_bootnode() {
             // Fetch the number of connected and connecting peers.
@@ -402,13 +400,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("Sending `GetPeers` requests to connected peers");
 
         for remote_address in self.connected_peers() {
-            self.send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers))
-                .await;
+            self.send_request(Message::new(Direction::Outbound(remote_address), Payload::GetPeers));
         }
     }
 
     /// Broadcasts a `Ping` message to all connected peers.
-    async fn broadcast_pings(&self) {
+    fn broadcast_pings(&self) {
         trace!("Broadcasting `Ping` messages");
 
         // Consider peering tests that don't use the sync layer.
@@ -424,8 +421,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             self.send_request(Message::new(
                 Direction::Outbound(remote_address),
                 Payload::Ping(current_block_height),
-            ))
-            .await;
+            ));
         }
     }
 
@@ -466,7 +462,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         }
     }
 
-    pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
+    pub(crate) fn send_peers(&self, remote_address: SocketAddr) {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
         let peers = self
             .peer_book
@@ -477,8 +473,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .copied()
             .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
 
-        self.send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)))
-            .await;
+        self.send_request(Message::new(Direction::Outbound(remote_address), Payload::Peers(peers)));
     }
 
     /// A node has sent their list of peer addresses.

@@ -43,7 +43,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 
 use metrics::{register_counter, register_gauge};
 use parking_lot::Mutex;
-use tokio::runtime::{Builder, Handle};
+use tokio::runtime::Builder;
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -142,7 +142,7 @@ fn register_metrics() {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()> {
+async fn start_server(config: Config) -> anyhow::Result<()> {
     initialize_logger(&config);
 
     initialize_metrics();
@@ -267,7 +267,7 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
                 node.register_thread(handle);
             }
             Err(_) => info!(
@@ -291,9 +291,8 @@ fn main() -> Result<(), NodeError> {
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?;
-    let handle = runtime.handle().clone();
 
-    runtime.block_on(start_server(config, handle))?;
+    runtime.block_on(start_server(config))?;
 
     Ok(())
 }

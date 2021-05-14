@@ -24,7 +24,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
     ///
     /// Sends a `GetSync` request to the given sync node.
     ///
-    pub async fn update_blocks(&self, sync_node: SocketAddr) {
+    pub fn update_blocks(&self, sync_node: SocketAddr) {
         let block_locator_hashes = match self.storage().get_block_locator_hashes() {
             Ok(block_locator_hashes) => block_locator_hashes,
             _ => {
@@ -36,33 +36,29 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         info!("Updating blocks from {}", sync_node);
 
         // Send a GetSync to the selected sync node.
-        self.node()
-            .send_request(Message::new(
-                Direction::Outbound(sync_node),
-                Payload::GetSync(block_locator_hashes),
-            ))
-            .await;
+        self.node().send_request(Message::new(
+            Direction::Outbound(sync_node),
+            Payload::GetSync(block_locator_hashes),
+        ));
     }
 
     /// Broadcast block to connected peers
-    pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
+    pub fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
         debug!("Propagating a block to peers");
 
         for remote_address in self.node().connected_peers() {
             if remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
-                self.node()
-                    .send_request(Message::new(
-                        Direction::Outbound(remote_address),
-                        Payload::Block(block_bytes.clone()),
-                    ))
-                    .await;
+                self.node().send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::Block(block_bytes.clone()),
+                ));
             }
         }
     }
 
     /// A peer has sent us a new block to process.
-    pub(crate) async fn received_block(
+    pub(crate) fn received_block(
         &self,
         remote_address: SocketAddr,
         block: Vec<u8>,
@@ -113,14 +109,14 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
 
         // This is a new block, send it to our peers.
         if is_block_new && block_validity.is_ok() {
-            self.propagate_block(block, remote_address).await;
+            self.propagate_block(block, remote_address);
         }
 
         Ok(())
     }
 
     /// A peer has requested a block.
-    pub(crate) async fn received_get_blocks(
+    pub(crate) fn received_get_blocks(
         &self,
         remote_address: SocketAddr,
         header_hashes: Vec<BlockHeaderHash>,
@@ -129,19 +125,17 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
             let block = self.storage().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.
-            self.node()
-                .send_request(Message::new(
-                    Direction::Outbound(remote_address),
-                    Payload::SyncBlock(block.serialize()?),
-                ))
-                .await;
+            self.node().send_request(Message::new(
+                Direction::Outbound(remote_address),
+                Payload::SyncBlock(block.serialize()?),
+            ));
         }
 
         Ok(())
     }
 
     /// A peer has requested our chain state to sync with.
-    pub(crate) async fn received_get_sync(
+    pub(crate) fn received_get_sync(
         &self,
         remote_address: SocketAddr,
         block_locator_hashes: Vec<BlockHeaderHash>,
@@ -180,25 +174,22 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
 
         // send a `Sync` message to the connected peer.
         self.node()
-            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)))
-            .await;
+            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)));
 
         Ok(())
     }
 
     /// A peer has sent us their chain state.
-    pub(crate) async fn received_sync(&self, remote_address: SocketAddr, block_hashes: Vec<BlockHeaderHash>) {
+    pub(crate) fn received_sync(&self, remote_address: SocketAddr, block_hashes: Vec<BlockHeaderHash>) {
         // If empty sync is no-op as chain states match
         if !block_hashes.is_empty() {
             for batch in block_hashes.chunks(crate::MAX_BLOCK_SYNC_COUNT as usize) {
                 // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
                 // detect missing blocks and divergence in chain for now.
-                self.node()
-                    .send_request(Message::new(
-                        Direction::Outbound(remote_address),
-                        Payload::GetBlocks(batch.to_vec()),
-                    ))
-                    .await;
+                self.node().send_request(Message::new(
+                    Direction::Outbound(remote_address),
+                    Payload::GetBlocks(batch.to_vec()),
+                ));
             }
         }
     }

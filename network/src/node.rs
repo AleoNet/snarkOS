@@ -195,9 +195,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             loop {
                 info!("Updating peers");
 
-                if let Err(e) = node_clone.update_peers().await {
-                    error!("Peer update error: {}", e);
-                }
+                node_clone.update_peers();
+
                 sleep(peer_sync_interval).await;
             }
         });
@@ -249,7 +248,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             sync_node = sync_clone.node().peer_book.last_seen();
                         }
 
-                        sync_clone.update_memory_pool(sync_node).await;
+                        sync_clone.update_memory_pool(sync_node);
                     }
 
                     sleep(mempool_sync_interval).await;
@@ -305,7 +304,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
                             // Begin a new sync attempt.
                             sync_clone.register_block_sync_attempt();
-                            sync_clone.update_blocks(*sync_node).await;
+                            sync_clone.update_blocks(*sync_node);
                         }
                     }
 
