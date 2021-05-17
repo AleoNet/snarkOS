@@ -299,6 +299,7 @@ impl Recorder for Stats {
                 HANDSHAKES_TIMEOUTS_INIT => self.handshakes.timeouts_init.fetch_add(value, Ordering::Relaxed),
                 HANDSHAKES_TIMEOUTS_RESP => self.handshakes.timeouts_resp.fetch_add(value, Ordering::Relaxed),
                 // misc
+                MISC_BLOCK_HEIGHT => 0, // obtained ad-hoc for the purposes of RPC metrics
                 MISC_BLOCKS_MINED => self.misc.blocks_mined.fetch_add(value, Ordering::Relaxed),
                 MISC_DUPLICATE_BLOCKS => self.misc.duplicate_blocks.fetch_add(value, Ordering::Relaxed),
                 MISC_DUPLICATE_SYNC_BLOCKS => self.misc.duplicate_sync_blocks.fetch_add(value, Ordering::Relaxed),
@@ -320,6 +321,8 @@ impl Recorder for Stats {
                         // queues
                         QUEUES_INBOUND => self.queues.inbound.fetch_add(value as u64, Ordering::SeqCst),
                         QUEUES_OUTBOUND => self.queues.outbound.fetch_add(value as u64, Ordering::SeqCst),
+                        // obtained ad-hoc for the purposes of RPC metrics
+                        CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
                         _ => {
                             error!("Metrics key {} wasn't assigned an operation and won't work!", key);
                             0
@@ -331,6 +334,8 @@ impl Recorder for Stats {
                         // queues
                         QUEUES_INBOUND => self.queues.inbound.fetch_sub(value as u64, Ordering::SeqCst),
                         QUEUES_OUTBOUND => self.queues.outbound.fetch_sub(value as u64, Ordering::SeqCst),
+                        // obtained ad-hoc for the purposes of RPC metrics
+                        CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
                         _ => {
                             error!("Metrics key {} wasn't assigned an operation and won't work!", key);
                             0
