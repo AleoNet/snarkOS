@@ -123,6 +123,9 @@ pub struct DecryptRecordInput {
 /// Returned value for the `getnodeinfo` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeInfo {
+    /// The configured listening address of the node.
+    pub listening_addr: SocketAddr,
+
     /// Flag indicating if the node is a bootnode
     pub is_bootnode: bool,
 
