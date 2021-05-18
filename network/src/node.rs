@@ -329,6 +329,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         for handle in self.tasks.lock().drain(..).rev() {
             handle.abort();
         }
+
+        info!("The node can be shut down now");
     }
 
     pub fn register_task(&self, handle: task::JoinHandle<()>) {
