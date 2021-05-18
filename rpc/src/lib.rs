@@ -27,6 +27,10 @@ extern crate derivative;
 #[macro_use]
 extern crate thiserror;
 
+pub mod custom_rpc_server;
+#[doc(inline)]
+pub use custom_rpc_server::*;
+
 pub mod error;
 
 pub mod rpc_impl;
@@ -36,11 +40,11 @@ pub use rpc_impl::*;
 pub mod rpc_impl_protected;
 #[doc(inline)]
 pub use rpc_impl_protected::*;
-
+/*
 pub mod rpc_server;
 #[doc(inline)]
 pub use rpc_server::*;
-
+*/
 pub mod rpc_trait;
 #[doc(inline)]
 pub use rpc_trait::*;

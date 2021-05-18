@@ -50,7 +50,7 @@ use snarkvm_utilities::{
 };
 
 use itertools::Itertools;
-use jsonrpc_http_server::jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
+use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use rand::{thread_rng, Rng};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
@@ -257,7 +257,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let address: SocketAddr = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        self.node.disconnect_from_peer(address);
+        self.disconnect(address);
 
         Ok(Value::Null)
     }
@@ -648,5 +648,9 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             commitment,
             commitment_randomness,
         })
+    }
+
+    fn disconnect(&self, address: SocketAddr) {
+        self.node.disconnect_from_peer(address);
     }
 }
