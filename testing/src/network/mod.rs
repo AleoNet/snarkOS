@@ -100,7 +100,7 @@ impl Default for ConsensusSetup {
 #[derive(Clone)]
 pub struct TestSetup {
     pub node_id: u64,
-    pub socket_address: Option<SocketAddr>,
+    pub socket_address: SocketAddr,
     pub consensus_setup: Option<ConsensusSetup>,
     pub peer_sync_interval: u64,
     pub min_peers: u16,
@@ -113,7 +113,7 @@ pub struct TestSetup {
 impl TestSetup {
     pub fn new(
         node_id: u64,
-        socket_address: Option<SocketAddr>,
+        socket_address: SocketAddr,
         consensus_setup: Option<ConsensusSetup>,
         peer_sync_interval: u64,
         min_peers: u16,
@@ -140,7 +140,7 @@ impl Default for TestSetup {
     fn default() -> Self {
         Self {
             node_id: u64::MAX,
-            socket_address: "127.0.0.1:0".parse().ok(),
+            socket_address: "127.0.0.1:0".parse().unwrap(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
             min_peers: 1,

@@ -64,14 +64,9 @@ impl Inbound {
 impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
-        let (listener_address, listener) = if let Some(addr) = self.config.desired_address {
-            let listener = TcpListener::bind(&addr).await?;
-            (listener.local_addr()?, listener)
-        } else {
-            let listener = TcpListener::bind("0.0.0.0:0").await?;
-            let listener_address = listener.local_addr()?;
-            (listener_address, listener)
-        };
+        let listener = TcpListener::bind(&self.config.desired_address).await?;
+        let listener_address = listener.local_addr()?;
+
         self.set_local_address(listener_address);
         info!("Initializing listener for node ({:x})", self.id);
 

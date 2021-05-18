@@ -150,14 +150,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     print_welcome(&config);
 
-    let address = format! {"{}:{}", config.node.ip, config.node.port};
+    let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
     let node_config = NodeConfig::new(
-        Some(desired_address),
+        desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
