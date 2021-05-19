@@ -61,6 +61,7 @@ pub const MISC_BLOCK_HEIGHT: &str = "snarkos_misc_block_height_total";
 pub const MISC_BLOCKS_MINED: &str = "snarkos_misc_blocks_mined_total";
 pub const MISC_DUPLICATE_BLOCKS: &str = "snarkos_misc_duplicate_blocks_total";
 pub const MISC_DUPLICATE_SYNC_BLOCKS: &str = "snarkos_misc_duplicate_sync_blocks_total";
+pub const MISC_RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";
 
 pub static NODE_STATS: Stats = Stats::new();
 
@@ -243,6 +244,8 @@ pub struct MiscStats {
     pub duplicate_blocks: AtomicU64,
     /// The number of duplicate sync blocks received.
     pub duplicate_sync_blocks: AtomicU64,
+    /// The number of RPC requests received.
+    pub rpc_requests: AtomicU64,
 }
 
 impl MiscStats {
@@ -251,6 +254,7 @@ impl MiscStats {
             blocks_mined: AtomicU64::new(0),
             duplicate_blocks: AtomicU64::new(0),
             duplicate_sync_blocks: AtomicU64::new(0),
+            rpc_requests: AtomicU64::new(0),
         }
     }
 }
@@ -303,6 +307,7 @@ impl Recorder for Stats {
                 MISC_BLOCKS_MINED => self.misc.blocks_mined.fetch_add(value, Ordering::Relaxed),
                 MISC_DUPLICATE_BLOCKS => self.misc.duplicate_blocks.fetch_add(value, Ordering::Relaxed),
                 MISC_DUPLICATE_SYNC_BLOCKS => self.misc.duplicate_sync_blocks.fetch_add(value, Ordering::Relaxed),
+                MISC_RPC_REQUESTS => self.misc.rpc_requests.fetch_add(value, Ordering::Relaxed),
                 _ => {
                     error!("Metrics key {} wasn't assigned an operation and won't work!", key);
                     0

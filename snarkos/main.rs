@@ -129,6 +129,7 @@ fn register_metrics() {
     register_counter!(snarkos_network::MISC_BLOCKS_MINED);
     register_counter!(snarkos_network::MISC_DUPLICATE_BLOCKS);
     register_counter!(snarkos_network::MISC_DUPLICATE_SYNC_BLOCKS);
+    register_counter!(snarkos_network::MISC_RPC_REQUESTS);
 }
 
 ///
