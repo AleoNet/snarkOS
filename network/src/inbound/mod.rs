@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod cache;
+pub use cache::*;
+
 pub mod connection_reader;
 pub use connection_reader::ConnReader;
 

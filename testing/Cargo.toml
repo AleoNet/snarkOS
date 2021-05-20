@@ -86,7 +86,7 @@ version = "0.8"
 version = "0.3"
 
 [dependencies.snow]
-version = "0.7"
+version = "0.8"
 default-features = false
 features = [
   "libsodium-resolver",

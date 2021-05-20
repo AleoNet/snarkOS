@@ -1,3 +1,5 @@
 [target.'cfg(any(not(target_arch = "wasm32"), feature = "noconfig"))']
 rustflags = ["-C", "target-cpu=native"]
 
+[build]
+incremental = false # https://github.com/rust-lang/rust/issues/84970

@@ -14,23 +14,36 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/version.md"))]
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Version {
-    /// The version number of the sender's node server.
-    pub version: u64,
-    /// The listening port of the sender.
-    pub listening_port: u16,
-    /// The node id of the sender.
-    pub node_id: u64,
+use crate::Payload;
+
+use circular_queue::CircularQueue;
+use fxhash::hash64;
+
+pub struct Cache {
+    queue: CircularQueue<u64>,
 }
 
-impl Version {
-    pub fn new(version: u64, listening_port: u16, node_id: u64) -> Self {
+impl Default for Cache {
+    fn default() -> Self {
         Self {
-            version,
-            listening_port,
-            node_id,
+            queue: CircularQueue::with_capacity(64),
+        }
+    }
+}
+
+impl Cache {
+    pub fn contains(&mut self, payload: &Payload) -> bool {
+        let hash = if let Payload::Block(bytes) = payload {
+            hash64(&bytes)
+        } else {
+            unreachable!("Only blocks are cached for now");
+        };
+
+        if self.queue.iter().any(|&e| e == hash) {
+            true
+        } else {
+            self.queue.push(hash);
+            false
         }
     }
 }

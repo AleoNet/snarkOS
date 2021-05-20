@@ -52,6 +52,7 @@ impl Version {
         Ok(Version {
             version: version.get_version(),
             listening_port: version.get_listening_port(),
+            node_id: version.get_node_id(),
         })
     }
 
@@ -60,6 +61,7 @@ impl Version {
         let mut builder = message.init_root::<version::Builder>();
         builder.set_version(self.version);
         builder.set_listening_port(self.listening_port);
+        builder.set_node_id(self.node_id);
 
         let mut writer = Vec::new();
         capnp::serialize_packed::write_message(&mut writer, &message)?;
@@ -363,7 +365,7 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_version() {
-        let version = Version::new(1, 4141);
+        let version = Version::new(crate::PROTOCOL_VERSION, 4141, 0);
 
         assert_eq!(
             Version::deserialize(&Version::serialize(&version).unwrap()).unwrap(),

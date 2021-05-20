@@ -2,14 +2,18 @@ Returns information about the node.
 
 ### Arguments
 
-None 
+None
 
 ### Response
 
-|   Parameter  | Type |                  Description                  |
-|:------------:|:----:|:---------------------------------------------:|
-|  `is_miner`  | bool | Flag indicating if the node is a miner        |
-| `is_snycing` | bool | Flag indicating if the node currently syncing |
+|     Parameter    |     Type      |                  Description                  |
+|:----------------:|:-------------:|:---------------------------------------------:|
+| `is_bootnode`    | bool          | Flag indicating if the node is a bootnode     |
+| `is_miner`       | bool          | Flag indicating if the node is a miner        |
+| `is_syncing`     | bool          | Flag indicating if the node currently syncing |
+| `launched`       | DateTime<Utc> | The timestamp of when the node was launched   |
+| `listening_addr` | SocketAddr    | The configured listening address of the node  |
+| `version`        | String        | The version of the client binary              |
 
 ### Example
 ```ignore

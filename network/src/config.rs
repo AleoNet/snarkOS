@@ -26,7 +26,7 @@ use std::{
 /// A core data structure containing the pre-configured parameters for the node.
 pub struct Config {
     /// The pre-configured desired address of this node.
-    pub desired_address: Option<SocketAddr>,
+    pub desired_address: SocketAddr,
     /// The minimum number of peers required to maintain connections with.
     minimum_number_of_connected_peers: u16,
     /// The maximum number of peers permitted to maintain connections with.
@@ -44,7 +44,7 @@ impl Config {
     /// Creates a new instance of `Environment`.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        desired_address: Option<SocketAddr>,
+        desired_address: SocketAddr,
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
         bootnodes_addresses: Vec<String>,

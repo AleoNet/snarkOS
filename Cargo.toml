@@ -92,6 +92,13 @@ version = "3.0.2"
 [dependencies.hex]
 version = "0.4.1"
 
+[dependencies.metrics]
+version = "0.15"
+
+[dependencies.metrics-exporter-prometheus]
+version = "0.4"
+optional = true
+
 [dependencies.parking_lot]
 version = "0.11.1"
 
@@ -99,7 +106,7 @@ version = "0.11.1"
 version = "0.8"
 
 [dependencies.self_update]
-version = "0.26.0"
+version = "0.27.0"
 features = [
   "archive-zip",
   "compression-zip-bzip2",
@@ -144,6 +151,7 @@ rustc_version = "0.3"
 
 [features]
 default = [ ]
+prometheus = [ "metrics-exporter-prometheus" ]
 compile_capnp_schema = [ "capnpc" ]
 noconfig = [ ]
 

@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::NetworkError;
 use snarkos_storage::BlockHeight;
 
 use chrono::{DateTime, Utc};
@@ -28,7 +27,7 @@ use std::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -54,6 +53,22 @@ pub struct PeerQuality {
     pub failures: AtomicU32,
     /// The number of remaining blocks to sync with.
     pub remaining_sync_blocks: AtomicU32,
+    /// The number of messages received from the peer.
+    pub num_messages_received: AtomicU64,
+}
+
+impl PeerQuality {
+    pub fn is_inactive(&self, now: DateTime<Utc>) -> bool {
+        let last_seen = *self.last_seen.read();
+        if let Some(last_seen) = last_seen {
+            now - last_seen > chrono::Duration::seconds(crate::MAX_PEER_INACTIVITY_SECS.into())
+        } else {
+            // Impossible to trigger, as completing a connection
+            // marks the peer with a timestamp. That being said,
+            // it's safest to leave this as `true` for future-proofing.
+            true
+        }
+    }
 }
 
 /// A data structure containing information about a peer.
@@ -61,8 +76,6 @@ pub struct PeerQuality {
 pub struct PeerInfo {
     /// The IP address of this peer.
     address: SocketAddr,
-    /// The current status of this peer.
-    status: PeerStatus,
     /// The timestamp of the first seen instance of this peer.
     first_seen: Option<DateTime<Utc>>,
     /// The timestamp of the last seen instance of this peer.
@@ -71,14 +84,15 @@ pub struct PeerInfo {
     last_disconnected: Option<DateTime<Utc>>,
     /// The number of times we have connected to this peer.
     connected_count: u64,
-    /// The number of times we have disconnected from this peer.
-    disconnected_count: u64,
     /// The quality of the connection with the peer.
     #[serde(skip)]
     pub quality: Arc<PeerQuality>,
-    /// The handles for tasks associated exclusively with this peer.
+    /// The handles for tasks associated exclusively with this peer;
+    /// The bool indicates whether it's abortable - otherwise it
+    /// needs to be awaited instead.
     #[serde(skip)]
-    pub tasks: Arc<Mutex<Vec<task::JoinHandle<()>>>>,
+    #[allow(clippy::type_complexity)]
+    pub tasks: Arc<Mutex<Vec<(task::JoinHandle<()>, bool)>>>,
 }
 
 impl PeerInfo {
@@ -88,12 +102,10 @@ impl PeerInfo {
     pub fn new(address: SocketAddr) -> Self {
         Self {
             address,
-            status: PeerStatus::NeverConnected,
             first_seen: None,
             last_connected: None,
             last_disconnected: None,
             connected_count: 0,
-            disconnected_count: 0,
             quality: Default::default(),
             tasks: Default::default(),
         }
@@ -108,27 +120,11 @@ impl PeerInfo {
     }
 
     ///
-    /// Returns the current status of this peer.
-    ///
-    #[inline]
-    pub fn status(&self) -> PeerStatus {
-        self.status
-    }
-
-    ///
     /// Returns the current block height of this peer.
     ///
     #[inline]
     pub fn block_height(&self) -> BlockHeight {
         self.quality.block_height.load(Ordering::SeqCst)
-    }
-
-    ///
-    /// Returns the timestamp of the first seen instance of this peer.
-    ///
-    #[inline]
-    pub fn first_seen(&self) -> Option<DateTime<Utc>> {
-        self.first_seen
     }
 
     ///
@@ -164,26 +160,16 @@ impl PeerInfo {
     }
 
     ///
-    /// Returns the number of times we have disconnected from this peer.
-    ///
-    #[inline]
-    pub fn disconnected_count(&self) -> u64 {
-        self.disconnected_count
-    }
-
-    ///
     /// Updates the peer to connected.
     ///
     pub(crate) fn set_connected(&mut self) {
-        if self.status() != PeerStatus::Connected {
-            // Set the state of this peer to connected.
-            self.status = PeerStatus::Connected;
-
-            self.last_connected = Some(Utc::now());
-            self.connected_count += 1;
-        } else {
-            trace!("Peer {} was set as connected more than once", self.address);
+        let now = Utc::now();
+        if self.first_seen.is_none() {
+            self.first_seen = Some(now);
         }
+        self.last_connected = Some(now);
+        *self.quality.last_seen.write() = Some(now);
+        self.connected_count += 1;
     }
 
     ///
@@ -192,98 +178,26 @@ impl PeerInfo {
     /// If the peer is not transitioning from `PeerStatus::Connecting` or `PeerStatus::Connected`,
     /// this function returns a `NetworkError`.
     ///
-    pub(crate) fn set_disconnected(&mut self) -> Result<(), NetworkError> {
-        match self.status() {
-            PeerStatus::Connected => {
-                // Set the state of this peer to disconnected.
-                self.status = PeerStatus::Disconnected;
+    pub(crate) fn set_disconnected(&mut self) {
+        self.last_disconnected = Some(Utc::now());
+        self.quality.expecting_pong.store(false, Ordering::SeqCst);
+        self.quality.remaining_sync_blocks.store(0, Ordering::SeqCst);
 
-                self.last_disconnected = Some(Utc::now());
-                self.quality.expecting_pong.store(false, Ordering::SeqCst);
-                self.quality.remaining_sync_blocks.store(0, Ordering::SeqCst);
-                self.disconnected_count += 1;
-
-                for handle in self.tasks.lock().drain(..).rev() {
-                    handle.abort();
-                }
-
-                Ok(())
-            }
-            PeerStatus::Disconnected | PeerStatus::NeverConnected => {
-                error!("Attempting to disconnect from a disconnected peer - {}", self.address);
-                Err(NetworkError::PeerAlreadyDisconnected)
+        for (handle, abortable) in self.tasks.lock().drain(..).rev() {
+            if abortable {
+                handle.abort();
+            } else {
+                task::spawn(async move {
+                    // An arbitrary amount of time to allow the task to shut down cleanly.
+                    if tokio::time::timeout(Duration::from_secs(5), handle).await.is_err() {
+                        warn!("One of the per-connection tasks didn't shut down cleanly");
+                    }
+                });
             }
         }
     }
 
-    pub(crate) fn register_task(&self, handle: task::JoinHandle<()>) {
-        self.tasks.lock().push(handle);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_new() {
-        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
-        let peer_info = PeerInfo::new(address);
-
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(0, peer_info.connected_count());
-        assert_eq!(0, peer_info.disconnected_count());
-    }
-
-    #[test]
-    fn test_set_disconnected_from_connected() {
-        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
-        let mut peer_info = PeerInfo::new(address);
-
-        peer_info.set_connected();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Connected, peer_info.status());
-        assert_eq!(1, peer_info.connected_count());
-        assert_eq!(0, peer_info.disconnected_count());
-
-        peer_info.set_disconnected().unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(1, peer_info.connected_count());
-        assert_eq!(1, peer_info.disconnected_count());
-    }
-
-    #[test]
-    fn test_set_disconnected_from_never_connected() {
-        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
-        let mut peer_info = PeerInfo::new(address);
-
-        assert!(peer_info.set_disconnected().is_err());
-
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::NeverConnected, peer_info.status());
-        assert_eq!(0, peer_info.connected_count());
-        assert_eq!(0, peer_info.disconnected_count());
-    }
-
-    #[test]
-    fn test_set_connected_from_disconnected() {
-        let address: SocketAddr = "127.0.0.1:4130".parse().unwrap();
-        let mut peer_info = PeerInfo::new(address);
-
-        peer_info.set_connected();
-        peer_info.set_disconnected().unwrap();
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Disconnected, peer_info.status());
-        assert_eq!(1, peer_info.connected_count());
-        assert_eq!(1, peer_info.disconnected_count());
-
-        peer_info.set_connected();
-
-        assert_eq!(address, peer_info.address());
-        assert_eq!(PeerStatus::Connected, peer_info.status());
-        assert_eq!(2, peer_info.connected_count());
-        assert_eq!(1, peer_info.disconnected_count());
+    pub(crate) fn register_task(&self, handle: task::JoinHandle<()>, abortable: bool) {
+        self.tasks.lock().push((handle, abortable));
     }
 }

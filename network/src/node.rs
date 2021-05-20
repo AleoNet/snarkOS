@@ -17,6 +17,7 @@
 use crate::*;
 use snarkvm_objects::Storage;
 
+use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
@@ -45,7 +46,7 @@ pub struct StateCode(AtomicU8);
 /// The internal state of a node.
 pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
-    pub name: u64,
+    pub id: u64,
     /// The current state of the node.
     state: StateCode,
     /// The local address of this node.
@@ -60,6 +61,8 @@ pub struct InnerNode<S: Storage> {
     pub peer_book: PeerBook,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync<S>>>,
+    /// The node's start-up timestamp.
+    pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
     tasks: Mutex<Vec<task::JoinHandle<()>>>,
     /// The threads spawned by the node.
@@ -76,7 +79,8 @@ impl<S: Storage> Drop for InnerNode<S> {
         // also, the connections are going to be broken automatically, so we only need to
         // take care of the associated tasks here
         for peer_info in self.peer_book.connected_peers().values() {
-            for handle in peer_info.tasks.lock().drain(..).rev() {
+            for (handle, _abortable) in peer_info.tasks.lock().drain(..).rev() {
+                // We're already shutting down, so always abort.
                 handle.abort();
             }
         }
@@ -129,7 +133,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
         Ok(Self(Arc::new(InnerNode {
-            name: thread_rng().gen(),
+            id: thread_rng().gen(),
             state: Default::default(),
             local_address: Default::default(),
             config,
@@ -137,6 +141,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             outbound: Default::default(),
             peer_book: Default::default(),
             sync: Default::default(),
+            launched: Utc::now(),
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),
@@ -171,9 +176,14 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver();
         let incoming_task = task::spawn(async move {
+            let mut cache = Cache::default();
+
             loop {
-                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
+                if let Err(e) = node_clone.process_incoming_messages(&mut receiver, &mut cache).await {
+                    metrics::increment_counter!(stats::INBOUND_ALL_FAILURES);
                     error!("Node error: {}", e);
+                } else {
+                    metrics::increment_counter!(stats::INBOUND_ALL_SUCCESSES);
                 }
             }
         });
@@ -185,9 +195,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             loop {
                 info!("Updating peers");
 
-                if let Err(e) = node_clone.update_peers().await {
-                    error!("Peer update error: {}", e);
-                }
+                node_clone.update_peers();
+
                 sleep(peer_sync_interval).await;
             }
         });
@@ -197,11 +206,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let state_tracking_task = task::spawn(async move {
             loop {
                 sleep(std::time::Duration::from_secs(5)).await;
-
-                // Make sure that the node doesn't remain in a sync state without peers.
-                if node_clone.state() == State::Syncing && node_clone.peer_book.number_of_connected_peers() == 0 {
-                    node_clone.set_state(State::Idle);
-                }
 
                 // Report node's current state.
                 trace!("Node state: {:?}", node_clone.state());
@@ -244,7 +248,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             sync_node = sync_clone.node().peer_book.last_seen();
                         }
 
-                        sync_clone.update_memory_pool(sync_node).await;
+                        sync_clone.update_memory_pool(sync_node);
                     }
 
                     sleep(mempool_sync_interval).await;
@@ -256,14 +260,25 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let block_sync_interval = sync_clone.block_sync_interval();
             let sync_block_task = task::spawn(async move {
                 loop {
-                    if !sync_clone.is_syncing_blocks() || sync_clone.has_block_sync_expired() {
-                        // The order of preference for the sync node is as follows:
-                        // Pick a random peer of all the connected ones that claim
-                        // to have a longer chain.
+                    let is_syncing_blocks = sync_clone.is_syncing_blocks();
+                    let is_sync_expired = sync_clone.has_block_sync_expired();
+
+                    // if the node is not currently syncing blocks or an earlier sync attempt has expired,
+                    // consider syncing blocks with a peer who has a longer chain
+                    if !is_syncing_blocks || is_sync_expired {
+                        // if the node's state is `Syncing`, change it to `Idle`, as it means the
+                        // previous attempt has expired - the peer has disconnected or was too slow
+                        // to deliver the batch of sync blocks
+                        if is_syncing_blocks {
+                            debug!("An unfinished block sync has expired.");
+                            sync_clone.node().set_state(State::Idle);
+                        }
 
                         let mut prospect_sync_nodes = Vec::new();
                         let my_height = sync_clone.current_block_height();
 
+                        // Pick a random peer of all the connected ones that claim
+                        // to have a longer chain.
                         for (peer, info) in sync_clone.node().peer_book.connected_peers().iter() {
                             // Fetch the current block height of this connected peer.
                             let peer_block_height = info.block_height();
@@ -285,12 +300,11 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             );
 
                             // Cancel any possibly ongoing sync attempts.
-                            sync_clone.node().set_state(State::Idle);
                             sync_clone.node().peer_book.cancel_any_unfinished_syncing();
 
                             // Begin a new sync attempt.
                             sync_clone.register_block_sync_attempt();
-                            sync_clone.update_blocks(Some(*sync_node)).await;
+                            sync_clone.update_blocks(*sync_node);
                         }
                     }
 
@@ -305,7 +319,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         debug!("Shutting down");
 
         for addr in self.connected_peers() {
-            let _ = self.disconnect_from_peer(addr);
+            self.disconnect_from_peer(addr);
         }
 
         for handle in self.threads.lock().drain(..).rev() {

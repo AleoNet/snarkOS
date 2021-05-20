@@ -62,6 +62,7 @@ pub struct Aleo {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JsonRPC {
     pub json_rpc: bool,
+    pub ip: String,
     pub port: u16,
     pub username: Option<String>,
     pub password: Option<String>,
@@ -113,6 +114,7 @@ impl Default for Config {
             },
             rpc: JsonRPC {
                 json_rpc: true,
+                ip: "0.0.0.0".into(),
                 port: 3030,
                 // TODO (raychu86) Establish a random username and password for the node operator by default
                 username: Some("Username".into()),
@@ -209,6 +211,7 @@ impl Config {
             "network" => self.network(clap::value_t!(arguments.value_of(*option), u8).ok()),
             "path" => self.path(arguments.value_of(option)),
             "port" => self.port(clap::value_t!(arguments.value_of(*option), u16).ok()),
+            "rpc-ip" => self.rpc_ip(arguments.value_of(option)),
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
@@ -305,6 +308,12 @@ impl Config {
         }
     }
 
+    fn rpc_ip(&mut self, argument: Option<&str>) {
+        if let Some(ip) = argument {
+            self.rpc.ip = ip.to_string();
+        }
+    }
+
     fn rpc_port(&mut self, argument: Option<u16>) {
         if let Some(rpc_port) = argument {
             self.rpc.port = rpc_port;
@@ -369,6 +378,7 @@ impl CLI for ConfigCli {
         option::MIN_PEERS,
         option::MAX_PEERS,
         option::NETWORK,
+        option::RPC_IP,
         option::RPC_PORT,
         option::RPC_USERNAME,
         option::RPC_PASSWORD,
@@ -392,6 +402,7 @@ impl CLI for ConfigCli {
             "mempool-interval",
             "min-peers",
             "max-peers",
+            "rpc-ip",
             "rpc-port",
             "rpc-username",
             "rpc-password",

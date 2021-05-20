@@ -38,8 +38,12 @@ use snarkvm_utilities::{to_bytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
+#[cfg(feature = "prometheus")]
+use metrics_exporter_prometheus::PrometheusBuilder;
+
+use metrics::{register_counter, register_gauge};
 use parking_lot::Mutex;
-use tokio::runtime::{Builder, Handle};
+use tokio::runtime::Builder;
 use tracing_subscriber::EnvFilter;
 
 fn initialize_logger(config: &Config) {
@@ -49,7 +53,7 @@ fn initialize_logger(config: &Config) {
             match verbosity {
                 1 => std::env::set_var("RUST_LOG", "info"),
                 2 => std::env::set_var("RUST_LOG", "debug"),
-                3 => std::env::set_var("RUST_LOG", "trace"),
+                3 | 4 => std::env::set_var("RUST_LOG", "trace"),
                 _ => std::env::set_var("RUST_LOG", "info"),
             };
 
@@ -59,7 +63,7 @@ fn initialize_logger(config: &Config) {
             // initialize tracing
             tracing_subscriber::fmt()
                 .with_env_filter(filter)
-                .with_target(false)
+                .with_target(config.node.verbose == 4)
                 .init();
         }
     }
@@ -67,6 +71,64 @@ fn initialize_logger(config: &Config) {
 
 fn print_welcome(config: &Config) {
     println!("{}", render_welcome(config));
+}
+
+#[cfg(feature = "prometheus")]
+fn initialize_metrics() {
+    let builder = PrometheusBuilder::new();
+    builder
+        .install()
+        .expect("failed to install Prometheus metrics recorder");
+}
+
+#[cfg(not(feature = "prometheus"))]
+fn initialize_metrics() {
+    use snarkos_network::NODE_STATS;
+
+    metrics::set_recorder(&NODE_STATS).expect("couldn't initialize the metrics recorder!");
+}
+
+fn register_metrics() {
+    register_counter!(snarkos_network::INBOUND_ALL_SUCCESSES);
+    register_counter!(snarkos_network::INBOUND_ALL_FAILURES);
+    register_counter!(snarkos_network::INBOUND_BLOCKS);
+    register_counter!(snarkos_network::INBOUND_GETBLOCKS);
+    register_counter!(snarkos_network::INBOUND_GETMEMORYPOOL);
+    register_counter!(snarkos_network::INBOUND_GETPEERS);
+    register_counter!(snarkos_network::INBOUND_GETSYNC);
+    register_counter!(snarkos_network::INBOUND_MEMORYPOOL);
+    register_counter!(snarkos_network::INBOUND_PEERS);
+    register_counter!(snarkos_network::INBOUND_PINGS);
+    register_counter!(snarkos_network::INBOUND_PONGS);
+    register_counter!(snarkos_network::INBOUND_SYNCS);
+    register_counter!(snarkos_network::INBOUND_SYNCBLOCKS);
+    register_counter!(snarkos_network::INBOUND_TRANSACTIONS);
+    register_counter!(snarkos_network::INBOUND_UNKNOWN);
+
+    register_counter!(snarkos_network::OUTBOUND_ALL_SUCCESSES);
+    register_counter!(snarkos_network::OUTBOUND_ALL_FAILURES);
+
+    register_counter!(snarkos_network::CONNECTIONS_ALL_ACCEPTED);
+    register_counter!(snarkos_network::CONNECTIONS_ALL_INITIATED);
+    register_counter!(snarkos_network::CONNECTIONS_ALL_REJECTED);
+    register_gauge!(snarkos_network::CONNECTIONS_CONNECTING);
+    register_gauge!(snarkos_network::CONNECTIONS_CONNECTED);
+    register_gauge!(snarkos_network::CONNECTIONS_DISCONNECTED);
+
+    register_counter!(snarkos_network::HANDSHAKES_FAILURES_INIT);
+    register_counter!(snarkos_network::HANDSHAKES_FAILURES_RESP);
+    register_counter!(snarkos_network::HANDSHAKES_SUCCESSES_INIT);
+    register_counter!(snarkos_network::HANDSHAKES_SUCCESSES_RESP);
+    register_counter!(snarkos_network::HANDSHAKES_TIMEOUTS_INIT);
+    register_counter!(snarkos_network::HANDSHAKES_TIMEOUTS_RESP);
+
+    register_gauge!(snarkos_network::QUEUES_INBOUND);
+    register_gauge!(snarkos_network::QUEUES_OUTBOUND);
+
+    register_counter!(snarkos_network::MISC_BLOCK_HEIGHT);
+    register_counter!(snarkos_network::MISC_BLOCKS_MINED);
+    register_counter!(snarkos_network::MISC_DUPLICATE_BLOCKS);
+    register_counter!(snarkos_network::MISC_DUPLICATE_SYNC_BLOCKS);
 }
 
 ///
@@ -80,19 +142,22 @@ fn print_welcome(config: &Config) {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()> {
+async fn start_server(config: Config) -> anyhow::Result<()> {
     initialize_logger(&config);
+
+    initialize_metrics();
+    register_metrics();
 
     print_welcome(&config);
 
-    let address = format! {"{}:{}", config.node.ip, config.node.port};
+    let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
     let mut path = config.node.dir;
     path.push(&config.node.db);
 
     let node_config = NodeConfig::new(
-        Some(desired_address),
+        desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
@@ -159,6 +224,9 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
             Duration::from_secs(config.p2p.mempool_sync_interval.into()),
         );
 
+        // The node can already be at some non-zero height.
+        metrics::counter!(snarkos_network::MISC_BLOCK_HEIGHT, sync.current_block_height() as u64);
+
         node.set_sync(sync);
     }
 
@@ -175,8 +243,12 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
             Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?)
         };
 
+        let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
+            .parse()
+            .expect("Invalid RPC server address!");
+
         let rpc_handle = start_rpc_server(
-            config.rpc.port,
+            rpc_address,
             secondary_storage,
             node.clone(),
             config.rpc.username,
@@ -195,7 +267,7 @@ async fn start_server(config: Config, tokio_handle: Handle) -> anyhow::Result<()
     if config.miner.is_miner {
         match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn(tokio_handle);
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
                 node.register_thread(handle);
             }
             Err(_) => info!(
@@ -219,9 +291,8 @@ fn main() -> Result<(), NodeError> {
         .enable_all()
         .thread_stack_size(4 * 1024 * 1024)
         .build()?;
-    let handle = runtime.handle().clone();
 
-    runtime.block_on(start_server(config, handle))?;
+    runtime.block_on(start_server(config))?;
 
     Ok(())
 }

@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Node, State};
+use crate::{stats, Node, State};
 use snarkos_consensus::Miner;
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
 use snarkvm_objects::Storage;
 
-use tokio::runtime;
 use tracing::*;
 
 use std::{sync::Arc, thread, time::Duration};
@@ -39,7 +38,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
     /// Spawns a new miner on a new thread using MinerInstance parameters.
     /// Once a block is found, A block message is sent to all peers.
     /// Calling this function multiple times will spawn additional listeners on separate threads.
-    pub fn spawn(self, tokio_handle: runtime::Handle) -> thread::JoinHandle<()> {
+    pub fn spawn(self) -> thread::JoinHandle<()> {
         let local_address = self.node.local_address().unwrap();
         info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
         let miner = Miner::new(
@@ -100,6 +99,8 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     self.node.set_state(State::Idle);
                 }
 
+                metrics::increment_counter!(stats::MISC_BLOCKS_MINED);
+
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
 
                 let serialized_block = if let Ok(block) = block.serialize() {
@@ -109,12 +110,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     continue;
                 };
 
-                let node = self.node.clone();
-                tokio_handle.spawn(async move {
-                    node.expect_sync()
-                        .propagate_block(serialized_block, local_address)
-                        .await;
-                });
+                self.node.expect_sync().propagate_block(serialized_block, local_address);
             }
         });
 

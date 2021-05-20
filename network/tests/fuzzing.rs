@@ -194,9 +194,14 @@ async fn fuzzing_corrupted_version_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    for _ in 0..ITERATIONS {
+    for i in 0..ITERATIONS {
         let mut stream = TcpStream::connect(node_addr).await.unwrap();
-        let version = Version::serialize(&Version::new(1u64, stream.local_addr().unwrap().port())).unwrap();
+        let version = Version::serialize(&Version::new(
+            snarkos_network::PROTOCOL_VERSION,
+            stream.local_addr().unwrap().port(),
+            i as u64,
+        ))
+        .unwrap();
 
         let corrupted_version = corrupt_bytes(&version);
 
@@ -227,7 +232,7 @@ async fn fuzzing_corrupted_version_post_handshake() {
         }
     });
 
-    let version = Version::serialize(&Version::new(1, 4141)).unwrap();
+    let version = Version::serialize(&Version::new(snarkos_network::PROTOCOL_VERSION, 4141, 0)).unwrap();
     for _ in 0..ITERATIONS {
         // Replace a random percentage of random bytes at random indices in the serialised message.
         let corrupted_version = corrupt_bytes(&version);
@@ -495,4 +500,37 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
 
     write_finished.store(true, Ordering::Relaxed);
     handle.await.unwrap();
+}
+
+#[tokio::test]
+async fn connection_request_spam() {
+    const NUM_ATTEMPTS: usize = 200;
+
+    let max_peers = NUM_ATTEMPTS as u16 / 2;
+    let node_setup = TestSetup {
+        consensus_setup: None,
+        max_peers,
+        ..Default::default()
+    };
+
+    let node = test_node(node_setup).await;
+    let node_addr = node.local_address().unwrap();
+
+    let sockets = Arc::new(parking_lot::Mutex::new(Vec::with_capacity(NUM_ATTEMPTS)));
+
+    for _ in 0..NUM_ATTEMPTS {
+        let socks = sockets.clone();
+        tokio::task::spawn(async move {
+            if let Ok(socket) = TcpStream::connect(node_addr).await {
+                socks.lock().push(socket);
+            }
+        });
+    }
+
+    wait_until!(3, node.peer_book.number_of_connecting_peers() == max_peers);
+
+    wait_until!(
+        snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 * 2,
+        node.peer_book.number_of_connecting_peers() == 0
+    );
 }

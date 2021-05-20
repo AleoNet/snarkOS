@@ -26,8 +26,6 @@
 extern crate derivative;
 #[macro_use]
 extern crate tracing;
-#[macro_use]
-extern crate snarkos_metrics;
 
 pub mod config;
 pub use config::*;
@@ -49,6 +47,9 @@ pub use outbound::*;
 
 pub mod peers;
 pub use peers::*;
+
+pub mod stats;
+pub use stats::*;
 
 pub mod sync;
 pub use sync::*;
@@ -74,11 +75,24 @@ pub const HANDSHAKE_BOOTNODE_TIMEOUT_SECS: u8 = 10;
 /// The maximum amount of time in which a handshake with a regular node can conclude before dropping the
 /// connection; it should be no greater than the `peer_sync_interval`.
 pub const HANDSHAKE_PEER_TIMEOUT_SECS: u8 = 5;
+/// The amount of time after which a peer will be considered inactive an disconnected from if they have
+/// not sent any messages in the meantime.
+pub const MAX_PEER_INACTIVITY_SECS: u8 = 30;
 
 /// The maximum size of a message that can be transmitted in the network.
 pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 /// The maximum number of peers shared at once in response to a `GetPeers` message.
 pub const SHARED_PEER_COUNT: usize = 25;
+
+/// The depth of the common inbound channel.
+pub const INBOUND_CHANNEL_DEPTH: usize = 16 * 1024;
+/// The depth of the per-connection outbound channels.
+pub const OUTBOUND_CHANNEL_DEPTH: usize = 1024;
+
+/// The version of the network protocol; it can be incremented in order to force users to update.
+/// FIXME: probably doesn't need to be a u64, could also be more informative than just a number
+// TODO (raychu86): Establish a formal node version.
+pub const PROTOCOL_VERSION: u64 = 2;
 
 pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
 
