@@ -104,6 +104,7 @@ version = "1.0"
 
 [dependencies.tokio]
 version = "1"
+features = [ "io-util", "parking_lot", "macros", "net", "rt-multi-thread", "sync", "time" ]
 
 [dependencies.tracing]
 default-features = false
