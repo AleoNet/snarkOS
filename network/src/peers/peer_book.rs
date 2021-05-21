@@ -217,7 +217,7 @@ impl PeerBook {
         if self.connected_peers.write().insert(listener, peer_info).is_none() {
             metrics::increment_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
         } else {
-            error!("{} had already been a connected peer!", listener);
+            error!("{} is already a connected peer!", listener);
         }
     }
 
