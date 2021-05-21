@@ -26,9 +26,13 @@ use std::{
 
 use parking_lot::Mutex;
 use rand::seq::IteratorRandom;
+use snow::HandshakeState;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpStream,
+    },
     sync::mpsc::channel,
     task,
 };
@@ -151,10 +155,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         debug!("Connecting to {}...", remote_address);
 
-        // Fetch the bootnodes and determine if address is a bootnode.
-        let bootnodes = self.config.bootnodes();
-        let is_connecting_peer_bootnode = bootnodes.contains(&remote_address);
-
         // Spawn a task that will be subject to a deadline.
         let node = self.clone();
         let handshake_task = task::spawn(async move {
@@ -206,43 +206,17 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             writer.write_all(&buffer[..len]).await?;
             trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
+            // The remote_listener is the same as remote_address when initiating a connection.
+            node.set_connected(remote_address, remote_address, noise, buffer, reader, writer)?;
+
             metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_INIT);
-
-            let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
-            let mut writer = ConnWriter::new(remote_address, writer, buffer.clone(), Arc::clone(&noise));
-            let mut reader = ConnReader::new(remote_address, reader, buffer, noise);
-
-            // Create a channel dedicated to sending messages to the connection.
-            let (sender, receiver) = channel(crate::OUTBOUND_CHANNEL_DEPTH);
-
-            // spawn the inbound loop
-            let node_clone = node.clone();
-            let conn_reading_task = tokio::spawn(async move {
-                node_clone.listen_for_inbound_messages(&mut reader).await;
-            });
-
-            // Listen for outbound messages.
-            let node_clone = node.clone();
-            let conn_writing_task = tokio::spawn(async move {
-                node_clone.listen_for_outbound_messages(receiver, &mut writer).await;
-            });
-
-            // Save the channel under the provided remote address.
-            node.outbound.channels.write().insert(remote_address, sender);
-
-            node.peer_book.set_connected(remote_address, None);
-
-            if let Ok(ref peer) = node.peer_book.get_peer(remote_address) {
-                peer.register_task(conn_reading_task, true);
-                peer.register_task(conn_writing_task, false);
-            } else {
-                // if the related peer is not found, it means it's already been dropped
-                conn_reading_task.abort();
-                conn_writing_task.abort();
-            }
 
             Ok(())
         });
+
+        // Fetch the bootnodes and determine if address is a bootnode.
+        let bootnodes = self.config.bootnodes();
+        let is_connecting_peer_bootnode = bootnodes.contains(&remote_address);
 
         // Check if the handshake doesn't time out.
         let timeout = match is_connecting_peer_bootnode {
@@ -460,6 +434,63 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             self.outbound.channels.write().remove(&remote_address);
             trace!("Disconnected from {}", remote_address);
         }
+    }
+
+    #[inline]
+    pub fn set_connected(
+        &self,
+        remote_address: SocketAddr,
+        remote_listener: SocketAddr,
+        noise: HandshakeState,
+        buffer: Box<[u8]>,
+        reader: OwnedReadHalf,
+        writer: OwnedWriteHalf,
+    ) -> Result<(), NetworkError> {
+        let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
+        let mut reader = ConnReader::new(remote_listener, reader, buffer.clone(), Arc::clone(&noise));
+        let mut writer = ConnWriter::new(remote_listener, writer, buffer, noise);
+
+        // Create a channel dedicated to sending messages to the connection.
+        let (sender, receiver) = channel(crate::OUTBOUND_CHANNEL_DEPTH);
+
+        // The node might already have connected to this peer in the meantime; double-check it.
+        if self.connected_peers().contains(&remote_listener) {
+            return Err(NetworkError::PeerAlreadyConnected);
+        }
+
+        // Save the channel under the provided remote address.
+        if self.outbound.channels.write().insert(remote_listener, sender).is_some() {
+            error!("The outbound channel for {} had already existed!", remote_listener);
+        }
+
+        // Listen for inbound messages.
+        let node = self.clone();
+        let peer_reading_task = tokio::spawn(async move {
+            node.listen_for_inbound_messages(&mut reader).await;
+        });
+
+        // Listen for outbound messages.
+        let node = self.clone();
+        let peer_writing_task = tokio::spawn(async move {
+            node.listen_for_outbound_messages(receiver, &mut writer).await;
+        });
+
+        // Mark the peer as connected.
+        self.peer_book.set_connected(remote_address, Some(remote_listener));
+
+        if let Some(peer) = self.peer_book.get_peer(remote_listener, true) {
+            peer.register_task(peer_reading_task, true);
+            peer.register_task(peer_writing_task, false);
+        } else {
+            peer_reading_task.abort();
+            peer_writing_task.abort();
+
+            return Err(NetworkError::PeerIsDisconnected);
+        }
+
+        trace!("Connected to {} (listener: {})", remote_address, remote_listener);
+
+        Ok(())
     }
 
     pub(crate) fn send_peers(&self, remote_address: SocketAddr) {

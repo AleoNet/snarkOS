@@ -214,9 +214,11 @@ impl PeerBook {
         peer_info.set_connected();
 
         // Add the address into the connected peers.
-        self.connected_peers.write().insert(listener, peer_info);
-
-        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+        if self.connected_peers.write().insert(listener, peer_info).is_none() {
+            metrics::increment_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+        } else {
+            error!("{} had already been a connected peer!", listener);
+        }
     }
 
     ///
@@ -238,9 +240,11 @@ impl PeerBook {
             metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
 
             // Add the address into the disconnected peers.
-            self.disconnected_peers.write().insert(address, peer_info);
-
-            metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+            if self.disconnected_peers.write().insert(address, peer_info).is_none() {
+                metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+            } else {
+                error!("Detected a double disconnect from {}!", address);
+            }
 
             return true;
         }
@@ -265,31 +269,22 @@ impl PeerBook {
     }
 
     ///
-    /// Returns a reference to the peer info of the given address, if it exists.
+    /// Returns the peer info of the given address, if it exists.
     ///
-    pub fn get_peer(&self, address: SocketAddr) -> Result<PeerInfo, NetworkError> {
+    pub fn get_peer(&self, address: SocketAddr, only_if_connected: bool) -> Option<PeerInfo> {
         // Check if the address is a connected peer.
         if self.is_connected(address) {
             // Fetch the peer info of the connected peer.
-            return self
-                .connected_peers()
-                .get(&address)
-                .cloned()
-                .ok_or(NetworkError::PeerBookMissingPeer);
+            return self.connected_peers().get(&address).cloned();
         }
 
         // Check if the address is a known disconnected peer.
-        if self.is_disconnected(address) {
+        if !only_if_connected && self.is_disconnected(address) {
             // Fetch the peer info of the disconnected peer.
-            return self
-                .disconnected_peers()
-                .get(&address)
-                .cloned()
-                .ok_or(NetworkError::PeerBookMissingPeer);
+            return self.disconnected_peers().get(&address).cloned();
         }
 
-        error!("Missing {} in the peer book", address);
-        Err(NetworkError::PeerBookMissingPeer)
+        None
     }
 
     ///
