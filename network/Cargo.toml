@@ -62,9 +62,6 @@ version = "0.2"
 [dependencies.derivative]
 version = "2"
 
-[dependencies.eigenvalues]
-version = "0.4"
-
 [dependencies.fxhash]
 version = "0.2"
 
