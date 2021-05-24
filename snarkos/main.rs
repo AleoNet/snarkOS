@@ -179,8 +179,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             None::<std::path::PathBuf>,
         )?)
     } else {
+        info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
         Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
     };
+    info!("Storage finished loading");
 
     // Enable the sync layer.
     {

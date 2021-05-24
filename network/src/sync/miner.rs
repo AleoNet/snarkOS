@@ -26,7 +26,7 @@ use tracing::*;
 use std::{sync::Arc, thread, time::Duration};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
-pub struct MinerInstance<S: Storage + core::marker::Sync + Send> {
+pub struct MinerInstance<S: Storage + core::marker::Sync + Send + 'static> {
     miner_address: AccountAddress<Components>,
     node: Node<S>,
 }

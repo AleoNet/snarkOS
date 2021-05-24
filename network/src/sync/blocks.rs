@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, stats, NetworkError, Node};
+use crate::{NetworkError, Node, master::SyncInbound, message::*, stats};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
@@ -77,6 +77,23 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
             )));
         }
 
+        if is_block_new {
+            self.process_received_block(remote_address, block, is_block_new).await?;
+        } else {
+            let sender = self.master_dispatch.read().await;
+            if let Some(sender) = &*sender {
+                sender.send(SyncInbound::Block(remote_address, block)).await.ok();
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) async fn process_received_block(
+        &self,
+        remote_address: SocketAddr,
+        block: Vec<u8>,
+        is_block_new: bool,
+    ) -> Result<(), NetworkError> {
         let block_struct = match Block::deserialize(&block) {
             Ok(block) => block,
             Err(error) => {
@@ -89,10 +106,11 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
         };
 
         info!(
-            "Received block from {} of epoch {} with hash {:?}",
+            "Received block from {} of epoch {} with hash {:?} (current head {})",
             remote_address,
             block_struct.header.time,
-            hex::encode(block_struct.header.get_hash().0)
+            hex::encode(block_struct.header.get_hash().0),
+            self.expect_sync().current_block_height(),
         );
 
         // Verify the block and insert it into the storage.
@@ -183,15 +201,12 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
 
     /// A peer has sent us their chain state.
     pub(crate) async fn received_sync(&self, remote_address: SocketAddr, block_hashes: Vec<BlockHeaderHash>) {
-        // If empty sync is no-op as chain states match
-        if !block_hashes.is_empty() {
-            for batch in block_hashes.chunks(crate::MAX_BLOCK_SYNC_COUNT as usize) {
-                // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
-                // detect missing blocks and divergence in chain for now.
-                self.peer_book
-                    .send_to(remote_address, Payload::GetBlocks(batch.to_vec()))
-                    .await;
-            }
+        let sender = self.master_dispatch.read().await;
+        if let Some(sender) = &*sender {
+            sender
+                .send(SyncInbound::BlockHashes(remote_address, block_hashes))
+                .await
+                .ok();
         }
     }
 }

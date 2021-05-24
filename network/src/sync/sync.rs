@@ -40,7 +40,7 @@ pub struct Sync<S: Storage> {
     last_block_sync: AtomicInstant,
 }
 
-impl<S: Storage + core::marker::Sync + Send> Sync<S> {
+impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         consensus: Arc<snarkos_consensus::Consensus<S>>,

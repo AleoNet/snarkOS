@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
+use crate::{*, master::SyncInbound, sync::master::SyncMaster};
 use snarkvm_objects::Storage;
 
 use chrono::{DateTime, Utc};
@@ -29,7 +29,7 @@ use std::{
     },
     thread,
 };
-use tokio::{task, time::sleep};
+use tokio::{sync::{RwLock, mpsc}, task, time::sleep};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -43,7 +43,7 @@ pub enum State {
 pub struct StateCode(AtomicU8);
 
 /// The internal state of a node.
-pub struct InnerNode<S: Storage + core::marker::Sync + Send> {
+pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
     /// The node's random numeric identifier.
     pub id: u64,
     /// The current state of the node.
@@ -66,14 +66,15 @@ pub struct InnerNode<S: Storage + core::marker::Sync + Send> {
     threads: DropJoin<thread::JoinHandle<()>>,
     /// An indicator of whether the node is shutting down.
     shutting_down: AtomicBool,
+    pub(crate) master_dispatch: RwLock<Option<mpsc::Sender<SyncInbound>>>,
 }
 
 /// A core data structure for operating the networking stack of this node.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct Node<S: Storage + core::marker::Sync + Send>(Arc<InnerNode<S>>);
+pub struct Node<S: Storage + core::marker::Sync + Send + 'static>(Arc<InnerNode<S>>);
 
-impl<S: Storage + core::marker::Sync + Send> Deref for Node<S> {
+impl<S: Storage + core::marker::Sync + Send + 'static> Deref for Node<S> {
     type Target = Arc<InnerNode<S>>;
 
     fn deref(&self) -> &Self::Target {
@@ -81,7 +82,7 @@ impl<S: Storage + core::marker::Sync + Send> Deref for Node<S> {
     }
 }
 
-impl<S: Storage + core::marker::Sync + Send> Node<S> {
+impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
     /// Returns the current state of the node.
     #[inline]
     pub fn state(&self) -> State {
@@ -117,6 +118,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),
+            master_dispatch: RwLock::new(None),
         })))
     }
 
@@ -233,41 +235,13 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let sync_block_task = task::spawn(async move {
                 loop {
                     let is_syncing_blocks = node_clone.is_syncing_blocks();
-                    let is_sync_expired = node_clone.expect_sync().has_block_sync_expired();
 
-                    // if the node is not currently syncing blocks or an earlier sync attempt has expired,
-                    // consider syncing blocks with a peer who has a longer chain
-                    if !is_syncing_blocks || is_sync_expired {
-                        // if the node's state is `Syncing`, change it to `Idle`, as it means the
-                        // previous attempt has expired - the peer has disconnected or was too slow
-                        // to deliver the batch of sync blocks
-                        if is_syncing_blocks {
-                            debug!("An unfinished block sync has expired.");
-                            node_clone.set_state(State::Idle);
+                    if !is_syncing_blocks {
+                        node_clone.register_block_sync_attempt();
+                        if let Err(e) = node_clone.run_sync().await {
+                            error!("failed sync process: {:?}", e);
                         }
-
-                        let my_height = node_clone.expect_sync().current_block_height();
-
-                        // Pick a random peer of all the connected ones that claim
-                        // to have a longer chain.
-                        let random_sync_peer = node_clone.peer_book.random_higher_peer(my_height + 1).await;
-                        if let Some((peer, total_nodes)) = random_sync_peer {
-                            // Log the sync job as a trace.
-                            trace!(
-                                "Preparing to sync from {} with a block height of {} (mine: {}, {} peers with a greater height)",
-                                peer.address,
-                                peer.quality.block_height,
-                                my_height,
-                                total_nodes
-                            );
-
-                            // Cancel any possibly ongoing sync attempts.
-                            node_clone.peer_book.cancel_any_unfinished_syncing().await;
-
-                            // Begin a new sync attempt.
-                            node_clone.register_block_sync_attempt();
-                            node_clone.update_blocks(peer.address).await;
-                        }
+                        node_clone.finished_syncing_blocks();
                     }
 
                     sleep(block_sync_interval).await;
@@ -322,4 +296,12 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             self.id,
         )
     }
+
+
+    pub async fn run_sync(&self) -> Result<(), NetworkError> {
+        let (master, sender) = SyncMaster::new(self.clone());
+        *self.master_dispatch.write().await = Some(sender);
+        master.run().await
+    }
+
 }
