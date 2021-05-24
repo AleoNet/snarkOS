@@ -71,7 +71,7 @@ version = "1.0"
 path = "../consensus"
 
 [dev-dependencies.snarkvm-curves]
-version = "0.2.2"
+version = "0.3.1"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"
