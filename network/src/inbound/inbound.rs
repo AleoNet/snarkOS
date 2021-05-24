@@ -23,7 +23,7 @@ use snarkvm_objects::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::mpsc::{channel, error::TrySendError},
+    sync::mpsc::error::TrySendError,
     task,
 };
 
@@ -65,14 +65,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
         let listener = TcpListener::bind(&self.config.desired_address).await?;
-        let listener_address = listener.local_addr()?;
+        let own_listener_address = listener.local_addr()?;
 
-        self.set_local_address(listener_address);
+        self.set_local_address(own_listener_address);
         info!("Initializing listener for node ({:x})", self.id);
 
         let node_clone = self.clone();
         let listener_handle = task::spawn(async move {
-            info!("Listening for nodes at {}", listener_address);
+            info!("Listening for nodes at {}", own_listener_address);
 
             loop {
                 match listener.accept().await {
@@ -89,46 +89,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             // Wait a maximum timeout limit for a connection request.
                             let handshake_result = tokio::time::timeout(
                                 Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
-                                node.connection_request(listener_address, remote_address, stream),
+                                node.connection_request(own_listener_address, remote_address, stream),
                             )
                             .await;
 
                             match handshake_result {
-                                Ok(Ok((mut writer, mut reader, remote_listener))) => {
-                                    // Create a channel dedicated to sending messages to the connection.
-                                    let (sender, receiver) = channel(crate::OUTBOUND_CHANNEL_DEPTH);
-
-                                    // Listen for inbound messages.
-                                    let node_clone = node.clone();
-                                    let peer_reading_task = tokio::spawn(async move {
-                                        node_clone.listen_for_inbound_messages(&mut reader).await;
-                                    });
-
-                                    // Listen for outbound messages.
-                                    let node_clone = node.clone();
-                                    let peer_writing_task = tokio::spawn(async move {
-                                        node_clone.listen_for_outbound_messages(receiver, &mut writer).await;
-                                    });
-
-                                    // Save the channel under the provided remote address.
-                                    node.outbound.channels.write().insert(remote_listener, sender);
-
-                                    // Finally, mark the peer as connected.
-                                    node.peer_book.set_connected(remote_address, Some(remote_listener));
-
-                                    trace!("Connected to {} (listener: {})", remote_address, remote_listener);
-
+                                Ok(Ok(remote_listener)) => {
                                     // Immediately send a ping to provide the peer with our block height.
                                     node.send_ping(remote_listener);
-
-                                    if let Ok(ref peer) = node.peer_book.get_peer(remote_listener) {
-                                        peer.register_task(peer_reading_task, true);
-                                        peer.register_task(peer_writing_task, false);
-                                    } else {
-                                        // If the related peer is not found, it means it's already been dropped.
-                                        peer_reading_task.abort();
-                                        peer_writing_task.abort();
-                                    }
                                 }
                                 Ok(Err(e)) => {
                                     error!("Failed to accept a connection request: {}", e);
@@ -335,10 +303,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     pub async fn connection_request(
         &self,
-        listener_address: SocketAddr,
+        own_listener_address: SocketAddr,
         remote_address: SocketAddr,
         stream: TcpStream,
-    ) -> Result<(ConnWriter, ConnReader, SocketAddr), NetworkError> {
+    ) -> Result<SocketAddr, NetworkError> {
         self.peer_book.set_connecting(remote_address)?;
 
         let (mut reader, mut writer) = stream.into_split();
@@ -366,8 +334,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("received e (XX handshake part 1/3) from {}", remote_address);
 
         // -> e, ee, s, es
-        let own_version =
-            Version::serialize(&Version::new(crate::PROTOCOL_VERSION, listener_address.port(), self.id)).unwrap();
+        let own_version = Version::serialize(&Version::new(
+            crate::PROTOCOL_VERSION,
+            own_listener_address.port(),
+            self.id,
+        ))
+        .unwrap();
         let len = noise.write_message(&own_version, &mut buffer)?;
         writer.write_all(&[len as u8]).await?;
         writer.write_all(&buffer[..len]).await?;
@@ -391,16 +363,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             return Err(NetworkError::InvalidHandshake);
         }
 
-        metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_RESP);
-
         // the remote listening address
         let remote_listener = SocketAddr::from((remote_address.ip(), peer_version.listening_port));
 
-        let noise = Arc::new(Mutex::new(noise.into_transport_mode()?));
-        let reader = ConnReader::new(remote_listener, reader, buffer.clone(), Arc::clone(&noise));
-        let writer = ConnWriter::new(remote_listener, writer, buffer, noise);
+        self.set_connected(remote_address, remote_listener, noise, buffer, reader, writer)?;
 
-        Ok((writer, reader, remote_listener))
+        metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_RESP);
+
+        Ok(remote_listener)
     }
 
     #[inline]
