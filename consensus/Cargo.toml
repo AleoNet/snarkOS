@@ -27,7 +27,7 @@ version = "0.2.2"
 version = "0.2.2"
 
 [dependencies.snarkvm-objects]
-version = "0.2.2"
+version = "0.3.1"
 
 [dependencies.snarkvm-posw]
 version = "0.2.2"
