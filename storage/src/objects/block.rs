@@ -182,8 +182,6 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         let mut cm_index = self.current_cm_index()?;
         let mut memo_index = self.current_memo_index()?;
 
-        let mut database_transaction = DatabaseTransaction::new();
-
         for transaction in self.get_block_transactions(&block_hash)?.0 {
             for sn in transaction.old_serial_numbers() {
                 database_transaction.push(Op::Delete {
