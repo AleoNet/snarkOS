@@ -62,8 +62,15 @@ version = "2"
 [dependencies.hex]
 version = "0.4.2"
 
+[dependencies.hyper]
+version = "0.14"
+features = [ "runtime", "server" ]
+
 [dependencies.itertools]
 version = "0.10.0"
+
+[dependencies.json-rpc2]
+version = "0.10"
 
 [dependencies.jsonrpc-core]
 version = "17"
@@ -72,9 +79,6 @@ version = "17"
 version = "17"
 
 [dependencies.jsonrpc-derive]
-version = "17"
-
-[dependencies.jsonrpc-http-server]
 version = "17"
 
 [dependencies.parking_lot]

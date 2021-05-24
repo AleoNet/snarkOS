@@ -17,7 +17,7 @@
 //! Structures for RPC endpoint requests and responses.
 
 use chrono::{DateTime, Utc};
-use jsonrpc_http_server::jsonrpc_core::Metadata;
+use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 

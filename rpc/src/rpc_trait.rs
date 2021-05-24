@@ -20,6 +20,8 @@ use crate::{error::RpcError, rpc_types::*};
 
 use jsonrpc_derive::rpc;
 
+use std::net::SocketAddr;
+
 /// Definition of public RPC endpoints.
 #[rpc]
 pub trait RpcFunctions {
@@ -120,4 +122,7 @@ pub trait ProtectedRpcFunctions {
 
     #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/decryptrecord.md"))]
     fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError>;
+
+    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/disconnect.md"))]
+    fn disconnect(&self, address: SocketAddr);
 }
