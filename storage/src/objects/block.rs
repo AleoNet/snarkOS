@@ -162,7 +162,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             return Err(StorageError::InvalidBlockDecommit);
         }
 
-        let update_best_block_num = current_block_height - 1;
+        let new_best_block_number = current_block_height - 1;
         let block_hash: BlockHeaderHash = self.get_block_hash(current_block_height)?;
 
         let mut database_transaction = DatabaseTransaction::new();
@@ -170,7 +170,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec(),
-            value: update_best_block_num.to_le_bytes().to_vec(),
+            value: new_best_block_number.to_le_bytes().to_vec(),
         });
 
         database_transaction.push(Op::Delete {
@@ -238,7 +238,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
 
         self.current_block_height.fetch_sub(1, Ordering::SeqCst);
 
-        self.update_merkle_tree()?;
+        self.update_merkle_tree(new_best_block_number)?;
 
         Ok(block_hash)
     }

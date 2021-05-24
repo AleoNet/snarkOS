@@ -129,15 +129,23 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Rebuild the stored merkle tree with the current stored commitments
-    pub fn update_merkle_tree(&self) -> Result<(), StorageError> {
+    pub fn update_merkle_tree(&self, new_best_block_number: u32) -> Result<(), StorageError> {
         self.rebuild_merkle_tree(vec![])?;
+        let new_digest = self.cm_merkle_tree.read().root();
 
-        let update_current_digest = DatabaseTransaction(vec![Op::Insert {
+        let mut database_transaction = DatabaseTransaction::new();
+
+        database_transaction.push(Op::Insert {
+            col: COL_DIGEST,
+            key: to_bytes![new_digest]?.to_vec(),
+            value: new_best_block_number.to_le_bytes().to_vec(),
+        });
+        database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![self.cm_merkle_tree.read().root()]?.to_vec(),
-        }]);
+            value: to_bytes![new_digest]?.to_vec(),
+        });
 
-        self.storage.batch(update_current_digest)
+        self.storage.batch(database_transaction)
     }
 }
