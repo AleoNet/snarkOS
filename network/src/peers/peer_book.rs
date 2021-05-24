@@ -181,8 +181,10 @@ impl PeerBook {
         if self.is_connected(address) {
             return Err(NetworkError::PeerAlreadyConnected);
         }
-        self.connecting_peers.write().insert(address);
-        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+
+        if self.connecting_peers.write().insert(address) {
+            metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+        }
 
         Ok(())
     }
@@ -206,9 +208,9 @@ impl PeerBook {
         };
 
         // Remove the peer's address from the list of connecting peers.
-        self.connecting_peers.write().remove(&address);
-
-        metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+        if self.connecting_peers.write().remove(&address) {
+            metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+        }
 
         // Update the peer info to connected.
         peer_info.set_connected();
