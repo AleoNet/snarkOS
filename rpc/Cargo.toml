@@ -81,6 +81,9 @@ version = "17"
 [dependencies.jsonrpc-derive]
 version = "17"
 
+[dependencies.metrics]
+version = "0.15"
+
 [dependencies.parking_lot]
 version = "0.11.1"
 

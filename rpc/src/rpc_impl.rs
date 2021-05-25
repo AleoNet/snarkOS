@@ -376,6 +376,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 blocks_mined: NODE_STATS.misc.blocks_mined.load(Ordering::Relaxed),
                 duplicate_blocks: NODE_STATS.misc.duplicate_blocks.load(Ordering::Relaxed),
                 duplicate_sync_blocks: NODE_STATS.misc.duplicate_sync_blocks.load(Ordering::Relaxed),
+                rpc_requests: NODE_STATS.misc.rpc_requests.load(Ordering::Relaxed),
             },
         })
     }

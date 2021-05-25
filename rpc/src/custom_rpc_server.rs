@@ -88,6 +88,9 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
     rpc: RpcImpl<S>,
     req: hyper::Request<Body>,
 ) -> Result<hyper::Response<Body>, Infallible> {
+    // Register the request in the metrics.
+    metrics::increment_counter!(snarkos_network::MISC_RPC_REQUESTS);
+
     // Obtain the username and password, if present.
     let auth = req
         .headers()
