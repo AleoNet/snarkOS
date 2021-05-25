@@ -70,7 +70,7 @@ features = [ "runtime", "server" ]
 version = "0.10.0"
 
 [dependencies.json-rpc-types]
-version = "1"
+version = "1.0.1"
 
 [dependencies.jsonrpc-core]
 version = "17"

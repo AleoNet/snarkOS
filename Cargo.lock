@@ -1274,9 +1274,9 @@ dependencies = [
 
 [[package]]
 name = "json-rpc-types"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dd69677be004820341a7bdff334b00aa6ceec45c39d75ef4afc88ff8f71633e"
+checksum = "7fbbae830dd9982663675265535efd2db328489088a05983da93b006ed6a7efd"
 dependencies = [
  "serde",
  "str-buf",
