@@ -96,7 +96,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns information about a block from a block hash.
     fn get_block(&self, block_hash_string: String) -> Result<BlockInfo, RpcError> {
         let block_hash = hex::decode(&block_hash_string)?;
-        assert_eq!(block_hash.len(), 32);
+        if block_hash.len() != 32 {
+            return Err(RpcError::InvalidBlockHash(block_hash_string));
+        }
 
         let storage = &self.storage;
 

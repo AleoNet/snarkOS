@@ -1273,15 +1273,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "json-rpc2"
-version = "0.10.1"
+name = "json-rpc-types"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78b49f717fad135c34796717cd5d932dc193aab2034c5c7a18caf29602f127a5"
+checksum = "7fbbae830dd9982663675265535efd2db328489088a05983da93b006ed6a7efd"
 dependencies = [
- "rand 0.8.3",
  "serde",
- "serde_json",
- "thiserror",
+ "str-buf",
 ]
 
 [[package]]
@@ -2783,7 +2781,7 @@ dependencies = [
  "hex",
  "hyper",
  "itertools 0.10.0",
- "json-rpc2",
+ "json-rpc-types",
  "jsonrpc-core",
  "jsonrpc-core-client",
  "jsonrpc-derive",
@@ -3149,6 +3147,15 @@ checksum = "7038b67c941e23501573cb7242ffb08709abe9b11eb74bceff875bbda024a6a8"
 dependencies = [
  "libc",
  "libsodium-sys",
+ "serde",
+]
+
+[[package]]
+name = "str-buf"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a66ae6a6cd930c97707cb3f1b62aadb8ddddd2fefa9df539564b3bfaa15dd31f"
+dependencies = [
  "serde",
 ]
 
