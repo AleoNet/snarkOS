@@ -38,8 +38,6 @@ use tokio::task;
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
 const INTERNAL_ERROR: isize = -32603;
-const METHOD_NOT_FOUND: isize = -32601;
-const PARSE_ERROR: isize = -32700;
 const SERVER_ERROR: isize = -32000;
 
 const METHODS_EXPECTING_PARAMS: [&str; 14] = [
@@ -142,160 +140,154 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
     };
 
     // Handle the request method.
-    let value = match req.method() {
+    let response = match req.method() {
         // public
         "getblock" => {
-            let resp = rpc
+            let result = rpc
                 .get_block(params[0].as_str().unwrap_or("").into())
                 .map_err(convert_crate_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "getblockcount" => {
-            let resp = rpc.get_block_count().map_err(convert_crate_err);
-            result_to_value(resp)
+            let result = rpc.get_block_count().map_err(convert_crate_err);
+            result_to_response(&mut req, result)
         }
         "getbestblockhash" => {
-            let resp = rpc.get_best_block_hash().map_err(convert_crate_err);
-            result_to_value(resp)
+            let result = rpc.get_best_block_hash().map_err(convert_crate_err);
+            result_to_response(&mut req, result)
         }
         "getblockhash" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
-                let resp = rpc.get_block_hash(height).map_err(convert_crate_err);
-                result_to_value(resp)
+                let result = rpc.get_block_hash(height).map_err(convert_crate_err);
+                result_to_response(&mut req, result)
             }
-            Err(_) => {
-                let err = json_rpc2::RpcError {
-                    code: PARSE_ERROR, // as per JSON-RPC 2.0 spec
-                    message: "The request can't be parsed: invalid block height!".into(),
-                    data: None,
-                };
-                serde_json::to_value(&err).unwrap_or_default()
+            Err(e) => {
+                let err = json_rpc2::Error::Parse { data: e.to_string() };
+                (&mut req, err).into()
             }
         },
         "getrawtransaction" => {
-            let resp = rpc
+            let result = rpc
                 .get_raw_transaction(params[0].as_str().unwrap_or("").into())
                 .map_err(convert_crate_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "gettransactioninfo" => {
-            let resp = rpc
+            let result = rpc
                 .get_transaction_info(params[0].as_str().unwrap_or("").into())
                 .map_err(convert_crate_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "decoderawtransaction" => {
-            let resp = rpc
+            let result = rpc
                 .decode_raw_transaction(params[0].as_str().unwrap_or("").into())
                 .map_err(convert_crate_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "sendtransaction" => {
-            let resp = rpc
+            let result = rpc
                 .send_raw_transaction(params[0].as_str().unwrap_or("").into())
                 .map_err(convert_crate_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "validaterawtransaction" => {
-            let resp = rpc
+            let result = rpc
                 .validate_raw_transaction(params[0].as_str().unwrap_or("").into())
                 .map_err(convert_crate_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "getconnectioncount" => {
-            let resp = rpc.get_connection_count().map_err(convert_crate_err);
-            result_to_value(resp)
+            let result = rpc.get_connection_count().map_err(convert_crate_err);
+            result_to_response(&mut req, result)
         }
         "getpeerinfo" => {
-            let resp = rpc.get_peer_info().map_err(convert_crate_err);
-            result_to_value(resp)
+            let result = rpc.get_peer_info().map_err(convert_crate_err);
+            result_to_response(&mut req, result)
         }
         "getnodeinfo" => {
-            let resp = rpc.get_node_info().map_err(convert_crate_err);
-            result_to_value(resp)
+            let result = rpc.get_node_info().map_err(convert_crate_err);
+            result_to_response(&mut req, result)
         }
         "getnodestats" => {
-            let resp = rpc.get_node_stats().map_err(convert_crate_err);
-            result_to_value(resp)
+            let result = rpc.get_node_stats().map_err(convert_crate_err);
+            result_to_response(&mut req, result)
         }
         "getblocktemplate" => {
-            let resp = rpc.get_block_template().map_err(convert_crate_err);
-            result_to_value(resp)
+            let result = rpc.get_block_template().map_err(convert_crate_err);
+            result_to_response(&mut req, result)
         }
         // private
         "createaccount" => {
-            let resp = rpc
+            let result = rpc
                 .create_account_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "createrawtransaction" => {
-            let resp = rpc
+            let result = rpc
                 .create_raw_transaction_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "createtransactionkernel" => {
-            let resp = rpc
+            let result = rpc
                 .create_transaction_kernel_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "createtransaction" => {
-            let resp = rpc
+            let result = rpc
                 .create_transaction_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "getrecordcommitments" => {
-            let resp = rpc
+            let result = rpc
                 .get_record_commitments_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "getrawrecord" => {
-            let resp = rpc
+            let result = rpc
                 .get_raw_record_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "decoderecord" => {
-            let resp = rpc
+            let result = rpc
                 .decode_record_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "decryptrecord" => {
-            let resp = rpc
+            let result = rpc
                 .decrypt_record_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
-            result_to_value(resp)
+            result_to_response(&mut req, result)
         }
         "disconnect" => {
-            let resp = rpc.disconnect_protected(Params::Array(params), meta).await;
-            result_to_value(resp)
+            let result = rpc.disconnect_protected(Params::Array(params), meta).await;
+            result_to_response(&mut req, result)
         }
         unknown => {
-            let err = json_rpc2::RpcError {
-                code: METHOD_NOT_FOUND, // as per JSON-RPC 2.0 spec
-                message: format!("Unknown method!: \"{}\"", unknown),
-                data: None,
+            let err = json_rpc2::Error::MethodNotFound {
+                id: req.id().clone(),
+                name: unknown.to_owned(),
             };
-            serde_json::to_value(&err).unwrap_or_default()
+            (&mut req, err).into()
         }
     };
 
-    // Create and serialize the response object.
-    let resp = json_rpc2::Response::from((&mut req, value));
-    let body = serde_json::to_vec(&resp).unwrap_or_default();
+    // Serialize the response object.
+    let body = serde_json::to_vec(&response).unwrap_or_default();
 
     // Send the HTTP response.
     Ok(hyper::Response::new(body.into()))
@@ -335,9 +327,14 @@ fn convert_core_err(err: jsonrpc_core::Error) -> json_rpc2::RpcError {
     }
 }
 
-fn result_to_value<T: Serialize, E: Serialize>(result: Result<T, E>) -> serde_json::Value {
-    match result {
+fn result_to_response<T: Serialize, E: Serialize>(
+    request: &mut json_rpc2::Request,
+    result: Result<T, E>,
+) -> json_rpc2::Response {
+    let value = match result {
         Ok(res) => serde_json::to_value(&res).unwrap_or_default(),
         Err(err) => serde_json::to_value(&err).unwrap_or_default(),
-    }
+    };
+
+    (request, value).into()
 }
