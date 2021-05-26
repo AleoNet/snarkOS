@@ -102,7 +102,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd consensus && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-consensus-cache
 
@@ -117,7 +117,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd metrics && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-metrics-cache
 
@@ -132,7 +132,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd network && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-network-cache
 
@@ -147,7 +147,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd parameters && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-parameters-cache
 
@@ -162,7 +162,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd profiler && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-profiler-cache
 
@@ -177,7 +177,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd rpc && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-rpc-cache
 
@@ -192,7 +192,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd storage && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-storage-cache
 
@@ -207,7 +207,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd testing && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-testing-cache
 
@@ -222,7 +222,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test
+          command: cd toolkit && RUST_MIN_STACK=8388608 cargo test
       - clear_environment:
           cache_key: snarkos-toolkit-cache
 
