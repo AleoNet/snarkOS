@@ -45,7 +45,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T
         })
     }
 
-    /// Returns the number of blocks including the genesis block
+    /// Returns the number of blocks including the genesis block.
     fn len(&self) -> usize {
         0
     }
