@@ -21,6 +21,7 @@ edition = "2018"
 default = [ "rocksdb_storage" ]
 rocksdb_storage = [ "rocksdb" ]
 mem_storage = [ ]
+test = [ ] # enables database deletion for tests; used by snarkos-testing
 
 [dependencies.snarkvm-algorithms]
 version = "0.3.1"

@@ -110,7 +110,7 @@ impl Drop for RocksDb {
         drop(db);
 
         // destroy the database in test conditions
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "test")]
         {
             let _ = DB::destroy(&Options::default(), _path);
         }
