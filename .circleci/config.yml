@@ -94,7 +94,7 @@ jobs:
   snarkos-consensus:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -109,7 +109,7 @@ jobs:
   snarkos-metrics:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -124,7 +124,7 @@ jobs:
   snarkos-network:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -139,7 +139,7 @@ jobs:
   snarkos-parameters:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -154,7 +154,7 @@ jobs:
   snarkos-profiler:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -169,7 +169,7 @@ jobs:
   snarkos-rpc:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -184,7 +184,7 @@ jobs:
   snarkos-storage:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -199,7 +199,7 @@ jobs:
   snarkos-testing:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
@@ -214,7 +214,7 @@ jobs:
   snarkos-toolkit:
     docker:
       - image: cimg/rust:1.51.0
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - setup_environment:
