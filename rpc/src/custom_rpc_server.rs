@@ -27,9 +27,9 @@ use snarkvm_objects::Storage;
 
 use hyper::{
     body::HttpBody,
+    server::Server,
     service::{make_service_fn, service_fn},
     Body,
-    Server,
 };
 use json_rpc_types as jrt;
 use jsonrpc_core::Params;

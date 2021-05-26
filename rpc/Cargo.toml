@@ -64,7 +64,7 @@ version = "0.4.2"
 
 [dependencies.hyper]
 version = "0.14"
-features = [ "runtime", "server" ]
+features = [ "http1", "runtime", "server" ]
 
 [dependencies.itertools]
 version = "0.10.0"
