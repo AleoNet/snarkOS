@@ -37,6 +37,7 @@ use snarkvm_utilities::{
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
+use std::sync::Arc;
 
 pub static FIXTURE: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(false));
 pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
@@ -45,7 +46,7 @@ pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
 pub struct Fixture<S: Storage> {
     pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
     pub test_accounts: [Account<Components>; 3],
-    pub ledger_parameters: CommitmentMerkleParameters,
+    pub ledger_parameters: Arc<CommitmentMerkleParameters>,
     pub genesis_block: Block<Tx>,
     pub program: NoopProgram<Components, <Components as BaseDPCComponents>::NoopProgramSNARK>,
     pub rng: XorShiftRng,

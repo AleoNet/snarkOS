@@ -41,7 +41,7 @@ commands:
             - .cache/sccache
             - .cargo
 jobs:
-  rust_stable:
+  rust-stable:
     docker:
       - image: cimg/rust:1.51.0
     resource_class: 2xlarge
@@ -59,6 +59,7 @@ jobs:
           paths: project/
       - clear_environment:
           cache_key: snarkos-stable-cache
+
   codecov:
     machine:
       image: ubuntu-1604:202004-01
@@ -74,7 +75,8 @@ jobs:
             docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
             howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
-  rust_nightly:
+
+  rust-nightly:
     docker:
       - image: howardwu/snarkos-ci:2021-03-25
     resource_class: 2xlarge
@@ -88,12 +90,157 @@ jobs:
           command: RUST_MIN_STACK=8388608 cargo test --all -- --skip test_rpc_create_raw_transaction
       - clear_environment:
           cache_key: snarkos-nightly-cache
+
+  snarkos-consensus:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-consensus-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd consensus && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-consensus-cache
+
+  snarkos-metrics:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-metrics-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd metrics && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-metrics-cache
+
+  snarkos-network:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-network-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd network && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-network-cache
+
+  snarkos-parameters:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-parameters-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd parameters && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-parameters-cache
+
+  snarkos-profiler:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-profiler-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd profiler && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-profiler-cache
+
+  snarkos-rpc:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-rpc-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd rpc && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-rpc-cache
+
+  snarkos-storage:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-storage-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd storage && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-storage-cache
+
+  snarkos-testing:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-testing-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd testing && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-testing-cache
+
+  snarkos-toolkit:
+    docker:
+      - image: cimg/rust:1.51.0
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-toolkit-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: cd toolkit && RUST_MIN_STACK=8388608 cargo test
+      - clear_environment:
+          cache_key: snarkos-toolkit-cache
+
 workflows:
   version: 2
   main-workflow:
     jobs:
-      - rust_stable
-      - rust_nightly
+      - rust-stable
+      - rust-nightly
       - codecov:
           requires:
-            - rust_stable
+            - rust-stable
+      - snarkos-consensus
+      - snarkos-metrics
+      - snarkos-network
+      - snarkos-parameters
+      - snarkos-profiler
+      - snarkos-rpc
+      - snarkos-storage
+      - snarkos-testing
+      - snarkos-toolkit

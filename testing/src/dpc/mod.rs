@@ -27,12 +27,13 @@ use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
 use rand::Rng;
+use std::sync::Arc;
 
 pub fn setup_or_load_parameters<R: Rng, S: Storage>(
     verify_only: bool,
     rng: &mut R,
 ) -> (
-    CommitmentMerkleParameters,
+    Arc<CommitmentMerkleParameters>,
     <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
 ) {
     // TODO (howardwu): Resolve this inconsistency on import structure with a new model once MerkleParameters are refactored.
@@ -40,7 +41,7 @@ pub fn setup_or_load_parameters<R: Rng, S: Storage>(
         <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
             .expect("read bytes as hash for MerkleParameters in ledger");
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
-    let ledger_merkle_tree_parameters = From::from(merkle_tree_hash_parameters);
+    let ledger_merkle_tree_parameters = Arc::new(From::from(merkle_tree_hash_parameters));
 
     let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(verify_only) {
         Ok(parameters) => parameters,

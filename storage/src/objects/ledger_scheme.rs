@@ -24,7 +24,7 @@ use snarkvm_utilities::{
 };
 
 use parking_lot::RwLock;
-use std::{fs, marker::PhantomData, path::Path};
+use std::{fs, marker::PhantomData, path::Path, sync::Arc};
 
 impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for Ledger<T, P, S> {
     type Block = Block<Self::Transaction>;
@@ -38,7 +38,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
     /// Instantiates a new ledger with a genesis block.
     fn new(
         path: Option<&Path>,
-        parameters: Self::MerkleParameters,
+        parameters: Arc<Self::MerkleParameters>,
         genesis_block: Self::Block,
     ) -> anyhow::Result<Self> {
         let storage = if let Some(path) = path {
@@ -77,7 +77,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
     }
 
     /// Return the parameters used to construct the ledger Merkle tree.
-    fn parameters(&self) -> &Self::MerkleParameters {
+    fn parameters(&self) -> &Arc<Self::MerkleParameters> {
         &self.ledger_parameters
     }
 
@@ -119,7 +119,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
     /// Returns true if the given Merkle path is a valid witness for
     /// the given ledger digest and commitment.
     fn verify_cm(
-        _parameters: &Self::MerkleParameters,
+        _parameters: &Arc<Self::MerkleParameters>,
         digest: &Self::MerkleTreeDigest,
         cm: &Self::Commitment,
         witness: &Self::MerklePath,
