@@ -17,10 +17,10 @@
 use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
 use snarkvm_objects::{Block, LedgerScheme, Transaction};
 
-use std::{marker::PhantomData, path::Path};
+use std::{marker::PhantomData, path::Path, sync::Arc};
 
 pub struct EmptyLedger<T: Transaction, P: LoadableMerkleParameters> {
-    parameters: P,
+    parameters: Arc<P>,
     _transaction: PhantomData<T>,
 }
 
@@ -36,7 +36,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T
     /// Instantiates a new ledger with a genesis block.
     fn new(
         _path: Option<&Path>,
-        parameters: Self::MerkleParameters,
+        parameters: Arc<Self::MerkleParameters>,
         _genesis_block: Self::Block,
     ) -> anyhow::Result<Self> {
         Ok(Self {
@@ -51,7 +51,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T
     }
 
     /// Return the parameters used to construct the ledger Merkle tree.
-    fn parameters(&self) -> &Self::MerkleParameters {
+    fn parameters(&self) -> &Arc<Self::MerkleParameters> {
         &self.parameters
     }
 
@@ -89,7 +89,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T
     /// Returns true if the given Merkle path is a valid witness for
     /// the given ledger digest and commitment.
     fn verify_cm(
-        _parameters: &Self::MerkleParameters,
+        _parameters: &Arc<Self::MerkleParameters>,
         _digest: &Self::MerkleTreeDigest,
         _cm: &Self::Commitment,
         _witness: &Self::MerklePath,
