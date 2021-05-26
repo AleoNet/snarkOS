@@ -48,7 +48,7 @@ use std::{
 
 /// Generate a blank ledger to facilitate generation of the genesis block
 fn empty_ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
-    parameters: P,
+    parameters: Arc<P>,
     path: &Path,
 ) -> Result<Ledger<T, P, S>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
@@ -89,7 +89,7 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
 
     // Instantiate an empty ledger
 
-    let ledger_parameters = From::from(merkle_tree_hash_parameters);
+    let ledger_parameters = Arc::new(From::from(merkle_tree_hash_parameters));
     let mut path = std::env::temp_dir();
     let random_path: usize = rng.gen();
     path.push(format!("./empty_ledger-{}", random_path));
