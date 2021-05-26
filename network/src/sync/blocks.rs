@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, stats, NetworkError, Sync};
+use crate::{message::*, stats, NetworkError, Node};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
 use std::net::SocketAddr;
 
-impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
+impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
     ///
     /// Sends a `GetSync` request to the given sync node.
     ///
     pub fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = match self.storage().get_block_locator_hashes() {
+        let block_locator_hashes = match self.expect_sync().storage().get_block_locator_hashes() {
             Ok(block_locator_hashes) => block_locator_hashes,
             _ => {
                 error!("Unable to get block locator hashes from storage");
@@ -36,7 +36,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         info!("Updating blocks from {}", sync_node);
 
         // Send a GetSync to the selected sync node.
-        self.node().send_request(Message::new(
+        self.send_request(Message::new(
             Direction::Outbound(sync_node),
             Payload::GetSync(block_locator_hashes),
         ));
@@ -48,10 +48,10 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
 
         debug!("Propagating a block to peers");
 
-        for remote_address in self.node().connected_peers() {
+        for remote_address in self.connected_peers() {
             if remote_address != block_miner {
                 // Send a `Block` message to the connected peer.
-                self.node().send_request(Message::new(
+                self.send_request(Message::new(
                     Direction::Outbound(remote_address),
                     Payload::Block(block_bytes.clone()),
                 ));
@@ -67,7 +67,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         is_block_new: bool,
     ) -> Result<(), NetworkError> {
         let block_size = block.len();
-        let max_block_size = self.max_block_size();
+        let max_block_size = self.expect_sync().max_block_size();
 
         if block_size > max_block_size {
             error!(
@@ -99,7 +99,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         );
 
         // Verify the block and insert it into the storage.
-        let block_validity = self.consensus.receive_block(&block_struct);
+        let block_validity = self.expect_sync().consensus.receive_block(&block_struct);
 
         if let Err(ConsensusError::PreExistingBlock) = block_validity {
             if is_block_new {
@@ -129,10 +129,10 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         for hash in header_hashes.into_iter().take(crate::MAX_BLOCK_SYNC_COUNT as usize) {
-            let block = self.storage().get_block(&hash)?;
+            let block = self.expect_sync().storage().get_block(&hash)?;
 
             // Send a `SyncBlock` message to the connected peer.
-            self.node().send_request(Message::new(
+            self.send_request(Message::new(
                 Direction::Outbound(remote_address),
                 Payload::SyncBlock(block.serialize()?),
             ));
@@ -148,7 +148,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         block_locator_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         let sync = {
-            let storage = self.storage();
+            let storage = self.expect_sync().storage();
 
             let latest_shared_hash = storage.get_latest_shared_hash(block_locator_hashes)?;
             let current_height = storage.get_current_block_height();
@@ -180,8 +180,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
         };
 
         // send a `Sync` message to the connected peer.
-        self.node()
-            .send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)));
+        self.send_request(Message::new(Direction::Outbound(remote_address), Payload::Sync(sync)));
 
         Ok(())
     }
@@ -193,7 +192,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Sync<S> {
             for batch in block_hashes.chunks(crate::MAX_BLOCK_SYNC_COUNT as usize) {
                 // GetBlocks for each block hash: fire and forget, relying on block locator hashes to
                 // detect missing blocks and divergence in chain for now.
-                self.node().send_request(Message::new(
+                self.send_request(Message::new(
                     Direction::Outbound(remote_address),
                     Payload::GetBlocks(batch.to_vec()),
                 ));

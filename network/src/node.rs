@@ -213,14 +213,14 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         });
         self.register_task(state_tracking_task);
 
-        if let Some(ref sync) = self.sync() {
+        if self.sync().is_some() {
             let bootnodes = self.config.bootnodes();
 
-            let sync_clone = Arc::clone(sync);
-            let mempool_sync_interval = sync_clone.mempool_sync_interval();
+            let node_clone = self.clone();
+            let mempool_sync_interval = node_clone.expect_sync().mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
                 loop {
-                    if !sync_clone.is_syncing_blocks() {
+                    if !node_clone.is_syncing_blocks() {
                         // TODO (howardwu): Add some random sync nodes beyond this approach
                         //  to ensure some diversity in mempool state that is fetched.
                         //  For now, this is acceptable because we propogate the mempool to
@@ -236,7 +236,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                         // Step 1.
                         let mut sync_node = None;
                         for bootnode in bootnodes.iter() {
-                            if sync_clone.node().peer_book.is_connected(*bootnode) {
+                            if node_clone.peer_book.is_connected(*bootnode) {
                                 sync_node = Some(*bootnode);
                                 break;
                             }
@@ -245,10 +245,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                         // Step 2.
                         if sync_node.is_none() {
                             // Select last seen node as block sync node.
-                            sync_node = sync_clone.node().peer_book.last_seen();
+                            sync_node = node_clone.peer_book.last_seen();
                         }
 
-                        sync_clone.update_memory_pool(sync_node);
+                        node_clone.update_memory_pool(sync_node);
                     }
 
                     sleep(mempool_sync_interval).await;
@@ -256,12 +256,12 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             });
             self.register_task(sync_mempool_task);
 
-            let sync_clone = Arc::clone(sync);
-            let block_sync_interval = sync_clone.block_sync_interval();
+            let node_clone = self.clone();
+            let block_sync_interval = node_clone.expect_sync().block_sync_interval();
             let sync_block_task = task::spawn(async move {
                 loop {
-                    let is_syncing_blocks = sync_clone.is_syncing_blocks();
-                    let is_sync_expired = sync_clone.has_block_sync_expired();
+                    let is_syncing_blocks = node_clone.is_syncing_blocks();
+                    let is_sync_expired = node_clone.expect_sync().has_block_sync_expired();
 
                     // if the node is not currently syncing blocks or an earlier sync attempt has expired,
                     // consider syncing blocks with a peer who has a longer chain
@@ -271,15 +271,15 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                         // to deliver the batch of sync blocks
                         if is_syncing_blocks {
                             debug!("An unfinished block sync has expired.");
-                            sync_clone.node().set_state(State::Idle);
+                            node_clone.set_state(State::Idle);
                         }
 
                         let mut prospect_sync_nodes = Vec::new();
-                        let my_height = sync_clone.current_block_height();
+                        let my_height = node_clone.expect_sync().current_block_height();
 
                         // Pick a random peer of all the connected ones that claim
                         // to have a longer chain.
-                        for (peer, info) in sync_clone.node().peer_book.connected_peers().iter() {
+                        for (peer, info) in node_clone.peer_book.connected_peers().iter() {
                             // Fetch the current block height of this connected peer.
                             let peer_block_height = info.block_height();
 
@@ -300,11 +300,11 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                             );
 
                             // Cancel any possibly ongoing sync attempts.
-                            sync_clone.node().peer_book.cancel_any_unfinished_syncing();
+                            node_clone.peer_book.cancel_any_unfinished_syncing();
 
                             // Begin a new sync attempt.
-                            sync_clone.register_block_sync_attempt();
-                            sync_clone.update_blocks(*sync_node);
+                            node_clone.register_block_sync_attempt();
+                            node_clone.update_blocks(*sync_node);
                         }
                     }
 

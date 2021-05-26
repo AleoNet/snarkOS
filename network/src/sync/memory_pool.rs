@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, NetworkError, Sync};
+use crate::{message::*, NetworkError, Node};
 use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
 use snarkvm_objects::Storage;
@@ -25,7 +25,7 @@ use snarkvm_utilities::{
 
 use std::net::SocketAddr;
 
-impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
+impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     ///
     /// Triggers the memory pool sync with a selected peer.
     ///
@@ -33,8 +33,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
         if let Some(sync_node) = sync_node {
             info!("Updating memory pool from {}", sync_node);
 
-            self.node()
-                .send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
+            self.send_request(Message::new(Direction::Outbound(sync_node), Payload::GetMemoryPool));
         } else {
             debug!("No sync node is registered, memory pool could not be synced");
         }
@@ -46,12 +45,12 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     pub(crate) fn propagate_memory_pool_transaction(&self, transaction_bytes: Vec<u8>, transaction_sender: SocketAddr) {
         debug!("Propagating a memory pool transaction to connected peers");
 
-        let local_address = self.node().local_address().unwrap();
+        let local_address = self.local_address().unwrap();
 
-        for remote_address in self.node().connected_peers() {
+        for remote_address in self.connected_peers() {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
-                self.node().send_request(Message::new(
+                self.send_request(Message::new(
                     Direction::Outbound(remote_address),
                     Payload::Transaction(transaction_bytes.clone()),
                 ));
@@ -70,9 +69,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
     ) -> Result<(), NetworkError> {
         if let Ok(tx) = Tx::read(&*transaction) {
             let insertion = {
-                let storage = self.storage();
+                let storage = self.expect_sync().storage();
 
-                if !self.consensus.verify_transaction(&tx)? {
+                if !self.expect_sync().consensus.verify_transaction(&tx)? {
                     error!("Received a transaction that was invalid");
                     return Ok(());
                 }
@@ -87,7 +86,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
                     transaction: tx,
                 };
 
-                self.memory_pool().lock().insert(storage, entry)
+                self.expect_sync().memory_pool().lock().insert(storage, entry)
             };
 
             if let Ok(inserted) = insertion {
@@ -107,7 +106,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
         let transactions = {
             let mut txs = vec![];
 
-            let mempool = self.memory_pool().lock().transactions.clone();
+            let mempool = self.expect_sync().memory_pool().lock().transactions.clone();
             for entry in mempool.values() {
                 if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
                     txs.push(transaction_bytes);
@@ -119,7 +118,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
 
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
-            self.node().send_request(Message::new(
+            self.send_request(Message::new(
                 Direction::Outbound(remote_address),
                 Payload::MemoryPool(transactions),
             ));
@@ -128,8 +127,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Sync<S> {
 
     /// A peer has sent us their memory pool transactions.
     pub(crate) fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
-        let mut memory_pool = self.memory_pool().lock();
-        let storage = self.storage();
+        let mut memory_pool = self.expect_sync().memory_pool().lock();
+        let storage = self.expect_sync().storage();
 
         for transaction_bytes in transactions {
             let transaction: Tx = Tx::read(&transaction_bytes[..])?;

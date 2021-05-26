@@ -218,7 +218,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         });
 
         let sync = Sync::new(
-            node.clone(),
             consensus,
             config.miner.is_miner,
             Duration::from_secs(config.p2p.block_sync_interval.into()),
