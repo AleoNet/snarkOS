@@ -21,6 +21,7 @@ use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
 use snarkvm_objects::{Block, LedgerScheme, Storage, Transaction};
 
 use rand::{thread_rng, Rng};
+use std::sync::Arc;
 
 pub type Store = Ledger<TestTx, CommitmentMerkleParameters, LedgerStorage>;
 
@@ -31,7 +32,7 @@ pub fn random_storage_path() -> String {
 
 // Initialize a test blockchain given genesis attributes
 pub fn initialize_test_blockchain<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
-    parameters: P,
+    parameters: Arc<P>,
     genesis_block: Block<T>,
 ) -> Ledger<T, P, S> {
     let mut path = std::env::temp_dir();

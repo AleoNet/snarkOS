@@ -26,14 +26,17 @@ use std::{
     fs,
     marker::PhantomData,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
 pub type BlockHeight = u32;
 
 pub struct Ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage> {
     pub current_block_height: AtomicU32,
-    pub ledger_parameters: P,
+    pub ledger_parameters: Arc<P>,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
     pub storage: S,
     pub _transaction: PhantomData<T>,
@@ -49,7 +52,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             Self::open_at_path(path)
         } else {
             let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
-            let ledger_parameters = P::from(crh);
+            let ledger_parameters = Arc::new(P::from(crh));
 
             let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
 
@@ -118,7 +121,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         };
 
         let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
-        let ledger_parameters = P::from(crh);
+        let ledger_parameters = Arc::new(P::from(crh));
 
         match latest_block_number {
             Some(val) => {
