@@ -44,10 +44,14 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();
 
-        // The given block header already exists
+        /*  The given block header already exists; temporarily disable this check, as it can cause issues
+            when decommitting blocks, or rather when sync blocks are received after that process - since
+            this check is done in COL_BLOCK_HEADER, a sync block that could become canonical would be rejected
+            as a duplicate
         if self.block_hash_exists(&block_hash) {
             return Ok(BlockPath::ExistingBlock);
         }
+        */
 
         // The given block header is valid on the canon chain
         if self.get_latest_block()?.header.get_hash() == block_header.previous_block_hash {
