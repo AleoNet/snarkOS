@@ -204,61 +204,61 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::Transaction(transaction) => {
                 metrics::increment_counter!(stats::INBOUND_TRANSACTIONS);
 
-                if let Some(ref sync) = self.sync() {
-                    sync.received_memory_pool_transaction(source, transaction)?;
+                if self.sync().is_some() {
+                    self.received_memory_pool_transaction(source, transaction)?;
                 }
             }
             Payload::Block(block) => {
                 metrics::increment_counter!(stats::INBOUND_BLOCKS);
 
-                if let Some(ref sync) = self.sync() {
-                    sync.received_block(source, block, true)?;
+                if self.sync().is_some() {
+                    self.received_block(source, block, true)?;
                 }
             }
             Payload::SyncBlock(block) => {
                 metrics::increment_counter!(stats::INBOUND_SYNCBLOCKS);
 
-                if let Some(ref sync) = self.sync() {
-                    sync.received_block(source, block, false)?;
+                if self.sync().is_some() {
+                    self.received_block(source, block, false)?;
 
                     // Update the peer and possibly finish the sync process.
                     if self.peer_book.got_sync_block(source) {
-                        sync.finished_syncing_blocks();
+                        self.finished_syncing_blocks();
                     }
                 }
             }
             Payload::GetBlocks(hashes) => {
                 metrics::increment_counter!(stats::INBOUND_GETBLOCKS);
 
-                if let Some(ref sync) = self.sync() {
-                    sync.received_get_blocks(source, hashes)?;
+                if self.sync().is_some() {
+                    self.received_get_blocks(source, hashes)?;
                 }
             }
             Payload::GetMemoryPool => {
                 metrics::increment_counter!(stats::INBOUND_GETMEMORYPOOL);
 
-                if let Some(ref sync) = self.sync() {
-                    sync.received_get_memory_pool(source);
+                if self.sync().is_some() {
+                    self.received_get_memory_pool(source);
                 }
             }
             Payload::MemoryPool(mempool) => {
                 metrics::increment_counter!(stats::INBOUND_MEMORYPOOL);
 
-                if let Some(ref sync) = self.sync() {
-                    sync.received_memory_pool(mempool)?;
+                if self.sync().is_some() {
+                    self.received_memory_pool(mempool)?;
                 }
             }
             Payload::GetSync(getsync) => {
                 metrics::increment_counter!(stats::INBOUND_GETSYNC);
 
-                if let Some(ref sync) = self.sync() {
-                    sync.received_get_sync(source, getsync)?;
+                if self.sync().is_some() {
+                    self.received_get_sync(source, getsync)?;
                 }
             }
             Payload::Sync(sync) => {
                 metrics::increment_counter!(stats::INBOUND_SYNCS);
 
-                if let Some(ref sync_handler) = self.sync() {
+                if self.sync().is_some() {
                     if sync.is_empty() {
                         // An empty `Sync` is unexpected, as `GetSync` requests are only
                         // sent to peers that declare a greater block height.
@@ -266,7 +266,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         warn!("{} doesn't have sync blocks to share", source);
                     } else if self.peer_book.expecting_sync_blocks(source, sync.len()) {
                         trace!("Received {} sync block hashes from {}", sync.len(), source);
-                        sync_handler.received_sync(source, sync);
+                        self.received_sync(source, sync);
                     }
                 }
             }

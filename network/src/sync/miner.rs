@@ -110,7 +110,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     continue;
                 };
 
-                self.node.expect_sync().propagate_block(serialized_block, local_address);
+                self.node.propagate_block(serialized_block, local_address);
             }
         });
 
