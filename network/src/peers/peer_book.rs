@@ -160,7 +160,7 @@ impl PeerBook {
         if let Some(active_handler) = self.connected_peers.get(&address) {
             Ok(Some(active_handler))
         } else {
-            if let Some(peer) = self.get_disconnected_peer(address) {
+            if let Some(mut peer) = self.get_disconnected_peer(address) {
                 if peer.judge() {
                     // dont reconnect to bad peers
                     return Ok(None);

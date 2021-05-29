@@ -30,7 +30,7 @@ pub(super) enum PeerAction {
     Get(oneshot::Sender<Peer>),
     QualityJudgement,
     CancelSync,
-    GotSyncBlock(oneshot::Sender<bool>),
+    GotSyncBlock,
     ExpectingSyncBlocks(u32),
     SoftFail,
 }
@@ -69,13 +69,9 @@ impl PeerHandle {
         self.sender.send(PeerAction::CancelSync).await.ok();
     }
 
-    pub async fn got_sync_block(&self) -> bool {
+    pub async fn got_sync_block(&self) {
         metrics::increment_gauge!(stats::QUEUES_OUTBOUND, 1.0);
-        let (sender, receiver) = oneshot::channel();
-        if self.sender.send(PeerAction::GotSyncBlock(sender)).await.is_err() {
-            return false;
-        }
-        receiver.await.unwrap_or(false)
+        self.sender.send(PeerAction::GotSyncBlock).await.ok();
     }
 
     pub async fn expecting_sync_blocks(&self, amount: u32) {
@@ -128,33 +124,40 @@ impl Peer {
                 }
             }
             PeerAction::CancelSync => {
-                if self.quality.remaining_sync_blocks > 0 {
+                if self.quality.remaining_sync_blocks > self.quality.total_sync_blocks / 2 {
                     warn!(
                         "Was expecting {} more sync blocks from {}",
                         self.quality.remaining_sync_blocks, self.address,
                     );
                     self.quality.remaining_sync_blocks = 0;
-                    self.quality.failures += 1;
+                    self.quality.total_sync_blocks = 0;
+                    self.fail();
+                } else if self.quality.remaining_sync_blocks > 0 {
+                    trace!(
+                        "Was expecting {} more sync blocks from {}",
+                        self.quality.remaining_sync_blocks, self.address,
+                    );
+                    self.quality.remaining_sync_blocks = 0;
+                    self.quality.total_sync_blocks = 0;
                 }
                 Ok(PeerResponse::None)
                 //todo: should we notify the peer we are no longer expecting anything from them?
             }
-            PeerAction::GotSyncBlock(sender) => {
+            PeerAction::GotSyncBlock => {
                 if self.quality.remaining_sync_blocks > 0 {
                     self.quality.remaining_sync_blocks -= 1;
-                    sender.send(self.quality.remaining_sync_blocks == 0).ok();
                 } else {
-                    self.quality.failures += 1;
-                    sender.send(false).ok();
+                    warn!("received unexpected or late sync block from {}", self.address);
                 }
                 Ok(PeerResponse::None)
             }
             PeerAction::ExpectingSyncBlocks(amount) => {
                 self.quality.remaining_sync_blocks = amount;
+                self.quality.total_sync_blocks = amount;
                 Ok(PeerResponse::None)
             }
             PeerAction::SoftFail => {
-                self.quality.failures += 1;
+                self.fail();
                 Ok(PeerResponse::None)
             }
         }

@@ -148,9 +148,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
                     // Update the peer and possibly finish the sync process.
                     if let Some(peer) = self.peer_book.get_peer_handle(source) {
-                        if peer.got_sync_block().await {
-                            self.finished_syncing_blocks();
-                        }
+                        peer.got_sync_block().await;
                     }
                 }
             }
@@ -194,11 +192,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             peer.soft_fail().await;
                         }
                     } else {
-                        if let Some(peer) = self.peer_book.get_peer_handle(source) {
-                            trace!("Received {} sync block hashes from {}", sync.len(), source);
-                            peer.expecting_sync_blocks(sync.len() as u32).await;
-                            self.received_sync(source, sync).await;
-                        }
+                        trace!("Received {} sync block hashes from {}", sync.len(), source);
+                        self.received_sync(source, sync).await;
                     }
                 }
             }

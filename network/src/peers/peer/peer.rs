@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::*;
+use chrono::Utc;
 use futures::{select, FutureExt};
 use serde::{Deserialize, Serialize};
 use snarkvm_objects::Storage;
@@ -47,9 +48,10 @@ pub struct Peer {
     pub status: PeerStatus,
     pub quality: PeerQuality,
     pub is_bootnode: bool,
-    #[serde(skip)]
-    pub(super) network_failures: usize,
 }
+
+const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
+const FAILURE_THRESHOLD: usize = 5;
 
 impl Peer {
     pub fn new(address: SocketAddr, is_bootnode: bool) -> Self {
@@ -58,12 +60,26 @@ impl Peer {
             status: PeerStatus::Disconnected,
             quality: Default::default(),
             is_bootnode,
-            network_failures: 0,
         }
     }
 
-    pub fn judge(&self) -> bool {
-        self.quality.rtt_ms > 1500 || self.quality.failures >= 3 || self.quality.is_inactive(chrono::Utc::now())
+    pub fn judge(&mut self) -> bool {
+        let f = self.failures();
+        println!("{}: {} {} {}", self.address, self.quality.rtt_ms, f, self.quality.is_inactive(chrono::Utc::now()));
+        // self.quality.rtt_ms > 1500 || 
+        self.failures() >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
+    }
+
+    pub fn fail(&mut self) {
+        self.quality.failures.push(Utc::now());
+    }
+
+    pub fn failures(&mut self) -> usize {
+        let now = Utc::now();
+        if self.quality.failures.len() > FAILURE_THRESHOLD {
+            self.quality.failures = self.quality.failures.iter().filter(|x| x.signed_duration_since(now) < chrono::Duration::from_std(FAILURE_EXPIRY_TIME).unwrap()).copied().collect();
+        }
+        self.quality.failures.len()
     }
 
     pub fn handshake_timeout(&self) -> Duration {

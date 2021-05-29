@@ -49,7 +49,7 @@ impl Peer {
                     self.quality.expecting_pong = false;
                     self.quality.rtt_ms = rtt;
                 } else {
-                    self.quality.failures += 1;
+                    self.fail();
                 }
                 metrics::increment_counter!(stats::INBOUND_PONGS);
             }
@@ -78,13 +78,12 @@ impl Peer {
         match self.inner_dispatch_payload(node, network, payload).await {
             Ok(()) => (),
             Err(e) => {
-                error!("Unable to read message from {}: {}", self.address, e);
-                self.network_failures += 1;
-
-                if e.is_fatal() || self.network_failures >= 10 {
-                    warn!("Disconnecting from {} (unreliable)", self.address);
-                    return Err(e);
+                if e.is_trivial() {
+                    trace!("Unable to read message from {}: {}", self.address, e);
+                } else {
+                    warn!("Unable to read message from {}: {}", self.address, e);
                 }
+                return Err(e);
             }
         }
         Ok(())

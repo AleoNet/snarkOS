@@ -72,10 +72,18 @@ impl Peer {
                 .await
                 .ok();
             if let Err(e) = peer.run(node, network, receiver).await {
-                error!(
-                    "unrecoverable failure communicating to inbound peer '{}': '{:?}'",
-                    peer.address, e
-                );
+                if !e.is_trivial() {
+                    peer.fail();
+                    error!(
+                        "unrecoverable failure communicating to inbound peer '{}': '{:?}'",
+                        peer.address, e
+                    );
+                } else {
+                    warn!(
+                        "unrecoverable failure communicating to inbound peer '{}': '{:?}'",
+                        peer.address, e
+                    );
+                }
             }
             metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
             peer.set_disconnected();

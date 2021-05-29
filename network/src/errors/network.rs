@@ -63,6 +63,19 @@ impl NetworkError {
             _ => false,
         }
     }
+
+    pub fn is_trivial(&self) -> bool {
+        match self {
+            NetworkError::Io(e) => {
+                matches!(e.kind(), ErrorKind::BrokenPipe |
+                    ErrorKind::ConnectionReset |
+                    ErrorKind::UnexpectedEof |
+                    ErrorKind::TimedOut |
+                    ErrorKind::ConnectionRefused)
+            },
+            _ => false,
+        }
+    }
 }
 
 impl From<capnp::Error> for NetworkError {

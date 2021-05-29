@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::{collections::{HashMap, HashSet}, net::SocketAddr, time::Duration};
 
 use crate::{NetworkError, Node, Payload, Peer};
 use futures::{pin_mut, select, FutureExt};
@@ -51,12 +51,16 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
     async fn find_sync_nodes(&mut self) -> Vec<Peer> {
         let our_block_height = self.node.expect_sync().current_block_height();
         let mut interesting_peers = vec![];
-        for node in self.node.peer_book.connected_peers_snapshot().await {
-            if !node.judge() && node.quality.block_height > our_block_height + 1 {
+        for mut node in self.node.peer_book.connected_peers_snapshot().await {
+            let judge = node.judge();
+            if !judge && node.quality.block_height > our_block_height + 1 {
                 interesting_peers.push(node);
+            } else if judge {
+                println!("judged: {:?}", node.quality);
             }
         }
         interesting_peers.sort_by(|x, y| y.quality.block_height.cmp(&x.quality.block_height));
+        println!("interesting peers = {}: {:?}", interesting_peers.len(), interesting_peers);
 
         // trim nodes close to us if any are > 10 blocks ahead
         if let Some(i) = interesting_peers
@@ -65,6 +69,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         {
             interesting_peers.truncate(i + 1);
         }
+        println!("interesting peers trimmed = {}", interesting_peers.len());
 
         interesting_peers
     }
@@ -84,6 +89,9 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
 
         info!("requested block information from {} peers", sync_nodes.len());
         let block_locator_hashes = self.block_locator_hashes().await;
+        for hash in block_locator_hashes.iter() {
+            println!("block locator hash = {}", hash);
+        }
         let mut sent = 0usize;
         let mut future_set = vec![];
         for peer in sync_nodes.iter() {
@@ -99,10 +107,11 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         sent
     }
 
-    async fn receive_messages<F: FnMut(SyncInbound) -> bool>(&mut self, timeout_sec: u64, mut handler: F) {
+    async fn receive_messages<F: FnMut(SyncInbound) -> bool>(&mut self, timeout_sec: u64, moving_timeout_sec: u64, mut handler: F) {
         let end = Instant::now() + Duration::from_secs(timeout_sec);
+        let mut moving_end = Instant::now() + Duration::from_secs(moving_timeout_sec);
         loop {
-            let timeout = tokio::time::sleep_until(end).fuse();
+            let timeout = tokio::time::sleep_until(end.min(moving_end)).fuse();
             pin_mut!(timeout);
             select! {
                 msg = self.incoming.recv().fuse() => {
@@ -112,6 +121,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
                     if handler(msg.unwrap()) {
                         break;
                     }
+                    moving_end = Instant::now() + Duration::from_secs(moving_timeout_sec);
                 },
                 _ = timeout => {
                     break;
@@ -121,10 +131,10 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
     }
 
     async fn receive_sync_hashes(&mut self, max_message_count: usize) -> HashMap<SocketAddr, Vec<BlockHeaderHash>> {
-        const TIMEOUT: u64 = 15;
+        const TIMEOUT: u64 = 5;
         let mut received_block_hashes = HashMap::new();
 
-        self.receive_messages(TIMEOUT, |msg| {
+        self.receive_messages(TIMEOUT, TIMEOUT, |msg| {
             match msg {
                 SyncInbound::BlockHashes(addr, hashes) => {
                     received_block_hashes.insert(addr, hashes);
@@ -139,7 +149,8 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         .await;
 
         info!(
-            "received block information from {} peers in {} seconds",
+            "received {} hashes from {} peers in {} seconds",
+            received_block_hashes.values().map(|x| x.len()).sum::<usize>(),
             received_block_hashes.len(),
             TIMEOUT
         );
@@ -151,7 +162,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         const TIMEOUT: u64 = 30;
         let mut blocks = vec![];
 
-        self.receive_messages(TIMEOUT, |msg| {
+        self.receive_messages(TIMEOUT, 4, |msg| {
             match msg {
                 SyncInbound::BlockHashes(_, _) => {
                     // late, ignored
@@ -171,17 +182,17 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
 
     fn order_block_hashes(input: &[(SocketAddr, Vec<BlockHeaderHash>)]) -> Vec<BlockHeaderHash> {
         let mut block_order = vec![];
+        let mut seen = HashSet::<&BlockHeaderHash>::new();
         let mut block_index = 0;
         loop {
             let mut found_row = false;
             for (_, hashes) in input {
                 if let Some(hash) = hashes.get(block_index) {
                     found_row = true;
-                    if let Some(last_hash) = block_order.last() {
-                        if last_hash == hash {
-                            continue;
-                        }
+                    if seen.contains(&hash) {
+                        continue;
                     }
+                    seen.insert(hash);
                     block_order.push(hash.clone());
                 }
             }
@@ -203,13 +214,15 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         block_peer_map
     }
 
-    async fn request_blocks(
-        &mut self,
+    fn get_peer_blocks(&mut self,
         blocks: &[BlockHeaderHash],
-        block_peer_map: &HashMap<BlockHeaderHash, Vec<SocketAddr>>,
-    ) -> usize {
+        block_peer_map: &HashMap<BlockHeaderHash, Vec<SocketAddr>>) -> (
+            Vec<SocketAddr>,
+            HashMap<BlockHeaderHash, SocketAddr>,
+            HashMap<SocketAddr, Vec<BlockHeaderHash>>,
+        ) {
         let mut peer_block_requests: HashMap<SocketAddr, Vec<BlockHeaderHash>> = HashMap::new();
-        let mut sent = 0usize;
+        let mut block_peers = HashMap::new();
         for block in blocks {
             let peers = block_peer_map.get(&block);
             if peers.is_none() {
@@ -219,29 +232,46 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
             if random_peer.is_none() {
                 continue;
             }
+            block_peers.insert(block.clone(), *random_peer.unwrap());
             peer_block_requests
                 .entry(random_peer.unwrap().clone())
                 .or_insert_with(|| vec![])
                 .push(block.clone());
         }
+        let addresses: Vec<SocketAddr> = peer_block_requests.keys().copied().collect();
+        (addresses, block_peers, peer_block_requests)
+    }
+
+    async fn request_blocks(
+        &mut self,
+        peer_block_requests: HashMap<SocketAddr, Vec<BlockHeaderHash>>,
+    ) -> usize {
+        let mut sent = 0usize;
 
         let mut future_set = vec![];
         for (addr, request) in peer_block_requests {
             if let Some(peer) = self.node.peer_book.get_peer_handle(addr) {
-                // break up requests so the peer wont try to send too large packets
-                // for hash in request {
-                //     let peer = peer.clone();
-                //     sent += 1;
-                //     future_set.push(async move { peer.send_payload(Payload::GetBlocks(vec![hash])).await; });
-                // }
                 sent += request.len();
                 future_set.push(async move {
+                    peer.expecting_sync_blocks(request.len() as u32).await;
                     peer.send_payload(Payload::GetBlocks(request)).await;
                 });
             }
         }
         futures::future::join_all(future_set).await;
         sent
+    }
+
+    async fn cancel_outstanding_syncs(&mut self, addresses: &[SocketAddr]) {
+        let mut future_set = vec![];
+        for addr in addresses {
+            if let Some(peer) = self.node.peer_book.get_peer_handle(*addr) {
+                future_set.push(async move {
+                    peer.cancel_sync().await;
+                });
+            }
+        }
+        futures::future::join_all(future_set).await;
     }
 
     pub async fn run(mut self) -> Result<(), NetworkError> {
@@ -259,13 +289,29 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
 
         let blocks = received_block_hashes.into_iter().collect::<Vec<_>>();
 
-        let block_order = Self::order_block_hashes(&blocks[..]);
+        let early_blocks = Self::order_block_hashes(&blocks[..]);
+        let early_blocks_count = early_blocks.len();
 
-        info!("requesting {} blocks for sync", block_order.len());
+        let ledger = &self.node.expect_sync().consensus.ledger;
+        let block_order: Vec<BlockHeaderHash> = early_blocks
+            .into_iter()
+            .filter(|x| !ledger.block_hash_exists(x))
+            .collect();
+
+        info!("requesting {} blocks for sync, received headers for {} known blocks", block_order.len(), early_blocks_count - block_order.len());
+        if block_order.is_empty() {
+            return Ok(());
+        }
 
         let block_peer_map = Self::block_peer_map(&blocks[..]);
 
-        let sent_block_requests = self.request_blocks(&block_order[..], &block_peer_map).await;
+        let (
+            peer_addresses,
+            block_peers,
+            peer_block_requests
+        ) = self.get_peer_blocks(&block_order[..], &block_peer_map);
+
+        let sent_block_requests = self.request_blocks(peer_block_requests).await;
 
         let received_blocks = self.receive_sync_blocks(sent_block_requests).await;
 
@@ -274,6 +320,8 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
             received_blocks.len(),
             sent_block_requests
         );
+
+        self.cancel_outstanding_syncs(&peer_addresses[..]).await;
 
         let mut blocks_by_hash = HashMap::new();
 
@@ -290,10 +338,11 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
                     .await?;
             } else {
                 warn!(
-                    "did not receive block {}/{} '{}' by deadline for sync",
+                    "did not receive block {}/{} '{}' by deadline for sync from {}",
                     i,
                     block_order.len(),
-                    hash
+                    hash,
+                    block_peers.get(hash).map(|x| x.to_string()).unwrap_or_default(),
                 );
             }
         }

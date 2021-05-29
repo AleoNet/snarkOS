@@ -37,11 +37,18 @@ impl Peer {
             self.set_connecting();
             match self.inner_connect(node.version()).await {
                 Err(e) => {
-                    self.quality.failures += 1;
-                    error!(
-                        "failed to send outgoing connection to peer '{}': '{:?}'",
-                        self.address, e
-                    );
+                    self.fail();
+                    if !e.is_trivial() {
+                        error!(
+                            "failed to send outgoing connection to peer '{}': '{:?}'",
+                            self.address, e
+                        );
+                    } else {
+                        warn!(
+                            "failed to send outgoing connection to peer '{}': '{:?}'",
+                            self.address, e
+                        );
+                    }
                 }
                 Ok(network) => {
                     self.set_connected();
@@ -54,11 +61,18 @@ impl Peer {
                         .await
                         .ok();
                     if let Err(e) = self.run(node, network, receiver).await {
-                        self.quality.failures += 1;
-                        error!(
-                            "unrecoverable failure communicating to outbound peer '{}': '{:?}'",
-                            self.address, e
-                        );
+                        if !e.is_trivial() {
+                            self.fail();
+                            error!(
+                                "unrecoverable failure communicating to outbound peer '{}': '{:?}'",
+                                self.address, e
+                            );
+                        } else {
+                            warn!(
+                                "unrecoverable failure communicating to outbound peer '{}': '{:?}'",
+                                self.address, e
+                            );
+                        }
                     }
                     metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
                 }

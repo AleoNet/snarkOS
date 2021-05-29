@@ -37,7 +37,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Fetch the number of connected and connecting peers.
         let active_peer_count = self.peer_book.get_active_peer_count() as usize;
 
-        trace!(
+        info!(
             "Connected to {} peer{}",
             active_peer_count,
             if active_peer_count == 1 { "" } else { "s" }
@@ -140,6 +140,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .copied()
         {
             let node = self.clone();
+            if node.peer_book.is_connected(bootnode_address) {
+                return;
+            }
             task::spawn(async move {
                 match node.initiate_connection(bootnode_address).await {
                     Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
@@ -302,7 +305,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         let max_peers = self.config.maximum_number_of_connected_peers() as usize;
 
-        if num_connected >= max_peers {
+        if num_connected > max_peers {
             warn!(
                 "Max number of connections ({} connected; max: {}) reached",
                 num_connected, max_peers

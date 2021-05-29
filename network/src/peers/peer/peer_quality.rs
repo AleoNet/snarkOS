@@ -19,7 +19,7 @@ use std::time::Instant;
 use chrono::{DateTime, Utc};
 use snarkos_storage::BlockHeight;
 
-#[derive(Debug, Default, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PeerQuality {
     pub block_height: BlockHeight,
     pub last_seen: Option<DateTime<Utc>>,
@@ -30,7 +30,9 @@ pub struct PeerQuality {
     /// The time it took to send a `Ping` to the peer and for it to respond with a `Pong`.
     pub rtt_ms: u64,
     /// The number of failures associated with the peer; grounds for dismissal.
-    pub failures: u32,
+    pub failures: Vec<DateTime<Utc>>,
+    /// number of requested sync blocks
+    pub total_sync_blocks: u32,
     /// The number of remaining blocks to sync with.
     pub remaining_sync_blocks: u32,
     pub num_messages_received: u64,
@@ -73,5 +75,6 @@ impl PeerQuality {
         self.disconnected_count += 1;
         self.expecting_pong = false;
         self.remaining_sync_blocks = 0;
+        self.total_sync_blocks = 0;
     }
 }
