@@ -120,9 +120,9 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         new_cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
 
         let old_commitments = old_cm_and_indices.into_iter().map(|(cm, _)| cm);
-        let new_commitments = new_cm_and_indices.into_iter().map(|(cm, _)| cm);
+        let new_commitments = new_cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
 
-        let new_tree = { self.cm_merkle_tree.read().rebuild(old_commitments, new_commitments)? };
+        let new_tree = { self.cm_merkle_tree.read().rebuild(old_commitments, &new_commitments[..])? };
         *self.cm_merkle_tree.write() = new_tree;
 
         Ok(())

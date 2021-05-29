@@ -18,14 +18,14 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.3.1"
+version = "0.4.0"
 default-features = false
 
 [dependencies.snarkvm-parameters]
-version = "0.3.1"
+version = "0.4.0"
 
 [dependencies.snarkvm-utilities]
-version = "0.3.1"
+version = "0.4.0"
 default-features = false
 
 [dependencies.curl]
@@ -33,19 +33,19 @@ version = "0.4.36"
 optional = true
 
 [dev-dependencies.snarkvm-curves]
-version = "0.3.1"
+version = "0.4.0"
 
 [dev-dependencies.snarkvm-dpc]
-version = "0.3.1"
+version = "0.4.0"
 
 [dev-dependencies.snarkvm-marlin]
-version = "0.3.1"
+version = "0.4.0"
 
 [dev-dependencies.snarkvm-objects]
-version = "0.3.1"
+version = "0.4.0"
 
 [dev-dependencies.snarkvm-posw]
-version = "0.3.1"
+version = "0.4.0"
 
 [dev-dependencies.snarkos-consensus]
 path = "../consensus"
