@@ -46,6 +46,8 @@ pub mod node;
 pub mod peers;
 pub mod sync;
 
+pub mod topology;
+
 /// The maximum number of block hashes that can be requested or provided in a single batch.
 pub const MAX_BLOCK_SYNC_COUNT: u32 = 64;
 /// The maximum amount of time allowed to process a single batch of sync blocks. It should be aligned
