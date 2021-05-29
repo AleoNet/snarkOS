@@ -18,10 +18,8 @@ use std::sync::Arc;
 
 use criterion::*;
 use rand::Rng;
-use snarkvm_algorithms::{CRH, MerkleParameters, merkle_tree::MerkleTree};
-use snarkvm_dpc::{
-    base_dpc::instantiated::*,
-};
+use snarkvm_algorithms::{merkle_tree::MerkleTree, MerkleParameters, CRH};
+use snarkvm_dpc::base_dpc::instantiated::*;
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
@@ -30,7 +28,8 @@ fn merkle_build(c: &mut Criterion) {
         <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
             .expect("read bytes as hash for MerkleParameters in ledger");
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
-    let ledger_merkle_tree_parameters: Arc<CommitmentMerkleParameters> = Arc::new(From::from(merkle_tree_hash_parameters));
+    let ledger_merkle_tree_parameters: Arc<CommitmentMerkleParameters> =
+        Arc::new(From::from(merkle_tree_hash_parameters));
 
     let mut commitments = Vec::with_capacity(10000);
     for _ in 0..10000 {
@@ -39,9 +38,7 @@ fn merkle_build(c: &mut Criterion) {
         commitments.push(buf);
     }
 
-
     c.bench_function("merkle_build", move |b| {
-
         b.iter(|| {
             MerkleTree::new(ledger_merkle_tree_parameters.clone(), &commitments[..]).unwrap();
         });
