@@ -28,12 +28,7 @@ impl TestBlocks {
     }
 
     pub fn load(count: usize) -> Self {
-        TestBlocks::read(&include_bytes!("../sync/test_blocks")[..], count).unwrap()
-    }
-
-    // TODO: implement Deref?
-    pub fn inner(&self) -> Vec<Block<Tx>> {
-        self.0.clone()
+        TestBlocks::read(&include_bytes!("../sync/test_blocks_100")[..], count).unwrap()
     }
 
     pub fn write<W: Write>(&self, mut writer: W) -> Result<()> {
