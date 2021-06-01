@@ -54,12 +54,6 @@ fn mine_block<S: Storage>(
     let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
-    // Duplicate blocks dont do anything
-    miner.consensus.receive_block(&block)?;
-
-    let new_block_height = miner.consensus.ledger.get_current_block_height();
-    assert_eq!(old_block_height + 1, new_block_height);
-
     Ok((block, coinbase_records))
 }
 
