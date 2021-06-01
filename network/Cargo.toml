@@ -84,6 +84,9 @@ version = "0.1"
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.nalgebra]
+version = "0.26"
+
 [dependencies.once_cell]
 version = "1.5.2"
 
@@ -144,8 +147,6 @@ version = "0.1"
 [dev-dependencies.snarkos-testing]
 path = "../testing"
 
-[dev-dependencies.nalgebra]
-version = "0.27"
 
 [dev-dependencies.peak_alloc]
 version = "0.1.0"
