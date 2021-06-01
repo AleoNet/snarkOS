@@ -18,7 +18,7 @@
 extern crate tracing;
 
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
-use snarkos_testing::{network::TestBlocks, sync::*};
+use snarkos_testing::sync::*;
 use snarkvm_dpc::{
     base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
     Account,
@@ -146,9 +146,11 @@ pub fn main() {
         .with_target(false)
         .init();
 
-    info!("Setting up test data");
-    let test_blocks = mine_blocks(10).unwrap();
+    let block_count = 100;
 
-    let file = std::io::BufWriter::new(File::create(PathBuf::from("test_blocks")).expect("could not open file"));
+    info!("Setting up test data");
+    let test_blocks = mine_blocks(block_count).unwrap();
+
+    let file = std::io::BufWriter::new(File::create(PathBuf::from(format!("test_blocks_{}", block_count))).expect("could not open file"));
     test_blocks.write(file).expect("could not write to file");
 }
