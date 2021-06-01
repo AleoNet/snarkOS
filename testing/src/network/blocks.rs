@@ -28,7 +28,7 @@ impl TestBlocks {
     }
 
     pub fn load(count: usize) -> Self {
-        TestBlocks::read(&include_bytes!("test_blocks")[..], count).unwrap()
+        TestBlocks::read(&include_bytes!("../sync/test_blocks")[..], count).unwrap()
     }
 
     // TODO: implement Deref?
