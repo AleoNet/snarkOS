@@ -108,6 +108,7 @@ pub struct TestSetup {
 }
 
 impl TestSetup {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         node_id: u64,
         socket_address: SocketAddr,
