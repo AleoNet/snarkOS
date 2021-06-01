@@ -93,7 +93,7 @@ version = "3.0.2"
 version = "0.4.1"
 
 [dependencies.metrics]
-version = "0.15"
+version = "0.16"
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.4"
