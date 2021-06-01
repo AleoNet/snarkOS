@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-testing"
-version = "1.3.6"
+version = "1.3.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Testing suite for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -51,20 +51,20 @@ version = "0.4.0"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
-version = "1.3.6"
+version = "1.3.7"
 
 [dependencies.snarkos-network]
 path = "../network"
-version = "1.3.6"
+version = "1.3.7"
 optional = true
 
 [dependencies.snarkos-parameters]
 path = "../parameters"
-version = "1.3.6"
+version = "1.3.7"
 
 [dependencies.snarkos-storage]
 path = "../storage"
-version = "1.3.6"
+version = "1.3.7"
 default-features = false
 features = [ "test" ]
 
