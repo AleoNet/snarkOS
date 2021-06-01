@@ -56,7 +56,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
         }
 
         let leaves: &[[u8; 32]] = &[];
-        let empty_cm_merkle_tree = MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), leaves.iter())?;
+        let empty_cm_merkle_tree = MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), leaves)?;
 
         let ledger_storage = Self {
             current_block_height: Default::default(),

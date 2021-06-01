@@ -134,7 +134,9 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
 
                 let mut cm_and_indices = vec![];
 
-                for (commitment_key, index_value) in storage.get_col(COL_COMMITMENT)? {
+                let cms = storage.get_col(COL_COMMITMENT)?;
+
+                for (commitment_key, index_value) in cms {
                     let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
                     let index = bytes_to_u32(&index_value) as usize;
 
@@ -142,9 +144,9 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
                 }
 
                 cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
-                let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm);
+                let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
 
-                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), commitments)?;
+                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments[..])?;
 
                 Ok(Self {
                     current_block_height: AtomicU32::new(bytes_to_u32(&val)),
