@@ -151,6 +151,8 @@ pub fn main() {
     info!("Setting up test data");
     let test_blocks = mine_blocks(block_count).unwrap();
 
-    let file = std::io::BufWriter::new(File::create(PathBuf::from(format!("test_blocks_{}", block_count))).expect("could not open file"));
+    let file = std::io::BufWriter::new(
+        File::create(PathBuf::from(format!("test_blocks_{}", block_count))).expect("could not open file"),
+    );
     test_blocks.write(file).expect("could not write to file");
 }
