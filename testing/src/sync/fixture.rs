@@ -23,11 +23,11 @@ use snarkos_parameters::GenesisBlock;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, BaseDPCComponents, NoopProgram},
+    testnet1::{instantiated::*, BaseDPCComponents, NoopProgram},
     Account,
     DPCScheme,
 };
-use snarkvm_objects::{Block, Storage};
+use snarkvm_dpc::{Block, Storage};
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},

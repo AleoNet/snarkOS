@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::Config;
-use snarkvm_dpc::{base_dpc::instantiated::Components, AccountAddress};
+use snarkvm_dpc::{testnet1::instantiated::Components, AccountAddress};
 
 use colored::*;
 use std::str::FromStr;

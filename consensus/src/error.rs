@@ -16,7 +16,7 @@
 
 use snarkvm_algorithms::errors::CRHError;
 use snarkvm_dpc::DPCError;
-use snarkvm_objects::{BlockError, StorageError, TransactionError};
+use snarkvm_dpc::{BlockError, StorageError, TransactionError};
 use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;

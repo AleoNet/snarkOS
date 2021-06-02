@@ -19,11 +19,11 @@ use snarkos_profiler::{end_timer, start_timer};
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, program::NoopProgram, BaseDPCComponents},
+    testnet1::{instantiated::*, program::NoopProgram, BaseDPCComponents},
     DPCScheme,
-    Program,
+    ProgramScheme,
 };
-use snarkvm_objects::{BlockHeader, MerkleRootHash, Network, PedersenMerkleRootHash, Storage};
+use snarkvm_dpc::{BlockHeader, MerkleRootHash, Network, PedersenMerkleRootHash, Storage};
 use snarkvm_posw::{Marlin, PoswMarlin};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
@@ -176,7 +176,7 @@ mod tests {
     use crate::get_block_reward;
     use rand::{thread_rng, Rng};
     use snarkos_testing::sync::DATA;
-    use snarkvm_objects::{BlockHeaderHash, PedersenMerkleRootHash};
+    use snarkvm_dpc::{BlockHeaderHash, PedersenMerkleRootHash};
 
     #[test]
     fn test_block_rewards() {

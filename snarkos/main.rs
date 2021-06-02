@@ -29,10 +29,10 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_dpc::{
-    base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
+    testnet1::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
     AccountAddress,
 };
-use snarkvm_objects::{Network, Storage};
+use snarkvm_dpc::{Network, Storage};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
@@ -125,11 +125,11 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         info!("Loaded Aleo parameters");
 
         // Fetch the set of valid inner circuit IDs.
-        let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerificationParameters =
+        let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerifyingKey =
             dpc_parameters.inner_snark_parameters.1.clone().into();
         let inner_snark_id = dpc_parameters
             .system_parameters
-            .inner_snark_verification_key_crh
+            .inner_circuit_id_crh
             .hash(&to_bytes![inner_snark_vk]?)?;
 
         let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];

@@ -18,12 +18,12 @@ mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, Miner};
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{
-        base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
+        block::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
         DPCScheme,
         Program,
         Record,
     };
-    use snarkvm_objects::{dpc::DPCTransactions, Block, LedgerScheme};
+    use snarkvm_dpc::{dpc::DPCTransactions, Block, LedgerScheme};
     use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
     use std::sync::Arc;

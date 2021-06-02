@@ -26,7 +26,7 @@ mod protected_rpc_tests {
     };
 
     use snarkvm_dpc::{
-        base_dpc::{
+        block::{
             instantiated::{Components, Tx},
             record::DPCRecord,
             TransactionKernel,

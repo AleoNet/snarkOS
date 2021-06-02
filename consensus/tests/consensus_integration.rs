@@ -17,8 +17,8 @@
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::base_dpc::instantiated::Tx;
-    use snarkvm_objects::{dpc::DPCTransactions, BlockHeader};
+    use snarkvm_dpc::block::instantiated::Tx;
+    use snarkvm_dpc::{dpc::DPCTransactions, BlockHeader};
     use snarkvm_posw::txids_to_roots;
 
     use std::sync::Arc;
@@ -35,7 +35,7 @@ mod consensus_integration {
         let expected_prev_block_hash = parent_header.get_hash();
         assert_eq!(header.previous_block_hash, expected_prev_block_hash);
 
-        let expected_merkle_root_hash = snarkvm_objects::merkle_root(&transactions.to_transaction_ids().unwrap());
+        let expected_merkle_root_hash = snarkvm_dpc::merkle_root(&transactions.to_transaction_ids().unwrap());
         assert_eq!(&header.merkle_root_hash.0[..], &expected_merkle_root_hash[..]);
 
         // generate the verifier args

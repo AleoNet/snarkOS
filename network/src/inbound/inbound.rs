@@ -19,7 +19,7 @@ use crate::{errors::NetworkError, message::*, stats, Cache, ConnReader, ConnWrit
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
-use snarkvm_objects::Storage;
+use snarkvm_dpc::Storage;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},

@@ -16,7 +16,7 @@
 
 use crate::*;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{
+use snarkvm_dpc::{
     Block,
     BlockError,
     BlockHeader,
@@ -25,13 +25,13 @@ use snarkvm_objects::{
     Op,
     Storage,
     StorageError,
-    Transaction,
+    TransactionScheme,
 };
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 use std::sync::atomic::Ordering;
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Commit a transaction to the canon chain
     #[allow(clippy::type_complexity)]
     pub(crate) fn commit_transaction(

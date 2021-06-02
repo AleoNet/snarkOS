@@ -26,7 +26,7 @@ use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
 
 use snarkvm_dpc::instantiated::Tx;
-use snarkvm_objects::block_header_hash::BlockHeaderHash;
+use snarkvm_dpc::block_header_hash::BlockHeaderHash;
 #[cfg(test)]
 use snarkvm_utilities::FromBytes;
 
@@ -105,7 +105,7 @@ async fn block_responder_side() {
     assert!(matches!(payload, Payload::Ping(..)));
 
     // insert block into node
-    let block_struct_1 = snarkvm_objects::Block::deserialize(&BLOCK_1).unwrap();
+    let block_struct_1 = snarkvm_dpc::Block::deserialize(&BLOCK_1).unwrap();
     node.expect_sync().consensus.receive_block(&block_struct_1).unwrap();
 
     // send a GetSync with an empty vec as only the genesis block is in the ledger
@@ -136,7 +136,7 @@ async fn block_responder_side() {
     } else {
         unreachable!();
     };
-    let block = snarkvm_objects::Block::deserialize(&block).unwrap();
+    let block = snarkvm_dpc::Block::deserialize(&block).unwrap();
 
     assert_eq!(block, block_struct_1);
 }

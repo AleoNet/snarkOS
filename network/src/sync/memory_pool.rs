@@ -16,8 +16,8 @@
 
 use crate::{message::*, NetworkError, Node};
 use snarkos_consensus::memory_pool::Entry;
-use snarkvm_dpc::base_dpc::instantiated::Tx;
-use snarkvm_objects::Storage;
+use snarkvm_dpc::testnet1::instantiated::Tx;
+use snarkvm_dpc::Storage;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

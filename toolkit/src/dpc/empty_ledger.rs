@@ -15,16 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
-use snarkvm_objects::{Block, LedgerScheme, Transaction};
+use snarkvm_dpc::{Block, LedgerScheme, TransactionScheme};
 
 use std::{marker::PhantomData, path::Path, sync::Arc};
 
-pub struct EmptyLedger<T: Transaction, P: LoadableMerkleParameters> {
+pub struct EmptyLedger<T: TransactionScheme, P: LoadableMerkleParameters> {
     parameters: Arc<P>,
     _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T, P> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T, P> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type MerkleParameters = P;
@@ -76,7 +76,7 @@ impl<T: Transaction, P: LoadableMerkleParameters> LedgerScheme for EmptyLedger<T
     }
 
     /// Returns true if the given memo exists in the ledger.
-    fn contains_memo(&self, _memo: &<Self::Transaction as Transaction>::Memorandum) -> bool {
+    fn contains_memo(&self, _memo: &<Self::Transaction as TransactionScheme>::Memorandum) -> bool {
         false
     }
 

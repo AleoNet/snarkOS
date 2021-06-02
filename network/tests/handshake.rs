@@ -21,7 +21,7 @@ use snarkos_testing::{
     wait_until,
 };
 
-use snarkvm_objects::block_header_hash::BlockHeaderHash;
+use snarkvm_dpc::block_header_hash::BlockHeaderHash;
 
 use std::time::Duration;
 

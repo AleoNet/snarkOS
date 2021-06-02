@@ -17,7 +17,7 @@
 use crate::*;
 use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
 use snarkvm_dpc::LedgerError;
-use snarkvm_objects::{Block, LedgerScheme, Storage, Transaction};
+use snarkvm_dpc::{Block, LedgerScheme, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -26,7 +26,7 @@ use snarkvm_utilities::{
 use parking_lot::RwLock;
 use std::{fs, marker::PhantomData, path::Path, sync::Arc};
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> LedgerScheme for Ledger<T, P, S> {
     type Block = Block<Self::Transaction>;
     type Commitment = T::Commitment;
     type MerkleParameters = P;
@@ -103,7 +103,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
     }
 
     /// Returns true if the given memo exists in the ledger.
-    fn contains_memo(&self, memo: &<Self::Transaction as Transaction>::Memorandum) -> bool {
+    fn contains_memo(&self, memo: &<Self::Transaction as TransactionScheme>::Memorandum) -> bool {
         self.storage.exists(COL_MEMO, &to_bytes![memo].unwrap())
     }
 

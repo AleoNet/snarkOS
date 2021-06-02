@@ -17,12 +17,12 @@
 use snarkos_consensus::MerkleTreeLedger;
 use snarkvm_algorithms::{MerkleParameters, CRH};
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, parameters::PublicParameters},
+    testnet1::{instantiated::*, parameters::PublicParameters},
     Account,
     AccountScheme,
     DPCScheme,
 };
-use snarkvm_objects::Storage;
+use snarkvm_dpc::Storage;
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 

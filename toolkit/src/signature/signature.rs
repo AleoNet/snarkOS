@@ -18,7 +18,7 @@ use crate::{account::PrivateKey, errors::SignatureError, signature::SignaturePub
 
 use snarkvm_algorithms::SignatureScheme;
 use snarkvm_dpc::{
-    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    testnet1::{instantiated::Components, parameters::SystemParameters},
     DPCComponents,
 };
 use snarkvm_utilities::{

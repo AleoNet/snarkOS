@@ -16,7 +16,7 @@
 
 use crate::errors::DPCError;
 
-use snarkvm_dpc::base_dpc::{instantiated::Components, DPCRecord};
+use snarkvm_dpc::testnet1::{instantiated::Components, Record as DPCRecord};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

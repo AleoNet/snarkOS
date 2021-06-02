@@ -16,10 +16,10 @@
 
 use crate::{Ledger, COL_BLOCK_HEADER};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, Storage, Transaction};
+use snarkvm_dpc::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, Storage, TransactionScheme};
 use snarkvm_utilities::FromBytes;
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Returns true if the block for the given block header hash exists.
     pub fn block_hash_exists(&self, block_hash: &BlockHeaderHash) -> bool {
         if self.is_empty() {

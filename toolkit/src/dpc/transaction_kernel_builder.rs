@@ -21,15 +21,14 @@ use crate::{
 };
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    base_dpc::{
+    testnet1::{
         instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
         parameters::{NoopProgramSNARKParameters, SystemParameters},
-        record_payload::RecordPayload,
         TransactionKernel as TransactionKernelNative,
     },
     DPCComponents,
     DPCScheme,
-    Record as RecordScheme,
+    RecordScheme,
     *,
 };
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
@@ -264,7 +263,7 @@ impl TransactionKernel {
                 address,
                 true, // The input record is dummy
                 0,
-                RecordPayload::default(),
+                Default::default(),
                 noop_program_id.clone(),
                 noop_program_id.clone(),
                 rng,
@@ -314,7 +313,7 @@ impl TransactionKernel {
 
         let new_birth_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_death_program_ids = vec![noop_program_id; Components::NUM_OUTPUT_RECORDS];
-        let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![Default::default(); Components::NUM_OUTPUT_RECORDS];
 
         // Generate a random memo
         let memo = rng.gen();

@@ -26,12 +26,12 @@ use snarkos_toolkit::{
 };
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    base_dpc::{
+    testnet1::{
         encrypted_record::EncryptedRecord,
         instantiated::{Components, InstantiatedDPC},
-        record::DPCRecord,
+        record::Record as DPCRecord,
         record_encryption::RecordEncryption,
-        record_payload::RecordPayload,
+        payload::Payload as RecordPayload,
         TransactionKernel,
     },
     Account,
@@ -41,9 +41,9 @@ use snarkvm_dpc::{
     AccountViewKey,
     DPCComponents,
     DPCScheme,
-    Record as RecordModel,
+    RecordScheme as RecordModel,
 };
-use snarkvm_objects::Storage;
+use snarkvm_dpc::Storage;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

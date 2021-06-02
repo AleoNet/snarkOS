@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_objects::Storage;
+use snarkvm_dpc::Storage;
 
 use chrono::{DateTime, Utc};
 use metrics::{register_counter, register_gauge};

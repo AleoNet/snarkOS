@@ -16,7 +16,7 @@
 
 use crate::{account::PrivateKey, errors::ViewKeyError};
 use snarkvm_dpc::{
-    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    testnet1::{instantiated::Components, parameters::SystemParameters},
     AccountViewKey,
 };
 

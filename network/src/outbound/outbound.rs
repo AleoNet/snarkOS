@@ -16,7 +16,7 @@
 
 use crate::{stats, ConnWriter, Direction, Message, NetworkError, Node, Payload};
 
-use snarkvm_objects::Storage;
+use snarkvm_dpc::Storage;
 
 use std::{collections::HashMap, net::SocketAddr};
 

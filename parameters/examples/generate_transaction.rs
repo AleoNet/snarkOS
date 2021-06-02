@@ -18,7 +18,7 @@ use snarkos_consensus::{Consensus, ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters, MerkleParameters, CRH};
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, record_payload::RecordPayload, DPC},
+    block::{instantiated::*, record_payload::RecordPayload, DPC},
     Account,
     AccountAddress,
     AccountScheme,
@@ -27,7 +27,7 @@ use snarkvm_dpc::{
     DPCScheme,
     LedgerError,
 };
-use snarkvm_objects::{Network, Storage, Transaction};
+use snarkvm_dpc::{Network, Storage, Transaction};
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{

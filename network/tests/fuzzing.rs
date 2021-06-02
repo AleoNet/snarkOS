@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 use snarkos_network::{MessageHeader, Payload, Version};
-use snarkvm_objects::BlockHeaderHash;
+use snarkvm_dpc::BlockHeaderHash;
 
 use rand::{distributions::Standard, thread_rng, Rng};
 use snarkos_testing::{

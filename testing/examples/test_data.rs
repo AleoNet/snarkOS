@@ -17,13 +17,13 @@
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
+    block::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
     Account,
     AccountAddress,
     Program,
     Record,
 };
-use snarkvm_objects::{dpc::DPCTransactions, Block, Storage};
+use snarkvm_dpc::{dpc::DPCTransactions, Block, Storage};
 use snarkvm_utilities::bytes::ToBytes;
 
 use rand::Rng;

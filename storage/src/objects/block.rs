@@ -16,22 +16,22 @@
 
 use crate::*;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{
+use snarkvm_dpc::{
     Block,
     BlockError,
     BlockHeaderHash,
-    DPCTransactions,
+    Transactions as DPCTransactions,
     DatabaseTransaction,
     Op,
     Storage,
     StorageError,
-    Transaction,
+    TransactionScheme,
 };
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the latest block in the chain.
     pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
         self.get_block_from_block_number(self.get_current_block_height())
