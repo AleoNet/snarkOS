@@ -108,7 +108,6 @@ impl PeerBook {
     }
 
     pub fn get_active_peer_count(&self) -> u32 {
-        println!("{} {}", self.connected_peers.len(), self.pending_connections());
         self.connected_peers.len() as u32 + self.pending_connections()
     }
 
