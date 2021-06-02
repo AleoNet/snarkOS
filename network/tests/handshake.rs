@@ -286,7 +286,7 @@ async fn handshake_timeout_responder_side() {
     let _fake_peer = TcpStream::connect(node_addr).await.unwrap();
 
     // the node should initally accept the connection
-    wait_until!(3, node.peer_book.number_of_connecting_peers() == 1 as u16);
+    wait_until!(3, node.peer_book.number_of_connecting_peers() == 1u16);
 
     // but since it won't conclude the handshake, it should be dropped after the handshake deadline
     wait_until!(
