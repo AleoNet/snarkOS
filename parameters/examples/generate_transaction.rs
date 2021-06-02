@@ -18,7 +18,7 @@ use snarkos_consensus::{Consensus, ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters, MerkleParameters, CRH};
 use snarkvm_dpc::{
-    block::{instantiated::*, record_payload::RecordPayload, DPC},
+    testnet1::{instantiated::*, payload::Payload as RecordPayload, DPC},
     Account,
     AccountAddress,
     AccountScheme,
@@ -28,7 +28,7 @@ use snarkvm_dpc::{
     LedgerError,
     Network,
     Storage,
-    Transaction,
+    TransactionScheme,
 };
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
@@ -49,7 +49,7 @@ use std::{
 };
 
 /// Generate a blank ledger to facilitate generation of the genesis block
-fn empty_ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
+fn empty_ledger<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage>(
     parameters: Arc<P>,
     path: &Path,
 ) -> Result<Ledger<T, P, S>, LedgerError> {

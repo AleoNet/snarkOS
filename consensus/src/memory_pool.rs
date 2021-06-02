@@ -246,7 +246,7 @@ impl<T: TransactionScheme> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{block::instantiated::Tx, Block};
+    use snarkvm_dpc::{testnet1::instantiated::Tx, Block};
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 

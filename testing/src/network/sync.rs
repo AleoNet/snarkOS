@@ -25,7 +25,7 @@ use crate::{
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
 
-use snarkvm_dpc::{block_header_hash::BlockHeaderHash, instantiated::Tx};
+use snarkvm_dpc::{block_header_hash::BlockHeaderHash, testnet1::instantiated::Tx};
 #[cfg(test)]
 use snarkvm_utilities::FromBytes;
 
@@ -291,7 +291,7 @@ async fn transaction_responder_side() {
 #[tokio::test]
 async fn transaction_two_node() {
     use snarkos_consensus::memory_pool::Entry;
-    use snarkvm_dpc::instantiated::Tx;
+    use snarkvm_dpc::testnet1::instantiated::Tx;
     use snarkvm_utilities::bytes::FromBytes;
 
     let node_alice = test_node(TestSetup::default()).await;

@@ -18,13 +18,13 @@ mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, Miner};
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{
-        block::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
-        dpc::DPCTransactions,
+        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record as DPCRecord},
         Block,
         DPCScheme,
         LedgerScheme,
-        Program,
-        Record,
+        ProgramScheme,
+        RecordScheme,
+        Transactions as DPCTransactions,
     };
     use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
