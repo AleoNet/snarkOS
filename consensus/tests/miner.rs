@@ -22,8 +22,7 @@ mod miner {
         encryption::EncryptionScheme,
         signature::SignatureScheme,
     };
-    use snarkvm_dpc::{AccountAddress, AccountPrivateKey, DPCComponents};
-    use snarkvm_dpc::{dpc::DPCTransactions, BlockHeader};
+    use snarkvm_dpc::{dpc::DPCTransactions, AccountAddress, AccountPrivateKey, BlockHeader, DPCComponents};
     use snarkvm_posw::txids_to_roots;
 
     use rand::{Rng, SeedableRng};

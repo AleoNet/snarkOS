@@ -17,13 +17,8 @@
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{testnet1::instantiated::Components, DPCComponents};
-use snarkvm_dpc::{Network, TransactionScheme, TransactionError};
-use snarkvm_parameters::{
-    global::InnerCircuitIDCRH,
-    testnet1::InnerSNARKVKParameters,
-    Parameter,
-};
+use snarkvm_dpc::{testnet1::instantiated::Components, DPCComponents, Network, TransactionError, TransactionScheme};
+use snarkvm_parameters::{global::InnerCircuitIDCRH, testnet1::InnerSNARKVKParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 

@@ -20,12 +20,12 @@ use snarkvm_dpc::{
     Block,
     BlockError,
     BlockHeaderHash,
-    Transactions as DPCTransactions,
     DatabaseTransaction,
     Op,
     Storage,
     StorageError,
     TransactionScheme,
+    Transactions as DPCTransactions,
 };
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 

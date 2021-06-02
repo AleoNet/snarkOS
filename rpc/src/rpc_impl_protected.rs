@@ -29,9 +29,9 @@ use snarkvm_dpc::{
     testnet1::{
         encrypted_record::EncryptedRecord,
         instantiated::{Components, InstantiatedDPC},
+        payload::Payload as RecordPayload,
         record::Record as DPCRecord,
         record_encryption::RecordEncryption,
-        payload::Payload as RecordPayload,
         TransactionKernel,
     },
     Account,
@@ -42,8 +42,8 @@ use snarkvm_dpc::{
     DPCComponents,
     DPCScheme,
     RecordScheme as RecordModel,
+    Storage,
 };
-use snarkvm_dpc::Storage;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

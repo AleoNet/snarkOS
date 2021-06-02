@@ -19,10 +19,14 @@ use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{instantiated::*, Record as DPCRecord},
     AccountAddress,
+    Block,
+    BlockHeader,
     DPCScheme,
     RecordScheme,
+    Storage,
+    TransactionScheme,
+    Transactions as DPCTransactions,
 };
-use snarkvm_dpc::{Transactions as DPCTransactions, Block, BlockHeader, Storage, TransactionScheme};
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 

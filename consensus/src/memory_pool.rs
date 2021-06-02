@@ -21,7 +21,7 @@
 use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{Transactions as DPCTransactions, BlockHeader, LedgerScheme, Storage, TransactionScheme};
+use snarkvm_dpc::{BlockHeader, LedgerScheme, Storage, TransactionScheme, Transactions as DPCTransactions};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -246,8 +246,7 @@ impl<T: TransactionScheme> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::block::instantiated::Tx;
-    use snarkvm_dpc::Block;
+    use snarkvm_dpc::{block::instantiated::Tx, Block};
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 

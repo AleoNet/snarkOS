@@ -19,11 +19,13 @@ mod consensus_dpc {
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{
         block::{instantiated::*, record::DPCRecord, record_payload::RecordPayload},
+        dpc::DPCTransactions,
+        Block,
         DPCScheme,
+        LedgerScheme,
         Program,
         Record,
     };
-    use snarkvm_dpc::{dpc::DPCTransactions, Block, LedgerScheme};
     use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
     use std::sync::Arc;

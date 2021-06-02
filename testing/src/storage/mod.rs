@@ -17,8 +17,13 @@
 use crate::sync::TestTx;
 pub use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
-use snarkvm_dpc::testnet1::instantiated::CommitmentMerkleParameters;
-use snarkvm_dpc::{Block, LedgerScheme, Storage, TransactionScheme};
+use snarkvm_dpc::{
+    testnet1::instantiated::CommitmentMerkleParameters,
+    Block,
+    LedgerScheme,
+    Storage,
+    TransactionScheme,
+};
 
 use rand::{thread_rng, Rng};
 use std::sync::Arc;

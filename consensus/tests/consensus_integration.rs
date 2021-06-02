@@ -17,8 +17,7 @@
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::block::instantiated::Tx;
-    use snarkvm_dpc::{dpc::DPCTransactions, BlockHeader};
+    use snarkvm_dpc::{block::instantiated::Tx, dpc::DPCTransactions, BlockHeader};
     use snarkvm_posw::txids_to_roots;
 
     use std::sync::Arc;

@@ -15,8 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_parameters::GenesisBlock;
-use snarkvm_dpc::testnet1::{instantiated::*, record::Record as DPCRecord};
-use snarkvm_dpc::{Block, BlockHeader};
+use snarkvm_dpc::{
+    testnet1::{instantiated::*, record::Record as DPCRecord},
+    Block,
+    BlockHeader,
+};
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},

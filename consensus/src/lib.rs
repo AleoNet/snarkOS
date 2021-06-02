@@ -58,11 +58,14 @@ pub mod parameters;
 pub use parameters::*;
 
 use snarkos_storage::Ledger;
-use snarkvm_dpc::testnet1::{
-    instantiated::{CommitmentMerkleParameters, Tx},
-    transaction::amount::AleoAmount,
+use snarkvm_dpc::{
+    testnet1::{
+        instantiated::{CommitmentMerkleParameters, Tx},
+        transaction::amount::AleoAmount,
+    },
+    BlockHeader,
+    BlockHeaderHash,
 };
-use snarkvm_dpc::{BlockHeader, BlockHeaderHash};
 
 pub type MerkleTreeLedger<S> = Ledger<Tx, CommitmentMerkleParameters, S>;
 

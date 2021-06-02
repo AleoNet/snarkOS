@@ -21,11 +21,15 @@
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_network::{Node, Sync, NODE_STATS};
-use snarkvm_dpc::testnet1::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
+use snarkvm_dpc::{
+    testnet1::{
+        instantiated::{Components, Tx},
+        parameters::PublicParameters,
+    },
+    BlockHeaderHash,
+    Storage,
+    TransactionScheme,
 };
-use snarkvm_dpc::{BlockHeaderHash, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

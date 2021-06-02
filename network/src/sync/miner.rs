@@ -16,8 +16,7 @@
 
 use crate::{stats, Node, State};
 use snarkos_consensus::Miner;
-use snarkvm_dpc::{testnet1::instantiated::*, AccountAddress};
-use snarkvm_dpc::Storage;
+use snarkvm_dpc::{testnet1::instantiated::*, AccountAddress, Storage};
 
 use tracing::*;
 

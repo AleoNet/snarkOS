@@ -21,8 +21,8 @@ use snarkvm_dpc::{
     Account,
     AccountScheme,
     DPCScheme,
+    Storage,
 };
-use snarkvm_dpc::Storage;
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 

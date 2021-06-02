@@ -15,8 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::DPCError;
-use snarkvm_dpc::{BlockError, StorageError, TransactionError};
+use snarkvm_dpc::{BlockError, DPCError, StorageError, TransactionError};
 use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;

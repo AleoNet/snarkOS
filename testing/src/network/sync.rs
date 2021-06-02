@@ -25,8 +25,7 @@ use crate::{
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
 
-use snarkvm_dpc::instantiated::Tx;
-use snarkvm_dpc::block_header_hash::BlockHeaderHash;
+use snarkvm_dpc::{block_header_hash::BlockHeaderHash, instantiated::Tx};
 #[cfg(test)]
 use snarkvm_utilities::FromBytes;
 

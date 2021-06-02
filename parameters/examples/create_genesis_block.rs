@@ -16,8 +16,8 @@
 
 use snarkos_parameters::transaction_1::Transaction1;
 
-use snarkvm_dpc::block::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
 use snarkvm_dpc::{
+    block::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents},
     BlockHeader,
     BlockHeaderHash,
     DPCTransactions,

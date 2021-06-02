@@ -17,11 +17,13 @@
 use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::BlockHeight;
-use snarkvm_dpc::testnet1::{
-    instantiated::{Components, Tx},
-    parameters::PublicParameters,
+use snarkvm_dpc::{
+    testnet1::{
+        instantiated::{Components, Tx},
+        parameters::PublicParameters,
+    },
+    Storage,
 };
-use snarkvm_dpc::Storage;
 
 use parking_lot::{Mutex, RwLock};
 use std::{

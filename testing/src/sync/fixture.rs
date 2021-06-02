@@ -25,9 +25,10 @@ use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{instantiated::*, BaseDPCComponents, NoopProgram},
     Account,
+    Block,
     DPCScheme,
+    Storage,
 };
-use snarkvm_dpc::{Block, Storage};
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},

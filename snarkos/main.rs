@@ -31,8 +31,9 @@ use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
     AccountAddress,
+    Network,
+    Storage,
 };
-use snarkvm_dpc::{Network, Storage};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, ToBytes};
 

@@ -23,7 +23,7 @@ use snarkvm_dpc::{
     testnet1::{
         instantiated::Components,
         parameters::SystemParameters,
-        record::{Record as DPCRecord, EncryptedRecord, RecordEncryption},
+        record::{EncryptedRecord, Record as DPCRecord, RecordEncryption},
         DPC,
     },
     RecordScheme as RecordTrait,

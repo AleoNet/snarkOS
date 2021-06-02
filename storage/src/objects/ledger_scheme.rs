@@ -16,8 +16,7 @@
 
 use crate::*;
 use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
-use snarkvm_dpc::LedgerError;
-use snarkvm_dpc::{Block, LedgerScheme, Storage, TransactionScheme};
+use snarkvm_dpc::{Block, LedgerError, LedgerScheme, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,

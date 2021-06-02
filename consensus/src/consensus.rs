@@ -21,18 +21,21 @@ use snarkvm_dpc::{
     testnet1::{
         instantiated::{Components, InstantiatedDPC, SerialNumberNonce, NUM_OUTPUT_RECORDS},
         parameters::PublicParameters,
-        transaction::amount::AleoAmount,
         payload::Payload as RecordPayload,
+        transaction::amount::AleoAmount,
         Record as DPCRecord,
     },
     Account,
     AccountAddress,
     AccountPrivateKey,
     AccountScheme,
+    Block,
     DPCComponents,
     DPCScheme,
+    LedgerScheme,
+    Storage,
+    Transactions as DPCTransactions,
 };
-use snarkvm_dpc::{Block, Transactions as DPCTransactions, LedgerScheme, Storage};
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
 

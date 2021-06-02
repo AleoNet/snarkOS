@@ -24,8 +24,7 @@ mod rpc_tests {
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
     };
-    use snarkvm_dpc::block::instantiated::Tx;
-    use snarkvm_dpc::Transaction;
+    use snarkvm_dpc::{block::instantiated::Tx, Transaction};
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,
