@@ -18,8 +18,7 @@ use crate::{stats, NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, 
 use futures::Future;
 use mpmc_map::MpmcMap;
 use rand::prelude::IteratorRandom;
-use snarkos_storage::BlockHeight;
-use snarkvm_objects::Storage;
+use snarkos_storage::{BlockHeight, Storage};
 use std::{
     net::SocketAddr,
     sync::{
@@ -109,6 +108,7 @@ impl PeerBook {
     }
 
     pub fn get_active_peer_count(&self) -> u32 {
+        println!("{} {}", self.connected_peers.len(), self.pending_connections());
         self.connected_peers.len() as u32 + self.pending_connections()
     }
 
@@ -141,7 +141,7 @@ impl PeerBook {
         self.pending_connections.load(Ordering::SeqCst)
     }
 
-    pub async fn receive_connection<S: Storage + Send + Sync + 'static>(
+    pub async fn receive_connection<S: Storage>(
         &self,
         node: Node<S>,
         address: SocketAddr,
@@ -152,7 +152,7 @@ impl PeerBook {
         Ok(())
     }
 
-    pub async fn get_or_connect<S: Storage + Send + Sync + 'static>(
+    pub async fn get_or_connect<S: Storage>(
         &self,
         node: Node<S>,
         address: SocketAddr,
