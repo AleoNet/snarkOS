@@ -84,17 +84,16 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
 
         info!("requested block information from {} peers", sync_nodes.len());
         let block_locator_hashes = self.block_locator_hashes().await;
-        let mut sent = 0usize;
         let mut future_set = vec![];
         for peer in sync_nodes.iter() {
             if let Some(handle) = self.node.peer_book.get_peer_handle(peer.address) {
                 let block_locator_hashes = block_locator_hashes.clone();
-                sent += 1;
                 future_set.push(async move {
                     handle.send_payload(Payload::GetSync(block_locator_hashes)).await;
                 });
             }
         }
+        let sent = future_set.len();
         futures::future::join_all(future_set).await;
         sent
     }
