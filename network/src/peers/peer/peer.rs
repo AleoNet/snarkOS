@@ -65,7 +65,6 @@ impl Peer {
 
     pub fn judge(&mut self) -> bool {
         let f = self.failures();
-        println!("{}: {} {} {}", self.address, self.quality.rtt_ms, f, self.quality.is_inactive(chrono::Utc::now()));
         // self.quality.rtt_ms > 1500 || 
         self.failures() >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
     }

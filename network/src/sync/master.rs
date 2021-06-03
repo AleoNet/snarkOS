@@ -55,12 +55,9 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
             let judge = node.judge();
             if !judge && node.quality.block_height > our_block_height + 1 {
                 interesting_peers.push(node);
-            } else if judge {
-                println!("judged: {:?}", node.quality);
             }
         }
         interesting_peers.sort_by(|x, y| y.quality.block_height.cmp(&x.quality.block_height));
-        println!("interesting peers = {}: {:?}", interesting_peers.len(), interesting_peers);
 
         // trim nodes close to us if any are > 10 blocks ahead
         if let Some(i) = interesting_peers
@@ -69,7 +66,9 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         {
             interesting_peers.truncate(i + 1);
         }
-        println!("interesting peers trimmed = {}", interesting_peers.len());
+
+        info!("found {} interesting peers for sync", interesting_peers.len());
+        debug!("sync interesting peers = {:?}", interesting_peers);
 
         interesting_peers
     }
@@ -89,9 +88,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
 
         info!("requested block information from {} peers", sync_nodes.len());
         let block_locator_hashes = self.block_locator_hashes().await;
-        for hash in block_locator_hashes.iter() {
-            println!("block locator hash = {}", hash);
-        }
+
         let mut sent = 0usize;
         let mut future_set = vec![];
         for peer in sync_nodes.iter() {
