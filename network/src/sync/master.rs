@@ -98,6 +98,9 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         sent
     }
 
+    /// receives an arbitrary amount of inbound sync messages with a given timeout.
+    /// if the passed `handler` callback returns `true`, then the loop is terminated early.
+    /// if the sync stream closes, the loop is also terminated early.
     async fn receive_messages<F: FnMut(SyncInbound) -> bool>(&mut self, timeout_sec: u64, mut handler: F) {
         let end = Instant::now() + Duration::from_secs(timeout_sec);
         loop {
