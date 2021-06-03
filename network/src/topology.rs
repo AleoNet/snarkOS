@@ -22,9 +22,6 @@
 // Q: extend the network protocol to include statistics or node metadata?
 // Q: when to perform centrality computation?
 
-use crate::Node;
-use snarkos_storage::LedgerStorage;
-
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashSet},
@@ -220,18 +217,7 @@ impl NodeCentrality {
     }
 }
 
-/// Returns the total connection count of the network.
-fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
-    let mut count = 0;
-
-    for node in nodes {
-        count += node.peer_book.number_of_connected_peers()
-    }
-
-    (count / 2).into()
-}
-
-fn calculate_density(n: f64, ac: f64) -> f64 {
+pub fn calculate_density(n: f64, ac: f64) -> f64 {
     // Calculate the total number of possible connections given a node count.
     let pc = n * (n - 1.0) / 2.0;
     // Actual connections divided by the possbile connections gives the density.

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::Node;
+use snarkos_network::{topology::calculate_density, Node};
 use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{
@@ -251,4 +251,32 @@ async fn binary_star_contact() {
     nodes.push(solo);
 
     wait_until!(10, network_density(&nodes) >= 0.05);
+}
+
+/// Returns the total connection count of the network.
+fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
+    let mut count = 0;
+
+    for node in nodes {
+        count += node.peer_book.number_of_connected_peers()
+    }
+
+    (count / 2).into()
+}
+
+// This could use the degree matrix, though as this is used extensively in tests and checked
+// repeatedly until it reaches a certain value, we want to keep its calculation decoupled from the
+// `NetworkMetrics`.
+fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
+    let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
+    let min = dc.clone().min().unwrap();
+    let max = dc.max().unwrap();
+
+    max - min
+}
+
+/// Returns the network density.
+fn network_density(nodes: &[Node<LedgerStorage>]) -> f64 {
+    let connections = total_connection_count(nodes);
+    calculate_density(nodes.len() as f64, connections as f64)
 }
