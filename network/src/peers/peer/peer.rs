@@ -63,10 +63,15 @@ impl Peer {
         }
     }
 
+
     pub fn judge(&mut self) -> bool {
         let f = self.failures();
-        // self.quality.rtt_ms > 1500 ||
-        self.failures() >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
+        // self.quality.rtt_ms > 1500 || 
+        f >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
+    }
+
+    pub fn judge_offline(&mut self) -> bool {
+        self.failures() >= FAILURE_THRESHOLD
     }
 
     pub fn fail(&mut self) {
@@ -75,18 +80,18 @@ impl Peer {
 
     pub fn failures(&mut self) -> usize {
         let now = Utc::now();
-        if self.quality.failures.len() > FAILURE_THRESHOLD {
+        if self.quality.failures.len() >= FAILURE_THRESHOLD {
             self.quality.failures = self
                 .quality
                 .failures
                 .iter()
-                .filter(|x| x.signed_duration_since(now) < chrono::Duration::from_std(FAILURE_EXPIRY_TIME).unwrap())
+                .filter(|x| now.signed_duration_since(**x) < chrono::Duration::from_std(FAILURE_EXPIRY_TIME).unwrap())
                 .copied()
                 .collect();
         }
         self.quality.failures.len()
     }
-
+    
     pub fn handshake_timeout(&self) -> Duration {
         if self.is_bootnode {
             Duration::from_secs(crate::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64)
