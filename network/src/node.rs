@@ -18,6 +18,7 @@ use crate::*;
 use snarkvm_objects::Storage;
 
 use chrono::{DateTime, Utc};
+use metrics::{register_counter, register_gauge};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
@@ -31,6 +32,9 @@ use std::{
     thread,
 };
 use tokio::{task, time::sleep};
+
+#[cfg(feature = "prometheus")]
+use metrics_exporter_prometheus::PrometheusBuilder;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -355,5 +359,78 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         self.local_address
             .set(addr)
             .expect("local address was set more than once!");
+    }
+
+    #[cfg(feature = "prometheus")]
+    pub fn initialize_metrics(&self) {
+        debug!("Initializing prometheus metrics");
+
+        let prometheus_builder = PrometheusBuilder::new();
+
+        let (recorder, exporter) = prometheus_builder
+            .build_with_exporter()
+            .expect("can't build the prometheus exporter");
+        metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
+
+        let metrics_exporter_task = task::spawn(async move {
+            exporter.await.expect("can't await the prometheus exporter");
+        });
+        self.register_task(metrics_exporter_task);
+    }
+
+    #[cfg(not(feature = "prometheus"))]
+    pub fn initialize_metrics(&self) {
+        debug!("Initializing RPC metrics");
+
+        metrics::set_recorder(&NODE_STATS).expect("couldn't initialize the metrics recorder!");
+    }
+
+    pub fn register_metrics(&self) {
+        register_counter!(crate::INBOUND_ALL_SUCCESSES);
+        register_counter!(crate::INBOUND_ALL_FAILURES);
+        register_counter!(crate::INBOUND_BLOCKS);
+        register_counter!(crate::INBOUND_GETBLOCKS);
+        register_counter!(crate::INBOUND_GETMEMORYPOOL);
+        register_counter!(crate::INBOUND_GETPEERS);
+        register_counter!(crate::INBOUND_GETSYNC);
+        register_counter!(crate::INBOUND_MEMORYPOOL);
+        register_counter!(crate::INBOUND_PEERS);
+        register_counter!(crate::INBOUND_PINGS);
+        register_counter!(crate::INBOUND_PONGS);
+        register_counter!(crate::INBOUND_SYNCS);
+        register_counter!(crate::INBOUND_SYNCBLOCKS);
+        register_counter!(crate::INBOUND_TRANSACTIONS);
+        register_counter!(crate::INBOUND_UNKNOWN);
+
+        register_counter!(crate::OUTBOUND_ALL_SUCCESSES);
+        register_counter!(crate::OUTBOUND_ALL_FAILURES);
+
+        register_counter!(crate::CONNECTIONS_ALL_ACCEPTED);
+        register_counter!(crate::CONNECTIONS_ALL_INITIATED);
+        register_counter!(crate::CONNECTIONS_ALL_REJECTED);
+        register_gauge!(crate::CONNECTIONS_CONNECTING);
+        register_gauge!(crate::CONNECTIONS_CONNECTED);
+        register_gauge!(crate::CONNECTIONS_DISCONNECTED);
+
+        register_counter!(crate::HANDSHAKES_FAILURES_INIT);
+        register_counter!(crate::HANDSHAKES_FAILURES_RESP);
+        register_counter!(crate::HANDSHAKES_SUCCESSES_INIT);
+        register_counter!(crate::HANDSHAKES_SUCCESSES_RESP);
+        register_counter!(crate::HANDSHAKES_TIMEOUTS_INIT);
+        register_counter!(crate::HANDSHAKES_TIMEOUTS_RESP);
+
+        register_gauge!(crate::QUEUES_INBOUND);
+        register_gauge!(crate::QUEUES_OUTBOUND);
+
+        register_counter!(crate::MISC_BLOCK_HEIGHT);
+        register_counter!(crate::MISC_BLOCKS_MINED);
+        register_counter!(crate::MISC_DUPLICATE_BLOCKS);
+        register_counter!(crate::MISC_DUPLICATE_SYNC_BLOCKS);
+        register_counter!(crate::MISC_RPC_REQUESTS);
+
+        // The node can already be at some non-zero height.
+        if let Some(sync) = self.sync() {
+            metrics::counter!(crate::MISC_BLOCK_HEIGHT, sync.current_block_height() as u64);
+        }
     }
 }

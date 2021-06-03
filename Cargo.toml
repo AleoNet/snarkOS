@@ -92,13 +92,6 @@ version = "3.0.2"
 [dependencies.hex]
 version = "0.4.1"
 
-[dependencies.metrics]
-version = "0.15"
-
-[dependencies.metrics-exporter-prometheus]
-version = "0.4"
-optional = true
-
 [dependencies.parking_lot]
 version = "0.11.1"
 
@@ -151,7 +144,7 @@ rustc_version = "0.3"
 
 [features]
 default = [ ]
-prometheus = [ "metrics-exporter-prometheus" ]
+prometheus = [ "snarkos-network/prometheus" ]
 compile_capnp_schema = [ "capnpc" ]
 noconfig = [ ]
 
