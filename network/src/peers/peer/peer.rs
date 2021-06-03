@@ -65,7 +65,7 @@ impl Peer {
 
     pub fn judge(&mut self) -> bool {
         let f = self.failures();
-        // self.quality.rtt_ms > 1500 || 
+        // self.quality.rtt_ms > 1500 ||
         self.failures() >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
     }
 
@@ -76,7 +76,13 @@ impl Peer {
     pub fn failures(&mut self) -> usize {
         let now = Utc::now();
         if self.quality.failures.len() > FAILURE_THRESHOLD {
-            self.quality.failures = self.quality.failures.iter().filter(|x| x.signed_duration_since(now) < chrono::Duration::from_std(FAILURE_EXPIRY_TIME).unwrap()).copied().collect();
+            self.quality.failures = self
+                .quality
+                .failures
+                .iter()
+                .filter(|x| x.signed_duration_since(now) < chrono::Duration::from_std(FAILURE_EXPIRY_TIME).unwrap())
+                .copied()
+                .collect();
         }
         self.quality.failures.len()
     }

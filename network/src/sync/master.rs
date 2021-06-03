@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::{HashMap, HashSet}, net::SocketAddr, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    time::Duration,
+};
 
 use crate::{NetworkError, Node, Payload, Peer};
 use futures::{pin_mut, select, FutureExt};
@@ -104,7 +108,12 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         sent
     }
 
-    async fn receive_messages<F: FnMut(SyncInbound) -> bool>(&mut self, timeout_sec: u64, moving_timeout_sec: u64, mut handler: F) {
+    async fn receive_messages<F: FnMut(SyncInbound) -> bool>(
+        &mut self,
+        timeout_sec: u64,
+        moving_timeout_sec: u64,
+        mut handler: F,
+    ) {
         let end = Instant::now() + Duration::from_secs(timeout_sec);
         let mut moving_end = Instant::now() + Duration::from_secs(moving_timeout_sec);
         loop {
@@ -211,13 +220,15 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         block_peer_map
     }
 
-    fn get_peer_blocks(&mut self,
+    fn get_peer_blocks(
+        &mut self,
         blocks: &[BlockHeaderHash],
-        block_peer_map: &HashMap<BlockHeaderHash, Vec<SocketAddr>>) -> (
-            Vec<SocketAddr>,
-            HashMap<BlockHeaderHash, SocketAddr>,
-            HashMap<SocketAddr, Vec<BlockHeaderHash>>,
-        ) {
+        block_peer_map: &HashMap<BlockHeaderHash, Vec<SocketAddr>>,
+    ) -> (
+        Vec<SocketAddr>,
+        HashMap<BlockHeaderHash, SocketAddr>,
+        HashMap<SocketAddr, Vec<BlockHeaderHash>>,
+    ) {
         let mut peer_block_requests: HashMap<SocketAddr, Vec<BlockHeaderHash>> = HashMap::new();
         let mut block_peers = HashMap::new();
         for block in blocks {
@@ -239,10 +250,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         (addresses, block_peers, peer_block_requests)
     }
 
-    async fn request_blocks(
-        &mut self,
-        peer_block_requests: HashMap<SocketAddr, Vec<BlockHeaderHash>>,
-    ) -> usize {
+    async fn request_blocks(&mut self, peer_block_requests: HashMap<SocketAddr, Vec<BlockHeaderHash>>) -> usize {
         let mut sent = 0usize;
 
         let mut future_set = vec![];
@@ -295,18 +303,19 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
             .filter(|x| !ledger.block_hash_exists(x))
             .collect();
 
-        info!("requesting {} blocks for sync, received headers for {} known blocks", block_order.len(), early_blocks_count - block_order.len());
+        info!(
+            "requesting {} blocks for sync, received headers for {} known blocks",
+            block_order.len(),
+            early_blocks_count - block_order.len()
+        );
         if block_order.is_empty() {
             return Ok(());
         }
 
         let block_peer_map = Self::block_peer_map(&blocks[..]);
 
-        let (
-            peer_addresses,
-            block_peers,
-            peer_block_requests
-        ) = self.get_peer_blocks(&block_order[..], &block_peer_map);
+        let (peer_addresses, block_peers, peer_block_requests) =
+            self.get_peer_blocks(&block_order[..], &block_peer_map);
 
         let sent_block_requests = self.request_blocks(peer_block_requests).await;
 

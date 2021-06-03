@@ -135,7 +135,8 @@ impl Peer {
                 } else if self.quality.remaining_sync_blocks > 0 {
                     trace!(
                         "Was expecting {} more sync blocks from {}",
-                        self.quality.remaining_sync_blocks, self.address,
+                        self.quality.remaining_sync_blocks,
+                        self.address,
                     );
                     self.quality.remaining_sync_blocks = 0;
                     self.quality.total_sync_blocks = 0;
