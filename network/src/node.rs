@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{*, master::SyncInbound, sync::master::SyncMaster};
+use crate::{master::SyncInbound, sync::master::SyncMaster, *};
 use snarkvm_objects::Storage;
 
 use chrono::{DateTime, Utc};
@@ -29,7 +29,11 @@ use std::{
     },
     thread,
 };
-use tokio::{sync::{RwLock, mpsc}, task, time::sleep};
+use tokio::{
+    sync::{mpsc, RwLock},
+    task,
+    time::sleep,
+};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -297,11 +301,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         )
     }
 
-
     pub async fn run_sync(&self) -> Result<(), NetworkError> {
         let (master, sender) = SyncMaster::new(self.clone());
         *self.master_dispatch.write().await = Some(sender);
         master.run().await
     }
-
 }

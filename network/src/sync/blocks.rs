@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{NetworkError, Node, master::SyncInbound, message::*, stats};
+use crate::{master::SyncInbound, message::*, stats, NetworkError, Node};
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_objects::{Block, BlockHeaderHash, Storage};
 
@@ -106,7 +106,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
         };
 
         info!(
-            "Received block from {} of epoch {} with hash {:?} (current head {})",
+            "Received block from {} of epoch {} with hash {} (current head {})",
             remote_address,
             block_struct.header.time,
             block_struct.header.get_hash(),
