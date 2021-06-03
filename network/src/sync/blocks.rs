@@ -109,7 +109,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
             "Received block from {} of epoch {} with hash {:?} (current head {})",
             remote_address,
             block_struct.header.time,
-            hex::encode(block_struct.header.get_hash().0),
+            block_struct.header.get_hash(),
             self.expect_sync().current_block_height(),
         );
 
