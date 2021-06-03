@@ -100,11 +100,15 @@ impl NetworkTopology {
         // Insert new connections.
         self.connections.extend(new_connections.iter());
     }
+
+    pub fn has_connections(&self) -> bool {
+        self.connections.read().len() > 0
+    }
 }
 
 /// Network topology measurements.
 #[derive(Debug)]
-struct NetworkMetrics {
+pub struct NetworkMetrics {
     /// The total node count of the network.
     node_count: usize,
     /// The total connection count for the network.
@@ -120,7 +124,7 @@ struct NetworkMetrics {
     algebraic_connectivity: f64,
     /// The difference between the node with the largest connection count and the node with the
     /// lowest.
-    degree_centrality_delta: u16,
+    degree_centrality_delta: f64,
     /// Node centrality measurements mapped to each node's address.
     ///
     /// Includes degree centrality, eigenvector centrality (the relative importance of a node in
@@ -129,35 +133,43 @@ struct NetworkMetrics {
 }
 
 impl NetworkMetrics {
-    /// Returns the network metrics for the state described by the node list.
-    fn new(nodes: &[Node<LedgerStorage>]) -> Self {
+    /// Returns the network metrics for the state described by the connections list.
+    pub fn new(topology: &NetworkTopology) -> Self {
+        // Copy the connections as the data must not change throughout the metrics computation.
+        let connections: HashSet<Connection> = topology.connections.read().iter().copied().collect();
+
+        // Construct the list of nodes from the connections.
+        let mut nodes: HashSet<SocketAddr> = HashSet::new();
+        for Connection((a, b)) in connections.iter() {
+            // Using a hashset guarantees uniqueness.
+            nodes.insert(*a);
+            nodes.insert(*b);
+        }
+
         let node_count = nodes.len();
-        let connection_count = total_connection_count(nodes);
-        let density = network_density(&nodes);
+        let connection_count = connections.len();
+        let density = calculate_density(node_count as f64, connection_count as f64);
 
         // Create an index of nodes to introduce some notion of order the rows and columns all matrices will follow.
-        let index: BTreeMap<SocketAddr, usize> = nodes
-            .iter()
-            .map(|node| node.local_address().unwrap())
-            .enumerate()
-            .map(|(i, addr)| (addr, i))
-            .collect();
+        let index: BTreeMap<SocketAddr, usize> = nodes.iter().enumerate().map(|(i, &addr)| (addr, i)).collect();
 
         // Not stored on the struct but can be pretty inspected with `println!`.
-        let degree_matrix = degree_matrix(&index, &nodes);
-        let adjacency_matrix = adjacency_matrix(&index, &nodes);
-        let laplacian_matrix = degree_matrix.clone().sub(adjacency_matrix.clone());
+        // The adjacency matrix can be built from the node index and the connections list.
+        let adjacency_matrix = adjacency_matrix(&index, connections);
+        // The degree matrix can be built from the adjacency matrix (row sum is connection count).
+        let degree_matrix = degree_matrix(&index, &adjacency_matrix);
+        // The laplacian matrix is degree matrix minus the adjacence matrix.
+        let laplacian_matrix = degree_matrix.clone().sub(&adjacency_matrix);
 
-        let degree_centrality = degree_centrality(&index, degree_matrix);
-        let degree_centrality_delta = degree_centrality_delta(&nodes);
+        let degree_centrality = degree_centrality(&index, &degree_matrix.clone());
+        let degree_centrality_delta = degree_centrality_delta(&degree_matrix);
         let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix);
         let (algebraic_connectivity, fiedler_vector_indexed) = fiedler(&index, laplacian_matrix);
 
         // Create the `NodeCentrality` instances for each node.
         let centrality: BTreeMap<SocketAddr, NodeCentrality> = nodes
             .iter()
-            .map(|node| {
-                let addr = node.local_address().unwrap();
+            .map(|&addr| {
                 // Must contain values for this node since it was constructed using same set of
                 // nodes.
                 let dc = degree_centrality.get(&addr).unwrap();
@@ -219,12 +231,6 @@ fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
     (count / 2).into()
 }
 
-/// Returns the network density.
-fn network_density(nodes: &[Node<LedgerStorage>]) -> f64 {
-    let connections = total_connection_count(nodes);
-    calculate_density(nodes.len() as f64, connections as f64)
-}
-
 fn calculate_density(n: f64, ac: f64) -> f64 {
     // Calculate the total number of possible connections given a node count.
     let pc = n * (n - 1.0) / 2.0;
@@ -233,50 +239,48 @@ fn calculate_density(n: f64, ac: f64) -> f64 {
 }
 
 /// Returns the degree matrix for the network with values ordered by the index.
-fn degree_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorage>]) -> DMatrix<f64> {
-    let n = nodes.len();
+fn degree_matrix(index: &BTreeMap<SocketAddr, usize>, adjacency_matrix: &DMatrix<f64>) -> DMatrix<f64> {
+    let n = index.len();
     let mut matrix = DMatrix::<f64>::zeros(n, n);
 
-    for node in nodes {
-        let n = node.peer_book.number_of_connected_peers();
-        // Address must be present.
-        // Get the index for the and set the number of connected peers. The degree matrix is
-        // diagonal.
-        let node_n = index.get(&node.local_address().unwrap()).unwrap();
-        matrix[(*node_n, *node_n)] = n as f64;
+    for (i, row) in adjacency_matrix.row_iter().enumerate() {
+        // Set the diagonal to be the sum of connections in that row. The index isn't necessary
+        // here since the rows are visited in order and the adjacency matrix is ordered after the
+        // index.
+        matrix[(i, i)] = row.sum()
     }
 
     matrix
 }
 
 /// Returns the adjacency matrix for the network with values ordered by the index.
-fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, nodes: &[Node<LedgerStorage>]) -> DMatrix<f64> {
-    let n = nodes.len();
+fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, connections: HashSet<Connection>) -> DMatrix<f64> {
+    let n = index.len();
     let mut matrix = DMatrix::<f64>::zeros(n, n);
 
     // Compute the adjacency matrix. As our network is an undirected graph, the adjacency matrix is
     // symmetric.
-    for node in nodes {
-        node.peer_book.connected_peers().keys().for_each(|addr| {
-            // Addresses must be present.
-            // Get the indices for each node, progressing row by row to construct the matrix.
-            let node_m = index.get(&node.local_address().unwrap()).unwrap();
-            let peer_n = index.get(&addr).unwrap();
-            matrix[(*node_m, *peer_n)] = 1.0;
-        });
+    for Connection((a, b)) in connections {
+        // Addresses must be present.
+        // Get the indices for each address in the connection.
+        let i = index.get(&a).unwrap();
+        let j = index.get(&b).unwrap();
+
+        // Since connections are unique both the upper and lower triangles must be writted (as the
+        // graph is unidrected) for each connection.
+        matrix[(*i, *j)] = 1.0;
+        matrix[(*j, *i)] = 1.0;
     }
 
     matrix
 }
 
 /// Returns the difference between the highest and lowest degree centrality in the network.
-// This could use the degree matrix, though as this is used extensively in tests and checked
-// repeatedly until it reaches a certain value, we want to keep its calculation decoupled from the
-// `NetworkMetrics`.
-fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
-    let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
-    let min = dc.clone().min().unwrap();
-    let max = dc.max().unwrap();
+///
+/// Returns an `f64`, though the value should be a natural number.
+fn degree_centrality_delta(degree_matrix: &DMatrix<f64>) -> f64 {
+    let max = degree_matrix.max();
+    let min = degree_matrix.min();
 
     max - min
 }
@@ -284,7 +288,7 @@ fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
 /// Returns the degree centrality of a node.
 ///
 /// This is defined as the connection count of the node.
-fn degree_centrality(index: &BTreeMap<SocketAddr, usize>, degree_matrix: DMatrix<f64>) -> BTreeMap<SocketAddr, u16> {
+fn degree_centrality(index: &BTreeMap<SocketAddr, usize>, degree_matrix: &DMatrix<f64>) -> BTreeMap<SocketAddr, u16> {
     let diag = degree_matrix.diagonal();
     index
         .keys()
