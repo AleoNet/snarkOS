@@ -36,7 +36,7 @@ harness = false
 version = "0.4.0"
 
 [dependencies.snarkvm-curves]
-version = "0.4.0"
+version = "0.5.1"
 
 [dependencies.snarkvm-dpc]
 version = "0.4.0"
