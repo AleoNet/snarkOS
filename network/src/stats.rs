@@ -16,10 +16,7 @@
 
 use metrics::{GaugeValue, Key, Recorder, Unit};
 
-use std::{
-    borrow::Borrow,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const INBOUND_ALL_SUCCESSES: &str = "snarkos_inbound_all_successes_total";
 pub const INBOUND_ALL_FAILURES: &str = "snarkos_inbound_all_failures_total";
@@ -270,90 +267,82 @@ impl Recorder for Stats {
     fn record_histogram(&self, _key: &Key, _value: f64) {}
 
     fn increment_counter(&self, key: &Key, value: u64) {
-        if let Some(name) = key.name().parts().next() {
-            match name.borrow() {
-                // inbound
-                INBOUND_ALL_SUCCESSES => self.inbound.all_successes.fetch_add(value, Ordering::Relaxed),
-                INBOUND_ALL_FAILURES => self.inbound.all_failures.fetch_add(value, Ordering::Relaxed),
-                INBOUND_BLOCKS => self.inbound.blocks.fetch_add(value, Ordering::Relaxed),
-                INBOUND_GETBLOCKS => self.inbound.getblocks.fetch_add(value, Ordering::Relaxed),
-                INBOUND_GETMEMORYPOOL => self.inbound.getmemorypool.fetch_add(value, Ordering::Relaxed),
-                INBOUND_GETPEERS => self.inbound.getpeers.fetch_add(value, Ordering::Relaxed),
-                INBOUND_GETSYNC => self.inbound.getsync.fetch_add(value, Ordering::Relaxed),
-                INBOUND_MEMORYPOOL => self.inbound.memorypool.fetch_add(value, Ordering::Relaxed),
-                INBOUND_PEERS => self.inbound.peers.fetch_add(value, Ordering::Relaxed),
-                INBOUND_PINGS => self.inbound.pings.fetch_add(value, Ordering::Relaxed),
-                INBOUND_PONGS => self.inbound.pongs.fetch_add(value, Ordering::Relaxed),
-                INBOUND_SYNCS => self.inbound.syncs.fetch_add(value, Ordering::Relaxed),
-                INBOUND_SYNCBLOCKS => self.inbound.syncblocks.fetch_add(value, Ordering::Relaxed),
-                INBOUND_TRANSACTIONS => self.inbound.transactions.fetch_add(value, Ordering::Relaxed),
-                INBOUND_UNKNOWN => self.inbound.unknown.fetch_add(value, Ordering::Relaxed),
-                // outbound
-                OUTBOUND_ALL_SUCCESSES => self.outbound.all_successes.fetch_add(value, Ordering::Relaxed),
-                OUTBOUND_ALL_FAILURES => self.outbound.all_failures.fetch_add(value, Ordering::Relaxed),
-                // connections
-                CONNECTIONS_ALL_ACCEPTED => self.connections.all_accepted.fetch_add(value, Ordering::Relaxed),
-                CONNECTIONS_ALL_INITIATED => self.connections.all_initiated.fetch_add(value, Ordering::Relaxed),
-                CONNECTIONS_ALL_REJECTED => self.connections.all_rejected.fetch_add(value, Ordering::Relaxed),
-                // handshakes
-                HANDSHAKES_FAILURES_INIT => self.handshakes.failures_init.fetch_add(value, Ordering::Relaxed),
-                HANDSHAKES_FAILURES_RESP => self.handshakes.failures_resp.fetch_add(value, Ordering::Relaxed),
-                HANDSHAKES_SUCCESSES_INIT => self.handshakes.successes_init.fetch_add(value, Ordering::Relaxed),
-                HANDSHAKES_SUCCESSES_RESP => self.handshakes.successes_resp.fetch_add(value, Ordering::Relaxed),
-                HANDSHAKES_TIMEOUTS_INIT => self.handshakes.timeouts_init.fetch_add(value, Ordering::Relaxed),
-                HANDSHAKES_TIMEOUTS_RESP => self.handshakes.timeouts_resp.fetch_add(value, Ordering::Relaxed),
-                // misc
-                MISC_BLOCK_HEIGHT => 0, // obtained ad-hoc for the purposes of RPC metrics
-                MISC_BLOCKS_MINED => self.misc.blocks_mined.fetch_add(value, Ordering::Relaxed),
-                MISC_DUPLICATE_BLOCKS => self.misc.duplicate_blocks.fetch_add(value, Ordering::Relaxed),
-                MISC_DUPLICATE_SYNC_BLOCKS => self.misc.duplicate_sync_blocks.fetch_add(value, Ordering::Relaxed),
-                MISC_RPC_REQUESTS => self.misc.rpc_requests.fetch_add(value, Ordering::Relaxed),
-                _ => {
-                    error!("Metrics key {} wasn't assigned an operation and won't work!", key);
-                    0
-                }
-            };
-        } else {
-            error!("Metrics key {} wasn't assigned a name and won't work!", key);
-        }
+        match key.name() {
+            // inbound
+            INBOUND_ALL_SUCCESSES => self.inbound.all_successes.fetch_add(value, Ordering::Relaxed),
+            INBOUND_ALL_FAILURES => self.inbound.all_failures.fetch_add(value, Ordering::Relaxed),
+            INBOUND_BLOCKS => self.inbound.blocks.fetch_add(value, Ordering::Relaxed),
+            INBOUND_GETBLOCKS => self.inbound.getblocks.fetch_add(value, Ordering::Relaxed),
+            INBOUND_GETMEMORYPOOL => self.inbound.getmemorypool.fetch_add(value, Ordering::Relaxed),
+            INBOUND_GETPEERS => self.inbound.getpeers.fetch_add(value, Ordering::Relaxed),
+            INBOUND_GETSYNC => self.inbound.getsync.fetch_add(value, Ordering::Relaxed),
+            INBOUND_MEMORYPOOL => self.inbound.memorypool.fetch_add(value, Ordering::Relaxed),
+            INBOUND_PEERS => self.inbound.peers.fetch_add(value, Ordering::Relaxed),
+            INBOUND_PINGS => self.inbound.pings.fetch_add(value, Ordering::Relaxed),
+            INBOUND_PONGS => self.inbound.pongs.fetch_add(value, Ordering::Relaxed),
+            INBOUND_SYNCS => self.inbound.syncs.fetch_add(value, Ordering::Relaxed),
+            INBOUND_SYNCBLOCKS => self.inbound.syncblocks.fetch_add(value, Ordering::Relaxed),
+            INBOUND_TRANSACTIONS => self.inbound.transactions.fetch_add(value, Ordering::Relaxed),
+            INBOUND_UNKNOWN => self.inbound.unknown.fetch_add(value, Ordering::Relaxed),
+            // outbound
+            OUTBOUND_ALL_SUCCESSES => self.outbound.all_successes.fetch_add(value, Ordering::Relaxed),
+            OUTBOUND_ALL_FAILURES => self.outbound.all_failures.fetch_add(value, Ordering::Relaxed),
+            // connections
+            CONNECTIONS_ALL_ACCEPTED => self.connections.all_accepted.fetch_add(value, Ordering::Relaxed),
+            CONNECTIONS_ALL_INITIATED => self.connections.all_initiated.fetch_add(value, Ordering::Relaxed),
+            CONNECTIONS_ALL_REJECTED => self.connections.all_rejected.fetch_add(value, Ordering::Relaxed),
+            // handshakes
+            HANDSHAKES_FAILURES_INIT => self.handshakes.failures_init.fetch_add(value, Ordering::Relaxed),
+            HANDSHAKES_FAILURES_RESP => self.handshakes.failures_resp.fetch_add(value, Ordering::Relaxed),
+            HANDSHAKES_SUCCESSES_INIT => self.handshakes.successes_init.fetch_add(value, Ordering::Relaxed),
+            HANDSHAKES_SUCCESSES_RESP => self.handshakes.successes_resp.fetch_add(value, Ordering::Relaxed),
+            HANDSHAKES_TIMEOUTS_INIT => self.handshakes.timeouts_init.fetch_add(value, Ordering::Relaxed),
+            HANDSHAKES_TIMEOUTS_RESP => self.handshakes.timeouts_resp.fetch_add(value, Ordering::Relaxed),
+            // misc
+            MISC_BLOCK_HEIGHT => 0, // obtained ad-hoc for the purposes of RPC metrics
+            MISC_BLOCKS_MINED => self.misc.blocks_mined.fetch_add(value, Ordering::Relaxed),
+            MISC_DUPLICATE_BLOCKS => self.misc.duplicate_blocks.fetch_add(value, Ordering::Relaxed),
+            MISC_DUPLICATE_SYNC_BLOCKS => self.misc.duplicate_sync_blocks.fetch_add(value, Ordering::Relaxed),
+            MISC_RPC_REQUESTS => self.misc.rpc_requests.fetch_add(value, Ordering::Relaxed),
+            _ => {
+                error!("Metrics key {} wasn't assigned an operation and won't work!", key);
+                0
+            }
+        };
     }
 
     fn update_gauge(&self, key: &Key, value: GaugeValue) {
-        if let Some(name) = key.name().parts().next() {
-            match value {
-                GaugeValue::Increment(value) => {
-                    match name.borrow() {
-                        // queues
-                        QUEUES_INBOUND => self.queues.inbound.fetch_add(value as u64, Ordering::SeqCst),
-                        QUEUES_OUTBOUND => self.queues.outbound.fetch_add(value as u64, Ordering::SeqCst),
-                        // obtained ad-hoc for the purposes of RPC metrics
-                        CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
-                        _ => {
-                            error!("Metrics key {} wasn't assigned an operation and won't work!", key);
-                            0
-                        }
+        match value {
+            GaugeValue::Increment(value) => {
+                match key.name() {
+                    // queues
+                    QUEUES_INBOUND => self.queues.inbound.fetch_add(value as u64, Ordering::SeqCst),
+                    QUEUES_OUTBOUND => self.queues.outbound.fetch_add(value as u64, Ordering::SeqCst),
+                    // obtained ad-hoc for the purposes of RPC metrics
+                    CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
+                    _ => {
+                        error!("Metrics key {} wasn't assigned an operation and won't work!", key);
+                        0
                     }
                 }
-                GaugeValue::Decrement(value) => {
-                    match name.borrow() {
-                        // queues
-                        QUEUES_INBOUND => self.queues.inbound.fetch_sub(value as u64, Ordering::SeqCst),
-                        QUEUES_OUTBOUND => self.queues.outbound.fetch_sub(value as u64, Ordering::SeqCst),
-                        // obtained ad-hoc for the purposes of RPC metrics
-                        CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
-                        _ => {
-                            error!("Metrics key {} wasn't assigned an operation and won't work!", key);
-                            0
-                        }
+            }
+            GaugeValue::Decrement(value) => {
+                match key.name() {
+                    // queues
+                    QUEUES_INBOUND => self.queues.inbound.fetch_sub(value as u64, Ordering::SeqCst),
+                    QUEUES_OUTBOUND => self.queues.outbound.fetch_sub(value as u64, Ordering::SeqCst),
+                    // obtained ad-hoc for the purposes of RPC metrics
+                    CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
+                    _ => {
+                        error!("Metrics key {} wasn't assigned an operation and won't work!", key);
+                        0
                     }
                 }
-                GaugeValue::Absolute(_value) => {
-                    error!("GaugeValue::Absolute is not used!");
-                    0
-                }
-            };
-        } else {
-            error!("Metrics key {} wasn't assigned a name and won't work!", key);
-        }
+            }
+            GaugeValue::Absolute(_value) => {
+                error!("GaugeValue::Absolute is not used!");
+                0
+            }
+        };
     }
 }
