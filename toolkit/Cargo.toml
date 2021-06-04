@@ -33,6 +33,7 @@ features = [ "wasm" ]
 [dependencies.snarkvm-dpc]
 version = "0.5.1"
 default-features = false
+features = [ "wasm" ]
 
 [dependencies.snarkvm-utilities]
 version = "0.5.1"
