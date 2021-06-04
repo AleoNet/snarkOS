@@ -5,4 +5,4 @@
 
 cargo run --release --example test_data
 
-mv test_data ../src/consensus
+mv test_data ../src/sync

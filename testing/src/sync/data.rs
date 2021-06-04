@@ -127,3 +127,38 @@ impl FromBytes for TestData {
 fn load_test_data() -> TestData {
     TestData::read(&include_bytes!("test_data")[..]).unwrap()
 }
+
+#[derive(Debug)]
+pub struct TestBlocks(pub Vec<Block<Tx>>);
+
+impl TestBlocks {
+    pub fn new(blocks: Vec<Block<Tx>>) -> Self {
+        TestBlocks(blocks)
+    }
+
+    pub fn load(count: usize) -> Self {
+        TestBlocks::read(&include_bytes!("test_blocks_100")[..], count).unwrap()
+    }
+
+    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        for block in &self.0 {
+            // Clone is necessary here, otherwise weird things happen.
+            let block = block.clone();
+            block.write(&mut writer)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn read<R: Read>(mut reader: R, count: usize) -> IoResult<Self> {
+        let mut blocks = Vec::with_capacity(count);
+
+        // Hardcoded for now as the trait doesn't allow for an N.
+        for _ in 0..count {
+            let block: Block<Tx> = FromBytes::read(&mut reader)?;
+            blocks.push(block);
+        }
+
+        Ok(TestBlocks::new(blocks))
+    }
+}

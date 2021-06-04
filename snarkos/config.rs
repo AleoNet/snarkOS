@@ -127,8 +127,8 @@ impl Default for Config {
                 mempool_sync_interval: 12,
                 peer_sync_interval: 15,
                 block_sync_interval: 4,
-                min_peers: 7,
-                max_peers: 25,
+                min_peers: 20,
+                max_peers: 50,
             },
         }
     }
