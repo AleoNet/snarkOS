@@ -16,11 +16,11 @@
 
 use crate::{bytes_to_u32, Ledger, COL_META, KEY_BEST_BLOCK_NUMBER};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{errors::StorageError, Storage, Transaction};
+use snarkvm_dpc::{errors::StorageError, Storage, TransactionScheme};
 
 use tracing::*;
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     pub fn validate(&self, mut limit: usize) -> Result<(), StorageError> {
         // Block height comes from the KEY_BEST_BLOCK_NUMBER.
         let mut current_height = self.get_current_block_height();
