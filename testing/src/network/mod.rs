@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod blocks;
-pub use blocks::*;
-
 #[cfg(test)]
 pub mod encryption;
 
@@ -111,6 +108,7 @@ pub struct TestSetup {
 }
 
 impl TestSetup {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         node_id: u64,
         socket_address: SocketAddr,
