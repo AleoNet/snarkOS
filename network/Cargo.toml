@@ -17,6 +17,9 @@ include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[features]
+prometheus = [ "metrics-exporter-prometheus" ]
+
 [dependencies.snarkvm-algorithms]
 version = "0.4.0"
 
@@ -72,7 +75,11 @@ version = "0.4.2"
 version = "0.4.11"
 
 [dependencies.metrics]
-version = "0.15"
+version = "0.16"
+
+[dependencies.metrics-exporter-prometheus]
+version = "0.4"
+optional = true
 
 [dependencies.once_cell]
 version = "1.5.2"
@@ -126,7 +133,7 @@ version = "0.2"
 path = "../testing"
 
 [dev-dependencies.nalgebra]
-version = "0.26"
+version = "0.27"
 
 [dev-dependencies.peak_alloc]
 version = "0.1.0"
