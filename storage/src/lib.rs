@@ -31,3 +31,6 @@ pub use mem::MemDb as LedgerStorage;
 mod rocks;
 #[cfg(feature = "rocksdb_storage")]
 pub use rocks::RocksDb as LedgerStorage;
+
+pub mod validator;
+pub use validator::*;

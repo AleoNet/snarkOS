@@ -68,6 +68,11 @@ features = [ "derive" ]
 [dependencies.thiserror]
 version = "1.0"
 
+[dependencies.tracing]
+default-features = false
+features = [ "log" ]
+version = "0.1"
+
 [dev-dependencies.snarkos-consensus]
 path = "../consensus"
 
