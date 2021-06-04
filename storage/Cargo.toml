@@ -33,7 +33,7 @@ version = "0.4.0"
 version = "0.4.0"
 
 [dependencies.snarkvm-parameters]
-version = "0.4.0"
+version = "0.5.1"
 
 [dependencies.snarkvm-utilities]
 version = "0.4.0"
