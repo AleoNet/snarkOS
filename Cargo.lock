@@ -1529,7 +1529,18 @@ version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c53c23fff9a59f261498953cf41dc9ffc2522fd79723bdf283c1e88dc1633624"
 dependencies = [
- "metrics-macros",
+ "metrics-macros 0.3.0",
+ "proc-macro-hack",
+ "t1ha",
+]
+
+[[package]]
+name = "metrics"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c0a7fa53d812d26e59d2baf7a6f77442041454ab32908eb304447f00f0dd4de"
+dependencies = [
+ "metrics-macros 0.4.0",
  "proc-macro-hack",
  "t1ha",
 ]
@@ -1541,7 +1552,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "954533c2d91c118cf2405264a4ac3a5592e84efac12b1f18561400ffef0597eb"
 dependencies = [
  "hyper",
- "metrics",
+ "metrics 0.15.1",
  "metrics-util",
  "parking_lot",
  "quanta",
@@ -1564,6 +1575,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics-macros"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caa72e4a3d157986dd2565c82ecbddcc23941513669a3766b938f6b72eb87f3f"
+dependencies = [
+ "lazy_static",
+ "proc-macro-hack",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
 name = "metrics-util"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1576,7 +1601,7 @@ dependencies = [
  "dashmap",
  "hashbrown 0.11.2",
  "indexmap",
- "metrics",
+ "metrics 0.15.1",
  "num_cpus",
  "ordered-float",
  "parking_lot",
@@ -2658,8 +2683,6 @@ dependencies = [
  "colored",
  "dirs",
  "hex",
- "metrics",
- "metrics-exporter-prometheus",
  "parking_lot",
  "rand 0.8.3",
  "rustc_version 0.3.3",
@@ -2670,11 +2693,11 @@ dependencies = [
  "snarkos-network",
  "snarkos-rpc",
  "snarkos-storage",
- "snarkvm-algorithms",
+ "snarkvm-algorithms 0.5.1",
  "snarkvm-dpc",
  "snarkvm-objects",
  "snarkvm-posw",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
  "tokio",
  "toml",
@@ -2698,13 +2721,13 @@ dependencies = [
  "snarkos-network",
  "snarkos-profiler",
  "snarkos-testing",
- "snarkvm-algorithms",
- "snarkvm-curves",
+ "snarkvm-algorithms 0.5.1",
+ "snarkvm-curves 0.4.0",
  "snarkvm-dpc",
  "snarkvm-objects",
  "snarkvm-parameters",
  "snarkvm-posw",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "tokio",
 ]
 
@@ -2722,12 +2745,12 @@ dependencies = [
  "snarkos-profiler",
  "snarkos-storage",
  "snarkos-testing",
- "snarkvm-algorithms",
- "snarkvm-curves",
+ "snarkvm-algorithms 0.5.1",
+ "snarkvm-curves 0.4.0",
  "snarkvm-dpc",
  "snarkvm-objects",
  "snarkvm-posw",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
  "tracing",
 ]
@@ -2740,7 +2763,7 @@ dependencies = [
  "lazy_static",
  "prometheus",
  "serial_test",
- "snarkvm-derives",
+ "snarkvm-derives 0.4.0",
  "tokio",
  "warp",
 ]
@@ -2760,7 +2783,8 @@ dependencies = [
  "fxhash",
  "hex",
  "log",
- "metrics",
+ "metrics 0.16.0",
+ "metrics-exporter-prometheus",
  "nalgebra",
  "once_cell",
  "parking_lot",
@@ -2771,10 +2795,10 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-storage",
  "snarkos-testing",
- "snarkvm-algorithms",
+ "snarkvm-algorithms 0.5.1",
  "snarkvm-dpc",
  "snarkvm-objects",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "snow",
  "thiserror",
  "tokio",
@@ -2793,14 +2817,14 @@ dependencies = [
  "rand 0.8.3",
  "snarkos-consensus",
  "snarkos-storage",
- "snarkvm-algorithms",
- "snarkvm-curves",
+ "snarkvm-algorithms 0.5.1",
+ "snarkvm-curves 0.4.0",
  "snarkvm-dpc",
  "snarkvm-marlin",
  "snarkvm-objects",
  "snarkvm-parameters",
  "snarkvm-posw",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
 ]
 
 [[package]]
@@ -2826,7 +2850,7 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpc-test",
- "metrics",
+ "metrics 0.16.0",
  "parking_lot",
  "rand 0.8.3",
  "rustc_version 0.3.3",
@@ -2837,10 +2861,10 @@ dependencies = [
  "snarkos-storage",
  "snarkos-testing",
  "snarkos-toolkit",
- "snarkvm-algorithms",
+ "snarkvm-algorithms 0.5.1",
  "snarkvm-dpc",
  "snarkvm-objects",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
  "tokio",
  "tracing",
@@ -2860,13 +2884,14 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-parameters",
  "snarkos-testing",
- "snarkvm-algorithms",
- "snarkvm-curves",
+ "snarkvm-algorithms 0.5.1",
+ "snarkvm-curves 0.4.0",
  "snarkvm-dpc",
  "snarkvm-objects",
  "snarkvm-parameters",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -2883,13 +2908,13 @@ dependencies = [
  "snarkos-network",
  "snarkos-parameters",
  "snarkos-storage",
- "snarkvm-algorithms",
- "snarkvm-curves",
+ "snarkvm-algorithms 0.5.1",
+ "snarkvm-curves 0.4.0",
  "snarkvm-dpc",
  "snarkvm-objects",
  "snarkvm-parameters",
  "snarkvm-posw",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "snow",
  "tokio",
  "tracing",
@@ -2907,10 +2932,10 @@ dependencies = [
  "hex",
  "rand 0.8.3",
  "rand_chacha 0.3.0",
- "snarkvm-algorithms",
+ "snarkvm-algorithms 0.5.1",
  "snarkvm-dpc",
  "snarkvm-objects",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -2932,11 +2957,35 @@ dependencies = [
  "rayon",
  "sha2",
  "smallvec",
- "snarkvm-curves",
- "snarkvm-fields",
- "snarkvm-profiler",
- "snarkvm-r1cs",
- "snarkvm-utilities",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
+ "snarkvm-profiler 0.4.0",
+ "snarkvm-r1cs 0.4.0",
+ "snarkvm-utilities 0.4.0",
+ "thiserror",
+]
+
+[[package]]
+name = "snarkvm-algorithms"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8433d93a6ac1d5bd785e9b328ff85bc9714b71c009c83d3097942f500ecfe20"
+dependencies = [
+ "bitvec",
+ "blake2",
+ "derivative",
+ "digest 0.9.0",
+ "itertools 0.10.0",
+ "rand 0.8.3",
+ "rand_chacha 0.3.0",
+ "rayon",
+ "sha2",
+ "smallvec",
+ "snarkvm-curves 0.5.1",
+ "snarkvm-fields 0.5.1",
+ "snarkvm-profiler 0.5.1",
+ "snarkvm-r1cs 0.5.1",
+ "snarkvm-utilities 0.5.1",
  "thiserror",
 ]
 
@@ -2951,8 +3000,24 @@ dependencies = [
  "rand_xorshift",
  "rustc_version 0.3.3",
  "serde",
- "snarkvm-fields",
- "snarkvm-utilities",
+ "snarkvm-fields 0.4.0",
+ "snarkvm-utilities 0.4.0",
+ "thiserror",
+]
+
+[[package]]
+name = "snarkvm-curves"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a62f3e81e6ea1b4d23535b51d0d2ae6b2673b4aad0376131c3ec99c25be99af"
+dependencies = [
+ "derivative",
+ "rand 0.8.3",
+ "rand_xorshift",
+ "rustc_version 0.3.3",
+ "serde",
+ "snarkvm-fields 0.5.1",
+ "snarkvm-utilities 0.5.1",
  "thiserror",
 ]
 
@@ -2961,6 +3026,19 @@ name = "snarkvm-derives"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "769aa9c2a57b7541cce8b8c253b07f6cef992caa08c62621195e6a5d3766d83c"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "snarkvm-derives"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b48ed3ef4e3de5098c7abb9836874ce15ecc19015813629337438ac5dde448e"
 dependencies = [
  "proc-macro-crate",
  "proc-macro-error",
@@ -2983,15 +3061,15 @@ dependencies = [
  "hex",
  "itertools 0.10.0",
  "rand 0.8.3",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-fields",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
  "snarkvm-gadgets",
  "snarkvm-objects",
  "snarkvm-parameters",
- "snarkvm-profiler",
- "snarkvm-r1cs",
- "snarkvm-utilities",
+ "snarkvm-profiler 0.4.0",
+ "snarkvm-r1cs 0.4.0",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
 ]
 
@@ -3006,7 +3084,22 @@ dependencies = [
  "rand 0.8.3",
  "rand_xorshift",
  "serde",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
+ "thiserror",
+]
+
+[[package]]
+name = "snarkvm-fields"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21aa997a151dd5cd67cc530fccd03182a1e2ff18991d95f5399cbbbc97235163"
+dependencies = [
+ "bincode",
+ "derivative",
+ "rand 0.8.3",
+ "rand_xorshift",
+ "serde",
+ "snarkvm-utilities 0.5.1",
  "thiserror",
 ]
 
@@ -3019,11 +3112,11 @@ dependencies = [
  "derivative",
  "digest 0.9.0",
  "itertools 0.10.0",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-fields",
- "snarkvm-r1cs",
- "snarkvm-utilities",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
+ "snarkvm-r1cs 0.4.0",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
 ]
 
@@ -3041,15 +3134,15 @@ dependencies = [
  "rand_chacha 0.3.0",
  "rand_core 0.6.2",
  "rayon",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-fields",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
  "snarkvm-gadgets",
  "snarkvm-nonnative",
  "snarkvm-polycommit",
- "snarkvm-profiler",
- "snarkvm-r1cs",
- "snarkvm-utilities",
+ "snarkvm-profiler 0.4.0",
+ "snarkvm-r1cs 0.4.0",
+ "snarkvm-utilities 0.4.0",
 ]
 
 [[package]]
@@ -3061,12 +3154,12 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-fields",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
  "snarkvm-gadgets",
- "snarkvm-r1cs",
- "snarkvm-utilities",
+ "snarkvm-r1cs 0.4.0",
+ "snarkvm-utilities 0.4.0",
 ]
 
 [[package]]
@@ -3083,10 +3176,10 @@ dependencies = [
  "rand 0.8.3",
  "serde",
  "sha2",
- "snarkvm-algorithms",
- "snarkvm-curves",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-curves 0.4.0",
  "snarkvm-parameters",
- "snarkvm-utilities",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
 ]
 
@@ -3098,8 +3191,8 @@ checksum = "fca43707d4b2948e79ce87c58996dd44feecb0b73f9972bf1b3537d051803784"
 dependencies = [
  "curl",
  "hex",
- "snarkvm-algorithms",
- "snarkvm-utilities",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
 ]
 
@@ -3113,14 +3206,14 @@ dependencies = [
  "digest 0.9.0",
  "hashbrown 0.11.2",
  "rand_core 0.6.2",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-fields",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
  "snarkvm-gadgets",
  "snarkvm-nonnative",
- "snarkvm-profiler",
- "snarkvm-r1cs",
- "snarkvm-utilities",
+ "snarkvm-profiler 0.4.0",
+ "snarkvm-r1cs 0.4.0",
+ "snarkvm-utilities 0.4.0",
 ]
 
 [[package]]
@@ -3131,17 +3224,17 @@ checksum = "e5424334a358ab43a1c5a669e773b937b63a0805408b227d224aeacef387c0e7"
 dependencies = [
  "blake2",
  "rand 0.8.3",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-fields",
+ "snarkvm-algorithms 0.4.0",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
  "snarkvm-gadgets",
  "snarkvm-marlin",
  "snarkvm-objects",
  "snarkvm-parameters",
  "snarkvm-polycommit",
- "snarkvm-profiler",
- "snarkvm-r1cs",
- "snarkvm-utilities",
+ "snarkvm-profiler 0.4.0",
+ "snarkvm-r1cs 0.4.0",
+ "snarkvm-utilities 0.4.0",
  "thiserror",
 ]
 
@@ -3150,6 +3243,12 @@ name = "snarkvm-profiler"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fd3e8f4794714aeb37d11632f071c2878e2fcbd4b959863a536edaec10d1604"
+
+[[package]]
+name = "snarkvm-profiler"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5260f9cb83a2828e72ad80d3aed01499943683ba28cfbb5854b3a25543997868"
 
 [[package]]
 name = "snarkvm-r1cs"
@@ -3161,9 +3260,24 @@ dependencies = [
  "fxhash",
  "indexmap",
  "itertools 0.10.0",
- "snarkvm-curves",
- "snarkvm-fields",
- "snarkvm-utilities",
+ "snarkvm-curves 0.4.0",
+ "snarkvm-fields 0.4.0",
+ "snarkvm-utilities 0.4.0",
+]
+
+[[package]]
+name = "snarkvm-r1cs"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfb45a3a5c14eb0192cf42d54c3a4d642ac51f481e2f2c18c17e4b47ae3025b9"
+dependencies = [
+ "cfg-if 1.0.0",
+ "fxhash",
+ "indexmap",
+ "itertools 0.10.0",
+ "snarkvm-curves 0.5.1",
+ "snarkvm-fields 0.5.1",
+ "snarkvm-utilities 0.5.1",
 ]
 
 [[package]]
@@ -3174,7 +3288,19 @@ checksum = "1e310ff5659e2fcc721103b0221d6bc4c2fd01d0a65b1b4c2bb317eb71522e55"
 dependencies = [
  "bincode",
  "rand 0.8.3",
- "snarkvm-derives",
+ "snarkvm-derives 0.4.0",
+ "thiserror",
+]
+
+[[package]]
+name = "snarkvm-utilities"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5859123ab00d39a006b5eb4070d99d86db2d0a6291a5d74f036ddb445647c3e"
+dependencies = [
+ "bincode",
+ "rand 0.8.3",
+ "snarkvm-derives 0.5.1",
  "thiserror",
 ]
 

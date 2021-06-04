@@ -18,7 +18,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.4.0"
+version = "0.5.1"
 default-features = false
 
 [dependencies.snarkvm-dpc]
@@ -82,7 +82,7 @@ version = "17"
 version = "17"
 
 [dependencies.metrics]
-version = "0.15"
+version = "0.16"
 
 [dependencies.parking_lot]
 version = "0.11.1"
