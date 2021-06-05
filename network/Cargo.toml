@@ -21,13 +21,13 @@ edition = "2018"
 prometheus = [ "metrics-exporter-prometheus" ]
 
 [dependencies.snarkvm-algorithms]
-version = "0.5.2"
+version = "0.5.3"
 
 [dependencies.snarkvm-dpc]
-version = "0.5.2"
+version = "0.5.3"
 
 [dependencies.snarkvm-utilities]
-version = "0.5.2"
+version = "0.5.3"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
