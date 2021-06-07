@@ -224,7 +224,7 @@ fn main() -> Result<(), NodeError> {
 
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_stack_size(4 * 1024 * 1024)
+        .thread_stack_size(16 * 1024 * 1024)
         .build()?;
 
     runtime.block_on(start_server(config))?;
