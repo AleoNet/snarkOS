@@ -22,7 +22,7 @@ version = "0.4.0"
 default-features = false
 
 [dependencies.snarkvm-dpc]
-version = "0.4.0"
+version = "0.5.2"
 
 [dependencies.snarkvm-objects]
 version = "0.4.0"
