@@ -92,28 +92,24 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
 
         info!("requested block information from {} peers", sync_nodes.len());
         let block_locator_hashes = self.block_locator_hashes().await;
-
-        let mut sent = 0usize;
         let mut future_set = vec![];
         for peer in sync_nodes.iter() {
             if let Some(handle) = self.node.peer_book.get_peer_handle(peer.address) {
                 let block_locator_hashes = block_locator_hashes.clone();
-                sent += 1;
                 future_set.push(async move {
                     handle.send_payload(Payload::GetSync(block_locator_hashes)).await;
                 });
             }
         }
+        let sent = future_set.len();
         futures::future::join_all(future_set).await;
         sent
     }
 
-    async fn receive_messages<F: FnMut(SyncInbound) -> bool>(
-        &mut self,
-        timeout_sec: u64,
-        moving_timeout_sec: u64,
-        mut handler: F,
-    ) {
+    /// receives an arbitrary amount of inbound sync messages with a given timeout.
+    /// if the passed `handler` callback returns `true`, then the loop is terminated early.
+    /// if the sync stream closes, the loop is also terminated early.
+    async fn receive_messages<F: FnMut(SyncInbound) -> bool>(&mut self, timeout_sec: u64, moving_timeout_sec: u64,, mut handler: F) {
         let end = Instant::now() + Duration::from_secs(timeout_sec);
         let mut moving_end = Instant::now() + Duration::from_secs(moving_timeout_sec);
         loop {
