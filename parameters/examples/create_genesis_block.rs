@@ -16,15 +16,15 @@
 
 use snarkos_parameters::transaction_1::Transaction1;
 
-use snarkvm_dpc::base_dpc::{instantiated::Components, transaction::DPCTransaction, BaseDPCComponents};
-use snarkvm_objects::{
+use snarkvm_dpc::{
+    testnet1::{instantiated::Components, transaction::Transaction as DPCTransaction, BaseDPCComponents},
     BlockHeader,
     BlockHeaderHash,
-    DPCTransactions,
     MerkleRootHash,
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
     TransactionError,
+    Transactions as DPCTransactions,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
@@ -50,7 +50,7 @@ pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
         difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
         nonce: 0,
         pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),
-        proof: ProofOfSuccinctWork::default(),
+        proof: ProofOfSuccinctWork([0; 972]),
     };
 
     Ok(genesis_header.serialize().to_vec())

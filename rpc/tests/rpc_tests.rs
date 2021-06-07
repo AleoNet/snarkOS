@@ -24,8 +24,7 @@ mod rpc_tests {
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
     };
-    use snarkvm_dpc::base_dpc::instantiated::Tx;
-    use snarkvm_objects::Transaction;
+    use snarkvm_dpc::{testnet1::instantiated::Tx, TransactionScheme};
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,
@@ -43,7 +42,7 @@ mod rpc_tests {
         let consensus = Arc::new(snarkos_testing::sync::create_test_consensus_from_ledger(ledger.clone()));
 
         let node_consensus = snarkos_network::Sync::new(
-            consensus.clone(),
+            consensus,
             consensus_setup.is_miner,
             Duration::from_secs(consensus_setup.block_sync_interval),
             Duration::from_secs(consensus_setup.tx_sync_interval),

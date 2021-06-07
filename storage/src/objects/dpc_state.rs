@@ -16,7 +16,7 @@
 
 use crate::*;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
+use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -24,7 +24,7 @@ use snarkvm_utilities::{
 
 use std::collections::HashSet;
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {

@@ -18,18 +18,24 @@ use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLe
 use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    instantiated::{Components, InstantiatedDPC, SerialNumberNonce, NUM_OUTPUT_RECORDS},
-    record_payload::RecordPayload,
+    testnet1::{
+        instantiated::{Components, InstantiatedDPC, SerialNumberNonce, NUM_OUTPUT_RECORDS},
+        parameters::PublicParameters,
+        payload::Payload as RecordPayload,
+        transaction::amount::AleoAmount,
+        Record as DPCRecord,
+    },
     Account,
     AccountAddress,
     AccountPrivateKey,
     AccountScheme,
+    Block,
     DPCComponents,
-    DPCRecord,
     DPCScheme,
-    PublicParameters,
+    LedgerScheme,
+    Storage,
+    Transactions as DPCTransactions,
 };
-use snarkvm_objects::{AleoAmount, Block, DPCTransactions, LedgerScheme, Storage};
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
 

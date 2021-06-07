@@ -17,7 +17,7 @@
 use crate::*;
 use snarkos_parameters::GenesisBlock;
 use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters};
-use snarkvm_objects::{errors::StorageError, Block, DatabaseTransaction, LedgerScheme, Op, Storage, Transaction};
+use snarkvm_dpc::{errors::StorageError, Block, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
 use snarkvm_parameters::{traits::genesis::Genesis, LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
@@ -34,7 +34,7 @@ use std::{
 
 pub type BlockHeight = u32;
 
-pub struct Ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage> {
+pub struct Ledger<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> {
     pub current_block_height: AtomicU32,
     pub ledger_parameters: Arc<P>,
     pub cm_merkle_tree: RwLock<MerkleTree<P>>,
@@ -42,7 +42,7 @@ pub struct Ledger<T: Transaction, P: LoadableMerkleParameters, S: Storage> {
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Create a fresh blockchain, optionally at the specified path.
     /// Warning: if specified, any existing storage at that location is removed.
     pub fn new_empty<PATH: AsRef<Path>>(path: Option<PATH>) -> Result<Self, StorageError> {

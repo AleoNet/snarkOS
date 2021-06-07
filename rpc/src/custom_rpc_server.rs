@@ -23,7 +23,7 @@ use crate::{
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_network::Node;
-use snarkvm_objects::Storage;
+use snarkvm_dpc::Storage;
 
 use hyper::{
     body::HttpBody,

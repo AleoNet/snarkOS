@@ -16,8 +16,7 @@
 
 use crate::*;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::Record;
-use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
+use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, RecordScheme, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -25,7 +24,7 @@ use snarkvm_utilities::{
 
 // TODO (howardwu): Remove this from `Ledger` as it is not used for ledger state.
 //  This is merely for local node / miner functionality.
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get all stored record commitments of the node
     pub fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut record_commitments = vec![];
@@ -44,7 +43,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn get_record<R: Record>(&self, record_commitment: &[u8]) -> Result<Option<R>, StorageError> {
+    pub fn get_record<R: RecordScheme>(&self, record_commitment: &[u8]) -> Result<Option<R>, StorageError> {
         match self.storage.get(COL_RECORDS, &record_commitment)? {
             Some(record_bytes) => {
                 let record: R = FromBytes::read(&record_bytes[..])?;
@@ -55,7 +54,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn store_record<R: Record>(&self, record: &R) -> Result<(), StorageError> {
+    pub fn store_record<R: RecordScheme>(&self, record: &R) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         database_transaction.push(Op::Insert {
@@ -68,7 +67,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn store_records<R: Record>(&self, records: &[R]) -> Result<(), StorageError> {
+    pub fn store_records<R: RecordScheme>(&self, records: &[R]) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         for record in records {
@@ -83,7 +82,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Removes a record from storage.
-    pub fn delete_record<R: Record>(&self, record: R) -> Result<(), StorageError> {
+    pub fn delete_record<R: RecordScheme>(&self, record: R) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         database_transaction.push(Op::Delete {

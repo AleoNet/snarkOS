@@ -16,8 +16,7 @@
 
 mod consensus_sidechain {
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::base_dpc::instantiated::Tx;
-    use snarkvm_objects::Block;
+    use snarkvm_dpc::{testnet1::instantiated::Tx, Block};
     use snarkvm_utilities::bytes::FromBytes;
 
     // Receive two new blocks out of order.

@@ -16,7 +16,7 @@
 
 use crate::{message::*, stats, NetworkError, Node};
 use snarkos_consensus::error::ConsensusError;
-use snarkvm_objects::{Block, BlockHeaderHash, Storage};
+use snarkvm_dpc::{Block, BlockHeaderHash, Storage};
 
 use std::net::SocketAddr;
 

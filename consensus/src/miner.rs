@@ -17,12 +17,16 @@
 use crate::{error::ConsensusError, Consensus};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    base_dpc::{instantiated::*, record::DPCRecord},
+    testnet1::{instantiated::*, Record as DPCRecord},
     AccountAddress,
+    Block,
+    BlockHeader,
     DPCScheme,
-    Record,
+    RecordScheme,
+    Storage,
+    TransactionScheme,
+    Transactions as DPCTransactions,
 };
-use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Storage, Transaction};
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
@@ -130,7 +134,7 @@ impl<S: Storage> Miner<S> {
 
     /// Run proof of work to find block.
     /// Returns BlockHeader with nonce solution.
-    pub fn find_block<T: Transaction>(
+    pub fn find_block<T: TransactionScheme>(
         &self,
         transactions: &DPCTransactions<T>,
         parent_header: &BlockHeader,

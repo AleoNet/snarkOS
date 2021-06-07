@@ -21,7 +21,7 @@ use crate::{
 };
 use snarkos_storage::{BlockHeight, Ledger};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{Storage, Transaction};
+use snarkvm_dpc::{Storage, TransactionScheme};
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -90,7 +90,7 @@ impl PeerBook {
     /// returns a new instance of PeerBook.
     ///
     #[inline]
-    pub fn load<T: Transaction, P: LoadableMerkleParameters, S: Storage>(storage: &Ledger<T, P, S>) -> Self {
+    pub fn load<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage>(storage: &Ledger<T, P, S>) -> Self {
         // Fetch the peer book from storage.
         match storage.get_peer_book() {
             // Attempt to deserialize it as a peer book.

@@ -21,7 +21,7 @@
 use crate::error::ConsensusError;
 use snarkos_storage::Ledger;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{dpc::DPCTransactions, BlockHeader, LedgerScheme, Storage, Transaction};
+use snarkvm_dpc::{BlockHeader, LedgerScheme, Storage, TransactionScheme, Transactions as DPCTransactions};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -32,7 +32,7 @@ use std::collections::HashMap;
 
 /// Stores a transaction and it's size in the memory pool.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Entry<T: Transaction> {
+pub struct Entry<T: TransactionScheme> {
     pub size_in_bytes: usize,
     pub transaction: T,
 }
@@ -40,7 +40,7 @@ pub struct Entry<T: Transaction> {
 /// Stores transactions received by the server.
 /// Transaction entries will eventually be fetched by the miner and assembled into blocks.
 #[derive(Debug, Clone)]
-pub struct MemoryPool<T: Transaction> {
+pub struct MemoryPool<T: TransactionScheme> {
     /// The mapping of all unconfirmed transaction IDs to their corresponding transaction data.
     pub transactions: HashMap<Vec<u8>, Entry<T>>,
     /// The total size in bytes of the current memory pool.
@@ -50,7 +50,7 @@ pub struct MemoryPool<T: Transaction> {
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
 const COINBASE_TRANSACTION_SIZE: usize = 1490; // TODO Find the value for actual coinbase transaction size
 
-impl<T: Transaction> MemoryPool<T> {
+impl<T: TransactionScheme> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
     #[inline]
     pub fn new() -> Self {
@@ -233,7 +233,7 @@ impl<T: Transaction> MemoryPool<T> {
     }
 }
 
-impl<T: Transaction> Default for MemoryPool<T> {
+impl<T: TransactionScheme> Default for MemoryPool<T> {
     fn default() -> Self {
         Self {
             total_size_in_bytes: 0,
@@ -246,8 +246,7 @@ impl<T: Transaction> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::base_dpc::instantiated::Tx;
-    use snarkvm_objects::Block;
+    use snarkvm_dpc::{testnet1::instantiated::Tx, Block};
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 

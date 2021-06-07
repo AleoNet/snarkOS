@@ -17,9 +17,8 @@
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{instantiated::Components, DPCComponents};
-use snarkvm_objects::{Network, Transaction, TransactionError};
-use snarkvm_parameters::{InnerSNARKVKCRHParameters, InnerSNARKVKParameters, Parameter};
+use snarkvm_dpc::{testnet1::instantiated::Components, DPCComponents, Network, TransactionError, TransactionScheme};
+use snarkvm_parameters::{global::InnerCircuitIDCRH, testnet1::InnerSNARKVKParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
@@ -36,9 +35,9 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerSNARKVerificationKeyCRH as CRH>::Parameters = FromBytes::read(InnerSNARKVKCRHParameters::load_bytes().unwrap().as_slice()).unwrap();
+    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerCircuitIDCRH as CRH>::Parameters = FromBytes::read(InnerCircuitIDCRH::load_bytes().unwrap().as_slice()).unwrap();
 
-    let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerSNARKVerificationKeyCRH =
+    let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerCircuitIDCRH =
         From::from(inner_snark_verification_key_crh_parameters);
 
     let inner_snark_id = to_bytes![
@@ -61,11 +60,11 @@ pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTx;
 
-impl Transaction for TestTx {
+impl TransactionScheme for TestTx {
     type Commitment = [u8; 32];
     type Digest = [u8; 32];
     type EncryptedRecord = [u8; 32];
-    type InnerSNARKID = [u8; 32];
+    type InnerCircuitID = [u8; 32];
     type LocalDataRoot = [u8; 32];
     type Memorandum = [u8; 32];
     type ProgramCommitment = [u8; 32];
@@ -84,7 +83,7 @@ impl Transaction for TestTx {
         &[0u8; 32]
     }
 
-    fn inner_circuit_id(&self) -> &Self::InnerSNARKID {
+    fn inner_circuit_id(&self) -> &Self::InnerCircuitID {
         &[0u8; 32]
     }
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_objects::BlockHeaderHash;
+use snarkvm_dpc::BlockHeaderHash;
 
 use crate::message::{Payload, Version};
 use payload_capnp::{

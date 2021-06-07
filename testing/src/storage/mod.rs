@@ -17,8 +17,13 @@
 use crate::sync::TestTx;
 pub use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
-use snarkvm_dpc::base_dpc::instantiated::CommitmentMerkleParameters;
-use snarkvm_objects::{Block, LedgerScheme, Storage, Transaction};
+use snarkvm_dpc::{
+    testnet1::instantiated::CommitmentMerkleParameters,
+    Block,
+    LedgerScheme,
+    Storage,
+    TransactionScheme,
+};
 
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
@@ -31,7 +36,7 @@ pub fn random_storage_path() -> String {
 }
 
 // Initialize a test blockchain given genesis attributes
-pub fn initialize_test_blockchain<T: Transaction, P: LoadableMerkleParameters, S: Storage>(
+pub fn initialize_test_blockchain<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage>(
     parameters: Arc<P>,
     genesis_block: Block<T>,
 ) -> Ledger<T, P, S> {

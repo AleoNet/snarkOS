@@ -16,7 +16,7 @@
 
 use crate::Ledger;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{errors::StorageError, BlockError, BlockHeader, BlockHeaderHash, Storage, Transaction};
+use snarkvm_dpc::{errors::StorageError, BlockError, BlockHeader, BlockHeaderHash, Storage, TransactionScheme};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
 
@@ -39,7 +39,7 @@ pub struct SideChainPath {
     pub path: Vec<BlockHeaderHash>,
 }
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();

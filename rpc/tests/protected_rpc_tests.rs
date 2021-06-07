@@ -26,15 +26,15 @@ mod protected_rpc_tests {
     };
 
     use snarkvm_dpc::{
-        base_dpc::{
+        testnet1::{
             instantiated::{Components, Tx},
-            record::DPCRecord,
+            record::Record as DPCRecord,
             TransactionKernel,
         },
         AccountAddress,
         AccountPrivateKey,
         AccountViewKey,
-        Record,
+        RecordScheme,
     };
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},

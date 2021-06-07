@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{message::*, stats, ConnReader, ConnWriter, NetworkError, Node, SerializedPeerBook, Version};
-use snarkvm_objects::Storage;
+use snarkvm_dpc::Storage;
 
 use std::{
     cmp,

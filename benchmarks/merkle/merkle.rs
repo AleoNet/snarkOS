@@ -19,7 +19,7 @@ use std::sync::Arc;
 use criterion::*;
 use rand::Rng;
 use snarkvm_algorithms::{merkle_tree::MerkleTree, MerkleParameters, CRH};
-use snarkvm_dpc::base_dpc::instantiated::*;
+use snarkvm_dpc::testnet1::instantiated::*;
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 

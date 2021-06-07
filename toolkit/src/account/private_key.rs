@@ -17,7 +17,7 @@
 use crate::errors::PrivateKeyError;
 
 use snarkvm_dpc::{
-    base_dpc::{instantiated::Components, parameters::SystemParameters},
+    testnet1::{instantiated::Components, parameters::SystemParameters},
     AccountPrivateKey,
 };
 

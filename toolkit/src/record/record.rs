@@ -20,13 +20,13 @@ use crate::{
 };
 
 use snarkvm_dpc::{
-    base_dpc::{
+    testnet1::{
         instantiated::Components,
         parameters::SystemParameters,
-        record::{DPCRecord, EncryptedRecord, RecordEncryption},
+        record::{EncryptedRecord, Record as DPCRecord, RecordEncryption},
         DPC,
     },
-    Record as RecordTrait,
+    RecordScheme as RecordTrait,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
