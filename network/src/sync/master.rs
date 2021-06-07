@@ -56,8 +56,8 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let our_block_height = self.node.expect_sync().current_block_height();
         let mut interesting_peers = vec![];
         for mut node in self.node.peer_book.connected_peers_snapshot().await {
-            let judge = node.judge();
-            if !judge && node.quality.block_height > our_block_height + 1 {
+            let judge_bad = node.judge_bad();
+            if !judge_bad && node.quality.block_height > our_block_height + 1 {
                 interesting_peers.push(node);
             }
         }

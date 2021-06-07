@@ -22,13 +22,13 @@ use crate::{stats, NetworkError, Payload, Peer};
 
 use super::network::PeerNetwork;
 
-pub type PeerJudge = dyn Fn(&Peer) -> bool + Send + Sync + 'static;
+pub type Peerjudge_bad = dyn Fn(&Peer) -> bool + Send + Sync + 'static;
 
 pub(super) enum PeerAction {
     Disconnect,
     Send(Payload),
     Get(oneshot::Sender<Peer>),
-    QualityJudgement,
+    Qualityjudge_badment,
     CancelSync,
     GotSyncBlock,
     ExpectingSyncBlocks(u32),
@@ -48,9 +48,9 @@ impl PeerHandle {
         receiver.await.ok()
     }
 
-    pub async fn judge(&self) {
+    pub async fn judge_bad(&self) {
         metrics::increment_gauge!(stats::QUEUES_OUTBOUND, 1.0);
-        self.sender.send(PeerAction::QualityJudgement).await.ok();
+        self.sender.send(PeerAction::Qualityjudge_badment).await.ok();
     }
 
     /// returns true if disconnected, false if not connected anymore
@@ -115,8 +115,8 @@ impl Peer {
                 sender.send(self.clone()).ok();
                 Ok(PeerResponse::None)
             }
-            PeerAction::QualityJudgement => {
-                if self.judge() {
+            PeerAction::Qualityjudge_badment => {
+                if self.judge_bad() {
                     warn!("Peer {} has a low quality score; disconnecting.", self.address);
                     Ok(PeerResponse::Disconnect)
                 } else {

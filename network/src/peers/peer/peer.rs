@@ -63,13 +63,13 @@ impl Peer {
         }
     }
 
-    pub fn judge(&mut self) -> bool {
+    pub fn judge_bad(&mut self) -> bool {
         let f = self.failures();
         // self.quality.rtt_ms > 1500 ||
         f >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
     }
 
-    pub fn judge_offline(&mut self) -> bool {
+    pub fn judge_bad_offline(&mut self) -> bool {
         self.failures() >= FAILURE_THRESHOLD
     }
 

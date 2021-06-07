@@ -161,7 +161,7 @@ impl PeerBook {
             Ok(Some(active_handler))
         } else {
             if let Some(mut peer) = self.get_disconnected_peer(address) {
-                if peer.judge_offline() {
+                if peer.judge_bad_offline() {
                     // dont reconnect to bad peers
                     return Ok(None);
                 }
@@ -198,9 +198,9 @@ impl PeerBook {
         futures::future::join_all(futures).await.into_iter().flatten().collect()
     }
 
-    pub async fn judgement(&self) {
+    pub async fn judge_badment(&self) {
         self.for_each_peer(move |peer| async move {
-            peer.judge().await;
+            peer.judge_bad().await;
         })
         .await;
     }

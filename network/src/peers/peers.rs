@@ -44,8 +44,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         );
 
         // Drop peers whose RTT is too high or have too many failures.
-        self.peer_book.judgement().await;
-        // give us 100ms to close some negatively judged connections (probably less needed, but we have time)
+        self.peer_book.judge_badment().await;
+        // give us 100ms to close some negatively judge_badd connections (probably less needed, but we have time)
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Attempt to connect to the default bootnodes of the network.
