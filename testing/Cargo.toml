@@ -29,7 +29,7 @@ network = [
 ]
 
 [dependencies.snarkvm-algorithms]
-version = "0.4.0"
+version = "0.5.2"
 
 [dependencies.snarkvm-curves]
 version = "0.4.0"
