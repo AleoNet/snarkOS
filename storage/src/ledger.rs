@@ -89,6 +89,16 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         self.get_current_block_height() + 1
     }
 
+    /// Get the height of the best block on the chain.
+    pub fn get_best_block_number(&self) -> Result<BlockHeight, StorageError> {
+        let best_block_number_bytes = self
+            .storage
+            .get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
+            .ok_or_else(|| StorageError::Message("Can't obtain the best block's number".into()))?;
+
+        Ok(bytes_to_u32(&best_block_number_bytes))
+    }
+
     /// Get the stored old connected peers.
     pub fn get_peer_book(&self) -> Result<Option<Vec<u8>>, StorageError> {
         self.storage.get(COL_META, &KEY_PEER_BOOK.as_bytes().to_vec())
@@ -179,11 +189,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     pub fn catch_up_secondary(&self, update_merkle_tree: bool) -> Result<(), StorageError> {
         // Sync the secondary and primary instances
         if self.storage.try_catch_up_with_primary().is_ok() {
-            let current_block_height_bytes = self
-                .storage
-                .get(COL_META, &KEY_BEST_BLOCK_NUMBER.as_bytes().to_vec())?
-                .ok_or_else(|| StorageError::Message("can't determine current block height".into()))?;
-            let new_current_block_height = bytes_to_u32(&current_block_height_bytes);
+            let new_current_block_height = self.get_best_block_number()?;
             let current_block_height = self.get_current_block_height();
 
             // If the new block height is greater than the stored block height,

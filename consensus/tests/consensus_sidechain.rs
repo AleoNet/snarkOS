@@ -156,4 +156,41 @@ mod consensus_sidechain {
 
         assert_eq!(old_block_height, new_block_height);
     }
+
+    #[test]
+    fn decommit() {
+        let consensus = snarkos_testing::sync::create_test_consensus();
+
+        // Introduce one block.
+        let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
+        consensus.receive_block(&block_1).unwrap();
+
+        // Verify that the best block number is the same as the block height.
+        let mut block_height = consensus.ledger.get_current_block_height();
+        let mut best_block_number = consensus.ledger.get_best_block_number().unwrap();
+        assert_eq!(best_block_number, block_height);
+
+        // Introduce another block.
+        let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
+        consensus.receive_block(&block_2).unwrap();
+
+        // Verify that the best block number is the same as the block height.
+        block_height = consensus.ledger.get_current_block_height();
+        best_block_number = consensus.ledger.get_best_block_number().unwrap();
+        assert_eq!(best_block_number, block_height);
+
+        // Check if the locator hashes can be found.
+        assert!(consensus.ledger.get_block_locator_hashes().is_ok());
+
+        // Decommit a block.
+        consensus.ledger.decommit_latest_block().unwrap();
+
+        // Verify that the best block number is the same as the block height.
+        block_height = consensus.ledger.get_current_block_height();
+        best_block_number = consensus.ledger.get_best_block_number().unwrap();
+        assert_eq!(best_block_number, block_height);
+
+        // Check if the locator hashes can still be found.
+        assert!(consensus.ledger.get_block_locator_hashes().is_ok());
+    }
 }
