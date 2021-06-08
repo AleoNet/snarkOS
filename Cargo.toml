@@ -133,7 +133,7 @@ version = "0.2"
 version = "0.11.2"
 
 [build-dependencies]
-rustc_version = "0.3"
+rustc_version = "0.4"
 
   [build-dependencies.capnpc]
   version = "0.14"

@@ -136,4 +136,4 @@ version = "0.26"
 version = "0.1.0"
 
 [build-dependencies]
-rustc_version = "0.3"
+rustc_version = "0.4"

@@ -2399,6 +2399,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustc_version"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
+dependencies = [
+ "semver 1.0.3",
+]
+
+[[package]]
 name = "rusty-hook"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2513,6 +2522,12 @@ checksum = "f301af10236f6df4160f7c3f04eec6dbc70ace82d23326abad5edee88801c6b6"
 dependencies = [
  "semver-parser 0.10.2",
 ]
+
+[[package]]
+name = "semver"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f3aac57ee7f3272d8395c6e4f502f434f0e289fcd62876f70daa008c20dcabe"
 
 [[package]]
 name = "semver-parser"
@@ -2687,7 +2702,7 @@ dependencies = [
  "hex",
  "parking_lot",
  "rand 0.8.3",
- "rustc_version 0.3.3",
+ "rustc_version 0.4.0",
  "rusty-hook",
  "self_update",
  "serde",
@@ -2789,7 +2804,7 @@ dependencies = [
  "parking_lot",
  "peak_alloc",
  "rand 0.8.3",
- "rustc_version 0.3.3",
+ "rustc_version 0.4.0",
  "serde",
  "snarkos-consensus",
  "snarkos-storage",
@@ -2850,7 +2865,7 @@ dependencies = [
  "metrics",
  "parking_lot",
  "rand 0.8.3",
- "rustc_version 0.3.3",
+ "rustc_version 0.4.0",
  "serde",
  "serde_json",
  "snarkos-consensus",
