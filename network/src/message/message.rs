@@ -62,29 +62,29 @@ impl fmt::Display for Message {
 /// The actual message transmitted over the network.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Payload {
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/block.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/block.md"))]
     Block(Vec<u8>),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_blocks.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/get_blocks.md"))]
     GetBlocks(Vec<BlockHeaderHash>),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_memory_pool.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/get_memory_pool.md"))]
     GetMemoryPool,
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_peers.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/get_peers.md"))]
     GetPeers,
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_sync.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/get_sync.md"))]
     GetSync(Vec<BlockHeaderHash>),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/memory_pool.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/memory_pool.md"))]
     MemoryPool(Vec<Vec<u8>>),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/peers.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/peers.md"))]
     Peers(Vec<SocketAddr>),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/ping.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/ping.md"))]
     Ping(BlockHeight),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/pong.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/pong.md"))]
     Pong,
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/sync.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/sync.md"))]
     Sync(Vec<BlockHeaderHash>),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/sync_block.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/sync_block.md"))]
     SyncBlock(Vec<u8>),
-    #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/transaction.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../../documentation/network_messages/transaction.md"))]
     Transaction(Vec<u8>),
 
     // a placeholder indicating the introduction of a new payload type; used for forward compatibility

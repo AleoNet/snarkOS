@@ -87,10 +87,10 @@ pub trait RpcFunctions {
 
 /// Definition of private RPC endpoints that require authentication.
 pub trait ProtectedRpcFunctions {
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createaccount.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/createaccount.md"))]
     fn create_account(&self) -> Result<RpcAccount, RpcError>;
 
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createrawtransaction.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/createrawtransaction.md"))]
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
@@ -98,31 +98,31 @@ pub trait ProtectedRpcFunctions {
 
     #[cfg_attr(
         nightly,
-        doc(include = "../documentation/private_endpoints/createtransactionkernel.md")
+        doc = include_str!("../documentation/private_endpoints/createtransactionkernel.md")
     )]
     fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError>;
 
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createtransaction.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/createtransaction.md"))]
     fn create_transaction(&self, transaction_kernel: String) -> Result<CreateRawTransactionOuput, RpcError>;
 
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrecordcommitments.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/getrecordcommitments.md"))]
     fn get_record_commitments(&self) -> Result<Vec<String>, RpcError>;
 
     #[cfg_attr(
         nightly,
-        doc(include = "../documentation/private_endpoints/getrecordcommitmentcount.md")
+        doc = include_str!("../documentation/private_endpoints/getrecordcommitmentcount.md")
     )]
     fn get_record_commitment_count(&self) -> Result<usize, RpcError>;
 
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrawrecord.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/getrawrecord.md"))]
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/decoderecord.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/decoderecord.md"))]
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
 
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/decryptrecord.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/decryptrecord.md"))]
     fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError>;
 
-    #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/disconnect.md"))]
+    #[cfg_attr(nightly, doc = include_str!("../documentation/private_endpoints/disconnect.md"))]
     fn disconnect(&self, address: SocketAddr);
 }

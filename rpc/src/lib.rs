@@ -18,9 +18,9 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 // Documentation
-#![cfg_attr(nightly, feature(doc_cfg, external_doc))]
+#![cfg_attr(nightly, feature(doc_cfg))]
 // #![cfg_attr(nightly, warn(missing_docs))]
-#![cfg_attr(nightly, doc(include = "../documentation/concepts/rpc_server.md"))]
+#![cfg_attr(nightly, doc = include_str!("../documentation/concepts/rpc_server.md"))]
 
 #[macro_use]
 extern crate derivative;
