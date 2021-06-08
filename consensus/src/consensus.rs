@@ -167,7 +167,7 @@ impl<S: Storage> Consensus<S> {
 
                     // Attempt to fast forward the block state if the node already stores
                     // the children of the new canon block.
-                    let (_, child_path) = self.ledger.longest_child_path(block.header.get_hash())?;
+                    let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
                     for child_block_hash in child_path {
                         let new_block = self.ledger.get_block(&child_block_hash)?;
                         self.process_block(&new_block)?;

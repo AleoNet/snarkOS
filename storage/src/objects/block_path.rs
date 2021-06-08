@@ -71,7 +71,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
                     let longest_path = self.longest_child_path(block_hash)?;
 
-                    side_chain_path.extend(longest_path.1);
+                    side_chain_path.extend(longest_path);
 
                     return Ok(BlockPath::SideChain(SideChainPath {
                         shared_block_number: *block_num,
@@ -93,30 +93,25 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     }
 
     /// Returns the path length and the longest path of children from the given block header
-    pub fn longest_child_path(
-        &self,
-        block_hash: BlockHeaderHash,
-    ) -> Result<(usize, Vec<BlockHeaderHash>), StorageError> {
-        let children = self.get_child_block_hashes(&block_hash)?;
-
-        let mut final_path = vec![block_hash];
-
-        if children.is_empty() {
-            Ok((1, final_path))
-        } else {
-            let mut paths = Vec::with_capacity(children.len());
-            for child in children {
-                paths.push(self.longest_child_path(child)?);
+    pub fn longest_child_path(&self, block_hash: BlockHeaderHash) -> Result<Vec<BlockHeaderHash>, StorageError> {
+        let mut round = vec![vec![block_hash]];
+        let mut next_round = vec![];
+        loop {
+            for path in &round {
+                let children = self.get_child_block_hashes(path.last().unwrap())?;
+                next_round.extend(children.into_iter().map(|x| {
+                    let mut path = path.clone();
+                    path.push(x);
+                    path
+                }));
             }
-
-            match paths.iter().max_by_key(|x| x.0) {
-                Some((longest_child_path_length, longest_child_path)) => {
-                    final_path.extend(longest_child_path.clone());
-
-                    Ok((*longest_child_path_length + 1, final_path))
-                }
-                None => Ok((1, final_path)),
+            if next_round.is_empty() {
+                break;
             }
+            round = next_round;
+            next_round = vec![];
         }
+
+        Ok(round.into_iter().max_by_key(|x| x.len()).unwrap())
     }
 }
