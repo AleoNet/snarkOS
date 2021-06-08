@@ -75,7 +75,7 @@ version = "0.4.11"
 version = "0.16"
 
 [dependencies.metrics-exporter-prometheus]
-version = "0.4"
+version = "0.5"
 optional = true
 
 [dependencies.once_cell]
