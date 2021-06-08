@@ -24,7 +24,7 @@ mem_storage = [ ]
 test = [ ]
 
 [dependencies.snarkvm-algorithms]
-version = "0.5.3"
+version = "0.5.4"
 
 [dependencies.snarkvm-dpc]
 version = "0.5.3"
