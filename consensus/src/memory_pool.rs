@@ -158,7 +158,7 @@ impl<T: TransactionScheme> MemoryPool<T> {
         let mut new_memory_pool = Self::new();
 
         for (_, entry) in self.clone().transactions.iter() {
-            new_memory_pool.insert(&storage, entry.clone())?;
+            new_memory_pool.insert(storage, entry.clone())?;
         }
 
         self.total_size_in_bytes = new_memory_pool.total_size_in_bytes;

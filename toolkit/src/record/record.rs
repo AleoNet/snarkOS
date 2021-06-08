@@ -60,7 +60,7 @@ impl Record {
 
     /// Return the serial number that corresponds to the record.
     pub fn to_serial_number(&self, private_key: &PrivateKey) -> Result<Vec<u8>, RecordError> {
-        let address = Address::from(&private_key)?;
+        let address = Address::from(private_key)?;
 
         // Check that the private key corresponds with the owner of the record
         if self.record.owner() != &address.address {

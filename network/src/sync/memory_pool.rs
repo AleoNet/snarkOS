@@ -136,7 +136,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                 transaction,
             };
 
-            if let Ok(Some(txid)) = memory_pool.insert(&storage, entry) {
+            if let Ok(Some(txid)) = memory_pool.insert(storage, entry) {
                 debug!(
                     "Transaction added to memory pool with txid: {:?}",
                     hex::encode(txid.clone())
@@ -147,11 +147,11 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         // Cleanse and store transactions once batch has been received.
         debug!("Cleansing memory pool transactions in database");
         memory_pool
-            .cleanse(&storage)
+            .cleanse(storage)
             .unwrap_or_else(|error| debug!("Failed to cleanse memory pool transactions in database {}", error));
         debug!("Storing memory pool transactions in database");
         memory_pool
-            .store(&storage)
+            .store(storage)
             .unwrap_or_else(|error| debug!("Failed to store memory pool transaction in database {}", error));
 
         Ok(())

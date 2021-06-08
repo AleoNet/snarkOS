@@ -69,7 +69,7 @@ impl FromBytes for TransactionLocation {
 
 pub fn bytes_to_u32(bytes: &[u8]) -> u32 {
     let mut num_bytes = [0u8; 4];
-    num_bytes.copy_from_slice(&bytes);
+    num_bytes.copy_from_slice(bytes);
 
     u32::from_le_bytes(num_bytes)
 }

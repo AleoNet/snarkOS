@@ -310,7 +310,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         // If the block does not exist in the storage
         if !self.block_hash_exists(&block_hash) {
             // Insert it first
-            self.insert_only(&block)?;
+            self.insert_only(block)?;
         }
         // Commit it
         self.commit(block)

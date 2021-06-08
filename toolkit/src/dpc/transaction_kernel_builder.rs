@@ -281,7 +281,7 @@ impl TransactionKernel {
                 &parameters.account_signature,
                 &parameters.account_commitment,
                 &parameters.account_encryption,
-                &private_key,
+                private_key,
             )?;
 
             assert_eq!(&address, record.owner());

@@ -272,7 +272,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                     transaction,
                 };
 
-                if let Ok(inserted) = self.memory_pool()?.lock().insert(&storage, entry) {
+                if let Ok(inserted) = self.memory_pool()?.lock().insert(storage, entry) {
                     if inserted.is_some() {
                         info!("Transaction added to the memory pool.");
                         // TODO(ljedrz): checks if needs to be propagated to the network; if need be, this could
@@ -398,7 +398,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let full_transactions = self
             .memory_pool()?
             .lock()
-            .get_candidates(&storage, self.consensus_parameters()?.max_block_size)?;
+            .get_candidates(storage, self.consensus_parameters()?.max_block_size)?;
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 

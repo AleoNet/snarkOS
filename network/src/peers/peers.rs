@@ -383,7 +383,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("Broadcasting `Ping` messages");
 
         // Consider peering tests that don't use the sync layer.
-        let current_block_height = if let Some(ref sync) = self.sync() {
+        let current_block_height = if let Some(sync) = self.sync() {
             sync.current_block_height()
         } else {
             0
@@ -412,7 +412,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let serialized_peer_book = bincode::serialize(&SerializedPeerBook::from(&self.peer_book))?;
 
         // TODO: the peer book should be stored outside of sync
-        if let Some(ref sync) = self.sync() {
+        if let Some(sync) = self.sync() {
             // Save the serialized peer book to storage.
             sync.storage().save_peer_book_to_storage(serialized_peer_book)?;
         }

@@ -106,7 +106,7 @@ impl Payload {
             match self {
                 Payload::Block(bytes) => {
                     let mut builder = builder.init_block();
-                    builder.set_data(&bytes);
+                    builder.set_data(bytes);
                 }
                 Payload::GetBlocks(hashes) => {
                     let mut builder = builder.init_get_blocks(hashes.len() as u32);
@@ -181,11 +181,11 @@ impl Payload {
                 }
                 Payload::SyncBlock(bytes) => {
                     let mut builder = builder.init_sync_block();
-                    builder.set_data(&bytes);
+                    builder.set_data(bytes);
                 }
                 Payload::Transaction(bytes) => {
                     let mut builder = builder.init_transaction();
-                    builder.set_data(&bytes);
+                    builder.set_data(bytes);
                 }
                 _ => unreachable!(),
             }
@@ -215,7 +215,7 @@ fn deserialize_block_hashes(hashes: BlockHashes<'_>) -> capnp::Result<Vec<BlockH
     for hash in hashes.iter() {
         let bytes = hash.get_hash()?;
         let mut block_hash = [0u8; 32];
-        block_hash.copy_from_slice(&bytes);
+        block_hash.copy_from_slice(bytes);
         vec.push(BlockHeaderHash(block_hash));
     }
 

@@ -44,7 +44,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
     /// Get a transaction bytes given the transaction id.
     pub fn get_record<R: RecordScheme>(&self, record_commitment: &[u8]) -> Result<Option<R>, StorageError> {
-        match self.storage.get(COL_RECORDS, &record_commitment)? {
+        match self.storage.get(COL_RECORDS, record_commitment)? {
             Some(record_bytes) => {
                 let record: R = FromBytes::read(&record_bytes[..])?;
                 Ok(Some(record))
