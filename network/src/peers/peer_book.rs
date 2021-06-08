@@ -82,7 +82,7 @@ impl PeerBook {
         let peers = PeerBook {
             disconnected_peers: Default::default(),
             connected_peers: Default::default(),
-            pending_connections: Arc::new(AtomicU32::default()),
+            pending_connections: Default::default(),
             peer_events: sender,
         };
         tokio::spawn(
