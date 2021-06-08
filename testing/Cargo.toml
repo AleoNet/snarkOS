@@ -32,7 +32,7 @@ network = [
 version = "0.5.3"
 
 [dependencies.snarkvm-curves]
-version = "0.5.3"
+version = "0.5.4"
 
 [dependencies.snarkvm-dpc]
 version = "0.5.3"
