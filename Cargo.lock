@@ -2974,9 +2974,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-derives"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5d63f2e96146d1a839cf47d30703cb0e281acb9569a1a5b3a20e8a826d0381a"
+checksum = "a87c013ae803f616168939152836beb419cc7d76a12e17db3c723a0c11faa612"
 dependencies = [
  "proc-macro-crate",
  "proc-macro-error",
