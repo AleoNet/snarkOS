@@ -229,6 +229,6 @@ mod consensus_sidechain {
         assert_eq!(shared_height, 100);
 
         // Verify the integrity of the block storage for the first instance.
-        consensus1.ledger.validate(100).unwrap();
+        consensus1.ledger.validate(None);
     }
 }
