@@ -139,8 +139,10 @@ impl TestBlocks {
         TestBlocks(blocks)
     }
 
-    pub fn load(count: usize) -> Self {
-        TestBlocks::read(&include_bytes!("test_blocks_100")[..], count).unwrap()
+    pub fn load(count: usize, batch: usize) -> Self {
+        let blocks_path = format!("{}/src/sync/test_blocks_100_{}", env!("CARGO_MANIFEST_DIR"), batch);
+        let blocks_bytes = std::fs::read(&blocks_path).unwrap();
+        TestBlocks::read(&*blocks_bytes, count).unwrap()
     }
 
     pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
