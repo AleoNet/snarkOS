@@ -193,4 +193,42 @@ mod consensus_sidechain {
         // Check if the locator hashes can still be found.
         assert!(consensus.ledger.get_block_locator_hashes().is_ok());
     }
+
+    #[test]
+    fn long_fork_and_sync() {
+        let consensus1 = snarkos_testing::sync::create_test_consensus();
+        let consensus2 = snarkos_testing::sync::create_test_consensus();
+
+        // Consensus 1 imports 25 blocks.
+        let blocks_1 = TestBlocks::load(25, 1).0;
+        for block in blocks_1 {
+            consensus1.receive_block(&block).unwrap();
+        }
+
+        // Consensus 2 imports 100 blocks.
+        let blocks_2 = TestBlocks::load(100, 2).0;
+        for block in &blocks_2 {
+            consensus2.receive_block(block).unwrap();
+        }
+
+        // There is no overlap between the 2 instances.
+        let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
+        let latest_shared_hash = consensus2.ledger.get_latest_shared_hash(consensus1_locator_hashes).unwrap();
+        let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
+        assert_eq!(shared_height, 0);
+
+        // Consensus 1 imports 100 blocks that consensus 2 has.
+        for block in blocks_2 {
+            consensus1.receive_block(&block).unwrap();
+        }
+
+        // The blocks should fully overlap between the 2 instances now.
+        let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
+        let latest_shared_hash = consensus2.ledger.get_latest_shared_hash(consensus1_locator_hashes).unwrap();
+        let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
+        assert_eq!(shared_height, 100);
+
+        // Verify the integrity of the block storage for the first instance.
+        consensus1.ledger.validate(100).unwrap();
+    }
 }
