@@ -37,7 +37,7 @@ fn providing_sync_blocks(c: &mut Criterion) {
 
     const NUM_BLOCKS: usize = 10;
 
-    let blocks = TestBlocks::load(NUM_BLOCKS, 1);
+    let blocks = TestBlocks::load(NUM_BLOCKS, "test_blocks_100_1");
     for block in &blocks.0 {
         provider.expect_sync().consensus.receive_block(&block).unwrap();
     }

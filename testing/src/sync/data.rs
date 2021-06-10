@@ -139,8 +139,8 @@ impl TestBlocks {
         TestBlocks(blocks)
     }
 
-    pub fn load(count: usize, batch: usize) -> Self {
-        let blocks_path = format!("{}/src/sync/test_blocks_100_{}", env!("CARGO_MANIFEST_DIR"), batch);
+    pub fn load(count: usize, batch_name: &str) -> Self {
+        let blocks_path = format!("{}/src/sync/{}", env!("CARGO_MANIFEST_DIR"), batch_name);
         let blocks_bytes = std::fs::read(&blocks_path).unwrap();
         TestBlocks::read(&*blocks_bytes, count).unwrap()
     }
