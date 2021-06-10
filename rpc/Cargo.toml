@@ -64,7 +64,7 @@ version = "0.14"
 features = [ "http1", "runtime", "server" ]
 
 [dependencies.itertools]
-version = "0.10.0"
+version = "0.10.1"
 
 [dependencies.json-rpc-types]
 version = "1.0.1"
