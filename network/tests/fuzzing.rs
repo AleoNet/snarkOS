@@ -538,7 +538,7 @@ async fn connection_request_spam() {
         });
     }
 
-    wait_until!(3, node.peer_book.get_active_peer_count() == max_peers as u32);
+    wait_until!(3, node.peer_book.get_active_peer_count() >= max_peers as u32);
 
     wait_until!(
         snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 * 2,
