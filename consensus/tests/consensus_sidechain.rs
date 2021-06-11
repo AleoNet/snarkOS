@@ -159,13 +159,13 @@ mod consensus_sidechain {
         assert_eq!(old_block_height, new_block_height);
     }
 
-    #[test]
-    fn decommit() {
+    #[tokio::test]
+    async fn decommit() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         // Introduce one block.
         let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        consensus.receive_block(&block_1).unwrap();
+        consensus.receive_block(&block_1).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
         let mut block_height = consensus.ledger.get_current_block_height();
@@ -174,7 +174,7 @@ mod consensus_sidechain {
 
         // Introduce another block.
         let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
-        consensus.receive_block(&block_2).unwrap();
+        consensus.receive_block(&block_2).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
         block_height = consensus.ledger.get_current_block_height();

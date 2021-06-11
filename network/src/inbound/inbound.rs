@@ -189,7 +189,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                         // sent to peers that declare a greater block height.
                         warn!("{} doesn't have sync blocks to share", source);
                         if let Some(peer) = self.peer_book.get_peer_handle(source) {
-                            peer.soft_fail().await;
+                            peer.fail().await;
                         }
                     } else {
                         trace!("Received {} sync block hashes from {}", sync.len(), source);

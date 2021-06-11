@@ -77,7 +77,7 @@ impl PeerHandle {
         self.sender.send(PeerAction::ExpectingSyncBlocks(amount)).await.ok();
     }
 
-    pub async fn soft_fail(&self) {
+    pub async fn fail(&self) {
         metrics::increment_gauge!(stats::QUEUES_OUTBOUND, 1.0);
         self.sender.send(PeerAction::SoftFail).await.ok();
     }

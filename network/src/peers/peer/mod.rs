@@ -17,21 +17,22 @@
 mod cipher;
 mod connector;
 mod handshake;
+mod inbound_handler;
 mod network;
-pub mod peer;
+mod outbound_handler;
 mod peer_events;
-pub mod peer_quality;
 mod receiver;
 
-mod inbound_handler;
-mod outbound_handler;
+pub mod peer;
+pub mod peer_quality;
 
 pub use outbound_handler::*;
 pub use peer::*;
+pub use peer_events::*;
 pub use peer_quality::*;
+
 // used in integration tests
 #[doc(hidden)]
 pub use cipher::Cipher;
 #[doc(hidden)]
 pub use network::*;
-pub use peer_events::*;

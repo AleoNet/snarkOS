@@ -31,22 +31,6 @@ use super::network::PeerIOHandle;
 const CONNECTION_TIMEOUT_SECS: u64 = 3;
 
 impl Peer {
-    async fn inner_connect(&mut self, our_version: Version) -> Result<PeerIOHandle, NetworkError> {
-        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
-        let _x = defer::defer(|| metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0));
-
-        let tcp_stream;
-        select! {
-            stream = TcpStream::connect(self.address).fuse() => {
-                tcp_stream = stream?;
-            },
-            _ = tokio::time::sleep(Duration::from_secs(CONNECTION_TIMEOUT_SECS)).fuse() => {
-                return Err(NetworkError::Io(IoError::new(ErrorKind::TimedOut, "connection timed out")));
-            },
-        }
-        self.inner_handshake_initiator(tcp_stream, our_version).await
-    }
-
     pub fn connect<S: Storage + Send + Sync + 'static>(mut self, node: Node<S>, event_target: mpsc::Sender<PeerEvent>) {
         let (sender, receiver) = mpsc::channel::<PeerAction>(64);
         tokio::spawn(async move {
@@ -103,5 +87,21 @@ impl Peer {
                 .await
                 .ok();
         });
+    }
+
+    async fn inner_connect(&mut self, our_version: Version) -> Result<PeerIOHandle, NetworkError> {
+        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+        let _x = defer::defer(|| metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0));
+
+        let tcp_stream;
+        select! {
+            stream = TcpStream::connect(self.address).fuse() => {
+                tcp_stream = stream?;
+            },
+            _ = tokio::time::sleep(Duration::from_secs(CONNECTION_TIMEOUT_SECS)).fuse() => {
+                return Err(NetworkError::Io(IoError::new(ErrorKind::TimedOut, "connection timed out")));
+            },
+        }
+        self.inner_handshake_initiator(tcp_stream, our_version).await
     }
 }

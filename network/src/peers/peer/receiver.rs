@@ -25,17 +25,6 @@ use crate::{stats, NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandl
 use super::network::PeerIOHandle;
 
 impl Peer {
-    async fn inner_receive(
-        remote_address: SocketAddr,
-        stream: TcpStream,
-        our_version: Version,
-    ) -> Result<(Peer, PeerIOHandle), NetworkError> {
-        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
-        let _x = defer::defer(|| metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0));
-
-        Peer::inner_handshake_responder(remote_address, stream, our_version).await
-    }
-
     pub fn receive<S: Storage + Send + Sync + 'static>(
         remote_address: SocketAddr,
         node: Node<S>,
@@ -95,5 +84,16 @@ impl Peer {
                 .await
                 .ok();
         });
+    }
+
+    async fn inner_receive(
+        remote_address: SocketAddr,
+        stream: TcpStream,
+        our_version: Version,
+    ) -> Result<(Peer, PeerIOHandle), NetworkError> {
+        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
+        let _x = defer::defer(|| metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0));
+
+        Peer::inner_handshake_responder(remote_address, stream, our_version).await
     }
 }
