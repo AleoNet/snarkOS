@@ -225,7 +225,7 @@ mod consensus_sidechain {
         let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
         assert_eq!(shared_height, 0);
 
-        // Consensus 2 imports a few random blocks that consensus 2 has.
+        // Consensus 1 imports a few random blocks that consensus 2 has.
         let num_random_blocks = rng.gen_range(1..=50);
         for block in blocks_2.iter().choose_multiple(&mut rng, num_random_blocks) {
             let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
