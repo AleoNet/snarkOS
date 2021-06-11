@@ -74,6 +74,9 @@ version = "0.3"
 [dev-dependencies.rand_xorshift]
 version = "0.3"
 
+[dev-dependencies.tracing-subscriber]
+version = "0.2"
+
 [[bench]]
 name = "transactions"
 path = "benches/transactions.rs"

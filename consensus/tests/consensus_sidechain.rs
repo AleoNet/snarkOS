@@ -19,6 +19,8 @@ mod consensus_sidechain {
     use snarkvm_dpc::{testnet1::instantiated::Tx, Block};
     use snarkvm_utilities::bytes::FromBytes;
 
+    use rand::{seq::IteratorRandom, thread_rng, Rng};
+
     // Receive two new blocks out of order.
     // Like the test above, except block 2 is received first as an orphan with no parent.
     // The sync mechanism should push the orphan into storage until block 1 is received.
@@ -192,5 +194,118 @@ mod consensus_sidechain {
 
         // Check if the locator hashes can still be found.
         assert!(consensus.ledger.get_block_locator_hashes().is_ok());
+    }
+
+    #[test]
+    fn long_fork_and_sync_no_overlap() {
+        //tracing_subscriber::fmt::init();
+        let mut rng = thread_rng();
+
+        let consensus1 = snarkos_testing::sync::create_test_consensus();
+        let consensus2 = snarkos_testing::sync::create_test_consensus();
+
+        // Consensus 1 imports a random number of blocks lower than consensus 2.
+        let blocks_1 = TestBlocks::load(rng.gen_range(0..=50), "test_blocks_100_1").0;
+        for block in blocks_1 {
+            consensus1.receive_block(&block).unwrap();
+        }
+
+        // Consensus 2 imports 100 blocks.
+        let blocks_2 = TestBlocks::load(100, "test_blocks_100_2").0;
+        for block in &blocks_2 {
+            consensus2.receive_block(block).unwrap();
+        }
+
+        // There is no overlap between the 2 instances.
+        let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
+        let latest_shared_hash = consensus2
+            .ledger
+            .get_latest_shared_hash(consensus1_locator_hashes)
+            .unwrap();
+        let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
+        assert_eq!(shared_height, 0);
+
+        // Consensus 1 imports a few random blocks that consensus 2 has.
+        let num_random_blocks = rng.gen_range(1..=50);
+        for block in blocks_2.iter().choose_multiple(&mut rng, num_random_blocks) {
+            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+        }
+
+        // Consensus 1 imports all the blocks that consensus 2 has, simulating a full sync.
+        for block in blocks_2 {
+            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+        }
+
+        // The blocks should fully overlap between the 2 instances now.
+        let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
+        let latest_shared_hash = consensus2
+            .ledger
+            .get_latest_shared_hash(consensus1_locator_hashes)
+            .unwrap();
+        let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
+        assert_eq!(shared_height, 100);
+
+        // Verify the integrity of the block storage for the first instance.
+        assert!(consensus1.ledger.validate(None));
+    }
+
+    #[test]
+    fn long_fork_and_sync_initial_overlap() {
+        //tracing_subscriber::fmt::init();
+        let mut rng = thread_rng();
+
+        let consensus1 = snarkos_testing::sync::create_test_consensus();
+        let consensus2 = snarkos_testing::sync::create_test_consensus();
+
+        let blocks1 = TestBlocks::load(50, "test_blocks_100_1").0; // side chain blocks
+        let blocks2 = TestBlocks::load(100, "test_blocks_100_2").0; // canon blocks
+
+        // Consensus 2 imports 100 blocks.
+        for block in &blocks2 {
+            consensus2.receive_block(block).unwrap();
+        }
+
+        // Consensus 1 imports a random number of blocks that consensus 2 has (canon).
+        for block in blocks2.iter().take(rng.gen_range(0..=25)) {
+            consensus1.receive_block(block).unwrap();
+        }
+        let overlap_height = consensus1.ledger.get_current_block_height();
+
+        // There is some initial overlap between the 2 instances.
+        let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
+        let latest_shared_hash = consensus2
+            .ledger
+            .get_latest_shared_hash(consensus1_locator_hashes)
+            .unwrap();
+        let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
+        assert_eq!(shared_height, overlap_height);
+
+        // Consensus 1 imports a random number of side blocks that cause it to fork to the side chain.
+        for block in blocks1.iter().take(rng.gen_range(0..=overlap_height as usize + 25)) {
+            consensus1.receive_block(&block).unwrap();
+        }
+
+        // Consensus 1 imports a few random blocks that consensus 2 has.
+        let num_random_blocks = rng.gen_range(overlap_height..=25) as usize;
+        for block in blocks2.iter().choose_multiple(&mut rng, num_random_blocks) {
+            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+        }
+
+        // Consensus 1 imports all the blocks that consensus 2 has, simulating a full sync.
+        for block in blocks2 {
+            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+        }
+
+        // The blocks should fully overlap between the 2 instances now.
+        let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
+        let latest_shared_hash = consensus2
+            .ledger
+            .get_latest_shared_hash(consensus1_locator_hashes)
+            .unwrap();
+        let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
+        assert_eq!(shared_height, 100);
+
+        // Verify the integrity of the block storage for the first instance.
+        assert!(consensus1.ledger.validate(None));
     }
 }
