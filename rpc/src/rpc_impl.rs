@@ -223,7 +223,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let transaction_id = transaction.transaction_id()?;
         let storage = &self.storage;
         let block_number = match storage.get_transaction_location(&transaction_id.to_vec())? {
-            Some(block_location) => Some(storage.get_block_number(&BlockHeaderHash(block_location.block_hash))?),
+            Some(block_location) => storage
+                .get_block_number(&BlockHeaderHash(block_location.block_hash))
+                .ok(),
             None => None,
         };
 
