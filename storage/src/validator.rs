@@ -16,13 +16,13 @@
 
 use crate::Ledger;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{Storage, TransactionScheme};
+use snarkvm_dpc::{Block, BlockHeaderHash, LedgerScheme, Storage, TransactionScheme};
 
 use tracing::*;
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
-    /// Performs a check of all the stored blocks and their relationships between one another; starts at the
-    /// current block height and goes down until the genesis block, making sure that the block-related data
+    /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
+    /// at the current block height and goes down until the genesis block, making sure that the block-related data
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks.
     pub fn validate(&self, mut limit: Option<usize>) -> bool {
@@ -115,6 +115,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 error!("The header for block at height {} is missing!", current_height);
             }
 
+            self.validate_block_transactions(&current_block, current_height);
+
             current_height -= 1;
 
             let previous_block = match self.get_block_from_block_number(current_height) {
@@ -175,5 +177,84 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         is_valid
+    }
+
+    /// Validates the storage of transactions belonging to the given block.
+    fn validate_block_transactions(&self, block: &Block<T>, height: u32) {
+        for tx in block.transactions.iter() {
+            let tx_id = match tx.transaction_id() {
+                Ok(hash) => hash,
+                Err(e) => {
+                    error!(
+                        "The id of a transaction from block {} can't be parsed: {}",
+                        block.header.get_hash(),
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            let tx = match self.get_transaction_bytes(&tx_id) {
+                Ok(tx) => match T::read(&tx[..]) {
+                    Ok(tx) => tx,
+                    Err(e) => {
+                        error!("Transaction {} can't be parsed: {}", hex::encode(tx_id), e);
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    error!(
+                        "Transaction {} can't be found in the storage: {}",
+                        hex::encode(tx_id),
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            for sn in tx.old_serial_numbers() {
+                if !self.contains_sn(&sn) {
+                    error!(
+                        "Transaction {} doesn't have an old serial number stored",
+                        hex::encode(tx_id)
+                    );
+                }
+            }
+
+            for cm in tx.new_commitments() {
+                if !self.contains_cm(&cm) {
+                    error!(
+                        "Transaction {} doesn't have a new commitment stored",
+                        hex::encode(tx_id)
+                    );
+                }
+            }
+
+            if !self.contains_memo(&tx.memorandum()) {
+                error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
+            }
+
+            match self.get_transaction_location(&tx_id) {
+                Ok(Some(block_location)) => match self.get_block_number(&BlockHeaderHash(block_location.block_hash)) {
+                    Ok(block_number) => {
+                        if block_number != height {
+                            error!(
+                                "The block indicated by the location of tx {} doesn't match the current height ({} != {})",
+                                hex::encode(tx_id),
+                                block_number,
+                                height,
+                            );
+                        }
+                    }
+                    Err(_) => error!(
+                        "Can't get the block number for tx {}! The block locator entry for hash {} is missing",
+                        hex::encode(tx_id),
+                        BlockHeaderHash(block_location.block_hash)
+                    ),
+                },
+                Err(e) => error!("Can't get the location of tx {}: {}", hex::encode(tx_id), e),
+                Ok(None) => error!("Can't get the location of tx {}", hex::encode(tx_id)),
+            }
+        }
     }
 }
