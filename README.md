@@ -82,6 +82,12 @@ We recommend installing Rust using [rustup](https://www.rustup.rs/). You can ins
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
+On Ubuntu/Debian, you may need install the following packages first:
+
+```
+sudo apt install pkg-config clang
+```
+
 ##### Windows
 
 Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
