@@ -14,12 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
+use crate::{Ledger, TransactionLocation, COL_MEMO, COL_TRANSACTION_LOCATION};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
 use snarkvm_utilities::{to_bytes, ToBytes};
 
 use tracing::*;
+
+use std::collections::HashSet;
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
@@ -105,6 +107,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             debug!("The true block height is {}", current_height);
         }
 
+        let mut tx_memos = HashSet::new();
+
         let mut current_hash = current_block.header.get_hash();
 
         while current_height > 0 {
@@ -119,7 +123,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 error!("The header for block at height {} is missing!", current_height);
             }
 
-            self.validate_block_transactions(&current_block, current_height, &mut database_fix, &mut is_valid);
+            self.validate_block_transactions(
+                &current_block,
+                current_height,
+                &mut tx_memos,
+                &mut database_fix,
+                &mut is_valid,
+            );
 
             current_height -= 1;
 
@@ -174,6 +184,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             current_hash = previous_hash;
         }
 
+        self.validate_transaction_memos(&tx_memos, &mut database_fix, &mut is_valid);
+
         if let Some(fix) = database_fix {
             if !fix.0.is_empty() {
                 info!("Fixing the storage issues");
@@ -197,6 +209,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         &self,
         block: &Block<T>,
         block_height: u32,
+        tx_memos: &mut HashSet<Vec<u8>>,
         database_fix: &mut Option<DatabaseTransaction>,
         is_storage_valid: &mut bool,
     ) {
@@ -257,10 +270,12 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 }
             }
 
-            if !self.contains_memo(&tx.memorandum()) {
+            let tx_memo = tx.memorandum();
+            if !self.contains_memo(&tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 *is_storage_valid = false;
             }
+            tx_memos.insert(to_bytes!(tx_memo).unwrap()); // to_bytes can't fail
 
             match self.get_transaction_location(&tx_id) {
                 Ok(Some(tx_location)) => match self.get_block_number(&BlockHeaderHash(tx_location.block_hash)) {
@@ -314,6 +329,47 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                     error!("Can't get the location of tx {}", hex::encode(tx_id));
                     *is_storage_valid = false;
                 }
+            }
+        }
+    }
+
+    fn validate_transaction_memos(
+        &self,
+        tx_memos: &HashSet<Vec<u8>>,
+        database_fix: &mut Option<DatabaseTransaction>,
+        is_storage_valid: &mut bool,
+    ) {
+        let memos_and_indices = match self.storage.get_col(COL_MEMO) {
+            Ok(col) => col,
+            Err(e) => {
+                error!("Couldn't obtain the memo column: {}", e);
+                *is_storage_valid = false;
+
+                return;
+            }
+        };
+
+        let storage_memos = memos_and_indices
+            .into_iter()
+            .map(|(memo, _)| memo.into_vec())
+            .collect::<HashSet<_>>();
+
+        if storage_memos.len() > tx_memos.len() {
+            warn!(
+                "The number of tx memos is lower than the number of stored memos ({} < {})",
+                tx_memos.len(),
+                storage_memos.len()
+            );
+
+            if let Some(ref mut fix) = database_fix {
+                for superfluous_memo in storage_memos.difference(&tx_memos) {
+                    fix.push(Op::Delete {
+                        col: COL_MEMO,
+                        key: superfluous_memo.to_vec(),
+                    });
+                }
+            } else {
+                *is_storage_valid = false;
             }
         }
     }
