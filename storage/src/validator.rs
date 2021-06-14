@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Ledger;
+use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{Block, BlockHeaderHash, LedgerScheme, Storage, TransactionScheme};
+use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
+use snarkvm_utilities::{to_bytes, ToBytes};
 
 use tracing::*;
 
@@ -24,8 +25,9 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
     /// at the current block height and goes down until the genesis block, making sure that the block-related data
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
-    /// it is likely that any issues are applicable only to the last few blocks.
-    pub fn validate(&self, mut limit: Option<usize>) -> bool {
+    /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
+    /// the validation process should also attempt to fix the issues it encounters.
+    pub fn validate(&self, mut limit: Option<usize>, fix: bool) -> bool {
         info!("Validating the storage...");
 
         let mut is_valid = true;
@@ -35,6 +37,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
             return is_valid;
         }
+
+        let mut database_fix = if fix { Some(DatabaseTransaction::new()) } else { None };
 
         let mut current_height = self.get_current_block_height();
 
@@ -115,7 +119,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 error!("The header for block at height {} is missing!", current_height);
             }
 
-            self.validate_block_transactions(&current_block, current_height);
+            self.validate_block_transactions(&current_block, current_height, &mut database_fix);
 
             current_height -= 1;
 
@@ -162,12 +166,21 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 if *limit == 0 {
                     info!("Specified block limit reached; the check is complete.");
 
-                    return is_valid;
+                    break;
                 }
             }
 
             current_block = previous_block;
             current_hash = previous_hash;
+        }
+
+        if let Some(fix) = database_fix {
+            if !fix.0.is_empty() {
+                info!("Fixing the storage issues");
+                if let Err(e) = self.storage.batch(fix) {
+                    error!("Couldn't fix the storage issues: {}", e);
+                }
+            }
         }
 
         if is_valid {
@@ -180,8 +193,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     }
 
     /// Validates the storage of transactions belonging to the given block.
-    fn validate_block_transactions(&self, block: &Block<T>, height: u32) {
-        for tx in block.transactions.iter() {
+    fn validate_block_transactions(
+        &self,
+        block: &Block<T>,
+        block_height: u32,
+        database_fix: &mut Option<DatabaseTransaction>,
+    ) {
+        for (block_tx_idx, tx) in block.transactions.iter().enumerate() {
             let tx_id = match tx.transaction_id() {
                 Ok(hash) => hash,
                 Err(e) => {
@@ -235,22 +253,44 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             }
 
             match self.get_transaction_location(&tx_id) {
-                Ok(Some(block_location)) => match self.get_block_number(&BlockHeaderHash(block_location.block_hash)) {
+                Ok(Some(tx_location)) => match self.get_block_number(&BlockHeaderHash(tx_location.block_hash)) {
                     Ok(block_number) => {
-                        if block_number != height {
+                        if block_number != block_height {
                             error!(
                                 "The block indicated by the location of tx {} doesn't match the current height ({} != {})",
                                 hex::encode(tx_id),
                                 block_number,
-                                height,
+                                block_height,
                             );
                         }
                     }
-                    Err(_) => error!(
-                        "Can't get the block number for tx {}! The block locator entry for hash {} is missing",
-                        hex::encode(tx_id),
-                        BlockHeaderHash(block_location.block_hash)
-                    ),
+                    Err(_) => {
+                        warn!(
+                            "Can't get the block number for tx {}! The block locator entry for hash {} is missing",
+                            hex::encode(tx_id),
+                            BlockHeaderHash(tx_location.block_hash)
+                        );
+
+                        if let Some(ref mut fix) = database_fix {
+                            let corrected_location = TransactionLocation {
+                                index: block_tx_idx as u32,
+                                block_hash: block.header.get_hash().0,
+                            };
+
+                            match to_bytes!(corrected_location) {
+                                Ok(location_bytes) => {
+                                    fix.push(Op::Insert {
+                                        col: COL_TRANSACTION_LOCATION,
+                                        key: tx_id.to_vec(),
+                                        value: location_bytes,
+                                    });
+                                }
+                                Err(e) => {
+                                    error!("Can't create a block locator fix for tx {}: {}", hex::encode(tx_id), e);
+                                }
+                            }
+                        }
+                    }
                 },
                 Err(e) => error!("Can't get the location of tx {}: {}", hex::encode(tx_id), e),
                 Ok(None) => error!("Can't get the location of tx {}", hex::encode(tx_id)),
