@@ -119,7 +119,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 error!("The header for block at height {} is missing!", current_height);
             }
 
-            self.validate_block_transactions(&current_block, current_height, &mut database_fix);
+            self.validate_block_transactions(&current_block, current_height, &mut database_fix, &mut is_valid);
 
             current_height -= 1;
 
@@ -198,6 +198,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         block: &Block<T>,
         block_height: u32,
         database_fix: &mut Option<DatabaseTransaction>,
+        is_storage_valid: &mut bool,
     ) {
         for (block_tx_idx, tx) in block.transactions.iter().enumerate() {
             let tx_id = match tx.transaction_id() {
@@ -208,6 +209,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                         block.header.get_hash(),
                         e
                     );
+                    *is_storage_valid = false;
+
                     continue;
                 }
             };
@@ -217,6 +220,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                     Ok(tx) => tx,
                     Err(e) => {
                         error!("Transaction {} can't be parsed: {}", hex::encode(tx_id), e);
+                        *is_storage_valid = false;
+
                         continue;
                     }
                 },
@@ -226,6 +231,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                         hex::encode(tx_id),
                         e
                     );
+                    *is_storage_valid = false;
+
                     continue;
                 }
             };
@@ -236,6 +243,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                         "Transaction {} doesn't have an old serial number stored",
                         hex::encode(tx_id)
                     );
+                    *is_storage_valid = false;
                 }
             }
 
@@ -245,11 +253,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                         "Transaction {} doesn't have a new commitment stored",
                         hex::encode(tx_id)
                     );
+                    *is_storage_valid = false;
                 }
             }
 
             if !self.contains_memo(&tx.memorandum()) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
+                *is_storage_valid = false;
             }
 
             match self.get_transaction_location(&tx_id) {
@@ -262,6 +272,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                                 block_number,
                                 block_height,
                             );
+                            *is_storage_valid = false;
                         }
                     }
                     Err(_) => {
@@ -287,13 +298,22 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                                 }
                                 Err(e) => {
                                     error!("Can't create a block locator fix for tx {}: {}", hex::encode(tx_id), e);
+                                    *is_storage_valid = false;
                                 }
                             }
+                        } else {
+                            *is_storage_valid = false;
                         }
                     }
                 },
-                Err(e) => error!("Can't get the location of tx {}: {}", hex::encode(tx_id), e),
-                Ok(None) => error!("Can't get the location of tx {}", hex::encode(tx_id)),
+                Err(e) => {
+                    error!("Can't get the location of tx {}: {}", hex::encode(tx_id), e);
+                    *is_storage_valid = false;
+                }
+                Ok(None) => {
+                    error!("Can't get the location of tx {}", hex::encode(tx_id));
+                    *is_storage_valid = false;
+                }
             }
         }
     }
