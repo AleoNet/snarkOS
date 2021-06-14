@@ -21,13 +21,13 @@ edition = "2018"
 prometheus = [ "metrics-exporter-prometheus" ]
 
 [dependencies.snarkvm-algorithms]
-version = "0.5.3"
+version = "0.5.4"
 
 [dependencies.snarkvm-dpc]
-version = "0.5.3"
+version = "0.5.4"
 
 [dependencies.snarkvm-utilities]
-version = "0.5.3"
+version = "0.5.4"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
@@ -130,10 +130,10 @@ version = "0.2"
 path = "../testing"
 
 [dev-dependencies.nalgebra]
-version = "0.26"
+version = "0.27"
 
 [dev-dependencies.peak_alloc]
 version = "0.1.0"
 
 [build-dependencies]
-rustc_version = "0.3"
+rustc_version = "0.4"
