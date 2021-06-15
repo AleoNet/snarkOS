@@ -119,7 +119,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     info!("Storage finished loading");
 
     // Enable the sync layer.
-    {
+    if !node.config.is_bootnode() {
         let memory_pool = MemoryPool::from_storage(&storage).await?;
 
         debug!("Loading Aleo parameters...");
