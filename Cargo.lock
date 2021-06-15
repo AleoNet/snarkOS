@@ -1586,39 +1586,13 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c53c23fff9a59f261498953cf41dc9ffc2522fd79723bdf283c1e88dc1633624"
-dependencies = [
- "metrics-macros 0.3.0",
- "proc-macro-hack",
- "t1ha",
-]
-
-[[package]]
-name = "metrics"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c0a7fa53d812d26e59d2baf7a6f77442041454ab32908eb304447f00f0dd4de"
 dependencies = [
- "metrics-macros 0.4.0",
+ "metrics-macros",
  "proc-macro-hack",
  "t1ha",
-]
-
-[[package]]
-name = "metrics-exporter-prometheus"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "954533c2d91c118cf2405264a4ac3a5592e84efac12b1f18561400ffef0597eb"
-dependencies = [
- "hyper",
- "metrics 0.15.1",
- "metrics-util 0.7.0",
- "parking_lot",
- "quanta",
- "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -1629,26 +1603,12 @@ checksum = "423ac561fc3300388e62947ce7f944ba6d40468afe9916ce5b7774171d8b38b8"
 dependencies = [
  "hyper",
  "ipnet",
- "metrics 0.16.0",
- "metrics-util 0.8.0",
+ "metrics",
+ "metrics-util",
  "parking_lot",
  "quanta",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "metrics-macros"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b22572ba9964744e261d34553568683b76db277bcd309ebf7215e28e0982505d"
-dependencies = [
- "lazy_static",
- "proc-macro-hack",
- "proc-macro2",
- "quote",
- "regex",
- "syn",
 ]
 
 [[package]]
@@ -1667,28 +1627,6 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6586f4c52af81a3f7832cf0bc86141d2fca7207bedd09fdd3f7da60c8dcd0c4a"
-dependencies = [
- "aho-corasick",
- "atomic-shim",
- "crossbeam-epoch 0.9.5",
- "crossbeam-utils 0.8.5",
- "dashmap",
- "hashbrown 0.11.2",
- "indexmap",
- "metrics 0.15.1",
- "num_cpus",
- "ordered-float",
- "parking_lot",
- "quanta",
- "sketches-ddsketch",
- "t1ha",
-]
-
-[[package]]
-name = "metrics-util"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0c93306cf63ff153c57963151a011194af0f33c91fe30ec30faf98732350a1a"
@@ -1700,7 +1638,7 @@ dependencies = [
  "dashmap",
  "hashbrown 0.11.2",
  "indexmap",
- "metrics 0.16.0",
+ "metrics",
  "num_cpus",
  "ordered-float",
  "parking_lot",
@@ -2547,15 +2485,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustc_version"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
-dependencies = [
- "semver 1.0.3",
-]
-
-[[package]]
 name = "rusty-hook"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2670,12 +2599,6 @@ checksum = "f301af10236f6df4160f7c3f04eec6dbc70ace82d23326abad5edee88801c6b6"
 dependencies = [
  "semver-parser 0.10.2",
 ]
-
-[[package]]
-name = "semver"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f3aac57ee7f3272d8395c6e4f502f434f0e289fcd62876f70daa008c20dcabe"
 
 [[package]]
 name = "semver-parser"
@@ -2858,11 +2781,11 @@ dependencies = [
  "colored",
  "dirs",
  "hex",
- "metrics 0.15.1",
- "metrics-exporter-prometheus 0.4.0",
+ "metrics",
+ "metrics-exporter-prometheus",
  "parking_lot",
  "rand 0.8.3",
- "rustc_version 0.4.0",
+ "rustc_version 0.3.3",
  "rusty-hook",
  "self_update",
  "serde",
@@ -2964,14 +2887,14 @@ dependencies = [
  "fxhash",
  "hex",
  "log",
- "metrics 0.16.0",
- "metrics-exporter-prometheus 0.5.0",
+ "metrics",
+ "metrics-exporter-prometheus",
  "mpmc-map",
  "nalgebra",
  "once_cell",
  "peak_alloc",
  "rand 0.8.3",
- "rustc_version 0.4.0",
+ "rustc_version 0.3.3",
  "serde",
  "snarkos-consensus",
  "snarkos-storage",
@@ -3031,10 +2954,10 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "jsonrpc-test",
- "metrics 0.16.0",
+ "metrics",
  "parking_lot",
  "rand 0.8.3",
- "rustc_version 0.4.0",
+ "rustc_version 0.3.3",
  "serde",
  "serde_json",
  "snarkos-consensus",

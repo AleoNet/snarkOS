@@ -93,10 +93,10 @@ version = "0.4.1"
 version = "0.11.1"
 
 [dependencies.metrics]
-version = "0.15"
+version = "0.16"
 
 [dependencies.metrics-exporter-prometheus]
-version = "0.4"
+version = "0.5"
 optional = true
 
 [dependencies.rand]
@@ -140,7 +140,7 @@ version = "0.2"
 version = "0.11.2"
 
 [build-dependencies]
-rustc_version = "0.4"
+rustc_version = "0.3"
 
 [build-dependencies.capnpc]
 version = "0.14"

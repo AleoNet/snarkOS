@@ -115,4 +115,4 @@ path = "../testing"
 version = "17"
 
 [build-dependencies]
-rustc_version = "0.4"
+rustc_version = "0.3"
