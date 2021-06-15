@@ -23,7 +23,59 @@ use tracing::*;
 
 use std::collections::HashSet;
 
+macro_rules! validate_tx_components {
+    ($fn_name:ident, $components_name:expr, $component_col:expr) => {
+        fn $fn_name(
+            &self,
+            tx_entries: &HashSet<Vec<u8>>,
+            database_fix: &mut Option<DatabaseTransaction>,
+            is_storage_valid: &mut bool,
+        ) {
+            let storage_entries_and_indices = match self.storage.get_col($component_col) {
+                Ok(col) => col,
+                Err(e) => {
+                    error!("Couldn't obtain the column with tx {}: {}", $components_name, e);
+                    *is_storage_valid = false;
+
+                    return;
+                }
+            };
+
+            let storage_entries = storage_entries_and_indices
+                .into_iter()
+                .map(|(entry, _)| entry.into_vec())
+                .collect::<HashSet<_>>();
+
+            if storage_entries.len() > tx_entries.len() {
+                warn!(
+                    "The number of {} in transactions is lower than their number in the storage ({} < {})",
+                    $components_name,
+                    tx_entries.len(),
+                    storage_entries.len()
+                );
+
+                if let Some(ref mut fix) = database_fix {
+                    for superfluous_item in storage_entries.difference(&tx_entries) {
+                        fix.push(Op::Delete {
+                            col: $component_col,
+                            key: superfluous_item.to_vec(),
+                        });
+                    }
+                } else {
+                    *is_storage_valid = false;
+                }
+            }
+        }
+    };
+}
+
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+    validate_tx_components!(validate_transaction_memos, "memorandums", COL_MEMO);
+
+    validate_tx_components!(validate_transaction_sns, "serial numbers", COL_SERIAL_NUMBER);
+
+    validate_tx_components!(validate_transaction_cms, "commitments", COL_COMMITMENT);
+
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
     /// at the current block height and goes down until the genesis block, making sure that the block-related data
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
@@ -339,129 +391,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                     error!("Can't get the location of tx {}", hex::encode(tx_id));
                     *is_storage_valid = false;
                 }
-            }
-        }
-    }
-
-    fn validate_transaction_memos(
-        &self,
-        tx_memos: &HashSet<Vec<u8>>,
-        database_fix: &mut Option<DatabaseTransaction>,
-        is_storage_valid: &mut bool,
-    ) {
-        let memos_and_indices = match self.storage.get_col(COL_MEMO) {
-            Ok(col) => col,
-            Err(e) => {
-                error!("Couldn't obtain the tx memo column: {}", e);
-                *is_storage_valid = false;
-
-                return;
-            }
-        };
-
-        let storage_memos = memos_and_indices
-            .into_iter()
-            .map(|(memo, _)| memo.into_vec())
-            .collect::<HashSet<_>>();
-
-        if storage_memos.len() > tx_memos.len() {
-            warn!(
-                "The number of tx memos is lower than the number of stored memos ({} < {})",
-                tx_memos.len(),
-                storage_memos.len()
-            );
-
-            if let Some(ref mut fix) = database_fix {
-                for superfluous_memo in storage_memos.difference(&tx_memos) {
-                    fix.push(Op::Delete {
-                        col: COL_MEMO,
-                        key: superfluous_memo.to_vec(),
-                    });
-                }
-            } else {
-                *is_storage_valid = false;
-            }
-        }
-    }
-
-    fn validate_transaction_sns(
-        &self,
-        tx_sns: &HashSet<Vec<u8>>,
-        database_fix: &mut Option<DatabaseTransaction>,
-        is_storage_valid: &mut bool,
-    ) {
-        let sns_and_indices = match self.storage.get_col(COL_SERIAL_NUMBER) {
-            Ok(col) => col,
-            Err(e) => {
-                error!("Couldn't obtain the tx serial number column: {}", e);
-                *is_storage_valid = false;
-
-                return;
-            }
-        };
-
-        let storage_sns = sns_and_indices
-            .into_iter()
-            .map(|(sn, _)| sn.into_vec())
-            .collect::<HashSet<_>>();
-
-        if storage_sns.len() > tx_sns.len() {
-            warn!(
-                "The number of tx sns is lower than the number of stored sns ({} < {})",
-                tx_sns.len(),
-                storage_sns.len()
-            );
-
-            if let Some(ref mut fix) = database_fix {
-                for superfluous_sn in storage_sns.difference(&tx_sns) {
-                    fix.push(Op::Delete {
-                        col: COL_SERIAL_NUMBER,
-                        key: superfluous_sn.to_vec(),
-                    });
-                }
-            } else {
-                *is_storage_valid = false;
-            }
-        }
-    }
-
-    fn validate_transaction_cms(
-        &self,
-        tx_cms: &HashSet<Vec<u8>>,
-        database_fix: &mut Option<DatabaseTransaction>,
-        is_storage_valid: &mut bool,
-    ) {
-        let cms_and_indices = match self.storage.get_col(COL_COMMITMENT) {
-            Ok(col) => col,
-            Err(e) => {
-                error!("Couldn't obtain the tx commitment column: {}", e);
-                *is_storage_valid = false;
-
-                return;
-            }
-        };
-
-        let storage_cms = cms_and_indices
-            .into_iter()
-            .map(|(cm, _)| cm.into_vec())
-            .collect::<HashSet<_>>();
-
-        if storage_cms.len() > tx_cms.len() {
-            warn!(
-                "The number of tx cms is lower than the number of stored cms ({} < {})",
-                tx_cms.len(),
-                storage_cms.len()
-            );
-
-            if let Some(ref mut fix) = database_fix {
-                for superfluous_cm in storage_cms.difference(&tx_cms) {
-                    fix.push(Op::Delete {
-                        col: COL_COMMITMENT,
-                        key: superfluous_cm.to_vec(),
-                    });
-                }
-            } else {
-                *is_storage_valid = false;
             }
         }
     }
