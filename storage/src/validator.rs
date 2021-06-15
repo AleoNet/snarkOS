@@ -82,6 +82,10 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
     pub fn validate(&self, mut limit: Option<usize>, fix: bool) -> bool {
+        if limit.is_some() && fix {
+            panic!("The validator can perform fixes only if there is no limit on the number of blocks to process");
+        }
+
         info!("Validating the storage...");
 
         let mut is_valid = true;
