@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Ledger, TransactionLocation, COL_MEMO, COL_TRANSACTION_LOCATION};
+use crate::{Ledger, TransactionLocation, COL_COMMITMENT, COL_MEMO, COL_SERIAL_NUMBER, COL_TRANSACTION_LOCATION};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
 use snarkvm_utilities::{to_bytes, ToBytes};
@@ -108,6 +108,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         let mut tx_memos = HashSet::new();
+        let mut tx_sns = HashSet::new();
+        let mut tx_cms = HashSet::new();
 
         let mut current_hash = current_block.header.get_hash();
 
@@ -127,6 +129,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 &current_block,
                 current_height,
                 &mut tx_memos,
+                &mut tx_sns,
+                &mut tx_cms,
                 &mut database_fix,
                 &mut is_valid,
             );
@@ -185,6 +189,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         self.validate_transaction_memos(&tx_memos, &mut database_fix, &mut is_valid);
+        self.validate_transaction_sns(&tx_sns, &mut database_fix, &mut is_valid);
+        self.validate_transaction_cms(&tx_cms, &mut database_fix, &mut is_valid);
 
         if let Some(fix) = database_fix {
             if !fix.0.is_empty() {
@@ -210,6 +216,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         block: &Block<T>,
         block_height: u32,
         tx_memos: &mut HashSet<Vec<u8>>,
+        tx_sns: &mut HashSet<Vec<u8>>,
+        tx_cms: &mut HashSet<Vec<u8>>,
         database_fix: &mut Option<DatabaseTransaction>,
         is_storage_valid: &mut bool,
     ) {
@@ -258,6 +266,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                     );
                     *is_storage_valid = false;
                 }
+                tx_sns.insert(to_bytes!(sn).unwrap()); // to_bytes can't fail
             }
 
             for cm in tx.new_commitments() {
@@ -268,6 +277,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                     );
                     *is_storage_valid = false;
                 }
+                tx_cms.insert(to_bytes!(cm).unwrap()); // to_bytes can't fail
             }
 
             let tx_memo = tx.memorandum();
@@ -342,7 +352,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let memos_and_indices = match self.storage.get_col(COL_MEMO) {
             Ok(col) => col,
             Err(e) => {
-                error!("Couldn't obtain the memo column: {}", e);
+                error!("Couldn't obtain the tx memo column: {}", e);
                 *is_storage_valid = false;
 
                 return;
@@ -366,6 +376,88 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                     fix.push(Op::Delete {
                         col: COL_MEMO,
                         key: superfluous_memo.to_vec(),
+                    });
+                }
+            } else {
+                *is_storage_valid = false;
+            }
+        }
+    }
+
+    fn validate_transaction_sns(
+        &self,
+        tx_sns: &HashSet<Vec<u8>>,
+        database_fix: &mut Option<DatabaseTransaction>,
+        is_storage_valid: &mut bool,
+    ) {
+        let sns_and_indices = match self.storage.get_col(COL_SERIAL_NUMBER) {
+            Ok(col) => col,
+            Err(e) => {
+                error!("Couldn't obtain the tx serial number column: {}", e);
+                *is_storage_valid = false;
+
+                return;
+            }
+        };
+
+        let storage_sns = sns_and_indices
+            .into_iter()
+            .map(|(sn, _)| sn.into_vec())
+            .collect::<HashSet<_>>();
+
+        if storage_sns.len() > tx_sns.len() {
+            warn!(
+                "The number of tx sns is lower than the number of stored sns ({} < {})",
+                tx_sns.len(),
+                storage_sns.len()
+            );
+
+            if let Some(ref mut fix) = database_fix {
+                for superfluous_sn in storage_sns.difference(&tx_sns) {
+                    fix.push(Op::Delete {
+                        col: COL_SERIAL_NUMBER,
+                        key: superfluous_sn.to_vec(),
+                    });
+                }
+            } else {
+                *is_storage_valid = false;
+            }
+        }
+    }
+
+    fn validate_transaction_cms(
+        &self,
+        tx_cms: &HashSet<Vec<u8>>,
+        database_fix: &mut Option<DatabaseTransaction>,
+        is_storage_valid: &mut bool,
+    ) {
+        let cms_and_indices = match self.storage.get_col(COL_COMMITMENT) {
+            Ok(col) => col,
+            Err(e) => {
+                error!("Couldn't obtain the tx commitment column: {}", e);
+                *is_storage_valid = false;
+
+                return;
+            }
+        };
+
+        let storage_cms = cms_and_indices
+            .into_iter()
+            .map(|(cm, _)| cm.into_vec())
+            .collect::<HashSet<_>>();
+
+        if storage_cms.len() > tx_cms.len() {
+            warn!(
+                "The number of tx cms is lower than the number of stored cms ({} < {})",
+                tx_cms.len(),
+                storage_cms.len()
+            );
+
+            if let Some(ref mut fix) = database_fix {
+                for superfluous_cm in storage_cms.difference(&tx_cms) {
+                    fix.push(Op::Delete {
+                        col: COL_COMMITMENT,
+                        key: superfluous_cm.to_vec(),
                     });
                 }
             } else {
