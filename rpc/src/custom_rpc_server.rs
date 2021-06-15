@@ -219,6 +219,10 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
             let result = rpc.get_block_template().map_err(convert_crate_err);
             result_to_response(&req, result)
         }
+        "getnetworkgraph" => {
+            let result = rpc.get_network_graph().map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         // private
         "createaccount" => {
             let result = rpc

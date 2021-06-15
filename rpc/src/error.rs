@@ -52,6 +52,9 @@ pub enum RpcError {
     #[error("The node doesn't have the sync layer running")]
     NoConsensus,
 
+    #[error("The node isn't tracking the network topology")]
+    NoNetworkTopology,
+
     #[error("{}", _0)]
     StorageError(StorageError),
 
