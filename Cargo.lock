@@ -2995,6 +2995,7 @@ dependencies = [
  "snarkvm-utilities",
  "thiserror",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

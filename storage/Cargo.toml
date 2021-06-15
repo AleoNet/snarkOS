@@ -81,3 +81,6 @@ version = "0.5.4"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.2"

@@ -24,7 +24,7 @@ use tracing::*;
 use std::collections::HashSet;
 
 macro_rules! validate_tx_components {
-    ($fn_name:ident, $components_name:expr, $component_col:expr) => {
+    ($fn_name:ident, $component_name:expr, $component_col:expr) => {
         fn $fn_name(
             &self,
             tx_entries: &HashSet<Vec<u8>>,
@@ -34,7 +34,7 @@ macro_rules! validate_tx_components {
             let storage_entries_and_indices = match self.storage.get_col($component_col) {
                 Ok(col) => col,
                 Err(e) => {
-                    error!("Couldn't obtain the column with tx {}: {}", $components_name, e);
+                    error!("Couldn't obtain the column with tx {}s: {}", $component_name, e);
                     *is_storage_valid = false;
 
                     return;
@@ -46,16 +46,18 @@ macro_rules! validate_tx_components {
                 .map(|(entry, _)| entry.into_vec())
                 .collect::<HashSet<_>>();
 
-            if storage_entries.len() > tx_entries.len() {
+            let superfluous_items = storage_entries.difference(&tx_entries).collect::<Vec<_>>();
+
+            if !superfluous_items.is_empty() {
                 warn!(
-                    "The number of {} in transactions is lower than their number in the storage ({} < {})",
-                    $components_name,
-                    tx_entries.len(),
-                    storage_entries.len()
+                    "There are {} more {}s stored than there are in canon transactions",
+                    superfluous_items.len(),
+                    $component_name
                 );
 
                 if let Some(ref mut fix) = database_fix {
-                    for superfluous_item in storage_entries.difference(&tx_entries) {
+                    for superfluous_item in superfluous_items {
+                        trace!("Staging a {} for deletion", $component_name);
                         fix.push(Op::Delete {
                             col: $component_col,
                             key: superfluous_item.to_vec(),
@@ -169,7 +171,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         let mut current_hash = current_block.header.get_hash();
 
-        while current_height > 0 {
+        loop {
             trace!("Validating block at height {} ({})", current_height, current_hash);
 
             if current_height % 100 == 0 {
@@ -190,6 +192,10 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 &mut database_fix,
                 &mut is_valid,
             );
+
+            if current_height == 0 {
+                break;
+            }
 
             current_height -= 1;
 
@@ -397,5 +403,24 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use snarkos_testing::sync::TestBlocks;
+
+    #[test]
+    fn valid_storage_validates() {
+        tracing_subscriber::fmt::init();
+
+        let consensus = snarkos_testing::sync::create_test_consensus();
+
+        let blocks = TestBlocks::load(10, "test_blocks_100_1").0;
+        for block in blocks {
+            consensus.receive_block(&block).unwrap();
+        }
+
+        assert!(consensus.ledger.validate(None, false));
     }
 }
