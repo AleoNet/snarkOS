@@ -14,18 +14,80 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Ledger;
+use crate::{Ledger, TransactionLocation, COL_COMMITMENT, COL_MEMO, COL_SERIAL_NUMBER, COL_TRANSACTION_LOCATION};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{Storage, TransactionScheme};
+use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
+use snarkvm_utilities::{to_bytes, ToBytes};
 
 use tracing::*;
 
+use std::collections::HashSet;
+
+macro_rules! validate_tx_components {
+    ($fn_name:ident, $component_name:expr, $component_col:expr) => {
+        fn $fn_name(
+            &self,
+            tx_entries: &HashSet<Vec<u8>>,
+            database_fix: &mut Option<DatabaseTransaction>,
+            is_storage_valid: &mut bool,
+        ) {
+            let storage_entries_and_indices = match self.storage.get_col($component_col) {
+                Ok(col) => col,
+                Err(e) => {
+                    error!("Couldn't obtain the column with tx {}s: {}", $component_name, e);
+                    *is_storage_valid = false;
+
+                    return;
+                }
+            };
+
+            let storage_entries = storage_entries_and_indices
+                .into_iter()
+                .map(|(entry, _)| entry.into_vec())
+                .collect::<HashSet<_>>();
+
+            let superfluous_items = storage_entries.difference(&tx_entries).collect::<Vec<_>>();
+
+            if !superfluous_items.is_empty() {
+                warn!(
+                    "There are {} more {}s stored than there are in canon transactions",
+                    superfluous_items.len(),
+                    $component_name
+                );
+
+                if let Some(ref mut fix) = database_fix {
+                    for superfluous_item in superfluous_items {
+                        trace!("Staging a {} for deletion", $component_name);
+                        fix.push(Op::Delete {
+                            col: $component_col,
+                            key: superfluous_item.to_vec(),
+                        });
+                    }
+                } else {
+                    *is_storage_valid = false;
+                }
+            }
+        }
+    };
+}
+
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
-    /// Performs a check of all the stored blocks and their relationships between one another; starts at the
-    /// current block height and goes down until the genesis block, making sure that the block-related data
+    validate_tx_components!(validate_transaction_memos, "memorandums", COL_MEMO);
+
+    validate_tx_components!(validate_transaction_sns, "serial numbers", COL_SERIAL_NUMBER);
+
+    validate_tx_components!(validate_transaction_cms, "commitments", COL_COMMITMENT);
+
+    /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
+    /// at the current block height and goes down until the genesis block, making sure that the block-related data
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
-    /// it is likely that any issues are applicable only to the last few blocks.
-    pub fn validate(&self, mut limit: Option<usize>) -> bool {
+    /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
+    /// the validation process should also attempt to fix the issues it encounters.
+    pub fn validate(&self, mut limit: Option<usize>, fix: bool) -> bool {
+        if limit.is_some() && fix {
+            panic!("The validator can perform fixes only if there is no limit on the number of blocks to process");
+        }
+
         info!("Validating the storage...");
 
         let mut is_valid = true;
@@ -35,6 +97,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
             return is_valid;
         }
+
+        let mut database_fix = if fix { Some(DatabaseTransaction::new()) } else { None };
 
         let mut current_height = self.get_current_block_height();
 
@@ -101,9 +165,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             debug!("The true block height is {}", current_height);
         }
 
+        let mut tx_memos = HashSet::new();
+        let mut tx_sns = HashSet::new();
+        let mut tx_cms = HashSet::new();
+
         let mut current_hash = current_block.header.get_hash();
 
-        while current_height > 0 {
+        loop {
             trace!("Validating block at height {} ({})", current_height, current_hash);
 
             if current_height % 100 == 0 {
@@ -113,6 +181,20 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             if !self.block_hash_exists(&current_hash) {
                 is_valid = false;
                 error!("The header for block at height {} is missing!", current_height);
+            }
+
+            self.validate_block_transactions(
+                &current_block,
+                current_height,
+                &mut tx_memos,
+                &mut tx_sns,
+                &mut tx_cms,
+                &mut database_fix,
+                &mut is_valid,
+            );
+
+            if current_height == 0 {
+                break;
             }
 
             current_height -= 1;
@@ -160,12 +242,25 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 if *limit == 0 {
                     info!("Specified block limit reached; the check is complete.");
 
-                    return is_valid;
+                    break;
                 }
             }
 
             current_block = previous_block;
             current_hash = previous_hash;
+        }
+
+        self.validate_transaction_memos(&tx_memos, &mut database_fix, &mut is_valid);
+        self.validate_transaction_sns(&tx_sns, &mut database_fix, &mut is_valid);
+        self.validate_transaction_cms(&tx_cms, &mut database_fix, &mut is_valid);
+
+        if let Some(fix) = database_fix {
+            if !fix.0.is_empty() {
+                info!("Fixing the storage issues");
+                if let Err(e) = self.storage.batch(fix) {
+                    error!("Couldn't fix the storage issues: {}", e);
+                }
+            }
         }
 
         if is_valid {
@@ -175,5 +270,157 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         is_valid
+    }
+
+    /// Validates the storage of transactions belonging to the given block.
+    fn validate_block_transactions(
+        &self,
+        block: &Block<T>,
+        block_height: u32,
+        tx_memos: &mut HashSet<Vec<u8>>,
+        tx_sns: &mut HashSet<Vec<u8>>,
+        tx_cms: &mut HashSet<Vec<u8>>,
+        database_fix: &mut Option<DatabaseTransaction>,
+        is_storage_valid: &mut bool,
+    ) {
+        for (block_tx_idx, tx) in block.transactions.iter().enumerate() {
+            let tx_id = match tx.transaction_id() {
+                Ok(hash) => hash,
+                Err(e) => {
+                    error!(
+                        "The id of a transaction from block {} can't be parsed: {}",
+                        block.header.get_hash(),
+                        e
+                    );
+                    *is_storage_valid = false;
+
+                    continue;
+                }
+            };
+
+            let tx = match self.get_transaction_bytes(&tx_id) {
+                Ok(tx) => match T::read(&tx[..]) {
+                    Ok(tx) => tx,
+                    Err(e) => {
+                        error!("Transaction {} can't be parsed: {}", hex::encode(tx_id), e);
+                        *is_storage_valid = false;
+
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    error!(
+                        "Transaction {} can't be found in the storage: {}",
+                        hex::encode(tx_id),
+                        e
+                    );
+                    *is_storage_valid = false;
+
+                    continue;
+                }
+            };
+
+            for sn in tx.old_serial_numbers() {
+                if !self.contains_sn(&sn) {
+                    error!(
+                        "Transaction {} doesn't have an old serial number stored",
+                        hex::encode(tx_id)
+                    );
+                    *is_storage_valid = false;
+                }
+                tx_sns.insert(to_bytes!(sn).unwrap()); // to_bytes can't fail
+            }
+
+            for cm in tx.new_commitments() {
+                if !self.contains_cm(&cm) {
+                    error!(
+                        "Transaction {} doesn't have a new commitment stored",
+                        hex::encode(tx_id)
+                    );
+                    *is_storage_valid = false;
+                }
+                tx_cms.insert(to_bytes!(cm).unwrap()); // to_bytes can't fail
+            }
+
+            let tx_memo = tx.memorandum();
+            if !self.contains_memo(&tx_memo) {
+                error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
+                *is_storage_valid = false;
+            }
+            tx_memos.insert(to_bytes!(tx_memo).unwrap()); // to_bytes can't fail
+
+            match self.get_transaction_location(&tx_id) {
+                Ok(Some(tx_location)) => match self.get_block_number(&BlockHeaderHash(tx_location.block_hash)) {
+                    Ok(block_number) => {
+                        if block_number != block_height {
+                            error!(
+                                "The block indicated by the location of tx {} doesn't match the current height ({} != {})",
+                                hex::encode(tx_id),
+                                block_number,
+                                block_height,
+                            );
+                            *is_storage_valid = false;
+                        }
+                    }
+                    Err(_) => {
+                        warn!(
+                            "Can't get the block number for tx {}! The block locator entry for hash {} is missing",
+                            hex::encode(tx_id),
+                            BlockHeaderHash(tx_location.block_hash)
+                        );
+
+                        if let Some(ref mut fix) = database_fix {
+                            let corrected_location = TransactionLocation {
+                                index: block_tx_idx as u32,
+                                block_hash: block.header.get_hash().0,
+                            };
+
+                            match to_bytes!(corrected_location) {
+                                Ok(location_bytes) => {
+                                    fix.push(Op::Insert {
+                                        col: COL_TRANSACTION_LOCATION,
+                                        key: tx_id.to_vec(),
+                                        value: location_bytes,
+                                    });
+                                }
+                                Err(e) => {
+                                    error!("Can't create a block locator fix for tx {}: {}", hex::encode(tx_id), e);
+                                    *is_storage_valid = false;
+                                }
+                            }
+                        } else {
+                            *is_storage_valid = false;
+                        }
+                    }
+                },
+                Err(e) => {
+                    error!("Can't get the location of tx {}: {}", hex::encode(tx_id), e);
+                    *is_storage_valid = false;
+                }
+                Ok(None) => {
+                    error!("Can't get the location of tx {}", hex::encode(tx_id));
+                    *is_storage_valid = false;
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use snarkos_testing::sync::TestBlocks;
+
+    #[tokio::test]
+    async fn valid_storage_validates() {
+        //tracing_subscriber::fmt::init();
+
+        let consensus = snarkos_testing::sync::create_test_consensus();
+
+        let blocks = TestBlocks::load(10, "test_blocks_100_1").0;
+        for block in blocks {
+            consensus.receive_block(&block).await.unwrap();
+        }
+
+        assert!(consensus.ledger.validate(None, false));
     }
 }

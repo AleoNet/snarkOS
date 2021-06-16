@@ -246,7 +246,7 @@ mod consensus_sidechain {
         assert_eq!(shared_height, 100);
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.ledger.validate(None));
+        assert!(consensus1.ledger.validate(None, false));
     }
 
     #[tokio::test]
@@ -306,6 +306,6 @@ mod consensus_sidechain {
         assert_eq!(shared_height, 100);
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.ledger.validate(None));
+        assert!(consensus1.ledger.validate(None, false));
     }
 }
