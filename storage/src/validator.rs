@@ -416,7 +416,7 @@ mod tests {
 
         let consensus = snarkos_testing::sync::create_test_consensus();
 
-        let blocks = TestBlocks::load(10, "test_blocks_100_1").0;
+        let blocks = TestBlocks::load(Some(10), "test_blocks_100_1").0;
         for block in blocks {
             consensus.receive_block(&block).await.unwrap();
         }

@@ -184,7 +184,7 @@ async fn block_two_node() {
 
     const NUM_BLOCKS: usize = 100;
 
-    let blocks = crate::sync::TestBlocks::load(NUM_BLOCKS, "test_blocks_100_1").0;
+    let blocks = crate::sync::TestBlocks::load(Some(NUM_BLOCKS), "test_blocks_100_1").0;
     assert_eq!(blocks.len(), NUM_BLOCKS);
 
     for block in blocks {

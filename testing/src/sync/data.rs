@@ -139,7 +139,7 @@ impl TestBlocks {
         TestBlocks(blocks)
     }
 
-    pub fn load(count: usize, batch_name: &str) -> Self {
+    pub fn load(count: Option<usize>, batch_name: &str) -> Self {
         let blocks_path = format!("{}/src/sync/{}", env!("CARGO_MANIFEST_DIR"), batch_name);
         let blocks_bytes = std::fs::read(&blocks_path).unwrap();
         TestBlocks::read(&*blocks_bytes, count).unwrap()
@@ -155,13 +155,20 @@ impl TestBlocks {
         Ok(())
     }
 
-    pub fn read<R: Read>(mut reader: R, count: usize) -> IoResult<Self> {
-        let mut blocks = Vec::with_capacity(count);
+    pub fn read<R: Read>(mut reader: R, count: Option<usize>) -> IoResult<Self> {
+        let mut blocks = Vec::new();
 
-        // Hardcoded for now as the trait doesn't allow for an N.
-        for _ in 0..count {
-            let block: Block<Tx> = FromBytes::read(&mut reader)?;
-            blocks.push(block);
+        if let Some(count) = count {
+            blocks.reserve(count);
+
+            for _ in 0..count {
+                let block: Block<Tx> = FromBytes::read(&mut reader)?;
+                blocks.push(block);
+            }
+        } else {
+            while let Ok(block) = FromBytes::read(&mut reader) {
+                blocks.push(block);
+            }
         }
 
         Ok(TestBlocks::new(blocks))

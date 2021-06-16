@@ -205,13 +205,13 @@ mod consensus_sidechain {
         let consensus2 = snarkos_testing::sync::create_test_consensus();
 
         // Consensus 1 imports a random number of blocks lower than consensus 2.
-        let blocks_1 = TestBlocks::load(rng.gen_range(0..=50), "test_blocks_100_1").0;
+        let blocks_1 = TestBlocks::load(Some(rng.gen_range(0..=50)), "test_blocks_100_1").0;
         for block in blocks_1 {
             consensus1.receive_block(&block).await.unwrap();
         }
 
         // Consensus 2 imports 100 blocks.
-        let blocks_2 = TestBlocks::load(100, "test_blocks_100_2").0;
+        let blocks_2 = TestBlocks::load(Some(100), "test_blocks_100_2").0;
         for block in &blocks_2 {
             consensus2.receive_block(block).await.unwrap();
         }
@@ -257,8 +257,8 @@ mod consensus_sidechain {
         let consensus1 = snarkos_testing::sync::create_test_consensus();
         let consensus2 = snarkos_testing::sync::create_test_consensus();
 
-        let blocks1 = TestBlocks::load(50, "test_blocks_100_1").0; // side chain blocks
-        let blocks2 = TestBlocks::load(100, "test_blocks_100_2").0; // canon blocks
+        let blocks1 = TestBlocks::load(Some(50), "test_blocks_100_1").0; // side chain blocks
+        let blocks2 = TestBlocks::load(Some(100), "test_blocks_100_2").0; // canon blocks
 
         // Consensus 2 imports 100 blocks.
         for block in &blocks2 {
