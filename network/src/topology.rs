@@ -63,7 +63,7 @@ impl Hash for Connection {
 }
 
 /// Keeps track of crawled peers and their connections.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct NetworkTopology {
     connections: HashSet<Connection>,
 }

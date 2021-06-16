@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{master::SyncInbound, sync::master::SyncMaster, *};
+use crate::{master::SyncInbound, sync::master::SyncMaster, topology::NetworkTopology, *};
 use snarkos_metrics::{self as metrics, inbound, misc};
 use snarkvm_dpc::Storage;
 
@@ -63,6 +63,8 @@ pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
     pub peer_book: PeerBook,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync<S>>>,
+    /// Tracks the network topology crawled by this node.
+    pub network_topology: OnceCell<NetworkTopology>,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -111,7 +113,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
 impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
-        Ok(Self(Arc::new(InnerNode {
+        let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
             local_address: Default::default(),
@@ -119,12 +121,21 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             inbound: Default::default(),
             peer_book: PeerBook::spawn(),
             sync: Default::default(),
+            network_topology: Default::default(),
             launched: Utc::now(),
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),
             master_dispatch: RwLock::new(None),
-        })))
+        }));
+
+        if node.config.is_bootnode() {
+            node.network_topology
+                .set(NetworkTopology::default())
+                .expect("network topology was set more than once");
+        }
+
+        Ok(node)
     }
 
     pub fn set_sync(&mut self, sync: Sync<S>) {
