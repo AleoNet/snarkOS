@@ -26,8 +26,6 @@ use snarkos_testing::{
     wait_until,
 };
 
-use std::{collections::BTreeMap, net::SocketAddr, ops::Sub};
-
 const N: usize = 25;
 const MIN_PEERS: u16 = 5;
 const MAX_PEERS: u16 = 30;
@@ -277,7 +275,7 @@ fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> u32 {
         count += node.peer_book.get_connected_peer_count()
     }
 
-    (count / 2)
+    count / 2
 }
 
 // This could use the degree matrix, though as this is used extensively in tests and checked
