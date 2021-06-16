@@ -135,7 +135,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         for (index, transaction) in block.transactions.0.iter().enumerate() {
             let transaction_location = TransactionLocation {
                 index: index as u32,
-                block_hash: block.header.get_hash().0,
+                block_hash: block_hash.0,
             };
             database_transaction.push(Op::Insert {
                 col: COL_TRANSACTION_LOCATION,
@@ -151,7 +151,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         });
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_TRANSACTIONS,
-            key: block.header.get_hash().0.to_vec(),
+            key: block_hash.0.to_vec(),
             value: to_bytes![block.transactions]?.to_vec(),
         });
 
