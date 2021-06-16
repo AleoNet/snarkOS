@@ -11,6 +11,10 @@ impl Counter {
     pub(crate) fn increment(&self, val: u64) {
         self.0.fetch_add(val, Ordering::SeqCst);
     }
+
+    pub fn read(&self) -> u64 {
+        self.0.load(Ordering::Relaxed)
+    }
 }
 
 /// Mimics a [`metrics-core`] arbitrarily increasing & decreasing [`Gauge`]
@@ -34,5 +38,9 @@ impl Gauge {
     pub(crate) fn decrease(&self, val: f64) {
         // TODO: @sadroeck - Reinterpret as f64 & do atomic C&S
         self.0.fetch_sub(val as u64, Ordering::SeqCst);
+    }
+
+    pub fn read(&self) -> f64 {
+        todo!("@sadroeck add me")
     }
 }

@@ -17,6 +17,10 @@
 use metrics::{GaugeValue, Key, Recorder, Unit};
 
 use crate::metric_types::{Counter, Gauge};
+use crate::snapshots::{
+    NodeConnectionStats, NodeHandshakeStats, NodeInboundStats, NodeMiscStats, NodeOutboundStats, NodeQueueStats,
+    NodeStats,
+};
 
 pub const INBOUND_ALL_SUCCESSES: &str = "snarkos_inbound_all_successes_total";
 pub const INBOUND_ALL_FAILURES: &str = "snarkos_inbound_all_failures_total";
@@ -62,8 +66,6 @@ pub const MISC_RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";
 
 pub static NODE_STATS: Stats = Stats::new();
 
-// TODO: make members private and make gathering of stats feature-gated and possibly
-// interchangeable with prometheus metrics.
 pub struct Stats {
     /// Stats related to messages received by the node.
     inbound: InboundStats,
@@ -90,6 +92,17 @@ impl Stats {
             misc: MiscStats::new(),
         }
     }
+
+    pub fn snapshot(&self) -> NodeStats {
+        NodeStats {
+            inbound: self.inbound.snapshot(),
+            outbound: self.outbound.snapshot(),
+            connections: self.connections.snapshot(),
+            handshakes: self.handshakes.snapshot(),
+            queues: self.queues.snapshot(),
+            misc: self.misc.snapshot(),
+        }
+    }
 }
 
 pub struct InboundStats {
@@ -97,7 +110,6 @@ pub struct InboundStats {
     all_successes: Counter,
     /// The number of inbound messages that couldn't be processed.
     all_failures: Counter,
-
     /// The number of all received `Block` messages.
     blocks: Counter,
     /// The number of all received `GetBlocks` messages.
@@ -146,6 +158,26 @@ impl InboundStats {
             unknown: Counter::new(),
         }
     }
+
+    pub fn snapshot(&self) -> NodeInboundStats {
+        NodeInboundStats {
+            all_successes: self.all_successes.read(),
+            all_failures: self.all_failures.read(),
+            blocks: self.blocks.read(),
+            getblocks: self.getblocks.read(),
+            getmemorypool: self.getmemorypool.read(),
+            getpeers: self.getpeers.read(),
+            getsync: self.getsync.read(),
+            memorypool: self.memorypool.read(),
+            peers: self.peers.read(),
+            pings: self.pings.read(),
+            pongs: self.pongs.read(),
+            syncs: self.syncs.read(),
+            syncblocks: self.syncblocks.read(),
+            transactions: self.transactions.read(),
+            unknown: self.unknown.read(),
+        }
+    }
 }
 
 pub struct OutboundStats {
@@ -162,6 +194,13 @@ impl OutboundStats {
             all_failures: Counter::new(),
         }
     }
+
+    pub fn snapshot(&self) -> NodeOutboundStats {
+        NodeOutboundStats {
+            all_successes: self.all_successes.read(),
+            all_failures: self.all_failures.read(),
+        }
+    }
 }
 
 pub struct ConnectionStats {
@@ -171,6 +210,10 @@ pub struct ConnectionStats {
     all_initiated: Counter,
     /// The number of rejected inbound connection requests.
     all_rejected: Counter,
+    /// Number of currently connected peers.
+    connected_peers: Gauge,
+    /// Number of known disconnected peers.
+    disconnected_peers: Gauge,
 }
 
 impl ConnectionStats {
@@ -179,6 +222,18 @@ impl ConnectionStats {
             all_accepted: Counter::new(),
             all_initiated: Counter::new(),
             all_rejected: Counter::new(),
+            connected_peers: Gauge::new(),
+            disconnected_peers: Gauge::new(),
+        }
+    }
+
+    pub fn snapshot(&self) -> NodeConnectionStats {
+        NodeConnectionStats {
+            all_accepted: self.all_accepted.read(),
+            all_initiated: self.all_initiated.read(),
+            all_rejected: self.all_rejected.read(),
+            connected_peers: self.connected_peers.read() as u32,
+            disconnected_peers: self.disconnected_peers.read() as u32,
         }
     }
 }
@@ -209,6 +264,17 @@ impl HandshakeStats {
             timeouts_resp: Counter::new(),
         }
     }
+
+    pub fn snapshot(&self) -> NodeHandshakeStats {
+        NodeHandshakeStats {
+            successes_init: self.successes_init.read(),
+            successes_resp: self.successes_resp.read(),
+            failures_init: self.failures_init.read(),
+            failures_resp: self.failures_resp.read(),
+            timeouts_init: self.timeouts_init.read(),
+            timeouts_resp: self.timeouts_resp.read(),
+        }
+    }
 }
 
 pub struct QueueStats {
@@ -223,6 +289,13 @@ impl QueueStats {
         Self {
             inbound: Gauge::new(),
             outbound: Gauge::new(),
+        }
+    }
+
+    pub fn snapshot(&self) -> NodeQueueStats {
+        NodeQueueStats {
+            inbound: self.inbound.read(),
+            outbound: self.outbound.read(),
         }
     }
 }
@@ -247,6 +320,16 @@ impl MiscStats {
             duplicate_blocks: Counter::new(),
             duplicate_sync_blocks: Counter::new(),
             rpc_requests: Counter::new(),
+        }
+    }
+
+    pub fn snapshot(&self) -> NodeMiscStats {
+        NodeMiscStats {
+            block_height: self.block_height.read(),
+            blocks_mined: self.blocks_mined.read(),
+            duplicate_blocks: self.duplicate_blocks.read(),
+            duplicate_sync_blocks: self.duplicate_sync_blocks.read(),
+            rpc_requests: self.rpc_requests.read(),
         }
     }
 }

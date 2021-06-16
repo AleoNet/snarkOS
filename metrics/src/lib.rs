@@ -26,6 +26,7 @@ pub mod prometheus;
 
 mod metric_types;
 
+pub mod snapshots;
 pub mod stats;
 #[cfg(test)]
 pub mod testing;

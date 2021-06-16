@@ -31,6 +31,10 @@ version = "0.16"
 version = "0.12"
 features = [ "process" ]
 
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
 [dependencies.tokio]
 version = "1"
 features = [ "macros", "rt-multi-thread" ]

@@ -17,6 +17,7 @@
 //! Definition of the public and private RPC endpoints.
 
 use crate::{error::RpcError, rpc_types::*};
+use snarkos_metrics::snapshots::NodeStats;
 
 use jsonrpc_derive::rpc;
 

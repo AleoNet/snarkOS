@@ -20,7 +20,8 @@
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_network::{Node, Sync, NODE_STATS};
+use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
+use snarkos_network::{Node, Sync};
 use snarkvm_dpc::{
     testnet1::{
         instantiated::{Components, Tx},
@@ -35,10 +36,7 @@ use snarkvm_utilities::{
 
 use chrono::Utc;
 
-use std::{
-    ops::Deref,
-    sync::{atomic::Ordering, Arc},
-};
+use std::{ops::Deref, sync::Arc};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -325,60 +323,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     /// Returns statistics related to the node.
     fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
-        Ok(NodeStats {
-            inbound: NodeInboundStats {
-                all_successes: NODE_STATS.inbound.all_successes.load(Ordering::Relaxed),
-                all_failures: NODE_STATS.inbound.all_failures.load(Ordering::Relaxed),
-
-                blocks: NODE_STATS.inbound.blocks.load(Ordering::Relaxed),
-                getblocks: NODE_STATS.inbound.getblocks.load(Ordering::Relaxed),
-                getmemorypool: NODE_STATS.inbound.getmemorypool.load(Ordering::Relaxed),
-                getpeers: NODE_STATS.inbound.getpeers.load(Ordering::Relaxed),
-                getsync: NODE_STATS.inbound.getsync.load(Ordering::Relaxed),
-                memorypool: NODE_STATS.inbound.memorypool.load(Ordering::Relaxed),
-                peers: NODE_STATS.inbound.peers.load(Ordering::Relaxed),
-                pings: NODE_STATS.inbound.pings.load(Ordering::Relaxed),
-                pongs: NODE_STATS.inbound.pongs.load(Ordering::Relaxed),
-                syncs: NODE_STATS.inbound.syncs.load(Ordering::Relaxed),
-                syncblocks: NODE_STATS.inbound.syncblocks.load(Ordering::Relaxed),
-                transactions: NODE_STATS.inbound.transactions.load(Ordering::Relaxed),
-                unknown: NODE_STATS.inbound.unknown.load(Ordering::Relaxed),
-            },
-            outbound: NodeOutboundStats {
-                all_successes: NODE_STATS.outbound.all_successes.load(Ordering::Relaxed),
-                all_failures: NODE_STATS.outbound.all_failures.load(Ordering::Relaxed),
-            },
-            connections: NodeConnectionStats {
-                all_accepted: NODE_STATS.connections.all_accepted.load(Ordering::Relaxed),
-                all_initiated: NODE_STATS.connections.all_initiated.load(Ordering::Relaxed),
-                all_rejected: NODE_STATS.connections.all_rejected.load(Ordering::Relaxed),
-                connected_peers: self.node.peer_book.get_active_peer_count(),
-                disconnected_peers: self.node.peer_book.get_disconnected_peer_count(),
-            },
-            handshakes: NodeHandshakeStats {
-                successes_init: NODE_STATS.handshakes.successes_init.load(Ordering::Relaxed),
-                successes_resp: NODE_STATS.handshakes.successes_resp.load(Ordering::Relaxed),
-                failures_init: NODE_STATS.handshakes.failures_init.load(Ordering::Relaxed),
-                failures_resp: NODE_STATS.handshakes.failures_resp.load(Ordering::Relaxed),
-                timeouts_init: NODE_STATS.handshakes.timeouts_init.load(Ordering::Relaxed),
-                timeouts_resp: NODE_STATS.handshakes.timeouts_resp.load(Ordering::Relaxed),
-            },
-            queues: NodeQueueStats {
-                inbound: NODE_STATS.queues.inbound.load(Ordering::SeqCst),
-                outbound: NODE_STATS.queues.outbound.load(Ordering::SeqCst),
-            },
-            misc: NodeMiscStats {
-                block_height: self
-                    .node
-                    .sync()
-                    .map(|sync| sync.current_block_height() as u64)
-                    .unwrap_or(0),
-                blocks_mined: NODE_STATS.misc.blocks_mined.load(Ordering::Relaxed),
-                duplicate_blocks: NODE_STATS.misc.duplicate_blocks.load(Ordering::Relaxed),
-                duplicate_sync_blocks: NODE_STATS.misc.duplicate_sync_blocks.load(Ordering::Relaxed),
-                rpc_requests: NODE_STATS.misc.rpc_requests.load(Ordering::Relaxed),
-            },
-        })
+        Ok(NODE_STATS.snapshot())
     }
 
     /// Returns the current mempool and sync information known by this node.
