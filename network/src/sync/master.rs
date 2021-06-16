@@ -299,10 +299,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let early_blocks_count = early_blocks.len();
 
         let ledger = &self.node.expect_sync().consensus.ledger;
-        let block_order: Vec<BlockHeaderHash> = early_blocks
-            .into_iter()
-            .filter(|x| !ledger.block_hash_exists(x))
-            .collect();
+        let block_order: Vec<BlockHeaderHash> = early_blocks.into_iter().filter(|x| !ledger.is_canon(x)).collect();
 
         info!(
             "requesting {} blocks for sync, received headers for {} known blocks",
