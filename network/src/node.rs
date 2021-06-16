@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{master::SyncInbound, sync::master::SyncMaster, topology::NetworkTopology, *};
+use crate::{master::SyncInbound, sync::master::SyncMaster, *};
 use snarkos_metrics::{self as metrics, inbound, misc};
 use snarkvm_dpc::Storage;
 
