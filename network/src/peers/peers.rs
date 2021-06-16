@@ -289,16 +289,23 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// A node has sent their list of peer addresses.
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
-    pub(crate) async fn process_inbound_peers(&self, peers: Vec<SocketAddr>) {
+    pub(crate) async fn process_inbound_peers(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         let local_address = self.local_address().unwrap(); // the address must be known by now
 
-        for peer_address in peers.into_iter().filter(|&peer_addr| peer_addr != local_address) {
+        for peer_address in peers.iter().filter(|&peer_addr| *peer_addr != local_address) {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
             self.peer_book
-                .add_peer(peer_address, self.config.bootnodes().contains(&peer_address))
+                .add_peer(*peer_address, self.config.bootnodes().contains(&peer_address))
                 .await;
+        }
+
+        if let Some(topology) = self.network_topology.get() {
+            // If this node is tracking the network topology, record the connections. This can
+            // then be used to construct the graph and query peer info from the peerbook.
+
+            topology.update(source, peers);
         }
     }
 
