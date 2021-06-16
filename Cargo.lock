@@ -2717,6 +2717,7 @@ dependencies = [
  "mpmc-map",
  "nalgebra",
  "once_cell",
+ "parking_lot",
  "peak_alloc",
  "rand 0.8.3",
  "serde",
