@@ -17,52 +17,11 @@
 use metrics::{GaugeValue, Key, Recorder, Unit};
 
 use crate::metric_types::{Counter, DiscreteGauge};
+use crate::names::*;
 use crate::snapshots::{
     NodeConnectionStats, NodeHandshakeStats, NodeInboundStats, NodeMiscStats, NodeOutboundStats, NodeQueueStats,
     NodeStats,
 };
-
-pub const INBOUND_ALL_SUCCESSES: &str = "snarkos_inbound_all_successes_total";
-pub const INBOUND_ALL_FAILURES: &str = "snarkos_inbound_all_failures_total";
-pub const INBOUND_BLOCKS: &str = "snarkos_inbound_blocks_total";
-pub const INBOUND_GETBLOCKS: &str = "snarkos_inbound_getblocks_total";
-pub const INBOUND_GETMEMORYPOOL: &str = "snarkos_inbound_getmemorypool_total";
-pub const INBOUND_GETPEERS: &str = "snarkos_inbound_getpeers_total";
-pub const INBOUND_GETSYNC: &str = "snarkos_inbound_getsync_total";
-pub const INBOUND_MEMORYPOOL: &str = "snarkos_inbound_memorypool_total";
-pub const INBOUND_PEERS: &str = "snarkos_inbound_peers_total";
-pub const INBOUND_PINGS: &str = "snarkos_inbound_pings_total";
-pub const INBOUND_PONGS: &str = "snarkos_inbound_pongs_total";
-pub const INBOUND_SYNCS: &str = "snarkos_inbound_syncs_total";
-pub const INBOUND_SYNCBLOCKS: &str = "snarkos_inbound_syncblocks_total";
-pub const INBOUND_TRANSACTIONS: &str = "snarkos_inbound_transactions_total";
-pub const INBOUND_UNKNOWN: &str = "snarkos_inbound_unknown_total";
-
-pub const OUTBOUND_ALL_SUCCESSES: &str = "snarkos_outbound_all_successes_total";
-pub const OUTBOUND_ALL_FAILURES: &str = "snarkos_outbound_all_failures_total";
-
-pub const CONNECTIONS_ALL_ACCEPTED: &str = "snarkos_connections_all_accepted_total";
-pub const CONNECTIONS_ALL_INITIATED: &str = "snarkos_connections_all_initiated_total";
-pub const CONNECTIONS_ALL_REJECTED: &str = "snarkos_connections_all_rejected_total";
-pub const CONNECTIONS_CONNECTING: &str = "snarkos_connections_connecting_total";
-pub const CONNECTIONS_CONNECTED: &str = "snarkos_connections_connected_total";
-pub const CONNECTIONS_DISCONNECTED: &str = "snarkos_connections_disconnected_total";
-
-pub const HANDSHAKES_FAILURES_INIT: &str = "snarkos_handshakes_failures_init_total";
-pub const HANDSHAKES_FAILURES_RESP: &str = "snarkos_handshakes_failures_resp_total";
-pub const HANDSHAKES_SUCCESSES_INIT: &str = "snarkos_handshakes_successes_init_total";
-pub const HANDSHAKES_SUCCESSES_RESP: &str = "snarkos_handshakes_successes_resp_total";
-pub const HANDSHAKES_TIMEOUTS_INIT: &str = "snarkos_handshakes_timeouts_init_total";
-pub const HANDSHAKES_TIMEOUTS_RESP: &str = "snarkos_handshakes_timeouts_resp_total";
-
-pub const QUEUES_INBOUND: &str = "snarkos_queues_inbound_total";
-pub const QUEUES_OUTBOUND: &str = "snarkos_queues_outbound_total";
-
-pub const MISC_BLOCK_HEIGHT: &str = "snarkos_misc_block_height_total";
-pub const MISC_BLOCKS_MINED: &str = "snarkos_misc_blocks_mined_total";
-pub const MISC_DUPLICATE_BLOCKS: &str = "snarkos_misc_duplicate_blocks_total";
-pub const MISC_DUPLICATE_SYNC_BLOCKS: &str = "snarkos_misc_duplicate_sync_blocks_total";
-pub const MISC_RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";
 
 pub static NODE_STATS: Stats = Stats::new();
 
@@ -347,40 +306,40 @@ impl Recorder for Stats {
     fn increment_counter(&self, key: &Key, value: u64) {
         let metric = match key.name() {
             // inbound
-            INBOUND_ALL_SUCCESSES => &self.inbound.all_successes,
-            INBOUND_ALL_FAILURES => &self.inbound.all_failures,
-            INBOUND_BLOCKS => &self.inbound.blocks,
-            INBOUND_GETBLOCKS => &self.inbound.getblocks,
-            INBOUND_GETMEMORYPOOL => &self.inbound.getmemorypool,
-            INBOUND_GETPEERS => &self.inbound.getpeers,
-            INBOUND_GETSYNC => &self.inbound.getsync,
-            INBOUND_MEMORYPOOL => &self.inbound.memorypool,
-            INBOUND_PEERS => &self.inbound.peers,
-            INBOUND_PINGS => &self.inbound.pings,
-            INBOUND_PONGS => &self.inbound.pongs,
-            INBOUND_SYNCS => &self.inbound.syncs,
-            INBOUND_SYNCBLOCKS => &self.inbound.syncblocks,
-            INBOUND_TRANSACTIONS => &self.inbound.transactions,
-            INBOUND_UNKNOWN => &self.inbound.unknown,
+            inbound::ALL_SUCCESSES => &self.inbound.all_successes,
+            inbound::ALL_FAILURES => &self.inbound.all_failures,
+            inbound::BLOCKS => &self.inbound.blocks,
+            inbound::GETBLOCKS => &self.inbound.getblocks,
+            inbound::GETMEMORYPOOL => &self.inbound.getmemorypool,
+            inbound::GETPEERS => &self.inbound.getpeers,
+            inbound::GETSYNC => &self.inbound.getsync,
+            inbound::MEMORYPOOL => &self.inbound.memorypool,
+            inbound::PEERS => &self.inbound.peers,
+            inbound::PINGS => &self.inbound.pings,
+            inbound::PONGS => &self.inbound.pongs,
+            inbound::SYNCS => &self.inbound.syncs,
+            inbound::SYNCBLOCKS => &self.inbound.syncblocks,
+            inbound::TRANSACTIONS => &self.inbound.transactions,
+            inbound::UNKNOWN => &self.inbound.unknown,
             // outbound
-            OUTBOUND_ALL_SUCCESSES => &self.outbound.all_successes,
-            OUTBOUND_ALL_FAILURES => &self.outbound.all_failures,
+            outbound::ALL_SUCCESSES => &self.outbound.all_successes,
+            outbound::ALL_FAILURES => &self.outbound.all_failures,
             // connections
-            CONNECTIONS_ALL_ACCEPTED => &self.connections.all_accepted,
-            CONNECTIONS_ALL_INITIATED => &self.connections.all_initiated,
-            CONNECTIONS_ALL_REJECTED => &self.connections.all_rejected,
+            connections::ALL_ACCEPTED => &self.connections.all_accepted,
+            connections::ALL_INITIATED => &self.connections.all_initiated,
+            connections::ALL_REJECTED => &self.connections.all_rejected,
             // handshakes
-            HANDSHAKES_FAILURES_INIT => &self.handshakes.failures_init,
-            HANDSHAKES_FAILURES_RESP => &self.handshakes.failures_resp,
-            HANDSHAKES_SUCCESSES_INIT => &self.handshakes.successes_init,
-            HANDSHAKES_SUCCESSES_RESP => &self.handshakes.successes_resp,
-            HANDSHAKES_TIMEOUTS_INIT => &self.handshakes.timeouts_init,
-            HANDSHAKES_TIMEOUTS_RESP => &self.handshakes.timeouts_resp,
+            handshakes::FAILURES_INIT => &self.handshakes.failures_init,
+            handshakes::FAILURES_RESP => &self.handshakes.failures_resp,
+            handshakes::SUCCESSES_INIT => &self.handshakes.successes_init,
+            handshakes::SUCCESSES_RESP => &self.handshakes.successes_resp,
+            handshakes::TIMEOUTS_INIT => &self.handshakes.timeouts_init,
+            handshakes::TIMEOUTS_RESP => &self.handshakes.timeouts_resp,
             // misc
-            MISC_BLOCKS_MINED => &self.misc.blocks_mined,
-            MISC_DUPLICATE_BLOCKS => &self.misc.duplicate_blocks,
-            MISC_DUPLICATE_SYNC_BLOCKS => &self.misc.duplicate_sync_blocks,
-            MISC_RPC_REQUESTS => &self.misc.rpc_requests,
+            misc::BLOCKS_MINED => &self.misc.blocks_mined,
+            misc::DUPLICATE_BLOCKS => &self.misc.duplicate_blocks,
+            misc::DUPLICATE_SYNC_BLOCKS => &self.misc.duplicate_sync_blocks,
+            misc::RPC_REQUESTS => &self.misc.rpc_requests,
             _ => {
                 return;
             }
@@ -391,12 +350,12 @@ impl Recorder for Stats {
     fn update_gauge(&self, key: &Key, value: GaugeValue) {
         let metric = match key.name() {
             // queues
-            QUEUES_INBOUND => &self.queues.inbound,
-            QUEUES_OUTBOUND => &self.queues.outbound,
+            queues::INBOUND => &self.queues.inbound,
+            queues::OUTBOUND => &self.queues.outbound,
             // misc
-            MISC_BLOCK_HEIGHT => &self.misc.block_height,
+            misc::BLOCK_HEIGHT => &self.misc.block_height,
             // obtained ad-hoc for the purposes of RPC metrics
-            CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => {
+            connections::CONNECTING | connections::CONNECTED | connections::DISCONNECTED => {
                 todo!("@sadroeck - add me")
             }
             _ => {

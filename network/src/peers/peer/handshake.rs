@@ -22,13 +22,11 @@ use tokio::{
     net::TcpStream,
 };
 
-use snarkos_metrics::stats;
+use snarkos_metrics::handshakes::*;
 
 use crate::{
     peer::{cipher::Cipher, network::PeerIOHandle},
-    NetworkError,
-    Peer,
-    Version,
+    NetworkError, Peer, Version,
 };
 
 pub struct HandshakeData {
@@ -91,7 +89,7 @@ async fn responder_handshake<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
         return Err(NetworkError::InvalidHandshake);
     }
 
-    metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_RESP);
+    metrics::increment_counter!(SUCCESSES_RESP);
     Ok(HandshakeData {
         version: peer_version,
         noise: noise.into_transport_mode()?,
@@ -150,7 +148,7 @@ async fn initiator_handshake<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     writer.flush().await?;
     trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
-    metrics::increment_counter!(stats::HANDSHAKES_SUCCESSES_INIT);
+    metrics::increment_counter!(SUCCESSES_INIT);
     Ok(HandshakeData {
         version,
         noise: noise.into_transport_mode()?,
@@ -176,11 +174,11 @@ impl Peer {
         let data = match result {
             Ok(Ok(data)) => data,
             Ok(Err(e)) => {
-                metrics::increment_counter!(stats::HANDSHAKES_FAILURES_INIT);
+                metrics::increment_counter!(FAILURES_INIT);
                 return Err(e);
             }
             Err(_) => {
-                metrics::increment_counter!(stats::HANDSHAKES_TIMEOUTS_INIT);
+                metrics::increment_counter!(TIMEOUTS_INIT);
                 return Err(NetworkError::HandshakeTimeout);
             }
         };
@@ -213,11 +211,11 @@ impl Peer {
         let data = match result {
             Ok(Ok(data)) => data,
             Ok(Err(e)) => {
-                metrics::increment_counter!(stats::HANDSHAKES_FAILURES_RESP);
+                metrics::increment_counter!(FAILURES_RESP);
                 return Err(e);
             }
             Err(_) => {
-                metrics::increment_counter!(stats::HANDSHAKES_TIMEOUTS_RESP);
+                metrics::increment_counter!(TIMEOUTS_RESP);
                 return Err(NetworkError::HandshakeTimeout);
             }
         };

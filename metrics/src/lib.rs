@@ -25,8 +25,11 @@ pub mod metrics;
 pub mod prometheus;
 
 mod metric_types;
+mod names;
 
+pub use names::*;
 pub mod snapshots;
 pub mod stats;
+
 #[cfg(test)]
 pub mod testing;

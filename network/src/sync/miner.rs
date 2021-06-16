@@ -22,7 +22,7 @@ use tokio::task;
 use tracing::*;
 
 use snarkos_consensus::Miner;
-use snarkos_metrics::stats;
+use snarkos_metrics::misc::*;
 
 use crate::{Node, State};
 
@@ -102,7 +102,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     self.node.set_state(State::Idle);
                 }
 
-                metrics::increment_counter!(stats::MISC_BLOCKS_MINED);
+                metrics::increment_counter!(BLOCKS_MINED);
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
 

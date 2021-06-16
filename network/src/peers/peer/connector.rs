@@ -23,7 +23,7 @@ use futures::{select, FutureExt};
 use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use snarkos_metrics::stats;
+use snarkos_metrics::connections::*;
 
 use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, Version};
 
@@ -53,7 +53,7 @@ impl Peer {
                 }
                 Ok(network) => {
                     self.set_connected();
-                    metrics::increment_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+                    metrics::increment_gauge!(CONNECTED, 1.0);
                     event_target
                         .send(PeerEvent {
                             address: self.address,
@@ -75,7 +75,7 @@ impl Peer {
                             );
                         }
                     }
-                    metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+                    metrics::decrement_gauge!(CONNECTED, 1.0);
                 }
             }
             let state = self.status;
@@ -91,8 +91,8 @@ impl Peer {
     }
 
     async fn inner_connect(&mut self, our_version: Version) -> Result<PeerIOHandle, NetworkError> {
-        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
-        let _x = defer::defer(|| metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0));
+        metrics::increment_gauge!(CONNECTING, 1.0);
+        let _x = defer::defer(|| metrics::decrement_gauge!(CONNECTING, 1.0));
 
         let tcp_stream;
         select! {

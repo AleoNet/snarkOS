@@ -23,7 +23,7 @@ use tokio::{
     task,
 };
 
-use snarkos_metrics::stats;
+use snarkos_metrics::{connections, inbound, queues};
 
 use crate::{errors::NetworkError, message::*, Cache, Node, Receiver, Sender, State};
 
@@ -97,7 +97,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     }
                     Err(e) => error!("Failed to accept a connection: {}", e),
                 }
-                metrics::increment_counter!(stats::CONNECTIONS_ALL_ACCEPTED);
+                metrics::increment_counter!(connections::ALL_ACCEPTED);
             }
         });
 
@@ -113,7 +113,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
-        metrics::decrement_gauge!(stats::QUEUES_INBOUND, 1.0);
+        metrics::decrement_gauge!(queues::INBOUND, 1.0);
 
         let source = if let Direction::Inbound(addr) = direction {
             addr
@@ -129,21 +129,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         match payload {
             Payload::Transaction(transaction) => {
-                metrics::increment_counter!(stats::INBOUND_TRANSACTIONS);
+                metrics::increment_counter!(inbound::TRANSACTIONS);
 
                 if self.sync().is_some() {
                     self.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
             Payload::Block(block) => {
-                metrics::increment_counter!(stats::INBOUND_BLOCKS);
+                metrics::increment_counter!(inbound::BLOCKS);
 
                 if self.sync().is_some() {
                     self.received_block(source, block, true).await?;
                 }
             }
             Payload::SyncBlock(block) => {
-                metrics::increment_counter!(stats::INBOUND_SYNCBLOCKS);
+                metrics::increment_counter!(inbound::SYNCBLOCKS);
 
                 if self.sync().is_some() {
                     self.received_block(source, block, false).await?;
@@ -155,35 +155,35 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetBlocks(hashes) => {
-                metrics::increment_counter!(stats::INBOUND_GETBLOCKS);
+                metrics::increment_counter!(inbound::GETBLOCKS);
 
                 if self.sync().is_some() {
                     self.received_get_blocks(source, hashes).await?;
                 }
             }
             Payload::GetMemoryPool => {
-                metrics::increment_counter!(stats::INBOUND_GETMEMORYPOOL);
+                metrics::increment_counter!(inbound::GETMEMORYPOOL);
 
                 if self.sync().is_some() {
                     self.received_get_memory_pool(source).await;
                 }
             }
             Payload::MemoryPool(mempool) => {
-                metrics::increment_counter!(stats::INBOUND_MEMORYPOOL);
+                metrics::increment_counter!(inbound::MEMORYPOOL);
 
                 if self.sync().is_some() {
                     self.received_memory_pool(mempool).await?;
                 }
             }
             Payload::GetSync(getsync) => {
-                metrics::increment_counter!(stats::INBOUND_GETSYNC);
+                metrics::increment_counter!(inbound::GETSYNC);
 
                 if self.sync().is_some() {
                     self.received_get_sync(source, getsync).await?;
                 }
             }
             Payload::Sync(sync) => {
-                metrics::increment_counter!(stats::INBOUND_SYNCS);
+                metrics::increment_counter!(inbound::SYNCS);
 
                 if self.sync().is_some() {
                     if sync.is_empty() {
@@ -200,12 +200,12 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 }
             }
             Payload::GetPeers => {
-                metrics::increment_counter!(stats::INBOUND_GETPEERS);
+                metrics::increment_counter!(inbound::GETPEERS);
 
                 self.send_peers(source).await;
             }
             Payload::Peers(peers) => {
-                metrics::increment_counter!(stats::INBOUND_PEERS);
+                metrics::increment_counter!(inbound::PEERS);
 
                 self.process_inbound_peers(peers).await;
             }
@@ -214,7 +214,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 unreachable!()
             }
             Payload::Unknown => {
-                metrics::increment_counter!(stats::INBOUND_UNKNOWN);
+                metrics::increment_counter!(inbound::UNKNOWN);
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
             }
         }
@@ -226,7 +226,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     pub(crate) fn route(&self, response: Message) {
         match self.inbound.sender.try_send(response) {
             Err(TrySendError::Full(msg)) => {
-                metrics::increment_counter!(stats::INBOUND_ALL_FAILURES);
+                metrics::increment_counter!(inbound::ALL_FAILURES);
                 error!("Failed to route a {}: the inbound channel is full", msg);
             }
             Err(TrySendError::Closed(msg)) => {
@@ -234,7 +234,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 error!("Failed to route a {}: the inbound channel is closed", msg);
             }
             Ok(_) => {
-                metrics::increment_gauge!(stats::QUEUES_INBOUND, 1.0);
+                metrics::increment_gauge!(queues::INBOUND, 1.0);
             }
         }
     }

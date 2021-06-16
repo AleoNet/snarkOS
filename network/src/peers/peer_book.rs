@@ -28,7 +28,7 @@ use rand::prelude::IteratorRandom;
 use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use snarkos_metrics::stats;
+use snarkos_metrics::connections::*;
 use snarkos_storage::BlockHeight;
 
 use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};
@@ -69,11 +69,11 @@ impl PeerBookRef {
                     if status == PeerStatus::Connecting {
                         self.pending_connections.fetch_sub(1, Ordering::SeqCst);
                     }
-                    metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
                 PeerEventData::FailHandshake => {
                     self.pending_connections.fetch_sub(1, Ordering::SeqCst);
-                    metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
             }
         }
@@ -138,7 +138,7 @@ impl PeerBook {
     }
 
     async fn take_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
-        metrics::decrement_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+        metrics::decrement_gauge!(DISCONNECTED, 1.0);
         self.disconnected_peers.remove(address).await
     }
 
@@ -242,7 +242,7 @@ impl PeerBook {
             .insert(address, Peer::new(address, is_bootnode))
             .await;
 
-        metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+        metrics::increment_gauge!(DISCONNECTED, 1.0);
 
         debug!("Added {} to the peer book", address);
     }

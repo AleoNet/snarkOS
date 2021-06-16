@@ -22,6 +22,7 @@ use crate::{
     RpcImpl,
 };
 use snarkos_consensus::MerkleTreeLedger;
+use snarkos_metrics::misc;
 use snarkos_network::Node;
 use snarkvm_dpc::Storage;
 
@@ -89,7 +90,7 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
     req: hyper::Request<Body>,
 ) -> Result<hyper::Response<Body>, Infallible> {
     // Register the request in the metrics.
-    metrics::increment_counter!(snarkos_network::MISC_RPC_REQUESTS);
+    metrics::increment_counter!(misc::RPC_REQUESTS);
 
     // Obtain the username and password, if present.
     let auth = req

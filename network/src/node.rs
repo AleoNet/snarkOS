@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{master::SyncInbound, sync::master::SyncMaster, *};
-use snarkos_metrics::stats;
+use snarkos_metrics::{inbound, misc};
 use snarkvm_dpc::Storage;
 
 use chrono::{DateTime, Utc};
@@ -163,10 +163,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
             loop {
                 if let Err(e) = node_clone.process_incoming_messages(&mut receiver, &mut cache).await {
-                    metrics::increment_counter!(stats::INBOUND_ALL_FAILURES);
+                    metrics::increment_counter!(inbound::ALL_FAILURES);
                     error!("Node error: {}", e);
                 } else {
-                    metrics::increment_counter!(stats::INBOUND_ALL_SUCCESSES);
+                    metrics::increment_counter!(inbound::ALL_SUCCESSES);
                 }
             }
         });
@@ -368,7 +368,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
         // The node can already be at some non-zero height.
         if let Some(sync) = self.sync() {
-            metrics::counter!(crate::MISC_BLOCK_HEIGHT, sync.current_block_height() as u64);
+            metrics::counter!(misc::BLOCK_HEIGHT, sync.current_block_height() as u64);
         }
     }
 

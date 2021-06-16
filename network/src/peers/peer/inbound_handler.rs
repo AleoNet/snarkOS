@@ -16,7 +16,7 @@
 
 use snarkvm_dpc::Storage;
 
-use snarkos_metrics::stats;
+use snarkos_metrics::inbound::*;
 
 use crate::{Direction, Message, NetworkError, Node, Payload, Peer};
 
@@ -53,12 +53,12 @@ impl Peer {
                 } else {
                     self.fail();
                 }
-                metrics::increment_counter!(stats::INBOUND_PONGS);
+                metrics::increment_counter!(PONGS);
             }
             Payload::Ping(block_height) => {
                 network.write_payload(&Payload::Pong).await?;
                 self.quality.block_height = block_height;
-                metrics::increment_counter!(stats::INBOUND_PINGS);
+                metrics::increment_counter!(PINGS);
             }
             payload => {
                 node.route(Message {
