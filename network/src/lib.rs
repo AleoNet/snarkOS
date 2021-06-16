@@ -27,32 +27,24 @@ extern crate derivative;
 #[macro_use]
 extern crate tracing;
 
-pub mod config;
 pub use config::*;
-
-pub mod errors;
+pub use drop_join::*;
 pub use errors::*;
-
-pub mod inbound;
 pub use inbound::*;
-
-pub mod message;
 pub use message::*;
-
-pub mod node;
 pub use node::*;
-
-pub mod peers;
 pub use peers::*;
-
-pub mod stats;
-pub use stats::*;
-
-pub mod sync;
+pub use snarkos_metrics::stats::*;
 pub use sync::*;
 
+pub mod config;
 mod drop_join;
-pub use drop_join::*;
+pub mod errors;
+pub mod inbound;
+pub mod message;
+pub mod node;
+pub mod peers;
+pub mod sync;
 
 /// The maximum number of block hashes that can be requested or provided in a single batch.
 pub const MAX_BLOCK_SYNC_COUNT: u32 = 64;

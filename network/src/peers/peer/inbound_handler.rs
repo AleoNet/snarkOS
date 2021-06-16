@@ -16,7 +16,9 @@
 
 use snarkvm_dpc::Storage;
 
-use crate::{stats, Direction, Message, NetworkError, Node, Payload, Peer};
+use snarkos_metrics::stats;
+
+use crate::{Direction, Message, NetworkError, Node, Payload, Peer};
 
 use super::network::PeerIOHandle;
 

@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{errors::NetworkError, message::*, stats, Cache, Node, Receiver, Sender, State};
-
 use std::time::Duration;
 
 use snarkvm_dpc::Storage;
@@ -24,6 +22,10 @@ use tokio::{
     sync::{mpsc::error::TrySendError, Mutex},
     task,
 };
+
+use snarkos_metrics::stats;
+
+use crate::{errors::NetworkError, message::*, Cache, Node, Receiver, Sender, State};
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug)]

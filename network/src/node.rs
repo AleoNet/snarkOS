@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{master::SyncInbound, sync::master::SyncMaster, *};
+use snarkos_metrics::stats;
 use snarkvm_dpc::Storage;
 
 use chrono::{DateTime, Utc};

@@ -17,12 +17,19 @@ include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[dependencies.const-default]
+version = "0.1"
+features = ["derive"]
+
 [dependencies.futures-util]
 version = "0.3.5"
 default-features = false
 
 [dependencies.lazy_static]
 version = "1.4"
+
+[dependencies.metrics]
+version = "0.16"
 
 [dependencies.prometheus]
 version = "0.12"

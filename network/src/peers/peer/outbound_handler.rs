@@ -18,7 +18,9 @@ use std::time::Instant;
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{stats, NetworkError, Payload, Peer};
+use snarkos_metrics::stats;
+
+use crate::{NetworkError, Payload, Peer};
 
 use super::network::PeerIOHandle;
 

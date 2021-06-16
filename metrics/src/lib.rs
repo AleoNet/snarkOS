@@ -17,12 +17,13 @@
 #[macro_use]
 extern crate lazy_static;
 
+pub use crate::metrics::*;
+
 pub mod macros;
 
 pub mod metrics;
-pub use metrics::*;
-
 pub mod prometheus;
 
+pub mod stats;
 #[cfg(test)]
 pub mod testing;

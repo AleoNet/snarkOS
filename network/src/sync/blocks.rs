@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{master::SyncInbound, message::*, stats, NetworkError, Node};
-use snarkos_consensus::error::ConsensusError;
+use std::net::SocketAddr;
+
 use snarkvm_dpc::{Block, BlockHeaderHash, Storage};
 
-use std::net::SocketAddr;
+use snarkos_consensus::error::ConsensusError;
+use snarkos_metrics::stats;
+
+use crate::{master::SyncInbound, message::*, NetworkError, Node};
 
 impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
     ///

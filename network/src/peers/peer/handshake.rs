@@ -22,9 +22,10 @@ use tokio::{
     net::TcpStream,
 };
 
+use snarkos_metrics::stats;
+
 use crate::{
     peer::{cipher::Cipher, network::PeerIOHandle},
-    stats,
     NetworkError,
     Peer,
     Version,

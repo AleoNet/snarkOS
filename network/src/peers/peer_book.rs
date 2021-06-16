@@ -14,12 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{stats, NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};
-use futures::Future;
-use mpmc_map::MpmcMap;
-use rand::prelude::IteratorRandom;
-use snarkos_storage::BlockHeight;
-use snarkvm_dpc::Storage;
 use std::{
     net::SocketAddr,
     sync::{
@@ -27,7 +21,17 @@ use std::{
         Arc,
     },
 };
+
+use futures::Future;
+use mpmc_map::MpmcMap;
+use rand::prelude::IteratorRandom;
+use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
+
+use snarkos_metrics::stats;
+use snarkos_storage::BlockHeight;
+
+use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};
 
 ///
 /// A data structure for storing the history of all peers with this node server.

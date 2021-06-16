@@ -26,14 +26,11 @@ use snarkvm_dpc::{
         instantiated::{Components, Tx},
         parameters::PublicParameters,
     },
-    BlockHeaderHash,
-    Storage,
-    TransactionScheme,
+    BlockHeaderHash, Storage, TransactionScheme,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
-    CanonicalSerialize,
+    to_bytes, CanonicalSerialize,
 };
 
 use chrono::Utc;

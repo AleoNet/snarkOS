@@ -2857,8 +2857,10 @@ dependencies = [
 name = "snarkos-metrics"
 version = "1.3.8"
 dependencies = [
+ "const-default",
  "futures-util",
  "lazy_static",
+ "metrics",
  "prometheus",
  "serial_test",
  "snarkvm-derives",
@@ -2895,6 +2897,7 @@ dependencies = [
  "rand 0.8.3",
  "serde",
  "snarkos-consensus",
+ "snarkos-metrics",
  "snarkos-storage",
  "snarkos-testing",
  "snarkvm-algorithms",

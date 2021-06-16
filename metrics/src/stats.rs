@@ -299,7 +299,6 @@ impl Recorder for Stats {
             MISC_DUPLICATE_SYNC_BLOCKS => &self.misc.duplicate_sync_blocks,
             MISC_RPC_REQUESTS => &self.misc.rpc_requests,
             _ => {
-                error!("Metrics key {} wasn't assigned an operation and won't work!", key);
                 return;
             }
         };
@@ -318,7 +317,6 @@ impl Recorder for Stats {
                 todo!("@sadroeck - add me")
             }
             _ => {
-                error!("Metrics key {} wasn't assigned an operation and won't work!", key);
                 return;
             }
         };

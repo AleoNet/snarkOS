@@ -19,10 +19,11 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use super::PeerAction;
-use crate::{stats, NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus, Version};
+use snarkos_metrics::stats;
 
-use super::network::PeerIOHandle;
+use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus, Version};
+
+use super::{network::PeerIOHandle, PeerAction};
 
 impl Peer {
     pub fn receive<S: Storage + Send + Sync + 'static>(

@@ -23,10 +23,11 @@ use futures::{select, FutureExt};
 use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use super::PeerAction;
-use crate::{stats, NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, Version};
+use snarkos_metrics::stats;
 
-use super::network::PeerIOHandle;
+use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, Version};
+
+use super::{network::PeerIOHandle, PeerAction};
 
 const CONNECTION_TIMEOUT_SECS: u64 = 3;
 
