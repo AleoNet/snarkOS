@@ -16,7 +16,7 @@
 
 use metrics::{GaugeValue, Key, Recorder, Unit};
 
-use crate::metric_types::{Counter, Gauge};
+use crate::metric_types::{Counter, DiscreteGauge};
 use crate::snapshots::{
     NodeConnectionStats, NodeHandshakeStats, NodeInboundStats, NodeMiscStats, NodeOutboundStats, NodeQueueStats,
     NodeStats,
@@ -211,9 +211,9 @@ pub struct ConnectionStats {
     /// The number of rejected inbound connection requests.
     all_rejected: Counter,
     /// Number of currently connected peers.
-    connected_peers: Gauge,
+    connected_peers: DiscreteGauge,
     /// Number of known disconnected peers.
-    disconnected_peers: Gauge,
+    disconnected_peers: DiscreteGauge,
 }
 
 impl ConnectionStats {
@@ -222,8 +222,8 @@ impl ConnectionStats {
             all_accepted: Counter::new(),
             all_initiated: Counter::new(),
             all_rejected: Counter::new(),
-            connected_peers: Gauge::new(),
-            disconnected_peers: Gauge::new(),
+            connected_peers: DiscreteGauge::new(),
+            disconnected_peers: DiscreteGauge::new(),
         }
     }
 
@@ -279,16 +279,16 @@ impl HandshakeStats {
 
 pub struct QueueStats {
     /// The number of messages queued in the common inbound channel.
-    inbound: Gauge,
+    inbound: DiscreteGauge,
     /// The number of messages queued in the individual outbound channels.
-    outbound: Gauge,
+    outbound: DiscreteGauge,
 }
 
 impl QueueStats {
     const fn new() -> Self {
         Self {
-            inbound: Gauge::new(),
-            outbound: Gauge::new(),
+            inbound: DiscreteGauge::new(),
+            outbound: DiscreteGauge::new(),
         }
     }
 
@@ -301,7 +301,7 @@ impl QueueStats {
 }
 
 pub struct MiscStats {
-    block_height: Gauge,
+    block_height: DiscreteGauge,
     /// The number of mined blocks.
     blocks_mined: Counter,
     /// The number of duplicate blocks received.
@@ -315,7 +315,7 @@ pub struct MiscStats {
 impl MiscStats {
     const fn new() -> Self {
         Self {
-            block_height: Gauge::new(),
+            block_height: DiscreteGauge::new(),
             blocks_mined: Counter::new(),
             duplicate_blocks: Counter::new(),
             duplicate_sync_blocks: Counter::new(),
