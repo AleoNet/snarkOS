@@ -326,10 +326,10 @@ mod consensus_sidechain {
             consensus.ledger.decommit_latest_block().unwrap();
         }
 
-        // Consensus re-imports 10 blocks.
-        for block in &blocks[10..] {
-            consensus.receive_block(block).await.unwrap();
-        }
+        assert_eq!(consensus.ledger.get_current_block_height(), 10);
+
+        // Consensus re-imports 1 block, the rest get fast-forwarded.
+        consensus.receive_block(&blocks[10]).await.unwrap();
 
         assert_eq!(consensus.ledger.get_current_block_height(), 20);
 
