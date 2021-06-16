@@ -76,21 +76,6 @@ jobs:
             howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
       - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
 
-  rust-nightly:
-    docker:
-      - image: howardwu/snarkos-ci:2021-03-25
-    resource_class: 2xlarge
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-nightly-cache
-      - run:
-          name: Build and test
-          no_output_timeout: 60m
-          command: RUST_MIN_STACK=8388608 cargo test --all -- --skip test_rpc_create_raw_transaction
-      - clear_environment:
-          cache_key: snarkos-nightly-cache
-
   snarkos-consensus:
     docker:
       - image: cimg/rust:1.51.0
@@ -231,7 +216,6 @@ workflows:
   main-workflow:
     jobs:
       - rust-stable
-      - rust-nightly
       - codecov:
           requires:
             - rust-stable

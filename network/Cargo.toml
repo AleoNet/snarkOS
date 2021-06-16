@@ -152,6 +152,3 @@ version = "0.27"
 
 [dev-dependencies.peak_alloc]
 version = "0.1.0"
-
-[build-dependencies]
-rustc_version = "0.3"
