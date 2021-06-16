@@ -37,8 +37,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     pub(crate) async fn update_peers(&self) {
         // Fetch the number of connected and connecting peers.
-        let active_peer_count = self.peer_book.get_active_peer_count() as usize;
-
+        let active_peer_count = self.peer_book.get_active_peer_count();
         info!(
             "Connected to {} peer{}",
             active_peer_count,
@@ -50,27 +49,31 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // give us 100ms to close some negatively judge_badd connections (probably less needed, but we have time)
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        // Attempt to connect to the default bootnodes of the network.
-        self.connect_to_bootnodes().await;
+        // Fetch active peer count after high RTTs disconnects.
+        let active_peer_count = self.peer_book.get_active_peer_count();
+        let min_peers = self.config.minimum_number_of_connected_peers() as u32;
+        let max_peers = self.config.maximum_number_of_connected_peers() as u32;
 
-        // Attempt to connect to each disconnected peer saved in the peer book.
-        if !self.config.is_bootnode() {
-            self.connect_to_disconnected_peers().await;
-        }
+        // Calculate the peer counts to disconnect and connect based on the node type and current
+        // peer counts.
+        let (number_to_disconnect, number_to_connect) = match self.config.is_bootnode() {
+            true => (
+                // Bootnodes disconnect down to the min peer count, this to free up room for
+                // the next crawled peers...
+                active_peer_count.saturating_sub(min_peers),
+                // ...then they connect to peers up to min peers below the max, so as to keep room for
+                // new incoming connections.
+                max_peers.saturating_sub(2 * min_peers),
+            ),
+            false => (
+                // Non-bootnodes disconnect if above the max peer count...
+                active_peer_count.saturating_sub(max_peers),
+                // ...and connect if below the min peer count.
+                min_peers.saturating_sub(active_peer_count),
+            ),
+        };
 
-        // Broadcast a `GetPeers` message to request for more peers.
-        self.broadcast_getpeers_requests().await;
-
-        let new_active_peer_count = self.peer_book.get_active_peer_count() as usize;
-        // Check if this node server is above the permitted number of connected peers.
-        let max_peers = self.config.maximum_number_of_connected_peers() as usize;
-        if new_active_peer_count > max_peers {
-            let number_to_disconnect = new_active_peer_count - max_peers;
-            trace!(
-                "Disconnecting from {} peers to maintain their permitted number",
-                number_to_disconnect
-            );
-
+        if number_to_disconnect != 0 {
             let mut current_peers = self.peer_book.connected_peers_snapshot().await;
 
             // Bootnodes will disconnect from random peers...
@@ -86,7 +89,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        if new_active_peer_count != 0 {
+        // Attempt to connect to the default bootnodes of the network if the node has no active
+        // connections.
+        if self.peer_book.get_active_peer_count() == 0 {
+            self.connect_to_bootnodes().await;
+        }
+
+        if number_to_connect != 0 {
+            self.connect_to_disconnected_peers(number_to_connect as usize).await;
+        }
+
+        // Only broadcast requests if any peers are connected.
+        if self.peer_book.get_connected_peer_count() != 0 {
+            // Broadcast a `GetPeers` message to request for more peers.
+            self.broadcast_getpeers_requests().await;
+
             // Send a `Ping` to every connected peer.
             self.broadcast_pings().await;
         }
@@ -167,44 +184,38 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     ///
     /// Broadcasts a connection request to all disconnected peers.
     ///
-    async fn connect_to_disconnected_peers(&self) {
+    async fn connect_to_disconnected_peers(&self, count: usize) {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
-        // If this node is a bootnode, attempt to connect to all disconnected peers.
         // If this node is not a bootnode, attempt to satisfy the minimum number of peer connections.
         let random_peers = {
-            // Fetch the number of connected and connecting peers.
-            let number_of_peers = self.peer_book.get_active_peer_count() as usize;
-
-            // Check if this node server is below the permitted number of connected peers.
-            let min_peers = self.config.minimum_number_of_connected_peers() as usize;
-            if number_of_peers >= min_peers {
-                return;
-            }
-
-            // Set the number of peers to attempt a connection to.
-            let count = min_peers - number_of_peers;
-
-            if count == 0 {
-                return;
-            }
-
-            let disconnected_peers = self.peer_book.disconnected_peers();
-
             trace!(
                 "Connecting to {} disconnected peers",
-                cmp::min(count, disconnected_peers.len())
+                cmp::min(count, self.peer_book.disconnected_peers().len())
             );
 
             let bootnodes = self.config.bootnodes();
 
             // Iterate through a selection of random peers and attempt to connect.
-            disconnected_peers
-                .iter()
-                .filter(|peer| **peer != own_address && !bootnodes.contains(peer))
-                .copied()
-                .choose_multiple(&mut rand::thread_rng(), count)
+            let mut candidates = self.peer_book.disconnected_peers_snapshot().await;
+
+            // FIXME: is_routable check.
+            candidates.retain(|peer| peer.address != own_address && !bootnodes.contains(&peer.address));
+
+            if self.config.is_bootnode() {
+                // Bootnodes choose peers they haven't dialed in a while.
+                candidates.sort_unstable_by_key(|peer| peer.quality.last_connected);
+            }
+
+            // Only keep the addresses.
+            let addr_iter = candidates.iter().map(|peer| peer.address);
+
+            if self.config.is_bootnode() {
+                addr_iter.take(count).collect()
+            } else {
+                addr_iter.choose_multiple(&mut rand::thread_rng(), count)
+            }
         };
 
         for remote_address in random_peers {

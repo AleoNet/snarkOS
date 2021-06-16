@@ -233,6 +233,10 @@ impl PeerBook {
         self.map_each_peer(|peer| async move { peer.load().await }).await
     }
 
+    pub async fn disconnected_peers_snapshot(&self) -> Vec<Peer> {
+        self.map_each_peer(|peer| async move { peer.load().await }).await
+    }
+
     ///
     /// Adds the given address to the disconnected peers in this `PeerBook`.
     ///
