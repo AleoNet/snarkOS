@@ -167,12 +167,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             });
         }
 
-        database_transaction.push(Op::Insert {
-            col: COL_BLOCK_TRANSACTIONS,
-            key: block.header.get_hash().0.to_vec(),
-            value: to_bytes![block.transactions]?.to_vec(),
-        });
-
         self.storage.batch(database_transaction)?;
 
         Ok(())
