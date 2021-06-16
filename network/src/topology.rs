@@ -31,6 +31,7 @@ use std::{
 };
 
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
+use parking_lot::RwLock;
 
 #[derive(Debug, Eq, Copy, Clone)]
 struct Connection((SocketAddr, SocketAddr));
@@ -65,11 +66,11 @@ impl Hash for Connection {
 /// Keeps track of crawled peers and their connections.
 #[derive(Debug, Default)]
 pub struct NetworkTopology {
-    connections: HashSet<Connection>,
+    connections: RwLock<HashSet<Connection>>,
 }
 
 impl NetworkTopology {
-    fn update(&mut self, source: SocketAddr, peers: Vec<SocketAddr>) {
+    pub fn update(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.
@@ -84,6 +85,7 @@ impl NetworkTopology {
         // removed.
         let connections_to_remove: HashSet<Connection> = self
             .connections
+            .read()
             .difference(&new_connections)
             .filter(|Connection((a, b))| a == &source || b == &source)
             .copied()
@@ -91,14 +93,15 @@ impl NetworkTopology {
 
         // Only retain connections that aren't removed.
         self.connections
+            .write()
             .retain(|connection| !connections_to_remove.contains(&connection));
 
         // Insert new connections.
-        self.connections.extend(new_connections.iter());
+        self.connections.write().extend(new_connections.iter());
     }
 
     pub fn has_connections(&self) -> bool {
-        self.connections.len() > 0
+        self.connections.read().len() > 0
     }
 }
 
@@ -132,7 +135,7 @@ impl NetworkMetrics {
     /// Returns the network metrics for the state described by the connections list.
     pub fn new(topology: &NetworkTopology) -> Self {
         // Copy the connections as the data must not change throughout the metrics computation.
-        let connections: HashSet<Connection> = topology.connections.iter().copied().collect();
+        let connections: HashSet<Connection> = topology.connections.read().iter().copied().collect();
 
         // Construct the list of nodes from the connections.
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
@@ -373,8 +376,8 @@ mod test {
 
         // Insert two connections.
         topology.update(a, vec![b, c]);
-        assert!(topology.connections.contains(&Connection((a, b))));
-        assert!(topology.connections.contains(&Connection((a, c))));
+        assert!(topology.connections.read().contains(&Connection((a, b))));
+        assert!(topology.connections.read().contains(&Connection((a, c))));
 
         // Insert (a, b) connection reversed, make sure it doesn't change the list.
         topology.update(b, vec![a]);
@@ -382,8 +385,8 @@ mod test {
 
         // Update c connections but don't include (c, a) == (a, c) and expect it to be removed.
         topology.update(c, vec![b]);
-        assert!(!topology.connections.contains(&Connection((a, c))));
-        assert!(topology.connections.contains(&Connection((c, b))));
+        assert!(!topology.connections.read().contains(&Connection((a, c))));
+        assert!(topology.connections.read().contains(&Connection((c, b))));
     }
 
     #[test]
