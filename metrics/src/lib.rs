@@ -24,6 +24,8 @@ pub mod macros;
 pub mod metrics;
 pub mod prometheus;
 
+mod metric_types;
+
 pub mod stats;
 #[cfg(test)]
 pub mod testing;

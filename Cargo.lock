@@ -2857,7 +2857,6 @@ dependencies = [
 name = "snarkos-metrics"
 version = "1.3.8"
 dependencies = [
- "const-default",
  "futures-util",
  "lazy_static",
  "metrics",

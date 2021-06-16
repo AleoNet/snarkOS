@@ -16,7 +16,7 @@
 
 use metrics::{GaugeValue, Key, Recorder, Unit};
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use crate::metric_types::{Counter, Gauge};
 
 pub const INBOUND_ALL_SUCCESSES: &str = "snarkos_inbound_all_successes_total";
 pub const INBOUND_ALL_FAILURES: &str = "snarkos_inbound_all_failures_total";
@@ -325,42 +325,5 @@ impl Recorder for Stats {
             GaugeValue::Decrement(val) => metric.decrease(val),
             GaugeValue::Absolute(val) => metric.set(val),
         }
-    }
-}
-
-/// Mimics a [`metrics-core`] monotonically increasing [`Counter`] type
-pub struct Counter(AtomicU64);
-
-impl Counter {
-    const fn new() -> Self {
-        Self(AtomicU64::new(0))
-    }
-
-    fn increment(&self, val: u64) {
-        self.0.fetch_add(val, Ordering::SeqCst);
-    }
-}
-
-/// Mimics a [`metrics-core`] arbitrarily increasing & decreasing [`Gauge`]
-pub struct Gauge(AtomicU64);
-
-impl Gauge {
-    const fn new() -> Self {
-        Self(AtomicU64::new(0))
-    }
-
-    fn set(&self, val: f64) {
-        // TODO: @sadroeck - Reinterpret as f64 & do atomic C&S
-        self.0.store(val as u64, Ordering::SeqCst);
-    }
-
-    fn increase(&self, val: f64) {
-        // TODO: @sadroeck - Reinterpret as f64 & do atomic C&S
-        self.0.fetch_add(val as u64, Ordering::SeqCst);
-    }
-
-    fn decrease(&self, val: f64) {
-        // TODO: @sadroeck - Reinterpret as f64 & do atomic C&S
-        self.0.fetch_sub(val as u64, Ordering::SeqCst);
     }
 }
