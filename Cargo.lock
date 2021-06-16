@@ -2994,6 +2994,7 @@ dependencies = [
  "snarkvm-parameters",
  "snarkvm-utilities",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]

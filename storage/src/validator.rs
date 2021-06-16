@@ -410,15 +410,15 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 mod tests {
     use snarkos_testing::sync::TestBlocks;
 
-    #[test]
-    fn valid_storage_validates() {
-        tracing_subscriber::fmt::init();
+    #[tokio::test]
+    async fn valid_storage_validates() {
+        //tracing_subscriber::fmt::init();
 
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let blocks = TestBlocks::load(10, "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).unwrap();
+            consensus.receive_block(&block).await.unwrap();
         }
 
         assert!(consensus.ledger.validate(None, false));

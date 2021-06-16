@@ -82,5 +82,8 @@ version = "0.5.4"
 [dev-dependencies.snarkos-testing]
 path = "../testing"
 
+[dev-dependencies.tokio]
+version = "1"
+
 [dev-dependencies.tracing-subscriber]
 version = "0.2"
