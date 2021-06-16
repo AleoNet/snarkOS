@@ -318,7 +318,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     pub fn initialize_metrics(&self) {
         debug!("Initializing RPC metrics");
 
-        metrics::set_recorder(&NODE_STATS).expect("couldn't initialize the metrics recorder!");
+        // TODO: @sadroeck - consolidate exporters
+        // metrics::set_recorder(&NODE_STATS).expect("couldn't initialize the metrics recorder!");
     }
 
     pub fn register_metrics(&self) {

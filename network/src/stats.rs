@@ -64,24 +64,23 @@ pub static NODE_STATS: Stats = Stats::new();
 
 // TODO: make members private and make gathering of stats feature-gated and possibly
 // interchangeable with prometheus metrics.
-#[derive(Default)]
 pub struct Stats {
     /// Stats related to messages received by the node.
-    pub inbound: InboundStats,
+    inbound: InboundStats,
     /// Stats related to messages sent by the node.
-    pub outbound: OutboundStats,
+    outbound: OutboundStats,
     /// Stats related to the node's connections.
-    pub connections: ConnectionStats,
+    connections: ConnectionStats,
     /// Stats related to the node's handshakes.
-    pub handshakes: HandshakeStats,
+    handshakes: HandshakeStats,
     /// Stats related to the node's queues.
-    pub queues: QueueStats,
+    queues: QueueStats,
     /// Miscellaneous stats related to the node.
-    pub misc: MiscStats,
+    misc: MiscStats,
 }
 
 impl Stats {
-    pub const fn new() -> Self {
+    const fn new() -> Self {
         Self {
             inbound: InboundStats::new(),
             outbound: OutboundStats::new(),
@@ -93,165 +92,161 @@ impl Stats {
     }
 }
 
-#[derive(Default)]
 pub struct InboundStats {
     /// The number of successfully processed inbound messages.
-    pub all_successes: AtomicU64,
+    all_successes: Counter,
     /// The number of inbound messages that couldn't be processed.
-    pub all_failures: AtomicU64,
+    all_failures: Counter,
 
     /// The number of all received `Block` messages.
-    pub blocks: AtomicU64,
+    blocks: Counter,
     /// The number of all received `GetBlocks` messages.
-    pub getblocks: AtomicU64,
+    getblocks: Counter,
     /// The number of all received `GetMemoryPool` messages.
-    pub getmemorypool: AtomicU64,
+    getmemorypool: Counter,
     /// The number of all received `GetPeers` messages.
-    pub getpeers: AtomicU64,
+    getpeers: Counter,
     /// The number of all received `GetSync` messages.
-    pub getsync: AtomicU64,
+    getsync: Counter,
     /// The number of all received `MemoryPool` messages.
-    pub memorypool: AtomicU64,
+    memorypool: Counter,
     /// The number of all received `Peers` messages.
-    pub peers: AtomicU64,
+    peers: Counter,
     /// The number of all received `Ping` messages.
-    pub pings: AtomicU64,
+    pings: Counter,
     /// The number of all received `Pong` messages.
-    pub pongs: AtomicU64,
+    pongs: Counter,
     /// The number of all received `Sync` messages.
-    pub syncs: AtomicU64,
+    syncs: Counter,
     /// The number of all received `SyncBlock` messages.
-    pub syncblocks: AtomicU64,
+    syncblocks: Counter,
     /// The number of all received `Transaction` messages.
-    pub transactions: AtomicU64,
+    transactions: Counter,
     /// The number of all received `Unknown` messages.
-    pub unknown: AtomicU64,
+    unknown: Counter,
 }
 
 impl InboundStats {
     const fn new() -> Self {
         Self {
-            all_successes: AtomicU64::new(0),
-            all_failures: AtomicU64::new(0),
-            blocks: AtomicU64::new(0),
-            getblocks: AtomicU64::new(0),
-            getmemorypool: AtomicU64::new(0),
-            getpeers: AtomicU64::new(0),
-            getsync: AtomicU64::new(0),
-            memorypool: AtomicU64::new(0),
-            peers: AtomicU64::new(0),
-            pings: AtomicU64::new(0),
-            pongs: AtomicU64::new(0),
-            syncs: AtomicU64::new(0),
-            syncblocks: AtomicU64::new(0),
-            transactions: AtomicU64::new(0),
-            unknown: AtomicU64::new(0),
+            all_successes: Counter::new(),
+            all_failures: Counter::new(),
+            blocks: Counter::new(),
+            getblocks: Counter::new(),
+            getmemorypool: Counter::new(),
+            getpeers: Counter::new(),
+            getsync: Counter::new(),
+            memorypool: Counter::new(),
+            peers: Counter::new(),
+            pings: Counter::new(),
+            pongs: Counter::new(),
+            syncs: Counter::new(),
+            syncblocks: Counter::new(),
+            transactions: Counter::new(),
+            unknown: Counter::new(),
         }
     }
 }
 
-#[derive(Default)]
 pub struct OutboundStats {
     /// The number of messages successfully sent by the node.
-    pub all_successes: AtomicU64,
+    all_successes: Counter,
     /// The number of messages that failed to be sent to peers.
-    pub all_failures: AtomicU64,
+    all_failures: Counter,
 }
 
 impl OutboundStats {
     const fn new() -> Self {
         Self {
-            all_successes: AtomicU64::new(0),
-            all_failures: AtomicU64::new(0),
+            all_successes: Counter::new(),
+            all_failures: Counter::new(),
         }
     }
 }
 
-#[derive(Default)]
 pub struct ConnectionStats {
     /// The number of all connections the node has accepted.
-    pub all_accepted: AtomicU64,
+    all_accepted: Counter,
     /// The number of all connections the node has initiated.
-    pub all_initiated: AtomicU64,
+    all_initiated: Counter,
     /// The number of rejected inbound connection requests.
-    pub all_rejected: AtomicU64,
+    all_rejected: Counter,
 }
 
 impl ConnectionStats {
     const fn new() -> Self {
         Self {
-            all_accepted: AtomicU64::new(0),
-            all_initiated: AtomicU64::new(0),
-            all_rejected: AtomicU64::new(0),
+            all_accepted: Counter::new(),
+            all_initiated: Counter::new(),
+            all_rejected: Counter::new(),
         }
     }
 }
 
-#[derive(Default)]
 pub struct HandshakeStats {
     /// The number of failed handshakes as the initiator.
-    pub failures_init: AtomicU64,
+    failures_init: Counter,
     /// The number of failed handshakes as the responder.
-    pub failures_resp: AtomicU64,
+    failures_resp: Counter,
     /// The number of successful handshakes as the initiator.
-    pub successes_init: AtomicU64,
+    successes_init: Counter,
     /// The number of successful handshakes as the responder.
-    pub successes_resp: AtomicU64,
+    successes_resp: Counter,
     /// The number of handshake timeouts as the initiator.
-    pub timeouts_init: AtomicU64,
+    timeouts_init: Counter,
     /// The number of handshake timeouts as the responder.
-    pub timeouts_resp: AtomicU64,
+    timeouts_resp: Counter,
 }
 
 impl HandshakeStats {
     const fn new() -> Self {
         Self {
-            failures_init: AtomicU64::new(0),
-            failures_resp: AtomicU64::new(0),
-            successes_init: AtomicU64::new(0),
-            successes_resp: AtomicU64::new(0),
-            timeouts_init: AtomicU64::new(0),
-            timeouts_resp: AtomicU64::new(0),
+            failures_init: Counter::new(),
+            failures_resp: Counter::new(),
+            successes_init: Counter::new(),
+            successes_resp: Counter::new(),
+            timeouts_init: Counter::new(),
+            timeouts_resp: Counter::new(),
         }
     }
 }
 
-#[derive(Default)]
 pub struct QueueStats {
     /// The number of messages queued in the common inbound channel.
-    pub inbound: AtomicU64,
+    inbound: Gauge,
     /// The number of messages queued in the individual outbound channels.
-    pub outbound: AtomicU64,
+    outbound: Gauge,
 }
 
 impl QueueStats {
     const fn new() -> Self {
         Self {
-            inbound: AtomicU64::new(0),
-            outbound: AtomicU64::new(0),
+            inbound: Gauge::new(),
+            outbound: Gauge::new(),
         }
     }
 }
 
-#[derive(Default)]
 pub struct MiscStats {
+    block_height: Gauge,
     /// The number of mined blocks.
-    pub blocks_mined: AtomicU64,
+    blocks_mined: Counter,
     /// The number of duplicate blocks received.
-    pub duplicate_blocks: AtomicU64,
+    duplicate_blocks: Counter,
     /// The number of duplicate sync blocks received.
-    pub duplicate_sync_blocks: AtomicU64,
+    duplicate_sync_blocks: Counter,
     /// The number of RPC requests received.
-    pub rpc_requests: AtomicU64,
+    rpc_requests: Counter,
 }
 
 impl MiscStats {
     const fn new() -> Self {
         Self {
-            blocks_mined: AtomicU64::new(0),
-            duplicate_blocks: AtomicU64::new(0),
-            duplicate_sync_blocks: AtomicU64::new(0),
-            rpc_requests: AtomicU64::new(0),
+            block_height: Gauge::new(),
+            blocks_mined: Counter::new(),
+            duplicate_blocks: Counter::new(),
+            duplicate_sync_blocks: Counter::new(),
+            rpc_requests: Counter::new(),
         }
     }
 }
@@ -267,82 +262,107 @@ impl Recorder for Stats {
     fn record_histogram(&self, _key: &Key, _value: f64) {}
 
     fn increment_counter(&self, key: &Key, value: u64) {
-        match key.name() {
+        let metric = match key.name() {
             // inbound
-            INBOUND_ALL_SUCCESSES => self.inbound.all_successes.fetch_add(value, Ordering::Relaxed),
-            INBOUND_ALL_FAILURES => self.inbound.all_failures.fetch_add(value, Ordering::Relaxed),
-            INBOUND_BLOCKS => self.inbound.blocks.fetch_add(value, Ordering::Relaxed),
-            INBOUND_GETBLOCKS => self.inbound.getblocks.fetch_add(value, Ordering::Relaxed),
-            INBOUND_GETMEMORYPOOL => self.inbound.getmemorypool.fetch_add(value, Ordering::Relaxed),
-            INBOUND_GETPEERS => self.inbound.getpeers.fetch_add(value, Ordering::Relaxed),
-            INBOUND_GETSYNC => self.inbound.getsync.fetch_add(value, Ordering::Relaxed),
-            INBOUND_MEMORYPOOL => self.inbound.memorypool.fetch_add(value, Ordering::Relaxed),
-            INBOUND_PEERS => self.inbound.peers.fetch_add(value, Ordering::Relaxed),
-            INBOUND_PINGS => self.inbound.pings.fetch_add(value, Ordering::Relaxed),
-            INBOUND_PONGS => self.inbound.pongs.fetch_add(value, Ordering::Relaxed),
-            INBOUND_SYNCS => self.inbound.syncs.fetch_add(value, Ordering::Relaxed),
-            INBOUND_SYNCBLOCKS => self.inbound.syncblocks.fetch_add(value, Ordering::Relaxed),
-            INBOUND_TRANSACTIONS => self.inbound.transactions.fetch_add(value, Ordering::Relaxed),
-            INBOUND_UNKNOWN => self.inbound.unknown.fetch_add(value, Ordering::Relaxed),
+            INBOUND_ALL_SUCCESSES => &self.inbound.all_successes,
+            INBOUND_ALL_FAILURES => &self.inbound.all_failures,
+            INBOUND_BLOCKS => &self.inbound.blocks,
+            INBOUND_GETBLOCKS => &self.inbound.getblocks,
+            INBOUND_GETMEMORYPOOL => &self.inbound.getmemorypool,
+            INBOUND_GETPEERS => &self.inbound.getpeers,
+            INBOUND_GETSYNC => &self.inbound.getsync,
+            INBOUND_MEMORYPOOL => &self.inbound.memorypool,
+            INBOUND_PEERS => &self.inbound.peers,
+            INBOUND_PINGS => &self.inbound.pings,
+            INBOUND_PONGS => &self.inbound.pongs,
+            INBOUND_SYNCS => &self.inbound.syncs,
+            INBOUND_SYNCBLOCKS => &self.inbound.syncblocks,
+            INBOUND_TRANSACTIONS => &self.inbound.transactions,
+            INBOUND_UNKNOWN => &self.inbound.unknown,
             // outbound
-            OUTBOUND_ALL_SUCCESSES => self.outbound.all_successes.fetch_add(value, Ordering::Relaxed),
-            OUTBOUND_ALL_FAILURES => self.outbound.all_failures.fetch_add(value, Ordering::Relaxed),
+            OUTBOUND_ALL_SUCCESSES => &self.outbound.all_successes,
+            OUTBOUND_ALL_FAILURES => &self.outbound.all_failures,
             // connections
-            CONNECTIONS_ALL_ACCEPTED => self.connections.all_accepted.fetch_add(value, Ordering::Relaxed),
-            CONNECTIONS_ALL_INITIATED => self.connections.all_initiated.fetch_add(value, Ordering::Relaxed),
-            CONNECTIONS_ALL_REJECTED => self.connections.all_rejected.fetch_add(value, Ordering::Relaxed),
+            CONNECTIONS_ALL_ACCEPTED => &self.connections.all_accepted,
+            CONNECTIONS_ALL_INITIATED => &self.connections.all_initiated,
+            CONNECTIONS_ALL_REJECTED => &self.connections.all_rejected,
             // handshakes
-            HANDSHAKES_FAILURES_INIT => self.handshakes.failures_init.fetch_add(value, Ordering::Relaxed),
-            HANDSHAKES_FAILURES_RESP => self.handshakes.failures_resp.fetch_add(value, Ordering::Relaxed),
-            HANDSHAKES_SUCCESSES_INIT => self.handshakes.successes_init.fetch_add(value, Ordering::Relaxed),
-            HANDSHAKES_SUCCESSES_RESP => self.handshakes.successes_resp.fetch_add(value, Ordering::Relaxed),
-            HANDSHAKES_TIMEOUTS_INIT => self.handshakes.timeouts_init.fetch_add(value, Ordering::Relaxed),
-            HANDSHAKES_TIMEOUTS_RESP => self.handshakes.timeouts_resp.fetch_add(value, Ordering::Relaxed),
+            HANDSHAKES_FAILURES_INIT => &self.handshakes.failures_init,
+            HANDSHAKES_FAILURES_RESP => &self.handshakes.failures_resp,
+            HANDSHAKES_SUCCESSES_INIT => &self.handshakes.successes_init,
+            HANDSHAKES_SUCCESSES_RESP => &self.handshakes.successes_resp,
+            HANDSHAKES_TIMEOUTS_INIT => &self.handshakes.timeouts_init,
+            HANDSHAKES_TIMEOUTS_RESP => &self.handshakes.timeouts_resp,
             // misc
-            MISC_BLOCK_HEIGHT => 0, // obtained ad-hoc for the purposes of RPC metrics
-            MISC_BLOCKS_MINED => self.misc.blocks_mined.fetch_add(value, Ordering::Relaxed),
-            MISC_DUPLICATE_BLOCKS => self.misc.duplicate_blocks.fetch_add(value, Ordering::Relaxed),
-            MISC_DUPLICATE_SYNC_BLOCKS => self.misc.duplicate_sync_blocks.fetch_add(value, Ordering::Relaxed),
-            MISC_RPC_REQUESTS => self.misc.rpc_requests.fetch_add(value, Ordering::Relaxed),
+            MISC_BLOCKS_MINED => &self.misc.blocks_mined,
+            MISC_DUPLICATE_BLOCKS => &self.misc.duplicate_blocks,
+            MISC_DUPLICATE_SYNC_BLOCKS => &self.misc.duplicate_sync_blocks,
+            MISC_RPC_REQUESTS => &self.misc.rpc_requests,
             _ => {
                 error!("Metrics key {} wasn't assigned an operation and won't work!", key);
-                0
+                return;
             }
         };
+        metric.increment(value);
     }
 
     fn update_gauge(&self, key: &Key, value: GaugeValue) {
-        match value {
-            GaugeValue::Increment(value) => {
-                match key.name() {
-                    // queues
-                    QUEUES_INBOUND => self.queues.inbound.fetch_add(value as u64, Ordering::SeqCst),
-                    QUEUES_OUTBOUND => self.queues.outbound.fetch_add(value as u64, Ordering::SeqCst),
-                    // obtained ad-hoc for the purposes of RPC metrics
-                    CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
-                    _ => {
-                        error!("Metrics key {} wasn't assigned an operation and won't work!", key);
-                        0
-                    }
-                }
+        let metric = match key.name() {
+            // queues
+            QUEUES_INBOUND => &self.queues.inbound,
+            QUEUES_OUTBOUND => &self.queues.outbound,
+            // misc
+            MISC_BLOCK_HEIGHT => &self.misc.block_height,
+            // obtained ad-hoc for the purposes of RPC metrics
+            CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => {
+                todo!("@sadroeck - add me")
             }
-            GaugeValue::Decrement(value) => {
-                match key.name() {
-                    // queues
-                    QUEUES_INBOUND => self.queues.inbound.fetch_sub(value as u64, Ordering::SeqCst),
-                    QUEUES_OUTBOUND => self.queues.outbound.fetch_sub(value as u64, Ordering::SeqCst),
-                    // obtained ad-hoc for the purposes of RPC metrics
-                    CONNECTIONS_CONNECTING | CONNECTIONS_CONNECTED | CONNECTIONS_DISCONNECTED => 0,
-                    _ => {
-                        error!("Metrics key {} wasn't assigned an operation and won't work!", key);
-                        0
-                    }
-                }
-            }
-            GaugeValue::Absolute(_value) => {
-                error!("GaugeValue::Absolute is not used!");
-                0
+            _ => {
+                error!("Metrics key {} wasn't assigned an operation and won't work!", key);
+                return;
             }
         };
+        match value {
+            GaugeValue::Increment(val) => metric.increase(val),
+            GaugeValue::Decrement(val) => metric.decrease(val),
+            GaugeValue::Absolute(val) => metric.set(val),
+        }
+    }
+}
+
+/// Mimics a [`metrics-core`] monotonically increasing [`Counter`] type
+pub struct Counter(AtomicU64);
+
+impl Counter {
+    const fn new() -> Self {
+        Self(AtomicU64::new(0))
+    }
+
+    fn increment(&self, val: u64) {
+        self.0.fetch_add(val, Ordering::SeqCst);
+    }
+}
+
+/// Mimics a [`metrics-core`] arbitrarily increasing & decreasing [`Gauge`]
+pub struct Gauge(AtomicU64);
+
+impl Gauge {
+    const fn new() -> Self {
+        Self(AtomicU64::new(0))
+    }
+
+    fn set(&self, val: f64) {
+        // TODO: @sadroeck - Reinterpret as f64 & do atomic C&S
+        self.0.store(val as u64, Ordering::SeqCst);
+    }
+
+    fn increase(&self, val: f64) {
+        // TODO: @sadroeck - Reinterpret as f64 & do atomic C&S
+        self.0.fetch_add(val as u64, Ordering::SeqCst);
+    }
+
+    fn decrease(&self, val: f64) {
+        // TODO: @sadroeck - Reinterpret as f64 & do atomic C&S
+        self.0.fetch_sub(val as u64, Ordering::SeqCst);
     }
 }
