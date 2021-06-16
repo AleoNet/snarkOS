@@ -25,8 +25,8 @@ mod consensus_sidechain {
     // Like the test above, except block 2 is received first as an orphan with no parent.
     // The sync mechanism should push the orphan into storage until block 1 is received.
     // After block 1 is received, block 2 should be fetched from storage and added to the chain.
-    #[test]
-    fn new_out_of_order() {
+    #[tokio::test]
+    async fn new_out_of_order() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let old_block_height = consensus.ledger.get_current_block_height();
@@ -34,12 +34,12 @@ mod consensus_sidechain {
         // Find second block
 
         let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
-        consensus.receive_block(&block_2).unwrap();
+        consensus.receive_block(&block_2).await.unwrap();
 
         // Find first block
 
         let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        consensus.receive_block(&block_1).unwrap();
+        consensus.receive_block(&block_1).await.unwrap();
 
         // Check balances after both blocks
 
@@ -49,8 +49,8 @@ mod consensus_sidechain {
 
     // Receive two blocks that reference the same parent.
     // Treat the first block received as the canonical chain but store and keep the rejected sidechain block in storage.
-    #[test]
-    fn reject() {
+    #[tokio::test]
+    async fn reject() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
@@ -60,11 +60,11 @@ mod consensus_sidechain {
 
         // 1. Receive canonchain block 1.
 
-        consensus.receive_block(&block_1_canon).unwrap();
+        consensus.receive_block(&block_1_canon).await.unwrap();
 
         // 2. Receive sidechain block 1.
 
-        consensus.receive_block(&block_1_side).unwrap();
+        consensus.receive_block(&block_1_side).await.unwrap();
 
         let new_block_height = consensus.ledger.get_current_block_height();
 
@@ -78,8 +78,8 @@ mod consensus_sidechain {
     }
 
     // Receive blocks from a sidechain that overtakes our current canonical chain.
-    #[test]
-    fn accept() {
+    #[tokio::test]
+    async fn accept() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
@@ -90,7 +90,7 @@ mod consensus_sidechain {
 
         let mut old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_canon).unwrap();
+        consensus.receive_block(&block_1_canon).await.unwrap();
 
         let mut new_block_height = consensus.ledger.get_current_block_height();
 
@@ -100,8 +100,8 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_side).unwrap();
-        consensus.receive_block(&block_2_side).unwrap();
+        consensus.receive_block(&block_1_side).await.unwrap();
+        consensus.receive_block(&block_2_side).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -109,8 +109,8 @@ mod consensus_sidechain {
     }
 
     // Receive blocks from a sidechain (out of order) that overtakes our current canonical chain.
-    #[test]
-    fn fork_out_of_order() {
+    #[tokio::test]
+    async fn fork_out_of_order() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
@@ -122,7 +122,7 @@ mod consensus_sidechain {
 
         let mut old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_2_canon).unwrap();
+        consensus.receive_block(&block_2_canon).await.unwrap();
 
         let mut new_block_height = consensus.ledger.get_current_block_height();
 
@@ -132,7 +132,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_side).unwrap();
+        consensus.receive_block(&block_1_side).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -142,7 +142,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_canon).unwrap();
+        consensus.receive_block(&block_1_canon).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -152,20 +152,20 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_2_side).unwrap();
+        consensus.receive_block(&block_2_side).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
         assert_eq!(old_block_height, new_block_height);
     }
 
-    #[test]
-    fn decommit() {
+    #[tokio::test]
+    async fn decommit() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         // Introduce one block.
         let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        consensus.receive_block(&block_1).unwrap();
+        consensus.receive_block(&block_1).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
         let mut block_height = consensus.ledger.get_current_block_height();
@@ -174,7 +174,7 @@ mod consensus_sidechain {
 
         // Introduce another block.
         let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
-        consensus.receive_block(&block_2).unwrap();
+        consensus.receive_block(&block_2).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
         block_height = consensus.ledger.get_current_block_height();
@@ -196,8 +196,8 @@ mod consensus_sidechain {
         assert!(consensus.ledger.get_block_locator_hashes().is_ok());
     }
 
-    #[test]
-    fn long_fork_and_sync_no_overlap() {
+    #[tokio::test]
+    async fn long_fork_and_sync_no_overlap() {
         //tracing_subscriber::fmt::init();
         let mut rng = thread_rng();
 
@@ -207,13 +207,13 @@ mod consensus_sidechain {
         // Consensus 1 imports a random number of blocks lower than consensus 2.
         let blocks_1 = TestBlocks::load(rng.gen_range(0..=50), "test_blocks_100_1").0;
         for block in blocks_1 {
-            consensus1.receive_block(&block).unwrap();
+            consensus1.receive_block(&block).await.unwrap();
         }
 
         // Consensus 2 imports 100 blocks.
         let blocks_2 = TestBlocks::load(100, "test_blocks_100_2").0;
         for block in &blocks_2 {
-            consensus2.receive_block(block).unwrap();
+            consensus2.receive_block(block).await.unwrap();
         }
 
         // There is no overlap between the 2 instances.
@@ -228,12 +228,12 @@ mod consensus_sidechain {
         // Consensus 1 imports a few random blocks that consensus 2 has.
         let num_random_blocks = rng.gen_range(1..=50);
         for block in blocks_2.iter().choose_multiple(&mut rng, num_random_blocks) {
-            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // Consensus 1 imports all the blocks that consensus 2 has, simulating a full sync.
         for block in blocks_2 {
-            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // The blocks should fully overlap between the 2 instances now.
@@ -249,8 +249,8 @@ mod consensus_sidechain {
         assert!(consensus1.ledger.validate(None));
     }
 
-    #[test]
-    fn long_fork_and_sync_initial_overlap() {
+    #[tokio::test]
+    async fn long_fork_and_sync_initial_overlap() {
         //tracing_subscriber::fmt::init();
         let mut rng = thread_rng();
 
@@ -262,12 +262,12 @@ mod consensus_sidechain {
 
         // Consensus 2 imports 100 blocks.
         for block in &blocks2 {
-            consensus2.receive_block(block).unwrap();
+            consensus2.receive_block(block).await.unwrap();
         }
 
         // Consensus 1 imports a random number of blocks that consensus 2 has (canon).
         for block in blocks2.iter().take(rng.gen_range(0..=25)) {
-            consensus1.receive_block(block).unwrap();
+            consensus1.receive_block(block).await.unwrap();
         }
         let overlap_height = consensus1.ledger.get_current_block_height();
 
@@ -282,18 +282,18 @@ mod consensus_sidechain {
 
         // Consensus 1 imports a random number of side blocks that cause it to fork to the side chain.
         for block in blocks1.iter().take(rng.gen_range(0..=overlap_height as usize + 25)) {
-            consensus1.receive_block(&block).unwrap();
+            consensus1.receive_block(&block).await.unwrap();
         }
 
         // Consensus 1 imports a few random blocks that consensus 2 has.
         let num_random_blocks = rng.gen_range(overlap_height..=25) as usize;
         for block in blocks2.iter().choose_multiple(&mut rng, num_random_blocks) {
-            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // Consensus 1 imports all the blocks that consensus 2 has, simulating a full sync.
         for block in blocks2 {
-            let _ = consensus1.receive_block(&block); // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // The blocks should fully overlap between the 2 instances now.

@@ -132,7 +132,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: cd network && RUST_MIN_STACK=8388608 cargo test
+          command: cd network && RUST_MIN_STACK=16777216 cargo test
       - clear_environment:
           cache_key: snarkos-network-cache
 

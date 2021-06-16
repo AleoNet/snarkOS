@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use std::net::Ipv4Addr;
+
 use crate::prometheus::{
     metrics_handler,
     CONNECTED_PEERS,
@@ -36,7 +38,7 @@ impl Metrics {
         let metrics_route = warp::path!("metrics").and_then(metrics_handler);
         // Serve them
         println!("Started on port 8080");
-        warp::serve(metrics_route).run(([0, 0, 0, 0], 8080)).await;
+        warp::serve(metrics_route).run((Ipv4Addr::UNSPECIFIED, 8080)).await;
     }
 
     pub fn get_connected_peers() -> i64 {

@@ -17,7 +17,7 @@
 use snarkos_metrics::prometheus::{initialize, metrics_handler, CONNECTED_PEERS};
 
 use futures_util::StreamExt;
-use std::time::Duration;
+use std::{net::Ipv4Addr, time::Duration};
 use tokio::task;
 use warp::{ws::WebSocket, Filter, Rejection, Reply};
 
@@ -75,6 +75,6 @@ async fn main() {
 
     println!("Started on port 8080");
     warp::serve(metrics_route.or(connected_peers_route).or(ws_route))
-        .run(([0, 0, 0, 0], 8080))
+        .run((Ipv4Addr::UNSPECIFIED, 8080))
         .await;
 }

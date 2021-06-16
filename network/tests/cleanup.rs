@@ -39,11 +39,11 @@ async fn check_connection_task_cleanup() {
     for _ in 0..10_000 {
         // Connect a peer.
         let peer = handshaken_peer(node.local_address().unwrap()).await;
-        wait_until!(5, node.peer_book.number_of_connected_peers() == 1);
+        wait_until!(5, node.peer_book.get_active_peer_count() == 1);
 
         // Drop the peer stream.
         drop(peer);
-        wait_until!(5, node.peer_book.number_of_connected_peers() == 0);
+        wait_until!(5, node.peer_book.get_active_peer_count() == 0);
     }
 }
 
@@ -62,12 +62,12 @@ async fn check_inactive_conn_cleanup() {
     let _peer = handshaken_peer(node.local_address().unwrap()).await;
 
     // Wait until the connection is complete.
-    wait_until!(1, node.peer_book.number_of_connected_peers() == 1);
+    wait_until!(1, node.peer_book.get_active_peer_count() == 1);
 
     // The peer should be dropped once `MAX_PEER_INACTIVITY_TIME_SECS` expires.
     wait_until!(
         snarkos_network::MAX_PEER_INACTIVITY_SECS as u64 * 2,
-        node.peer_book.number_of_connected_peers() == 0
+        node.peer_book.get_active_peer_count() == 0
     );
 }
 
@@ -91,11 +91,11 @@ async fn check_node_cleanup() {
     for i in 0u16..4096 {
         // Connect a peer.
         let peer = handshaken_peer(node.local_address().unwrap()).await;
-        wait_until!(5, node.peer_book.number_of_connected_peers() == 1);
+        wait_until!(5, node.peer_book.get_active_peer_count() == 1);
 
         // Drop the peer stream.
         drop(peer);
-        wait_until!(5, node.peer_book.number_of_connected_peers() == 0);
+        wait_until!(5, node.peer_book.get_active_peer_count() == 0);
 
         // Register heap bump after the connection was dropped.
         let curr_peak = PEAK_ALLOC.peak_usage();

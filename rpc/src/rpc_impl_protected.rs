@@ -257,7 +257,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let address: SocketAddr = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        self.disconnect(address);
+        self.node.disconnect_from_peer(address).await;
 
         Ok(Value::Null)
     }
@@ -651,6 +651,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     }
 
     fn disconnect(&self, address: SocketAddr) {
-        self.node.disconnect_from_peer(address);
+        let node = self.node.clone();
+        tokio::spawn(async move { node.disconnect_from_peer(address).await });
     }
 }

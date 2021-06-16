@@ -14,8 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod connection_writer;
-pub use connection_writer::ConnWriter;
+use std::net::SocketAddr;
 
-pub mod outbound;
-pub use outbound::*;
+use crate::{Peer, PeerHandle, PeerStatus};
+
+pub enum PeerEventData {
+    Connected(PeerHandle),
+    Disconnect(Peer, PeerStatus),
+    FailHandshake,
+}
+
+pub struct PeerEvent {
+    pub address: SocketAddr,
+    pub data: PeerEventData,
+}

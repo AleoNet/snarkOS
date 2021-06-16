@@ -13,6 +13,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+
 use snarkos_network::{MessageHeader, Payload, Version};
 use snarkvm_dpc::BlockHeaderHash;
 
@@ -21,7 +22,7 @@ use snarkos_testing::{
     network::{handshaken_node_and_peer, spawn_2_fake_nodes, test_node, TestSetup},
     wait_until,
 };
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
 use std::{
     net::SocketAddr,
@@ -60,10 +61,10 @@ async fn fuzzing_zeroes_pre_handshake() {
     let node_addr = node.local_address().unwrap();
 
     let mut stream = TcpStream::connect(node_addr).await.unwrap();
-    wait_until!(1, node.peer_book.number_of_connecting_peers() == 1);
+    wait_until!(1, node.peer_book.get_active_peer_count() == 1);
 
     let _ = stream.write_all(&[0u8; 64]).await;
-    wait_until!(1, node.peer_book.number_of_connecting_peers() == 0);
+    wait_until!(1, node.peer_book.get_active_peer_count() == 0);
 }
 
 #[tokio::test]
@@ -74,10 +75,10 @@ async fn fuzzing_zeroes_post_handshake() {
         ..Default::default()
     };
     let (node, mut fake_node) = handshaken_node_and_peer(node_setup).await;
-    wait_until!(1, node.peer_book.number_of_connected_peers() == 1);
+    wait_until!(1, node.peer_book.get_active_peer_count() == 1);
 
     fake_node.write_bytes(&[0u8; 64]).await;
-    wait_until!(1, node.peer_book.number_of_connected_peers() == 0);
+    wait_until!(1, node.peer_book.get_active_peer_count() == 0);
 }
 
 #[tokio::test]
@@ -129,7 +130,8 @@ async fn fuzzing_valid_header_post_handshake() {
     }
 
     write_finished.store(true, Ordering::Relaxed);
-    handle.await.unwrap();
+    handle.abort();
+    handle.await.ok();
 }
 
 #[tokio::test]
@@ -179,7 +181,8 @@ async fn fuzzing_post_handshake() {
     }
 
     write_finished.store(true, Ordering::Relaxed);
-    handle.await.unwrap();
+    handle.abort();
+    handle.await.ok();
 }
 
 #[tokio::test]
@@ -211,7 +214,7 @@ async fn fuzzing_corrupted_version_pre_handshake() {
         let _ = stream.write_all(&corrupted_version).await;
     }
 
-    assert_eq!(node.peer_book.number_of_connected_peers(), 0);
+    wait_until!(3, node.peer_book.get_active_peer_count() == 0);
 }
 
 #[tokio::test]
@@ -244,7 +247,8 @@ async fn fuzzing_corrupted_version_post_handshake() {
     }
 
     write_finished.store(true, Ordering::Relaxed);
-    handle.await.unwrap();
+    handle.abort();
+    handle.await.ok();
 }
 
 #[tokio::test]
@@ -276,7 +280,7 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
         }
     }
 
-    assert_eq!(node.peer_book.number_of_connected_peers(), 0);
+    wait_until!(3, node.peer_book.get_active_peer_count() == 0);
 }
 
 #[tokio::test]
@@ -315,7 +319,7 @@ async fn fuzzing_corrupted_empty_payloads_post_handshake() {
 }
 
 // Using a multi-threaded rt for this test notably improves performance.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
@@ -353,18 +357,23 @@ async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
     ] {
         let serialized = Payload::serialize(payload).unwrap();
 
-        for _ in 0..ITERATIONS {
-            let corrupted_payload = corrupt_bytes(&serialized);
+        let mut future_set = vec![];
+        for _ in 0..100 {
+            let serialized = serialized.clone();
+            future_set.push(tokio::spawn(async move {
+                let corrupted_payload = corrupt_bytes(&serialized);
 
-            let header = MessageHeader::from(corrupted_payload.len());
+                let header = MessageHeader::from(corrupted_payload.len());
 
-            let mut stream = TcpStream::connect(node_addr).await.unwrap();
-            let _ = stream.write_all(&header.as_bytes()).await;
-            let _ = stream.write_all(&corrupted_payload).await;
+                let mut stream = TcpStream::connect(node_addr).await.unwrap();
+                let _ = stream.write_all(&header.as_bytes()).await;
+                let _ = stream.write_all(&corrupted_payload).await;
+            }));
         }
+        futures::future::join_all(future_set).await;
     }
 
-    assert_eq!(node.peer_book.number_of_connected_peers(), 0);
+    wait_until!(3, node.peer_book.get_active_peer_count() == 0);
 }
 
 // Using a multi-threaded rt for this test notably improves performance.
@@ -412,7 +421,7 @@ async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     ] {
         let serialized = Payload::serialize(payload).unwrap();
 
-        for _ in 0..ITERATIONS {
+        for _ in 0..100 {
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -423,7 +432,8 @@ async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     }
 
     write_finished.store(true, Ordering::Relaxed);
-    handle.await.unwrap();
+    handle.abort();
+    handle.await.ok();
 }
 
 #[tokio::test]
@@ -447,7 +457,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     ] {
         let serialized = Payload::serialize(payload).unwrap();
 
-        for _ in 0..ITERATIONS {
+        for _ in 0..100 {
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -458,7 +468,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
         }
     }
 
-    assert_eq!(node.peer_book.number_of_connected_peers(), 0);
+    wait_until!(3, node.peer_book.get_active_peer_count() == 0);
 }
 
 #[tokio::test]
@@ -488,7 +498,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
     ] {
         let serialized = Payload::serialize(payload).unwrap();
 
-        for _ in 0..ITERATIONS {
+        for _ in 0..100 {
             let corrupted_payload = corrupt_bytes(&serialized);
 
             let header = MessageHeader::from(corrupted_payload.len());
@@ -499,7 +509,8 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
     }
 
     write_finished.store(true, Ordering::Relaxed);
-    handle.await.unwrap();
+    handle.abort();
+    handle.await.ok();
 }
 
 #[tokio::test]
@@ -516,21 +527,21 @@ async fn connection_request_spam() {
     let node = test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
-    let sockets = Arc::new(parking_lot::Mutex::new(Vec::with_capacity(NUM_ATTEMPTS)));
+    let sockets = Arc::new(Mutex::new(Vec::with_capacity(NUM_ATTEMPTS)));
 
     for _ in 0..NUM_ATTEMPTS {
         let socks = sockets.clone();
         tokio::task::spawn(async move {
             if let Ok(socket) = TcpStream::connect(node_addr).await {
-                socks.lock().push(socket);
+                socks.lock().await.push(socket);
             }
         });
     }
 
-    wait_until!(3, node.peer_book.number_of_connecting_peers() == max_peers);
+    wait_until!(3, node.peer_book.get_active_peer_count() >= max_peers as u32);
 
     wait_until!(
         snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 * 2,
-        node.peer_book.number_of_connecting_peers() == 0
+        node.peer_book.get_active_peer_count() == 0
     );
 }

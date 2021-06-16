@@ -92,6 +92,13 @@ version = "0.4.1"
 [dependencies.parking_lot]
 version = "0.11.1"
 
+[dependencies.metrics]
+version = "0.16"
+
+[dependencies.metrics-exporter-prometheus]
+version = "0.5"
+optional = true
+
 [dependencies.rand]
 version = "0.8"
 
@@ -133,11 +140,11 @@ version = "0.2"
 version = "0.11.2"
 
 [build-dependencies]
-rustc_version = "0.4"
+rustc_version = "0.3"
 
-  [build-dependencies.capnpc]
-  version = "0.14"
-  optional = true
+[build-dependencies.capnpc]
+version = "0.14"
+optional = true
 
 [features]
 default = [ ]
@@ -160,6 +167,7 @@ debug-assertions = false
 
 [profile.dev]
 opt-level = 0
+incremental = true
 
 [profile.test]
 opt-level = 3

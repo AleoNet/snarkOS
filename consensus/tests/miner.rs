@@ -68,8 +68,8 @@ mod miner {
             .unwrap();
     }
 
-    #[test]
-    fn find_valid_block() {
+    #[tokio::test]
+    async fn find_valid_block() {
         let transactions = DPCTransactions(vec![TestTx; 3]);
         let parent_header = genesis().header;
         test_find_block(&transactions, &parent_header);

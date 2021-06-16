@@ -14,11 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod peers;
-pub use peers::*;
-
-pub mod peer_book;
-pub use peer_book::*;
+mod cipher;
+mod connector;
+mod handshake;
+mod inbound_handler;
+mod network;
+mod outbound_handler;
+mod peer_events;
+mod receiver;
 
 pub mod peer;
+pub mod peer_quality;
+
+pub use outbound_handler::*;
 pub use peer::*;
+pub use peer_events::*;
+pub use peer_quality::*;
+
+// used in integration tests
+#[doc(hidden)]
+pub use cipher::Cipher;
+#[doc(hidden)]
+pub use network::*;

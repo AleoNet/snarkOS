@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use snarkos_network::message::*;
 use snarkos_testing::{
     network::{handshaken_node_and_peer, random_bound_address, test_node, TestSetup},
     wait_until,
 };
+use tokio::time::sleep;
 
 #[tokio::test]
 async fn peer_initiator_side() {
@@ -30,13 +33,13 @@ async fn peer_initiator_side() {
     };
     let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
-    // check if the peer has received an automatic Ping message from the node
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Ping(..)));
-
     // check if the peer has received the GetPeers message from the node
     let payload = peer.read_payload().await.unwrap();
     assert!(matches!(payload, Payload::GetPeers));
+
+    // check if the peer has received an automatic Ping message from the node
+    let payload = peer.read_payload().await.unwrap();
+    assert!(matches!(payload, Payload::Ping(..)));
 
     // respond with a Peers message
     let (addr, _) = random_bound_address().await;
@@ -80,17 +83,22 @@ async fn triangle() {
     let node_alice = test_node(setup(vec![])).await;
     let addr_alice = node_alice.local_address().unwrap();
 
+    // wait a few ms so that nodes don't try to connect into one another simultaneously
+    sleep(Duration::from_millis(10)).await;
+
     let node_bob = test_node(setup(vec![addr_alice.to_string()])).await;
     let addr_bob = node_bob.local_address().unwrap();
+
+    sleep(Duration::from_millis(10)).await;
 
     //  Spin up node C and connect to B.
     let node_charlie = test_node(setup(vec![addr_bob.to_string()])).await;
 
     let triangle_is_formed = || {
         node_charlie.peer_book.is_connected(addr_alice)
-            && node_alice.peer_book.number_of_connected_peers() == 2
-            && node_bob.peer_book.number_of_connected_peers() == 2
-            && node_charlie.peer_book.number_of_connected_peers() == 2
+            && node_alice.peer_book.get_active_peer_count() == 2
+            && node_bob.peer_book.get_active_peer_count() == 2
+            && node_charlie.peer_book.get_active_peer_count() == 2
     };
 
     // Make sure C connects to A => peer propagation works.
