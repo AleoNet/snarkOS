@@ -130,7 +130,11 @@ async fn spawn_nodes_in_a_mesh() {
     // Make sure the node with the largest degree centrality and smallest degree centrality don't
     // have a delta greater than the max-min peer interval allows for. This check also provides
     // some insight into whether the network is meshed in a homogeneous manner.
-    wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
+    wait_until!(
+        15,
+        degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
+        200
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -147,7 +151,11 @@ async fn line_converges_to_mesh() {
     start_nodes(&nodes).await;
 
     wait_until!(10, network_density(&nodes) >= 0.1, 200);
-    wait_until!(10, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
+    wait_until!(
+        10,
+        degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
+        200
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -164,7 +172,11 @@ async fn ring_converges_to_mesh() {
     start_nodes(&nodes).await;
 
     wait_until!(10, network_density(&nodes) >= 0.1, 200);
-    wait_until!(10, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
+    wait_until!(
+        10,
+        degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
+        200
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -181,7 +193,11 @@ async fn star_converges_to_mesh() {
     start_nodes(&nodes).await;
 
     wait_until!(15, network_density(&nodes) >= 0.1, 200);
-    wait_until!(15, degree_centrality_delta(&nodes) <= MAX_PEERS - MIN_PEERS, 200);
+    wait_until!(
+        15,
+        degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
+        200
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -254,21 +270,21 @@ async fn binary_star_contact() {
 }
 
 /// Returns the total connection count of the network.
-fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> usize {
+fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> u32 {
     let mut count = 0;
 
     for node in nodes {
-        count += node.peer_book.number_of_connected_peers()
+        count += node.peer_book.get_connected_peer_count()
     }
 
-    (count / 2).into()
+    (count / 2)
 }
 
 // This could use the degree matrix, though as this is used extensively in tests and checked
 // repeatedly until it reaches a certain value, we want to keep its calculation decoupled from the
 // `NetworkMetrics`.
-fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u16 {
-    let dc = nodes.iter().map(|node| node.peer_book.number_of_connected_peers());
+fn degree_centrality_delta(nodes: &[Node<LedgerStorage>]) -> u32 {
+    let dc = nodes.iter().map(|node| node.peer_book.get_connected_peer_count());
     let min = dc.clone().min().unwrap();
     let max = dc.max().unwrap();
 

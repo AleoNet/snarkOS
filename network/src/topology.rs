@@ -31,7 +31,6 @@ use std::{
 };
 
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
-use parking_lot::RwLock;
 
 #[derive(Debug, Eq, Copy, Clone)]
 struct Connection((SocketAddr, SocketAddr));
@@ -65,7 +64,7 @@ impl Hash for Connection {
 
 /// Keeps track of crawled peers and their connections.
 #[derive(Default)]
-struct NetworkTopology {
+pub struct NetworkTopology {
     connections: HashSet<Connection>,
 }
 
@@ -99,7 +98,7 @@ impl NetworkTopology {
     }
 
     pub fn has_connections(&self) -> bool {
-        self.connections.read().len() > 0
+        self.connections.len() > 0
     }
 }
 
@@ -133,7 +132,7 @@ impl NetworkMetrics {
     /// Returns the network metrics for the state described by the connections list.
     pub fn new(topology: &NetworkTopology) -> Self {
         // Copy the connections as the data must not change throughout the metrics computation.
-        let connections: HashSet<Connection> = topology.connections.read().iter().copied().collect();
+        let connections: HashSet<Connection> = topology.connections.iter().copied().collect();
 
         // Construct the list of nodes from the connections.
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
