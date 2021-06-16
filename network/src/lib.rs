@@ -47,6 +47,7 @@ pub mod peers;
 pub mod sync;
 
 pub mod topology;
+pub use topology::*;
 
 /// The maximum number of block hashes that can be requested or provided in a single batch.
 pub const MAX_BLOCK_SYNC_COUNT: u32 = 64;

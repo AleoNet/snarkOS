@@ -90,18 +90,20 @@ impl NetworkTopology {
         // With sets: a - b = removed connections (if and only if one of the two addrs is the
         // source), otherwise it's a connection which doesn't include the source and shouldn't be
         // removed.
-        let connections_to_remove: HashSet<Connection> = self
-            .connections
-            .read()
-            .difference(&new_connections)
-            .filter(|Connection((a, b))| a == &source || b == &source)
-            .copied()
-            .collect();
+        //  let connections_to_remove: HashSet<Connection> = self
+        //      .connections
+        //      .read()
+        //      .difference(&new_connections)
+        //      .filter(|Connection((a, b))| a == &source || b == &source)
+        //      .copied()
+        //      .collect();
+
+        // dbg!(&connections_to_remove.len());
 
         // Only retain connections that aren't removed.
-        self.connections
-            .write()
-            .retain(|connection| !connections_to_remove.contains(&connection));
+        // self.connections
+        //     .write()
+        //     .retain(|connection| !connections_to_remove.contains(&connection));
 
         // Insert new connections.
         self.connections.write().extend(new_connections.iter());

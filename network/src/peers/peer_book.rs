@@ -234,7 +234,11 @@ impl PeerBook {
     }
 
     pub async fn disconnected_peers_snapshot(&self) -> Vec<Peer> {
-        self.map_each_peer(|peer| async move { peer.load().await }).await
+        self.disconnected_peers
+            .inner()
+            .iter()
+            .map(|(_, peer)| peer.clone())
+            .collect()
     }
 
     ///
