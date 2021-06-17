@@ -110,7 +110,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
-            transaction_serial_numbers.push(transaction.transaction_id()?);
+            transaction_serial_numbers.push(transaction.old_serial_numbers());
             transaction_commitments.push(transaction.new_commitments());
             transaction_memos.push(transaction.memorandum());
         }
@@ -188,7 +188,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
-            transaction_serial_numbers.push(transaction.transaction_id()?);
+            transaction_serial_numbers.push(transaction.old_serial_numbers());
             transaction_commitments.push(transaction.new_commitments());
             transaction_memos.push(transaction.memorandum());
         }
