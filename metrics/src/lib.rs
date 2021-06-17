@@ -14,22 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate lazy_static;
-
-pub use crate::metrics::*;
-
-pub mod macros;
-
-pub mod metrics;
-pub mod prometheus;
-
 mod metric_types;
 mod names;
 
 pub use names::*;
 pub mod snapshots;
 pub mod stats;
-
-#[cfg(test)]
-pub mod testing;

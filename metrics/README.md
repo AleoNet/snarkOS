@@ -6,22 +6,20 @@
 
 ## Development
 
-To start a local instance of Prometheus for development purposes, run:
+To start a local instance of Prometheus for development purposes, run the following command from the current directory:
 ```
 cd prometheus/{YOUR_OS}
 docker build -t prometheus .
 docker run -p 9090:9090 --network=host prometheus
 ```
 
-Then, to start `snarkos-metrics` on its own, run:
+Then, start a `snarkos` mining node to start generating metrics from the root of the repository:
 ```
-cargo run
+cargo run --bin snarkos
 ```
-
-To confirm the `snarkos-metrics` instance is up, navigate to [https://localhost:8080/metrics](https://localhost:8080/metrics).
 
 To confirm the Prometheus instance is up, navigate to [https://localhost:9090/graph](https://localhost:9090/graph).
 
 ## Security
 
-To enable access to metrics, open ports `8080` and `9090` on your development or production machine.
+To enable access to metrics, open port `9090` on your development or production machine.

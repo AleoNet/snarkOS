@@ -19,7 +19,6 @@ use snarkos_metrics::{inbound, misc};
 use snarkvm_dpc::Storage;
 
 use chrono::{DateTime, Utc};
-use metrics::{register_counter, register_gauge};
 use once_cell::sync::OnceCell;
 use rand::{thread_rng, Rng};
 use std::{
