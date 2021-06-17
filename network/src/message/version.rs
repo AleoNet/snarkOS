@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[cfg_attr(nightly, doc(include = "../../documentation/network_messages/version.md"))]
+// todo: readd in Rust 1.54
+// #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/version.md"))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Version {
     /// The version number of the sender's node server.

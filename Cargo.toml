@@ -139,9 +139,6 @@ version = "0.2"
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
 
-[build-dependencies]
-rustc_version = "0.3"
-
 [build-dependencies.capnpc]
 version = "0.14"
 optional = true

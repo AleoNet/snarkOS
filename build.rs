@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// Detect the rustc channel
-use rustc_version::{version_meta, Channel};
-
 fn main() {
     #[cfg(feature = "compile_capnp_schema")]
     {
@@ -28,13 +25,5 @@ fn main() {
             .output_path(".")
             .run()
             .expect("cap'n'proto network schema compilation failed");
-    }
-
-    // Set cfg flags depending on release channel
-    match version_meta().unwrap().channel {
-        Channel::Stable => println!("cargo:rustc-cfg=stable"),
-        Channel::Beta => println!("cargo:rustc-cfg=beta"),
-        Channel::Nightly => println!("cargo:rustc-cfg=nightly"),
-        Channel::Dev => println!("cargo:rustc-cfg=rustc_dev"),
     }
 }
