@@ -211,7 +211,7 @@ impl NetworkMetrics {
         // The laplacian matrix is degree matrix minus the adjacence matrix.
         let laplacian_matrix = degree_matrix.clone().sub(&adjacency_matrix);
 
-        let degree_centrality = degree_centrality(&index, &degree_matrix.clone());
+        let degree_centrality = degree_centrality(&index, &degree_matrix);
         let degree_centrality_delta = degree_centrality_delta(&degree_matrix);
         let eigenvector_centrality = eigenvector_centrality(&index, adjacency_matrix);
         let (algebraic_connectivity, fiedler_vector_indexed) = fiedler(&index, laplacian_matrix);
