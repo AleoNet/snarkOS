@@ -18,7 +18,7 @@ use std::time::Instant;
 
 use tokio::sync::{mpsc, oneshot};
 
-use snarkos_metrics::queues::*;
+use snarkos_metrics::{self as metrics, queues::*};
 
 use crate::{NetworkError, Payload, Peer};
 

@@ -19,7 +19,7 @@ use std::net::SocketAddr;
 use snarkvm_dpc::{Block, BlockHeaderHash, Storage};
 
 use snarkos_consensus::error::ConsensusError;
-use snarkos_metrics::misc::*;
+use snarkos_metrics::{self as metrics, misc::*};
 
 use crate::{master::SyncInbound, message::*, NetworkError, Node};
 

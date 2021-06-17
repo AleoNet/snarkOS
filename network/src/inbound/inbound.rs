@@ -23,7 +23,7 @@ use tokio::{
     task,
 };
 
-use snarkos_metrics::{connections, inbound, queues};
+use snarkos_metrics::{self as metrics, connections, inbound, queues};
 
 use crate::{errors::NetworkError, message::*, Cache, Node, Receiver, Sender, State};
 

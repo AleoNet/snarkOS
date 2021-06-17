@@ -22,7 +22,7 @@ use tokio::{
     net::TcpStream,
 };
 
-use snarkos_metrics::handshakes::*;
+use snarkos_metrics::{self as metrics, handshakes::*};
 
 use crate::{
     peer::{cipher::Cipher, network::PeerIOHandle},

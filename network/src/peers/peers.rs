@@ -20,7 +20,7 @@ use rand::seq::IteratorRandom;
 use snarkvm_dpc::Storage;
 use tokio::task;
 
-use snarkos_metrics::connections::*;
+use snarkos_metrics::{self as metrics, connections::*};
 
 use crate::{message::*, NetworkError, Node};
 

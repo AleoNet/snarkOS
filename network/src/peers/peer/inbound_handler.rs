@@ -16,7 +16,7 @@
 
 use snarkvm_dpc::Storage;
 
-use snarkos_metrics::inbound::*;
+use snarkos_metrics::{self as metrics, inbound::*};
 
 use crate::{Direction, Message, NetworkError, Node, Payload, Peer};
 

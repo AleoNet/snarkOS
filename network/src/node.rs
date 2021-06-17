@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{master::SyncInbound, sync::master::SyncMaster, *};
-use snarkos_metrics::{inbound, misc};
+use snarkos_metrics::{self as metrics, inbound, misc};
 use snarkvm_dpc::Storage;
 
 use chrono::{DateTime, Utc};
@@ -35,9 +35,6 @@ use tokio::{
     task,
     time::sleep,
 };
-
-#[cfg(feature = "prometheus")]
-use metrics_exporter_prometheus::PrometheusBuilder;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]

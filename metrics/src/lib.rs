@@ -22,6 +22,9 @@ pub use names::*;
 pub mod snapshots;
 pub mod stats;
 
+/// Re-export metrics macros
+pub use metrics::*;
+
 // TODO: @sadroeck - consolidate exporters
 #[cfg(feature = "prometheus")]
 pub fn initialize() -> tokio::task::JoinHandle<()> {

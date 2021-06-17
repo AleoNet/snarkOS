@@ -23,7 +23,7 @@ use futures::{select, FutureExt};
 use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use snarkos_metrics::connections::*;
+use snarkos_metrics::{self as metrics, connections::*};
 
 use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, Version};
 

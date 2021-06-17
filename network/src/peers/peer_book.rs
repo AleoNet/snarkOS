@@ -28,7 +28,7 @@ use rand::prelude::IteratorRandom;
 use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use snarkos_metrics::connections::*;
+use snarkos_metrics::{self as metrics, connections::*};
 use snarkos_storage::BlockHeight;
 
 use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};

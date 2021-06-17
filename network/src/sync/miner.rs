@@ -22,7 +22,7 @@ use tokio::task;
 use tracing::*;
 
 use snarkos_consensus::Miner;
-use snarkos_metrics::misc::*;
+use snarkos_metrics::{self as metrics, misc::*};
 
 use crate::{Node, State};
 
