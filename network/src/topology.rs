@@ -464,7 +464,10 @@ mod test {
 
         // Insert (a, d) again and make sure the timestamp was updated.
         topology.update(a, vec![d]);
-        assert_ne!(old_but_valid_timestamp, topology.get_connection(a, d).last_seen);
+        assert_ne!(
+            old_but_valid_timestamp,
+            topology.get_connection(a, d).unwrap().last_seen
+        );
     }
 
     #[test]
