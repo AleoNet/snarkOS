@@ -8,10 +8,14 @@ impl Counter {
         Self(AtomicU64::new(0))
     }
 
+    /// Increases the value of the [`Counter`] by a discrete amount
+    #[inline]
     pub(crate) fn increment(&self, val: u64) {
         self.0.fetch_add(val, Ordering::SeqCst);
     }
 
+    /// Read the current state of the [`Counter`]
+    #[inline]
     pub fn read(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
@@ -26,18 +30,26 @@ impl DiscreteGauge {
         Self(AtomicU64::new(0))
     }
 
+    /// Overwrite the value of the [`DiscreteGauge`] to a fixed discrete amount
+    #[inline]
     pub(crate) fn set(&self, val: f64) {
         self.0.store(val as u64, Ordering::SeqCst);
     }
 
+    /// Increases the value of the [`DiscreteGauge`] by a discrete amount
+    #[inline]
     pub(crate) fn increase(&self, val: f64) {
         self.0.fetch_add(val as u64, Ordering::SeqCst);
     }
 
+    /// Decreases the value of the [`DiscreteGauge`] by a discrete amount
+    #[inline]
     pub(crate) fn decrease(&self, val: f64) {
         self.0.fetch_sub(val as u64, Ordering::SeqCst);
     }
 
+    /// Read the current state of the [`DiscreteGauge`]
+    #[inline]
     pub fn read(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
@@ -53,22 +65,32 @@ impl Gauge {
         Self(AtomicU64::new(0))
     }
 
+    /// Overwrite the value of the [`Gauge`] to a fixed real amount
+    #[inline]
     pub(crate) fn set(&self, val: f64) {
         self.0.store(val.to_bits(), Ordering::SeqCst);
     }
 
+    /// Increases the value of the [`Gauge`] by a real amount
+    #[inline]
     pub(crate) fn increase(&self, val: f64) {
         self.transform(|v| v + val);
     }
 
+    /// Decreases the value of the [`Gauge`] by a real amount
+    #[inline]
     pub(crate) fn decrease(&self, val: f64) {
         self.transform(|v| v - val);
     }
 
+    /// Read the current state of the [`Gauge`]
+    #[inline]
     pub fn read(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
 
+    /// Apply a numerical transformation to the [`f64`] interpretation of the stored value.
+    /// Note: This is applied in a loop by a set of atomic compare-and-swap operations
     #[inline]
     fn transform<F: Fn(f64) -> f64>(&self, f: F) {
         let mut old = self.0.load(Ordering::Relaxed);
