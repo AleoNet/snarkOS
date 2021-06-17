@@ -34,13 +34,21 @@ use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use parking_lot::RwLock;
 
-// Purges connections that haven't been seen within this time.
+// Purges connections that haven't been seen within this time (in hours).
 const STALE_CUTOFF: i64 = 4;
 
+/// A connection between two peers.
+///
+/// Implements `partialEq` and `Hash` so that the `source`-`target` order has no impact on equality
+/// (since connections are directionless). The timestamp is also not included in the comparison.
 #[derive(Debug, Eq, Copy, Clone)]
 pub struct Connection {
+    /// One side of the connection.
     pub source: SocketAddr,
+    /// The other side of the connection.
     pub target: SocketAddr,
+    /// The last time this peer was seen by the crawler (used determine which connections are
+    /// likely stale).
     last_seen: DateTime<Utc>,
 }
 
@@ -84,11 +92,11 @@ impl Connection {
 /// Keeps track of crawled peers and their connections.
 #[derive(Debug, Default)]
 pub struct NetworkTopology {
-    // FIXME: func not public field.
     connections: RwLock<HashSet<Connection>>,
 }
 
 impl NetworkTopology {
+    /// Updates the crawled connection set.
     pub fn update(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
@@ -104,7 +112,7 @@ impl NetworkTopology {
         // With sets: a - b = removed connections (if and only if one of the two addrs is the
         // source), otherwise it's a connection which doesn't include the source and shouldn't be
         // removed. We also keep connections seen within the last few hours as peerlists are capped
-        // in size and ommitted connections don't necessarily mean they don't exist anymore.
+        // in size and omitted connections don't necessarily mean they don't exist anymore.
         let connections_to_remove: HashSet<Connection> = self
             .connections
             .read()
@@ -132,14 +140,17 @@ impl NetworkTopology {
         }
     }
 
-    pub fn get_connection(&self, (a, b): (SocketAddr, SocketAddr)) -> Option<Connection> {
-        self.connections.read().get(&Connection::new(a, b)).copied()
+    /// Returns a connection.
+    pub fn get_connection(&self, source: SocketAddr, target: SocketAddr) -> Option<Connection> {
+        self.connections.read().get(&Connection::new(source, target)).copied()
     }
 
+    /// Returns a snapshot of all the connections.
     pub fn connections(&self) -> HashSet<Connection> {
         self.connections.read().clone()
     }
 
+    /// Returns `true` if the topology has tracked any connections, `false` otherwise.
     pub fn has_connections(&self) -> bool {
         self.connections.read().len() > 0
     }
@@ -175,7 +186,7 @@ impl NetworkMetrics {
     /// Returns the network metrics for the state described by the connections list.
     pub fn new(topology: &NetworkTopology) -> Self {
         // Copy the connections as the data must not change throughout the metrics computation.
-        let connections: HashSet<Connection> = topology.connections.read().iter().copied().collect();
+        let connections: HashSet<Connection> = topology.connections();
 
         // Construct the list of nodes from the connections.
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
@@ -453,15 +464,7 @@ mod test {
 
         // Insert (a, d) again and make sure the timestamp was updated.
         topology.update(a, vec![d]);
-        assert_ne!(
-            old_but_valid_timestamp,
-            topology
-                .connections
-                .read()
-                .get(&Connection::new(a, d))
-                .unwrap()
-                .last_seen
-        );
+        assert_ne!(old_but_valid_timestamp, topology.get_connection(a, d).last_seen);
     }
 
     #[test]
