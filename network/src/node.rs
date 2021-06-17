@@ -297,32 +297,11 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             .expect("local address was set more than once!");
     }
 
-    #[cfg(feature = "prometheus")]
     pub fn initialize_metrics(&self) {
-        debug!("Initializing prometheus metrics");
+        debug!("Initializing metrics");
+        let metrics_task = snarkos_metrics::initialize();
+        self.register_task(metrics_task);
 
-        let prometheus_builder = PrometheusBuilder::new();
-
-        let (recorder, exporter) = prometheus_builder
-            .build_with_exporter()
-            .expect("can't build the prometheus exporter");
-        metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
-
-        let metrics_exporter_task = task::spawn(async move {
-            exporter.await.expect("can't await the prometheus exporter");
-        });
-        self.register_task(metrics_exporter_task);
-    }
-
-    #[cfg(not(feature = "prometheus"))]
-    pub fn initialize_metrics(&self) {
-        debug!("Initializing RPC metrics");
-
-        // TODO: @sadroeck - consolidate exporters
-        // metrics::set_recorder(&NODE_STATS).expect("couldn't initialize the metrics recorder!");
-    }
-
-    pub fn register_metrics(&self) {
         // The node can already be at some non-zero height.
         if let Some(sync) = self.sync() {
             metrics::counter!(misc::BLOCK_HEIGHT, sync.current_block_height() as u64);

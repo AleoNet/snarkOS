@@ -17,8 +17,16 @@ include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[features]
+std = []
+prometheus = ["metrics-exporter-prometheus"]
+
 [dependencies.metrics]
 version = "0.16"
+
+[dependencies.metrics-exporter-prometheus]
+version = "0.5"
+optional = true
 
 [dependencies.serde]
 version = "1.0"
