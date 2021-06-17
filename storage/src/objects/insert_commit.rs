@@ -264,13 +264,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_LOCATOR,
-            key: block.header.get_hash().0.to_vec(),
+            key: block_header_hash.0.to_vec(),
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_LOCATOR,
             key: new_best_block_number.to_le_bytes().to_vec(),
-            value: block.header.get_hash().0.to_vec(),
+            value: block_header_hash.0.to_vec(),
         });
 
         // Rebuild the new commitment merkle tree
