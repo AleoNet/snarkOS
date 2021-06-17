@@ -41,7 +41,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             Some(transaction_location) => {
                 let block_transactions =
                     self.get_block_transactions(&BlockHeaderHash(transaction_location.block_hash))?;
-                Ok(Some(block_transactions.0[transaction_location.index as usize].clone()))
+                Ok(block_transactions.0.get(transaction_location.index as usize).cloned())
             }
             None => Ok(None),
         }
