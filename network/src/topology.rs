@@ -30,16 +30,24 @@ use std::{
     ops::Sub,
 };
 
+use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use parking_lot::RwLock;
 
+// Purges connections that haven't been seen within this time.
+const STALE_CUTOFF: i64 = 4;
+
 #[derive(Debug, Eq, Copy, Clone)]
-pub struct Connection((SocketAddr, SocketAddr));
+pub struct Connection {
+    pub source: SocketAddr,
+    pub target: SocketAddr,
+    last_seen: DateTime<Utc>,
+}
 
 impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {
-        let (a, b) = self.0;
-        let (c, d) = other.0;
+        let (a, b) = (self.source, self.target);
+        let (c, d) = (other.source, other.target);
 
         a == d && b == c || a == c && b == d
     }
@@ -47,7 +55,7 @@ impl PartialEq for Connection {
 
 impl Hash for Connection {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let (a, b) = self.0;
+        let (a, b) = (self.source, self.target);
 
         match a.cmp(&b) {
             Ordering::Greater => {
@@ -64,8 +72,12 @@ impl Hash for Connection {
 }
 
 impl Connection {
-    pub fn into_inner(&self) -> (SocketAddr, SocketAddr) {
-        self.0
+    fn new(source: SocketAddr, target: SocketAddr) -> Self {
+        Connection {
+            source,
+            target,
+            last_seen: Utc::now(),
+        }
     }
 }
 
@@ -81,32 +93,47 @@ impl NetworkTopology {
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.
-        //  - if an exisitng connection involving the source isn't in the peerlist, remove it.
+        //  - if an exisitng connection involving the source isn't in the peerlist, remove it if
+        //  it's stale.
 
-        let new_connections: HashSet<Connection> = peers.into_iter().map(|peer| Connection((source, peer))).collect();
+        let new_connections: HashSet<Connection> =
+            peers.into_iter().map(|peer| Connection::new(source, peer)).collect();
 
         // Find which connections need to be removed.
         //
         // With sets: a - b = removed connections (if and only if one of the two addrs is the
         // source), otherwise it's a connection which doesn't include the source and shouldn't be
-        // removed.
-        //  let connections_to_remove: HashSet<Connection> = self
-        //      .connections
-        //      .read()
-        //      .difference(&new_connections)
-        //      .filter(|Connection((a, b))| a == &source || b == &source)
-        //      .copied()
-        //      .collect();
-
-        // dbg!(&connections_to_remove.len());
+        // removed. We also keep connections seen within the last few hours as peerlists are capped
+        // in size and ommitted connections don't necessarily mean they don't exist anymore.
+        let connections_to_remove: HashSet<Connection> = self
+            .connections
+            .read()
+            .difference(&new_connections)
+            .filter(|conn| {
+                (conn.source == source || conn.target == source)
+                    && (Utc::now() - conn.last_seen).num_hours() > STALE_CUTOFF
+            })
+            .copied()
+            .collect();
 
         // Only retain connections that aren't removed.
-        // self.connections
-        //     .write()
-        //     .retain(|connection| !connections_to_remove.contains(&connection));
+        self.connections
+            .write()
+            .retain(|connection| !connections_to_remove.contains(&connection));
 
-        // Insert new connections.
-        self.connections.write().extend(new_connections.iter());
+        // Scope the write lock.
+        {
+            let mut connections_g = self.connections.write();
+
+            // Insert new connections, we use replace so the last seen timestamp is overwritten.
+            for new_connection in new_connections.into_iter() {
+                connections_g.replace(new_connection);
+            }
+        }
+    }
+
+    pub fn get_connection(&self, (a, b): (SocketAddr, SocketAddr)) -> Option<Connection> {
+        self.connections.read().get(&Connection::new(a, b)).copied()
     }
 
     pub fn connections(&self) -> HashSet<Connection> {
@@ -152,10 +179,10 @@ impl NetworkMetrics {
 
         // Construct the list of nodes from the connections.
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
-        for Connection((a, b)) in connections.iter() {
+        for connection in connections.iter() {
             // Using a hashset guarantees uniqueness.
-            nodes.insert(*a);
-            nodes.insert(*b);
+            nodes.insert(connection.source);
+            nodes.insert(connection.target);
         }
 
         let node_count = nodes.len();
@@ -261,11 +288,11 @@ fn adjacency_matrix(index: &BTreeMap<SocketAddr, usize>, connections: HashSet<Co
 
     // Compute the adjacency matrix. As our network is an undirected graph, the adjacency matrix is
     // symmetric.
-    for Connection((a, b)) in connections {
+    for connection in connections {
         // Addresses must be present.
         // Get the indices for each address in the connection.
-        let i = index.get(&a).unwrap();
-        let j = index.get(&b).unwrap();
+        let i = index.get(&connection.source).unwrap();
+        let j = index.get(&connection.target).unwrap();
 
         // Since connections are unique both the upper and lower triangles must be writted (as the
         // graph is unidrected) for each connection.
@@ -369,14 +396,15 @@ fn sorted_eigenvalue_vector_pairs(matrix: DMatrix<f64>, ascending: bool) -> Vec<
 #[cfg(test)]
 mod test {
     use super::*;
+    use chrono::Duration;
 
     #[test]
     fn connections_partial_eq() {
         let a = "12.34.56.78:9000".parse().unwrap();
         let b = "98.76.54.32:1000".parse().unwrap();
 
-        assert_eq!(Connection((a, b)), Connection((b, a)));
-        assert_eq!(Connection((a, b)), Connection((a, b)));
+        assert_eq!(Connection::new(a, b), Connection::new(b, a));
+        assert_eq!(Connection::new(a, b), Connection::new(a, b));
     }
 
     #[test]
@@ -384,22 +412,56 @@ mod test {
         let a = "11.11.11.11:1000".parse().unwrap();
         let b = "22.22.22.22:2000".parse().unwrap();
         let c = "33.33.33.33:3000".parse().unwrap();
+        let d = "44.44.44.44:4000".parse().unwrap();
+        let e = "55.55.55.55:5000".parse().unwrap();
 
-        let mut topology = NetworkTopology::default();
+        let old_but_valid_timestamp = Utc::now() - Duration::hours(STALE_CUTOFF - 1);
+        let stale_timestamp = Utc::now() - Duration::hours(STALE_CUTOFF + 1);
+
+        // Seed the topology with the older connections.
+        let old_but_valid_connection = Connection {
+            source: a,
+            target: d,
+            last_seen: old_but_valid_timestamp,
+        };
+
+        let stale_connection = Connection {
+            source: a,
+            target: e,
+            last_seen: stale_timestamp,
+        };
+
+        let mut seeded_connections = HashSet::new();
+        seeded_connections.insert(old_but_valid_connection);
+        seeded_connections.insert(stale_connection);
+
+        let topology = NetworkTopology {
+            connections: RwLock::new(seeded_connections),
+        };
 
         // Insert two connections.
         topology.update(a, vec![b, c]);
-        assert!(topology.connections.read().contains(&Connection((a, b))));
-        assert!(topology.connections.read().contains(&Connection((a, c))));
+        assert!(topology.connections.read().contains(&Connection::new(a, b)));
+        assert!(topology.connections.read().contains(&Connection::new(a, c)));
+        assert!(topology.connections.read().contains(&Connection::new(a, d)));
+        // Assert the stale connection was purged.
+        assert!(!topology.connections.read().contains(&Connection::new(a, e)));
 
         // Insert (a, b) connection reversed, make sure it doesn't change the list.
         topology.update(b, vec![a]);
-        assert!(topology.connections.len() == 2);
+        assert_eq!(topology.connections.read().len(), 3);
 
-        // Update c connections but don't include (c, a) == (a, c) and expect it to be removed.
-        topology.update(c, vec![b]);
-        assert!(!topology.connections.read().contains(&Connection((a, c))));
-        assert!(topology.connections.read().contains(&Connection((c, b))));
+        // Insert (a, d) again and make sure the timestamp was updated.
+        topology.update(a, vec![d]);
+        assert_ne!(
+            old_but_valid_timestamp,
+            topology
+                .connections
+                .read()
+                .get(&Connection::new(a, d))
+                .unwrap()
+                .last_seen
+        );
     }
 
     #[test]
@@ -412,8 +474,8 @@ mod test {
         let mut h1 = DefaultHasher::new();
         let mut h2 = DefaultHasher::new();
 
-        let k1 = Connection((a, b));
-        let k2 = Connection((b, a));
+        let k1 = Connection::new(a, b);
+        let k2 = Connection::new(b, a);
 
         k1.hash(&mut h1);
         k2.hash(&mut h2);
