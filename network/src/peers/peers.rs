@@ -200,7 +200,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // Iterate through a selection of random peers and attempt to connect.
             let mut candidates = self.peer_book.disconnected_peers_snapshot().await;
 
-            // FIXME: is_routable check.
             candidates.retain(|peer| peer.address != own_address && !bootnodes.contains(&peer.address));
 
             if self.config.is_bootnode() {

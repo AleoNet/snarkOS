@@ -392,8 +392,14 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             .map(|connection| {
                 let (source, target) = (connection.source, connection.target);
 
-                vertices.insert(Vertice { id: source });
-                vertices.insert(Vertice { id: target });
+                vertices.insert(Vertice {
+                    id: source,
+                    is_bootnode: self.node.config.bootnodes().contains(&source),
+                });
+                vertices.insert(Vertice {
+                    id: target,
+                    is_bootnode: self.node.config.bootnodes().contains(&target),
+                });
 
                 Edge { source, target }
             })

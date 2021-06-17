@@ -292,6 +292,7 @@ pub struct NetworkGraph {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Vertice {
     pub id: SocketAddr,
+    pub is_bootnode: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
