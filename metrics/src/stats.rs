@@ -169,6 +169,8 @@ pub struct ConnectionStats {
     all_initiated: Counter,
     /// The number of rejected inbound connection requests.
     all_rejected: Counter,
+    /// Number of currently connecting peers.
+    connecting_peers: DiscreteGauge,
     /// Number of currently connected peers.
     connected_peers: DiscreteGauge,
     /// Number of known disconnected peers.
@@ -181,6 +183,7 @@ impl ConnectionStats {
             all_accepted: Counter::new(),
             all_initiated: Counter::new(),
             all_rejected: Counter::new(),
+            connecting_peers: DiscreteGauge::new(),
             connected_peers: DiscreteGauge::new(),
             disconnected_peers: DiscreteGauge::new(),
         }
@@ -191,6 +194,7 @@ impl ConnectionStats {
             all_accepted: self.all_accepted.read(),
             all_initiated: self.all_initiated.read(),
             all_rejected: self.all_rejected.read(),
+            connecting_peers: self.connecting_peers.read() as u32,
             connected_peers: self.connected_peers.read() as u32,
             disconnected_peers: self.disconnected_peers.read() as u32,
         }
@@ -354,10 +358,10 @@ impl Recorder for Stats {
             queues::OUTBOUND => &self.queues.outbound,
             // misc
             misc::BLOCK_HEIGHT => &self.misc.block_height,
-            // obtained ad-hoc for the purposes of RPC metrics
-            connections::CONNECTING | connections::CONNECTED | connections::DISCONNECTED => {
-                todo!("@sadroeck - add me")
-            }
+            // connections
+            connections::CONNECTING => &self.connections.connecting_peers,
+            connections::CONNECTED => &self.connections.connected_peers,
+            connections::DISCONNECTED => &self.connections.disconnected_peers,
             _ => {
                 return;
             }
