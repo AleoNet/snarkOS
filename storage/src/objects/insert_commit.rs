@@ -218,10 +218,20 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         let mut transaction_cms = vec![];
 
-        for transaction in block.transactions.0.iter() {
+        for (index, transaction) in block.transactions.0.iter().enumerate() {
             let (tx_ops, cms) = self.commit_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
             database_transaction.push_vec(tx_ops);
             transaction_cms.extend(cms);
+
+            let transaction_location = TransactionLocation {
+                index: index as u32,
+                block_hash: block_header_hash.0,
+            };
+            database_transaction.push(Op::Insert {
+                col: COL_TRANSACTION_LOCATION,
+                key: transaction.transaction_id()?.to_vec(),
+                value: to_bytes![transaction_location]?.to_vec(),
+            });
         }
 
         // Update the database state for current indexes
