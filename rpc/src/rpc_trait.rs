@@ -99,6 +99,8 @@ pub trait RpcFunctions {
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;
 
+    // todo: readd in Rust 1.54
+    // #[cfg_attr(nightly, doc(include ="../documentation/public_endpoints/getnetworkgraph.md"))]
     #[rpc(name = "getnetworkgraph")]
     fn get_network_graph(&self) -> Result<NetworkGraph, RpcError>;
 }
