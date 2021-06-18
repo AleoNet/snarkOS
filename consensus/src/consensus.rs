@@ -167,8 +167,21 @@ impl<S: Storage> Consensus<S> {
                     // Attempt to fast forward the block state if the node already stores
                     // the children of the new canon block.
                     let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
-                    for child_block_hash in child_path {
+
+                    if child_path.len() > 1 {
+                        debug!(
+                            "Attempting to canonize the descendants of block at height {}.",
+                            block_height
+                        );
+                    }
+
+                    for child_block_hash in child_path.into_iter().skip(1) {
                         let new_block = self.ledger.get_block(&child_block_hash)?;
+
+                        debug!(
+                            "Processing the next known descendant. Height {}",
+                            self.ledger.get_current_block_height() + 1
+                        );
                         self.process_block(&new_block).await?;
                     }
                 }

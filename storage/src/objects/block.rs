@@ -158,6 +158,9 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// De-commit the latest block and return its header hash.
     pub fn decommit_latest_block(&self) -> Result<BlockHeaderHash, StorageError> {
         let current_block_height = self.get_current_block_height();
+
+        tracing::debug!("Decommitting block at height {}", current_block_height);
+
         if current_block_height == 0 {
             return Err(StorageError::InvalidBlockDecommit);
         }

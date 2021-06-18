@@ -160,7 +160,7 @@ mod consensus_sidechain {
     }
 
     #[tokio::test]
-    async fn decommit() {
+    async fn decommit_one_block() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         // Introduce one block.
@@ -307,5 +307,33 @@ mod consensus_sidechain {
 
         // Verify the integrity of the block storage for the first instance.
         assert!(consensus1.ledger.validate(None, false));
+    }
+
+    #[tokio::test]
+    async fn decommit_many_and_reimport() {
+        //tracing_subscriber::fmt::init();
+
+        let consensus = snarkos_testing::sync::create_test_consensus();
+        let blocks = TestBlocks::load(20, "test_blocks_100_1").0;
+
+        // Consensus imports 20 blocks.
+        for block in &blocks {
+            consensus.receive_block(block).await.unwrap();
+        }
+
+        // Consensus decommits 10 blocks.
+        for _ in 0..10 {
+            consensus.ledger.decommit_latest_block().unwrap();
+        }
+
+        assert_eq!(consensus.ledger.get_current_block_height(), 10);
+
+        // Consensus re-imports 1 block, the rest get fast-forwarded.
+        consensus.receive_block(&blocks[10]).await.unwrap();
+
+        assert_eq!(consensus.ledger.get_current_block_height(), 20);
+
+        // Verify the integrity of the block storage.
+        assert!(consensus.ledger.validate(None, false));
     }
 }

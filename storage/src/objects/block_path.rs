@@ -45,7 +45,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let block_hash = block_header.get_hash();
 
         // The given block header already exists
-        if self.block_hash_exists(&block_hash) {
+        if self.is_canon(&block_hash) {
             return Ok(BlockPath::ExistingBlock);
         }
 
