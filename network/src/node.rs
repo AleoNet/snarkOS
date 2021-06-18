@@ -130,9 +130,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         }));
 
         if node.config.is_bootnode() {
-            node.network_topology
-                .set(NetworkTopology::default())
-                .expect("network topology was set more than once");
+            // Safe since this can only ever be set here.
+            node.network_topology.set(NetworkTopology::default()).unwrap();
         }
 
         Ok(node)

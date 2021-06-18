@@ -35,11 +35,11 @@ use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use parking_lot::RwLock;
 
 // Purges connections that haven't been seen within this time (in hours).
-const STALE_CUTOFF: i64 = 4;
+const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
 
 /// A connection between two peers.
 ///
-/// Implements `partialEq` and `Hash` so that the `source`-`target` order has no impact on equality
+/// Implements `partialEq` and `Hash` manually so that the `source`-`target` order has no impact on equality
 /// (since connections are directionless). The timestamp is also not included in the comparison.
 #[derive(Debug, Eq, Copy, Clone)]
 pub struct Connection {
@@ -65,12 +65,12 @@ impl Hash for Connection {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let (a, b) = (self.source, self.target);
 
+        // This ensures the hash is the same for (a, b) as it is for (b, a).
         match a.cmp(&b) {
             Ordering::Greater => {
                 b.hash(state);
                 a.hash(state);
             }
-
             _ => {
                 a.hash(state);
                 b.hash(state);
@@ -119,7 +119,7 @@ impl NetworkTopology {
             .difference(&new_connections)
             .filter(|conn| {
                 (conn.source == source || conn.target == source)
-                    && (Utc::now() - conn.last_seen).num_hours() > STALE_CUTOFF
+                    && (Utc::now() - conn.last_seen).num_hours() > STALE_CONNECTION_CUTOFF_TIME_HRS
             })
             .copied()
             .collect();
@@ -152,7 +152,7 @@ impl NetworkTopology {
 
     /// Returns `true` if the topology has tracked any connections, `false` otherwise.
     pub fn has_connections(&self) -> bool {
-        self.connections.read().len() > 0
+        !self.connections.read().is_empty()
     }
 }
 
@@ -420,25 +420,25 @@ mod test {
 
     #[test]
     fn connections_update() {
-        let a = "11.11.11.11:1000".parse().unwrap();
-        let b = "22.22.22.22:2000".parse().unwrap();
-        let c = "33.33.33.33:3000".parse().unwrap();
-        let d = "44.44.44.44:4000".parse().unwrap();
-        let e = "55.55.55.55:5000".parse().unwrap();
+        let addr_a = "11.11.11.11:1000".parse().unwrap();
+        let addr_b = "22.22.22.22:2000".parse().unwrap();
+        let addr_c = "33.33.33.33:3000".parse().unwrap();
+        let addr_d = "44.44.44.44:4000".parse().unwrap();
+        let addr_e = "55.55.55.55:5000".parse().unwrap();
 
-        let old_but_valid_timestamp = Utc::now() - Duration::hours(STALE_CUTOFF - 1);
-        let stale_timestamp = Utc::now() - Duration::hours(STALE_CUTOFF + 1);
+        let old_but_valid_timestamp = Utc::now() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS - 1);
+        let stale_timestamp = Utc::now() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS + 1);
 
         // Seed the topology with the older connections.
         let old_but_valid_connection = Connection {
-            source: a,
-            target: d,
+            source: addr_a,
+            target: addr_d,
             last_seen: old_but_valid_timestamp,
         };
 
         let stale_connection = Connection {
-            source: a,
-            target: e,
+            source: addr_a,
+            target: addr_e,
             last_seen: stale_timestamp,
         };
 
@@ -451,22 +451,22 @@ mod test {
         };
 
         // Insert two connections.
-        topology.update(a, vec![b, c]);
-        assert!(topology.connections.read().contains(&Connection::new(a, b)));
-        assert!(topology.connections.read().contains(&Connection::new(a, c)));
-        assert!(topology.connections.read().contains(&Connection::new(a, d)));
+        topology.update(addr_a, vec![addr_b, addr_c]);
+        assert!(topology.connections.read().contains(&Connection::new(addr_a, addr_b)));
+        assert!(topology.connections.read().contains(&Connection::new(addr_a, addr_c)));
+        assert!(topology.connections.read().contains(&Connection::new(addr_a, addr_d)));
         // Assert the stale connection was purged.
-        assert!(!topology.connections.read().contains(&Connection::new(a, e)));
+        assert!(!topology.connections.read().contains(&Connection::new(addr_a, addr_e)));
 
         // Insert (a, b) connection reversed, make sure it doesn't change the list.
-        topology.update(b, vec![a]);
+        topology.update(addr_b, vec![addr_a]);
         assert_eq!(topology.connections.read().len(), 3);
 
         // Insert (a, d) again and make sure the timestamp was updated.
-        topology.update(a, vec![d]);
+        topology.update(addr_a, vec![addr_d]);
         assert_ne!(
             old_but_valid_timestamp,
-            topology.get_connection(a, d).unwrap().last_seen
+            topology.get_connection(addr_a, addr_d).unwrap().last_seen
         );
     }
 
