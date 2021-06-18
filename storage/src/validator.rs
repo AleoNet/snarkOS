@@ -14,7 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Ledger, TransactionLocation, COL_COMMITMENT, COL_MEMO, COL_SERIAL_NUMBER, COL_TRANSACTION_LOCATION};
+use crate::{
+    Ledger,
+    TransactionLocation,
+    COL_COMMITMENT,
+    COL_DIGEST,
+    COL_MEMO,
+    COL_SERIAL_NUMBER,
+    COL_TRANSACTION_LOCATION,
+};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
 use snarkvm_utilities::{to_bytes, ToBytes};
@@ -85,6 +93,8 @@ pub enum FixMode {
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     validate_tx_components!(validate_transaction_memos, "memorandums", COL_MEMO);
+
+    validate_tx_components!(validate_transaction_digests, "digests", COL_DIGEST);
 
     validate_tx_components!(validate_transaction_sns, "serial numbers", COL_SERIAL_NUMBER);
 
@@ -186,6 +196,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let mut tx_memos = HashSet::new();
         let mut tx_sns = HashSet::new();
         let mut tx_cms = HashSet::new();
+        let mut tx_digests = HashSet::new();
 
         let mut current_hash = current_block.header.get_hash();
 
@@ -207,6 +218,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 &mut tx_memos,
                 &mut tx_sns,
                 &mut tx_cms,
+                &mut tx_digests,
                 &mut db_ops,
                 fix_mode,
                 &mut is_valid,
@@ -271,6 +283,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         if [FixMode::TxComponents, FixMode::Everything].contains(&fix_mode) {
             self.validate_transaction_memos(&tx_memos, &mut db_ops, &mut is_valid);
+            self.validate_transaction_digests(&tx_digests, &mut db_ops, &mut is_valid);
             self.validate_transaction_sns(&tx_sns, &mut db_ops, &mut is_valid);
             self.validate_transaction_cms(&tx_cms, &mut db_ops, &mut is_valid);
         }
@@ -301,6 +314,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         tx_memos: &mut HashSet<Vec<u8>>,
         tx_sns: &mut HashSet<Vec<u8>>,
         tx_cms: &mut HashSet<Vec<u8>>,
+        tx_digests: &mut HashSet<Vec<u8>>,
         database_fix: &mut Option<DatabaseTransaction>,
         fix_mode: FixMode,
         is_storage_valid: &mut bool,
@@ -363,6 +377,14 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 }
                 tx_cms.insert(to_bytes!(cm).unwrap()); // to_bytes can't fail
             }
+
+            let tx_digest = tx.ledger_digest();
+            // to_bytes can't fail
+            if !self.storage.exists(COL_DIGEST, &to_bytes![tx_digest].unwrap()) {
+                error!("Transaction {} doesn't have a ledger digest stored", hex::encode(tx_id));
+                *is_storage_valid = false;
+            }
+            tx_digests.insert(to_bytes!(tx_digest).unwrap()); // to_bytes can't fail
 
             let tx_memo = tx.memorandum();
             if !self.contains_memo(tx_memo) {
