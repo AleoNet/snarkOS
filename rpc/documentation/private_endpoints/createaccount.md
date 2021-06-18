@@ -13,6 +13,7 @@ Yes
 |   Parameter   |  Type  |         Description         |
 |:------------- |:------:|:--------------------------- |
 | `private_key` | string | An Aleo account private key |
+| `view_key`    | string | An Aleo account view key    |
 | `address`     | string | An Aleo account address     |
 
 ### Example
