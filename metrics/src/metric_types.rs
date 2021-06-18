@@ -27,7 +27,7 @@ impl Counter {
     /// Increases the value of the [`Counter`] by a discrete amount
     #[inline]
     pub(crate) fn increment(&self, val: u64) {
-        self.0.fetch_add(val, Ordering::SeqCst);
+        self.0.fetch_add(val, Ordering::Release);
     }
 
     /// Read the current state of the [`Counter`]
@@ -49,19 +49,19 @@ impl DiscreteGauge {
     /// Overwrite the value of the [`DiscreteGauge`] to a fixed discrete amount
     #[inline]
     pub(crate) fn set(&self, val: f64) {
-        self.0.store(val as u64, Ordering::SeqCst);
+        self.0.store(val as u64, Ordering::Relaxed);
     }
 
     /// Increases the value of the [`DiscreteGauge`] by a discrete amount
     #[inline]
     pub(crate) fn increase(&self, val: f64) {
-        self.0.fetch_add(val as u64, Ordering::SeqCst);
+        self.0.fetch_add(val as u64, Ordering::Release);
     }
 
     /// Decreases the value of the [`DiscreteGauge`] by a discrete amount
     #[inline]
     pub(crate) fn decrease(&self, val: f64) {
-        self.0.fetch_sub(val as u64, Ordering::SeqCst);
+        self.0.fetch_sub(val as u64, Ordering::Release);
     }
 
     /// Read the current state of the [`DiscreteGauge`]
@@ -84,7 +84,7 @@ impl Gauge {
     /// Overwrite the value of the [`Gauge`] to a fixed real amount
     #[inline]
     pub(crate) fn set(&self, val: f64) {
-        self.0.store(val.to_bits(), Ordering::SeqCst);
+        self.0.store(val.to_bits(), Ordering::Relaxed);
     }
 
     /// Increases the value of the [`Gauge`] by a real amount
