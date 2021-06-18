@@ -31,7 +31,7 @@ use tracing::*;
 
 use std::collections::HashSet;
 
-macro_rules! validate_tx_components {
+macro_rules! check_for_superfluous_tx_components {
     ($fn_name:ident, $component_name:expr, $component_col:expr) => {
         fn $fn_name(
             &self,
@@ -85,20 +85,22 @@ pub enum FixMode {
     Nothing,
     /// Update transaction locations if need be.
     TxLocations,
+    /// Store transaction serial numbers, commitments and memorandums that are missing in the storage.
+    MissingTxComponents,
     /// Remove transaction serial numbers, commitments and memorandums for missing transactions.
-    TxComponents,
+    SuperfluousTxComponents,
     /// Apply all the available fixes.
     Everything,
 }
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
-    validate_tx_components!(validate_transaction_memos, "memorandums", COL_MEMO);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandums", COL_MEMO);
 
-    validate_tx_components!(validate_transaction_digests, "digests", COL_DIGEST);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digests", COL_DIGEST);
 
-    validate_tx_components!(validate_transaction_sns, "serial numbers", COL_SERIAL_NUMBER);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_sns, "serial numbers", COL_SERIAL_NUMBER);
 
-    validate_tx_components!(validate_transaction_cms, "commitments", COL_COMMITMENT);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitments", COL_COMMITMENT);
 
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
     /// at the current block height and goes down until the genesis block, making sure that the block-related data
@@ -106,7 +108,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
     pub fn validate(&self, mut limit: Option<usize>, fix_mode: FixMode) -> bool {
-        if limit.is_some() && [FixMode::TxComponents, FixMode::Everything].contains(&fix_mode) {
+        if limit.is_some() && [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
             );
@@ -281,11 +283,11 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             current_hash = previous_hash;
         }
 
-        if [FixMode::TxComponents, FixMode::Everything].contains(&fix_mode) {
-            self.validate_transaction_memos(&tx_memos, &mut db_ops, &mut is_valid);
-            self.validate_transaction_digests(&tx_digests, &mut db_ops, &mut is_valid);
-            self.validate_transaction_sns(&tx_sns, &mut db_ops, &mut is_valid);
-            self.validate_transaction_cms(&tx_cms, &mut db_ops, &mut is_valid);
+        if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+            self.check_for_superfluous_tx_memos(&tx_memos, &mut db_ops, &mut is_valid);
+            self.check_for_superfluous_tx_digests(&tx_digests, &mut db_ops, &mut is_valid);
+            self.check_for_superfluous_tx_sns(&tx_sns, &mut db_ops, &mut is_valid);
+            self.check_for_superfluous_tx_cms(&tx_cms, &mut db_ops, &mut is_valid);
         }
 
         if let Some(ops) = db_ops {
