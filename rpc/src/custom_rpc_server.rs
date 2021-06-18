@@ -105,7 +105,7 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         _ => {
             let resp = jrt::Response::<(), ()>::error(
                 jrt::Version::V2,
-                jrt::Error::from_code(jrt::ErrorCode::ParseError),
+                jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't read the RPC body"),
                 None,
             );
             let body = serde_json::to_vec(&resp).unwrap_or_default();
@@ -120,7 +120,7 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         Err(_) => {
             let resp = jrt::Response::<(), ()>::error(
                 jrt::Version::V2,
-                jrt::Error::from_code(jrt::ErrorCode::ParseError),
+                jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body"),
                 None,
             );
             let body = serde_json::to_vec(&resp).unwrap_or_default();
