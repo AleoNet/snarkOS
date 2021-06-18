@@ -39,7 +39,10 @@ use snarkvm_utilities::{
 
 use chrono::Utc;
 
-use std::{ops::Deref, sync::Arc};
+use std::{
+    ops::Deref,
+    sync::{atomic::Ordering, Arc},
+};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -326,7 +329,20 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     /// Returns statistics related to the node.
     fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
-        Ok(NODE_STATS.snapshot())
+        let mut metrics = NODE_STATS.snapshot();
+
+        // Note: Temporarily overriding node metrics here, as they aren't all correctly updated
+        // @sadroeck - remove me
+        metrics.misc.block_height = self.storage.current_block_height.load(Ordering::Relaxed) as u64;
+        metrics.connections.connected_peers = self.node.peer_book.get_active_peer_count();
+        metrics.connections.disconnected_peers = self.node.peer_book.get_disconnected_peer_count();
+        metrics.misc.block_height = self
+            .node
+            .sync()
+            .map(|sync| sync.current_block_height() as u64)
+            .unwrap_or(0);
+
+        Ok(metrics)
     }
 
     /// Returns the current mempool and sync information known by this node.
