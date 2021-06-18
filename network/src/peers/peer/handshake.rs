@@ -26,7 +26,9 @@ use snarkos_metrics::{self as metrics, handshakes::*};
 
 use crate::{
     peer::{cipher::Cipher, network::PeerIOHandle},
-    NetworkError, Peer, Version,
+    NetworkError,
+    Peer,
+    Version,
 };
 
 pub struct HandshakeData {

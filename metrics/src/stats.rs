@@ -16,11 +16,18 @@
 
 use metrics::{GaugeValue, Key, Recorder, Unit};
 
-use crate::metric_types::{Counter, DiscreteGauge};
-use crate::names::*;
-use crate::snapshots::{
-    NodeConnectionStats, NodeHandshakeStats, NodeInboundStats, NodeMiscStats, NodeOutboundStats, NodeQueueStats,
-    NodeStats,
+use crate::{
+    metric_types::{Counter, DiscreteGauge},
+    names::*,
+    snapshots::{
+        NodeConnectionStats,
+        NodeHandshakeStats,
+        NodeInboundStats,
+        NodeMiscStats,
+        NodeOutboundStats,
+        NodeQueueStats,
+        NodeStats,
+    },
 };
 
 pub static NODE_STATS: Stats = Stats::new();
