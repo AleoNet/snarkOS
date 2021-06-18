@@ -63,8 +63,8 @@ pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
     pub peer_book: PeerBook,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync<S>>>,
-    /// Tracks the network topology crawled by this node.
-    pub network_topology: OnceCell<NetworkTopology>,
+    /// Tracks the known network crawled by this node.
+    pub known_network: OnceCell<KnownNetwork>,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -121,7 +121,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             inbound: Default::default(),
             peer_book: PeerBook::spawn(),
             sync: Default::default(),
-            network_topology: Default::default(),
+            known_network: Default::default(),
             launched: Utc::now(),
             tasks: Default::default(),
             threads: Default::default(),
@@ -131,7 +131,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
         if node.config.is_bootnode() {
             // Safe since this can only ever be set here.
-            node.network_topology.set(NetworkTopology::default()).unwrap();
+            node.known_network.set(KnownNetwork::default()).unwrap();
         }
 
         Ok(node)
@@ -161,8 +161,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         self.sync().is_some()
     }
 
-    pub fn network_topology(&self) -> Option<&NetworkTopology> {
-        self.network_topology.get()
+    pub fn known_network(&self) -> Option<&KnownNetwork> {
+        self.known_network.get()
     }
 
     pub async fn start_services(&self) {

@@ -91,11 +91,11 @@ impl Connection {
 
 /// Keeps track of crawled peers and their connections.
 #[derive(Debug, Default)]
-pub struct NetworkTopology {
+pub struct KnownNetwork {
     connections: RwLock<HashSet<Connection>>,
 }
 
-impl NetworkTopology {
+impl KnownNetwork {
     /// Updates the crawled connection set.
     pub fn update(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
@@ -150,7 +150,7 @@ impl NetworkTopology {
         self.connections.read().clone()
     }
 
-    /// Returns `true` if the topology has tracked any connections, `false` otherwise.
+    /// Returns `true` if the known network contains any connections, `false` otherwise.
     pub fn has_connections(&self) -> bool {
         !self.connections.read().is_empty()
     }
@@ -184,9 +184,9 @@ pub struct NetworkMetrics {
 
 impl NetworkMetrics {
     /// Returns the network metrics for the state described by the connections list.
-    pub fn new(topology: &NetworkTopology) -> Self {
+    pub fn new(known_network: &KnownNetwork) -> Self {
         // Copy the connections as the data must not change throughout the metrics computation.
-        let connections: HashSet<Connection> = topology.connections();
+        let connections: HashSet<Connection> = known_network.connections();
 
         // Construct the list of nodes from the connections.
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
@@ -429,7 +429,7 @@ mod test {
         let old_but_valid_timestamp = Utc::now() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS - 1);
         let stale_timestamp = Utc::now() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS + 1);
 
-        // Seed the topology with the older connections.
+        // Seed the known network with the older connections.
         let old_but_valid_connection = Connection {
             source: addr_a,
             target: addr_d,
@@ -446,27 +446,47 @@ mod test {
         seeded_connections.insert(old_but_valid_connection);
         seeded_connections.insert(stale_connection);
 
-        let topology = NetworkTopology {
+        let known_network = KnownNetwork {
             connections: RwLock::new(seeded_connections),
         };
 
         // Insert two connections.
-        topology.update(addr_a, vec![addr_b, addr_c]);
-        assert!(topology.connections.read().contains(&Connection::new(addr_a, addr_b)));
-        assert!(topology.connections.read().contains(&Connection::new(addr_a, addr_c)));
-        assert!(topology.connections.read().contains(&Connection::new(addr_a, addr_d)));
+        known_network.update(addr_a, vec![addr_b, addr_c]);
+        assert!(
+            known_network
+                .connections
+                .read()
+                .contains(&Connection::new(addr_a, addr_b))
+        );
+        assert!(
+            known_network
+                .connections
+                .read()
+                .contains(&Connection::new(addr_a, addr_c))
+        );
+        assert!(
+            known_network
+                .connections
+                .read()
+                .contains(&Connection::new(addr_a, addr_d))
+        );
         // Assert the stale connection was purged.
-        assert!(!topology.connections.read().contains(&Connection::new(addr_a, addr_e)));
+        assert!(
+            !known_network
+                .connections
+                .read()
+                .contains(&Connection::new(addr_a, addr_e))
+        );
 
         // Insert (a, b) connection reversed, make sure it doesn't change the list.
-        topology.update(addr_b, vec![addr_a]);
-        assert_eq!(topology.connections.read().len(), 3);
+        known_network.update(addr_b, vec![addr_a]);
+        assert_eq!(known_network.connections.read().len(), 3);
 
         // Insert (a, d) again and make sure the timestamp was updated.
-        topology.update(addr_a, vec![addr_d]);
+        known_network.update(addr_a, vec![addr_d]);
         assert_ne!(
             old_but_valid_timestamp,
-            topology.get_connection(addr_a, addr_d).unwrap().last_seen
+            known_network.get_connection(addr_a, addr_d).unwrap().last_seen
         );
     }
 

@@ -311,11 +311,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 .await;
         }
 
-        if let Some(topology) = self.network_topology.get() {
-            // If this node is tracking the network topology, record the connections. This can
+        if let Some(known_network) = self.known_network.get() {
+            // If this node is tracking the network, record the connections. This can
             // then be used to construct the graph and query peer info from the peerbook.
 
-            topology.update(source, peers);
+            known_network.update(source, peers);
         }
     }
 

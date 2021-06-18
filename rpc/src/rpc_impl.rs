@@ -21,7 +21,7 @@
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
-use snarkos_network::{NetworkTopology, Node, Sync};
+use snarkos_network::{KnownNetwork, Node, Sync};
 use snarkvm_dpc::{
     testnet1::{
         instantiated::{Components, Tx},
@@ -96,8 +96,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcImpl<S> {
         Ok(self.sync_handler()?.memory_pool())
     }
 
-    pub fn network_topology(&self) -> Result<&NetworkTopology, RpcError> {
-        self.node.network_topology().ok_or(RpcError::NoNetworkTopology)
+    pub fn known_network(&self) -> Result<&KnownNetwork, RpcError> {
+        self.node.known_network().ok_or(RpcError::NoKnownNetwork)
     }
 }
 
@@ -386,7 +386,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     fn get_network_graph(&self) -> Result<NetworkGraph, RpcError> {
         let mut vertices = HashSet::new();
         let edges: HashSet<Edge> = self
-            .network_topology()?
+            .known_network()?
             .connections()
             .iter()
             .map(|connection| {
