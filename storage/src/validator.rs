@@ -383,8 +383,24 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             let tx_digest = tx.ledger_digest();
             // to_bytes can't fail
             if !self.storage.exists(COL_DIGEST, &to_bytes![tx_digest].unwrap()) {
-                error!("Transaction {} doesn't have a ledger digest stored", hex::encode(tx_id));
-                *is_storage_valid = false;
+                warn!(
+                    "Transaction {} doesn't have the ledger digest stored",
+                    hex::encode(tx_id),
+                );
+
+                if let Some(ref mut db_ops) = database_fix {
+                    if [FixMode::MissingTxComponents, FixMode::Everything].contains(&fix_mode) {
+                        db_ops.push(Op::Insert {
+                            col: COL_DIGEST,
+                            key: to_bytes![tx_digest].unwrap(), // to_bytes can't fail
+                            value: block_height.to_le_bytes().to_vec(),
+                        });
+                    } else {
+                        *is_storage_valid = false;
+                    }
+                } else {
+                    *is_storage_valid = false;
+                }
             }
             tx_digests.insert(to_bytes!(tx_digest).unwrap()); // to_bytes can't fail
 
