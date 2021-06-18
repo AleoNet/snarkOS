@@ -497,8 +497,8 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             .iter()
             .zip_eq(&transaction_input.old_account_private_keys)
         {
-            let record = Record::from_str(&record_string)?;
-            let private_key = PrivateKey::from_str(&private_key_string)?;
+            let record = Record::from_str(record_string)?;
+            let private_key = PrivateKey::from_str(private_key_string)?;
 
             builder = builder.add_input(private_key, record)?;
         }

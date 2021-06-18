@@ -123,6 +123,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> LedgerScheme
         cm: &Self::Commitment,
         witness: &Self::MerklePath,
     ) -> bool {
-        witness.verify(&digest, cm).unwrap()
+        witness.verify(digest, cm).unwrap()
     }
 }

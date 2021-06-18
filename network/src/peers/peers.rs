@@ -250,7 +250,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         trace!("Broadcasting `Ping` messages");
 
         // Consider peering tests that don't use the sync layer.
-        let current_block_height = if let Some(ref sync) = self.sync() {
+        let current_block_height = if let Some(sync) = self.sync() {
             sync.current_block_height()
         } else {
             0

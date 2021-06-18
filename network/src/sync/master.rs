@@ -233,7 +233,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let mut peer_block_requests: HashMap<SocketAddr, Vec<BlockHeaderHash>> = HashMap::new();
         let mut block_peers = HashMap::new();
         for block in blocks {
-            let peers = block_peer_map.get(&block);
+            let peers = block_peer_map.get(block);
             if peers.is_none() {
                 continue;
             }

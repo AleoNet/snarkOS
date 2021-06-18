@@ -65,7 +65,7 @@ async fn responder_handshake<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     trace!("received e (XX handshake part 1/3) from {}", remote_address);
 
     // -> e, ee, s, es
-    let serialized_version = Version::serialize(&own_version).unwrap();
+    let serialized_version = Version::serialize(own_version).unwrap();
     let len = noise.write_message(&serialized_version, &mut noise_buffer)?;
     writer.write_all(&[len as u8]).await?;
     writer.write_all(&noise_buffer[..len]).await?;

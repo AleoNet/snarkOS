@@ -321,7 +321,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             };
 
             for sn in tx.old_serial_numbers() {
-                if !self.contains_sn(&sn) {
+                if !self.contains_sn(sn) {
                     error!(
                         "Transaction {} doesn't have an old serial number stored",
                         hex::encode(tx_id)
@@ -332,7 +332,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             }
 
             for cm in tx.new_commitments() {
-                if !self.contains_cm(&cm) {
+                if !self.contains_cm(cm) {
                     error!(
                         "Transaction {} doesn't have a new commitment stored",
                         hex::encode(tx_id)
@@ -343,7 +343,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             }
 
             let tx_memo = tx.memorandum();
-            if !self.contains_memo(&tx_memo) {
+            if !self.contains_memo(tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 *is_storage_valid = false;
             }
