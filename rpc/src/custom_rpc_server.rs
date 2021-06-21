@@ -102,12 +102,13 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
     let mut body = req.into_body();
     let data = match body.data().await {
         Some(Ok(data)) => data,
-        _ => {
-            let resp = jrt::Response::<(), ()>::error(
-                jrt::Version::V2,
-                jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't read the RPC body"),
-                None,
-            );
+        err_or_none => {
+            let mut error = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't read the RPC body");
+            if let Some(Err(err)) = err_or_none {
+                error.data = Some(err.to_string());
+            }
+
+            let resp = jrt::Response::<(), String>::error(jrt::Version::V2, error, None);
             let body = serde_json::to_vec(&resp).unwrap_or_default();
 
             return Ok(hyper::Response::new(body.into()));
