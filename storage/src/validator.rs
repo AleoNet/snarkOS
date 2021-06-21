@@ -115,7 +115,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
-    pub fn validate(&self, mut limit: Option<usize>, fix_mode: FixMode) -> bool {
+    pub fn validate(&self, mut limit: Option<u32>, fix_mode: FixMode) -> bool {
         if limit.is_some() && [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
@@ -198,13 +198,15 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
         let tx_cms = Default::default();
         let tx_digests = Default::default();
 
-        loop {
-            if current_height == 0 {
-                break;
-            }
+        let to_process = if let Some(ref mut limit) = limit {
+            *limit
+        } else {
+            current_height
+        };
 
+        (0..to_process).into_par_iter().for_each(|i| {
             self.validate_block(
-                current_height,
+                current_height - i,
                 &tx_memos,
                 &tx_sns,
                 &tx_cms,
@@ -213,18 +215,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                 fix_mode,
                 &is_valid,
             );
-
-            current_height -= 1;
-
-            if let Some(ref mut limit) = limit {
-                *limit -= 1;
-                if *limit == 0 {
-                    info!("Specified block limit reached; the check is complete.");
-
-                    break;
-                }
-            }
-        }
+        });
 
         if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
             self.check_for_superfluous_tx_memos(&*tx_memos.lock(), &db_ops, &is_valid);
@@ -276,10 +267,6 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
         let block_hash = block.header.get_hash();
 
         trace!("Validating block at height {} ({})", block_height, block_hash);
-
-        if block_height % 100 == 0 {
-            debug!("Still validating; current height: {}", block_height);
-        }
 
         if !self.block_hash_exists(&block_hash) {
             is_storage_valid.store(false, Ordering::SeqCst);
