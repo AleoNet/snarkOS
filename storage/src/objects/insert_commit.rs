@@ -283,6 +283,15 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             value: block_header_hash.0.to_vec(),
         });
 
+        // If it's the genesis block, store its initial applicable digest.
+        if is_genesis {
+            database_transaction.push(Op::Insert {
+                col: COL_DIGEST,
+                key: to_bytes![self.current_digest()?]?.to_vec(),
+                value: 0u32.to_le_bytes().to_vec(),
+            });
+        }
+
         // Rebuild the new commitment merkle tree
         self.rebuild_merkle_tree(transaction_cms)?;
         let tree = self.cm_merkle_tree.load();
