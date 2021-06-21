@@ -164,9 +164,9 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
         let mut true_height_mismatch = false;
 
-        // Current block is found by COL_BLOCK_LOCATOR, as it should have been committed (i.e. be canon).
-        let mut current_block = self.get_block_from_block_number(current_height);
-        while let Err(e) = current_block {
+        // get_block_hash uses COL_BLOCK_LOCATOR, as it should have been committed (i.e. be canon).
+        let mut current_hash = self.get_block_hash(current_height);
+        while let Err(e) = current_hash {
             is_valid.store(false, Ordering::SeqCst);
             error!(
                 "Couldn't find the latest block (height {}): {}! Trying a lower height next.",
@@ -186,18 +186,8 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                 }
             }
 
-            current_block = self.get_block_from_block_number(current_height);
+            current_hash = self.get_block_hash(current_height);
         }
-
-        let mut current_block = match current_block {
-            Ok(block) => block,
-            Err(e) => {
-                error!("Couldn't even obtain the genesis block by height 0: {}!", e);
-                error!("The storage is invalid!");
-
-                return false;
-            }
-        };
 
         if true_height_mismatch {
             debug!("The true block height is {}", current_height);
@@ -208,22 +198,12 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
         let tx_cms = Default::default();
         let tx_digests = Default::default();
 
-        let mut current_hash = current_block.header.get_hash();
-
         loop {
-            trace!("Validating block at height {} ({})", current_height, current_hash);
-
-            if current_height % 100 == 0 {
-                debug!("Still validating; current height: {}", current_height);
+            if current_height == 0 {
+                break;
             }
 
-            if !self.block_hash_exists(&current_hash) {
-                is_valid.store(false, Ordering::SeqCst);
-                error!("The header for block at height {} is missing!", current_height);
-            }
-
-            self.validate_block_transactions(
-                &current_block,
+            self.validate_block(
                 current_height,
                 &tx_memos,
                 &tx_sns,
@@ -234,49 +214,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                 &is_valid,
             );
 
-            if current_height == 0 {
-                break;
-            }
-
             current_height -= 1;
-
-            let previous_block = match self.get_block_from_block_number(current_height) {
-                Ok(block) => block,
-                Err(e) => {
-                    error!("Couldn't find a block at height {}: {}!", current_height, e);
-                    error!("The storage is invalid!");
-
-                    return false;
-                }
-            };
-
-            let previous_hash = previous_block.header.get_hash();
-
-            if current_block.header.previous_block_hash != previous_hash {
-                is_valid.store(false, Ordering::SeqCst);
-                error!(
-                    "The parent hash of block at height {} doesn't match its child at {}!",
-                    current_height + 1,
-                    current_height,
-                );
-            }
-
-            match self.get_child_block_hashes(&previous_hash) {
-                Err(e) => {
-                    is_valid.store(false, Ordering::SeqCst);
-                    error!("Can't find the children of block at height {}: {}!", previous_hash, e);
-                }
-                Ok(child_hashes) => {
-                    if !child_hashes.contains(&current_hash) {
-                        is_valid.store(false, Ordering::SeqCst);
-                        error!(
-                            "The list of children hash of block at height {} don't contain the child at {}!",
-                            current_height,
-                            current_height + 1,
-                        );
-                    }
-                }
-            }
 
             if let Some(ref mut limit) = limit {
                 *limit -= 1;
@@ -286,9 +224,6 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     break;
                 }
             }
-
-            current_block = previous_block;
-            current_hash = previous_hash;
         }
 
         if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
@@ -316,6 +251,88 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
         }
 
         is_valid
+    }
+
+    /// Validates the storage of the given block.
+    fn validate_block(
+        &self,
+        block_height: u32,
+        tx_memos: &Mutex<HashSet<Vec<u8>>>,
+        tx_sns: &Mutex<HashSet<Vec<u8>>>,
+        tx_cms: &Mutex<HashSet<Vec<u8>>>,
+        tx_digests: &Mutex<HashSet<Vec<u8>>>,
+        database_fix: &Mutex<Option<DatabaseTransaction>>,
+        fix_mode: FixMode,
+        is_storage_valid: &AtomicBool,
+    ) {
+        let block = if let Ok(block) = self.get_block_from_block_number(block_height) {
+            block
+        } else {
+            // Block not found; register the failure and attempt to carry on.
+            is_storage_valid.store(false, Ordering::SeqCst);
+            return;
+        };
+
+        let block_hash = block.header.get_hash();
+
+        trace!("Validating block at height {} ({})", block_height, block_hash);
+
+        if block_height % 100 == 0 {
+            debug!("Still validating; current height: {}", block_height);
+        }
+
+        if !self.block_hash_exists(&block_hash) {
+            is_storage_valid.store(false, Ordering::SeqCst);
+            error!("The header for block at height {} is missing!", block_height);
+        }
+
+        self.validate_block_transactions(
+            &block,
+            block_height,
+            &tx_memos,
+            &tx_sns,
+            &tx_cms,
+            &tx_digests,
+            &database_fix,
+            fix_mode,
+            &is_storage_valid,
+        );
+
+        let previous_hash = match self.get_block_hash(block_height - 1) {
+            Ok(hash) => hash,
+            Err(e) => {
+                error!("Couldn't find a block at height {}: {}!", block_height - 1, e);
+                is_storage_valid.store(false, Ordering::SeqCst);
+
+                return;
+            }
+        };
+
+        if block.header.previous_block_hash != previous_hash {
+            is_storage_valid.store(false, Ordering::SeqCst);
+            error!(
+                "The parent hash of block at height {} doesn't match its child at {}!",
+                block_height,
+                block_height - 1,
+            );
+        }
+
+        match self.get_child_block_hashes(&previous_hash) {
+            Err(e) => {
+                is_storage_valid.store(false, Ordering::SeqCst);
+                error!("Can't find the children of block at height {}: {}!", previous_hash, e);
+            }
+            Ok(child_hashes) => {
+                if !child_hashes.contains(&block_hash) {
+                    is_storage_valid.store(false, Ordering::SeqCst);
+                    error!(
+                        "The list of children hash of block at height {} don't contain the child at {}!",
+                        block_height - 1,
+                        block_height,
+                    );
+                }
+            }
+        }
     }
 
     /// Validates the storage of transactions belonging to the given block.
