@@ -33,6 +33,11 @@ use std::{
 use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use parking_lot::RwLock;
+use tokio::sync::{
+    mpsc,
+    mpsc::{Receiver, Sender},
+    Mutex,
+};
 
 // Purges connections that haven't been seen within this time (in hours).
 const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
@@ -90,14 +95,32 @@ impl Connection {
 }
 
 /// Keeps track of crawled peers and their connections.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct KnownNetwork {
+    pub sender: Sender<(SocketAddr, Vec<SocketAddr>)>,
+    receiver: Mutex<Receiver<(SocketAddr, Vec<SocketAddr>)>>,
     connections: RwLock<HashSet<Connection>>,
+}
+
+impl Default for KnownNetwork {
+    fn default() -> Self {
+        // Buffer size of 1000 messages seems reasonable to begin with.
+        let (tx, rx) = mpsc::channel(1000);
+
+        Self {
+            sender: tx,
+            receiver: Mutex::new(rx),
+            connections: RwLock::new(HashSet::new()),
+        }
+    }
 }
 
 impl KnownNetwork {
     /// Updates the crawled connection set.
-    pub fn update(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
+    pub async fn update(&self) {
+        // FIXME (nkls): error handling
+        let (source, peers) = self.receiver.lock().await.recv().await.unwrap();
+
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.

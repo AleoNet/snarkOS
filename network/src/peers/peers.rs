@@ -311,11 +311,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 .await;
         }
 
-        if let Some(known_network) = self.known_network.get() {
+        if let Some(known_network) = self.known_network() {
             // If this node is tracking the network, record the connections. This can
             // then be used to construct the graph and query peer info from the peerbook.
 
-            known_network.update(source, peers);
+            let _ = known_network.sender.try_send((source, peers));
         }
     }
 

@@ -195,6 +195,20 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         });
         self.register_task(peering_task);
 
+        if self.known_network().is_some() {
+            let node_clone = self.clone();
+
+            let known_network_task = task::spawn(async move {
+                loop {
+                    // Should always be present since we check for it before this block.
+                    if let Some(known_network) = node_clone.known_network() {
+                        known_network.update().await
+                    }
+                }
+            });
+            self.register_task(known_network_task);
+        }
+
         let node_clone = self.clone();
         let state_tracking_task = task::spawn(async move {
             loop {
