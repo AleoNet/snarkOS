@@ -110,7 +110,7 @@ impl Default for KnownNetwork {
         Self {
             sender: tx,
             receiver: Mutex::new(rx),
-            connections: RwLock::new(HashSet::new()),
+            connections: Default::default(),
         }
     }
 }
@@ -118,9 +118,13 @@ impl Default for KnownNetwork {
 impl KnownNetwork {
     /// Updates the crawled connection set.
     pub async fn update(&self) {
-        // FIXME (nkls): error handling
-        let (source, peers) = self.receiver.lock().await.recv().await.unwrap();
+        if let Some((source, peers)) = self.receiver.lock().await.recv().await {
+            self.update_inner(source, peers);
+        }
+    }
 
+    // More convenient for testing.
+    fn update_inner(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.
@@ -469,12 +473,15 @@ mod test {
         seeded_connections.insert(old_but_valid_connection);
         seeded_connections.insert(stale_connection);
 
+        let (tx, rx) = mpsc::channel(100);
         let known_network = KnownNetwork {
+            sender: tx,
+            receiver: Mutex::new(rx),
             connections: RwLock::new(seeded_connections),
         };
 
         // Insert two connections.
-        known_network.update(addr_a, vec![addr_b, addr_c]);
+        known_network.update_inner(addr_a, vec![addr_b, addr_c]);
         assert!(
             known_network
                 .connections
@@ -502,11 +509,11 @@ mod test {
         );
 
         // Insert (a, b) connection reversed, make sure it doesn't change the list.
-        known_network.update(addr_b, vec![addr_a]);
+        known_network.update_inner(addr_b, vec![addr_a]);
         assert_eq!(known_network.connections.read().len(), 3);
 
         // Insert (a, d) again and make sure the timestamp was updated.
-        known_network.update(addr_a, vec![addr_d]);
+        known_network.update_inner(addr_a, vec![addr_d]);
         assert_ne!(
             old_but_valid_timestamp,
             known_network.get_connection(addr_a, addr_d).unwrap().last_seen
