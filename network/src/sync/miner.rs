@@ -14,15 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{stats, Node, State};
-use futures::executor::block_on;
-use snarkos_consensus::Miner;
-use snarkvm_dpc::{testnet1::instantiated::*, AccountAddress, Storage};
+use std::{sync::Arc, thread, time::Duration};
 
+use futures::executor::block_on;
+use snarkvm_dpc::{testnet1::instantiated::*, AccountAddress, Storage};
 use tokio::task;
 use tracing::*;
 
-use std::{sync::Arc, thread, time::Duration};
+use snarkos_consensus::Miner;
+use snarkos_metrics::{self as metrics, misc::*};
+
+use crate::{Node, State};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance<S: Storage + core::marker::Sync + Send + 'static> {
@@ -100,7 +102,7 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
                     self.node.set_state(State::Idle);
                 }
 
-                metrics::increment_counter!(stats::MISC_BLOCKS_MINED);
+                metrics::increment_counter!(BLOCKS_MINED);
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
 

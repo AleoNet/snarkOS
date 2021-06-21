@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::*, stats, NetworkError, Node};
-use snarkvm_dpc::Storage;
-
 use std::{cmp, net::SocketAddr, time::Duration};
 
 use rand::seq::IteratorRandom;
+use snarkvm_dpc::Storage;
 use tokio::task;
+
+use snarkos_metrics::{self as metrics, connections::*};
+
+use crate::{message::*, NetworkError, Node};
 
 impl<S: Storage + core::marker::Sync + Send> Node<S> {
     /// Obtain a list of addresses of connected peers for this node.
@@ -111,7 +113,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             return Err(NetworkError::PeerAlreadyConnected);
         }
 
-        metrics::increment_counter!(stats::CONNECTIONS_ALL_INITIATED);
+        metrics::increment_counter!(ALL_INITIATED);
 
         self.peer_book.get_or_connect(self.clone(), remote_address).await?;
 

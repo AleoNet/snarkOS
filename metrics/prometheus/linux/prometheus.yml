@@ -8,6 +8,6 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'service-collector'
+  - job_name: 'snarkos-metrics-collector'
     static_configs:
-      - targets: ['localhost:8080']
+      - targets: ['localhost:9000']

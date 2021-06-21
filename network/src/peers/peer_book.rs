@@ -14,12 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{stats, NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};
-use futures::Future;
-use mpmc_map::MpmcMap;
-use rand::prelude::IteratorRandom;
-use snarkos_storage::BlockHeight;
-use snarkvm_dpc::Storage;
 use std::{
     net::SocketAddr,
     sync::{
@@ -27,7 +21,17 @@ use std::{
         Arc,
     },
 };
+
+use futures::Future;
+use mpmc_map::MpmcMap;
+use rand::prelude::IteratorRandom;
+use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
+
+use snarkos_metrics::{self as metrics, connections::*};
+use snarkos_storage::BlockHeight;
+
+use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};
 
 ///
 /// A data structure for storing the history of all peers with this node server.
@@ -65,11 +69,11 @@ impl PeerBookRef {
                     if status == PeerStatus::Connecting {
                         self.pending_connections.fetch_sub(1, Ordering::SeqCst);
                     }
-                    metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
                 PeerEventData::FailHandshake => {
                     self.pending_connections.fetch_sub(1, Ordering::SeqCst);
-                    metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
             }
         }
@@ -134,7 +138,7 @@ impl PeerBook {
     }
 
     async fn take_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
-        metrics::decrement_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+        metrics::decrement_gauge!(DISCONNECTED, 1.0);
         self.disconnected_peers.remove(address).await
     }
 
@@ -238,7 +242,7 @@ impl PeerBook {
             .insert(address, Peer::new(address, is_bootnode))
             .await;
 
-        metrics::increment_gauge!(stats::CONNECTIONS_DISCONNECTED, 1.0);
+        metrics::increment_gauge!(DISCONNECTED, 1.0);
 
         debug!("Added {} to the peer book", address);
     }

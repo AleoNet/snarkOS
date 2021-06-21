@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{master::SyncInbound, message::*, stats, NetworkError, Node};
-use snarkos_consensus::error::ConsensusError;
+use std::net::SocketAddr;
+
 use snarkvm_dpc::{Block, BlockHeaderHash, Storage};
 
-use std::net::SocketAddr;
+use snarkos_consensus::error::ConsensusError;
+use snarkos_metrics::{self as metrics, misc::*};
+
+use crate::{master::SyncInbound, message::*, NetworkError, Node};
 
 impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
     ///
@@ -43,7 +46,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
 
     /// Broadcast block to connected peers
     pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
-        metrics::increment_counter!(stats::MISC_BLOCK_HEIGHT);
+        metrics::increment_counter!(BLOCK_HEIGHT);
         debug!("Propagating a block to peers");
 
         for remote_address in self.connected_peers() {
@@ -118,9 +121,9 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
 
         if let Err(ConsensusError::PreExistingBlock) = block_validity {
             if is_block_new {
-                metrics::increment_counter!(stats::MISC_DUPLICATE_BLOCKS);
+                metrics::increment_counter!(DUPLICATE_BLOCKS);
             } else {
-                metrics::increment_counter!(stats::MISC_DUPLICATE_SYNC_BLOCKS);
+                metrics::increment_counter!(DUPLICATE_SYNC_BLOCKS);
             }
         }
 
@@ -130,7 +133,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
                 self.propagate_block(block, remote_address).await;
             } else {
                 // If it's a valid SyncBlock, bump block height.
-                metrics::increment_counter!(stats::MISC_BLOCK_HEIGHT);
+                metrics::increment_counter!(BLOCK_HEIGHT);
             }
         }
 

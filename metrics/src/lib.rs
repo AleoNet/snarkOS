@@ -14,15 +14,35 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate lazy_static;
+mod metric_types;
+mod names;
 
-pub mod macros;
+pub use names::*;
 
-pub mod metrics;
+pub mod snapshots;
+pub mod stats;
+
+/// Re-export metrics macros
 pub use metrics::*;
 
-pub mod prometheus;
+// TODO: @sadroeck - consolidate exporters
+#[cfg(feature = "prometheus")]
+pub fn initialize() -> tokio::task::JoinHandle<()> {
+    let prometheus_builder = metrics_exporter_prometheus::PrometheusBuilder::new();
 
-#[cfg(test)]
-pub mod testing;
+    let (recorder, exporter) = prometheus_builder
+        .build_with_exporter()
+        .expect("can't build the prometheus exporter");
+    metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
+
+    let metrics_exporter_task = tokio::task::spawn(async move {
+        exporter.await.expect("can't await the prometheus exporter");
+    });
+    metrics_exporter_task
+}
+
+#[cfg(not(feature = "prometheus"))]
+pub fn initialize() -> tokio::task::JoinHandle<()> {
+    metrics::set_recorder(&crate::stats::NODE_STATS).expect("couldn't initialize the metrics recorder!");
+    tokio::task::spawn(std::future::pending())
+}

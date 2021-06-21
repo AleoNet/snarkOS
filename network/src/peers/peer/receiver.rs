@@ -19,10 +19,11 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use super::PeerAction;
-use crate::{stats, NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus, Version};
+use snarkos_metrics::{self as metrics, connections::*};
 
-use super::network::PeerIOHandle;
+use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus, Version};
+
+use super::{network::PeerIOHandle, PeerAction};
 
 impl Peer {
     pub fn receive<S: Storage + Send + Sync + 'static>(
@@ -52,7 +53,7 @@ impl Peer {
             };
 
             peer.set_connected();
-            metrics::increment_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+            metrics::increment_gauge!(CONNECTED, 1.0);
             event_target
                 .send(PeerEvent {
                     address: peer.address,
@@ -74,7 +75,7 @@ impl Peer {
                     );
                 }
             }
-            metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTED, 1.0);
+            metrics::decrement_gauge!(CONNECTED, 1.0);
             peer.set_disconnected();
             event_target
                 .send(PeerEvent {
@@ -91,8 +92,8 @@ impl Peer {
         stream: TcpStream,
         our_version: Version,
     ) -> Result<(Peer, PeerIOHandle), NetworkError> {
-        metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
-        let _x = defer::defer(|| metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0));
+        metrics::increment_gauge!(CONNECTING, 1.0);
+        let _x = defer::defer(|| metrics::decrement_gauge!(CONNECTING, 1.0));
 
         Peer::inner_handshake_responder(remote_address, stream, our_version).await
     }
