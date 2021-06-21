@@ -57,14 +57,18 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Calculate the peer counts to disconnect and connect based on the node type and current
         // peer counts.
         let (number_to_disconnect, number_to_connect) = match self.config.is_bootnode() {
-            true => (
+            true => {
                 // Bootnodes disconnect down to the min peer count, this to free up room for
                 // the next crawled peers...
-                active_peer_count.saturating_sub(min_peers),
-                // ...then they connect to peers up to min peers below the max, so as to keep room for
-                // new incoming connections.
-                max_peers.saturating_sub(2 * min_peers),
-            ),
+                let number_to_disconnect = active_peer_count.saturating_sub(min_peers);
+                // ...then they connect to disconnected peers leaving 20% of their capacity open
+                // incoming connections.
+                const CRAWLING_CAPACITY_PERCENTAGE: f64 = 0.8;
+                let crawling_capacity = (CRAWLING_CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
+                let number_to_connect = crawling_capacity.saturating_sub(active_peer_count - number_to_disconnect);
+
+                (number_to_disconnect, number_to_connect)
+            }
             false => (
                 // Non-bootnodes disconnect if above the max peer count...
                 active_peer_count.saturating_sub(max_peers),
