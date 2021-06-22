@@ -103,12 +103,13 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
     let mut body = req.into_body();
     let data = match body.data().await {
         Some(Ok(data)) => data,
-        _ => {
-            let resp = jrt::Response::<(), ()>::error(
-                jrt::Version::V2,
-                jrt::Error::from_code(jrt::ErrorCode::ParseError),
-                None,
-            );
+        err_or_none => {
+            let mut error = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't read the RPC body");
+            if let Some(Err(err)) = err_or_none {
+                error.data = Some(err.to_string());
+            }
+
+            let resp = jrt::Response::<(), String>::error(jrt::Version::V2, error, None);
             let body = serde_json::to_vec(&resp).unwrap_or_default();
 
             return Ok(hyper::Response::new(body.into()));
@@ -121,7 +122,7 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         Err(_) => {
             let resp = jrt::Response::<(), ()>::error(
                 jrt::Version::V2,
-                jrt::Error::from_code(jrt::ErrorCode::ParseError),
+                jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body"),
                 None,
             );
             let body = serde_json::to_vec(&resp).unwrap_or_default();
@@ -309,23 +310,21 @@ fn read_params(req: &jrt::Request<Params>) -> Result<Vec<serde_json::Value>, jrt
 }
 
 /// Converts the crate's RpcError into a jrt::RpcError
-fn convert_crate_err(err: crate::error::RpcError) -> jrt::Error<()> {
-    let mut err = err.to_string();
-    err.truncate(31); // json-rpc-type Error length limit
-    jrt::Error::with_custom_msg(jrt::ErrorCode::ServerError(0), &err)
+fn convert_crate_err(err: crate::error::RpcError) -> jrt::Error<String> {
+    let error = jrt::Error::with_custom_msg(jrt::ErrorCode::ServerError(-32000), "internal error");
+    error.set_data(err.to_string())
 }
 
 /// Converts the jsonrpc-core's Error into a jrt::RpcError
-fn convert_core_err(err: jsonrpc_core::Error) -> jrt::Error<()> {
-    let mut err = err.to_string();
-    err.truncate(31); // json-rpc-type Error length limit
-    jrt::Error::with_custom_msg(jrt::ErrorCode::InternalError, &err)
+fn convert_core_err(err: jsonrpc_core::Error) -> jrt::Error<String> {
+    let error = jrt::Error::with_custom_msg(jrt::ErrorCode::InternalError, "JSONRPC server error");
+    error.set_data(err.to_string())
 }
 
 fn result_to_response<T: Serialize>(
     request: &jrt::Request<Params>,
-    result: Result<T, jrt::Error<()>>,
-) -> jrt::Response<serde_json::Value, ()> {
+    result: Result<T, jrt::Error<String>>,
+) -> jrt::Response<serde_json::Value, String> {
     match result {
         Ok(res) => {
             let result = serde_json::to_value(&res).unwrap_or_default();
