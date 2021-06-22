@@ -170,7 +170,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
         let new_memory_pool = Self::new();
 
         for (_, entry) in self.clone().transactions.inner().iter() {
-            new_memory_pool.insert(&storage, entry.clone()).await?;
+            new_memory_pool.insert(storage, entry.clone()).await?;
         }
 
         self.total_size_in_bytes.store(

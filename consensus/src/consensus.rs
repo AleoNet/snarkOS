@@ -148,7 +148,7 @@ impl<S: Storage> Consensus<S> {
             // 1) The block is a genesis block, or
             // 2) The block is unknown and does not correspond with the canon chain.
             if crate::is_genesis(&block.header) && self.ledger.is_empty() {
-                self.process_block(&block).await?;
+                self.process_block(block).await?;
             } else {
                 self.ledger.insert_only(block)?;
             }
@@ -206,7 +206,7 @@ impl<S: Storage> Consensus<S> {
                         if !side_chain_path.path.is_empty() {
                             for block_hash in side_chain_path.path {
                                 if block_hash == block.header.get_hash() {
-                                    self.process_block(&block).await?
+                                    self.process_block(block).await?
                                 } else {
                                     let new_block = self.ledger.get_block(&block_hash)?;
                                     self.process_block(&new_block).await?;

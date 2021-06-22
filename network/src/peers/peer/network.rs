@@ -33,7 +33,7 @@ pub struct PeerIOHandle {
 
 impl PeerIOHandle {
     pub async fn write_payload(&mut self, payload: &Payload) -> Result<(), NetworkError> {
-        let serialized_payload = Payload::serialize(&payload)?;
+        let serialized_payload = Payload::serialize(payload)?;
         self.cipher
             .write_packet(&mut self.writer, &serialized_payload[..])
             .await?;

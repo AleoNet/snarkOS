@@ -275,7 +275,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 };
 
                 // this block_on will halt the tokio worker until insert completion -- can cause problems if not in a multi-threaded environment (tests)
-                if let Ok(inserted) = futures::executor::block_on(self.memory_pool()?.insert(&storage, entry)) {
+                if let Ok(inserted) = futures::executor::block_on(self.memory_pool()?.insert(storage, entry)) {
                     if inserted.is_some() {
                         info!("Transaction added to the memory pool.");
                         // TODO(ljedrz): checks if needs to be propagated to the network; if need be, this could
@@ -359,7 +359,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         let full_transactions = self
             .memory_pool()?
-            .get_candidates(&storage, self.consensus_parameters()?.max_block_size)?;
+            .get_candidates(storage, self.consensus_parameters()?.max_block_size)?;
 
         let transaction_strings = full_transactions.serialize_as_str()?;
 

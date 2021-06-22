@@ -26,7 +26,7 @@ use snarkvm_utilities::{
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Returns a transaction location given the transaction ID if it exists. Returns `None` otherwise.
     pub fn get_transaction_location(&self, transaction_id: &[u8]) -> Result<Option<TransactionLocation>, StorageError> {
-        match self.storage.get(COL_TRANSACTION_LOCATION, &transaction_id)? {
+        match self.storage.get(COL_TRANSACTION_LOCATION, transaction_id)? {
             Some(transaction_locator) => {
                 let transaction_location = TransactionLocation::read(&transaction_locator[..])?;
                 Ok(Some(transaction_location))
@@ -37,7 +37,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
     /// Returns a transaction given the transaction ID if it exists. Returns `None` otherwise.
     pub fn get_transaction(&self, transaction_id: &[u8]) -> Result<Option<T>, StorageError> {
-        match self.get_transaction_location(&transaction_id)? {
+        match self.get_transaction_location(transaction_id)? {
             Some(transaction_location) => {
                 let block_transactions =
                     self.get_block_transactions(&BlockHeaderHash(transaction_location.block_hash))?;
