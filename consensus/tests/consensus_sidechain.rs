@@ -358,7 +358,7 @@ mod consensus_sidechain {
         //tracing_subscriber::fmt::init();
 
         let consensus = snarkos_testing::sync::create_test_consensus();
-        let blocks = TestBlocks::load(20, "test_blocks_100_1").0;
+        let blocks = TestBlocks::load(Some(20), "test_blocks_100_1").0;
 
         // Consensus imports 20 blocks.
         for block in &blocks {
@@ -378,6 +378,6 @@ mod consensus_sidechain {
         assert_eq!(consensus.ledger.get_current_block_height(), 20);
 
         // Verify the integrity of the block storage.
-        assert!(consensus.ledger.validate(None, false));
+        assert!(consensus.ledger.validate(None, FixMode::Nothing));
     }
 }
