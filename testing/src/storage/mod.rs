@@ -190,4 +190,26 @@ mod validator {
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
         assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
     }
+
+    #[tokio::test]
+    async fn validator_vs_a_superfluous_digest() {
+        let consensus = create_test_consensus();
+
+        let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
+        for block in blocks {
+            consensus.receive_block(&block).await.unwrap();
+        }
+
+        // Add an extra random tx commitment.
+        let mut database_transaction = DatabaseTransaction::new();
+        database_transaction.push(Op::Insert {
+            col: COL_DIGEST,
+            key: vec![0; 32],
+            value: (consensus.ledger.get_current_block_height() + 1).to_le_bytes().to_vec(),
+        });
+        consensus.ledger.storage.batch(database_transaction).unwrap();
+
+        assert!(!consensus.ledger.validate(None, FixMode::Nothing));
+        assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    }
 }
