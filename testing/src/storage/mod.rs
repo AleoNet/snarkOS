@@ -121,7 +121,7 @@ mod validator {
             consensus.receive_block(&block).await.unwrap();
         }
 
-        // Remove a random tx serial number.
+        // Remove a random digest.
         let stored_digests = consensus.ledger.storage.get_col(COL_DIGEST).unwrap();
         let random_digest = &stored_digests.choose(&mut thread_rng()).unwrap().0;
         let mut database_transaction = DatabaseTransaction::new();
@@ -200,7 +200,7 @@ mod validator {
             consensus.receive_block(&block).await.unwrap();
         }
 
-        // Add an extra random tx commitment.
+        // Add an extra random digest.
         let mut database_transaction = DatabaseTransaction::new();
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
