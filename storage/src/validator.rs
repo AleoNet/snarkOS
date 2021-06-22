@@ -102,13 +102,13 @@ pub enum FixMode {
 }
 
 impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage + Sync> Ledger<T, P, S> {
-    check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandums", COL_MEMO);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", COL_MEMO);
 
-    check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digests", COL_DIGEST);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", COL_DIGEST);
 
-    check_for_superfluous_tx_components!(check_for_superfluous_tx_sns, "serial numbers", COL_SERIAL_NUMBER);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_sns, "serial number", COL_SERIAL_NUMBER);
 
-    check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitments", COL_COMMITMENT);
+    check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment", COL_COMMITMENT);
 
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
     /// at the current block height and goes down until the genesis block, making sure that the block-related data
