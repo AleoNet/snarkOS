@@ -86,7 +86,8 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        //assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+        // Currently unsupported.
+        // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
     }
 
     #[tokio::test]
@@ -109,7 +110,8 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        //assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+        // Currently unsupported
+        // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
     }
 
     #[tokio::test]
@@ -132,7 +134,8 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        //assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+        // Currently unsupported
+        // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
     }
 
     #[tokio::test]
