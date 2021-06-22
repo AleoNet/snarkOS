@@ -58,7 +58,7 @@ Returns information about a transaction from serialized transaction bytes.
 | `transaction_proof`     | string | The transaction zero knowledge proof      |
 | `program_commitment`    | string | The program verification key commitment   |
 | `local_data_root`       | string | The local data root                       |
-| `value balance`         | number | The transaction value balance             |
+| `value_balance`         | number | The transaction value balance             |
 | `signatures`            | array  | The list of transaction signatures        |
 | `encrypted_records`     | array  | The list of new encrypted records         |
 | `transaction_metadata`  | object | The transaction metadata                  |
@@ -97,20 +97,20 @@ Returns information about a block from a block hash.
 
 ### Response
 
-|        Parameter       |  Type  |                               Description                              |
-|:----------------------:|:------:|:----------------------------------------------------------------------:|
-| `confirmations`        | number | The number of confirmations for this block                             |
-| `difficulty_target`    | number | The difficulty of the block                                            |
-| `hash`                 | string | The block hash (same as provided)                                      |
-| `height`               | number | The block height                                                       |
-| `merkle_root`          | number | The Merkle root of the transactions in the block                       |
-| `nonce`                | number | The nonce for solving the PoSW puzzle                                  |
-| `pedersen_merkle_root` | number | The Merkle root of the transactions in the block using a Pedersen hash |
-| `previous_block_hash`  | string | The block hash of the parent block                                     |
-| `proof`                | string | The Proof of Succinct Work                                             |
-| `size`                 | number | The size of the block in bytes                                         |
-| `time`                 | number | The block time                                                         |
-| `transactions`         | array  | The list of transaction ids included in the block                      |
+|        Parameter            |  Type  |                               Description                              |
+|:---------------------------:|:------:|:----------------------------------------------------------------------:|
+| `confirmations`             | number | The number of confirmations for this block                             |
+| `difficulty_target`         | number | The difficulty of the block                                            |
+| `hash`                      | string | The block hash (same as provided)                                      |
+| `height`                    | number | The block height                                                       |
+| `merkle_root`               | number | The Merkle root of the transactions in the block                       |
+| `nonce`                     | number | The nonce for solving the PoSW puzzle                                  |
+| `pedersen_merkle_root_hash` | number | The Merkle root of the transactions in the block using a Pedersen hash |
+| `previous_block_hash`       | string | The block hash of the parent block                                     |
+| `proof`                     | string | The Proof of Succinct Work                                             |
+| `size`                      | number | The size of the block in bytes                                         |
+| `time`                      | number | The block time                                                         |
+| `transactions`              | array  | The list of transaction ids included in the block                      |
 
 ### Example
 ```ignore
@@ -210,9 +210,9 @@ None
 | `is_bootnode`    | bool          | Flag indicating if the node is a bootnode     |
 | `is_miner`       | bool          | Flag indicating if the node is a miner        |
 | `is_syncing`     | bool          | Flag indicating if the node currently syncing |
-| `launched`       | DateTime<Utc> | The timestamp of when the node was launched   |
+| `launched`       | timestamp     | The timestamp of when the node was launched   |
 | `listening_addr` | SocketAddr    | The configured listening address of the node  |
-| `version`        | String        | The version of the client binary              |
+| `version`        | string        | The version of the client binary              |
 
 ### Example
 ```ignore
@@ -332,7 +332,7 @@ Returns information about a transaction from a transaction id.
 | `transaction_proof`     | string | The transaction zero knowledge proof     |
 | `program_commitment`    | string | The program verification key commitment  |
 | `local_data_root`       | string | The local data root                      |
-| `value balance`         | number | The transaction value balance            |
+| `value_balance`         | number | The transaction value balance            |
 | `signatures`            | array  | The list of transaction signatures       |
 | `encrypted_records`     | array  | The list of new encrypted records        |
 | `transaction_metadata`  | object | The transaction metadata                 |
@@ -400,6 +400,7 @@ Yes
 |   Parameter   |  Type  |         Description         |
 |:------------- |:------:|:--------------------------- |
 | `private_key` | string | An Aleo account private key |
+| `view_key`    | string | An Aleo account view key    |
 | `address`     | string | An Aleo account address     |
 
 ### Example
