@@ -204,7 +204,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             current_height
         };
 
-        (0..to_process).into_par_iter().for_each(|i| {
+        (0..=to_process).into_par_iter().for_each(|i| {
             self.validate_block(
                 current_height - i,
                 &tx_memos,
@@ -285,6 +285,11 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             fix_mode,
             &is_storage_valid,
         );
+
+        // The genesis block has no parent.
+        if block_height == 0 {
+            return;
+        }
 
         let previous_hash = match self.get_block_hash(block_height - 1) {
             Ok(hash) => hash,
