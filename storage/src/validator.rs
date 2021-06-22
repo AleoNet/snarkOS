@@ -45,6 +45,7 @@ macro_rules! check_for_superfluous_tx_components {
             &self,
             tx_entries: &HashSet<Vec<u8>>,
             db_ops: &Mutex<Option<DatabaseTransaction>>,
+            fix_mode: FixMode,
             is_storage_valid: &AtomicBool,
         ) {
             let storage_entries_and_indices = match self.storage.get_col($component_col) {
@@ -72,12 +73,16 @@ macro_rules! check_for_superfluous_tx_components {
                 );
 
                 if let Some(ref mut ops) = &mut *db_ops.lock() {
-                    for superfluous_item in superfluous_items {
-                        trace!("Staging a {} for deletion", $component_name);
-                        ops.push(Op::Delete {
-                            col: $component_col,
-                            key: superfluous_item.to_vec(),
-                        });
+                    if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+                        for superfluous_item in superfluous_items {
+                            trace!("Staging a {} for deletion", $component_name);
+                            ops.push(Op::Delete {
+                                col: $component_col,
+                                key: superfluous_item.to_vec(),
+                            });
+                        }
+                    } else {
+                        is_storage_valid.store(false, Ordering::SeqCst);
                     }
                 } else {
                     is_storage_valid.store(false, Ordering::SeqCst);
@@ -217,11 +222,12 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             );
         });
 
-        if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
-            self.check_for_superfluous_tx_memos(&*tx_memos.lock(), &db_ops, &is_valid);
-            self.check_for_superfluous_tx_digests(&*tx_digests.lock(), &db_ops, &is_valid);
-            self.check_for_superfluous_tx_sns(&*tx_sns.lock(), &db_ops, &is_valid);
-            self.check_for_superfluous_tx_cms(&*tx_cms.lock(), &db_ops, &is_valid);
+        // Superfluous items can only be removed after a full storage pass.
+        if limit.is_none() {
+            self.check_for_superfluous_tx_memos(&*tx_memos.lock(), &db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_digests(&*tx_digests.lock(), &db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_sns(&*tx_sns.lock(), &db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_cms(&*tx_cms.lock(), &db_ops, fix_mode, &is_valid);
         }
 
         if let Some(ops) = db_ops.lock().take() {
