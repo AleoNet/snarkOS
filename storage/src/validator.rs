@@ -28,7 +28,7 @@ macro_rules! validate_tx_components {
         fn $fn_name(
             &self,
             tx_entries: &HashSet<Vec<u8>>,
-            database_fix: &mut Option<DatabaseTransaction>,
+            db_ops: &mut Option<DatabaseTransaction>,
             is_storage_valid: &mut bool,
         ) {
             let storage_entries_and_indices = match self.storage.get_col($component_col) {
@@ -55,10 +55,10 @@ macro_rules! validate_tx_components {
                     $component_name
                 );
 
-                if let Some(ref mut fix) = database_fix {
+                if let Some(ref mut ops) = db_ops {
                     for superfluous_item in superfluous_items {
                         trace!("Staging a {} for deletion", $component_name);
-                        fix.push(Op::Delete {
+                        ops.push(Op::Delete {
                             col: $component_col,
                             key: superfluous_item.to_vec(),
                         });
@@ -69,6 +69,18 @@ macro_rules! validate_tx_components {
             }
         }
     };
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum FixMode {
+    /// Don't fix anything in the storage.
+    Nothing,
+    /// Update transaction locations if need be.
+    TxLocations,
+    /// Remove transaction serial numbers, commitments and memorandums for missing transactions.
+    TxComponents,
+    /// Apply all the available fixes.
+    Everything,
 }
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
@@ -83,9 +95,11 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
-    pub fn validate(&self, mut limit: Option<usize>, fix: bool) -> bool {
-        if limit.is_some() && fix {
-            panic!("The validator can perform fixes only if there is no limit on the number of blocks to process");
+    pub fn validate(&self, mut limit: Option<usize>, fix_mode: FixMode) -> bool {
+        if limit.is_some() && [FixMode::TxComponents, FixMode::Everything].contains(&fix_mode) {
+            panic!(
+                "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
+            );
         }
 
         info!("Validating the storage...");
@@ -98,7 +112,11 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             return is_valid;
         }
 
-        let mut database_fix = if fix { Some(DatabaseTransaction::new()) } else { None };
+        let mut db_ops = if fix_mode != FixMode::Nothing {
+            Some(DatabaseTransaction::new())
+        } else {
+            None
+        };
 
         let mut current_height = self.get_current_block_height();
 
@@ -189,7 +207,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 &mut tx_memos,
                 &mut tx_sns,
                 &mut tx_cms,
-                &mut database_fix,
+                &mut db_ops,
+                fix_mode,
                 &mut is_valid,
             );
 
@@ -250,14 +269,16 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             current_hash = previous_hash;
         }
 
-        self.validate_transaction_memos(&tx_memos, &mut database_fix, &mut is_valid);
-        self.validate_transaction_sns(&tx_sns, &mut database_fix, &mut is_valid);
-        self.validate_transaction_cms(&tx_cms, &mut database_fix, &mut is_valid);
+        if [FixMode::TxComponents, FixMode::Everything].contains(&fix_mode) {
+            self.validate_transaction_memos(&tx_memos, &mut db_ops, &mut is_valid);
+            self.validate_transaction_sns(&tx_sns, &mut db_ops, &mut is_valid);
+            self.validate_transaction_cms(&tx_cms, &mut db_ops, &mut is_valid);
+        }
 
-        if let Some(fix) = database_fix {
-            if !fix.0.is_empty() {
-                info!("Fixing the storage issues");
-                if let Err(e) = self.storage.batch(fix) {
+        if let Some(ops) = db_ops {
+            if !ops.0.is_empty() {
+                info!("Fixing the detected storage issues ({} fixes)", ops.0.len());
+                if let Err(e) = self.storage.batch(ops) {
                     error!("Couldn't fix the storage issues: {}", e);
                 }
             }
@@ -281,6 +302,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         tx_sns: &mut HashSet<Vec<u8>>,
         tx_cms: &mut HashSet<Vec<u8>>,
         database_fix: &mut Option<DatabaseTransaction>,
+        fix_mode: FixMode,
         is_storage_valid: &mut bool,
     ) {
         for (block_tx_idx, tx) in block.transactions.iter().enumerate() {
@@ -369,24 +391,28 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                             BlockHeaderHash(tx_location.block_hash)
                         );
 
-                        if let Some(ref mut fix) = database_fix {
-                            let corrected_location = TransactionLocation {
-                                index: block_tx_idx as u32,
-                                block_hash: block.header.get_hash().0,
-                            };
+                        if let Some(ref mut db_ops) = database_fix {
+                            if [FixMode::TxLocations, FixMode::Everything].contains(&fix_mode) {
+                                let corrected_location = TransactionLocation {
+                                    index: block_tx_idx as u32,
+                                    block_hash: block.header.get_hash().0,
+                                };
 
-                            match to_bytes!(corrected_location) {
-                                Ok(location_bytes) => {
-                                    fix.push(Op::Insert {
-                                        col: COL_TRANSACTION_LOCATION,
-                                        key: tx_id.to_vec(),
-                                        value: location_bytes,
-                                    });
+                                match to_bytes!(corrected_location) {
+                                    Ok(location_bytes) => {
+                                        db_ops.push(Op::Insert {
+                                            col: COL_TRANSACTION_LOCATION,
+                                            key: tx_id.to_vec(),
+                                            value: location_bytes,
+                                        });
+                                    }
+                                    Err(e) => {
+                                        error!("Can't create a block locator fix for tx {}: {}", hex::encode(tx_id), e);
+                                        *is_storage_valid = false;
+                                    }
                                 }
-                                Err(e) => {
-                                    error!("Can't create a block locator fix for tx {}: {}", hex::encode(tx_id), e);
-                                    *is_storage_valid = false;
-                                }
+                            } else {
+                                *is_storage_valid = false;
                             }
                         } else {
                             *is_storage_valid = false;
@@ -403,24 +429,5 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 }
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use snarkos_testing::sync::TestBlocks;
-
-    #[tokio::test]
-    async fn valid_storage_validates() {
-        //tracing_subscriber::fmt::init();
-
-        let consensus = snarkos_testing::sync::create_test_consensus();
-
-        let blocks = TestBlocks::load(10, "test_blocks_100_1").0;
-        for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
-        }
-
-        assert!(consensus.ledger.validate(None, false));
     }
 }

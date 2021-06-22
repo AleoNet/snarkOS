@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_sidechain {
+    use snarkos_storage::validator::FixMode;
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{testnet1::instantiated::Tx, Block};
     use snarkvm_utilities::bytes::FromBytes;
@@ -205,13 +206,13 @@ mod consensus_sidechain {
         let consensus2 = snarkos_testing::sync::create_test_consensus();
 
         // Consensus 1 imports a random number of blocks lower than consensus 2.
-        let blocks_1 = TestBlocks::load(rng.gen_range(0..=50), "test_blocks_100_1").0;
+        let blocks_1 = TestBlocks::load(Some(rng.gen_range(0..=50)), "test_blocks_100_1").0;
         for block in blocks_1 {
             consensus1.receive_block(&block).await.unwrap();
         }
 
         // Consensus 2 imports 100 blocks.
-        let blocks_2 = TestBlocks::load(100, "test_blocks_100_2").0;
+        let blocks_2 = TestBlocks::load(Some(100), "test_blocks_100_2").0;
         for block in &blocks_2 {
             consensus2.receive_block(block).await.unwrap();
         }
@@ -246,7 +247,7 @@ mod consensus_sidechain {
         assert_eq!(shared_height, 100);
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.ledger.validate(None, false));
+        assert!(consensus1.ledger.validate(None, FixMode::Everything));
     }
 
     #[tokio::test]
@@ -257,8 +258,8 @@ mod consensus_sidechain {
         let consensus1 = snarkos_testing::sync::create_test_consensus();
         let consensus2 = snarkos_testing::sync::create_test_consensus();
 
-        let blocks1 = TestBlocks::load(50, "test_blocks_100_1").0; // side chain blocks
-        let blocks2 = TestBlocks::load(100, "test_blocks_100_2").0; // canon blocks
+        let blocks1 = TestBlocks::load(Some(50), "test_blocks_100_1").0; // side chain blocks
+        let blocks2 = TestBlocks::load(Some(100), "test_blocks_100_2").0; // canon blocks
 
         // Consensus 2 imports 100 blocks.
         for block in &blocks2 {
@@ -306,7 +307,50 @@ mod consensus_sidechain {
         assert_eq!(shared_height, 100);
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.ledger.validate(None, false));
+        assert!(consensus1.ledger.validate(None, FixMode::Everything));
+    }
+
+    #[tokio::test]
+    async fn forking_back_and_forth() {
+        //tracing_subscriber::fmt::init();
+
+        let consensus1 = snarkos_testing::sync::create_test_consensus();
+        let consensus2 = snarkos_testing::sync::create_test_consensus();
+
+        let blocks1 = TestBlocks::load(Some(10), "test_blocks_100_1").0;
+        let blocks2 = TestBlocks::load(Some(10), "test_blocks_100_2").0;
+
+        // Consensus 1 imports 10 blocks.
+        for block in &blocks1 {
+            consensus1.receive_block(block).await.unwrap();
+        }
+
+        // Consensus 2 imports a side chain block and a canon block one after the other.
+        for i in 0..10 {
+            if i % 2 == 0 {
+                let _ = consensus2.receive_block(&blocks1[i]).await;
+                let _ = consensus2.receive_block(&blocks1[i + 1]).await;
+            } else {
+                if i == 1 {
+                    let _ = consensus2.receive_block(&blocks2[i - 1]).await;
+                }
+                let _ = consensus2.receive_block(&blocks2[i]).await;
+                if i != 9 {
+                    let _ = consensus2.receive_block(&blocks2[i + 1]).await;
+                }
+            }
+        }
+
+        // The blocks should fully overlap between the 2 instances now.
+        let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
+        let latest_shared_hash = consensus2
+            .ledger
+            .get_latest_shared_hash(consensus1_locator_hashes)
+            .unwrap();
+        let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
+        assert_eq!(shared_height, 10);
+
+        assert!(consensus2.ledger.validate(None, FixMode::Everything));
     }
 
     #[tokio::test]

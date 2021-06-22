@@ -110,7 +110,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
-            transaction_serial_numbers.push(transaction.transaction_id()?);
+            transaction_serial_numbers.push(transaction.old_serial_numbers());
             transaction_commitments.push(transaction.new_commitments());
             transaction_memos.push(transaction.memorandum());
         }
@@ -135,7 +135,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         for (index, transaction) in block.transactions.0.iter().enumerate() {
             let transaction_location = TransactionLocation {
                 index: index as u32,
-                block_hash: block.header.get_hash().0,
+                block_hash: block_hash.0,
             };
             database_transaction.push(Op::Insert {
                 col: COL_TRANSACTION_LOCATION,
@@ -151,7 +151,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         });
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_TRANSACTIONS,
-            key: block.header.get_hash().0.to_vec(),
+            key: block_hash.0.to_vec(),
             value: to_bytes![block.transactions]?.to_vec(),
         });
 
@@ -166,12 +166,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 value: bincode::serialize(&child_hashes)?,
             });
         }
-
-        database_transaction.push(Op::Insert {
-            col: COL_BLOCK_TRANSACTIONS,
-            key: block.header.get_hash().0.to_vec(),
-            value: to_bytes![block.transactions]?.to_vec(),
-        });
 
         self.storage.batch(database_transaction)?;
 
@@ -194,7 +188,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
-            transaction_serial_numbers.push(transaction.transaction_id()?);
+            transaction_serial_numbers.push(transaction.old_serial_numbers());
             transaction_commitments.push(transaction.new_commitments());
             transaction_memos.push(transaction.memorandum());
         }
@@ -224,10 +218,20 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         let mut transaction_cms = vec![];
 
-        for transaction in block.transactions.0.iter() {
+        for (index, transaction) in block.transactions.0.iter().enumerate() {
             let (tx_ops, cms) = self.commit_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
             database_transaction.push_vec(tx_ops);
             transaction_cms.extend(cms);
+
+            let transaction_location = TransactionLocation {
+                index: index as u32,
+                block_hash: block_header_hash.0,
+            };
+            database_transaction.push(Op::Insert {
+                col: COL_TRANSACTION_LOCATION,
+                key: transaction.transaction_id()?.to_vec(),
+                value: to_bytes![transaction_location]?.to_vec(),
+            });
         }
 
         // Update the database state for current indexes
@@ -270,13 +274,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_LOCATOR,
-            key: block.header.get_hash().0.to_vec(),
+            key: block_header_hash.0.to_vec(),
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_LOCATOR,
             key: new_best_block_number.to_le_bytes().to_vec(),
-            value: block.header.get_hash().0.to_vec(),
+            value: block_header_hash.0.to_vec(),
         });
 
         // Rebuild the new commitment merkle tree
