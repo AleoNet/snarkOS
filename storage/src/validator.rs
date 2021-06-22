@@ -245,6 +245,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     }
 
     /// Validates the storage of the given block.
+    #[allow(clippy::too_many_arguments)]
     fn validate_block(
         &self,
         block_height: u32,
@@ -323,6 +324,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     }
 
     /// Validates the storage of transactions belonging to the given block.
+    #[allow(clippy::too_many_arguments)]
     fn validate_block_transactions(
         &self,
         block: &Block<T>,
