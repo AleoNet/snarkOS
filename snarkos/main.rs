@@ -35,7 +35,7 @@ use snarkvm_dpc::{
     Storage,
 };
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
@@ -125,7 +125,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     if let Some(limit) = config.storage.export {
-        let mut export_path = config.node.dir;
+        let mut export_path = config.node.dir.clone();
         export_path.push("canon_blocks");
 
         let now = std::time::Instant::now();
@@ -174,6 +174,30 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             parameters: consensus_params,
             public_parameters: dpc_parameters,
         });
+
+        if let Some(import_path) = config.storage.import {
+            info!("Importing canon blocks from {}", import_path.display());
+
+            let now = std::time::Instant::now();
+            let mut blocks = std::io::Cursor::new(std::fs::read(import_path)?);
+
+            let mut processed = 0usize;
+            let mut imported = 0usize;
+            while let Ok(block) = FromBytes::read(&mut blocks) {
+                // Skip possible duplicate blocks etc.
+                if consensus.receive_block(&block).await.is_ok() {
+                    imported += 1;
+                }
+                processed += 1;
+            }
+
+            info!(
+                "Processed {} canon blocks ({} imported) in {}ms",
+                processed,
+                imported,
+                now.elapsed().as_millis()
+            );
+        }
 
         let sync = Sync::new(
             consensus,

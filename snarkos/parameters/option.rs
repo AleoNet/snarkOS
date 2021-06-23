@@ -51,6 +51,13 @@ pub const EXPORT_CANON_BLOCKS: OptionType = (
     &[],
 );
 
+pub const IMPORT_CANON_BLOCKS: OptionType = (
+    "[import-canon-blocks] --import-canon-blocks=[path] 'Specify the path for the file with canon blocks to import'",
+    &[],
+    &[],
+    &[],
+);
+
 pub const MINER_ADDRESS: OptionType = (
     "[miner-address] --miner-address=[miner-address] 'Specify the address that will receive miner rewards'",
     &[],

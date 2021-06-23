@@ -99,6 +99,7 @@ pub struct P2P {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Storage {
     pub export: Option<u32>,
+    pub import: Option<PathBuf>,
     pub validate: bool,
 }
 
@@ -139,6 +140,7 @@ impl Default for Config {
             },
             storage: Storage {
                 export: None,
+                import: None,
                 validate: false,
             },
         }
@@ -215,6 +217,7 @@ impl Config {
             // Options
             "connect" => self.connect(arguments.value_of(option)),
             "export-canon-blocks" => self.export_canon_blocks(clap::value_t!(arguments.value_of(*option), u32).ok()),
+            "import-canon-blocks" => self.import_canon_blocks(arguments.value_of(option)),
             "ip" => self.ip(arguments.value_of(option)),
             "miner-address" => self.miner_address(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
@@ -260,6 +263,12 @@ impl Config {
 
     fn no_jsonrpc(&mut self, argument: bool) {
         self.rpc.json_rpc = !argument;
+    }
+
+    fn import_canon_blocks(&mut self, argument: Option<&str>) {
+        if let Some(path) = argument {
+            self.storage.import = Some(path.to_owned().into());
+        }
     }
 
     fn is_bootnode(&mut self, argument: bool) {
@@ -399,6 +408,7 @@ impl CLI for ConfigCli {
         option::PATH,
         option::CONNECT,
         option::EXPORT_CANON_BLOCKS,
+        option::IMPORT_CANON_BLOCKS,
         option::MINER_ADDRESS,
         option::MEMPOOL_INTERVAL,
         option::MIN_PEERS,
@@ -419,6 +429,7 @@ impl CLI for ConfigCli {
             "network",
             "no-jsonrpc",
             "export-canon-blocks",
+            "import-canon-blocks",
             "is-bootnode",
             "is-miner",
             "ip",
