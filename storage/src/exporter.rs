@@ -76,6 +76,8 @@ impl PartialOrd for BlockLocatorPair {
 }
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+    /// Serializes the node's stored canon blocks into a single file written to `location`; `limit` specifies the limit
+    /// on the number of blocks to export, with `0` being no limit (a full export).
     pub fn export_canon_blocks(&self, limit: u32, location: &Path) -> Result<(), anyhow::Error> {
         info!("Exporting node's canon blocks to {}", location.display());
 

@@ -98,8 +98,11 @@ pub struct P2P {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Storage {
+    /// If set, the value specifies the limit on the number of blocks to export; `0` means there is no limit.
     pub export: Option<u32>,
+    /// If set, contains the path to the file contained canon blocks exported using the `--export-canon-blocks` option.
     pub import: Option<PathBuf>,
+    /// If `true`, checks the node's storage for inconsistencies and attempts to fix any encountered issues.
     pub validate: bool,
 }
 
