@@ -88,7 +88,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
-    let mut path = config.node.dir;
+    let mut path = config.node.dir.clone();
     path.push(&config.node.db);
 
     let node_config = NodeConfig::new(
@@ -122,6 +122,22 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let now = std::time::Instant::now();
         storage.validate(None, snarkos_storage::validator::FixMode::Everything);
         info!("Storage validated in {}ms", now.elapsed().as_millis());
+    }
+
+    if let Some(limit) = config.storage.export {
+        let mut export_path = config.node.dir;
+        export_path.push("canon_blocks");
+
+        let now = std::time::Instant::now();
+        if let Err(e) = storage.export_canon_blocks(limit, &export_path) {
+            error!("Couldn't export canon blocks to {}: {}", export_path.display(), e);
+        } else {
+            info!(
+                "Canon blocks exported to {} in {}ms",
+                export_path.display(),
+                now.elapsed().as_millis()
+            );
+        }
     }
 
     // Enable the sync layer.

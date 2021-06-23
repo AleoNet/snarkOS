@@ -44,6 +44,13 @@ pub const CONNECT: OptionType = (
     &[],
 );
 
+pub const EXPORT_CANON_BLOCKS: OptionType = (
+    "[export-canon-blocks] --export-canon-blocks=[block-number-limit] 'Specify the limit on canon blocks to export'",
+    &[],
+    &[],
+    &[],
+);
+
 pub const MINER_ADDRESS: OptionType = (
     "[miner-address] --miner-address=[miner-address] 'Specify the address that will receive miner rewards'",
     &[],

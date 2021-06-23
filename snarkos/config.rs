@@ -98,6 +98,7 @@ pub struct P2P {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Storage {
+    pub export: Option<u32>,
     pub validate: bool,
 }
 
@@ -136,7 +137,10 @@ impl Default for Config {
                 min_peers: 20,
                 max_peers: 50,
             },
-            storage: Storage { validate: false },
+            storage: Storage {
+                export: None,
+                validate: false,
+            },
         }
     }
 }
@@ -207,8 +211,10 @@ impl Config {
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
+            "validate-storage" => self.validate_storage(arguments.is_present(option)),
             // Options
             "connect" => self.connect(arguments.value_of(option)),
+            "export-canon-blocks" => self.export_canon_blocks(clap::value_t!(arguments.value_of(*option), u32).ok()),
             "ip" => self.ip(arguments.value_of(option)),
             "miner-address" => self.miner_address(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
@@ -221,7 +227,6 @@ impl Config {
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
-            "validate-storage" => self.validate_storage(arguments.is_present(option)),
             "verbose" => self.verbose(clap::value_t!(arguments.value_of(*option), u8).ok()),
             _ => (),
         });
@@ -289,6 +294,10 @@ impl Config {
             let bootnodes: Vec<String> = sanitize_bootnodes.split(',').map(|s| s.to_string()).collect();
             self.p2p.bootnodes = bootnodes;
         }
+    }
+
+    fn export_canon_blocks(&mut self, argument: Option<u32>) {
+        self.storage.export = argument;
     }
 
     fn miner_address(&mut self, argument: Option<&str>) {
@@ -389,6 +398,7 @@ impl CLI for ConfigCli {
         option::PORT,
         option::PATH,
         option::CONNECT,
+        option::EXPORT_CANON_BLOCKS,
         option::MINER_ADDRESS,
         option::MEMPOOL_INTERVAL,
         option::MIN_PEERS,
@@ -408,6 +418,7 @@ impl CLI for ConfigCli {
         config.parse(arguments, &[
             "network",
             "no-jsonrpc",
+            "export-canon-blocks",
             "is-bootnode",
             "is-miner",
             "ip",
