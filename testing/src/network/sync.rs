@@ -107,7 +107,7 @@ async fn block_responder_side() {
     let block_struct_1 = snarkvm_dpc::Block::deserialize(&BLOCK_1).unwrap();
     node.expect_sync()
         .consensus
-        .receive_block(&block_struct_1)
+        .receive_block(&block_struct_1, false)
         .await
         .unwrap();
 
@@ -188,7 +188,12 @@ async fn block_two_node() {
     assert_eq!(blocks.len(), NUM_BLOCKS);
 
     for block in blocks {
-        node_alice.expect_sync().consensus.receive_block(&block).await.unwrap();
+        node_alice
+            .expect_sync()
+            .consensus
+            .receive_block(&block, false)
+            .await
+            .unwrap();
     }
 
     let setup = TestSetup {

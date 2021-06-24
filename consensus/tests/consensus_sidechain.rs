@@ -35,12 +35,12 @@ mod consensus_sidechain {
         // Find second block
 
         let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
-        consensus.receive_block(&block_2).await.unwrap();
+        consensus.receive_block(&block_2, false).await.unwrap();
 
         // Find first block
 
         let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        consensus.receive_block(&block_1).await.unwrap();
+        consensus.receive_block(&block_1, false).await.unwrap();
 
         // Check balances after both blocks
 
@@ -61,11 +61,11 @@ mod consensus_sidechain {
 
         // 1. Receive canonchain block 1.
 
-        consensus.receive_block(&block_1_canon).await.unwrap();
+        consensus.receive_block(&block_1_canon, false).await.unwrap();
 
         // 2. Receive sidechain block 1.
 
-        consensus.receive_block(&block_1_side).await.unwrap();
+        consensus.receive_block(&block_1_side, false).await.unwrap();
 
         let new_block_height = consensus.ledger.get_current_block_height();
 
@@ -91,7 +91,7 @@ mod consensus_sidechain {
 
         let mut old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_canon).await.unwrap();
+        consensus.receive_block(&block_1_canon, false).await.unwrap();
 
         let mut new_block_height = consensus.ledger.get_current_block_height();
 
@@ -101,8 +101,8 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_side).await.unwrap();
-        consensus.receive_block(&block_2_side).await.unwrap();
+        consensus.receive_block(&block_1_side, false).await.unwrap();
+        consensus.receive_block(&block_2_side, false).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -123,7 +123,7 @@ mod consensus_sidechain {
 
         let mut old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_2_canon).await.unwrap();
+        consensus.receive_block(&block_2_canon, false).await.unwrap();
 
         let mut new_block_height = consensus.ledger.get_current_block_height();
 
@@ -133,7 +133,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_side).await.unwrap();
+        consensus.receive_block(&block_1_side, false).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -143,7 +143,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_1_canon).await.unwrap();
+        consensus.receive_block(&block_1_canon, false).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -153,7 +153,7 @@ mod consensus_sidechain {
 
         old_block_height = consensus.ledger.get_current_block_height();
 
-        consensus.receive_block(&block_2_side).await.unwrap();
+        consensus.receive_block(&block_2_side, false).await.unwrap();
 
         new_block_height = consensus.ledger.get_current_block_height();
 
@@ -166,7 +166,7 @@ mod consensus_sidechain {
 
         // Introduce one block.
         let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        consensus.receive_block(&block_1).await.unwrap();
+        consensus.receive_block(&block_1, false).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
         let mut block_height = consensus.ledger.get_current_block_height();
@@ -175,7 +175,7 @@ mod consensus_sidechain {
 
         // Introduce another block.
         let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
-        consensus.receive_block(&block_2).await.unwrap();
+        consensus.receive_block(&block_2, false).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
         block_height = consensus.ledger.get_current_block_height();
@@ -208,13 +208,13 @@ mod consensus_sidechain {
         // Consensus 1 imports a random number of blocks lower than consensus 2.
         let blocks_1 = TestBlocks::load(Some(rng.gen_range(0..=50)), "test_blocks_100_1").0;
         for block in blocks_1 {
-            consensus1.receive_block(&block).await.unwrap();
+            consensus1.receive_block(&block, false).await.unwrap();
         }
 
         // Consensus 2 imports 100 blocks.
         let blocks_2 = TestBlocks::load(Some(100), "test_blocks_100_2").0;
         for block in &blocks_2 {
-            consensus2.receive_block(block).await.unwrap();
+            consensus2.receive_block(block, false).await.unwrap();
         }
 
         // There is no overlap between the 2 instances.
@@ -229,12 +229,12 @@ mod consensus_sidechain {
         // Consensus 1 imports a few random blocks that consensus 2 has.
         let num_random_blocks = rng.gen_range(1..=50);
         for block in blocks_2.iter().choose_multiple(&mut rng, num_random_blocks) {
-            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block, false).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // Consensus 1 imports all the blocks that consensus 2 has, simulating a full sync.
         for block in blocks_2 {
-            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block, false).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // The blocks should fully overlap between the 2 instances now.
@@ -263,12 +263,12 @@ mod consensus_sidechain {
 
         // Consensus 2 imports 100 blocks.
         for block in &blocks2 {
-            consensus2.receive_block(block).await.unwrap();
+            consensus2.receive_block(block, false).await.unwrap();
         }
 
         // Consensus 1 imports a random number of blocks that consensus 2 has (canon).
         for block in blocks2.iter().take(rng.gen_range(0..=25)) {
-            consensus1.receive_block(block).await.unwrap();
+            consensus1.receive_block(block, false).await.unwrap();
         }
         let overlap_height = consensus1.ledger.get_current_block_height();
 
@@ -283,18 +283,18 @@ mod consensus_sidechain {
 
         // Consensus 1 imports a random number of side blocks that cause it to fork to the side chain.
         for block in blocks1.iter().take(rng.gen_range(0..=overlap_height as usize + 25)) {
-            consensus1.receive_block(&block).await.unwrap();
+            consensus1.receive_block(&block, false).await.unwrap();
         }
 
         // Consensus 1 imports a few random blocks that consensus 2 has.
         let num_random_blocks = rng.gen_range(overlap_height..=25) as usize;
         for block in blocks2.iter().choose_multiple(&mut rng, num_random_blocks) {
-            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block, false).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // Consensus 1 imports all the blocks that consensus 2 has, simulating a full sync.
         for block in blocks2 {
-            let _ = consensus1.receive_block(&block).await; // ignore potential errors (primarily possible duplicates)
+            let _ = consensus1.receive_block(&block, false).await; // ignore potential errors (primarily possible duplicates)
         }
 
         // The blocks should fully overlap between the 2 instances now.
@@ -322,21 +322,21 @@ mod consensus_sidechain {
 
         // Consensus 1 imports 10 blocks.
         for block in &blocks1 {
-            consensus1.receive_block(block).await.unwrap();
+            consensus1.receive_block(block, false).await.unwrap();
         }
 
         // Consensus 2 imports a side chain block and a canon block one after the other.
         for i in 0..10 {
             if i % 2 == 0 {
-                let _ = consensus2.receive_block(&blocks1[i]).await;
-                let _ = consensus2.receive_block(&blocks1[i + 1]).await;
+                let _ = consensus2.receive_block(&blocks1[i], false).await;
+                let _ = consensus2.receive_block(&blocks1[i + 1], false).await;
             } else {
                 if i == 1 {
-                    let _ = consensus2.receive_block(&blocks2[i - 1]).await;
+                    let _ = consensus2.receive_block(&blocks2[i - 1], false).await;
                 }
-                let _ = consensus2.receive_block(&blocks2[i]).await;
+                let _ = consensus2.receive_block(&blocks2[i], false).await;
                 if i != 9 {
-                    let _ = consensus2.receive_block(&blocks2[i + 1]).await;
+                    let _ = consensus2.receive_block(&blocks2[i + 1], false).await;
                 }
             }
         }
@@ -362,7 +362,7 @@ mod consensus_sidechain {
 
         // Consensus imports 20 blocks.
         for block in &blocks {
-            consensus.receive_block(block).await.unwrap();
+            consensus.receive_block(block, false).await.unwrap();
         }
 
         // Consensus decommits 10 blocks.
@@ -373,7 +373,7 @@ mod consensus_sidechain {
         assert_eq!(consensus.ledger.get_current_block_height(), 10);
 
         // Consensus re-imports 1 block, the rest get fast-forwarded.
-        consensus.receive_block(&blocks[10]).await.unwrap();
+        consensus.receive_block(&blocks[10], false).await.unwrap();
 
         assert_eq!(consensus.ledger.get_current_block_height(), 20);
 

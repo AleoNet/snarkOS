@@ -187,7 +187,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             let mut imported = 0usize;
             while let Ok(block) = FromBytes::read(&mut blocks) {
                 // Skip possible duplicate blocks etc.
-                if consensus.receive_block(&block).await.is_ok() {
+                if consensus.receive_block(&block, true).await.is_ok() {
                     imported += 1;
                 }
                 processed += 1;

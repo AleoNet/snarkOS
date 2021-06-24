@@ -187,7 +187,7 @@ impl<S: Storage> Miner<S> {
 
         let block = Block { header, transactions };
 
-        self.consensus.receive_block(&block).await?;
+        self.consensus.receive_block(&block, false).await?;
 
         // Store the non-dummy coinbase records.
         let mut records_to_store = vec![];
