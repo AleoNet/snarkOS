@@ -125,7 +125,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     if let Some(limit) = config.storage.export {
-        let mut export_path = config.node.dir.clone();
+        let mut export_path = path.clone();
         export_path.push("canon_blocks");
 
         let now = std::time::Instant::now();
