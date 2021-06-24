@@ -19,13 +19,16 @@ use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{BlockHeaderHash, Storage, TransactionScheme};
 use snarkvm_utilities::ToBytes;
 
+use parking_lot::Mutex;
+use rayon::prelude::*;
 use tracing::*;
 
 use std::{
-    cmp::Ordering,
+    cmp::{self, Ordering},
     collections::BinaryHeap,
     fs,
     hash::{Hash, Hasher},
+    io::BufWriter,
     path::Path,
 };
 
@@ -75,10 +78,11 @@ impl PartialOrd for BlockLocatorPair {
     }
 }
 
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage + Sync> Ledger<T, P, S> {
     /// Serializes the node's stored canon blocks into a single file written to `location`; `limit` specifies the limit
-    /// on the number of blocks to export, with `0` being no limit (a full export).
-    pub fn export_canon_blocks(&self, limit: u32, location: &Path) -> Result<(), anyhow::Error> {
+    /// on the number of blocks to export, with `0` being no limit (a full export). Returns the number of exported
+    /// blocks.
+    pub fn export_canon_blocks(&self, limit: u32, location: &Path) -> Result<usize, anyhow::Error> {
         info!("Exporting node's canon blocks to {}", location.display());
 
         let locator_col = self.storage.get_col(COL_BLOCK_LOCATOR)?;
@@ -92,15 +96,30 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         let number_to_export = if limit == 0 { u32::MAX } else { limit } as usize;
 
-        let mut serialized_blocks = Vec::new();
+        let blocks = Mutex::new(Vec::with_capacity(cmp::min(numbers_and_hashes.len(), number_to_export)));
+
         // Skip the genesis block, as it's always known.
-        for (_block_number, block_hash) in numbers_and_hashes.into_iter().skip(1).take(number_to_export) {
-            let block = self.get_block(&BlockHeaderHash::new(block_hash.into_vec()))?;
-            block.write(&mut serialized_blocks)?;
+        numbers_and_hashes
+            .into_par_iter()
+            .skip(1)
+            .take(number_to_export)
+            .for_each(|(block_number, block_hash)| {
+                let hash = BlockHeaderHash::new(block_hash.into_vec());
+                let block = self
+                    .get_block(&hash)
+                    .expect("Can't export blocks; one of the blocks was not found!");
+                blocks.lock().push((block_number, block));
+            });
+
+        let mut blocks = blocks.into_inner();
+
+        blocks.par_sort_unstable_by_key(|(block_number, _block)| *block_number);
+
+        let mut target_file = BufWriter::new(fs::File::create(location)?);
+        for (_block_number, block) in &blocks {
+            block.write(&mut target_file)?;
         }
 
-        fs::write(location, serialized_blocks)?;
-
-        Ok(())
+        Ok(blocks.len())
     }
 }

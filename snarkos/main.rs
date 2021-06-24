@@ -129,14 +129,16 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         export_path.push("canon_blocks");
 
         let now = std::time::Instant::now();
-        if let Err(e) = storage.export_canon_blocks(limit, &export_path) {
-            error!("Couldn't export canon blocks to {}: {}", export_path.display(), e);
-        } else {
-            info!(
-                "Canon blocks exported to {} in {}ms",
-                export_path.display(),
-                now.elapsed().as_millis()
-            );
+        match storage.export_canon_blocks(limit, &export_path) {
+            Ok(num_exported) => {
+                info!(
+                    "{} canon blocks exported to {} in {}ms",
+                    num_exported,
+                    export_path.display(),
+                    now.elapsed().as_millis()
+                );
+            }
+            Err(e) => error!("Couldn't export canon blocks to {}: {}", export_path.display(), e),
         }
     }
 
