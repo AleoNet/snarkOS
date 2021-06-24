@@ -83,7 +83,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     /// on the number of blocks to export, with `0` being no limit (a full export). Returns the number of exported
     /// blocks.
     pub fn export_canon_blocks(&self, limit: u32, location: &Path) -> Result<usize, anyhow::Error> {
-        info!("Exporting node's canon blocks to {}", location.display());
+        info!("Exporting the node's canon blocks to {}", location.display());
 
         let locator_col = self.storage.get_col(COL_BLOCK_LOCATOR)?;
 
