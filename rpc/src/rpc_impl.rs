@@ -277,15 +277,13 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                 let self_clone = self.clone();
                 tokio::spawn(async move {
                     match self_clone.memory_pool() {
-                        Ok(pool) => {
-                            match pool.insert(&self_clone.storage, entry).await {
-                                Ok(Some(_)) => {
-                                    info!("Transaction added to the memory pool.");
-                                },
-                                Ok(None) => (),
-                                Err(e) => {
-                                    error!("failed to insert into memory pool: {:?}", e);
-                                }
+                        Ok(pool) => match pool.insert(&self_clone.storage, entry).await {
+                            Ok(Some(_)) => {
+                                info!("Transaction added to the memory pool.");
+                            }
+                            Ok(None) => (),
+                            Err(e) => {
+                                error!("failed to insert into memory pool: {:?}", e);
                             }
                         },
                         Err(e) => {
