@@ -274,14 +274,25 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                     transaction,
                 };
 
-                // this block_on will halt the tokio worker until insert completion -- can cause problems if not in a multi-threaded environment (tests)
-                if let Ok(inserted) = futures::executor::block_on(self.memory_pool()?.insert(storage, entry)) {
-                    if inserted.is_some() {
-                        info!("Transaction added to the memory pool.");
-                        // TODO(ljedrz): checks if needs to be propagated to the network; if need be, this could
-                        // be made automatic at the time when a tx from any source is added the memory pool
+                let self_clone = self.clone();
+                tokio::spawn(async move {
+                    match self_clone.memory_pool() {
+                        Ok(pool) => {
+                            match pool.insert(&self_clone.storage, entry).await {
+                                Ok(Some(_)) => {
+                                    info!("Transaction added to the memory pool.");
+                                },
+                                Ok(None) => (),
+                                Err(e) => {
+                                    error!("failed to insert into memory pool: {:?}", e);
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            error!("failed to fetch memory pool: {:?}", e);
+                        }
                     }
-                }
+                });
 
                 Ok(transaction_hex_id)
             }
