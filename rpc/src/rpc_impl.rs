@@ -287,7 +287,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                             }
                         },
                         Err(e) => {
-                            error!("failed to fetch memory pool: {:?}", e);
+                            error!("Failed to fetch memory pool: {:?}", e);
                         }
                     }
                 });
