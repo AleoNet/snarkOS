@@ -283,7 +283,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
                             }
                             Ok(None) => (),
                             Err(e) => {
-                                error!("failed to insert into memory pool: {:?}", e);
+                                error!("Failed to insert into memory pool: {:?}", e);
                             }
                         },
                         Err(e) => {
