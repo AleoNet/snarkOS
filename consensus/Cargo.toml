@@ -37,7 +37,11 @@ version = "1"
 
 [dependencies.snarkos-metrics]
 path = "../metrics"
+<<<<<<< HEAD
 version = "1.3.10"
+=======
+version = "1.3.10"
+>>>>>>> Increment orphan rate during sync
 
 [dependencies.snarkos-profiler]
 path = "../profiler"

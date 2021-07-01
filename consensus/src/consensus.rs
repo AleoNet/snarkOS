@@ -146,6 +146,8 @@ impl<S: Storage> Consensus<S> {
         if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
 
+            metrics::increment_counter!(ORPHAN_BLOCKS);
+
             // There are two possible cases for an unknown orphan.
             // 1) The block is a genesis block, or
             // 2) The block is unknown and does not correspond with the canon chain.
