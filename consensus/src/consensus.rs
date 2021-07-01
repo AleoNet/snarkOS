@@ -39,6 +39,8 @@ use snarkvm_dpc::{
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
+use snarkos_metrics::{self as metrics, misc::*};
+
 use rand::Rng;
 
 use std::sync::Arc;
@@ -144,6 +146,8 @@ impl<S: Storage> Consensus<S> {
         if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
 
+            metrics::increment_counter!(ORPHAN_BLOCKS);
+
             // There are two possible cases for an unknown orphan.
             // 1) The block is a genesis block, or
             // 2) The block is unknown and does not correspond with the canon chain.
@@ -214,6 +218,8 @@ impl<S: Storage> Consensus<S> {
                             }
                         }
                     } else {
+                        metrics::increment_counter!(ORPHAN_BLOCKS);
+
                         // If the sidechain is not longer than the main canon chain, simply store the block
                         self.ledger.insert_only(block)?;
                     }
