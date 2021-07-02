@@ -63,13 +63,24 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                         key: block_hash_bytes.to_vec(),
                     });
                     for transaction in self.get_block_transactions(&block_hash)?.0 {
-                        database_transaction.lock().push(Op::Delete {
-                            col: COL_TRANSACTION_LOCATION,
-                            key: transaction.transaction_id()?.to_vec(),
-                        });
+                        let tx_id = transaction.transaction_id()?;
+                        let tx_location = if let Some(location) = self.get_transaction_location(&tx_id)? {
+                            location
+                        } else {
+                            continue;
+                        };
+
+                        // Don't remove the tx location if it points to a different block than the one currently
+                        // being processed - it could be applicable.
+                        if &tx_location.block_hash[..] == &block_hash_bytes[..] {
+                            database_transaction.lock().push(Op::Delete {
+                                col: COL_TRANSACTION_LOCATION,
+                                key: tx_id.to_vec(),
+                            });
+                        }
                     }
 
-                    // Remove parent's obsolete reference
+                    // Remove parent's obsolete references
 
                     let parent_hash = &block_header.previous_block_hash;
                     let mut parent_child_hashes = self.get_child_block_hashes(parent_hash)?;
