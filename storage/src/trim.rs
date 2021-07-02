@@ -32,7 +32,18 @@ use tracing::*;
 
 use std::collections::HashSet;
 
+#[derive(Debug, Default)]
+struct StorageTrimSummary {
+    all_ops: usize,
+    obsolete_blocks: usize,
+    obsolete_txs: usize,
+    updated_parents: usize,
+}
+
 impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage + Sync> Ledger<T, P, S> {
+    /// Removes obsolete objects from the database; can be used for cleanup purposes, but it can also provide
+    /// some insight into the features of the chain, e.g. the number of blocks and transactions that were
+    /// ultimately not accepted into the canonical chain.
     pub fn trim(&self) -> Result<(), StorageError> {
         info!("Checking for obsolete objects in the storage...");
 
@@ -56,7 +67,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
                     trace!("Block {} is obsolete, staging its objects for removal", block_hash);
 
-                    // Remove obsolete transactions
+                    // Remove obsolete transactions.
 
                     database_transaction.lock().push(Op::Delete {
                         col: COL_BLOCK_TRANSACTIONS,
@@ -72,7 +83,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
                         // Don't remove the tx location if it points to a different block than the one currently
                         // being processed - it could be applicable.
-                        if &tx_location.block_hash[..] == &block_hash_bytes[..] {
+                        if tx_location.block_hash[..] == block_hash_bytes[..] {
                             database_transaction.lock().push(Op::Delete {
                                 col: COL_TRANSACTION_LOCATION,
                                 key: tx_id.to_vec(),
@@ -80,7 +91,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                         }
                     }
 
-                    // Remove parent's obsolete references
+                    // Remove parent's obsolete references.
 
                     let parent_hash = &block_header.previous_block_hash;
                     let mut parent_child_hashes = self.get_child_block_hashes(parent_hash)?;
@@ -98,7 +109,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                         });
                     }
 
-                    // Remove the obsolete header
+                    // Remove the obsolete header.
 
                     database_transaction.lock().push(Op::Delete {
                         col: COL_BLOCK_HEADER,
@@ -111,11 +122,29 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
         let database_transaction = database_transaction.into_inner();
 
-        let num_items = database_transaction.0.len();
-        if !database_transaction.0.is_empty() {
+        // Gather stats.
+
+        let mut summary = StorageTrimSummary::default();
+        for op in &database_transaction.0 {
+            match op {
+                Op::Insert { .. } => summary.updated_parents += 1,
+                Op::Delete { col, .. } => match *col {
+                    COL_BLOCK_HEADER => summary.obsolete_blocks += 1,
+                    COL_TRANSACTION_LOCATION => summary.obsolete_txs += 1,
+                    _ => {}
+                },
+            }
+            summary.all_ops += 1;
+        }
+
+        if summary.all_ops != 0 {
             self.storage.batch(database_transaction)?;
         }
-        info!("The storage was trimmed successfully ({} items removed)!", num_items);
+        info!(
+            "The storage was trimmed successfully ({} items removed)!",
+            summary.obsolete_blocks + summary.obsolete_txs
+        );
+        debug!("Storage trim details: {:?}", summary);
 
         Ok(())
     }
