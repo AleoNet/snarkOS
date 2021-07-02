@@ -26,6 +26,8 @@ use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{BlockHeader, BlockHeaderHash, DatabaseTransaction, Op, Storage, StorageError, TransactionScheme};
 use snarkvm_utilities::FromBytes;
 
+use parking_lot::Mutex;
+use rayon::prelude::*;
 use tracing::*;
 
 use std::collections::HashSet;
@@ -43,54 +45,60 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
         let headers_col = self.storage.get_col(COL_BLOCK_HEADER)?;
 
-        let mut database_transaction = DatabaseTransaction::new();
+        let database_transaction = Mutex::new(DatabaseTransaction::new());
 
-        for (block_hash_bytes, block_header_bytes) in headers_col {
-            if !canon_hashes.contains(&block_hash_bytes) {
-                let block_hash = BlockHeaderHash::new(block_hash_bytes.to_vec());
-                let block_header = BlockHeader::read(&block_header_bytes[..])?;
+        headers_col
+            .into_par_iter()
+            .try_for_each::<_, Result<(), StorageError>>(|(block_hash_bytes, block_header_bytes)| {
+                if !canon_hashes.contains(&block_hash_bytes) {
+                    let block_hash = BlockHeaderHash::new(block_hash_bytes.to_vec());
+                    let block_header = BlockHeader::read(&block_header_bytes[..])?;
 
-                trace!("Block {} is obsolete, staging its objects for removal", block_hash);
+                    trace!("Block {} is obsolete, staging its objects for removal", block_hash);
 
-                // Remove obsolete transactions
+                    // Remove obsolete transactions
 
-                database_transaction.push(Op::Delete {
-                    col: COL_BLOCK_TRANSACTIONS,
-                    key: block_hash_bytes.to_vec(),
-                });
-                for transaction in self.get_block_transactions(&block_hash)?.0 {
-                    database_transaction.push(Op::Delete {
-                        col: COL_TRANSACTION_LOCATION,
-                        key: transaction.transaction_id()?.to_vec(),
+                    database_transaction.lock().push(Op::Delete {
+                        col: COL_BLOCK_TRANSACTIONS,
+                        key: block_hash_bytes.to_vec(),
+                    });
+                    for transaction in self.get_block_transactions(&block_hash)?.0 {
+                        database_transaction.lock().push(Op::Delete {
+                            col: COL_TRANSACTION_LOCATION,
+                            key: transaction.transaction_id()?.to_vec(),
+                        });
+                    }
+
+                    // Remove parent's obsolete reference
+
+                    let parent_hash = &block_header.previous_block_hash;
+                    let mut parent_child_hashes = self.get_child_block_hashes(parent_hash)?;
+
+                    if let Some(index) = parent_child_hashes
+                        .iter()
+                        .position(|child_hash| *child_hash == block_hash)
+                    {
+                        parent_child_hashes.remove(index);
+
+                        database_transaction.lock().push(Op::Insert {
+                            col: COL_CHILD_HASHES,
+                            key: parent_hash.0.to_vec(),
+                            value: bincode::serialize(&parent_child_hashes)?,
+                        });
+                    }
+
+                    // Remove the obsolete header
+
+                    database_transaction.lock().push(Op::Delete {
+                        col: COL_BLOCK_HEADER,
+                        key: block_hash_bytes.into_vec(),
                     });
                 }
 
-                // Remove parent's obsolete reference
+                Ok(())
+            })?;
 
-                let parent_hash = &block_header.previous_block_hash;
-                let mut parent_child_hashes = self.get_child_block_hashes(parent_hash)?;
-
-                if let Some(index) = parent_child_hashes
-                    .iter()
-                    .position(|child_hash| *child_hash == block_hash)
-                {
-                    parent_child_hashes.remove(index);
-
-                    database_transaction.push(Op::Insert {
-                        col: COL_CHILD_HASHES,
-                        key: parent_hash.0.to_vec(),
-                        value: bincode::serialize(&parent_child_hashes)?,
-                    });
-                }
-
-                // Remove the obsolete header
-
-                database_transaction.push(Op::Delete {
-                    col: COL_BLOCK_HEADER,
-                    key: block_hash_bytes.into_vec(),
-                });
-            }
-        }
+        let database_transaction = database_transaction.into_inner();
 
         let num_items = database_transaction.0.len();
         if !database_transaction.0.is_empty() {
