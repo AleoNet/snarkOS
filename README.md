@@ -73,6 +73,13 @@ snarkos
 
 ### Option 2 - Install from Crates.io
 
+#### Prerequisite
+
+For **Ubuntu** users, start by installing the following dependencies. 
+```
+$sudo apt-get install -y pkg-config clang libssl-dev
+```
+
 #### Step 1. Install Rust
 
 We recommend installing Rust using [rustup](https://www.rustup.rs/). You can install `rustup` as follows:
