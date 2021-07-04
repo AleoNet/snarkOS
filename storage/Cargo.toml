@@ -57,6 +57,9 @@ version = "0.8"
 [dependencies.arc-swap]
 version = "1.2"
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.rocksdb]
 version = "0.16.0"
 optional = true

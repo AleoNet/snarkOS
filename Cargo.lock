@@ -2821,6 +2821,7 @@ dependencies = [
  "hex",
  "parking_lot",
  "rand 0.8.3",
+ "rayon",
  "rocksdb",
  "serde",
  "snarkos-consensus",
