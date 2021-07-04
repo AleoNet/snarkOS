@@ -113,8 +113,16 @@ impl PeerBook {
         self.connected_peers.inner().keys().copied().collect()
     }
 
+    pub fn disconnected_peers(&self) -> Vec<SocketAddr> {
+        self.disconnected_peers.inner().keys().copied().collect()
+    }
+
+    pub fn get_connected_peer_count(&self) -> u32 {
+        self.connected_peers.len() as u32
+    }
+
     pub fn get_active_peer_count(&self) -> u32 {
-        self.connected_peers.len() as u32 + self.pending_connections()
+        self.get_connected_peer_count() + self.pending_connections()
     }
 
     pub fn get_disconnected_peer_count(&self) -> u32 {
@@ -131,10 +139,6 @@ impl PeerBook {
 
     pub fn get_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
         self.disconnected_peers.get(&address)
-    }
-
-    pub fn disconnected_peers(&self) -> Vec<SocketAddr> {
-        self.disconnected_peers.inner().keys().copied().collect()
     }
 
     async fn take_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
@@ -227,6 +231,14 @@ impl PeerBook {
 
     pub async fn connected_peers_snapshot(&self) -> Vec<Peer> {
         self.map_each_peer(|peer| async move { peer.load().await }).await
+    }
+
+    pub async fn disconnected_peers_snapshot(&self) -> Vec<Peer> {
+        self.disconnected_peers
+            .inner()
+            .iter()
+            .map(|(_, peer)| peer.clone())
+            .collect()
     }
 
     ///

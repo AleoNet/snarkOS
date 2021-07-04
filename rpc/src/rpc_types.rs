@@ -19,7 +19,7 @@
 use chrono::{DateTime, Utc};
 use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{collections::HashSet, net::SocketAddr};
 
 /// Defines the authentication format for accessing private endpoints on the RPC server
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -281,4 +281,22 @@ pub struct TransactionRecipient {
     pub address: String,
     /// The amount being sent
     pub amount: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NetworkGraph {
+    pub vertices: HashSet<Vertice>,
+    pub edges: HashSet<Edge>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct Vertice {
+    pub addr: SocketAddr,
+    pub is_bootnode: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct Edge {
+    pub source: SocketAddr,
+    pub target: SocketAddr,
 }

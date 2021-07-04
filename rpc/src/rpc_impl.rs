@@ -21,7 +21,7 @@
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
-use snarkos_network::{Node, Sync};
+use snarkos_network::{KnownNetwork, Node, Sync};
 use snarkvm_dpc::{
     testnet1::{
         instantiated::{Components, Tx},
@@ -40,6 +40,7 @@ use snarkvm_utilities::{
 use chrono::Utc;
 
 use std::{
+    collections::HashSet,
     ops::Deref,
     sync::{atomic::Ordering, Arc},
 };
@@ -93,6 +94,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcImpl<S> {
 
     pub fn memory_pool(&self) -> Result<&MemoryPool<Tx>, RpcError> {
         Ok(self.sync_handler()?.memory_pool())
+    }
+
+    pub fn known_network(&self) -> Result<&KnownNetwork, RpcError> {
+        self.node.known_network().ok_or(RpcError::NoKnownNetwork)
     }
 }
 
@@ -385,5 +390,30 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             transactions: transaction_strings,
             coinbase_value: coinbase_value.0 as u64,
         })
+    }
+
+    fn get_network_graph(&self) -> Result<NetworkGraph, RpcError> {
+        let mut vertices = HashSet::new();
+        let edges: HashSet<Edge> = self
+            .known_network()?
+            .connections()
+            .iter()
+            .map(|connection| {
+                let (source, target) = (connection.source, connection.target);
+
+                vertices.insert(Vertice {
+                    addr: source,
+                    is_bootnode: self.node.config.bootnodes().contains(&source),
+                });
+                vertices.insert(Vertice {
+                    addr: target,
+                    is_bootnode: self.node.config.bootnodes().contains(&target),
+                });
+
+                Edge { source, target }
+            })
+            .collect();
+
+        Ok(NetworkGraph { vertices, edges })
     }
 }
