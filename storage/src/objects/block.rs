@@ -189,7 +189,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             for sn in transaction.old_serial_numbers() {
                 database_transaction.push(Op::Delete {
                     col: COL_SERIAL_NUMBER,
-                    key: to_bytes![sn]?.to_vec(),
+                    key: to_bytes![sn]?,
                 });
                 sn_index -= 1;
             }
@@ -197,14 +197,14 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             for cm in transaction.new_commitments() {
                 database_transaction.push(Op::Delete {
                     col: COL_COMMITMENT,
-                    key: to_bytes![cm]?.to_vec(),
+                    key: to_bytes![cm]?,
                 });
                 cm_index -= 1;
             }
 
             database_transaction.push(Op::Delete {
                 col: COL_MEMO,
-                key: to_bytes![transaction.memorandum()]?.to_vec(),
+                key: to_bytes![transaction.memorandum()]?,
             });
             memo_index -= 1;
         }

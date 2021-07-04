@@ -140,19 +140,19 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             database_transaction.push(Op::Insert {
                 col: COL_TRANSACTION_LOCATION,
                 key: transaction.transaction_id()?.to_vec(),
-                value: to_bytes![transaction_location]?.to_vec(),
+                value: to_bytes![transaction_location]?,
             });
         }
 
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_HEADER,
             key: block_hash.0.to_vec(),
-            value: to_bytes![block.header]?.to_vec(),
+            value: to_bytes![block.header]?,
         });
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_TRANSACTIONS,
             key: block_hash.0.to_vec(),
-            value: to_bytes![block.transactions]?.to_vec(),
+            value: to_bytes![block.transactions]?,
         });
 
         let mut child_hashes = self.get_child_block_hashes(&block.header.previous_block_hash)?;
@@ -230,7 +230,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             database_transaction.push(Op::Insert {
                 col: COL_TRANSACTION_LOCATION,
                 key: transaction.transaction_id()?.to_vec(),
-                value: to_bytes![transaction_location]?.to_vec(),
+                value: to_bytes![transaction_location]?,
             });
         }
 
@@ -287,7 +287,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         if is_genesis {
             database_transaction.push(Op::Insert {
                 col: COL_DIGEST,
-                key: to_bytes![self.current_digest()?]?.to_vec(),
+                key: to_bytes![self.current_digest()?]?,
                 value: 0u32.to_le_bytes().to_vec(),
             });
         }
@@ -299,13 +299,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
-            key: to_bytes![new_digest]?.to_vec(),
+            key: to_bytes![new_digest]?,
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
         database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![new_digest]?.to_vec(),
+            value: to_bytes![new_digest]?,
         });
 
         self.storage.batch(database_transaction)?;

@@ -138,13 +138,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
-            key: to_bytes![new_digest]?.to_vec(),
+            key: to_bytes![new_digest]?,
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
         database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![new_digest]?.to_vec(),
+            value: to_bytes![new_digest]?,
         });
 
         self.storage.batch(database_transaction)
