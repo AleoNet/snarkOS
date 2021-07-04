@@ -60,7 +60,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         assert!(consensus.ledger.validate(None, FixMode::Nothing));
@@ -72,7 +72,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Remove a random tx serial number.
@@ -96,7 +96,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Remove a random tx commitment.
@@ -120,7 +120,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Remove a random memo.
@@ -144,7 +144,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Remove a random digest.
@@ -167,7 +167,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Add an extra random tx serial number.
@@ -195,7 +195,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Add an extra random tx commitment.
@@ -223,7 +223,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Add an extra random memo.
@@ -251,7 +251,7 @@ mod validator {
 
         let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
         for block in blocks {
-            consensus.receive_block(&block).await.unwrap();
+            consensus.receive_block(&block, false).await.unwrap();
         }
 
         // Add an extra random digest.

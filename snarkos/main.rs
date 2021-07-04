@@ -35,7 +35,7 @@ use snarkvm_dpc::{
     Storage,
 };
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
@@ -88,7 +88,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
-    let mut path = config.node.dir;
+    let mut path = config.node.dir.clone();
     path.push(&config.node.db);
 
     let node_config = NodeConfig::new(
@@ -122,6 +122,24 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let now = std::time::Instant::now();
         storage.validate(None, snarkos_storage::validator::FixMode::Everything);
         info!("Storage validated in {}ms", now.elapsed().as_millis());
+    }
+
+    if let Some(limit) = config.storage.export {
+        let mut export_path = path.clone();
+        export_path.push("canon_blocks");
+
+        let now = std::time::Instant::now();
+        match storage.export_canon_blocks(limit, &export_path) {
+            Ok(num_exported) => {
+                info!(
+                    "{} canon blocks exported to {} in {}ms",
+                    num_exported,
+                    export_path.display(),
+                    now.elapsed().as_millis()
+                );
+            }
+            Err(e) => error!("Couldn't export canon blocks to {}: {}", export_path.display(), e),
+        }
     }
 
     // Enable the sync layer.
@@ -158,6 +176,30 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             parameters: consensus_params,
             public_parameters: dpc_parameters,
         });
+
+        if let Some(import_path) = config.storage.import {
+            info!("Importing canon blocks from {}", import_path.display());
+
+            let now = std::time::Instant::now();
+            let mut blocks = std::io::Cursor::new(std::fs::read(import_path)?);
+
+            let mut processed = 0usize;
+            let mut imported = 0usize;
+            while let Ok(block) = FromBytes::read(&mut blocks) {
+                // Skip possible duplicate blocks etc.
+                if consensus.receive_block(&block, true).await.is_ok() {
+                    imported += 1;
+                }
+                processed += 1;
+            }
+
+            info!(
+                "Processed {} canon blocks ({} imported) in {}ms",
+                processed,
+                imported,
+                now.elapsed().as_millis()
+            );
+        }
 
         let sync = Sync::new(
             consensus,

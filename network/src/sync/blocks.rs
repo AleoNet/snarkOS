@@ -117,7 +117,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
         );
 
         // Verify the block and insert it into the storage.
-        let block_validity = self.expect_sync().consensus.receive_block(&block_struct).await;
+        let block_validity = self.expect_sync().consensus.receive_block(&block_struct, false).await;
 
         if let Err(ConsensusError::PreExistingBlock) = block_validity {
             if is_block_new {

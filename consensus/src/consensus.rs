@@ -139,7 +139,7 @@ impl<S: Storage> Consensus<S> {
     }
 
     /// Receive a block from an external source and process it based on ledger state.
-    pub async fn receive_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
+    pub async fn receive_block(&self, block: &Block<Tx>, batch_import: bool) -> Result<(), ConsensusError> {
         // Block is an unknown orphan
         if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
@@ -164,25 +164,27 @@ impl<S: Storage> Consensus<S> {
 
                     self.process_block(block).await?;
 
-                    // Attempt to fast forward the block state if the node already stores
-                    // the children of the new canon block.
-                    let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
+                    if !batch_import {
+                        // Attempt to fast forward the block state if the node already stores
+                        // the children of the new canon block.
+                        let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
 
-                    if child_path.len() > 1 {
-                        debug!(
-                            "Attempting to canonize the descendants of block at height {}.",
-                            block_height
-                        );
-                    }
+                        if child_path.len() > 1 {
+                            debug!(
+                                "Attempting to canonize the descendants of block at height {}.",
+                                block_height
+                            );
+                        }
 
-                    for child_block_hash in child_path.into_iter().skip(1) {
-                        let new_block = self.ledger.get_block(&child_block_hash)?;
+                        for child_block_hash in child_path.into_iter().skip(1) {
+                            let new_block = self.ledger.get_block(&child_block_hash)?;
 
-                        debug!(
-                            "Processing the next known descendant. Height {}",
-                            self.ledger.get_current_block_height() + 1
-                        );
-                        self.process_block(&new_block).await?;
+                            debug!(
+                                "Processing the next known descendant. Height {}",
+                                self.ledger.get_current_block_height() + 1
+                            );
+                            self.process_block(&new_block).await?;
+                        }
                     }
                 }
                 BlockPath::SideChain(side_chain_path) => {
