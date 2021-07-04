@@ -51,6 +51,7 @@ pub struct Config {
     pub miner: Miner,
     pub rpc: JsonRPC,
     pub p2p: P2P,
+    pub storage: Storage,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -95,6 +96,11 @@ pub struct P2P {
     pub max_peers: u16,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Storage {
+    pub validate: bool,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -130,6 +136,7 @@ impl Default for Config {
                 min_peers: 20,
                 max_peers: 50,
             },
+            storage: Storage { validate: false },
         }
     }
 }
@@ -214,6 +221,7 @@ impl Config {
             "rpc-port" => self.rpc_port(clap::value_t!(arguments.value_of(*option), u16).ok()),
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
+            "validate-storage" => self.validate_storage(arguments.is_present(option)),
             "verbose" => self.verbose(clap::value_t!(arguments.value_of(*option), u8).ok()),
             _ => (),
         });
@@ -331,6 +339,10 @@ impl Config {
         }
     }
 
+    fn validate_storage(&mut self, argument: bool) {
+        self.storage.validate = argument;
+    }
+
     fn verbose(&mut self, argument: Option<u8>) {
         if let Some(verbose) = argument {
             self.node.verbose = verbose
@@ -365,7 +377,12 @@ impl CLI for ConfigCli {
     type Config = Config;
 
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
-    const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER];
+    const FLAGS: &'static [FlagType] = &[
+        flag::NO_JSONRPC,
+        flag::IS_BOOTNODE,
+        flag::IS_MINER,
+        flag::VALIDATE_STORAGE,
+    ];
     const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
@@ -405,6 +422,7 @@ impl CLI for ConfigCli {
             "rpc-port",
             "rpc-username",
             "rpc-password",
+            "validate-storage",
             "verbose",
         ]);
 

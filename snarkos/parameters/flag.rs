@@ -24,3 +24,5 @@ pub const IS_BOOTNODE: &str =
 pub const IS_MINER: &str = "[is-miner] --is-miner 'Start mining blocks from this node'";
 
 pub const LIST: &str = "[list] -l --list 'List all available releases of snarkOS'";
+
+pub const VALIDATE_STORAGE: &str = "[validate-storage] --validate-storage 'Check the integrity of the node's storage and attempt to fix encountered issues'";

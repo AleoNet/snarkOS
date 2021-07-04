@@ -118,6 +118,12 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     };
     info!("Storage finished loading");
 
+    if config.storage.validate {
+        let now = std::time::Instant::now();
+        storage.validate(None, snarkos_storage::validator::FixMode::Everything);
+        info!("Storage validated in {}ms", now.elapsed().as_millis());
+    }
+
     // Enable the sync layer.
     {
         let memory_pool = MemoryPool::from_storage(&storage).await?;
