@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::{BlockError, DPCError, StorageError, TransactionError};
+use snarkvm_dpc::{BlockError, DPCError, RecordError, StorageError, TransactionError};
 use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;
@@ -90,6 +90,9 @@ pub enum ConsensusError {
     PoswError(#[from] PoswError),
 
     #[error("{}", _0)]
+    RecordError(RecordError),
+
+    #[error("{}", _0)]
     StorageError(StorageError),
 
     #[error("timestamp {:?} is less than parent timestamp {:?}", _0, _1)]
@@ -120,6 +123,12 @@ impl From<CRHError> for ConsensusError {
 impl From<DPCError> for ConsensusError {
     fn from(error: DPCError) -> Self {
         ConsensusError::DPCError(error)
+    }
+}
+
+impl From<RecordError> for ConsensusError {
+    fn from(error: RecordError) -> Self {
+        ConsensusError::RecordError(error)
     }
 }
 

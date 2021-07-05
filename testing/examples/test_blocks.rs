@@ -20,13 +20,13 @@ extern crate tracing;
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    block::Transactions as DPCTransactions,
+    block::Transactions,
     testnet1::{
         instantiated::*,
-        record::{payload::Payload as RecordPayload, Record as DPCRecord},
+        record::{payload::Payload as RecordPayload, Record},
     },
     Account,
-    AccountAddress,
+    Address,
     Block,
     ProgramScheme,
     RecordScheme,
@@ -39,11 +39,11 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 
 async fn mine_block<S: Storage>(
     miner: &Miner<S>,
-    txs: Vec<Tx>,
-) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
+    txs: Vec<Testnet1Transaction>,
+) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
     info!("Mining block!");
 
-    let transactions = DPCTransactions(txs);
+    let transactions = Transactions(txs);
 
     let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
 
@@ -68,12 +68,12 @@ async fn mine_block<S: Storage>(
 fn send<R: Rng, S: Storage>(
     consensus: &Consensus<S>,
     from: &Account<Components>,
-    inputs: Vec<DPCRecord<Components>>,
-    receiver: &AccountAddress<Components>,
+    inputs: Vec<Record<Components>>,
+    receiver: &Address<Components>,
     amount: u64,
     rng: &mut R,
     memo: [u8; 32],
-) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
     let mut sum = 0;
     for inp in &inputs {
         sum += inp.value();
@@ -126,7 +126,7 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
         txs.clear();
         let mut memo = [0u8; 32];
         memo[0] = i as u8;
-        // make a tx which spends 10 to the BaseDPCComponents receiver
+        // make a tx which spends 10 to the Testnet1Components receiver
         let (_records, tx) = send(
             &consensus,
             &miner_acc,

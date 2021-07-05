@@ -24,7 +24,7 @@ use crate::error::ConsensusError;
 use mpmc_map::MpmcMap;
 use snarkos_storage::Ledger;
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{BlockHeader, LedgerScheme, Storage, TransactionScheme, Transactions as DPCTransactions};
+use snarkvm_dpc::{BlockHeader, LedgerScheme, Storage, TransactionScheme, Transactions};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -74,7 +74,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
         let memory_pool = Self::new();
 
         if let Ok(Some(serialized_transactions)) = storage.get_memory_pool() {
-            if let Ok(transaction_bytes) = DPCTransactions::<T>::read(&serialized_transactions[..]) {
+            if let Ok(transaction_bytes) = Transactions::<T>::read(&serialized_transactions[..]) {
                 for transaction in transaction_bytes.0 {
                     let size = transaction.size();
                     let entry = Entry {
@@ -95,7 +95,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
         &self,
         storage: &Ledger<T, P, S>,
     ) -> Result<(), ConsensusError> {
-        let mut transactions = DPCTransactions::<T>::new();
+        let mut transactions = Transactions::<T>::new();
 
         for (_transaction_id, entry) in self.transactions.inner().iter() {
             transactions.push(entry.transaction.clone())
@@ -229,11 +229,11 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
         &self,
         storage: &Ledger<T, P, S>,
         max_size: usize,
-    ) -> Result<DPCTransactions<T>, ConsensusError> {
+    ) -> Result<Transactions<T>, ConsensusError> {
         let max_size = max_size - (BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE);
 
         let mut block_size = 0;
-        let mut transactions = DPCTransactions::new();
+        let mut transactions = Transactions::new();
 
         // TODO Change naive transaction selection
         for (_transaction_id, entry) in self.transactions.inner().iter() {
@@ -264,7 +264,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{testnet1::instantiated::Tx, Block};
+    use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 
@@ -273,7 +273,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
         mem_pool
@@ -306,10 +306,10 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
-        let entry = Entry::<Tx> {
+        let entry = Entry::<Testnet1Transaction> {
             size_in_bytes: size,
             transaction,
         };
@@ -330,7 +330,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
         mem_pool
@@ -358,7 +358,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
 
         let size = to_bytes![transaction].unwrap().len();
 
@@ -383,7 +383,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
                 size_in_bytes: TRANSACTION_2.len(),
@@ -409,7 +409,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
                 size_in_bytes: TRANSACTION_2.len(),
@@ -422,8 +422,8 @@ mod tests {
 
         mem_pool.store(&blockchain).unwrap();
 
-        let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
+        let block_1 = Block::<Testnet1Transaction>::read(&BLOCK_1[..]).unwrap();
+        let block_2 = Block::<Testnet1Transaction>::read(&BLOCK_2[..]).unwrap();
 
         blockchain.insert_and_commit(&block_1).unwrap();
         blockchain.insert_and_commit(&block_2).unwrap();

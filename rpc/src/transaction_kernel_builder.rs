@@ -14,36 +14,38 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    account::{Address, PrivateKey},
-    dpc::{EmptyLedger, Record},
-    errors::DPCError,
-};
+use crate::{dpc::EmptyLedger, errors::DPCError};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
         instantiated::{CommitmentMerkleParameters, Components, Testnet1DPC, Testnet1Transaction},
         parameters::{NoopProgramSNARKParameters, SystemParameters},
+        Record,
         TransactionKernel as TransactionKernelNative,
     },
-    DPCComponents, DPCScheme, RecordScheme, *,
+    Address,
+    DPCComponents,
+    DPCScheme,
+    PrivateKey,
+    RecordScheme,
+    *,
 };
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
 pub type MerkleTreeLedger = EmptyLedger<Testnet1Transaction, CommitmentMerkleParameters>;
 
 #[derive(Clone, Debug)]
 pub struct TransactionInput {
-    pub(crate) private_key: PrivateKey,
-    pub(crate) record: Record,
+    pub(crate) private_key: PrivateKey<Components>,
+    pub(crate) record: Record<Components>,
 }
 
 #[derive(Clone, Debug)]
 pub struct TransactionOutput {
-    pub(crate) recipient: Address,
+    pub(crate) recipient: Address<Components>,
     pub(crate) amount: u64,
     // TODO (raychu86): Add support for payloads and birth/death program ids.
     // pub(crate) payload: Option<Vec<u8>>,
@@ -84,7 +86,7 @@ impl TransactionKernelBuilder {
     /// Returns a new transaction builder with the added transaction input.
     /// Otherwise, returns a `DPCError`.
     ///
-    pub fn add_input(self, private_key: PrivateKey, record: Record) -> Result<Self, DPCError> {
+    pub fn add_input(self, private_key: PrivateKey<Components>, record: Record<Components>) -> Result<Self, DPCError> {
         // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
         if self.inputs.len() > Components::NUM_INPUT_RECORDS {
             return Err(DPCError::InvalidNumberOfInputs(
@@ -107,7 +109,7 @@ impl TransactionKernelBuilder {
     /// Returns a new transaction builder with the added transaction output.
     /// Otherwise, returns a `DPCError`.
     ///
-    pub fn add_output(self, recipient: Address, amount: u64) -> Result<Self, DPCError> {
+    pub fn add_output(self, recipient: Address<Components>, amount: u64) -> Result<Self, DPCError> {
         // Check that the transaction is limited to `Components::NUM_OUTPUT_RECORDS` outputs.
         if self.outputs.len() > Components::NUM_OUTPUT_RECORDS {
             return Err(DPCError::InvalidNumberOfOutputs(
@@ -152,7 +154,7 @@ impl TransactionKernelBuilder {
     ///
     /// Otherwise, returns `DPCError`.
     ///
-    pub fn build<R: Rng>(&self, rng: &mut R) -> Result<TransactionKernel, DPCError> {
+    pub fn build<R: Rng + CryptoRng>(&self, rng: &mut R) -> Result<TransactionKernel, DPCError> {
         // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
         match self.inputs.len() {
             1 | 2 => {}
@@ -208,10 +210,10 @@ impl TransactionKernelBuilder {
 
 impl TransactionKernel {
     /// Returns an offline transaction kernel
-    pub(crate) fn new<R: Rng>(
-        spenders: Vec<PrivateKey>,
-        records_to_spend: Vec<Record>,
-        recipients: Vec<Address>,
+    pub(crate) fn new<R: Rng + CryptoRng>(
+        spenders: Vec<PrivateKey<Components>>,
+        records_to_spend: Vec<Record<Components>>,
+        recipients: Vec<Address<Components>>,
         recipient_amounts: Vec<u64>,
         network_id: u8,
         rng: &mut R,
@@ -225,19 +227,21 @@ impl TransactionKernel {
         assert!(!recipients.is_empty());
         assert_eq!(recipients.len(), recipient_amounts.len());
 
-        let noop_program_id = to_bytes![parameters
-            .program_verification_key_crh
-            .hash(&to_bytes![noop_program_snark_parameters.verification_key]?)?]?;
+        let noop_program_id = to_bytes![
+            parameters
+                .program_verification_key_crh
+                .hash(&to_bytes![noop_program_snark_parameters.verifying_key]?)?
+        ]?;
 
         // Construct the new records
         let mut old_records = vec![];
         for record in records_to_spend {
-            old_records.push(record.record);
+            old_records.push(record);
         }
 
         let mut old_account_private_keys = vec![];
         for private_key in spenders {
-            old_account_private_keys.push(private_key.private_key);
+            old_account_private_keys.push(private_key);
         }
 
         while old_records.len() < Components::NUM_INPUT_RECORDS {
@@ -252,15 +256,15 @@ impl TransactionKernel {
                 &private_key,
             )?;
 
-            let dummy_record = Testnet1DPC::generate_record(
-                &parameters,
-                old_sn_nonce,
+            let dummy_record = Record::<Components>::new(
+                &parameters.record_commitment,
                 address,
                 true, // The input record is dummy
                 0,
                 Default::default(),
                 noop_program_id.clone(),
                 noop_program_id.clone(),
+                old_sn_nonce,
                 rng,
             )?;
 
@@ -290,7 +294,7 @@ impl TransactionKernel {
         let mut new_is_dummy_flags = vec![];
         let mut new_values = vec![];
         for (recipient, amount) in recipients.iter().zip(recipient_amounts) {
-            new_record_owners.push(recipient.address.clone());
+            new_record_owners.push(recipient.clone());
             new_is_dummy_flags.push(false);
             new_values.push(amount);
         }
@@ -316,7 +320,7 @@ impl TransactionKernel {
         // Generate transaction
 
         // Offline execution to generate a DPC transaction
-        let transaction_kernel = <Testnet1DPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
+        let transaction_kernel = <Testnet1DPC as DPCScheme<MerkleTreeLedger>>::execute_offline_phase(
             parameters,
             old_records,
             old_account_private_keys,
@@ -348,17 +352,13 @@ impl FromStr for TransactionKernel {
 
     fn from_str(transaction_kernel: &str) -> Result<Self, Self::Err> {
         Ok(Self {
-            transaction_kernel: TransactionKernelNative::<Components>::read(&hex::decode(transaction_kernel)?[..])?,
+            transaction_kernel: TransactionKernelNative::<Components>::from_str(transaction_kernel)?,
         })
     }
 }
 
 impl fmt::Display for TransactionKernel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            hex::encode(to_bytes![self.transaction_kernel].expect("couldn't serialize to bytes"))
-        )
+        write!(f, "{}", self.transaction_kernel.to_string())
     }
 }

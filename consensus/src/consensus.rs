@@ -14,45 +14,44 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Tx};
+use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Testnet1Transaction};
 use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
-        instantiated::{Components, InstantiatedDPC, SerialNumberNonce, NUM_OUTPUT_RECORDS},
-        parameters::PublicParameters,
-        payload::Payload as RecordPayload,
-        transaction::amount::AleoAmount,
-        Record as DPCRecord,
+        instantiated::{Components, Testnet1DPC},
+        Payload,
+        PublicParameters,
+        Record,
     },
     Account,
-    AccountAddress,
-    AccountPrivateKey,
     AccountScheme,
+    Address,
+    AleoAmount,
     Block,
     DPCComponents,
     DPCScheme,
     LedgerScheme,
+    PrivateKey,
     Storage,
-    Transactions as DPCTransactions,
+    Transactions,
 };
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
-use rand::Rng;
-
+use rand::{CryptoRng, Rng};
 use std::sync::Arc;
 
 pub struct Consensus<S: Storage> {
     pub parameters: ConsensusParameters,
     pub public_parameters: PublicParameters<Components>,
     pub ledger: Arc<MerkleTreeLedger<S>>,
-    pub memory_pool: MemoryPool<Tx>,
+    pub memory_pool: MemoryPool<Testnet1Transaction>,
 }
 
 impl<S: Storage> Consensus<S> {
     /// Check if the transaction is valid.
-    pub fn verify_transaction(&self, transaction: &Tx) -> Result<bool, ConsensusError> {
+    pub fn verify_transaction(&self, transaction: &Testnet1Transaction) -> Result<bool, ConsensusError> {
         if !self
             .parameters
             .authorized_inner_snark_ids
@@ -61,15 +60,11 @@ impl<S: Storage> Consensus<S> {
             return Ok(false);
         }
 
-        Ok(InstantiatedDPC::verify(
-            &self.public_parameters,
-            transaction,
-            &*self.ledger,
-        )?)
+        Ok(Testnet1DPC::verify(&self.public_parameters, transaction, &*self.ledger))
     }
 
     /// Check if the transactions are valid.
-    pub fn verify_transactions(&self, transactions: &[Tx]) -> Result<bool, ConsensusError> {
+    pub fn verify_transactions(&self, transactions: &[Testnet1Transaction]) -> Result<bool, ConsensusError> {
         for tx in transactions {
             if !self
                 .parameters
@@ -80,16 +75,16 @@ impl<S: Storage> Consensus<S> {
             }
         }
 
-        Ok(InstantiatedDPC::verify_transactions(
+        Ok(Testnet1DPC::verify_transactions(
             &self.public_parameters,
             transactions,
             &*self.ledger,
-        )?)
+        ))
     }
 
     /// Check if the block is valid.
     /// Verify transactions and transaction fees.
-    pub fn verify_block(&self, block: &Block<Tx>) -> Result<bool, ConsensusError> {
+    pub fn verify_block(&self, block: &Block<Testnet1Transaction>) -> Result<bool, ConsensusError> {
         let transaction_ids: Vec<_> = block.transactions.to_transaction_ids()?;
         let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
 
@@ -139,7 +134,11 @@ impl<S: Storage> Consensus<S> {
     }
 
     /// Receive a block from an external source and process it based on ledger state.
-    pub async fn receive_block(&self, block: &Block<Tx>, batch_import: bool) -> Result<(), ConsensusError> {
+    pub async fn receive_block(
+        &self,
+        block: &Block<Testnet1Transaction>,
+        batch_import: bool,
+    ) -> Result<(), ConsensusError> {
         // Block is an unknown orphan
         if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
@@ -230,7 +229,7 @@ impl<S: Storage> Consensus<S> {
     /// 1. Verify that the block header is valid.
     /// 2. Verify that the transactions are valid.
     /// 3. Insert/canonize block.
-    pub async fn process_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
+    pub async fn process_block(&self, block: &Block<Testnet1Transaction>) -> Result<(), ConsensusError> {
         if self.ledger.is_canon(&block.header.get_hash()) {
             return Ok(());
         }
@@ -253,45 +252,65 @@ impl<S: Storage> Consensus<S> {
 
     /// Generate a transaction by spending old records and specifying new record attributes
     #[allow(clippy::too_many_arguments)]
-    pub fn create_transaction<R: Rng>(
+    pub fn create_transaction<R: Rng + CryptoRng>(
         &self,
-        old_records: Vec<DPCRecord<Components>>,
-        old_account_private_keys: Vec<AccountPrivateKey<Components>>,
-        new_record_owners: Vec<AccountAddress<Components>>,
+        old_records: Vec<Record<Components>>,
+        old_private_keys: Vec<PrivateKey<Components>>,
+        new_record_owners: Vec<Address<Components>>,
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
         new_is_dummy_flags: Vec<bool>,
         new_values: Vec<u64>,
-        new_payloads: Vec<RecordPayload>,
+        new_payloads: Vec<Payload>,
         memo: [u8; 32],
         rng: &mut R,
-    ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+    ) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
+        let mut joint_serial_numbers = vec![];
+        for i in 0..Components::NUM_INPUT_RECORDS {
+            let (sn, _) = old_records[i].to_serial_number(
+                &self.public_parameters.system_parameters.account_signature,
+                &old_private_keys[i],
+            )?;
+            joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
+        }
+
+        let mut new_records = vec![];
+        for j in 0..Components::NUM_OUTPUT_RECORDS {
+            new_records.push(Record::new_full(
+                &self.public_parameters.system_parameters.serial_number_nonce,
+                &self.public_parameters.system_parameters.record_commitment,
+                new_record_owners[j].clone(),
+                new_is_dummy_flags[j],
+                new_values[j],
+                new_payloads[j].clone(),
+                new_birth_program_ids[j].clone(),
+                new_death_program_ids[j].clone(),
+                j as u8,
+                joint_serial_numbers.clone(),
+                rng,
+            )?);
+        }
+
         // Offline execution to generate a DPC transaction
-        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::execute_offline(
+        let transaction_kernel = <Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::execute_offline_phase::<R>(
             self.public_parameters.system_parameters.clone(),
+            &old_private_keys,
             old_records,
-            old_account_private_keys,
-            new_record_owners,
-            &new_is_dummy_flags,
-            &new_values,
-            new_payloads,
-            new_birth_program_ids,
-            new_death_program_ids,
+            new_records,
             memo,
-            self.parameters.network_id.id(),
             rng,
         )?;
 
         // Construct the program proofs
-        let (old_death_program_proofs, new_birth_program_proofs) =
+        let program_proofs =
             ConsensusParameters::generate_program_proofs::<R, S>(&self.public_parameters, &transaction_kernel, rng)?;
 
         // Online execution to generate a DPC transaction
-        let (new_records, transaction) = InstantiatedDPC::execute_online(
+        let (new_records, transaction) = Testnet1DPC::execute_online_phase(
             &self.public_parameters,
+            &old_private_keys,
             transaction_kernel,
-            old_death_program_proofs,
-            new_birth_program_proofs,
+            program_proofs,
             &*self.ledger,
             rng,
         )?;
@@ -301,16 +320,16 @@ impl<S: Storage> Consensus<S> {
 
     /// Generate a coinbase transaction given candidate block transactions
     #[allow(clippy::too_many_arguments)]
-    pub fn create_coinbase_transaction<R: Rng>(
+    pub fn create_coinbase_transaction<R: Rng + CryptoRng>(
         &self,
         block_num: u32,
-        transactions: &DPCTransactions<Tx>,
+        transactions: &Transactions<Testnet1Transaction>,
         program_vk_hash: Vec<u8>,
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
-        recipient: AccountAddress<Components>,
+        recipient: Address<Components>,
         rng: &mut R,
-    ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+    ) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
         let mut total_value_balance = crate::get_block_reward(block_num);
 
         for transaction in transactions.iter() {
@@ -338,21 +357,19 @@ impl<S: Storage> Consensus<S> {
         for _ in 0..Components::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
-            let old_sn_nonce = SerialNumberNonce::hash(
-                &self.public_parameters.system_parameters.serial_number_nonce,
-                &sn_nonce_input,
-            )?;
-
-            let old_record = InstantiatedDPC::generate_record(
-                &self.public_parameters.system_parameters,
-                old_sn_nonce,
+            let old_record = Record::new(
+                &self.public_parameters.system_parameters.record_commitment,
                 new_account.address.clone(),
                 true, // The input record is dummy
                 0,
-                RecordPayload::default(),
+                Payload::default(),
                 // Filler program input
                 program_vk_hash.clone(),
                 program_vk_hash.clone(),
+                <Components as DPCComponents>::SerialNumberNonceCRH::hash(
+                    &self.public_parameters.system_parameters.serial_number_nonce,
+                    &sn_nonce_input,
+                )?,
                 rng,
             )?;
 
@@ -367,7 +384,7 @@ impl<S: Storage> Consensus<S> {
                 - 1
         ]]
         .concat();
-        let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![Payload::default(); Components::NUM_OUTPUT_RECORDS];
 
         let memo: [u8; 32] = rng.gen();
 

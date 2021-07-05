@@ -27,7 +27,7 @@ mod protected_rpc_tests {
 
     use snarkvm_dpc::{
         testnet1::{
-            instantiated::{Components, Tx},
+            instantiated::{Components, Testnet1Transaction},
             record::Record as DPCRecord,
             TransactionKernel,
         },
@@ -226,7 +226,7 @@ mod protected_rpc_tests {
         let system_parameters = &FIXTURE_VK.parameters.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
 
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Testnet1Transaction::read(&TRANSACTION_1[..]).unwrap();
         let ciphertexts = transaction.encrypted_records;
 
         let records = &DATA.records_1;
@@ -311,7 +311,7 @@ mod protected_rpc_tests {
 
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
         let transaction_bytes = hex::decode(transaction_string).unwrap();
-        let _transaction: Tx = FromBytes::read(&transaction_bytes[..]).unwrap();
+        let _transaction: Testnet1Transaction = FromBytes::read(&transaction_bytes[..]).unwrap();
     }
 
     #[tokio::test]
@@ -396,7 +396,7 @@ mod protected_rpc_tests {
 
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
         let transaction_bytes = hex::decode(transaction_string).unwrap();
-        let _transaction: Tx = FromBytes::read(&transaction_bytes[..]).unwrap();
+        let _transaction: Testnet1Transaction = FromBytes::read(&transaction_bytes[..]).unwrap();
     }
 
     #[tokio::test]

@@ -19,7 +19,7 @@ use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::BlockHeight;
 use snarkvm_dpc::{
     testnet1::{
-        instantiated::{Components, Tx},
+        instantiated::{Components, Testnet1Transaction},
         parameters::PublicParameters,
     },
     Storage,
@@ -67,7 +67,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
 
     /// Returns a reference to the memory pool of this node.
     #[inline]
-    pub fn memory_pool(&self) -> &MemoryPool<Tx> {
+    pub fn memory_pool(&self) -> &MemoryPool<Testnet1Transaction> {
         &self.consensus.memory_pool
     }
 

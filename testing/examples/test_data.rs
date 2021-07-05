@@ -17,13 +17,13 @@
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    block::Transactions as DPCTransactions,
+    block::Transactions,
     testnet1::{
         instantiated::*,
-        record::{payload::Payload as RecordPayload, Record as DPCRecord},
+        record::{payload::Payload as RecordPayload, Record},
     },
     Account,
-    AccountAddress,
+    Address,
     Block,
     ProgramScheme,
     RecordScheme,
@@ -45,7 +45,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     // mine an empty block
     let (block_1, coinbase_records) = mine_block(&miner, vec![])?;
 
-    // make a tx which spends 10 to the BaseDPCComponents receiver
+    // make a tx which spends 10 to the Testnet1Components receiver
     let (_records_1, tx_1) = send(
         &consensus,
         &miner_acc,
@@ -80,9 +80,9 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
 
 fn mine_block<S: Storage>(
     miner: &Miner<S>,
-    txs: Vec<Tx>,
-) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
-    let transactions = DPCTransactions(txs);
+    txs: Vec<Testnet1Transaction>,
+) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
+    let transactions = Transactions(txs);
 
     let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
 
@@ -113,11 +113,11 @@ fn mine_block<S: Storage>(
 fn send<R: Rng, S: Storage>(
     consensus: &Consensus<S>,
     from: &Account<Components>,
-    inputs: Vec<DPCRecord<Components>>,
-    receiver: &AccountAddress<Components>,
+    inputs: Vec<Record<Components>>,
+    receiver: &Address<Components>,
     amount: u64,
     rng: &mut R,
-) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
     let mut sum = 0;
     for inp in &inputs {
         sum += inp.value();

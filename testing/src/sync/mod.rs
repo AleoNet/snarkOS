@@ -58,9 +58,9 @@ pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TestTx;
+pub struct TestTestnet1Transaction;
 
-impl TransactionScheme for TestTx {
+impl TransactionScheme for TestTestnet1Transaction {
     type Commitment = [u8; 32];
     type Digest = [u8; 32];
     type EncryptedRecord = [u8; 32];
@@ -69,6 +69,7 @@ impl TransactionScheme for TestTx {
     type Memorandum = [u8; 32];
     type ProgramCommitment = [u8; 32];
     type SerialNumber = [u8; 32];
+    type Signature = [u8; 32];
     type ValueBalance = i64;
 
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
@@ -88,11 +89,11 @@ impl TransactionScheme for TestTx {
     }
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
-        &[[0u8; 32]]
+        &[[0u8; 32]; 2]
     }
 
     fn new_commitments(&self) -> &[Self::Commitment] {
-        &[[0u8; 32]]
+        &[[0u8; 32]; 2]
     }
 
     fn program_commitment(&self) -> &Self::ProgramCommitment {
@@ -111,8 +112,12 @@ impl TransactionScheme for TestTx {
         &[0u8; 32]
     }
 
+    fn signatures(&self) -> &[Self::Signature] {
+        &[[0u8; 32]; 2]
+    }
+
     fn encrypted_records(&self) -> &[Self::EncryptedRecord] {
-        &[[0u8; 32]]
+        &[[0u8; 32]; 2]
     }
 
     fn size(&self) -> usize {
@@ -120,14 +125,14 @@ impl TransactionScheme for TestTx {
     }
 }
 
-impl ToBytes for TestTx {
+impl ToBytes for TestTestnet1Transaction {
     #[inline]
     fn write<W: Write>(&self, mut _writer: W) -> IoResult<()> {
         Ok(())
     }
 }
 
-impl FromBytes for TestTx {
+impl FromBytes for TestTestnet1Transaction {
     #[inline]
     fn read<R: Read>(mut _reader: R) -> IoResult<Self> {
         Ok(Self)

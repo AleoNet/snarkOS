@@ -19,8 +19,9 @@ use snarkos_profiler::{end_timer, start_timer};
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::{
-    testnet1::{instantiated::*, program::NoopProgram, BaseDPCComponents},
+    testnet1::{instantiated::*, NoopProgram, Testnet1Components},
     BlockHeader,
+    DPCComponents,
     DPCScheme,
     MerkleRootHash,
     Network,
@@ -124,53 +125,29 @@ impl ConsensusParameters {
     /// Generate the birth and death program proofs for a transaction for a given transaction kernel
     #[allow(clippy::type_complexity)]
     pub fn generate_program_proofs<R: Rng, S: Storage>(
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
-        transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
+        parameters: &<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+        transaction_kernel: &<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
         rng: &mut R,
-    ) -> Result<
-        (
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
-        ),
-        ConsensusError,
-    > {
+    ) -> Result<Vec<<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>, ConsensusError> {
         let local_data = transaction_kernel.into_local_data();
 
-        let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
+        let noop_program_snark_id = to_bytes![<Components as DPCComponents>::ProgramVerificationKeyCRH::hash(
             &parameters.system_parameters.program_verification_key_crh,
-            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
+            &to_bytes![parameters.noop_program_snark_parameters.verifying_key]?
         )?]?;
 
-        let dpc_program =
-            NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
+        let dpc_program = NoopProgram::<_, <Components as Testnet1Components>::NoopProgramSNARK>::new(
+            noop_program_snark_id,
+            parameters.noop_program_snark_parameters.proving_key.clone(),
+            parameters.noop_program_snark_parameters.verifying_key.clone(),
+        );
 
-        let mut old_death_program_proofs = Vec::with_capacity(NUM_INPUT_RECORDS);
-        for i in 0..NUM_INPUT_RECORDS {
-            let private_input = dpc_program.execute(
-                &parameters.noop_program_snark_parameters.proving_key,
-                &parameters.noop_program_snark_parameters.verification_key,
-                &local_data,
-                i as u8,
-                rng,
-            )?;
-
-            old_death_program_proofs.push(private_input);
+        let mut program_proofs = Vec::with_capacity(Components::NUM_TOTAL_RECORDS);
+        for position in 0..Components::NUM_TOTAL_RECORDS {
+            program_proofs.push(dpc_program.execute(&local_data, position as u8, rng)?);
         }
 
-        let mut new_birth_program_proofs = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-        for j in 0..NUM_OUTPUT_RECORDS {
-            let private_input = dpc_program.execute(
-                &parameters.noop_program_snark_parameters.proving_key,
-                &parameters.noop_program_snark_parameters.verification_key,
-                &local_data,
-                (NUM_INPUT_RECORDS + j) as u8,
-                rng,
-            )?;
-
-            new_birth_program_proofs.push(private_input);
-        }
-
-        Ok((old_death_program_proofs, new_birth_program_proofs))
+        Ok(program_proofs)
     }
 }
 

@@ -26,16 +26,16 @@ use snarkvm_dpc::{
     Storage,
 };
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
-use snarkvm_utilities::bytes::FromBytes;
+use snarkvm_utilities::FromBytes;
 
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 
-pub fn setup_or_load_parameters<R: Rng, S: Storage>(
+pub fn setup_or_load_parameters<R: Rng + CryptoRng, S: Storage>(
     verify_only: bool,
     rng: &mut R,
 ) -> (
     Arc<CommitmentMerkleParameters>,
-    <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+    <Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
 ) {
     // TODO (howardwu): Resolve this inconsistency on import structure with a new model once MerkleParameters are refactored.
     let crh_parameters =
@@ -44,11 +44,11 @@ pub fn setup_or_load_parameters<R: Rng, S: Storage>(
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_merkle_tree_parameters = Arc::new(From::from(merkle_tree_hash_parameters));
 
-    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(verify_only) {
+    let parameters = match <Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(verify_only) {
         Ok(parameters) => parameters,
         Err(err) => {
             println!("error - {}, re-running parameter Setup", err);
-            <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::setup(&ledger_merkle_tree_parameters, rng)
+            <Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::setup(&ledger_merkle_tree_parameters, rng)
                 .expect("DPC setup failed")
         }
     };
@@ -60,8 +60,8 @@ pub fn load_verifying_parameters() -> PublicParameters<Components> {
     PublicParameters::<Components>::load_vk_direct().unwrap()
 }
 
-pub fn generate_test_accounts<R: Rng, S: Storage>(
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+pub fn generate_test_accounts<R: Rng + CryptoRng, S: Storage>(
+    parameters: &<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
     let signature_parameters = &parameters.system_parameters.account_signature;

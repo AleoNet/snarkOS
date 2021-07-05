@@ -73,7 +73,12 @@ macro_rules! check_for_superfluous_tx_components {
                 );
 
                 if let Some(ref mut ops) = &mut *db_ops.lock() {
-                    if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+                    if [
+                        FixMode::SuperfluousTestnet1TransactionComponents,
+                        FixMode::Everything,
+                    ]
+                    .contains(&fix_mode)
+                    {
                         for superfluous_item in superfluous_items {
                             trace!("Staging a {} for deletion", $component_name);
                             ops.push(Op::Delete {
@@ -97,11 +102,11 @@ pub enum FixMode {
     /// Don't fix anything in the storage.
     Nothing,
     /// Update transaction locations if need be.
-    TxLocations,
+    Testnet1TransactionLocations,
     /// Store transaction serial numbers, commitments and memorandums that are missing in the storage.
-    MissingTxComponents,
+    MissingTestnet1TransactionComponents,
     /// Remove transaction serial numbers, commitments and memorandums for missing transactions.
-    SuperfluousTxComponents,
+    SuperfluousTestnet1TransactionComponents,
     /// Apply all the available fixes.
     Everything,
 }
@@ -121,7 +126,9 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
     pub fn validate(&self, mut limit: Option<u32>, fix_mode: FixMode) -> bool {
-        if limit.is_some() && [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+        if limit.is_some()
+            && [FixMode::SuperfluousTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode)
+        {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
             );
@@ -416,7 +423,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                 );
 
                 if let Some(ref mut db_ops) = &mut *database_fix.lock() {
-                    if [FixMode::MissingTxComponents, FixMode::Everything].contains(&fix_mode) {
+                    if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
                         db_ops.push(Op::Insert {
                             col: COL_DIGEST,
                             key: to_bytes![tx_digest].unwrap(), // to_bytes can't fail
@@ -459,7 +466,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                         );
 
                         if let Some(ref mut db_ops) = &mut *database_fix.lock() {
-                            if [FixMode::TxLocations, FixMode::Everything].contains(&fix_mode) {
+                            if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
                                 let corrected_location = TransactionLocation {
                                     index: block_tx_idx as u32,
                                     block_hash: block.header.get_hash().0,

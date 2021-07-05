@@ -62,15 +62,15 @@ pub static ALTERNATIVE_BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| {
     to_bytes![alternative_block_2].unwrap()
 });
 
-pub fn genesis() -> Block<Tx> {
-    let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
+pub fn genesis() -> Block<Testnet1Transaction> {
+    let genesis_block: Block<Testnet1Transaction> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     genesis_block
 }
 
 pub struct TestData {
-    pub block_1: Block<Tx>,
-    pub block_2: Block<Tx>,
+    pub block_1: Block<Testnet1Transaction>,
+    pub block_2: Block<Testnet1Transaction>,
     pub records_1: Vec<DPCRecord<Components>>,
     pub records_2: Vec<DPCRecord<Components>>,
     pub alternative_block_1_header: BlockHeader,
@@ -99,9 +99,9 @@ impl ToBytes for TestData {
 
 impl FromBytes for TestData {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let block_1: Block<Tx> = FromBytes::read(&mut reader)?;
+        let block_1: Block<Testnet1Transaction> = FromBytes::read(&mut reader)?;
 
-        let block_2: Block<Tx> = FromBytes::read(&mut reader)?;
+        let block_2: Block<Testnet1Transaction> = FromBytes::read(&mut reader)?;
 
         let len = u64::read(&mut reader)? as usize;
         let records_1 = (0..len)
@@ -132,10 +132,10 @@ fn load_test_data() -> TestData {
 }
 
 #[derive(Debug)]
-pub struct TestBlocks(pub Vec<Block<Tx>>);
+pub struct TestBlocks(pub Vec<Block<Testnet1Transaction>>);
 
 impl TestBlocks {
-    pub fn new(blocks: Vec<Block<Tx>>) -> Self {
+    pub fn new(blocks: Vec<Block<Testnet1Transaction>>) -> Self {
         TestBlocks(blocks)
     }
 
@@ -162,7 +162,7 @@ impl TestBlocks {
             blocks.reserve(count);
 
             for _ in 0..count {
-                let block: Block<Tx> = FromBytes::read(&mut reader)?;
+                let block: Block<Testnet1Transaction> = FromBytes::read(&mut reader)?;
                 blocks.push(block);
             }
         } else {

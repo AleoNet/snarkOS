@@ -18,31 +18,32 @@
 //!
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
-use crate::{error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*, RpcImpl};
-use snarkos_consensus::ConsensusParameters;
-use snarkos_toolkit::{
-    account::{Address, PrivateKey},
-    dpc::{Record, TransactionKernelBuilder},
+use crate::{
+    error::RpcError,
+    rpc_trait::ProtectedRpcFunctions,
+    rpc_types::*,
+    transaction_kernel_builder::TransactionKernelBuilder,
+    RpcImpl,
 };
+use snarkos_consensus::ConsensusParameters;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
-        encrypted_record::EncryptedRecord,
-        instantiated::{Components, InstantiatedDPC},
-        payload::Payload as RecordPayload,
-        record::Record as DPCRecord,
-        record_encryption::RecordEncryption,
+        instantiated::{Components, Testnet1DPC},
+        EncryptedRecord,
+        Payload,
+        Record,
         TransactionKernel,
     },
     Account,
-    AccountAddress,
-    AccountPrivateKey,
     AccountScheme,
-    AccountViewKey,
+    Address,
     DPCComponents,
     DPCScheme,
+    PrivateKey,
     RecordScheme as RecordModel,
     Storage,
+    ViewKey,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -325,7 +326,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             rng,
         )?;
 
-        let view_key = AccountViewKey::<Components>::from_private_key(
+        let view_key = ViewKey::<Components>::from_private_key(
             self.dpc_parameters()?.account_signature_parameters(),
             self.dpc_parameters()?.account_commitment_parameters(),
             &account.private_key,
@@ -359,7 +360,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             .system_parameters
             .program_verification_key_crh
             .hash(&to_bytes![
-                self.dpc_parameters()?.noop_program_snark_parameters.verification_key
+                self.dpc_parameters()?.noop_program_snark_parameters.verifying_key
             ]?)?;
         let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
 
@@ -371,12 +372,12 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
         for record_string in transaction_input.old_records {
             let record_bytes = hex::decode(record_string)?;
-            old_records.push(DPCRecord::<Components>::read(&record_bytes[..])?);
+            old_records.push(Record::<Components>::read(&record_bytes[..])?);
         }
 
         let mut old_account_private_keys = Vec::with_capacity(transaction_input.old_account_private_keys.len());
         for private_key_string in transaction_input.old_account_private_keys {
-            old_account_private_keys.push(AccountPrivateKey::<Components>::from_str(&private_key_string)?);
+            old_account_private_keys.push(PrivateKey::<Components>::from_str(&private_key_string)?);
         }
 
         let sn_randomness: [u8; 32] = rng.gen();
@@ -389,22 +390,22 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
                 .hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
-            let address = AccountAddress::<Components>::from_private_key(
+            let address = Address::<Components>::from_private_key(
                 self.dpc_parameters()?.account_signature_parameters(),
                 self.dpc_parameters()?.account_commitment_parameters(),
                 self.dpc_parameters()?.account_encryption_parameters(),
                 &private_key,
             )?;
 
-            let dummy_record = InstantiatedDPC::generate_record(
-                &self.dpc_parameters()?.system_parameters,
-                old_sn_nonce,
+            let dummy_record = Record::<Components>::new(
+                &self.dpc_parameters()?.system_parameters.record_commitment,
                 address,
                 true, // The input record is dummy
                 0,
-                RecordPayload::default(),
+                Payload::default(),
                 program_id.clone(),
                 program_id.clone(),
+                old_sn_nonce,
                 rng,
             )?;
 
@@ -420,7 +421,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let mut new_is_dummy_flags = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_values = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for recipient in transaction_input.recipients {
-            new_record_owners.push(AccountAddress::<Components>::from_str(&recipient.address)?);
+            new_record_owners.push(Address::<Components>::from_str(&recipient.address)?);
             new_is_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
@@ -437,7 +438,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
 
         // Default record payload
-        let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![Payload::default(); Components::NUM_OUTPUT_RECORDS];
 
         // Decode memo
         let mut memo = [0u8; 32];
@@ -497,15 +498,15 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             .iter()
             .zip_eq(&transaction_input.old_account_private_keys)
         {
-            let record = Record::from_str(record_string)?;
-            let private_key = PrivateKey::from_str(private_key_string)?;
+            let record = Record::<Components>::from_str(record_string)?;
+            let private_key = PrivateKey::<Components>::from_str(private_key_string)?;
 
             builder = builder.add_input(private_key, record)?;
         }
 
         // Add individual transaction outputs to the transaction kernel builder.
         for recipient in &transaction_input.recipients {
-            let address = Address::from_str(&recipient.address)?;
+            let address = Address::<Components>::from_str(&recipient.address)?;
 
             builder = builder.add_output(address, recipient.amount)?;
         }
@@ -544,15 +545,14 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let transaction_kernel = TransactionKernel::<Components>::read(&transaction_kernel_bytes[..])?;
 
         // Construct the program proofs
-        let (old_death_program_proofs, new_birth_program_proofs) =
+        let program_proofs =
             ConsensusParameters::generate_program_proofs::<_, S>(self.dpc_parameters()?, &transaction_kernel, rng)?;
 
         // Online execution to generate a DPC transaction
-        let (records, transaction) = InstantiatedDPC::execute_online(
+        let (records, transaction) = Testnet1DPC::execute_online_phase(
             self.dpc_parameters()?,
             transaction_kernel,
-            old_death_program_proofs,
-            new_birth_program_proofs,
+            program_proofs,
             &*self.storage,
             rng,
         )?;
@@ -592,7 +592,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         match self
             .storage
-            .get_record::<DPCRecord<Components>>(&hex::decode(record_commitment)?)?
+            .get_record::<Record<Components>>(&hex::decode(record_commitment)?)?
         {
             Some(record) => {
                 let record_bytes = to_bytes![record]?;
@@ -609,14 +609,10 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
 
         // Read the view key
-        let account_view_key = AccountViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
+        let view_key = ViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
 
         // Decrypt the record ciphertext
-        let record = RecordEncryption::decrypt_record(
-            &self.dpc_parameters()?.system_parameters,
-            &account_view_key,
-            &encrypted_record,
-        )?;
+        let record = encrypted_record.decrypt(&self.dpc_parameters()?.system_parameters, &view_key)?;
         let record_bytes = to_bytes![record]?;
 
         Ok(hex::encode(record_bytes))
@@ -625,7 +621,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     /// Returns information about a record from serialized record bytes.
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
         let record_bytes = hex::decode(record_bytes)?;
-        let record = DPCRecord::<Components>::read(&record_bytes[..])?;
+        let record = Record::<Components>::read(&record_bytes[..])?;
 
         let owner = record.owner().to_string();
         let payload = RPCRecordPayload {

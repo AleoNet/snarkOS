@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::sync::TestTx;
+use crate::sync::TestTestnet1Transaction;
 pub use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_dpc::{
@@ -28,7 +28,7 @@ use snarkvm_dpc::{
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
-pub type Store = Ledger<TestTx, CommitmentMerkleParameters, LedgerStorage>;
+pub type Store = Ledger<TestTestnet1Transaction, CommitmentMerkleParameters, LedgerStorage>;
 
 pub fn random_storage_path() -> String {
     let random_path: usize = thread_rng().gen();
@@ -87,7 +87,7 @@ mod validator {
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
         // Currently unsupported.
-        // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+        // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
     }
 
     #[tokio::test]
@@ -111,7 +111,7 @@ mod validator {
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
         // Currently unsupported
-        // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+        // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
     }
 
     #[tokio::test]
@@ -135,7 +135,7 @@ mod validator {
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
         // Currently unsupported
-        // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+        // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
     }
 
     #[tokio::test]
@@ -158,7 +158,11 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+        assert!(
+            consensus
+                .ledger
+                .validate(None, FixMode::MissingTestnet1TransactionComponents)
+        );
     }
 
     #[tokio::test]
@@ -186,7 +190,11 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+        assert!(
+            consensus
+                .ledger
+                .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+        );
     }
 
     #[tokio::test]
@@ -214,7 +222,11 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+        assert!(
+            consensus
+                .ledger
+                .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+        );
     }
 
     #[tokio::test]
@@ -242,7 +254,11 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+        assert!(
+            consensus
+                .ledger
+                .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+        );
     }
 
     #[tokio::test]
@@ -264,6 +280,10 @@ mod validator {
         consensus.ledger.storage.batch(database_transaction).unwrap();
 
         assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-        assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+        assert!(
+            consensus
+                .ledger
+                .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+        );
     }
 }

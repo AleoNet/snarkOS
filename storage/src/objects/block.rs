@@ -25,7 +25,7 @@ use snarkvm_dpc::{
     Storage,
     StorageError,
     TransactionScheme,
-    Transactions as DPCTransactions,
+    Transactions,
 };
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
@@ -73,9 +73,9 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     }
 
     /// Get the list of transaction ids given a block hash.
-    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<DPCTransactions<T>, StorageError> {
+    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Transactions<T>, StorageError> {
         match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0)? {
-            Some(encoded_block_transactions) => Ok(DPCTransactions::read(&encoded_block_transactions[..])?),
+            Some(encoded_block_transactions) => Ok(Transactions::read(&encoded_block_transactions[..])?),
             None => Err(StorageError::MissingBlockTransactions(block_hash.to_string())),
         }
     }

@@ -18,13 +18,13 @@ mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, Miner};
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{
-        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record as DPCRecord},
+        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record},
         Block,
         DPCScheme,
         LedgerScheme,
         ProgramScheme,
         RecordScheme,
-        Transactions as DPCTransactions,
+        Transactions,
     };
     use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
@@ -40,13 +40,13 @@ mod consensus_dpc {
         let miner = Miner::new(miner_acc.address, consensus.clone());
 
         println!("Creating block with coinbase transaction");
-        let transactions = DPCTransactions::<Tx>::new();
+        let transactions = Transactions::<Testnet1Transaction>::new();
         let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions).unwrap();
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
         let block = Block { header, transactions };
 
         assert!(
-            InstantiatedDPC::verify_transactions(&consensus.public_parameters, &block.transactions, &*consensus.ledger)
+            Testnet1DPC::verify_transactions(&consensus.public_parameters, &block.transactions, &*consensus.ledger)
                 .unwrap()
         );
 
@@ -107,16 +107,15 @@ mod consensus_dpc {
         assert_eq!(spend_records[1].value(), 10);
         assert_eq!(transaction.value_balance.0, (block_reward.0 - 20) as i64);
 
-        assert!(InstantiatedDPC::verify(&consensus.public_parameters, &transaction, &*consensus.ledger).unwrap());
+        assert!(Testnet1DPC::verify(&consensus.public_parameters, &transaction, &*consensus.ledger).unwrap());
 
         println!("Create a new block with the payment transaction");
-        let mut transactions = DPCTransactions::new();
+        let mut transactions = Transactions::new();
         transactions.push(transaction);
         let (previous_block_header, transactions, new_coinbase_records) = miner.establish_block(&transactions).unwrap();
 
         assert!(
-            InstantiatedDPC::verify_transactions(&consensus.public_parameters, &transactions, &*consensus.ledger)
-                .unwrap()
+            Testnet1DPC::verify_transactions(&consensus.public_parameters, &transactions, &*consensus.ledger).unwrap()
         );
 
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
@@ -141,7 +140,7 @@ mod consensus_dpc {
         for record in &new_coinbase_records {
             consensus.ledger.store_record(record).unwrap();
 
-            let reconstruct_record: Option<DPCRecord<Components>> = consensus
+            let reconstruct_record: Option<Record<Components>> = consensus
                 .ledger
                 .get_record(&to_bytes![record.commitment()].unwrap().to_vec())
                 .unwrap();
