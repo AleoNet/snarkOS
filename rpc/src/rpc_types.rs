@@ -19,7 +19,7 @@
 use chrono::{DateTime, Utc};
 use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 
 /// Defines the authentication format for accessing private endpoints on the RPC server
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

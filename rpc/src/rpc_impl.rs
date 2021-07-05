@@ -39,7 +39,7 @@ use snarkvm_utilities::{
 
 use chrono::Utc;
 
-use std::{collections::HashSet, ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
