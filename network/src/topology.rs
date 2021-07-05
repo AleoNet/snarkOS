@@ -14,14 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// Network crawler:
-// Start a crawler task (similar to the peers task) which updates state. Only one peer would be
-// connected at a time to start and would be queried for peers. It would then select on peer at
-// random to continue the crawl.
-//
-// Q: extend the network protocol to include statistics or node metadata?
-// Q: when to perform centrality computation?
-
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashSet},
