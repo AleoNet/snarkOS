@@ -65,15 +65,15 @@ impl PeerBookRef {
                 }
                 PeerEventData::Disconnect(peer, status) => {
                     self.connected_peers.remove(peer.address).await;
-                    self.disconnected_peers.insert(peer.address, peer).await;
+                    if self.disconnected_peers.insert(peer.address, peer).await.is_none() {
+                        metrics::increment_gauge!(DISCONNECTED, 1.0);
+                    }
                     if status == PeerStatus::Connecting {
                         self.pending_connections.fetch_sub(1, Ordering::SeqCst);
                     }
-                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
                 PeerEventData::FailHandshake => {
                     self.pending_connections.fetch_sub(1, Ordering::SeqCst);
-                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
             }
         }
@@ -142,7 +142,6 @@ impl PeerBook {
     }
 
     async fn take_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
-        metrics::decrement_gauge!(DISCONNECTED, 1.0);
         self.disconnected_peers.remove(address).await
     }
 
@@ -176,6 +175,7 @@ impl PeerBook {
                 }
             }
             let peer = if let Some(peer) = self.take_disconnected_peer(address).await {
+                metrics::decrement_gauge!(DISCONNECTED, 1.0);
                 peer
             } else {
                 Peer::new(address, node.config.bootnodes().contains(&address))
@@ -250,11 +250,14 @@ impl PeerBook {
         }
 
         // Add the given address to the map of disconnected peers.
-        self.disconnected_peers
+        if self
+            .disconnected_peers
             .insert(address, Peer::new(address, is_bootnode))
-            .await;
-
-        metrics::increment_gauge!(DISCONNECTED, 1.0);
+            .await
+            .is_none()
+        {
+            metrics::increment_gauge!(DISCONNECTED, 1.0);
+        }
 
         debug!("Added {} to the peer book", address);
     }

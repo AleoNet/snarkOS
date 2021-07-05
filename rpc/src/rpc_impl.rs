@@ -346,7 +346,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         // Note: Temporarily overriding node metrics here, as they aren't all correctly updated
         // @sadroeck - remove me
         metrics.connections.connected_peers = self.node.peer_book.get_active_peer_count();
-        metrics.connections.disconnected_peers = self.node.peer_book.get_disconnected_peer_count();
 
         Ok(metrics)
     }
