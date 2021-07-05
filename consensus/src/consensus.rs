@@ -25,17 +25,8 @@ use snarkvm_dpc::{
         transaction::amount::AleoAmount,
         Record as DPCRecord,
     },
-    Account,
-    AccountAddress,
-    AccountPrivateKey,
-    AccountScheme,
-    Block,
-    DPCComponents,
-    DPCScheme,
-    LedgerScheme,
-    Storage,
-    StorageError,
-    Transactions as DPCTransactions,
+    Account, AccountAddress, AccountPrivateKey, AccountScheme, Block, DPCComponents, DPCScheme, LedgerScheme, Storage,
+    StorageError, Transactions as DPCTransactions,
 };
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
@@ -196,6 +187,8 @@ impl<S: Storage> Consensus<S> {
                     // perform a fork to the side chain.
                     let canon_difficulty =
                         self.get_canon_difficulty_from_height(side_chain_path.shared_block_number)?;
+                    println!("{}", canon_difficulty);
+                    println!("{}", side_chain_path.aggregate_difficulty);
 
                     if side_chain_path.aggregate_difficulty > canon_difficulty {
                         debug!(
@@ -363,11 +356,10 @@ impl<S: Storage> Consensus<S> {
 
         let new_record_owners = vec![recipient; Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [vec![total_value_balance.0 as u64], vec![
-            0;
-            Components::NUM_OUTPUT_RECORDS
-                - 1
-        ]]
+        let new_values = [
+            vec![total_value_balance.0 as u64],
+            vec![0; Components::NUM_OUTPUT_RECORDS - 1],
+        ]
         .concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 

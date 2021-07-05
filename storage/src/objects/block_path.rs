@@ -58,7 +58,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         let mut side_chain_path = vec![];
-        let mut side_chain_diff = 0u128;
+        let mut side_chain_diff = block_header.difficulty_target as u128;
         let mut parent_hash = block_header.previous_block_hash.clone();
 
         // Find the sidechain path (with a maximum size of OLDEST_FORK_THRESHOLD)
@@ -68,10 +68,17 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 // This is a canon parent
                 Ok(block_num) => {
                     // Add the children from the latest block
-
-                    let longest_path = self.longest_child_path(block_hash)?;
+                    let longest_path = self.longest_child_path(block_hash.clone())?;
 
                     side_chain_path.extend(longest_path);
+
+                    // Add all the difficulty targets associated with the side path
+                    for hash in side_chain_path.iter() {
+                        if *hash != block_hash {
+                            let block_header = self.get_block_header(&hash)?;
+                            side_chain_diff += block_header.difficulty_target as u128;
+                        }
+                    }
 
                     return Ok(BlockPath::SideChain(SideChainPath {
                         shared_block_number: *block_num,
@@ -83,9 +90,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 // Add to the side_chain_path
                 Err(_) => {
                     side_chain_path.insert(0, parent_hash.clone());
-                    let block_header = self.get_block_header(&parent_hash)?;
-                    side_chain_diff += block_header.difficulty_target as u128;
-                    parent_hash = block_header.previous_block_hash;
+                    parent_hash = self.get_block_header(&parent_hash)?.previous_block_hash;
                 }
             }
         }
