@@ -154,7 +154,7 @@ impl KnownNetwork {
         // Only retain connections that aren't removed.
         self.connections
             .write()
-            .retain(|connection| !connections_to_remove.contains(&connection));
+            .retain(|connection| !connections_to_remove.contains(connection));
 
         // Scope the write lock.
         {

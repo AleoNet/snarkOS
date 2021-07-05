@@ -283,13 +283,13 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
         self.validate_block_transactions(
             &block,
             block_height,
-            &tx_memos,
-            &tx_sns,
-            &tx_cms,
-            &tx_digests,
-            &database_fix,
+            tx_memos,
+            tx_sns,
+            tx_cms,
+            tx_digests,
+            database_fix,
             fix_mode,
-            &is_storage_valid,
+            is_storage_valid,
         );
 
         // The genesis block has no parent.
