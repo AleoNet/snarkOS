@@ -341,11 +341,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     /// Returns statistics related to the node.
     fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
-        let mut metrics = NODE_STATS.snapshot();
-
-        // Note: Temporarily overriding node metrics here, as they aren't all correctly updated
-        // @sadroeck - remove me
-        metrics.connections.connected_peers = self.node.peer_book.get_active_peer_count();
+        let metrics = NODE_STATS.snapshot();
 
         Ok(metrics)
     }
