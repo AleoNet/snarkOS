@@ -39,11 +39,7 @@ use snarkvm_utilities::{
 
 use chrono::Utc;
 
-use std::{
-    collections::HashSet,
-    ops::Deref,
-    sync::{atomic::Ordering, Arc},
-};
+use std::{collections::HashSet, ops::Deref, sync::Arc};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -349,14 +345,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         // Note: Temporarily overriding node metrics here, as they aren't all correctly updated
         // @sadroeck - remove me
-        metrics.misc.block_height = self.storage.current_block_height.load(Ordering::Relaxed) as u64;
         metrics.connections.connected_peers = self.node.peer_book.get_active_peer_count();
         metrics.connections.disconnected_peers = self.node.peer_book.get_disconnected_peer_count();
-        metrics.misc.block_height = self
-            .node
-            .sync()
-            .map(|sync| sync.current_block_height() as u64)
-            .unwrap_or(0);
 
         Ok(metrics)
     }

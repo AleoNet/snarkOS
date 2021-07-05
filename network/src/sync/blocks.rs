@@ -46,7 +46,6 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
 
     /// Broadcast block to connected peers
     pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
-        metrics::increment_counter!(BLOCK_HEIGHT);
         debug!("Propagating a block to peers");
 
         for remote_address in self.connected_peers() {
@@ -127,14 +126,9 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
             }
         }
 
-        if block_validity.is_ok() {
-            // This is a non-sync Block, send it to our peers.
-            if is_block_new {
-                self.propagate_block(block, remote_address).await;
-            } else {
-                // If it's a valid SyncBlock, bump block height.
-                metrics::increment_counter!(BLOCK_HEIGHT);
-            }
+        // This is a non-sync Block, send it to our peers.
+        if block_validity.is_ok() && is_block_new {
+            self.propagate_block(block, remote_address).await;
         }
 
         Ok(())
