@@ -28,13 +28,14 @@ use snarkvm_dpc::{
     Account,
     Address,
     Block,
+    DPCComponents,
     ProgramScheme,
     RecordScheme,
     Storage,
 };
 use tracing_subscriber::EnvFilter;
 
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf, sync::Arc};
 
 async fn mine_block<S: Storage>(
@@ -65,7 +66,7 @@ async fn mine_block<S: Storage>(
 /// Spends some value from inputs owned by the sender, to the receiver,
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
-fn send<R: Rng, S: Storage>(
+fn send<R: Rng + CryptoRng, S: Storage>(
     consensus: &Consensus<S>,
     from: &Account<Components>,
     inputs: Vec<Record<Components>>,
@@ -81,15 +82,15 @@ fn send<R: Rng, S: Storage>(
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
 
-    let input_programs = vec![FIXTURE.program.into_compact_repr(); NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.into_compact_repr(); NUM_OUTPUT_RECORDS];
+    let input_programs = vec![FIXTURE.program.into_compact_repr(); Components::NUM_INPUT_RECORDS];
+    let output_programs = vec![FIXTURE.program.into_compact_repr(); Components::NUM_OUTPUT_RECORDS];
 
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
-    let output = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let output = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
+    let dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
 
-    let from = vec![from.private_key.clone(); NUM_INPUT_RECORDS];
+    let from = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS];
     consensus.create_transaction(
         inputs,
         from,

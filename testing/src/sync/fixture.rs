@@ -21,21 +21,16 @@ use crate::{
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_parameters::GenesisBlock;
 use snarkos_storage::LedgerStorage;
-use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::{instantiated::*, NoopProgram, Testnet1Components},
+    testnet1::{instantiated::*, NoopProgram},
     Account,
     Block,
-    DPCComponents,
     DPCScheme,
     ProgramScheme,
     Storage,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_utilities::bytes::FromBytes;
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
@@ -51,7 +46,7 @@ pub struct Fixture<S: Storage> {
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: Arc<CommitmentMerkleParameters>,
     pub genesis_block: Block<Testnet1Transaction>,
-    pub program: NoopProgram<Components, <Components as Testnet1Components>::NoopProgramSNARK>,
+    pub program: NoopProgram<Components>,
     pub rng: ChaChaRng,
 }
 
@@ -74,20 +69,12 @@ fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
 
     let noop_program_parameters = parameters.noop_program_snark_parameters();
 
-    let program_vk_hash = to_bytes![
-        <Components as DPCComponents>::ProgramVerificationKeyCRH::hash(
-            &parameters.system_parameters.program_verification_key_crh,
-            &to_bytes![noop_program_parameters.verifying_key].unwrap()
-        )
-        .unwrap()
-    ]
-    .unwrap();
-
     let program = NoopProgram::new(
-        program_vk_hash,
+        &parameters.system_parameters.program_verification_key_crh,
         noop_program_parameters.proving_key.clone(),
         noop_program_parameters.verifying_key.clone(),
-    );
+    )
+    .unwrap();
 
     Fixture {
         parameters,

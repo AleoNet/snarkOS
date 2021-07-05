@@ -16,10 +16,10 @@
 
 use crate::{difficulty::bitcoin_retarget, error::ConsensusError, MerkleTreeLedger};
 use snarkos_profiler::{end_timer, start_timer};
-use snarkvm_algorithms::{CRH, SNARK};
+use snarkvm_algorithms::SNARK;
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::{
-    testnet1::{instantiated::*, NoopProgram, Testnet1Components},
+    testnet1::{instantiated::*, NoopProgram},
     BlockHeader,
     DPCComponents,
     DPCScheme,
@@ -30,7 +30,7 @@ use snarkvm_dpc::{
     Storage,
 };
 use snarkvm_posw::{Marlin, PoswMarlin};
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::FromBytes;
 
 use chrono::Utc;
 use rand::Rng;
@@ -131,16 +131,11 @@ impl ConsensusParameters {
     ) -> Result<Vec<<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>, ConsensusError> {
         let local_data = transaction_kernel.into_local_data();
 
-        let noop_program_snark_id = to_bytes![<Components as DPCComponents>::ProgramVerificationKeyCRH::hash(
+        let dpc_program = NoopProgram::<Components>::new(
             &parameters.system_parameters.program_verification_key_crh,
-            &to_bytes![parameters.noop_program_snark_parameters.verifying_key]?
-        )?]?;
-
-        let dpc_program = NoopProgram::<_, <Components as Testnet1Components>::NoopProgramSNARK>::new(
-            noop_program_snark_id,
             parameters.noop_program_snark_parameters.proving_key.clone(),
             parameters.noop_program_snark_parameters.verifying_key.clone(),
-        );
+        )?;
 
         let mut program_proofs = Vec::with_capacity(Components::NUM_TOTAL_RECORDS);
         for position in 0..Components::NUM_TOTAL_RECORDS {

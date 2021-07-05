@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{dpc::EmptyLedger, errors::DPCError};
+use crate::empty_ledger::EmptyLedger;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
@@ -30,7 +30,7 @@ use snarkvm_dpc::{
     RecordScheme,
     *,
 };
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::{to_bytes, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
@@ -168,7 +168,7 @@ impl TransactionKernelBuilder {
 
         // Check that the transaction has at least one output and is limited to `Components::NUM_OUTPUT_RECORDS` outputs.
         match self.outputs.len() {
-            0 => return Err(DPCError::MissingOutputs),
+            0 => return Err(DPCError::Message("Transaction kernel is missing outputs".to_string())),
             1 | 2 => {}
             num_inputs => {
                 return Err(DPCError::InvalidNumberOfInputs(

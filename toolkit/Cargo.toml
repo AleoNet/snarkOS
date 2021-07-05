@@ -21,17 +21,17 @@ edition = "2018"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies.snarkvm-algorithms]
-version = "0.7.0"
+version = "0.7.1"
 default-features = false
 features = [ "wasm" ]
 
 [dependencies.snarkvm-dpc]
-version = "0.7.0"
+version = "0.7.1"
 default-features = false
 features = [ "wasm" ]
 
 [dependencies.snarkvm-utilities]
-version = "0.7.0"
+version = "0.7.1"
 
 [dependencies.anyhow]
 version = "1.0.40"
