@@ -176,7 +176,7 @@ impl KnownNetwork {
 }
 
 /// Network topology measurements.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NetworkMetrics {
     /// The total node count of the network.
     pub node_count: usize,
@@ -204,6 +204,12 @@ pub struct NetworkMetrics {
 impl NetworkMetrics {
     /// Returns the network metrics for the state described by the connections list.
     pub fn new(connections: HashSet<Connection>) -> Self {
+        // Don't compute the metrics for an empty set of connections.
+        if connections.is_empty() {
+            // Returns all metrics set to `0`.
+            return Self::default();
+        }
+
         // Construct the list of nodes from the connections.
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
         for connection in connections.iter() {
