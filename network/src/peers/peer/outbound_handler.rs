@@ -14,7 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::Instant;
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Instant,
+};
 
 use tokio::sync::{mpsc, oneshot};
 
@@ -38,49 +44,44 @@ pub(super) enum PeerAction {
 #[derive(Clone, Debug)]
 pub struct PeerHandle {
     pub(super) sender: mpsc::Sender<PeerAction>,
+    pub queued_outbound_message_count: Arc<AtomicUsize>,
 }
 
 impl PeerHandle {
     pub async fn load(&self) -> Option<Peer> {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
         let (sender, receiver) = oneshot::channel();
         self.sender.send(PeerAction::Get(sender)).await.ok()?;
         receiver.await.ok()
     }
 
     pub async fn judge_bad(&self) {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
         self.sender.send(PeerAction::QualityJudgement).await.ok();
     }
 
     /// returns true if disconnected, false if not connected anymore
     pub async fn disconnect(&self) -> bool {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
         self.sender.send(PeerAction::Disconnect).await.is_ok()
     }
 
     pub async fn send_payload(&self, payload: Payload) {
         metrics::increment_gauge!(OUTBOUND, 1.0);
+        self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
         self.sender.send(PeerAction::Send(payload)).await.ok();
     }
 
     pub async fn cancel_sync(&self) {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
         self.sender.send(PeerAction::CancelSync).await.ok();
     }
 
     pub async fn got_sync_block(&self) {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
         self.sender.send(PeerAction::GotSyncBlock).await.ok();
     }
 
     pub async fn expecting_sync_blocks(&self, amount: u32) {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
         self.sender.send(PeerAction::ExpectingSyncBlocks(amount)).await.ok();
     }
 
     pub async fn fail(&self) {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
         self.sender.send(PeerAction::SoftFail).await.ok();
     }
 }
@@ -96,7 +97,6 @@ impl Peer {
         network: &mut PeerIOHandle,
         message: PeerAction,
     ) -> Result<PeerResponse, NetworkError> {
-        metrics::decrement_gauge!(OUTBOUND, 1.0);
         match message {
             PeerAction::Disconnect => Ok(PeerResponse::Disconnect),
             PeerAction::Send(message) => {
@@ -105,6 +105,10 @@ impl Peer {
                     self.quality.last_ping_sent = Some(Instant::now());
                 }
                 network.write_payload(&message).await?;
+
+                metrics::decrement_gauge!(OUTBOUND, 1.0);
+                self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
+
                 match &message {
                     Payload::SyncBlock(_) => trace!("Sent a '{}' message to {}", &message, self.address),
                     _ => debug!("Sent a '{}' message to {}", &message, self.address),

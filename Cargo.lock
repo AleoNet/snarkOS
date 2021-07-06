@@ -2718,6 +2718,7 @@ dependencies = [
  "fxhash",
  "hex",
  "log",
+ "metrics",
  "mpmc-map",
  "nalgebra",
  "once_cell",

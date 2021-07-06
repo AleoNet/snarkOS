@@ -19,7 +19,14 @@ use chrono::Utc;
 use futures::{select, FutureExt};
 use serde::{Deserialize, Serialize};
 use snarkvm_dpc::Storage;
-use std::{net::SocketAddr, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::mpsc;
 
 use super::PeerQuality;
@@ -48,6 +55,8 @@ pub struct Peer {
     pub status: PeerStatus,
     pub quality: PeerQuality,
     pub is_bootnode: bool,
+    #[serde(skip)]
+    pub queued_outbound_message_count: Arc<AtomicUsize>,
 }
 
 const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
@@ -60,6 +69,7 @@ impl Peer {
             status: PeerStatus::Disconnected,
             quality: Default::default(),
             is_bootnode,
+            queued_outbound_message_count: Default::default(),
         }
     }
 
@@ -151,6 +161,10 @@ impl Peer {
                 },
             }
         }
+
+        let queued_outbound_message_count = self.queued_outbound_message_count.swap(0, Ordering::SeqCst);
+        metrics::decrement_gauge!(snarkos_metrics::queues::OUTBOUND, queued_outbound_message_count as f64);
+
         Ok(())
     }
 
