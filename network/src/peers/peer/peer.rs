@@ -57,6 +57,10 @@ pub struct Peer {
     pub is_bootnode: bool,
     #[serde(skip)]
     pub queued_outbound_message_count: Arc<AtomicUsize>,
+    /// Whether this peer is routable or not.
+    ///
+    /// `None` indicates the node has never attempted a connection with this peer.
+    pub is_routable: Option<bool>,
 }
 
 const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
@@ -70,6 +74,10 @@ impl Peer {
             quality: Default::default(),
             is_bootnode,
             queued_outbound_message_count: Default::default(),
+
+            // Set to `None` since peer creation only ever happens before a connection to the peer,
+            // therefore we don't know if its listener is routable or not.
+            is_routable: Default::default(),
         }
     }
 
