@@ -104,8 +104,12 @@ impl Peer {
                     self.quality.expecting_pong = true;
                     self.quality.last_ping_sent = Some(Instant::now());
                 }
-                network.write_payload(&message).await?;
+                network.write_payload(&message).await.map_err(|e| {
+                    metrics::increment_counter!(metrics::outbound::ALL_FAILURES);
+                    e
+                })?;
 
+                metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
                 metrics::decrement_gauge!(OUTBOUND, 1.0);
                 self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
 
