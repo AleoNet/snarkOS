@@ -294,7 +294,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             .peer_book
             .connected_peers()
             .into_iter()
-            .filter(|&addr| addr != remote_address)
+            .filter(|&addr| addr != remote_address && !self.config.bootnodes().contains(&addr))
             .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
 
         self.peer_book.send_to(remote_address, Payload::Peers(peers)).await;
