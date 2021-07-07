@@ -67,7 +67,7 @@ impl NetworkError {
 
     pub fn is_trivial(&self) -> bool {
         match self {
-            NetworkError::Io(e) => {
+            Self::Io(e) => {
                 matches!(
                     e.kind(),
                     ErrorKind::BrokenPipe
