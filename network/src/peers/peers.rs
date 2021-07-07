@@ -292,9 +292,15 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
         let peers = self
             .peer_book
-            .connected_peers()
+            .connected_peers_snapshot()
+            .await
             .into_iter()
-            .filter(|&addr| addr != remote_address && !self.config.bootnodes().contains(&addr))
+            .filter(|peer| {
+                peer.address != remote_address
+                    && !self.config.bootnodes().contains(&peer.address)
+                    && peer.is_routable.unwrap_or(false)
+            })
+            .map(|peer| peer.address)
             .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
 
         self.peer_book.send_to(remote_address, Payload::Peers(peers)).await;
