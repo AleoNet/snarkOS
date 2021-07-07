@@ -77,7 +77,7 @@ impl Peer {
 
             // Set to `None` since peer creation only ever happens before a connection to the peer,
             // therefore we don't know if its listener is routable or not.
-            is_routable: Default::default(),
+            is_routable: None,
         }
     }
 
