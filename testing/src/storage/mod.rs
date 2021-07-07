@@ -15,6 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #[cfg(test)]
+pub mod exporter;
+
+#[cfg(test)]
 pub mod validator;
 
 use crate::sync::TestTx;
