@@ -187,8 +187,6 @@ impl<S: Storage> Consensus<S> {
                     // perform a fork to the side chain.
                     let canon_difficulty =
                         self.get_canon_difficulty_from_height(side_chain_path.shared_block_number)?;
-                    println!("{}", canon_difficulty);
-                    println!("{}", side_chain_path.aggregate_difficulty);
 
                     if side_chain_path.aggregate_difficulty > canon_difficulty {
                         debug!(
