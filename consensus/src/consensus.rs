@@ -393,9 +393,11 @@ impl<S: Storage> Consensus<S> {
         let mut aggregate_difficulty = 0u128;
 
         for i in 0..path_size {
-            let block = self.ledger.get_block_from_block_number(current_block_height - i)?;
+            let block_header = self
+                .ledger
+                .get_block_header(&self.ledger.get_block_hash(current_block_height - i)?)?;
 
-            aggregate_difficulty += block.header.difficulty_target as u128;
+            aggregate_difficulty += block_header.difficulty_target as u128;
         }
 
         Ok(aggregate_difficulty)
