@@ -50,6 +50,7 @@ pub enum NetworkError {
 }
 
 impl NetworkError {
+    // FIXME (nkls): is unused and overlaps with `is_trivial`?
     pub fn is_fatal(&self) -> bool {
         match self {
             Self::Io(err) => [
