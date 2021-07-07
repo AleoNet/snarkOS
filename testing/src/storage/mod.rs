@@ -18,6 +18,9 @@
 pub mod exporter;
 
 #[cfg(test)]
+pub mod trim;
+
+#[cfg(test)]
 pub mod validator;
 
 use crate::sync::TestTx;
