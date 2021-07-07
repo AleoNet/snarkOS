@@ -50,9 +50,14 @@ impl Peer {
                             self.address, e
                         );
                     }
+
+                    // Marks the peer as unroutable if the connection fails.
+                    // FIXME (nkls): refine this to be set for specific errors?
+                    self.set_routable(false);
                 }
                 Ok(network) => {
                     self.set_connected();
+                    self.set_routable(true);
                     metrics::increment_gauge!(CONNECTED, 1.0);
                     event_target
                         .send(PeerEvent {

@@ -190,4 +190,8 @@ impl Peer {
         self.quality.disconnected();
         self.status = PeerStatus::Disconnected;
     }
+
+    pub(super) fn set_routable(&mut self, is_routable: bool) {
+        self.is_routable = Some(is_routable)
+    }
 }
