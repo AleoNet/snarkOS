@@ -25,8 +25,17 @@ use snarkvm_dpc::{
         transaction::amount::AleoAmount,
         Record as DPCRecord,
     },
-    Account, AccountAddress, AccountPrivateKey, AccountScheme, Block, DPCComponents, DPCScheme, LedgerScheme, Storage,
-    StorageError, Transactions as DPCTransactions,
+    Account,
+    AccountAddress,
+    AccountPrivateKey,
+    AccountScheme,
+    Block,
+    DPCComponents,
+    DPCScheme,
+    LedgerScheme,
+    Storage,
+    StorageError,
+    Transactions as DPCTransactions,
 };
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
@@ -190,8 +199,8 @@ impl<S: Storage> Consensus<S> {
 
                     if side_chain_path.aggregate_difficulty > canon_difficulty {
                         debug!(
-                            "Determined side chain is heavier than canon chain by {} blocks",
-                            side_chain_path.new_block_number - self.ledger.get_current_block_height()
+                            "Determined side chain is heavier than canon chain by {}%",
+                            get_delta_percentage(side_chain_path.aggregate_difficulty, canon_difficulty)
                         );
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
@@ -354,10 +363,11 @@ impl<S: Storage> Consensus<S> {
 
         let new_record_owners = vec![recipient; Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [
-            vec![total_value_balance.0 as u64],
-            vec![0; Components::NUM_OUTPUT_RECORDS - 1],
-        ]
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Components::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
         .concat();
         let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
 
@@ -390,4 +400,9 @@ impl<S: Storage> Consensus<S> {
 
         Ok(aggregate_difficulty)
     }
+}
+
+fn get_delta_percentage(side_chain_diff: u128, canon_diff: u128) -> f64 {
+    let delta = side_chain_diff - canon_diff;
+    (delta as f64 / canon_diff as f64) * 100.0
 }
