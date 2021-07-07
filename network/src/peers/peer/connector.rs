@@ -51,9 +51,18 @@ impl Peer {
                         );
                     }
 
-                    // Marks the peer as unroutable if the connection fails.
+                    // Marks the peer as unroutable if the connection fails. Currently matches
+                    // against all io errors which exclude a potential max peers limit breach.
+                    //
                     // FIXME (nkls): refine this to be set for specific errors?
-                    self.set_routable(false);
+                    //
+                    // TCP/IP error codes are different on Unix and on Windows and can't be
+                    // reliably matched with the current error kinds. Nightly recently saw the
+                    // addition of new error kinds that could be useful once stabilised:
+                    // https://github.com/rust-lang/rust/issues/86442.
+                    if let NetworkError::Io(_e) = e {
+                        self.set_routable(false);
+                    }
                 }
                 Ok(network) => {
                     self.set_connected();
