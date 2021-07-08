@@ -27,7 +27,7 @@ pub use metrics::*;
 
 // TODO: @sadroeck - consolidate exporters
 #[cfg(feature = "prometheus")]
-pub fn initialize() -> tokio::task::JoinHandle<()> {
+pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
     let prometheus_builder = metrics_exporter_prometheus::PrometheusBuilder::new();
 
     let (recorder, exporter) = prometheus_builder
@@ -38,11 +38,13 @@ pub fn initialize() -> tokio::task::JoinHandle<()> {
     let metrics_exporter_task = tokio::task::spawn(async move {
         exporter.await.expect("can't await the prometheus exporter");
     });
-    metrics_exporter_task
+
+    Some(metrics_exporter_task)
 }
 
 #[cfg(not(feature = "prometheus"))]
-pub fn initialize() -> tokio::task::JoinHandle<()> {
+pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
     metrics::set_recorder(&crate::stats::NODE_STATS).expect("couldn't initialize the metrics recorder!");
-    tokio::task::spawn(std::future::pending())
+
+    None
 }
