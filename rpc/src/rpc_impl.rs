@@ -107,7 +107,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         let storage = &self.storage;
 
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         let block_header_hash = BlockHeaderHash::new(block_hash);
         let height = match storage.get_block_number(&block_header_hash) {
@@ -149,17 +150,17 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         }
     }
 
-    /// Returns the number of blocks in the canonical chain.
+    /// Returns the number of blocks in the canonical chain, including the genesis.
     fn get_block_count(&self) -> Result<u32, RpcError> {
-        let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
-        Ok(storage.get_block_count())
+        let primary_height = self.sync_handler()?.current_block_height();
+        Ok(primary_height + 1)
     }
 
     /// Returns the block hash of the head of the canonical chain.
     fn get_best_block_hash(&self) -> Result<String, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
         let best_block_hash = storage.get_block_hash(storage.get_current_block_height())?;
 
         Ok(hex::encode(&best_block_hash.0))
@@ -168,7 +169,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the block hash of the index specified if it exists in the canonical chain.
     fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
         let block_hash = storage.get_block_hash(block_height)?;
 
         Ok(hex::encode(&block_hash.0))
@@ -177,7 +179,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
         Ok(hex::encode(
             &storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
         ))
@@ -191,7 +194,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     /// Returns information about a transaction from serialized transaction bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
-        self.storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        self.storage.catch_up_secondary(false, primary_height)?;
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
@@ -261,7 +265,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         let storage = &self.storage;
 
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         if !self.sync_handler()?.consensus.verify_transaction(&transaction)? {
             // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
@@ -306,7 +311,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         let storage = &self.storage;
 
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         Ok(self.sync_handler()?.consensus.verify_transaction(&transaction)?)
     }
@@ -349,7 +355,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the current mempool and sync information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         let block_height = storage.get_current_block_height();
         let block = storage.get_block_from_block_number(block_height)?;
