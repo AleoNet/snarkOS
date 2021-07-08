@@ -19,7 +19,7 @@
 use chrono::{DateTime, Utc};
 use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 
 /// Defines the authentication format for accessing private endpoints on the RPC server
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -283,19 +283,42 @@ pub struct TransactionRecipient {
     pub amount: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+/// The crawled known network and measurements.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NetworkGraph {
-    pub vertices: HashSet<Vertice>,
-    pub edges: HashSet<Edge>,
+    /// The number of nodes in the known network.
+    pub node_count: usize,
+    /// The number of connections in the known network.
+    pub connection_count: usize,
+    /// The density of the network: actual connections divided by the number of possible
+    /// connections.
+    pub density: f64,
+    /// The fiedler eigenvalue.
+    pub algebraic_connectivity: f64,
+    /// The difference between the node with the largest connection count and the node with the
+    /// lowest.
+    pub degree_centrality_delta: f64,
+
+    /// Known nodes.
+    pub vertices: Vec<Vertice>,
+    /// Known connections.
+    pub edges: Vec<Edge>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+/// Metadata and measurements pertaining to a node in the graph of the known network.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Vertice {
     pub addr: SocketAddr,
     pub is_bootnode: bool,
+
+    // Centrality measurements for the node.
+    pub degree_centrality: u16,
+    pub eigenvector_centrality: f64,
+    pub fiedler_value: f64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+/// A connection in the graph of the known network.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Edge {
     pub source: SocketAddr,
     pub target: SocketAddr,
