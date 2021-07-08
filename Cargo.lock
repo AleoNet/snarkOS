@@ -2704,7 +2704,7 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "serde",
- "snarkvm-derives",
+ "snarkvm-derives 0.7.2",
  "tokio",
 ]
 
@@ -2924,9 +2924,22 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-derives"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a87c013ae803f616168939152836beb419cc7d76a12e17db3c723a0c11faa612"
+checksum = "fb9a82f5d5bccd798ecbe85ec6771474ad848ec1f62edf3315246ab10ac84976"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "snarkvm-derives"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4863fe9df5eda69baec4bdca78382f7e069538e069ed20401b94b97cfed7718"
 dependencies = [
  "proc-macro-crate",
  "proc-macro-error",
@@ -3107,7 +3120,7 @@ checksum = "e2c3439bd12599fcaca1d885eb9051c885f2276be2dd0e2692e5f90cc03466f1"
 dependencies = [
  "bincode",
  "rand 0.8.3",
- "snarkvm-derives",
+ "snarkvm-derives 0.5.5",
  "thiserror",
 ]
 
