@@ -57,7 +57,10 @@ impl Peer {
             event_target
                 .send(PeerEvent {
                     address: peer.address,
-                    data: PeerEventData::Connected(PeerHandle { sender: sender.clone() }),
+                    data: PeerEventData::Connected(PeerHandle {
+                        sender: sender.clone(),
+                        queued_outbound_message_count: peer.queued_outbound_message_count.clone(),
+                    }),
                 })
                 .await
                 .ok();
