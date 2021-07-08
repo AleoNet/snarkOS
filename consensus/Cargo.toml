@@ -37,7 +37,7 @@ version = "1"
 
 [dependencies.snarkos-metrics]
 path = "../metrics"
-version = "1.3.9"
+version = "1.3.10"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
