@@ -311,7 +311,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
             self.peer_book
-                .add_peer(*peer_address, self.config.bootnodes().contains(&peer_address))
+                .add_peer(*peer_address, self.config.bootnodes().contains(peer_address))
                 .await;
         }
 
