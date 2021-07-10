@@ -35,8 +35,8 @@ use snarkvm_dpc::{
         TransactionKernel,
     },
     Account,
-    AccountAddress,
-    AccountPrivateKey,
+    Address,
+    PrivateKey,
     AccountScheme,
     AccountViewKey,
     DPCComponents,
@@ -376,7 +376,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         let mut old_account_private_keys = Vec::with_capacity(transaction_input.old_account_private_keys.len());
         for private_key_string in transaction_input.old_account_private_keys {
-            old_account_private_keys.push(AccountPrivateKey::<Components>::from_str(&private_key_string)?);
+            old_account_private_keys.push(PrivateKey::<Components>::from_str(&private_key_string)?);
         }
 
         let sn_randomness: [u8; 32] = rng.gen();
@@ -389,7 +389,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
                 .hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
-            let address = AccountAddress::<Components>::from_private_key(
+            let address = Address::<Components>::from_private_key(
                 self.dpc_parameters()?.account_signature_parameters(),
                 self.dpc_parameters()?.account_commitment_parameters(),
                 self.dpc_parameters()?.account_encryption_parameters(),
@@ -420,7 +420,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let mut new_is_dummy_flags = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         let mut new_values = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
         for recipient in transaction_input.recipients {
-            new_record_owners.push(AccountAddress::<Components>::from_str(&recipient.address)?);
+            new_record_owners.push(Address::<Components>::from_str(&recipient.address)?);
             new_is_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }

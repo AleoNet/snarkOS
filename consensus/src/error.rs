@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::{BlockError, DPCError, StorageError, TransactionError};
+use snarkvm_dpc::{BlockError, DPCError, ProgramError, StorageError, TransactionError};
 use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;
@@ -49,6 +49,12 @@ pub enum ConsensusError {
 
     #[error("{}", _0)]
     DPCError(DPCError),
+
+    #[error("{}", _0)]
+    ProgramError(#[from] ProgramError),
+
+    #[error("{}", _0)]
+    RecordError(#[from] snarkvm_dpc::RecordError),
 
     #[error("timestamp more than 2 hours into the future {:?} actual {:?}", _0, _1)]
     FuturisticTimestamp(i64, i64),

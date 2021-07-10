@@ -29,8 +29,8 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_dpc::{
-    testnet1::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
-    AccountAddress,
+    testnet1::instantiated::Components,
+    Address,
     Network,
     Storage,
 };
@@ -249,7 +249,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start the miner task if mining configuration is enabled.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     if config.miner.is_miner {
-        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+        match Address::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
                 let handle = MinerInstance::new(miner_address, node.clone()).spawn();
                 node.register_task(handle);

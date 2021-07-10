@@ -22,15 +22,7 @@ use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
-use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Tx},
-        parameters::PublicParameters,
-    },
-    BlockHeaderHash,
-    Storage,
-    TransactionScheme,
-};
+use snarkvm_dpc::{BlockHeaderHash, Storage, TransactionScheme, testnet1::{instantiated::{Components, Testnet1DPC, Tx}, parameters::PublicParameters}};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -84,7 +76,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcImpl<S> {
         Ok(self.sync_handler()?.consensus_parameters())
     }
 
-    pub fn dpc_parameters(&self) -> Result<&PublicParameters<Components>, RpcError> {
+    pub fn dpc_parameters(&self) -> Result<&Testnet1DPC, RpcError> {
         Ok(self.sync_handler()?.dpc_parameters())
     }
 

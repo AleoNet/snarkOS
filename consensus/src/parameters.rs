@@ -16,23 +16,14 @@
 
 use crate::{difficulty::bitcoin_retarget, error::ConsensusError, MerkleTreeLedger};
 use snarkos_profiler::{end_timer, start_timer};
-use snarkvm_algorithms::{CRH, SNARK};
+use snarkvm_algorithms::SNARK;
 use snarkvm_curves::bls12_377::Bls12_377;
-use snarkvm_dpc::{
-    testnet1::{instantiated::*, program::NoopProgram, BaseDPCComponents},
-    BlockHeader,
-    DPCScheme,
-    MerkleRootHash,
-    Network,
-    PedersenMerkleRootHash,
-    ProgramScheme,
-    Storage,
-};
+use snarkvm_dpc::{BlockHeader, DPCComponents, DPCScheme, MerkleRootHash, Network, PedersenMerkleRootHash, ProgramScheme, Storage, testnet1::{instantiated::*, program::NoopProgram}};
 use snarkvm_posw::{Marlin, PoswMarlin};
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::FromBytes;
 
 use chrono::Utc;
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -123,32 +114,30 @@ impl ConsensusParameters {
     // TODO (raychu86): Genericize this model to allow for generic programs.
     /// Generate the birth and death program proofs for a transaction for a given transaction kernel
     #[allow(clippy::type_complexity)]
-    pub fn generate_program_proofs<R: Rng, S: Storage>(
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
-        transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
+    pub fn generate_program_proofs<R: Rng + CryptoRng, S: Storage>(
+        parameters: &Testnet1DPC,
+        transaction_kernel: &<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
         rng: &mut R,
     ) -> Result<
         (
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
+            Vec<<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::Execution>,
+            Vec<<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::Execution>,
         ),
         ConsensusError,
     > {
         let local_data = transaction_kernel.into_local_data();
 
-        let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
-            &parameters.system_parameters.program_verification_key_crh,
-            &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
-        )?]?;
+        // let noop_program_snark_id = to_bytes![ProgramVerificationKeyCRH::hash(
+        //     &,
+        //     &to_bytes![parameters.noop_program_snark_parameters.verification_key]?
+        // )?]?;
 
         let dpc_program =
-            NoopProgram::<_, <Components as BaseDPCComponents>::NoopProgramSNARK>::new(noop_program_snark_id);
+            NoopProgram::<Components>::setup(&parameters.system_parameters.local_data_commitment, &parameters.system_parameters.program_verification_key_crh, rng)?;
 
-        let mut old_death_program_proofs = Vec::with_capacity(NUM_INPUT_RECORDS);
-        for i in 0..NUM_INPUT_RECORDS {
+        let mut old_death_program_proofs = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        for i in 0..Components::NUM_INPUT_RECORDS {
             let private_input = dpc_program.execute(
-                &parameters.noop_program_snark_parameters.proving_key,
-                &parameters.noop_program_snark_parameters.verification_key,
                 &local_data,
                 i as u8,
                 rng,
@@ -157,13 +146,11 @@ impl ConsensusParameters {
             old_death_program_proofs.push(private_input);
         }
 
-        let mut new_birth_program_proofs = Vec::with_capacity(NUM_OUTPUT_RECORDS);
-        for j in 0..NUM_OUTPUT_RECORDS {
+        let mut new_birth_program_proofs = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        for j in 0..Components::NUM_OUTPUT_RECORDS {
             let private_input = dpc_program.execute(
-                &parameters.noop_program_snark_parameters.proving_key,
-                &parameters.noop_program_snark_parameters.verification_key,
                 &local_data,
-                (NUM_INPUT_RECORDS + j) as u8,
+                (Components::NUM_INPUT_RECORDS + j) as u8,
                 rng,
             )?;
 

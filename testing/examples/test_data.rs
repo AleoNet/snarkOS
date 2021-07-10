@@ -23,7 +23,7 @@ use snarkvm_dpc::{
         record::{payload::Payload as RecordPayload, Record as DPCRecord},
     },
     Account,
-    AccountAddress,
+    Address,
     Block,
     ProgramScheme,
     RecordScheme,
@@ -114,7 +114,7 @@ fn send<R: Rng, S: Storage>(
     consensus: &Consensus<S>,
     from: &Account<Components>,
     inputs: Vec<DPCRecord<Components>>,
-    receiver: &AccountAddress<Components>,
+    receiver: &Address<Components>,
     amount: u64,
     rng: &mut R,
 ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {

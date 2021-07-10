@@ -18,7 +18,7 @@ use crate::errors::PrivateKeyError;
 
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, parameters::SystemParameters},
-    AccountPrivateKey,
+    PrivateKey as DPCPrivateKey,
 };
 
 use rand::{CryptoRng, Rng};
@@ -26,14 +26,14 @@ use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug)]
 pub struct PrivateKey {
-    pub(crate) private_key: AccountPrivateKey<Components>,
+    pub(crate) private_key: DPCPrivateKey<Components>,
 }
 
 impl PrivateKey {
     pub fn new<R: Rng + CryptoRng>(rng: &mut R) -> Result<Self, PrivateKeyError> {
         let parameters = SystemParameters::<Components>::load()?;
         let private_key =
-            AccountPrivateKey::<Components>::new(&parameters.account_signature, &parameters.account_commitment, rng)?;
+        DPCPrivateKey::<Components>::new(&parameters.account_signature, &parameters.account_commitment, rng)?;
         Ok(Self { private_key })
     }
 }
@@ -43,7 +43,7 @@ impl FromStr for PrivateKey {
 
     fn from_str(private_key: &str) -> Result<Self, Self::Err> {
         Ok(Self {
-            private_key: AccountPrivateKey::<Components>::from_str(private_key)?,
+            private_key: DPCPrivateKey::<Components>::from_str(private_key)?,
         })
     }
 }

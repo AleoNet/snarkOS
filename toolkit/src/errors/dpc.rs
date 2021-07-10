@@ -19,6 +19,9 @@ pub enum DPCError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
+    #[error("{}", _0)]
+    RecordError(#[from] snarkvm_dpc::RecordError),
+
     #[error("Invalid number of inputs. (Current: {}, Max: {})", _0, _1)]
     InvalidNumberOfInputs(usize, usize),
 

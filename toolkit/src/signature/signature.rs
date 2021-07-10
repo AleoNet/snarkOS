@@ -31,7 +31,7 @@ use std::{fmt, str::FromStr};
 
 #[derive(Debug)]
 pub struct Signature {
-    pub(crate) signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output,
+    pub(crate) signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Signature,
 }
 
 impl Signature {
@@ -71,7 +71,7 @@ impl FromStr for Signature {
 
     fn from_str(signature: &str) -> Result<Self, Self::Err> {
         let signature_bytes = hex::decode(signature)?;
-        let signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output =
+        let signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Signature =
             FromBytes::read(&signature_bytes[..])?;
 
         Ok(Self { signature })

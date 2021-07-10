@@ -18,7 +18,7 @@ use crate::{account::PrivateKey, errors::AddressError};
 
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, parameters::SystemParameters},
-    AccountAddress,
+    Address as DPCAddress,
 };
 use snarkvm_utilities::bytes::ToBytes;
 
@@ -26,13 +26,13 @@ use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug)]
 pub struct Address {
-    pub(crate) address: AccountAddress<Components>,
+    pub(crate) address: DPCAddress<Components>,
 }
 
 impl Address {
     pub fn from(private_key: &PrivateKey) -> Result<Self, AddressError> {
         let parameters = SystemParameters::<Components>::load()?;
-        let address = AccountAddress::<Components>::from_private_key(
+        let address = DPCAddress::<Components>::from_private_key(
             &parameters.account_signature,
             &parameters.account_commitment,
             &parameters.account_encryption,
@@ -53,7 +53,7 @@ impl FromStr for Address {
 
     fn from_str(address: &str) -> Result<Self, Self::Err> {
         Ok(Self {
-            address: AccountAddress::<Components>::from_str(address)?,
+            address: DPCAddress::<Components>::from_str(address)?,
         })
     }
 }

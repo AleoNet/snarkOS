@@ -17,20 +17,20 @@
 use crate::{account::PrivateKey, errors::ViewKeyError};
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, parameters::SystemParameters},
-    AccountViewKey,
+    ViewKey as DPCViewKey,
 };
 
 use std::{fmt, str::FromStr};
 
 #[derive(Debug)]
 pub struct ViewKey {
-    pub(crate) view_key: AccountViewKey<Components>,
+    pub(crate) view_key: DPCViewKey<Components>,
 }
 
 impl ViewKey {
     pub fn from(private_key: &PrivateKey) -> Result<Self, ViewKeyError> {
         let parameters = SystemParameters::<Components>::load()?;
-        let view_key = AccountViewKey::<Components>::from_private_key(
+        let view_key = DPCViewKey::<Components>::from_private_key(
             &parameters.account_signature,
             &parameters.account_commitment,
             &private_key.private_key,
@@ -44,7 +44,7 @@ impl FromStr for ViewKey {
 
     fn from_str(view_key: &str) -> Result<Self, Self::Err> {
         Ok(Self {
-            view_key: AccountViewKey::<Components>::from_str(view_key)?,
+            view_key: DPCViewKey::<Components>::from_str(view_key)?,
         })
     }
 }

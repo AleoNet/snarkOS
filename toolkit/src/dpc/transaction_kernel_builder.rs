@@ -19,24 +19,15 @@ use crate::{
     dpc::{EmptyLedger, Record},
     errors::DPCError,
 };
+use itertools::izip;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{CommitmentMerkleParameters, Components, InstantiatedDPC, Tx},
-        parameters::{NoopProgramSNARKParameters, SystemParameters},
-        TransactionKernel as TransactionKernelNative,
-    },
-    DPCComponents,
-    DPCScheme,
-    RecordScheme,
-    *,
-};
+use snarkvm_dpc::{Address as DPCAddress, DPCComponents, DPCScheme, ProgramScheme, RecordScheme, testnet1::{Record as DPCRecord, TransactionKernel as TransactionKernelNative, instantiated::*}};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
-pub type MerkleTreeLedger = EmptyLedger<Tx, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = EmptyLedger<Testnet1DPC, CommitmentMerkleParameters>;
 
 #[derive(Clone, Debug)]
 pub struct TransactionInput {
@@ -155,7 +146,7 @@ impl TransactionKernelBuilder {
     ///
     /// Otherwise, returns `DPCError`.
     ///
-    pub fn build<R: Rng>(&self, rng: &mut R) -> Result<TransactionKernel, DPCError> {
+    pub fn build<R: Rng + CryptoRng>(&self, dpc: &Testnet1DPC, rng: &mut R) -> Result<TransactionKernel, DPCError> {
         // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
         match self.inputs.len() {
             1 | 2 => {}
@@ -199,6 +190,7 @@ impl TransactionKernelBuilder {
 
         // Construct the transaction kernel
         TransactionKernel::new(
+            dpc,
             spenders,
             records_to_spend,
             recipients,
@@ -211,7 +203,8 @@ impl TransactionKernelBuilder {
 
 impl TransactionKernel {
     /// Returns an offline transaction kernel
-    pub(crate) fn new<R: Rng>(
+    pub(crate) fn new<R: Rng + CryptoRng>(
+        dpc: &Testnet1DPC,
         spenders: Vec<PrivateKey>,
         records_to_spend: Vec<Record>,
         recipients: Vec<Address>,
@@ -219,20 +212,14 @@ impl TransactionKernel {
         network_id: u8,
         rng: &mut R,
     ) -> Result<Self, DPCError> {
-        let parameters = SystemParameters::<Components>::load().unwrap();
 
-        let noop_program_snark_parameters = NoopProgramSNARKParameters::<Components>::load().unwrap();
         assert!(!spenders.is_empty());
         assert_eq!(spenders.len(), records_to_spend.len());
 
         assert!(!recipients.is_empty());
         assert_eq!(recipients.len(), recipient_amounts.len());
 
-        let noop_program_id = to_bytes![
-            parameters
-                .program_verification_key_crh
-                .hash(&to_bytes![noop_program_snark_parameters.verification_key]?)?
-        ]?;
+        let noop_program_id = dpc.noop_program.id();
 
         // Construct the new records
         let mut old_records = vec![];
@@ -247,25 +234,25 @@ impl TransactionKernel {
 
         while old_records.len() < Components::NUM_INPUT_RECORDS {
             let sn_randomness: [u8; 32] = rng.gen();
-            let old_sn_nonce = parameters.serial_number_nonce.hash(&sn_randomness)?;
+            let old_sn_nonce = dpc.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
-            let address = AccountAddress::<Components>::from_private_key(
-                &parameters.account_signature,
-                &parameters.account_commitment,
-                &parameters.account_encryption,
+            let address = DPCAddress::<Components>::from_private_key(
+                &dpc.system_parameters.account_signature,
+                &dpc.system_parameters.account_commitment,
+                &dpc.system_parameters.account_encryption,
                 &private_key,
             )?;
 
-            let dummy_record = InstantiatedDPC::generate_record(
-                &parameters,
-                old_sn_nonce,
+            let dummy_record = DPCRecord::<Components>::new(
+                &dpc.system_parameters.record_commitment,
                 address,
                 true, // The input record is dummy
                 0,
                 Default::default(),
                 noop_program_id.clone(),
                 noop_program_id.clone(),
+                old_sn_nonce,
                 rng,
             )?;
 
@@ -277,10 +264,10 @@ impl TransactionKernel {
 
         // Enforce that the old record addresses correspond with the private keys
         for (private_key, record) in old_account_private_keys.iter().zip(&old_records) {
-            let address = AccountAddress::<Components>::from_private_key(
-                &parameters.account_signature,
-                &parameters.account_commitment,
-                &parameters.account_encryption,
+            let address = DPCAddress::<Components>::from_private_key(
+                &dpc.system_parameters.account_signature,
+                &dpc.system_parameters.account_commitment,
+                &dpc.system_parameters.account_encryption,
                 private_key,
             )?;
 
@@ -321,18 +308,38 @@ impl TransactionKernel {
         // Generate transaction
 
         // Offline execution to generate a DPC transaction
-        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger>>::execute_offline(
-            parameters,
+
+
+        let mut joint_serial_numbers = vec![];
+        for (record, key) in old_records.iter().zip(old_account_private_keys.iter()) {
+            let (_, serial) = record.to_serial_number(&dpc.system_parameters.account_signature, key)?;
+            joint_serial_numbers.extend_from_slice(&serial[..]);
+        }
+
+        let new_records = izip!(new_record_owners, new_birth_program_ids, new_death_program_ids, new_is_dummy_flags, new_values, new_payloads, 0..2)
+            .map(|(owner, new_birth_program_id, new_death_program_id, new_is_dummy_flag, new_value, new_payload, index)| {
+                DPCRecord::new_full(
+                    &dpc.system_parameters.serial_number_nonce,
+                    &dpc.system_parameters.record_commitment,
+                    owner,
+                    new_is_dummy_flag,
+                    new_value,
+                    new_payload,
+                    new_birth_program_id,
+                    new_death_program_id,
+                    index,
+                    joint_serial_numbers.clone(),
+                    &mut rng,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Offline execution to generate a DPC transaction
+        let transaction_kernel = dpc.execute_offline_phase(
+            &old_account_private_keys,
             old_records,
-            old_account_private_keys,
-            new_record_owners,
-            &new_is_dummy_flags,
-            &new_values,
-            new_payloads,
-            new_birth_program_ids,
-            new_death_program_ids,
+            new_records,
             memo,
-            network_id,
             rng,
         )?;
 

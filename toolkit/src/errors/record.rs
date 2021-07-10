@@ -46,6 +46,12 @@ impl From<snarkvm_dpc::DPCError> for RecordError {
     }
 }
 
+impl From<snarkvm_dpc::RecordError> for RecordError {
+    fn from(error: snarkvm_dpc::RecordError) -> Self {
+        RecordError::Crate("snarkvm_dpc", format!("{:?}", error))
+    }
+}
+
 impl From<std::io::Error> for RecordError {
     fn from(error: std::io::Error) -> Self {
         RecordError::Crate("std::io", format!("{:?}", error))

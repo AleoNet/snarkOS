@@ -31,8 +31,8 @@ mod protected_rpc_tests {
             record::Record as DPCRecord,
             TransactionKernel,
         },
-        AccountAddress,
-        AccountPrivateKey,
+        Address,
+        PrivateKey,
         AccountViewKey,
         RecordScheme,
     };
@@ -414,8 +414,8 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
+        let _address = Address::<Components>::from_str(&account.address).unwrap();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
         let response = rpc.handle_request_sync(&request, meta).unwrap();
@@ -424,7 +424,7 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
+        let _address = Address::<Components>::from_str(&account.address).unwrap();
     }
 }

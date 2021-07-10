@@ -23,8 +23,7 @@ use snarkvm_dpc::{
     testnet1::{
         instantiated::Components,
         parameters::SystemParameters,
-        record::{EncryptedRecord, Record as DPCRecord, RecordEncryption},
-        DPC,
+        record::{EncryptedRecord, Record as DPCRecord},
     },
     RecordScheme as RecordTrait,
 };
@@ -53,7 +52,7 @@ impl Record {
         let encrypted_record = EncryptedRecord::<Components>::read(&encrypted_record_bytes[..])?;
 
         let parameters = SystemParameters::<Components>::load()?;
-        let record = RecordEncryption::decrypt_record(&parameters, &view_key.view_key, &encrypted_record)?;
+        let record = encrypted_record.decrypt(&parameters, &view_key.view_key)?;
 
         Ok(Self { record })
     }
@@ -69,7 +68,7 @@ impl Record {
 
         let parameters = SystemParameters::<Components>::load()?;
         let (serial_number, _randomizer) =
-            DPC::<Components>::generate_sn(&parameters, &self.record, &private_key.private_key)?;
+            self.record.to_serial_number(&parameters.account_signature, &private_key.private_key)?;
 
         Ok(to_bytes![serial_number]?)
     }
