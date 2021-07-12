@@ -73,7 +73,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                     // Add all the difficulty targets associated with the longest_path,
                     // skipping the first element (which is the hash associated to
                     // `block_header`).
-                    for hash in longest_path[1..].iter() {
+                    for hash in longest_path.iter().skip(1) {
                         let block_header = self.get_block_header(hash)?;
                         side_chain_diff += block_header.difficulty_target as u128;
                     }
