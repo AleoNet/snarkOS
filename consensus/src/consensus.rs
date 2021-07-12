@@ -21,7 +21,6 @@ use snarkvm_dpc::{
     testnet1::{
         instantiated::{Components, Testnet1DPC},
         Payload,
-        PublicParameters,
         Record,
     },
     Account,
@@ -44,7 +43,7 @@ use std::sync::Arc;
 
 pub struct Consensus<S: Storage> {
     pub parameters: ConsensusParameters,
-    pub public_parameters: PublicParameters<Components>,
+    pub dpc: Testnet1DPC,
     pub ledger: Arc<MerkleTreeLedger<S>>,
     pub memory_pool: MemoryPool<Testnet1Transaction>,
 }
@@ -60,7 +59,7 @@ impl<S: Storage> Consensus<S> {
             return Ok(false);
         }
 
-        Ok(Testnet1DPC::verify(&self.public_parameters, transaction, &*self.ledger))
+        Ok(self.dpc.verify(transaction, &*self.ledger))
     }
 
     /// Check if the transactions are valid.
@@ -75,11 +74,7 @@ impl<S: Storage> Consensus<S> {
             }
         }
 
-        Ok(Testnet1DPC::verify_transactions(
-            &self.public_parameters,
-            transactions,
-            &*self.ledger,
-        ))
+        Ok(self.dpc.verify_transactions(transactions, &*self.ledger))
     }
 
     /// Check if the block is valid.
@@ -267,18 +262,16 @@ impl<S: Storage> Consensus<S> {
     ) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
         let mut joint_serial_numbers = vec![];
         for i in 0..Components::NUM_INPUT_RECORDS {
-            let (sn, _) = old_records[i].to_serial_number(
-                &self.public_parameters.system_parameters.account_signature,
-                &old_private_keys[i],
-            )?;
+            let (sn, _) =
+                old_records[i].to_serial_number(&self.dpc.system_parameters.account_signature, &old_private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
         let mut new_records = vec![];
         for j in 0..Components::NUM_OUTPUT_RECORDS {
             new_records.push(Record::new_full(
-                &self.public_parameters.system_parameters.serial_number_nonce,
-                &self.public_parameters.system_parameters.record_commitment,
+                &self.dpc.system_parameters.serial_number_nonce,
+                &self.dpc.system_parameters.record_commitment,
                 new_record_owners[j].clone(),
                 new_is_dummy_flags[j],
                 new_values[j],
@@ -293,7 +286,7 @@ impl<S: Storage> Consensus<S> {
 
         // Offline execution to generate a DPC transaction
         let transaction_kernel = <Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::execute_offline_phase::<R>(
-            self.public_parameters.system_parameters.clone(),
+            &self.dpc,
             &old_private_keys,
             old_records,
             new_records,
@@ -302,12 +295,11 @@ impl<S: Storage> Consensus<S> {
         )?;
 
         // Construct the program proofs
-        let program_proofs =
-            ConsensusParameters::generate_program_proofs::<R, S>(&self.public_parameters, &transaction_kernel, rng)?;
+        let program_proofs = ConsensusParameters::generate_program_proofs::<R, S>(&self.dpc, &transaction_kernel, rng)?;
 
         // Online execution to generate a DPC transaction
         let (new_records, transaction) = Testnet1DPC::execute_online_phase(
-            &self.public_parameters,
+            &self.dpc,
             &old_private_keys,
             transaction_kernel,
             program_proofs,
@@ -344,9 +336,9 @@ impl<S: Storage> Consensus<S> {
 
         // Generate a new account that owns the dummy input records
         let new_account = Account::new(
-            &self.public_parameters.system_parameters.account_signature,
-            &self.public_parameters.system_parameters.account_commitment,
-            &self.public_parameters.system_parameters.account_encryption,
+            &self.dpc.system_parameters.account_signature,
+            &self.dpc.system_parameters.account_commitment,
+            &self.dpc.system_parameters.account_encryption,
             rng,
         )
         .unwrap();
@@ -358,7 +350,7 @@ impl<S: Storage> Consensus<S> {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
             let old_record = Record::new(
-                &self.public_parameters.system_parameters.record_commitment,
+                &self.dpc.system_parameters.record_commitment,
                 new_account.address.clone(),
                 true, // The input record is dummy
                 0,
@@ -367,7 +359,7 @@ impl<S: Storage> Consensus<S> {
                 program_vk_hash.clone(),
                 program_vk_hash.clone(),
                 <Components as DPCComponents>::SerialNumberNonceCRH::hash(
-                    &self.public_parameters.system_parameters.serial_number_nonce,
+                    &self.dpc.system_parameters.serial_number_nonce,
                     &sn_nonce_input,
                 )?,
                 rng,

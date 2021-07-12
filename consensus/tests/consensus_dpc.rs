@@ -47,7 +47,7 @@ mod consensus_dpc {
         let block = Block { header, transactions };
 
         assert!(Testnet1DPC::verify_transactions(
-            &consensus.public_parameters,
+            &consensus.dpc,
             &block.transactions,
             &*consensus.ledger
         ));
@@ -109,11 +109,7 @@ mod consensus_dpc {
         assert_eq!(spend_records[1].value(), 10);
         assert_eq!(transaction.value_balance.0, (block_reward.0 - 20) as i64);
 
-        assert!(Testnet1DPC::verify(
-            &consensus.public_parameters,
-            &transaction,
-            &*consensus.ledger
-        ));
+        assert!(Testnet1DPC::verify(&consensus.dpc, &transaction, &*consensus.ledger));
 
         println!("Create a new block with the payment transaction");
         let mut transactions = Transactions::new();
@@ -121,7 +117,7 @@ mod consensus_dpc {
         let (previous_block_header, transactions, new_coinbase_records) = miner.establish_block(&transactions).unwrap();
 
         assert!(Testnet1DPC::verify_transactions(
-            &consensus.public_parameters,
+            &consensus.dpc,
             &transactions,
             &*consensus.ledger
         ));

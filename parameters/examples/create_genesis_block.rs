@@ -40,7 +40,7 @@ pub fn generate<C: Testnet1Components>() -> Result<Vec<u8>, TransactionError> {
     // Add transactions to block
     let mut transactions = Transactions::new();
 
-    let transaction_1 = Transaction::<C>::read(Transaction1::load_bytes().as_slice())?;
+    let transaction_1 = Transaction::<C>::read_le(Transaction1::load_bytes().as_slice())?;
     transactions.push(transaction_1);
 
     let genesis_header = BlockHeader {

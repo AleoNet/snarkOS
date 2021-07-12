@@ -150,6 +150,6 @@ pub fn create_test_consensus_from_ledger(
         ledger,
         memory_pool: Default::default(),
         parameters: TEST_CONSENSUS_PARAMS.clone(),
-        public_parameters: FIXTURE.parameters.clone(),
+        dpc: FIXTURE.parameters.clone(),
     }
 }

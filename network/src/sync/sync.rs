@@ -80,7 +80,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
     /// Returns a reference to the DPC parameters of this node.
     #[inline]
     pub fn dpc_parameters(&self) -> &PublicParameters<Components> {
-        &self.consensus.public_parameters
+        &self.consensus.dpc
     }
 
     /// Returns `true` if this node is a mining node. Otherwise, returns `false`.

@@ -174,7 +174,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             ledger: Arc::clone(&storage),
             memory_pool,
             parameters: consensus_params,
-            public_parameters: dpc_parameters,
+            dpc: dpc_parameters,
         });
 
         if let Some(import_path) = config.storage.import {

@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, Consensus};
-use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{instantiated::*, Record},
     Address,
@@ -23,6 +22,7 @@ use snarkvm_dpc::{
     BlockHeader,
     DPCComponents,
     DPCScheme,
+    ProgramScheme,
     RecordScheme,
     Storage,
     TransactionScheme,
@@ -72,23 +72,6 @@ impl<S: Storage> Miner<S> {
         transactions: &mut Transactions<Testnet1Transaction>,
         rng: &mut R,
     ) -> Result<Vec<Record<Components>>, ConsensusError> {
-        let program_vk_hash = to_bytes_le![<Components as DPCComponents>::ProgramVerificationKeyCRH::hash(
-            &self
-                .consensus
-                .public_parameters
-                .system_parameters
-                .program_verification_key_crh,
-            &to_bytes_le![
-                self.consensus
-                    .public_parameters
-                    .noop_program_snark_parameters
-                    .verifying_key
-            ]?
-        )?]?;
-
-        let new_birth_programs = vec![program_vk_hash.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_programs = vec![program_vk_hash.clone(); Components::NUM_OUTPUT_RECORDS];
-
         for transaction in transactions.iter() {
             if self.consensus.parameters.network_id != transaction.network {
                 return Err(ConsensusError::ConflictingNetworkId(
@@ -101,9 +84,9 @@ impl<S: Storage> Miner<S> {
         let (records, tx) = self.consensus.create_coinbase_transaction(
             self.consensus.ledger.get_current_block_height() + 1,
             transactions,
-            program_vk_hash,
-            new_birth_programs,
-            new_death_programs,
+            self.consensus.dpc.noop_program.id(),
+            vec![self.consensus.dpc.noop_program.id(); Components::NUM_OUTPUT_RECORDS],
+            vec![self.consensus.dpc.noop_program.id(); Components::NUM_OUTPUT_RECORDS],
             self.address.clone(),
             rng,
         )?;
@@ -124,7 +107,7 @@ impl<S: Storage> Miner<S> {
 
         // Verify transactions
         assert!(Testnet1DPC::verify_transactions(
-            &self.consensus.public_parameters,
+            &self.consensus.dpc,
             &transactions.0,
             &*self.consensus.ledger,
         ));

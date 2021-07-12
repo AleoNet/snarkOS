@@ -74,7 +74,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
         let memory_pool = Self::new();
 
         if let Ok(Some(serialized_transactions)) = storage.get_memory_pool() {
-            if let Ok(transaction_bytes) = Transactions::<T>::read(&serialized_transactions[..]) {
+            if let Ok(transaction_bytes) = Transactions::<T>::read_le(&serialized_transactions[..]) {
                 for transaction in transaction_bytes.0 {
                     let size = transaction.size();
                     let entry = Entry {
