@@ -14,14 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// Network crawler:
-// Start a crawler task (similar to the peers task) which updates state. Only one peer would be
-// connected at a time to start and would be queried for peers. It would then select on peer at
-// random to continue the crawl.
-//
-// Q: extend the network protocol to include statistics or node metadata?
-// Q: when to perform centrality computation?
-
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashSet},
@@ -154,7 +146,7 @@ impl KnownNetwork {
         // Only retain connections that aren't removed.
         self.connections
             .write()
-            .retain(|connection| !connections_to_remove.contains(&connection));
+            .retain(|connection| !connections_to_remove.contains(connection));
 
         // Scope the write lock.
         {
@@ -184,36 +176,39 @@ impl KnownNetwork {
 }
 
 /// Network topology measurements.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NetworkMetrics {
     /// The total node count of the network.
-    node_count: usize,
+    pub node_count: usize,
     /// The total connection count for the network.
-    connection_count: usize,
+    pub connection_count: usize,
     /// The network density.
     ///
     /// This is defined as actual connections divided by the total number of possible connections.
-    density: f64,
+    pub density: f64,
     /// The algebraic connectivity of the network.
     ///
     /// This is the value of the Fiedler eigenvalue, the second-smallest eigenvalue of the network's
     /// Laplacian matrix.
-    algebraic_connectivity: f64,
+    pub algebraic_connectivity: f64,
     /// The difference between the node with the largest connection count and the node with the
     /// lowest.
-    degree_centrality_delta: f64,
+    pub degree_centrality_delta: f64,
     /// Node centrality measurements mapped to each node's address.
     ///
     /// Includes degree centrality, eigenvector centrality (the relative importance of a node in
     /// the network) and Fiedler vector (describes a possible partitioning of the network).
-    centrality: BTreeMap<SocketAddr, NodeCentrality>,
+    pub centrality: BTreeMap<SocketAddr, NodeCentrality>,
 }
 
 impl NetworkMetrics {
     /// Returns the network metrics for the state described by the connections list.
-    pub fn new(known_network: &KnownNetwork) -> Self {
-        // Copy the connections as the data must not change throughout the metrics computation.
-        let connections: HashSet<Connection> = known_network.connections();
+    pub fn new(connections: HashSet<Connection>) -> Self {
+        // Don't compute the metrics for an empty set of connections.
+        if connections.is_empty() {
+            // Returns all metrics set to `0`.
+            return Self::default();
+        }
 
         // Construct the list of nodes from the connections.
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
@@ -271,20 +266,20 @@ impl NetworkMetrics {
 
 /// Centrality measurements of a node.
 #[derive(Debug)]
-struct NodeCentrality {
+pub struct NodeCentrality {
     /// Connection count of the node.
-    degree_centrality: u16,
+    pub degree_centrality: u16,
     /// A measure of the relative importance of the node in the network.
     ///
     /// Summing the values of each node adds up to the number of nodes in the network. This was
     /// done to allow comparison between different network topologies irrespective of node count.
-    eigenvector_centrality: f64,
+    pub eigenvector_centrality: f64,
     /// This value is extracted from the Fiedler eigenvector corresponding to the second smallest
     /// eigenvalue of the Laplacian matrix of the network.
     ///
     /// The network can be partitioned on the basis of these values (positive, negative and when
     /// relevant close to zero).
-    fiedler_value: f64,
+    pub fiedler_value: f64,
 }
 
 impl NodeCentrality {

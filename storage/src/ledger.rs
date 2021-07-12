@@ -186,18 +186,16 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     }
 
     /// Attempt to catch the secondary read-only storage instance with the primary instance.
-    pub fn catch_up_secondary(&self, update_merkle_tree: bool) -> Result<(), StorageError> {
-        // Sync the secondary and primary instances
-        if self.storage.try_catch_up_with_primary().is_ok() {
-            let new_current_block_height = self.get_best_block_number()?;
-            let current_block_height = self.get_current_block_height();
+    pub fn catch_up_secondary(&self, update_merkle_tree: bool, primary_height: u32) -> Result<(), StorageError> {
+        let secondary_height = self.get_current_block_height();
 
-            // If the new block height is greater than the stored block height,
-            // update the block height and merkle tree.
-            if new_current_block_height > current_block_height {
+        // If the primary block height is greater than the secondary block height, attempt to catch up,
+        // update the block height and potentially the merkle tree.
+        if primary_height > secondary_height {
+            // Sync the secondary and primary instances
+            if self.storage.try_catch_up_with_primary().is_ok() {
                 // Update the latest block height of the secondary instance.
-                self.current_block_height
-                    .store(new_current_block_height, Ordering::SeqCst);
+                self.current_block_height.store(primary_height, Ordering::SeqCst);
 
                 // Optional `cm_merkle_tree` regeneration because not all usages of
                 // the secondary instance requires it.

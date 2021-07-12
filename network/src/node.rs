@@ -324,12 +324,13 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
     pub fn initialize_metrics(&self) {
         debug!("Initializing metrics");
-        let metrics_task = snarkos_metrics::initialize();
-        self.register_task(metrics_task);
+        if let Some(metrics_task) = snarkos_metrics::initialize() {
+            self.register_task(metrics_task);
+        }
 
         // The node can already be at some non-zero height.
         if let Some(sync) = self.sync() {
-            metrics::counter!(misc::BLOCK_HEIGHT, sync.current_block_height() as u64);
+            metrics::gauge!(misc::BLOCK_HEIGHT, sync.current_block_height() as f64);
         }
     }
 

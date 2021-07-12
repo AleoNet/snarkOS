@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Testnet1Transaction};
+use snarkos_metrics::misc::BLOCK_HEIGHT;
 use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
@@ -199,6 +200,9 @@ impl<S: Storage> Consensus<S> {
                         // Fork to superior side chain
                         self.ledger.revert_for_fork(&side_chain_path)?;
 
+                        // Update the current block height metric.
+                        metrics::gauge!(BLOCK_HEIGHT, self.ledger.get_current_block_height() as f64);
+
                         if !side_chain_path.path.is_empty() {
                             for block_hash in side_chain_path.path {
                                 if block_hash == block.header.get_hash() {
@@ -236,6 +240,9 @@ impl<S: Storage> Consensus<S> {
 
         // 2. Insert/canonize block
         self.ledger.insert_and_commit(block)?;
+
+        // Increment the current block height metric
+        metrics::increment_gauge!(BLOCK_HEIGHT, 1.0);
 
         // 3. Remove transactions from the mempool
         for transaction_id in block.transactions.to_transaction_ids()? {
