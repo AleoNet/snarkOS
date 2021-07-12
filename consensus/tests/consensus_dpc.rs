@@ -27,7 +27,7 @@ mod consensus_dpc {
         RecordScheme,
         Transactions,
     };
-    use snarkvm_utilities::{bytes::ToBytes, to_bytes};
+    use snarkvm_utilities::{bytes::ToBytes, to_bytes_le};
 
     use std::sync::Arc;
 
@@ -150,12 +150,12 @@ mod consensus_dpc {
 
             let reconstruct_record: Option<Record<Components>> = consensus
                 .ledger
-                .get_record(&to_bytes![record.commitment()].unwrap().to_vec())
+                .get_record(&to_bytes_le![record.commitment()].unwrap().to_vec())
                 .unwrap();
 
             assert_eq!(
-                to_bytes![reconstruct_record.unwrap()].unwrap(),
-                to_bytes![record].unwrap()
+                to_bytes_le![reconstruct_record.unwrap()].unwrap(),
+                to_bytes_le![record].unwrap()
             );
         }
     }

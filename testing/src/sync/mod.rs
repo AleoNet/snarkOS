@@ -20,7 +20,7 @@ use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{testnet1::instantiated::Components, DPCComponents, Network, TransactionError, TransactionScheme};
 use snarkvm_parameters::{global::InnerCircuitIDCRH, testnet1::InnerSNARKVKParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
 use std::{
@@ -35,12 +35,12 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerCircuitIDCRH as CRH>::Parameters = FromBytes::read(InnerCircuitIDCRH::load_bytes().unwrap().as_slice()).unwrap();
+    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerCircuitIDCRH as CRH>::Parameters = FromBytes::read_le(InnerCircuitIDCRH::load_bytes().unwrap().as_slice()).unwrap();
 
     let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerCircuitIDCRH =
         From::from(inner_snark_verification_key_crh_parameters);
 
-    let inner_snark_id = to_bytes![
+    let inner_snark_id = to_bytes_le![
         inner_snark_verification_key_crh
             .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
             .unwrap()

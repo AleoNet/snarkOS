@@ -25,7 +25,7 @@ use crate::{
 };
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -371,7 +371,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             };
 
             let tx = match self.get_transaction_bytes(&tx_id) {
-                Ok(tx) => match T::read(&tx[..]) {
+                Ok(tx) => match T::read_le(&tx[..]) {
                     Ok(tx) => tx,
                     Err(e) => {
                         error!("Transaction {} can't be parsed: {}", hex::encode(tx_id), e);
@@ -400,7 +400,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                tx_sns.lock().insert(to_bytes!(sn).unwrap()); // to_bytes can't fail
+                tx_sns.lock().insert(to_bytes_le!(sn).unwrap()); // to_bytes can't fail
             }
 
             for cm in tx.new_commitments() {
@@ -411,12 +411,12 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                tx_cms.lock().insert(to_bytes!(cm).unwrap()); // to_bytes can't fail
+                tx_cms.lock().insert(to_bytes_le!(cm).unwrap()); // to_bytes can't fail
             }
 
             let tx_digest = tx.ledger_digest();
             // to_bytes can't fail
-            if !self.storage.exists(COL_DIGEST, &to_bytes![tx_digest].unwrap()) {
+            if !self.storage.exists(COL_DIGEST, &to_bytes_le![tx_digest].unwrap()) {
                 warn!(
                     "Transaction {} doesn't have the ledger digest stored",
                     hex::encode(tx_id),
@@ -426,7 +426,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
                         db_ops.push(Op::Insert {
                             col: COL_DIGEST,
-                            key: to_bytes![tx_digest].unwrap(), // to_bytes can't fail
+                            key: to_bytes_le![tx_digest].unwrap(), // to_bytes can't fail
                             value: block_height.to_le_bytes().to_vec(),
                         });
                     } else {
@@ -436,14 +436,14 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
             }
-            tx_digests.lock().insert(to_bytes!(tx_digest).unwrap()); // to_bytes can't fail
+            tx_digests.lock().insert(to_bytes_le!(tx_digest).unwrap()); // to_bytes can't fail
 
             let tx_memo = tx.memorandum();
             if !self.contains_memo(tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
-            tx_memos.lock().insert(to_bytes!(tx_memo).unwrap()); // to_bytes can't fail
+            tx_memos.lock().insert(to_bytes_le!(tx_memo).unwrap()); // to_bytes can't fail
 
             match self.get_transaction_location(&tx_id) {
                 Ok(Some(tx_location)) => match self.get_block_number(&BlockHeaderHash(tx_location.block_hash)) {
@@ -472,7 +472,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                                     block_hash: block.header.get_hash().0,
                                 };
 
-                                match to_bytes!(corrected_location) {
+                                match to_bytes_le!(corrected_location) {
                                     Ok(location_bytes) => {
                                         db_ops.push(Op::Insert {
                                             col: COL_TRANSACTION_LOCATION,

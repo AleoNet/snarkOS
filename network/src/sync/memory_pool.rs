@@ -19,7 +19,7 @@ use snarkos_consensus::memory_pool::Entry;
 use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Storage};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use std::net::SocketAddr;
@@ -109,7 +109,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let mut txs = vec![];
 
             for entry in self.expect_sync().memory_pool().transactions.inner().values() {
-                if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
+                if let Ok(transaction_bytes) = to_bytes_le![entry.transaction] {
                     txs.push(transaction_bytes);
                 }
             }

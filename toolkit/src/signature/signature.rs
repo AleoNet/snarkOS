@@ -23,7 +23,7 @@ use snarkvm_dpc::{
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use rand::{CryptoRng, Rng};
@@ -72,7 +72,7 @@ impl FromStr for Signature {
     fn from_str(signature: &str) -> Result<Self, Self::Err> {
         let signature_bytes = hex::decode(signature)?;
         let signature: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::Output =
-            FromBytes::read(&signature_bytes[..])?;
+            FromBytes::read_le(&signature_bytes[..])?;
 
         Ok(Self { signature })
     }
@@ -83,7 +83,7 @@ impl fmt::Display for Signature {
         write!(
             f,
             "{}",
-            hex::encode(to_bytes![self.signature].expect("failed to convert to bytes"))
+            hex::encode(to_bytes_le![self.signature].expect("failed to convert to bytes"))
         )
     }
 }

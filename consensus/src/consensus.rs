@@ -37,7 +37,7 @@ use snarkvm_dpc::{
     Transactions,
 };
 use snarkvm_posw::txids_to_roots;
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::sync::Arc;
@@ -55,7 +55,7 @@ impl<S: Storage> Consensus<S> {
         if !self
             .parameters
             .authorized_inner_snark_ids
-            .contains(&to_bytes![transaction.inner_circuit_id]?)
+            .contains(&to_bytes_le![transaction.inner_circuit_id]?)
         {
             return Ok(false);
         }
@@ -69,7 +69,7 @@ impl<S: Storage> Consensus<S> {
             if !self
                 .parameters
                 .authorized_inner_snark_ids
-                .contains(&to_bytes![tx.inner_circuit_id]?)
+                .contains(&to_bytes_le![tx.inner_circuit_id]?)
             {
                 return Ok(false);
             }
@@ -271,7 +271,7 @@ impl<S: Storage> Consensus<S> {
                 &self.public_parameters.system_parameters.account_signature,
                 &old_private_keys[i],
             )?;
-            joint_serial_numbers.extend_from_slice(&to_bytes![sn]?);
+            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
         let mut new_records = vec![];

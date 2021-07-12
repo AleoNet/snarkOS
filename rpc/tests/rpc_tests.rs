@@ -28,7 +28,7 @@ mod rpc_tests {
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,
-        to_bytes,
+        to_bytes_le,
     };
 
     use jsonrpc_test::Rpc;
@@ -69,26 +69,26 @@ mod rpc_tests {
         let new_commitments: Vec<Value> = transaction
             .new_commitments()
             .iter()
-            .map(|cm| Value::String(hex::encode(to_bytes![cm].unwrap())))
+            .map(|cm| Value::String(hex::encode(to_bytes_le![cm].unwrap())))
             .collect();
         let memo = hex::encode(transaction.memorandum());
         let network_id = transaction.network.id();
 
-        let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
-        let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
-        let program_commitment = hex::encode(to_bytes![transaction.program_commitment()].unwrap());
-        let local_data_root = hex::encode(to_bytes![transaction.local_data_root].unwrap());
+        let digest = hex::encode(to_bytes_le![transaction.ledger_digest].unwrap());
+        let transaction_proof = hex::encode(to_bytes_le![transaction.transaction_proof].unwrap());
+        let program_commitment = hex::encode(to_bytes_le![transaction.program_commitment()].unwrap());
+        let local_data_root = hex::encode(to_bytes_le![transaction.local_data_root].unwrap());
         let value_balance = transaction.value_balance;
         let signatures: Vec<Value> = transaction
             .signatures
             .iter()
-            .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
+            .map(|s| Value::String(hex::encode(to_bytes_le![s].unwrap())))
             .collect();
 
         let encrypted_records: Vec<Value> = transaction
             .encrypted_records
             .iter()
-            .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
+            .map(|s| Value::String(hex::encode(to_bytes_le![s].unwrap())))
             .collect();
 
         assert_eq!(transaction_id, transaction_info["txid"]);
@@ -200,7 +200,7 @@ mod rpc_tests {
 
         assert_eq!(rpc.request("getrawtransaction", &[transaction_id]), format![
             r#""{}""#,
-            hex::encode(to_bytes![transaction].unwrap())
+            hex::encode(to_bytes_le![transaction].unwrap())
         ]);
     }
 
@@ -218,7 +218,7 @@ mod rpc_tests {
 
         let transaction_info: Value = serde_json::from_str(&response).unwrap();
 
-        verify_transaction_info(to_bytes![transaction].unwrap(), transaction_info);
+        verify_transaction_info(to_bytes_le![transaction].unwrap(), transaction_info);
     }
 
     #[tokio::test]

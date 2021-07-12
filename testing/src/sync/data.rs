@@ -23,7 +23,7 @@ use snarkvm_dpc::{
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use once_cell::sync::Lazy;
@@ -34,14 +34,14 @@ pub static DATA: Lazy<TestData> = Lazy::new(load_test_data);
 
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
-pub static BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_1].unwrap());
+pub static BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_1].unwrap());
 pub static BLOCK_1_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_1.header.get_hash().0);
 
-pub static BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_2].unwrap());
+pub static BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_2].unwrap());
 pub static BLOCK_2_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_2.header.get_hash().0);
 
-pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_1.transactions.0[0]].unwrap());
-pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_2.transactions.0[0]].unwrap());
+pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_1.transactions.0[0]].unwrap());
+pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_2.transactions.0[0]].unwrap());
 
 // Alternative blocks used for testing syncs and rollbacks
 pub static ALTERNATIVE_BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -50,7 +50,7 @@ pub static ALTERNATIVE_BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| {
         transactions: DATA.block_1.transactions.clone(),
     };
 
-    to_bytes![alternative_block_1].unwrap()
+    to_bytes_le![alternative_block_1].unwrap()
 });
 
 pub static ALTERNATIVE_BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -59,11 +59,11 @@ pub static ALTERNATIVE_BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| {
         transactions: DATA.block_2.transactions.clone(),
     };
 
-    to_bytes![alternative_block_2].unwrap()
+    to_bytes_le![alternative_block_2].unwrap()
 });
 
 pub fn genesis() -> Block<Testnet1Transaction> {
-    let genesis_block: Block<Testnet1Transaction> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
+    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     genesis_block
 }
@@ -99,22 +99,22 @@ impl ToBytes for TestData {
 
 impl FromBytes for TestData {
     fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let block_1: Block<Testnet1Transaction> = FromBytes::read(&mut reader)?;
+        let block_1: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
 
-        let block_2: Block<Testnet1Transaction> = FromBytes::read(&mut reader)?;
+        let block_2: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
 
         let len = u64::read(&mut reader)? as usize;
         let records_1 = (0..len)
-            .map(|_| FromBytes::read(&mut reader))
+            .map(|_| FromBytes::read_le(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
 
         let len = u64::read(&mut reader)? as usize;
         let records_2 = (0..len)
-            .map(|_| FromBytes::read(&mut reader))
+            .map(|_| FromBytes::read_le(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let alternative_block_1_header: BlockHeader = FromBytes::read(&mut reader)?;
-        let alternative_block_2_header: BlockHeader = FromBytes::read(&mut reader)?;
+        let alternative_block_1_header: BlockHeader = FromBytes::read_le(&mut reader)?;
+        let alternative_block_2_header: BlockHeader = FromBytes::read_le(&mut reader)?;
 
         Ok(Self {
             block_1,
@@ -162,11 +162,11 @@ impl TestBlocks {
             blocks.reserve(count);
 
             for _ in 0..count {
-                let block: Block<Testnet1Transaction> = FromBytes::read(&mut reader)?;
+                let block: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
                 blocks.push(block);
             }
         } else {
-            while let Ok(block) = FromBytes::read(&mut reader) {
+            while let Ok(block) = FromBytes::read_le(&mut reader) {
                 blocks.push(block);
             }
         }

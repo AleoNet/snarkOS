@@ -23,7 +23,7 @@ use snarkvm_dpc::{
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use std::{fmt, str::FromStr};
@@ -57,7 +57,7 @@ impl FromStr for SignaturePublicKey {
     fn from_str(public_key: &str) -> Result<Self, Self::Err> {
         let public_key_bytes = hex::decode(public_key)?;
         let public_key: <<Components as DPCComponents>::AccountSignature as SignatureScheme>::PublicKey =
-            FromBytes::read(&public_key_bytes[..])?;
+            FromBytes::read_le(&public_key_bytes[..])?;
 
         Ok(Self { public_key })
     }
@@ -68,7 +68,7 @@ impl fmt::Display for SignaturePublicKey {
         write!(
             f,
             "{}",
-            hex::encode(to_bytes![self.public_key].expect("failed to convert to bytes"))
+            hex::encode(to_bytes_le![self.public_key].expect("failed to convert to bytes"))
         )
     }
 }

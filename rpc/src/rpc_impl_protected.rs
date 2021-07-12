@@ -47,7 +47,7 @@ use snarkvm_dpc::{
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use itertools::Itertools;
@@ -359,10 +359,10 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             .dpc_parameters()?
             .system_parameters
             .program_verification_key_crh
-            .hash(&to_bytes![
+            .hash(&to_bytes_le![
                 self.dpc_parameters()?.noop_program_snark_parameters.verifying_key
             ]?)?;
-        let program_vk_hash_bytes = to_bytes![program_vk_hash]?;
+        let program_vk_hash_bytes = to_bytes_le![program_vk_hash]?;
 
         let program_id = program_vk_hash_bytes;
         let new_birth_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
@@ -467,10 +467,10 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             rng,
         )?;
 
-        let encoded_transaction = hex::encode(to_bytes![transaction]?);
+        let encoded_transaction = hex::encode(to_bytes_le![transaction]?);
         let mut encoded_records = Vec::with_capacity(records.len());
         for record in records {
-            encoded_records.push(hex::encode(to_bytes![record]?));
+            encoded_records.push(hex::encode(to_bytes_le![record]?));
         }
 
         Ok(CreateRawTransactionOuput {
@@ -557,10 +557,10 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             rng,
         )?;
 
-        let encoded_transaction = hex::encode(to_bytes![transaction]?);
+        let encoded_transaction = hex::encode(to_bytes_le![transaction]?);
         let mut encoded_records = Vec::with_capacity(records.len());
         for record in records {
-            encoded_records.push(hex::encode(to_bytes![record]?));
+            encoded_records.push(hex::encode(to_bytes_le![record]?));
         }
 
         Ok(CreateRawTransactionOuput {
@@ -595,7 +595,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             .get_record::<Record<Components>>(&hex::decode(record_commitment)?)?
         {
             Some(record) => {
-                let record_bytes = to_bytes![record]?;
+                let record_bytes = to_bytes_le![record]?;
                 Ok(hex::encode(record_bytes))
             }
             None => Ok("Record not found".to_string()),
@@ -613,7 +613,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         // Decrypt the record ciphertext
         let record = encrypted_record.decrypt(&self.dpc_parameters()?.system_parameters, &view_key)?;
-        let record_bytes = to_bytes![record]?;
+        let record_bytes = to_bytes_le![record]?;
 
         Ok(hex::encode(record_bytes))
     }
@@ -625,13 +625,13 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         let owner = record.owner().to_string();
         let payload = RPCRecordPayload {
-            payload: hex::encode(to_bytes![record.payload()]?),
+            payload: hex::encode(to_bytes_le![record.payload()]?),
         };
         let birth_program_id = hex::encode(record.birth_program_id());
         let death_program_id = hex::encode(record.death_program_id());
-        let serial_number_nonce = hex::encode(to_bytes![record.serial_number_nonce()]?);
-        let commitment = hex::encode(to_bytes![record.commitment()]?);
-        let commitment_randomness = hex::encode(to_bytes![record.commitment_randomness()]?);
+        let serial_number_nonce = hex::encode(to_bytes_le![record.serial_number_nonce()]?);
+        let commitment = hex::encode(to_bytes_le![record.commitment()]?);
+        let commitment_randomness = hex::encode(to_bytes_le![record.commitment_randomness()]?);
 
         Ok(RecordInfo {
             owner,

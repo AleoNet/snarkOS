@@ -28,7 +28,7 @@ use snarkvm_dpc::{
     },
     DPCComponents, DPCScheme, RecordScheme, *,
 };
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use rand::Rng;
 use std::{fmt, str::FromStr};
@@ -225,9 +225,9 @@ impl TransactionKernel {
         assert!(!recipients.is_empty());
         assert_eq!(recipients.len(), recipient_amounts.len());
 
-        let noop_program_id = to_bytes![parameters
+        let noop_program_id = to_bytes_le![parameters
             .program_verification_key_crh
-            .hash(&to_bytes![noop_program_snark_parameters.verification_key]?)?]?;
+            .hash(&to_bytes_le![noop_program_snark_parameters.verification_key]?)?]?;
 
         // Construct the new records
         let mut old_records = vec![];
@@ -358,7 +358,7 @@ impl fmt::Display for TransactionKernel {
         write!(
             f,
             "{}",
-            hex::encode(to_bytes![self.transaction_kernel].expect("couldn't serialize to bytes"))
+            hex::encode(to_bytes_le![self.transaction_kernel].expect("couldn't serialize to bytes"))
         )
     }
 }

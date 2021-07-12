@@ -29,7 +29,7 @@ use snarkvm_dpc::{
     Transactions,
 };
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use chrono::Utc;
 use rand::{thread_rng, CryptoRng, Rng};
@@ -72,13 +72,13 @@ impl<S: Storage> Miner<S> {
         transactions: &mut Transactions<Testnet1Transaction>,
         rng: &mut R,
     ) -> Result<Vec<Record<Components>>, ConsensusError> {
-        let program_vk_hash = to_bytes![<Components as DPCComponents>::ProgramVerificationKeyCRH::hash(
+        let program_vk_hash = to_bytes_le![<Components as DPCComponents>::ProgramVerificationKeyCRH::hash(
             &self
                 .consensus
                 .public_parameters
                 .system_parameters
                 .program_verification_key_crh,
-            &to_bytes![
+            &to_bytes_le![
                 self.consensus
                     .public_parameters
                     .noop_program_snark_parameters
@@ -178,7 +178,7 @@ impl<S: Storage> Miner<S> {
         debug!("The miner generated a coinbase transaction");
 
         for (index, record) in coinbase_records.iter().enumerate() {
-            let record_commitment = hex::encode(&to_bytes![record.commitment()]?);
+            let record_commitment = hex::encode(&to_bytes_le![record.commitment()]?);
             debug!("Coinbase record {:?} commitment: {:?}", index, record_commitment);
         }
 

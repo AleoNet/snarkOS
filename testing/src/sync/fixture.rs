@@ -65,7 +65,7 @@ fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
     // Generate addresses
     let test_accounts = generate_test_accounts::<_, S>(&parameters, &mut rng);
 
-    let genesis_block: Block<Testnet1Transaction> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
+    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     let noop_program_parameters = parameters.noop_program_snark_parameters();
 

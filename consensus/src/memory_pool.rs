@@ -28,7 +28,7 @@ use snarkvm_dpc::{BlockHeader, LedgerScheme, Storage, TransactionScheme, Transac
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
-    to_bytes,
+    to_bytes_le,
 };
 
 /// Stores a transaction and it's size in the memory pool.
@@ -101,7 +101,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
             transactions.push(entry.transaction.clone())
         }
 
-        let serialized_transactions = to_bytes![transactions]?.to_vec();
+        let serialized_transactions = to_bytes_le![transactions]?.to_vec();
 
         storage.store_to_memory_pool(serialized_transactions)?;
 
@@ -360,7 +360,7 @@ mod tests {
         let mem_pool = MemoryPool::new();
         let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
 
-        let size = to_bytes![transaction].unwrap().len();
+        let size = to_bytes_le![transaction].unwrap().len();
 
         let expected_transaction = transaction.clone();
         mem_pool

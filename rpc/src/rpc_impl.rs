@@ -33,7 +33,7 @@ use snarkvm_dpc::{
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
     CanonicalSerialize,
 };
 
@@ -210,20 +210,20 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let mut new_commitments = Vec::with_capacity(transaction.new_commitments().len());
 
         for cm in transaction.new_commitments() {
-            new_commitments.push(hex::encode(to_bytes![cm]?));
+            new_commitments.push(hex::encode(to_bytes_le![cm]?));
         }
 
-        let memo = hex::encode(to_bytes![transaction.memorandum()]?);
+        let memo = hex::encode(to_bytes_le![transaction.memorandum()]?);
 
         let mut signatures = Vec::with_capacity(transaction.signatures.len());
         for sig in &transaction.signatures {
-            signatures.push(hex::encode(to_bytes![sig]?));
+            signatures.push(hex::encode(to_bytes_le![sig]?));
         }
 
         let mut encrypted_records = Vec::with_capacity(transaction.encrypted_records.len());
 
         for encrypted_record in &transaction.encrypted_records {
-            encrypted_records.push(hex::encode(to_bytes![encrypted_record]?));
+            encrypted_records.push(hex::encode(to_bytes_le![encrypted_record]?));
         }
 
         let transaction_id = transaction.transaction_id()?;
@@ -244,10 +244,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             new_commitments,
             memo,
             network_id: transaction.network.id(),
-            digest: hex::encode(to_bytes![transaction.ledger_digest]?),
-            transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
-            program_commitment: hex::encode(to_bytes![transaction.program_commitment]?),
-            local_data_root: hex::encode(to_bytes![transaction.local_data_root]?),
+            digest: hex::encode(to_bytes_le![transaction.ledger_digest]?),
+            transaction_proof: hex::encode(to_bytes_le![transaction.transaction_proof]?),
+            program_commitment: hex::encode(to_bytes_le![transaction.program_commitment]?),
+            local_data_root: hex::encode(to_bytes_le![transaction.local_data_root]?),
             value_balance: transaction.value_balance.0,
             signatures,
             encrypted_records,

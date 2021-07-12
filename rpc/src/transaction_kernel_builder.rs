@@ -30,7 +30,7 @@ use snarkvm_dpc::{
     RecordScheme,
     *,
 };
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
@@ -227,10 +227,10 @@ impl TransactionKernel {
         assert!(!recipients.is_empty());
         assert_eq!(recipients.len(), recipient_amounts.len());
 
-        let noop_program_id = to_bytes![
+        let noop_program_id = to_bytes_le![
             parameters
                 .program_verification_key_crh
-                .hash(&to_bytes![noop_program_snark_parameters.verifying_key]?)?
+                .hash(&to_bytes_le![noop_program_snark_parameters.verifying_key]?)?
         ]?;
 
         // Construct the new records

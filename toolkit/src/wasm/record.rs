@@ -19,7 +19,7 @@ use crate::{
     record::Record as RecordNative,
 };
 use snarkvm_dpc::RecordScheme as RecordTrait;
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
@@ -63,32 +63,32 @@ impl Record {
 
     #[wasm_bindgen]
     pub fn payload(&self) -> String {
-        hex::encode(to_bytes![self.record.record.payload()].unwrap())
+        hex::encode(to_bytes_le![self.record.record.payload()].unwrap())
     }
 
     #[wasm_bindgen]
     pub fn birth_program_id(&self) -> String {
-        hex::encode(to_bytes![self.record.record.birth_program_id()].unwrap())
+        hex::encode(to_bytes_le![self.record.record.birth_program_id()].unwrap())
     }
 
     #[wasm_bindgen]
     pub fn death_program_id(&self) -> String {
-        hex::encode(to_bytes![self.record.record.death_program_id()].unwrap())
+        hex::encode(to_bytes_le![self.record.record.death_program_id()].unwrap())
     }
 
     #[wasm_bindgen]
     pub fn serial_number_nonce(&self) -> String {
-        hex::encode(to_bytes![self.record.record.serial_number_nonce()].unwrap())
+        hex::encode(to_bytes_le![self.record.record.serial_number_nonce()].unwrap())
     }
 
     #[wasm_bindgen]
     pub fn commitment(&self) -> String {
-        hex::encode(to_bytes![self.record.record.commitment()].unwrap())
+        hex::encode(to_bytes_le![self.record.record.commitment()].unwrap())
     }
 
     #[wasm_bindgen]
     pub fn commitment_randomness(&self) -> String {
-        hex::encode(to_bytes![self.record.record.commitment_randomness()].unwrap())
+        hex::encode(to_bytes_le![self.record.record.commitment_randomness()].unwrap())
     }
 
     #[wasm_bindgen]

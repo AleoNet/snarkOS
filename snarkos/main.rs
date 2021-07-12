@@ -35,7 +35,7 @@ use snarkvm_dpc::{
     Storage,
 };
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
@@ -156,9 +156,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let inner_snark_id = dpc_parameters
             .system_parameters
             .inner_circuit_id_crh
-            .hash(&to_bytes![inner_snark_vk]?)?;
+            .hash(&to_bytes_le![inner_snark_vk]?)?;
 
-        let authorized_inner_snark_ids = vec![to_bytes![inner_snark_id]?];
+        let authorized_inner_snark_ids = vec![to_bytes_le![inner_snark_id]?];
 
         // Set the initial sync parameters.
         let consensus_params = ConsensusParameters {
@@ -185,7 +185,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
             let mut processed = 0usize;
             let mut imported = 0usize;
-            while let Ok(block) = FromBytes::read(&mut blocks) {
+            while let Ok(block) = FromBytes::read_le(&mut blocks) {
                 // Skip possible duplicate blocks etc.
                 if consensus.receive_block(&block, true).await.is_ok() {
                     imported += 1;
