@@ -25,8 +25,6 @@ use snarkvm_dpc::{
     testnet1::{instantiated::*, NoopProgram},
     Account,
     Block,
-    DPCScheme,
-    ProgramScheme,
     Storage,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
@@ -35,19 +33,20 @@ use snarkvm_utilities::bytes::FromBytes;
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 pub static FIXTURE: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(false));
 pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
 pub struct Fixture<S: Storage> {
-    pub parameters: <Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+    pub dpc: Arc<Testnet1DPC>,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: Arc<CommitmentMerkleParameters>,
     pub genesis_block: Block<Testnet1Transaction>,
     pub program: NoopProgram<Components>,
     pub rng: ChaChaRng,
+    _storage: PhantomData<S>,
 }
 
 impl<S: Storage> Fixture<S> {
@@ -60,28 +59,24 @@ fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
     let mut rng = ChaChaRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, parameters) = setup_or_load_parameters::<_, S>(verify_only, &mut rng);
+    let (ledger_parameters, dpc) = setup_or_load_parameters::<_, S>(verify_only, &mut rng);
 
     // Generate addresses
-    let test_accounts = generate_test_accounts::<_, S>(&parameters, &mut rng);
+    let test_accounts = generate_test_accounts::<_, S>(&dpc, &mut rng);
 
     let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
 
-    let noop_program_parameters = parameters.noop_program_snark_parameters();
+    let program = dpc.noop_program.clone();
 
-    let program = NoopProgram::new(
-        &parameters.system_parameters.program_verification_key_crh,
-        noop_program_parameters.proving_key.clone(),
-        noop_program_parameters.verifying_key.clone(),
-    )
-    .unwrap();
+    let dpc = Arc::new(dpc);
 
     Fixture {
-        parameters,
+        dpc,
         test_accounts,
         ledger_parameters,
         genesis_block,
         program,
         rng,
+        _storage: PhantomData,
     }
 }

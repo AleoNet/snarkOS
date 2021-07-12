@@ -23,10 +23,7 @@ use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameter
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, Node, Sync};
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1Transaction},
-        parameters::PublicParameters,
-    },
+    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
     BlockHeaderHash,
     Storage,
     TransactionScheme,
@@ -88,7 +85,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcImpl<S> {
         Ok(self.sync_handler()?.consensus_parameters())
     }
 
-    pub fn dpc_parameters(&self) -> Result<&PublicParameters<Components>, RpcError> {
+    pub fn dpc(&self) -> Result<&Testnet1DPC, RpcError> {
         Ok(self.sync_handler()?.dpc_parameters())
     }
 
@@ -197,7 +194,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
         self.storage.catch_up_secondary(false)?;
         let transaction_bytes = hex::decode(transaction_bytes)?;
-        let transaction = Testnet1Transaction::read(&transaction_bytes[..])?;
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
 
         let mut old_serial_numbers = Vec::with_capacity(transaction.old_serial_numbers().len());
 
@@ -260,7 +257,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the transaction id if valid.
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
-        let transaction = Testnet1Transaction::read(&transaction_bytes[..])?;
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
         let transaction_hex_id = hex::encode(transaction.transaction_id()?);
 
         let storage = &self.storage;
@@ -306,7 +303,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Validate and return if the transaction is valid.
     fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
-        let transaction = Testnet1Transaction::read(&transaction_bytes[..])?;
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
 
         let storage = &self.storage;
 

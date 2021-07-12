@@ -29,8 +29,12 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_dpc::{
-    testnet1::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
-    AccountAddress,
+    testnet1::{
+        instantiated::{Components, Testnet1DPC},
+        Testnet1Components,
+    },
+    Address,
+    DPCScheme,
     Network,
     Storage,
 };
@@ -147,13 +151,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let memory_pool = MemoryPool::from_storage(&storage).await?;
 
         debug!("Loading Aleo parameters...");
-        let dpc_parameters = PublicParameters::<Components>::load(!config.miner.is_miner)?;
+        let dpc = <Testnet1DPC as DPCScheme<MerkleTreeLedger<LedgerStorage>>>::load(!config.miner.is_miner)?;
         info!("Loaded Aleo parameters");
 
         // Fetch the set of valid inner circuit IDs.
-        let inner_snark_vk: <<Components as BaseDPCComponents>::InnerSNARK as SNARK>::VerifyingKey =
-            dpc_parameters.inner_snark_parameters.1.clone().into();
-        let inner_snark_id = dpc_parameters
+        let inner_snark_vk: <<Components as Testnet1Components>::InnerSNARK as SNARK>::VerifyingKey =
+            dpc.inner_snark_parameters.1.clone().into();
+        let inner_snark_id = dpc
             .system_parameters
             .inner_circuit_id_crh
             .hash(&to_bytes_le![inner_snark_vk]?)?;
@@ -165,7 +169,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             max_block_size: 1_000_000_000usize,
             max_nonce: u32::max_value(),
             target_block_time: 10i64,
-            network_id: Network::from_network_id(config.aleo.network_id),
+            network_id: Network::from_id(config.aleo.network_id),
             verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
             authorized_inner_snark_ids,
         };
@@ -174,7 +178,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             ledger: Arc::clone(&storage),
             memory_pool,
             parameters: consensus_params,
-            dpc: dpc_parameters,
+            dpc: Arc::new(dpc),
         });
 
         if let Some(import_path) = config.storage.import {
@@ -249,7 +253,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start the miner task if mining configuration is enabled.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     if config.miner.is_miner {
-        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+        match Address::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
                 let handle = MinerInstance::new(miner_address, node.clone()).spawn();
                 node.register_task(handle);

@@ -273,7 +273,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
         mem_pool
@@ -306,7 +306,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
         let entry = Entry::<Testnet1Transaction> {
@@ -330,7 +330,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         let size = TRANSACTION_2.len();
 
         mem_pool
@@ -358,7 +358,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
 
         let size = to_bytes_le![transaction].unwrap().len();
 
@@ -383,7 +383,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
                 size_in_bytes: TRANSACTION_2.len(),
@@ -409,7 +409,7 @@ mod tests {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
-        let transaction = Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
             .insert(&blockchain, Entry {
                 size_in_bytes: TRANSACTION_2.len(),
@@ -422,8 +422,8 @@ mod tests {
 
         mem_pool.store(&blockchain).unwrap();
 
-        let block_1 = Block::<Testnet1Transaction>::read(&BLOCK_1[..]).unwrap();
-        let block_2 = Block::<Testnet1Transaction>::read(&BLOCK_2[..]).unwrap();
+        let block_1 = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
+        let block_2 = Block::<Testnet1Transaction>::read_le(&BLOCK_2[..]).unwrap();
 
         blockchain.insert_and_commit(&block_1).unwrap();
         blockchain.insert_and_commit(&block_2).unwrap();

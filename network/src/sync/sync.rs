@@ -18,10 +18,7 @@ use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::BlockHeight;
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1Transaction},
-        parameters::PublicParameters,
-    },
+    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
     Storage,
 };
 
@@ -79,7 +76,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
 
     /// Returns a reference to the DPC parameters of this node.
     #[inline]
-    pub fn dpc_parameters(&self) -> &PublicParameters<Components> {
+    pub fn dpc_parameters(&self) -> &Testnet1DPC {
         &self.consensus.dpc
     }
 

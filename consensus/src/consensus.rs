@@ -43,7 +43,7 @@ use std::sync::Arc;
 
 pub struct Consensus<S: Storage> {
     pub parameters: ConsensusParameters,
-    pub dpc: Testnet1DPC,
+    pub dpc: Arc<Testnet1DPC>,
     pub ledger: Arc<MerkleTreeLedger<S>>,
     pub memory_pool: MemoryPool<Testnet1Transaction>,
 }

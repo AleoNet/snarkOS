@@ -71,12 +71,12 @@ mod consensus_dpc {
 
         let old_account_private_keys = vec![miner_acc.private_key; Components::NUM_INPUT_RECORDS];
         let old_records = coinbase_records;
-        let new_birth_program_ids = vec![program.into_compact_repr(); Components::NUM_INPUT_RECORDS];
+        let new_birth_program_ids = vec![program.id(); Components::NUM_INPUT_RECORDS];
 
         // OUTPUTS
 
         let new_record_owners = vec![recipient.address; Components::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![program.into_compact_repr(); Components::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![program.id(); Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
         let new_values = vec![10; Components::NUM_OUTPUT_RECORDS];
         let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];

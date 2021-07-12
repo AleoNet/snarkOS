@@ -126,8 +126,8 @@ fn send<R: Rng + CryptoRng, S: Storage>(
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
 
-    let input_programs = vec![FIXTURE.program.into_compact_repr(); Components::NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.into_compact_repr(); Components::NUM_OUTPUT_RECORDS];
+    let input_programs = vec![FIXTURE.program.id(); Components::NUM_INPUT_RECORDS];
+    let output_programs = vec![FIXTURE.program.id(); Components::NUM_OUTPUT_RECORDS];
 
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
@@ -155,5 +155,5 @@ pub fn main() {
     const TEST_DATA_FILE: &str = "test_data";
 
     let file = std::io::BufWriter::new(File::create(PathBuf::from(TEST_DATA_FILE)).expect("could not open file"));
-    test_data.write(file).expect("could not write to file");
+    test_data.write_le(file).expect("could not write to file");
 }

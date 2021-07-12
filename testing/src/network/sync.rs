@@ -238,12 +238,12 @@ async fn transaction_initiator_side() {
     // Create the entries to verify
     let entry_1 = Entry {
         size_in_bytes: TRANSACTION_1.len(),
-        transaction: Testnet1Transaction::read(&TRANSACTION_1[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap(),
     };
 
     let entry_2 = Entry {
         size_in_bytes: TRANSACTION_2.len(),
-        transaction: Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap(),
     };
 
     // Verify the transactions have been stored in the node's memory pool
@@ -266,12 +266,12 @@ async fn transaction_responder_side() {
 
     let entry_1 = Entry {
         size_in_bytes: TRANSACTION_1.len(),
-        transaction: Testnet1Transaction::read(&TRANSACTION_1[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap(),
     };
 
     let entry_2 = Entry {
         size_in_bytes: TRANSACTION_2.len(),
-        transaction: Testnet1Transaction::read(&TRANSACTION_2[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap(),
     };
 
     memory_pool.insert(&storage, entry_1).await.unwrap().unwrap();
@@ -307,7 +307,7 @@ async fn transaction_two_node() {
     let memory_pool = node_alice.expect_sync().memory_pool();
     let storage = node_alice.expect_sync().storage();
 
-    let transaction = Testnet1Transaction::read(&TRANSACTION_1[..]).unwrap();
+    let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
     let size = TRANSACTION_1.len();
     let entry = Entry {
         size_in_bytes: size,

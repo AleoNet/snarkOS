@@ -53,7 +53,7 @@ mod rpc_tests {
     }
 
     fn verify_transaction_info(transaction_bytes: Vec<u8>, transaction_info: Value) {
-        let transaction = Testnet1Transaction::read(&transaction_bytes[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..]).unwrap();
 
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
         let transaction_size = transaction_bytes.len();
@@ -239,7 +239,7 @@ mod rpc_tests {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(storage).await;
 
-        let transaction = Testnet1Transaction::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
 
         assert_eq!(
             rpc.request("sendtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),

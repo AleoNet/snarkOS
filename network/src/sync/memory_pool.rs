@@ -69,7 +69,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         source: SocketAddr,
         transaction: Vec<u8>,
     ) -> Result<(), NetworkError> {
-        if let Ok(tx) = Testnet1Transaction::read(&*transaction) {
+        if let Ok(tx) = Testnet1Transaction::read_le(&*transaction) {
             let insertion = {
                 let storage = self.expect_sync().storage();
 
@@ -131,7 +131,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let storage = self.expect_sync().storage();
 
         for transaction_bytes in transactions {
-            let transaction: Testnet1Transaction = Testnet1Transaction::read(&transaction_bytes[..])?;
+            let transaction: Testnet1Transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
             let entry = Entry::<Testnet1Transaction> {
                 size_in_bytes: transaction_bytes.len(),
                 transaction,

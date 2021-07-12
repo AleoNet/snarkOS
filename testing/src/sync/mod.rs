@@ -127,14 +127,14 @@ impl TransactionScheme for TestTestnet1Transaction {
 
 impl ToBytes for TestTestnet1Transaction {
     #[inline]
-    fn write<W: Write>(&self, mut _writer: W) -> IoResult<()> {
+    fn write_le<W: Write>(&self, mut _writer: W) -> IoResult<()> {
         Ok(())
     }
 }
 
 impl FromBytes for TestTestnet1Transaction {
     #[inline]
-    fn read<R: Read>(mut _reader: R) -> IoResult<Self> {
+    fn read_le<R: Read>(mut _reader: R) -> IoResult<Self> {
         Ok(Self)
     }
 }
@@ -150,6 +150,6 @@ pub fn create_test_consensus_from_ledger(
         ledger,
         memory_pool: Default::default(),
         parameters: TEST_CONSENSUS_PARAMS.clone(),
-        dpc: FIXTURE.parameters.clone(),
+        dpc: FIXTURE.dpc.clone(),
     }
 }

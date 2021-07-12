@@ -31,10 +31,10 @@ mod protected_rpc_tests {
             record::Record as DPCRecord,
             TransactionKernel,
         },
-        AccountAddress,
-        AccountPrivateKey,
-        AccountViewKey,
+        Address,
+        PrivateKey,
         RecordScheme,
+        ViewKey,
     };
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
@@ -223,15 +223,15 @@ mod protected_rpc_tests {
         let meta = authentication();
         let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
-        let system_parameters = &FIXTURE_VK.parameters.system_parameters;
+        let system_parameters = &FIXTURE_VK.dpc.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
 
-        let transaction = Testnet1Transaction::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
         let ciphertexts = transaction.encrypted_records;
 
         let records = &DATA.records_1;
 
-        let view_key = AccountViewKey::from_private_key(
+        let view_key = ViewKey::from_private_key(
             &system_parameters.account_signature,
             &system_parameters.account_commitment,
             &miner_acc.private_key,
@@ -414,8 +414,8 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
+        let _address = Address::<Components>::from_str(&account.address).unwrap();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
         let response = rpc.handle_request_sync(&request, meta).unwrap();
@@ -424,7 +424,7 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = AccountPrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = AccountAddress::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
+        let _address = Address::<Components>::from_str(&account.address).unwrap();
     }
 }

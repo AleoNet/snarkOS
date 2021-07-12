@@ -79,36 +79,36 @@ pub struct TestData {
 
 impl ToBytes for TestData {
     #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.block_1.write(&mut writer)?;
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.block_1.write_le(&mut writer)?;
 
-        self.block_2.write(&mut writer)?;
+        self.block_2.write_le(&mut writer)?;
 
         writer.write_all(&(self.records_1.len() as u64).to_le_bytes())?;
-        self.records_1.write(&mut writer)?;
+        self.records_1.write_le(&mut writer)?;
 
         writer.write_all(&(self.records_2.len() as u64).to_le_bytes())?;
-        self.records_2.write(&mut writer)?;
+        self.records_2.write_le(&mut writer)?;
 
-        self.alternative_block_1_header.write(&mut writer)?;
-        self.alternative_block_2_header.write(&mut writer)?;
+        self.alternative_block_1_header.write_le(&mut writer)?;
+        self.alternative_block_2_header.write_le(&mut writer)?;
 
         Ok(())
     }
 }
 
 impl FromBytes for TestData {
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let block_1: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
 
         let block_2: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
 
-        let len = u64::read(&mut reader)? as usize;
+        let len = u64::read_le(&mut reader)? as usize;
         let records_1 = (0..len)
             .map(|_| FromBytes::read_le(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let len = u64::read(&mut reader)? as usize;
+        let len = u64::read_le(&mut reader)? as usize;
         let records_2 = (0..len)
             .map(|_| FromBytes::read_le(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
@@ -128,7 +128,7 @@ impl FromBytes for TestData {
 }
 
 fn load_test_data() -> TestData {
-    TestData::read(&include_bytes!("test_data")[..]).unwrap()
+    TestData::read_le(&include_bytes!("test_data")[..]).unwrap()
 }
 
 #[derive(Debug)]
@@ -142,20 +142,20 @@ impl TestBlocks {
     pub fn load(count: Option<usize>, batch_name: &str) -> Self {
         let blocks_path = format!("{}/src/sync/{}", env!("CARGO_MANIFEST_DIR"), batch_name);
         let blocks_bytes = std::fs::read(&blocks_path).unwrap();
-        TestBlocks::read(&*blocks_bytes, count).unwrap()
+        TestBlocks::read_le(&*blocks_bytes, count).unwrap()
     }
 
-    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+    pub fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         for block in &self.0 {
             // Clone is necessary here, otherwise weird things happen.
             let block = block.clone();
-            block.write(&mut writer)?;
+            block.write_le(&mut writer)?;
         }
 
         Ok(())
     }
 
-    pub fn read<R: Read>(mut reader: R, count: Option<usize>) -> IoResult<Self> {
+    pub fn read_le<R: Read>(mut reader: R, count: Option<usize>) -> IoResult<Self> {
         let mut blocks = Vec::new();
 
         if let Some(count) = count {
