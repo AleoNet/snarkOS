@@ -196,21 +196,6 @@ jobs:
       - clear_environment:
           cache_key: snarkos-testing-cache
 
-  snarkos-toolkit:
-    docker:
-      - image: cimg/rust:1.51.0
-    resource_class: xlarge
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-toolkit-cache
-      - run:
-          name: Build and run tests
-          no_output_timeout: 35m
-          command: cd toolkit && RUST_MIN_STACK=8388608 cargo test
-      - clear_environment:
-          cache_key: snarkos-toolkit-cache
-
 workflows:
   version: 2
   main-workflow:
@@ -227,4 +212,3 @@ workflows:
       - snarkos-rpc
       - snarkos-storage
       - snarkos-testing
-      - snarkos-toolkit
