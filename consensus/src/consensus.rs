@@ -35,6 +35,7 @@ use snarkvm_dpc::{
     DPCScheme,
     LedgerScheme,
     Storage,
+    StorageError,
     Transactions as DPCTransactions,
 };
 use snarkvm_posw::txids_to_roots;
@@ -194,12 +195,15 @@ impl<S: Storage> Consensus<S> {
                         side_chain_path.new_block_number
                     );
 
-                    // If the side chain is now longer than the canon chain,
+                    // If the side chain is now heavier than the canon chain,
                     // perform a fork to the side chain.
-                    if side_chain_path.new_block_number > self.ledger.get_current_block_height() {
+                    let canon_difficulty =
+                        self.get_canon_difficulty_from_height(side_chain_path.shared_block_number)?;
+
+                    if side_chain_path.aggregate_difficulty > canon_difficulty {
                         debug!(
-                            "Determined side chain is longer than canon chain by {} blocks",
-                            side_chain_path.new_block_number - self.ledger.get_current_block_height()
+                            "Determined side chain is heavier than canon chain by {}%",
+                            get_delta_percentage(side_chain_path.aggregate_difficulty, canon_difficulty)
                         );
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
@@ -391,4 +395,25 @@ impl<S: Storage> Consensus<S> {
             rng,
         )
     }
+
+    fn get_canon_difficulty_from_height(&self, height: u32) -> Result<u128, StorageError> {
+        let current_block_height = self.ledger.get_current_block_height();
+        let path_size = current_block_height - height;
+        let mut aggregate_difficulty = 0u128;
+
+        for i in 0..path_size {
+            let block_header = self
+                .ledger
+                .get_block_header(&self.ledger.get_block_hash(current_block_height - i)?)?;
+
+            aggregate_difficulty += block_header.difficulty_target as u128;
+        }
+
+        Ok(aggregate_difficulty)
+    }
+}
+
+fn get_delta_percentage(side_chain_diff: u128, canon_diff: u128) -> f64 {
+    let delta = side_chain_diff - canon_diff;
+    (delta as f64 / canon_diff as f64) * 100.0
 }

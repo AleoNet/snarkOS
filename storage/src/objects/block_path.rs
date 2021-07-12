@@ -37,6 +37,9 @@ pub struct SideChainPath {
 
     /// Path of block hashes from the shared block to the latest diverging block (oldest first).
     pub path: Vec<BlockHeaderHash>,
+
+    /// The accumulated difficulty targets for all block headers in the sidechain.
+    pub aggregate_difficulty: u128,
 }
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
@@ -55,6 +58,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         let mut side_chain_path = vec![];
+        let mut side_chain_diff = block_header.difficulty_target as u128;
         let mut parent_hash = block_header.previous_block_hash.clone();
 
         // Find the sidechain path (with a maximum size of OLDEST_FORK_THRESHOLD)
@@ -64,8 +68,15 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 // This is a canon parent
                 Ok(block_num) => {
                     // Add the children from the latest block
-
                     let longest_path = self.longest_child_path(block_hash)?;
+
+                    // Add all the difficulty targets associated with the longest_path,
+                    // skipping the first element (which is the hash associated to
+                    // `block_header`).
+                    for hash in longest_path.iter().skip(1) {
+                        let block_header = self.get_block_header(hash)?;
+                        side_chain_diff += block_header.difficulty_target as u128;
+                    }
 
                     side_chain_path.extend(longest_path);
 
@@ -73,12 +84,15 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                         shared_block_number: *block_num,
                         new_block_number: block_num + side_chain_path.len() as u32,
                         path: side_chain_path,
+                        aggregate_difficulty: side_chain_diff,
                     }));
                 }
                 // Add to the side_chain_path
                 Err(_) => {
                     side_chain_path.insert(0, parent_hash.clone());
-                    parent_hash = self.get_block_header(&parent_hash)?.previous_block_hash;
+                    let parent_header = self.get_block_header(&parent_hash)?;
+                    side_chain_diff += parent_header.difficulty_target as u128;
+                    parent_hash = parent_header.previous_block_hash;
                 }
             }
         }
