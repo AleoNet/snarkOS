@@ -36,7 +36,7 @@ default-features = false
 features = [ "wasm" ]
 
 [dependencies.snarkvm-utilities]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.anyhow]
 version = "1.0.40"

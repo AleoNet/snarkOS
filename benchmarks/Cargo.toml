@@ -48,7 +48,7 @@ version = "0.5.4"
 version = "0.5.4"
 
 [dependencies.snarkvm-utilities]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
