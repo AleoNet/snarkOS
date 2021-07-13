@@ -318,7 +318,6 @@ pub struct PotentialFork {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Vertice {
     pub addr: SocketAddr,
-    pub block_height: u32,
     pub is_bootnode: bool,
 
     // Centrality measurements for the node.
