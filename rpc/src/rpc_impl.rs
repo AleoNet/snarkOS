@@ -387,7 +387,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     fn get_network_graph(&self) -> Result<NetworkGraph, RpcError> {
         // Copy the connections as the data must not change throughout the metrics computation.
-        let connections = self.known_network()?.connections();
+        let known_network = self.known_network()?;
+        let connections = known_network.connections();
 
         // Collect the edges.
         let edges = connections
@@ -402,17 +403,75 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let network_metrics = NetworkMetrics::new(connections);
 
         // Collect the vertices with the metrics.
-        let vertices = network_metrics
+        let vertices: Vec<Vertice> = network_metrics
             .centrality
             .iter()
-            .map(|(addr, node_centrality)| Vertice {
-                addr: *addr,
-                is_bootnode: self.node.config.bootnodes().contains(&addr),
-                degree_centrality: node_centrality.degree_centrality,
-                eigenvector_centrality: node_centrality.eigenvector_centrality,
-                fiedler_value: node_centrality.fiedler_value,
+            .map(|(addr, node_centrality)| {
+                // Return the block height for the node if it is in the peerbook (not all crawled
+                // addresses will be), 0 indicates the height isn't known.
+
+                let block_height = match self.node.peer_book.get_disconnected_peer(*addr) {
+                    Some(peer) => peer.quality.block_height,
+                    None => 0,
+                };
+
+                Vertice {
+                    addr: *addr,
+                    block_height,
+                    is_bootnode: self.node.config.bootnodes().contains(&addr),
+                    degree_centrality: node_centrality.degree_centrality,
+                    eigenvector_centrality: node_centrality.eigenvector_centrality,
+                    fiedler_value: node_centrality.fiedler_value,
+                }
             })
             .collect();
+
+        let potential_forks = known_network
+            .potential_forks()
+            .into_iter()
+            .map(|(height, members)| PotentialFork { height, members })
+            .collect();
+
+        //  // Sort vertices into clusters at similar heights.
+        //  let potential_forks = if !nodes.is_empty() {
+        //      use itertools::Itertools;
+        //      const HEIGHT_DELTA_TOLERANCE: u32 = 5;
+
+        //      vertices.sort_unstable_by_key(|v| v.block_height);
+
+        //      // Clone the vertices and only keep nodes that aren't at a height of `0`.
+        //      let mut nodes = vertices.clone();
+        //      nodes.retain(|node| node.block_height != 0);
+
+        //      // Find the indexes at which the split the heights.
+        //      let split_indexes: Vec<usize> = nodes
+        //          .iter()
+        //          .tuple_windows()
+        //          .enumerate()
+        //          .filter(|(_i, (a, b))| b.block_height - a.block_height >= HEIGHT_DELTA_TOLERANCE)
+        //          .map(|(i, _)| i + 1)
+        //          .collect();
+
+        //      // Create the clusters based on the indexes.
+        //      let mut nodes_grouped = Vec::with_capacity(nodes.len());
+        //      for i in split_indexes.iter().rev() {
+        //          nodes_grouped.insert(0, nodes.split_off(*i));
+        //      }
+
+        //      // Don't forget the first cluster left after the `split_off` operation.
+        //      nodes_grouped.insert(0, nodes);
+
+        //      // Remove the last cluster since it will contain the nodes even with the chain tip.
+        //      nodes_grouped.pop();
+
+        //      // Filter out any clusters smaller than three nodes, this minimises the false-positives
+        //      // as it's reasonable to assume a fork would include more than 2 members.
+        //      nodes_grouped.retain(|s| s.len() > 2);
+
+        //      nodes_grouped
+        //  } else {
+        //      vec![]
+        //  };
 
         Ok(NetworkGraph {
             node_count: network_metrics.node_count,
@@ -420,6 +479,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             density: network_metrics.density,
             algebraic_connectivity: network_metrics.algebraic_connectivity,
             degree_centrality_delta: network_metrics.degree_centrality_delta,
+            potential_forks,
             vertices,
             edges,
         })
