@@ -16,7 +16,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     hash::{Hash, Hasher},
     net::SocketAddr,
     ops::Sub,
@@ -86,11 +86,19 @@ impl Connection {
     }
 }
 
+pub enum KnownNetworkMessage {
+    Peers((SocketAddr, Vec<SocketAddr>)),
+    Height((SocketAddr, u32)),
+}
+
 /// Keeps track of crawled peers and their connections.
 #[derive(Debug)]
 pub struct KnownNetwork {
-    pub sender: Sender<(SocketAddr, Vec<SocketAddr>)>,
-    receiver: Mutex<Receiver<(SocketAddr, Vec<SocketAddr>)>>,
+    pub sender: Sender<KnownNetworkMessage>,
+    receiver: Mutex<Receiver<KnownNetworkMessage>>,
+
+    // The nodes and their block height if known.
+    nodes: RwLock<HashMap<SocketAddr, u32>>,
     connections: RwLock<HashSet<Connection>>,
 }
 
@@ -102,6 +110,7 @@ impl Default for KnownNetwork {
         Self {
             sender: tx,
             receiver: Mutex::new(rx),
+            nodes: Default::default(),
             connections: Default::default(),
         }
     }
@@ -110,13 +119,16 @@ impl Default for KnownNetwork {
 impl KnownNetwork {
     /// Updates the crawled connection set.
     pub async fn update(&self) {
-        if let Some((source, peers)) = self.receiver.lock().await.recv().await {
-            self.update_inner(source, peers);
+        if let Some(message) = self.receiver.lock().await.recv().await {
+            match message {
+                KnownNetworkMessage::Peers((source, peers)) => self.update_connections(source, peers),
+                KnownNetworkMessage::Height((source, height)) => self.update_height(source, height),
+            }
         }
     }
 
     // More convenient for testing.
-    fn update_inner(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
+    fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.
@@ -159,6 +171,16 @@ impl KnownNetwork {
         }
     }
 
+    /// Update the height stored for this particular node.
+    pub fn update_height(&self, source: SocketAddr, height: u32) {
+        self.nodes.write().insert(source, height);
+    }
+
+    /// Returns `true` if the known network contains any connections, `false` otherwise.
+    pub fn has_connections(&self) -> bool {
+        !self.connections.read().is_empty()
+    }
+
     /// Returns a connection.
     pub fn get_connection(&self, source: SocketAddr, target: SocketAddr) -> Option<Connection> {
         self.connections.read().get(&Connection::new(source, target)).copied()
@@ -169,9 +191,9 @@ impl KnownNetwork {
         self.connections.read().clone()
     }
 
-    /// Returns `true` if the known network contains any connections, `false` otherwise.
-    pub fn has_connections(&self) -> bool {
-        !self.connections.read().is_empty()
+    /// Returns a snapshot of all the nodes.
+    pub fn nodes(&self) -> HashMap<SocketAddr, u32> {
+        self.nodes.read().clone()
     }
 }
 
@@ -211,6 +233,7 @@ impl NetworkMetrics {
         }
 
         // Construct the list of nodes from the connections.
+        // FIXME: dedup?
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
         for connection in connections.iter() {
             // Using a hashset guarantees uniqueness.

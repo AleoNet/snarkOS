@@ -18,7 +18,7 @@ use snarkvm_dpc::Storage;
 
 use snarkos_metrics::{self as metrics, inbound::*};
 
-use crate::{Direction, Message, NetworkError, Node, Payload, Peer};
+use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload, Peer};
 
 use super::network::PeerIOHandle;
 
@@ -59,6 +59,13 @@ impl Peer {
                 network.write_payload(&Payload::Pong).await?;
                 self.quality.block_height = block_height;
                 metrics::increment_counter!(PINGS);
+
+                // Relay the height to the known network.
+                if let Some(known_network) = node.known_network() {
+                    let _ = known_network
+                        .sender
+                        .try_send(KnownNetworkMessage::Height((self.address, block_height)));
+                }
             }
             payload => {
                 node.route(Message {

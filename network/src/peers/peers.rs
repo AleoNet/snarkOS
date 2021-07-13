@@ -22,7 +22,7 @@ use tokio::task;
 
 use snarkos_metrics::{self as metrics, connections::*};
 
-use crate::{message::*, NetworkError, Node};
+use crate::{message::*, KnownNetworkMessage, NetworkError, Node};
 
 impl<S: Storage + core::marker::Sync + Send> Node<S> {
     /// Obtain a list of addresses of connected peers for this node.
@@ -319,7 +319,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // If this node is tracking the network, record the connections. This can
             // then be used to construct the graph and query peer info from the peerbook.
 
-            let _ = known_network.sender.try_send((source, peers));
+            let _ = known_network
+                .sender
+                .try_send(KnownNetworkMessage::Peers((source, peers)));
         }
     }
 
