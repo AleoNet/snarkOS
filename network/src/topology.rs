@@ -169,6 +169,8 @@ impl KnownNetwork {
                 connections_g.replace(new_connection);
             }
         }
+
+        // TODO: remove the nodes that no longer correspond to connections.
     }
 
     /// Update the height stored for this particular node.
@@ -194,6 +196,53 @@ impl KnownNetwork {
     /// Returns a snapshot of all the nodes.
     pub fn nodes(&self) -> HashMap<SocketAddr, u32> {
         self.nodes.read().clone()
+    }
+
+    /// Returns a map of the potential forks.
+    pub fn potential_forks(&self) -> HashMap<u32, Vec<SocketAddr>> {
+        const HEIGHT_DELTA_TOLERANCE: u32 = 5;
+        use itertools::Itertools;
+
+        let mut nodes: Vec<(SocketAddr, u32)> = self.nodes().into_iter().collect();
+
+        nodes.sort_unstable_by_key(|&(_, height)| height);
+
+        // Find the indexes at which the split the heights.
+        let split_indexes: Vec<usize> = nodes
+            .iter()
+            .tuple_windows()
+            .enumerate()
+            .filter(|(_i, (a, b))| b.1 - a.1 >= HEIGHT_DELTA_TOLERANCE)
+            .map(|(i, _)| i + 1)
+            .collect();
+
+        // Create the clusters based on the indexes.
+        let mut nodes_grouped = Vec::with_capacity(nodes.len());
+        for i in split_indexes.iter().rev() {
+            nodes_grouped.insert(0, nodes.split_off(*i));
+        }
+
+        // Don't forget the first cluster left after the `split_off` operation.
+        nodes_grouped.insert(0, nodes);
+
+        // Remove the last cluster since it will contain the nodes even with the chain tip.
+        nodes_grouped.pop();
+
+        // Filter out any clusters smaller than three nodes, this minimises the false-positives
+        // as it's reasonable to assume a fork would include more than 2 members.
+        nodes_grouped.retain(|s| s.len() > 2);
+
+        let mut potential_forks = HashMap::new();
+
+        for cluster in nodes_grouped {
+            // Safe since no clusters are of length 0.
+            let max_height = cluster.iter().map(|(_, height)| height).max().unwrap();
+            let addrs = cluster.iter().map(|(addr, _)| addr).copied().collect();
+
+            potential_forks.insert(*max_height, addrs);
+        }
+
+        potential_forks
     }
 }
 
