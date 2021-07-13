@@ -160,7 +160,7 @@ impl KnownNetwork {
             .write()
             .retain(|connection| !connections_to_remove.contains(connection));
 
-        // Scope the write lock.
+        // Scope the write lock: insert new connections.
         {
             let mut connections_g = self.connections.write();
 
@@ -170,7 +170,15 @@ impl KnownNetwork {
             }
         }
 
-        // TODO: remove the nodes that no longer correspond to connections.
+        // Scope the write lock: remove nodes that don't have connections.
+        {
+            let mut nodes_g = self.nodes.write();
+
+            // Remove the nodes that no longer correspond to connections.
+            let node_addrs: HashSet<SocketAddr> = nodes_g.iter().map(|(&addr, _)| addr).collect();
+            let diff: HashSet<SocketAddr> = node_addrs.difference(&self.nodes_from_connections()).copied().collect();
+            nodes_g.retain(|addr, _| !diff.contains(addr));
+        }
     }
 
     /// Update the height stored for this particular node.
@@ -198,13 +206,24 @@ impl KnownNetwork {
         self.nodes.read().clone()
     }
 
+    /// Constructs a set of nodes contained from the connection set.
+    pub fn nodes_from_connections(&self) -> HashSet<SocketAddr> {
+        let mut nodes: HashSet<SocketAddr> = HashSet::new();
+        for connection in self.connections().iter() {
+            // Using a hashset guarantees uniqueness.
+            nodes.insert(connection.source);
+            nodes.insert(connection.target);
+        }
+
+        nodes
+    }
+
     /// Returns a map of the potential forks.
     pub fn potential_forks(&self) -> HashMap<u32, Vec<SocketAddr>> {
         const HEIGHT_DELTA_TOLERANCE: u32 = 5;
         use itertools::Itertools;
 
         let mut nodes: Vec<(SocketAddr, u32)> = self.nodes().into_iter().collect();
-
         nodes.sort_unstable_by_key(|&(_, height)| height);
 
         // Find the indexes at which the split the heights.
@@ -229,13 +248,12 @@ impl KnownNetwork {
         nodes_grouped.pop();
 
         // Filter out any clusters smaller than three nodes, this minimises the false-positives
-        // as it's reasonable to assume a fork would include more than 2 members.
+        // as it's reasonable to assume a fork would include more than two members.
         nodes_grouped.retain(|s| s.len() > 2);
 
         let mut potential_forks = HashMap::new();
-
         for cluster in nodes_grouped {
-            // Safe since no clusters are of length 0.
+            // Safe since no clusters are of length `0`.
             let max_height = cluster.iter().map(|(_, height)| height).max().unwrap();
             let addrs = cluster.iter().map(|(addr, _)| addr).copied().collect();
 
