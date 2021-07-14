@@ -64,7 +64,7 @@ impl Peer {
                 if let Some(known_network) = node.known_network() {
                     let _ = known_network
                         .sender
-                        .try_send(KnownNetworkMessage::Height((self.address, block_height)));
+                        .try_send(KnownNetworkMessage::Height(self.address, block_height));
                 }
             }
             payload => {

@@ -88,8 +88,10 @@ impl Connection {
 
 /// Message types passed through the `KnownNetwork` channel.
 pub enum KnownNetworkMessage {
-    Peers((SocketAddr, Vec<SocketAddr>)),
-    Height((SocketAddr, u32)),
+    /// Maps a peer address to its peers.
+    Peers(SocketAddr, Vec<SocketAddr>),
+    /// Maps a peer address to its block height.
+    Height(SocketAddr, u32),
 }
 
 /// Keeps track of crawled peers and their connections.
@@ -122,8 +124,8 @@ impl KnownNetwork {
     pub async fn update(&self) {
         if let Some(message) = self.receiver.lock().await.recv().await {
             match message {
-                KnownNetworkMessage::Peers((source, peers)) => self.update_connections(source, peers),
-                KnownNetworkMessage::Height((source, height)) => self.update_height(source, height),
+                KnownNetworkMessage::Peers(source, peers) => self.update_connections(source, peers),
+                KnownNetworkMessage::Height(source, height) => self.update_height(source, height),
             }
         }
     }
