@@ -178,7 +178,7 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
 
             // Remove the nodes that no longer correspond to connections.
-            let node_addrs: HashSet<SocketAddr> = nodes_g.iter().map(|(&addr, _)| addr).collect();
+            let node_addrs: HashSet<SocketAddr> = nodes_g.keys().copied().collect();
             let diff: HashSet<SocketAddr> = node_addrs.difference(&self.nodes_from_connections()).copied().collect();
             nodes_g.retain(|addr, _| !diff.contains(addr));
         }
