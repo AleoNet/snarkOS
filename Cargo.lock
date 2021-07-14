@@ -2717,6 +2717,7 @@ dependencies = [
  "futures 0.3.15",
  "fxhash",
  "hex",
+ "itertools 0.10.1",
  "log",
  "metrics",
  "mpmc-map",
