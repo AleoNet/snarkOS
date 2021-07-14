@@ -234,13 +234,14 @@ impl KnownNetwork {
             .tuple_windows()
             .enumerate()
             .filter(|(_i, (a, b))| b.1 - a.1 >= HEIGHT_DELTA_TOLERANCE)
-            .map(|(i, _)| i + 1)
+            .map(|(i, _)| i)
             .collect();
 
         // Create the clusters based on the indexes.
         let mut nodes_grouped = Vec::with_capacity(nodes.len());
         for i in split_indexes.iter().rev() {
-            nodes_grouped.insert(0, nodes.split_off(*i));
+            // The index needs to be offset by one.
+            nodes_grouped.insert(0, nodes.split_off(*i + 1));
         }
 
         // Don't forget the first cluster left after the `split_off` operation.
