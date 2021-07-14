@@ -75,7 +75,6 @@ macro_rules! check_for_superfluous_tx_components {
                 if let Some(ref mut ops) = &mut *db_ops.lock() {
                     if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
                         for superfluous_item in superfluous_items {
-                            trace!("Staging a {} for deletion", $component_name);
                             ops.push(Op::Delete {
                                 col: $component_col,
                                 key: superfluous_item.to_vec(),
@@ -273,7 +272,8 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
         let block_hash = block.header.get_hash();
 
-        trace!("Validating block at height {} ({})", block_height, block_hash);
+        // This is extremely verbose and shouldn't be used outside of debugging.
+        // trace!("Validating block at height {} ({})", block_height, block_hash);
 
         if !self.block_hash_exists(&block_hash) {
             is_storage_valid.store(false, Ordering::SeqCst);
