@@ -231,7 +231,7 @@ impl KnownNetwork {
         let mut nodes: Vec<(SocketAddr, u32)> = self.nodes().into_iter().collect();
         nodes.sort_unstable_by_key(|&(_, height)| height);
 
-        // Find the indexes at which the split the heights.
+        // Find the indices at which to split the heights.
         let split_indexes: Vec<usize> = nodes
             .iter()
             .tuple_windows()
@@ -240,7 +240,7 @@ impl KnownNetwork {
             .map(|(i, _)| i)
             .collect();
 
-        // Create the clusters based on the indexes.
+        // Identify the clusters based on the indices.
         let mut nodes_grouped = Vec::with_capacity(nodes.len());
         for i in split_indexes.iter().rev() {
             // The index needs to be offset by one.
