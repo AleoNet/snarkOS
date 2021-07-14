@@ -465,19 +465,11 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                                     block_hash: block.header.get_hash().0,
                                 };
 
-                                match to_bytes!(corrected_location) {
-                                    Ok(location_bytes) => {
-                                        db_ops.push(Op::Insert {
-                                            col: COL_TRANSACTION_LOCATION,
-                                            key: tx_id.to_vec(),
-                                            value: location_bytes,
-                                        });
-                                    }
-                                    Err(e) => {
-                                        error!("Can't create a block locator fix for tx {}: {}", hex::encode(tx_id), e);
-                                        is_storage_valid.store(false, Ordering::SeqCst);
-                                    }
-                                }
+                                db_ops.push(Op::Insert {
+                                    col: COL_TRANSACTION_LOCATION,
+                                    key: tx_id.to_vec(),
+                                    value: to_bytes!(corrected_location).unwrap(), // to_bytes can't fail
+                                });
                             } else {
                                 is_storage_valid.store(false, Ordering::SeqCst);
                             }
