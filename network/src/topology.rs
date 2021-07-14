@@ -564,11 +564,12 @@ mod test {
         let known_network = KnownNetwork {
             sender: tx,
             receiver: Mutex::new(rx),
+            nodes: RwLock::new(HashMap::new()),
             connections: RwLock::new(seeded_connections),
         };
 
         // Insert two connections.
-        known_network.update_inner(addr_a, vec![addr_b, addr_c]);
+        known_network.update_connections(addr_a, vec![addr_b, addr_c]);
         assert!(
             known_network
                 .connections
@@ -596,11 +597,11 @@ mod test {
         );
 
         // Insert (a, b) connection reversed, make sure it doesn't change the list.
-        known_network.update_inner(addr_b, vec![addr_a]);
+        known_network.update_connections(addr_b, vec![addr_a]);
         assert_eq!(known_network.connections.read().len(), 3);
 
         // Insert (a, d) again and make sure the timestamp was updated.
-        known_network.update_inner(addr_a, vec![addr_d]);
+        known_network.update_connections(addr_a, vec![addr_d]);
         assert_ne!(
             old_but_valid_timestamp,
             known_network.get_connection(addr_a, addr_d).unwrap().last_seen
