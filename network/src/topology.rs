@@ -86,6 +86,7 @@ impl Connection {
     }
 }
 
+/// Message types passed through the `KnownNetwork` channel.
 pub enum KnownNetworkMessage {
     Peers((SocketAddr, Vec<SocketAddr>)),
     Height((SocketAddr, u32)),

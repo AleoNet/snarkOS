@@ -308,6 +308,7 @@ pub struct NetworkGraph {
     pub edges: Vec<Edge>,
 }
 
+/// A potential fork in the network, maps height to members.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PotentialFork {
     pub height: u32,
