@@ -160,7 +160,7 @@ impl KnownNetwork {
             .write()
             .retain(|connection| !connections_to_remove.contains(connection));
 
-        // Scope the write lock: insert new connections.
+        // Scope the write lock.
         {
             let mut connections_g = self.connections.write();
 
@@ -170,7 +170,7 @@ impl KnownNetwork {
             }
         }
 
-        // Scope the write lock: remove nodes that don't have connections.
+        // Scope the write lock.
         {
             let mut nodes_g = self.nodes.write();
 
@@ -220,8 +220,10 @@ impl KnownNetwork {
 
     /// Returns a map of the potential forks.
     pub fn potential_forks(&self) -> HashMap<u32, Vec<SocketAddr>> {
-        const HEIGHT_DELTA_TOLERANCE: u32 = 5;
         use itertools::Itertools;
+
+        const HEIGHT_DELTA_TOLERANCE: u32 = 5;
+        const MIN_CLUSTER_SIZE: usize = 3;
 
         let mut nodes: Vec<(SocketAddr, u32)> = self.nodes().into_iter().collect();
         nodes.sort_unstable_by_key(|&(_, height)| height);
@@ -249,7 +251,7 @@ impl KnownNetwork {
 
         // Filter out any clusters smaller than three nodes, this minimises the false-positives
         // as it's reasonable to assume a fork would include more than two members.
-        nodes_grouped.retain(|s| s.len() > 2);
+        nodes_grouped.retain(|s| s.len() >= MIN_CLUSTER_SIZE);
 
         let mut potential_forks = HashMap::new();
         for cluster in nodes_grouped {
