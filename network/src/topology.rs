@@ -303,7 +303,6 @@ impl NetworkMetrics {
         }
 
         // Construct the list of nodes from the connections.
-        // FIXME: dedup?
         let mut nodes: HashSet<SocketAddr> = HashSet::new();
         for connection in connections.iter() {
             // Using a hashset guarantees uniqueness.
