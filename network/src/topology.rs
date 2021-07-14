@@ -627,4 +627,39 @@ mod test {
         // verify k1 == k2 => hash(k1) == hash(k2)
         assert_eq!(h1.finish(), h2.finish());
     }
+
+    #[test]
+    fn fork_detection() {
+        let addr_a = "11.11.11.11:1000".parse().unwrap();
+        let addr_b = "22.22.22.22:2000".parse().unwrap();
+        let addr_c = "33.33.33.33:3000".parse().unwrap();
+        let addr_d = "44.44.44.44:4000".parse().unwrap();
+        let addr_e = "55.55.55.55:5000".parse().unwrap();
+        let addr_f = "66.66.66.66:6000".parse().unwrap();
+
+        let (tx, rx) = mpsc::channel(100);
+        let known_network = KnownNetwork {
+            sender: tx,
+            receiver: Mutex::new(rx),
+            nodes: RwLock::new(
+                vec![
+                    (addr_b, 24),
+                    (addr_a, 1),
+                    (addr_d, 26),
+                    (addr_f, 50),
+                    (addr_c, 25),
+                    (addr_e, 50),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            connections: RwLock::new(HashSet::new()),
+        };
+
+        let potential_forks = known_network.potential_forks();
+        let expected_potential_forks: HashMap<u32, Vec<SocketAddr>> =
+            vec![(26, vec![addr_b, addr_c, addr_d])].into_iter().collect();
+
+        assert_eq!(potential_forks, expected_potential_forks);
+    }
 }
