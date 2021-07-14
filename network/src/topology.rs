@@ -178,7 +178,8 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
 
             // Remove the nodes that no longer correspond to connections.
-            nodes_g.retain(|addr, _| self.nodes_from_connections().contains(addr));
+            let nodes_from_connections = self.nodes_from_connections();
+            nodes_g.retain(|addr, _| nodes_from_connections.contains(addr));
         }
     }
 
