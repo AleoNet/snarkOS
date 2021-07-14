@@ -567,7 +567,7 @@ mod test {
         let known_network = KnownNetwork {
             sender: tx,
             receiver: Mutex::new(rx),
-            nodes: RwLock::new(HashMap::new()),
+            nodes: Default::default(),
             connections: RwLock::new(seeded_connections),
         };
 
@@ -656,7 +656,7 @@ mod test {
                 .into_iter()
                 .collect(),
             ),
-            connections: RwLock::new(HashSet::new()),
+            connections: Default::default(),
         };
 
         let potential_forks = known_network.potential_forks();
