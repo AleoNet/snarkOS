@@ -118,10 +118,18 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     };
     info!("Storage finished loading");
 
-    if config.storage.validate {
+    // For extra safety, validate storage too if a trim is requested.
+    if config.storage.validate || config.storage.trim {
         let now = std::time::Instant::now();
         storage.validate(None, snarkos_storage::validator::FixMode::Everything);
         info!("Storage validated in {}ms", now.elapsed().as_millis());
+    }
+
+    if config.storage.trim {
+        let now = std::time::Instant::now();
+        // There shouldn't be issues after validation, but if there are, ignore them,.
+        let _ = storage.trim();
+        info!("Storage trimmed in {}ms", now.elapsed().as_millis());
     }
 
     if let Some(limit) = config.storage.export {
