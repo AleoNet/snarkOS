@@ -278,6 +278,8 @@ pub struct MiscStats {
     duplicate_blocks: Counter,
     /// The number of duplicate sync blocks received.
     duplicate_sync_blocks: Counter,
+    /// The number of orphan blocks received.
+    orphan_blocks: Counter,
     /// The number of RPC requests received.
     rpc_requests: Counter,
 }
@@ -289,6 +291,7 @@ impl MiscStats {
             blocks_mined: Counter::new(),
             duplicate_blocks: Counter::new(),
             duplicate_sync_blocks: Counter::new(),
+            orphan_blocks: Counter::new(),
             rpc_requests: Counter::new(),
         }
     }
@@ -299,6 +302,7 @@ impl MiscStats {
             blocks_mined: self.blocks_mined.read(),
             duplicate_blocks: self.duplicate_blocks.read(),
             duplicate_sync_blocks: self.duplicate_sync_blocks.read(),
+            orphan_blocks: self.orphan_blocks.read(),
             rpc_requests: self.rpc_requests.read(),
         }
     }
@@ -350,6 +354,7 @@ impl Recorder for Stats {
             misc::BLOCKS_MINED => &self.misc.blocks_mined,
             misc::DUPLICATE_BLOCKS => &self.misc.duplicate_blocks,
             misc::DUPLICATE_SYNC_BLOCKS => &self.misc.duplicate_sync_blocks,
+            misc::ORPHAN_BLOCKS => &self.misc.orphan_blocks,
             misc::RPC_REQUESTS => &self.misc.rpc_requests,
             _ => {
                 return;

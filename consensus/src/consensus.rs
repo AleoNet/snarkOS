@@ -41,6 +41,8 @@ use snarkvm_dpc::{
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
+use snarkos_metrics::{self as metrics, misc::*};
+
 use rand::Rng;
 
 use std::sync::Arc;
@@ -152,6 +154,7 @@ impl<S: Storage> Consensus<S> {
             if crate::is_genesis(&block.header) && self.ledger.is_empty() {
                 self.process_block(block).await?;
             } else {
+                metrics::increment_counter!(ORPHAN_BLOCKS);
                 self.ledger.insert_only(block)?;
             }
         } else {
@@ -224,6 +227,8 @@ impl<S: Storage> Consensus<S> {
                             }
                         }
                     } else {
+                        metrics::increment_counter!(ORPHAN_BLOCKS);
+
                         // If the sidechain is not longer than the main canon chain, simply store the block
                         self.ledger.insert_only(block)?;
                     }
