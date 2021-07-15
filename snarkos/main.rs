@@ -127,7 +127,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     if config.storage.trim {
         let now = std::time::Instant::now();
-        // There shouldn't be issues after validation, but if there are, ignore them,.
+        // There shouldn't be issues after validation, but if there are, ignore them.
         let _ = storage.trim();
         info!("Storage trimmed in {}ms", now.elapsed().as_millis());
     }
