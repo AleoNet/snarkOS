@@ -104,6 +104,10 @@ pub struct Storage {
     pub import: Option<PathBuf>,
     /// If `true`, checks the node's storage for inconsistencies and attempts to fix any encountered issues.
     pub validate: bool,
+    /// If `true`, deletes any superfluous (non-canon) items from the node's storage. Note: it can temporarily increase
+    /// the size of the database files, but they will become smaller after a while, when the database has run its
+    /// automated maintenance.
+    pub trim: bool,
 }
 
 impl Default for Config {
@@ -144,6 +148,7 @@ impl Default for Config {
             storage: Storage {
                 export: None,
                 import: None,
+                trim: false,
                 validate: false,
             },
         }
@@ -216,6 +221,7 @@ impl Config {
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
+            "trim-storage" => self.trim_storage(arguments.is_present(option)),
             "validate-storage" => self.validate_storage(arguments.is_present(option)),
             // Options
             "connect" => self.connect(arguments.value_of(option)),
@@ -360,6 +366,10 @@ impl Config {
         }
     }
 
+    fn trim_storage(&mut self, argument: bool) {
+        self.storage.trim = argument;
+    }
+
     fn validate_storage(&mut self, argument: bool) {
         self.storage.validate = argument;
     }
@@ -402,6 +412,7 @@ impl CLI for ConfigCli {
         flag::NO_JSONRPC,
         flag::IS_BOOTNODE,
         flag::IS_MINER,
+        flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
     ];
     const NAME: NameType = "snarkOS";
@@ -447,6 +458,7 @@ impl CLI for ConfigCli {
             "rpc-port",
             "rpc-username",
             "rpc-password",
+            "trim-storage",
             "validate-storage",
             "verbose",
         ]);
