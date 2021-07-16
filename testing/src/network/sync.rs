@@ -44,8 +44,10 @@ async fn block_initiator_side() {
     let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
     // check if the peer has received an automatic Ping message from the node
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Ping(..)), "unexpected payload: {}", payload);
+    wait_until!(5, {
+        let payload = peer.read_payload().await.unwrap();
+        matches!(payload, Payload::Ping(..))
+    });
 
     // wait for the block_sync_interval to "expire"
     sleep(Duration::from_secs(1)).await;
@@ -55,12 +57,16 @@ async fn block_initiator_side() {
     peer.write_message(&ping).await;
 
     // read the Pong
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Pong));
+    wait_until!(5, {
+        let payload = peer.read_payload().await.unwrap();
+        matches!(payload, Payload::Pong)
+    });
 
     // check if a GetSync message was received
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::GetSync(..)));
+    wait_until!(5, {
+        let payload = peer.read_payload().await.unwrap();
+        matches!(payload, Payload::GetSync(..))
+    });
 
     let block_1_header_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
     let block_2_header_hash = BlockHeaderHash::new(BLOCK_2_HEADER_HASH.to_vec());
@@ -101,8 +107,10 @@ async fn block_responder_side() {
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
 
     // check if the peer has received an automatic Ping message from the node
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Ping(..)));
+    wait_until!(5, {
+        let payload = peer.read_payload().await.unwrap();
+        matches!(payload, Payload::Ping(..))
+    });
 
     // insert block into node
     let block_struct_1 = snarkvm_dpc::Block::deserialize(&BLOCK_1).unwrap();
@@ -224,13 +232,13 @@ async fn transaction_initiator_side() {
     };
     let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
-    // check if the peer has received an automatic Ping message from the node
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Ping(..)));
-
-    // check GetMemoryPool message was received
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::GetMemoryPool));
+    // check if the peer has received a Ping and a GetMemoryPool from the node, in any order
+    for _ in 0usize..2 {
+        wait_until!(5, {
+            let payload = peer.read_payload().await.unwrap();
+            matches!(payload, Payload::Ping(..)) || matches!(payload, Payload::GetMemoryPool)
+        });
+    }
 
     // Respond with MemoryPool message
     let memory_pool = Payload::MemoryPool(vec![TRANSACTION_1.to_vec(), TRANSACTION_2.to_vec()]);
@@ -258,8 +266,10 @@ async fn transaction_responder_side() {
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
 
     // check if the peer has received an automatic Ping message from the node
-    let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Ping(..)), "unexpected payload: {}", payload);
+    wait_until!(5, {
+        let payload = peer.read_payload().await.unwrap();
+        matches!(payload, Payload::Ping(..))
+    });
 
     // insert transaction into node
     let memory_pool = node.expect_sync().memory_pool();
