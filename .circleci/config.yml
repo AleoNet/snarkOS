@@ -53,7 +53,7 @@ jobs:
           name: Build and run tests
           no_output_timeout: 60m
           command: >
-            RUST_MIN_STACK=8388608 cargo test --all -- --skip test_rpc_create_raw_transaction
+            RUST_MIN_STACK=8388608 cargo test --workspace --no-run
       - persist_to_workspace:
           root: ~/
           paths: project/
@@ -117,7 +117,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: cd network && RUST_MIN_STACK=16777216 cargo test
+          command: cd network && RUST_MIN_STACK=16777216 cargo test --release
       - clear_environment:
           cache_key: snarkos-network-cache
 
@@ -192,7 +192,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: cd testing && RUST_MIN_STACK=8388608 cargo test
+          command: cd testing && RUST_MIN_STACK=8388608 cargo test --release
       - clear_environment:
           cache_key: snarkos-testing-cache
 
