@@ -290,18 +290,56 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
-        let peers = self
-            .peer_book
-            .connected_peers_snapshot()
-            .await
-            .into_iter()
-            .filter(|peer| {
-                peer.address != remote_address
-                    && !self.config.bootnodes().contains(&peer.address)
-                    && peer.is_routable.unwrap_or(false)
-            })
+        //
+        // Order of tried sets for bootnode peer lists:
+        //
+        // 1. routable connected peers (only set shared by regular nodes)
+        // 2. connected peers
+        // 3. disconnected peers
+
+        use crate::Peer;
+        use rand::prelude::SliceRandom;
+
+        let connected_peers = self.peer_book.connected_peers_snapshot().await;
+
+        let filter = |peer: &Peer| peer.address != remote_address && !self.config.bootnodes().contains(&peer.address);
+        let strict_filter = |peer: &Peer| filter(peer) && peer.is_routable.unwrap_or(false);
+
+        // 1.
+        let strictly_filtered_peers: Vec<SocketAddr> = connected_peers
+            .iter()
+            .filter(|peer| strict_filter(peer))
             .map(|peer| peer.address)
-            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
+            .collect();
+
+        let peers = match (self.config.is_bootnode(), strictly_filtered_peers.is_empty()) {
+            (false, _) | (true, false) => strictly_filtered_peers,
+            (true, true) => {
+                let filtered_peers: Vec<SocketAddr> = connected_peers
+                    .iter()
+                    .filter(|peer| filter(peer))
+                    .map(|peer| peer.address)
+                    .collect();
+
+                // 2. or 3.
+                match filtered_peers.is_empty() {
+                    false => filtered_peers,
+                    true => self
+                        .peer_book
+                        .disconnected_peers()
+                        .iter()
+                        .filter(|&&addr| addr != remote_address)
+                        .copied()
+                        .collect(),
+                }
+            }
+        };
+
+        // Limit set size.
+        let peers = peers
+            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
+            .copied()
+            .collect();
 
         self.peer_book.send_to(remote_address, Payload::Peers(peers)).await;
     }
