@@ -45,7 +45,7 @@ async fn block_initiator_side() {
 
     // check if the peer has received an automatic Ping message from the node
     let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Ping(..)));
+    assert!(matches!(payload, Payload::Ping(..)), "unexpected payload: {}", payload);
 
     // wait for the block_sync_interval to "expire"
     sleep(Duration::from_secs(1)).await;
@@ -259,7 +259,7 @@ async fn transaction_responder_side() {
 
     // check if the peer has received an automatic Ping message from the node
     let payload = peer.read_payload().await.unwrap();
-    assert!(matches!(payload, Payload::Ping(..)));
+    assert!(matches!(payload, Payload::Ping(..)), "unexpected payload: {}", payload);
 
     // insert transaction into node
     let memory_pool = node.expect_sync().memory_pool();
