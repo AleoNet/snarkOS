@@ -70,29 +70,28 @@ async fn peer_responder_side() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn triangle() {
-    let setup = |bootnodes| TestSetup {
+async fn bootnode_peer_propagation() {
+    let setup = |is_bootnode, bootnodes| TestSetup {
         consensus_setup: None,
         min_peers: 2,
         peer_sync_interval: 1,
+        is_bootnode,
         bootnodes,
         ..Default::default()
     };
 
     // Spin up and connect nodes A and B.
-    let node_alice = test_node(setup(vec![])).await;
+    let node_alice = test_node(setup(true, vec![])).await;
     let addr_alice = node_alice.local_address().unwrap();
 
-    // wait a few ms so that nodes don't try to connect into one another simultaneously
-    sleep(Duration::from_millis(10)).await;
+    // Connect B to A.
+    let node_bob = test_node(setup(false, vec![addr_alice.to_string()])).await;
 
-    let node_bob = test_node(setup(vec![addr_alice.to_string()])).await;
-    let addr_bob = node_bob.local_address().unwrap();
+    // Sleep to avoid C and B trying to simultaneously connect to each other.
+    sleep(Duration::from_millis(100)).await;
 
-    sleep(Duration::from_millis(10)).await;
-
-    //  Spin up node C and connect to B.
-    let node_charlie = test_node(setup(vec![addr_bob.to_string()])).await;
+    // Connect C to A.
+    let node_charlie = test_node(setup(false, vec![addr_alice.to_string()])).await;
 
     let triangle_is_formed = || {
         node_charlie.peer_book.is_connected(addr_alice)
@@ -101,6 +100,7 @@ async fn triangle() {
             && node_charlie.peer_book.get_active_peer_count() == 2
     };
 
-    // Make sure C connects to A => peer propagation works.
+    // Make sure B and C connect => bootnode propagates peers (without `is_routable` check in this
+    // case).
     wait_until!(5, triangle_is_formed());
 }
