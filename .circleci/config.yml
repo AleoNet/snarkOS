@@ -53,7 +53,7 @@ jobs:
           name: Build and run tests
           no_output_timeout: 60m
           command: >
-            RUST_MIN_STACK=8388608 cargo test --all -- --skip test_rpc_create_raw_transaction
+            RUST_MIN_STACK=8388608 cargo test --workspace --no-run
       - persist_to_workspace:
           root: ~/
           paths: project/
