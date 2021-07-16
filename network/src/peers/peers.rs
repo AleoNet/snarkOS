@@ -202,7 +202,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let bootnodes = self.config.bootnodes();
 
             // Iterate through a selection of random peers and attempt to connect.
-            let mut candidates = self.peer_book.disconnected_peers_snapshot().await;
+            let mut candidates = self.peer_book.disconnected_peers_snapshot();
 
             candidates.retain(|peer| peer.address != own_address && !bootnodes.contains(&peer.address));
 
@@ -319,10 +319,10 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // ...and if need be on disconnected peers.
             if filtered_peers.is_empty() {
                 self.peer_book
-                    .disconnected_peers()
+                    .disconnected_peers_snapshot()
                     .iter()
-                    .filter(|&&addr| addr != remote_address)
-                    .copied()
+                    .filter(|peer| basic_filter(peer))
+                    .map(|peer| peer.address)
                     .collect()
             } else {
                 filtered_peers
