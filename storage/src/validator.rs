@@ -80,7 +80,6 @@ macro_rules! check_for_superfluous_tx_components {
                     .contains(&fix_mode)
                     {
                         for superfluous_item in superfluous_items {
-                            trace!("Staging a {} for deletion", $component_name);
                             ops.push(Op::Delete {
                                 col: $component_col,
                                 key: superfluous_item.to_vec(),
@@ -280,7 +279,8 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
         let block_hash = block.header.get_hash();
 
-        trace!("Validating block at height {} ({})", block_height, block_hash);
+        // This is extremely verbose and shouldn't be used outside of debugging.
+        // trace!("Validating block at height {} ({})", block_height, block_hash);
 
         if !self.block_hash_exists(&block_hash) {
             is_storage_valid.store(false, Ordering::SeqCst);
@@ -472,19 +472,11 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                                     block_hash: block.header.get_hash().0,
                                 };
 
-                                match to_bytes_le!(corrected_location) {
-                                    Ok(location_bytes) => {
-                                        db_ops.push(Op::Insert {
-                                            col: COL_TRANSACTION_LOCATION,
-                                            key: tx_id.to_vec(),
-                                            value: location_bytes,
-                                        });
-                                    }
-                                    Err(e) => {
-                                        error!("Can't create a block locator fix for tx {}: {}", hex::encode(tx_id), e);
-                                        is_storage_valid.store(false, Ordering::SeqCst);
-                                    }
-                                }
+                                db_ops.push(Op::Insert {
+                                    col: COL_TRANSACTION_LOCATION,
+                                    key: tx_id.to_vec(),
+                                    value: to_bytes_le!(corrected_location).unwrap(), // to_bytes_le can't fail
+                                });
                             } else {
                                 is_storage_valid.store(false, Ordering::SeqCst);
                             }

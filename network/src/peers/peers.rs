@@ -22,7 +22,7 @@ use tokio::task;
 
 use snarkos_metrics::{self as metrics, connections::*};
 
-use crate::{message::*, NetworkError, Node};
+use crate::{message::*, KnownNetworkMessage, NetworkError, Node};
 
 impl<S: Storage + core::marker::Sync + Send> Node<S> {
     /// Obtain a list of addresses of connected peers for this node.
@@ -202,7 +202,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             let bootnodes = self.config.bootnodes();
 
             // Iterate through a selection of random peers and attempt to connect.
-            let mut candidates = self.peer_book.disconnected_peers_snapshot().await;
+            let mut candidates = self.peer_book.disconnected_peers_snapshot();
 
             candidates.retain(|peer| peer.address != own_address && !bootnodes.contains(&peer.address));
 
@@ -290,12 +290,52 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
-        let peers = self
-            .peer_book
-            .connected_peers()
-            .into_iter()
-            .filter(|&addr| addr != remote_address)
-            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT);
+
+        use crate::Peer;
+        use rand::prelude::SliceRandom;
+
+        let connected_peers = self.peer_book.connected_peers_snapshot().await;
+
+        let basic_filter =
+            |peer: &Peer| peer.address != remote_address && !self.config.bootnodes().contains(&peer.address);
+        let strict_filter = |peer: &Peer| basic_filter(peer) && peer.is_routable.unwrap_or(false);
+
+        // Strictly filter the connected peers by only including the routable addresses.
+        let strictly_filtered_peers: Vec<SocketAddr> = connected_peers
+            .iter()
+            .filter(|peer| strict_filter(peer))
+            .map(|peer| peer.address)
+            .collect();
+
+        // Bootnodes apply less strict filtering rules if the set is empty by falling back on
+        // connected peers that may or may not be routable...
+        let peers = if self.config.is_bootnode() && strictly_filtered_peers.is_empty() {
+            let filtered_peers: Vec<SocketAddr> = connected_peers
+                .iter()
+                .filter(|peer| basic_filter(peer))
+                .map(|peer| peer.address)
+                .collect();
+
+            // ...and if need be on disconnected peers.
+            if filtered_peers.is_empty() {
+                self.peer_book
+                    .disconnected_peers_snapshot()
+                    .iter()
+                    .filter(|peer| basic_filter(peer))
+                    .map(|peer| peer.address)
+                    .collect()
+            } else {
+                filtered_peers
+            }
+        } else {
+            strictly_filtered_peers
+        };
+
+        // Limit set size.
+        let peers = peers
+            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
+            .copied()
+            .collect();
 
         self.peer_book.send_to(remote_address, Payload::Peers(peers)).await;
     }
@@ -318,8 +358,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if let Some(known_network) = self.known_network() {
             // If this node is tracking the network, record the connections. This can
             // then be used to construct the graph and query peer info from the peerbook.
-
-            let _ = known_network.sender.try_send((source, peers));
+            let _ = known_network.sender.try_send(KnownNetworkMessage::Peers(source, peers));
         }
     }
 

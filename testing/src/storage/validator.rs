@@ -252,3 +252,35 @@ async fn validator_vs_a_superfluous_digest() {
             .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
     );
 }
+
+#[ignore]
+#[tokio::test]
+async fn validator_vs_a_very_broken_db() {
+    tracing_subscriber::fmt::init();
+
+    let consensus = create_test_consensus();
+
+    let blocks = TestBlocks::load(Some(10), "test_blocks_100_1").0;
+    for block in blocks {
+        consensus.receive_block(&block, false).await.unwrap();
+    }
+
+    let mut database_transaction = DatabaseTransaction::new();
+
+    // Delete all tx-related items.
+    for col in [COL_SERIAL_NUMBER, COL_COMMITMENT, COL_MEMO, COL_DIGEST].iter() {
+        let stored_col = consensus.ledger.storage.get_col(*col).unwrap();
+        for key in stored_col.into_iter().map(|(key, _val)| key) {
+            database_transaction.push(Op::Delete {
+                col: *col,
+                key: key.into_vec(),
+            });
+        }
+    }
+
+    consensus.ledger.storage.batch(database_transaction).unwrap();
+
+    let now = std::time::Instant::now();
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
+    tracing::info!("Storage validated in {}ms", now.elapsed().as_millis());
+}

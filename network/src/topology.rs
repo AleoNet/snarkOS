@@ -16,7 +16,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     hash::{Hash, Hasher},
     net::SocketAddr,
     ops::Sub,
@@ -86,11 +86,22 @@ impl Connection {
     }
 }
 
+/// Message types passed through the `KnownNetwork` channel.
+pub enum KnownNetworkMessage {
+    /// Maps a peer address to its peers.
+    Peers(SocketAddr, Vec<SocketAddr>),
+    /// Maps a peer address to its block height.
+    Height(SocketAddr, u32),
+}
+
 /// Keeps track of crawled peers and their connections.
 #[derive(Debug)]
 pub struct KnownNetwork {
-    pub sender: Sender<(SocketAddr, Vec<SocketAddr>)>,
-    receiver: Mutex<Receiver<(SocketAddr, Vec<SocketAddr>)>>,
+    pub sender: Sender<KnownNetworkMessage>,
+    receiver: Mutex<Receiver<KnownNetworkMessage>>,
+
+    // The nodes and their block height if known.
+    nodes: RwLock<HashMap<SocketAddr, u32>>,
     connections: RwLock<HashSet<Connection>>,
 }
 
@@ -102,6 +113,7 @@ impl Default for KnownNetwork {
         Self {
             sender: tx,
             receiver: Mutex::new(rx),
+            nodes: Default::default(),
             connections: Default::default(),
         }
     }
@@ -110,13 +122,16 @@ impl Default for KnownNetwork {
 impl KnownNetwork {
     /// Updates the crawled connection set.
     pub async fn update(&self) {
-        if let Some((source, peers)) = self.receiver.lock().await.recv().await {
-            self.update_inner(source, peers);
+        if let Some(message) = self.receiver.lock().await.recv().await {
+            match message {
+                KnownNetworkMessage::Peers(source, peers) => self.update_connections(source, peers),
+                KnownNetworkMessage::Height(source, height) => self.update_height(source, height),
+            }
         }
     }
 
     // More convenient for testing.
-    fn update_inner(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
+    fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.
@@ -157,6 +172,25 @@ impl KnownNetwork {
                 connections_g.replace(new_connection);
             }
         }
+
+        // Scope the write lock.
+        {
+            let mut nodes_g = self.nodes.write();
+
+            // Remove the nodes that no longer correspond to connections.
+            let nodes_from_connections = self.nodes_from_connections();
+            nodes_g.retain(|addr, _| nodes_from_connections.contains(addr));
+        }
+    }
+
+    /// Update the height stored for this particular node.
+    pub fn update_height(&self, source: SocketAddr, height: u32) {
+        self.nodes.write().insert(source, height);
+    }
+
+    /// Returns `true` if the known network contains any connections, `false` otherwise.
+    pub fn has_connections(&self) -> bool {
+        !self.connections.read().is_empty()
     }
 
     /// Returns a connection.
@@ -169,9 +203,69 @@ impl KnownNetwork {
         self.connections.read().clone()
     }
 
-    /// Returns `true` if the known network contains any connections, `false` otherwise.
-    pub fn has_connections(&self) -> bool {
-        !self.connections.read().is_empty()
+    /// Returns a snapshot of all the nodes.
+    pub fn nodes(&self) -> HashMap<SocketAddr, u32> {
+        self.nodes.read().clone()
+    }
+
+    /// Constructs a set of nodes contained from the connection set.
+    pub fn nodes_from_connections(&self) -> HashSet<SocketAddr> {
+        let mut nodes: HashSet<SocketAddr> = HashSet::new();
+        for connection in self.connections().iter() {
+            // Using a hashset guarantees uniqueness.
+            nodes.insert(connection.source);
+            nodes.insert(connection.target);
+        }
+
+        nodes
+    }
+
+    /// Returns a map of the potential forks.
+    pub fn potential_forks(&self) -> HashMap<u32, Vec<SocketAddr>> {
+        use itertools::Itertools;
+
+        const HEIGHT_DELTA_TOLERANCE: u32 = 5;
+        const MIN_CLUSTER_SIZE: usize = 3;
+
+        let mut nodes: Vec<(SocketAddr, u32)> = self.nodes().into_iter().collect();
+        nodes.sort_unstable_by_key(|&(_, height)| height);
+
+        // Find the indices at which to split the heights.
+        let split_indexes: Vec<usize> = nodes
+            .iter()
+            .tuple_windows()
+            .enumerate()
+            .filter(|(_i, (a, b))| b.1 - a.1 >= HEIGHT_DELTA_TOLERANCE)
+            .map(|(i, _)| i)
+            .collect();
+
+        // Identify the clusters based on the indices.
+        let mut nodes_grouped = Vec::with_capacity(nodes.len());
+        for i in split_indexes.iter().rev() {
+            // The index needs to be offset by one.
+            nodes_grouped.insert(0, nodes.split_off(*i + 1));
+        }
+
+        // Don't forget the first cluster left after the `split_off` operation.
+        nodes_grouped.insert(0, nodes);
+
+        // Remove the last cluster since it will contain the nodes even with the chain tip.
+        nodes_grouped.pop();
+
+        // Filter out any clusters smaller than three nodes, this minimises the false-positives
+        // as it's reasonable to assume a fork would include more than two members.
+        nodes_grouped.retain(|s| s.len() >= MIN_CLUSTER_SIZE);
+
+        let mut potential_forks = HashMap::new();
+        for cluster in nodes_grouped {
+            // Safe since no clusters are of length `0`.
+            let max_height = cluster.iter().map(|(_, height)| height).max().unwrap();
+            let addrs = cluster.iter().map(|(addr, _)| addr).copied().collect();
+
+            potential_forks.insert(*max_height, addrs);
+        }
+
+        potential_forks
     }
 }
 
@@ -472,11 +566,12 @@ mod test {
         let known_network = KnownNetwork {
             sender: tx,
             receiver: Mutex::new(rx),
+            nodes: Default::default(),
             connections: RwLock::new(seeded_connections),
         };
 
         // Insert two connections.
-        known_network.update_inner(addr_a, vec![addr_b, addr_c]);
+        known_network.update_connections(addr_a, vec![addr_b, addr_c]);
         assert!(
             known_network
                 .connections
@@ -504,11 +599,11 @@ mod test {
         );
 
         // Insert (a, b) connection reversed, make sure it doesn't change the list.
-        known_network.update_inner(addr_b, vec![addr_a]);
+        known_network.update_connections(addr_b, vec![addr_a]);
         assert_eq!(known_network.connections.read().len(), 3);
 
         // Insert (a, d) again and make sure the timestamp was updated.
-        known_network.update_inner(addr_a, vec![addr_d]);
+        known_network.update_connections(addr_a, vec![addr_d]);
         assert_ne!(
             old_but_valid_timestamp,
             known_network.get_connection(addr_a, addr_d).unwrap().last_seen
@@ -533,5 +628,40 @@ mod test {
 
         // verify k1 == k2 => hash(k1) == hash(k2)
         assert_eq!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn fork_detection() {
+        let addr_a = "11.11.11.11:1000".parse().unwrap();
+        let addr_b = "22.22.22.22:2000".parse().unwrap();
+        let addr_c = "33.33.33.33:3000".parse().unwrap();
+        let addr_d = "44.44.44.44:4000".parse().unwrap();
+        let addr_e = "55.55.55.55:5000".parse().unwrap();
+        let addr_f = "66.66.66.66:6000".parse().unwrap();
+
+        let (tx, rx) = mpsc::channel(100);
+        let known_network = KnownNetwork {
+            sender: tx,
+            receiver: Mutex::new(rx),
+            nodes: RwLock::new(
+                vec![
+                    (addr_b, 24),
+                    (addr_a, 1),
+                    (addr_d, 26),
+                    (addr_f, 50),
+                    (addr_c, 25),
+                    (addr_e, 50),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            connections: Default::default(),
+        };
+
+        let potential_forks = known_network.potential_forks();
+        let expected_potential_forks: HashMap<u32, Vec<SocketAddr>> =
+            vec![(26, vec![addr_b, addr_c, addr_d])].into_iter().collect();
+
+        assert_eq!(potential_forks, expected_potential_forks);
     }
 }

@@ -384,7 +384,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     fn get_network_graph(&self) -> Result<NetworkGraph, RpcError> {
         // Copy the connections as the data must not change throughout the metrics computation.
-        let connections = self.known_network()?.connections();
+        let known_network = self.known_network()?;
+        let connections = known_network.connections();
 
         // Collect the edges.
         let edges = connections
@@ -399,16 +400,22 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let network_metrics = NetworkMetrics::new(connections);
 
         // Collect the vertices with the metrics.
-        let vertices = network_metrics
+        let vertices: Vec<Vertice> = network_metrics
             .centrality
             .iter()
             .map(|(addr, node_centrality)| Vertice {
                 addr: *addr,
-                is_bootnode: self.node.config.bootnodes().contains(&addr),
+                is_bootnode: self.node.config.bootnodes().contains(addr),
                 degree_centrality: node_centrality.degree_centrality,
                 eigenvector_centrality: node_centrality.eigenvector_centrality,
                 fiedler_value: node_centrality.fiedler_value,
             })
+            .collect();
+
+        let potential_forks = known_network
+            .potential_forks()
+            .into_iter()
+            .map(|(height, members)| PotentialFork { height, members })
             .collect();
 
         Ok(NetworkGraph {
@@ -417,6 +424,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             density: network_metrics.density,
             algebraic_connectivity: network_metrics.algebraic_connectivity,
             degree_centrality_delta: network_metrics.degree_centrality_delta,
+            potential_forks,
             vertices,
             edges,
         })

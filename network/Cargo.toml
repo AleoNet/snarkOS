@@ -87,6 +87,9 @@ version = "0.1"
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.itertools]
+version = "0.10.1"
+
 [dependencies.nalgebra]
 version = "0.28"
 

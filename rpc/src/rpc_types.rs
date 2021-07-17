@@ -299,10 +299,20 @@ pub struct NetworkGraph {
     /// lowest.
     pub degree_centrality_delta: f64,
 
+    /// The potential forks in the network and their member nodes.
+    pub potential_forks: Vec<PotentialFork>,
+
     /// Known nodes.
     pub vertices: Vec<Vertice>,
     /// Known connections.
     pub edges: Vec<Edge>,
+}
+
+/// A potential fork in the network, maps height to members.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PotentialFork {
+    pub height: u32,
+    pub members: Vec<SocketAddr>,
 }
 
 /// Metadata and measurements pertaining to a node in the graph of the known network.
