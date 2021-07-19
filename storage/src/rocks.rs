@@ -43,6 +43,7 @@ impl Storage for RocksDb {
         }
     }
 
+    #[inline]
     fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
         self.db().get_cf(self.get_cf_ref(col), key).map_err(convert_err)
     }
@@ -88,11 +89,9 @@ impl Storage for RocksDb {
         Ok(())
     }
 
+    #[inline]
     fn exists(&self, col: u32, key: &[u8]) -> bool {
-        match self.db().get_cf(self.get_cf_ref(col), key) {
-            Ok(val) => val.is_some(),
-            Err(_) => false,
-        }
+        self.get(col, key).map(|val| val.is_some()).unwrap_or(false)
     }
 
     fn try_catch_up_with_primary(&self) -> Result<(), StorageError> {
