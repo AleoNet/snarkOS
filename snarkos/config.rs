@@ -402,6 +402,10 @@ impl Config {
             return Err(CliError::MinerBootstrapper);
         }
 
+        if self.node.is_bootnode && self.node.is_crawler {
+            return Err(CliError::CrawlerBootstrapper);
+        }
+
         // TODO (howardwu): Check the memory pool interval.
 
         Ok(())

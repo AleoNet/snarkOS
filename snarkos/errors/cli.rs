@@ -31,6 +31,9 @@ pub enum CliError {
     #[error("The node can't be a bootstrapper and a miner at the same time")]
     MinerBootstrapper,
 
+    #[error("The node can't be a bootstrapper and a crawler at the same time")]
+    CrawlerBootstrapper,
+
     #[error("The minimum or maximum value for peer count is invalid")]
     PeerCountInvalid,
 
