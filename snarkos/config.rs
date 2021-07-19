@@ -73,6 +73,7 @@ pub struct Node {
     pub dir: PathBuf,
     pub db: String,
     pub is_bootnode: bool,
+    pub is_crawler: bool,
     pub ip: String,
     pub port: u16,
     pub verbose: u8,
@@ -118,6 +119,7 @@ impl Default for Config {
                 dir: Self::snarkos_dir(),
                 db: "snarkos_testnet1".into(),
                 is_bootnode: false,
+                is_crawler: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
                 verbose: 2,
@@ -220,6 +222,7 @@ impl Config {
             // Flags
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
+            "is-crawler" => self.is_crawler(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
             "validate-storage" => self.validate_storage(arguments.is_present(option)),
@@ -286,6 +289,10 @@ impl Config {
 
     fn is_miner(&mut self, argument: bool) {
         self.miner.is_miner = argument;
+    }
+
+    fn is_crawler(&mut self, argument: bool) {
+        self.node.is_crawler = argument;
     }
 
     fn ip(&mut self, argument: Option<&str>) {
@@ -412,6 +419,7 @@ impl CLI for ConfigCli {
         flag::NO_JSONRPC,
         flag::IS_BOOTNODE,
         flag::IS_MINER,
+        flag::IS_CRAWLER,
         flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
     ];
@@ -446,6 +454,7 @@ impl CLI for ConfigCli {
             "import-canon-blocks",
             "is-bootnode",
             "is-miner",
+            "is-crawler",
             "ip",
             "port",
             "path",

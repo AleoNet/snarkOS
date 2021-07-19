@@ -97,6 +97,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
         config.node.is_bootnode,
+        config.node.is_crawler,
         // Set sync intervals for peers, blocks and transactions (memory pool).
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
