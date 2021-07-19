@@ -247,7 +247,7 @@ mod consensus_sidechain {
         assert_eq!(shared_height, 100);
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.ledger.validate(None, FixMode::Nothing));
+        assert!(consensus1.ledger.validate(None, FixMode::Nothing).await);
     }
 
     #[tokio::test]
@@ -307,7 +307,7 @@ mod consensus_sidechain {
         assert_eq!(shared_height, 100);
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.ledger.validate(None, FixMode::Nothing));
+        assert!(consensus1.ledger.validate(None, FixMode::Nothing).await);
     }
 
     #[tokio::test]
@@ -350,7 +350,7 @@ mod consensus_sidechain {
         let shared_height = consensus2.ledger.get_block_number(&latest_shared_hash).unwrap();
         assert_eq!(shared_height, 10);
 
-        assert!(consensus2.ledger.validate(None, FixMode::Nothing));
+        assert!(consensus2.ledger.validate(None, FixMode::Nothing).await);
     }
 
     #[tokio::test]
@@ -378,6 +378,6 @@ mod consensus_sidechain {
         assert_eq!(consensus.ledger.get_current_block_height(), 20);
 
         // Verify the integrity of the block storage.
-        assert!(consensus.ledger.validate(None, FixMode::Nothing));
+        assert!(consensus.ledger.validate(None, FixMode::Nothing).await);
     }
 }

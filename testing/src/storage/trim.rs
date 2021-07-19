@@ -98,5 +98,5 @@ async fn trim_side_chain_blocks() {
     assert_eq!(consensus.ledger.get_child_block_hashes(&genesis_hash).unwrap().len(), 1);
 
     // Validate the post-trim storage.
-    assert!(consensus.ledger.validate(None, FixMode::Nothing));
+    assert!(consensus.ledger.validate(None, FixMode::Nothing).await);
 }
