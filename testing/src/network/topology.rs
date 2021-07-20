@@ -56,9 +56,9 @@ fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Start each node with the previous as a bootnode.
     for node in nodes {
         if let Some(addr) = prev_node {
-            let mut bootnodes = (&**node.config.bootnodes.load()).clone();
-            bootnodes.push(addr);
-            node.config.bootnodes.store(Arc::new(bootnodes));
+            let mut initial_peers = (&**node.config.initial_peers.load()).clone();
+            initial_peers.push(addr);
+            node.config.initial_peers.store(Arc::new(initial_peers));
         };
 
         // Assumes the node has an established address.
@@ -73,10 +73,10 @@ fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
 
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
-    let bootnodes = &nodes.last().unwrap().config.bootnodes;
-    let mut bootnodes_handle = (&**bootnodes.load()).clone();
-    bootnodes_handle.push(first_addr);
-    bootnodes.store(Arc::new(bootnodes_handle));
+    let initial_peers = &nodes.last().unwrap().config.initial_peers;
+    let mut initial_peers_handle = (&**initial_peers.load()).clone();
+    initial_peers_handle.push(first_addr);
+    initial_peers.store(Arc::new(initial_peers_handle));
 }
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
@@ -93,7 +93,7 @@ fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
             )
             .copied()
             .collect();
-        node.config.bootnodes.store(Arc::new(random_addrs));
+        node.config.initial_peers.store(Arc::new(random_addrs));
     }
 }
 
