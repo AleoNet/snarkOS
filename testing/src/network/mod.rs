@@ -103,6 +103,7 @@ pub struct TestSetup {
     pub max_peers: u16,
     pub is_bootnode: bool,
     pub bootnodes: Vec<String>,
+    pub initial_peers: Vec<String>,
     pub tokio_handle: Option<runtime::Handle>,
 }
 
@@ -117,6 +118,7 @@ impl TestSetup {
         max_peers: u16,
         is_bootnode: bool,
         bootnodes: Vec<String>,
+        initial_peers: Vec<String>,
         tokio_handle: Option<runtime::Handle>,
     ) -> Self {
         Self {
@@ -128,6 +130,7 @@ impl TestSetup {
             max_peers,
             is_bootnode,
             bootnodes,
+            initial_peers,
             tokio_handle,
         }
     }
@@ -144,6 +147,7 @@ impl Default for TestSetup {
             max_peers: 100,
             is_bootnode: false,
             bootnodes: vec![],
+            initial_peers: vec![],
             tokio_handle: None,
         }
     }
@@ -167,6 +171,7 @@ pub fn test_config(setup: TestSetup) -> Config {
         setup.min_peers,
         setup.max_peers,
         setup.bootnodes,
+        setup.initial_peers,
         setup.is_bootnode,
         Duration::from_secs(setup.peer_sync_interval),
     )
