@@ -17,6 +17,7 @@
 use crate::{
     Ledger,
     TransactionLocation,
+    COL_BLOCK_TRANSACTIONS,
     COL_COMMITMENT,
     COL_DIGEST,
     COL_MEMO,
@@ -24,8 +25,16 @@ use crate::{
     COL_TRANSACTION_LOCATION,
 };
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_dpc::{
+    Block,
+    BlockHeaderHash,
+    DatabaseTransaction,
+    Op,
+    Storage,
+    TransactionScheme,
+    Transactions as DPCTransactions,
+};
+use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
 use rayon::prelude::*;
 use tokio::{sync::mpsc, task};
@@ -348,35 +357,33 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
         fix_mode: FixMode,
         is_storage_valid: &AtomicBool,
     ) {
-        block.transactions.as_slice().par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
+        let block_hash = block.header.get_hash();
+
+        let block_stored_txs_bytes = match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0) {
+            Ok(Some(txs)) => txs,
+            Ok(None) => {
+                error!("Can't find the transactions stored for block {}", block_hash);
+                is_storage_valid.store(false, Ordering::SeqCst);
+
+                return;
+            }
+            Err(e) => {
+                error!("Can't find the transactions stored for block {}: {}", block_hash, e);
+                is_storage_valid.store(false, Ordering::SeqCst);
+
+                return;
+            }
+        };
+
+        let block_stored_txs: DPCTransactions<T> = FromBytes::read(&block_stored_txs_bytes[..]).unwrap();
+
+        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
             let tx_id = match tx.transaction_id() {
                 Ok(hash) => hash,
                 Err(e) => {
                     error!(
                         "The id of a transaction from block {} can't be parsed: {}",
-                        block.header.get_hash(),
-                        e
-                    );
-                    is_storage_valid.store(false, Ordering::SeqCst);
-
-                    return;
-                }
-            };
-
-            let tx = match self.get_transaction_bytes(&tx_id) {
-                Ok(tx) => match T::read(&tx[..]) {
-                    Ok(tx) => tx,
-                    Err(e) => {
-                        error!("Transaction {} can't be parsed: {}", hex::encode(tx_id), e);
-                        is_storage_valid.store(false, Ordering::SeqCst);
-
-                        return;
-                    }
-                },
-                Err(e) => {
-                    error!(
-                        "Transaction {} can't be found in the storage: {}",
-                        hex::encode(tx_id),
+                        block_hash,
                         e
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
@@ -386,25 +393,27 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             };
 
             for sn in tx.old_serial_numbers() {
-                if !self.contains_sn(sn) {
+                let sn = to_bytes![sn].unwrap();
+                if !self.storage.exists(COL_SERIAL_NUMBER, &sn) {
                     error!(
                         "Transaction {} doesn't have an old serial number stored",
                         hex::encode(tx_id)
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                component_sender.send(ValidatorAction::RegisterTxComponent(COL_SERIAL_NUMBER, to_bytes!(sn).unwrap())).unwrap();
+                component_sender.send(ValidatorAction::RegisterTxComponent(COL_SERIAL_NUMBER, sn)).unwrap();
             }
 
             for cm in tx.new_commitments() {
-                if !self.contains_cm(cm) {
+                let cm = to_bytes![cm].unwrap();
+                if !self.storage.exists(COL_COMMITMENT, &cm) {
                     error!(
                         "Transaction {} doesn't have a new commitment stored",
                         hex::encode(tx_id)
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                component_sender.send(ValidatorAction::RegisterTxComponent(COL_COMMITMENT, to_bytes!(cm).unwrap())).unwrap();
+                component_sender.send(ValidatorAction::RegisterTxComponent(COL_COMMITMENT, cm)).unwrap();
             }
 
             let tx_digest = to_bytes![tx.ledger_digest()].unwrap();
@@ -427,12 +436,12 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             }
             component_sender.send(ValidatorAction::RegisterTxComponent(COL_DIGEST, tx_digest)).unwrap();
 
-            let tx_memo = tx.memorandum();
-            if !self.contains_memo(tx_memo) {
+            let tx_memo = to_bytes![tx.memorandum()].unwrap();
+            if !self.storage.exists(COL_MEMO, &tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
-            component_sender.send(ValidatorAction::RegisterTxComponent(COL_MEMO, to_bytes!(tx_memo).unwrap())).unwrap();
+            component_sender.send(ValidatorAction::RegisterTxComponent(COL_MEMO, tx_memo.to_vec())).unwrap();
 
             match self.get_transaction_location(&tx_id) {
                 Ok(Some(tx_location)) => match self.get_block_number(&BlockHeaderHash(tx_location.block_hash)) {
@@ -457,7 +466,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                         if [FixMode::TxLocations, FixMode::Everything].contains(&fix_mode) {
                             let corrected_location = TransactionLocation {
                                 index: block_tx_idx as u32,
-                                block_hash: block.header.get_hash().0,
+                                block_hash: block_hash.0,
                             };
 
                             let db_op = Op::Insert {
