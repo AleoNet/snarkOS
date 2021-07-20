@@ -93,10 +93,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        // Attempt to connect to the default bootnodes of the network if the node has no active
+        // Attempt to connect to the default bootnodes and initial peers of the network if the node has no active
         // connections.
         if self.peer_book.get_active_peer_count() == 0 {
             self.connect_to_bootnodes().await;
+            self.connect_to_initial_peers().await;
         }
 
         if number_to_connect != 0 {
@@ -158,6 +159,41 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         for bootnode_address in self
             .config
             .bootnodes()
+            .iter()
+            .filter(|peer| **peer != own_address)
+            .copied()
+        {
+            let node = self.clone();
+            if node.peer_book.is_connected(bootnode_address) {
+                return;
+            }
+            task::spawn(async move {
+                match node.initiate_connection(bootnode_address).await {
+                    Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
+                        // no issue here, already connecting
+                    }
+                    Err(e @ NetworkError::TooManyConnections) => {
+                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                        // the connection hasn't been established, no need to disconnect
+                    }
+                    Err(e) => {
+                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                        node.disconnect_from_peer(bootnode_address).await;
+                    }
+                    Ok(_) => {}
+                }
+            });
+        }
+    }
+
+    async fn connect_to_initial_peers(&self) {
+        // Local address must be known by now.
+        let own_address = self.local_address().unwrap();
+
+        // Iterate through each bootnode address and attempt a connection request.
+        for bootnode_address in self
+            .config
+            .initial_peers()
             .iter()
             .filter(|peer| **peer != own_address)
             .copied()
