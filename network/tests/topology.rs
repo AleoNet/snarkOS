@@ -18,8 +18,7 @@ use snarkos_network::{topology::calculate_density, Node};
 use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{
-        started_test_node,
-        test_config,
+        test_node,
         topology::{connect_nodes, Topology},
         TestSetup,
     },
@@ -42,16 +41,6 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
     }
 
     nodes
-}
-
-async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
-    let environment = test_config(setup);
-    let node = Node::new(environment).unwrap();
-
-    node.listen().await.unwrap();
-    node.start_services().await;
-
-    node
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -258,7 +247,7 @@ async fn binary_star_contact() {
         bootnodes,
         ..Default::default()
     };
-    let solo = started_test_node(solo_setup).await;
+    let solo = test_node(solo_setup).await;
     nodes.push(solo);
 
     wait_until!(10, network_density(&nodes) >= target_density(nodes.len()));
