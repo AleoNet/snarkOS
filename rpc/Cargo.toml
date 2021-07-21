@@ -76,7 +76,7 @@ version = "17"
 version = "17"
 
 [dependencies.jsonrpc-derive]
-version = "17"
+version = "18"
 
 [dependencies.snarkos-metrics]
 version = "1.3.10"
