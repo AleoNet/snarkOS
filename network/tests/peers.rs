@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use snarkos_network::message::*;
 use snarkos_testing::{
-    network::{handshaken_node_and_peer, random_bound_address, test_node, TestSetup},
+    network::{handshaken_node_and_peer, random_bound_address, started_test_node, TestSetup},
     wait_until,
 };
 use tokio::time::sleep;
@@ -81,17 +81,17 @@ async fn bootnode_peer_propagation() {
     };
 
     // Spin up and connect nodes A and B.
-    let node_alice = test_node(setup(true, vec![])).await;
+    let node_alice = started_test_node(setup(true, vec![])).await;
     let addr_alice = node_alice.local_address().unwrap();
 
     // Connect B to A.
-    let node_bob = test_node(setup(false, vec![addr_alice.to_string()])).await;
+    let node_bob = started_test_node(setup(false, vec![addr_alice.to_string()])).await;
 
     // Sleep to avoid C and B trying to simultaneously connect to each other.
     sleep(Duration::from_millis(100)).await;
 
     // Connect C to A.
-    let node_charlie = test_node(setup(false, vec![addr_alice.to_string()])).await;
+    let node_charlie = started_test_node(setup(false, vec![addr_alice.to_string()])).await;
 
     let triangle_is_formed = || {
         node_charlie.peer_book.is_connected(addr_alice)

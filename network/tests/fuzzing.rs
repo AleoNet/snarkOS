@@ -19,7 +19,7 @@ use snarkvm_dpc::BlockHeaderHash;
 
 use rand::{distributions::Standard, thread_rng, Rng};
 use snarkos_testing::{
-    network::{handshaken_node_and_peer, spawn_2_fake_nodes, test_node, TestSetup},
+    network::{handshaken_node_and_peer, spawn_2_fake_nodes, started_test_node, TestSetup},
     wait_until,
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
@@ -57,7 +57,7 @@ async fn fuzzing_zeroes_pre_handshake() {
         is_bootnode: true, // same rules for establishing connections and reading messages as a regular node, but lighter
         ..Default::default()
     };
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     let mut stream = TcpStream::connect(node_addr).await.unwrap();
@@ -90,7 +90,7 @@ async fn fuzzing_valid_header_pre_handshake() {
         is_bootnode: true,
         ..Default::default()
     };
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     for _ in 0..ITERATIONS {
@@ -143,7 +143,7 @@ async fn fuzzing_pre_handshake() {
         is_bootnode: true,
         ..Default::default()
     };
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     for _ in 0..ITERATIONS {
@@ -194,7 +194,7 @@ async fn fuzzing_corrupted_version_pre_handshake() {
         ..Default::default()
     };
 
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     for i in 0..ITERATIONS {
@@ -263,7 +263,7 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
         ..Default::default()
     };
 
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     for payload in &[Payload::GetMemoryPool, Payload::GetPeers, Payload::Pong] {
@@ -328,7 +328,7 @@ async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
         ..Default::default()
     };
 
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     let mut rng = thread_rng();
@@ -445,7 +445,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
         ..Default::default()
     };
 
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     let hashes: Vec<BlockHeaderHash> = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect();
@@ -524,7 +524,7 @@ async fn connection_request_spam() {
         ..Default::default()
     };
 
-    let node = test_node(node_setup).await;
+    let node = started_test_node(node_setup).await;
     let node_addr = node.local_address().unwrap();
 
     let sockets = Arc::new(Mutex::new(Vec::with_capacity(NUM_ATTEMPTS)));

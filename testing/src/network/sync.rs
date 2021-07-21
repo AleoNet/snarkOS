@@ -17,7 +17,7 @@
 use tokio::time::sleep;
 
 use crate::{
-    network::{handshaken_node_and_peer, test_node, ConsensusSetup, TestSetup},
+    network::{handshaken_node_and_peer, started_test_node, ConsensusSetup, TestSetup},
     sync::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
     wait_until,
 };
@@ -188,7 +188,7 @@ async fn block_two_node() {
         peer_sync_interval: 1,
         ..Default::default()
     };
-    let node_alice = test_node(setup).await;
+    let node_alice = started_test_node(setup).await;
     let alice_address = node_alice.local_address().unwrap();
 
     const NUM_BLOCKS: usize = 100;
@@ -214,7 +214,7 @@ async fn block_two_node() {
         bootnodes: vec![alice_address.to_string()],
         ..Default::default()
     };
-    let node_bob = test_node(setup).await;
+    let node_bob = started_test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
     wait_until!(30, node_bob.expect_sync().current_block_height() as usize == NUM_BLOCKS);
@@ -311,7 +311,7 @@ async fn transaction_two_node() {
     use snarkvm_dpc::testnet1::instantiated::Tx;
     use snarkvm_utilities::bytes::FromBytes;
 
-    let node_alice = test_node(TestSetup::default()).await;
+    let node_alice = started_test_node(TestSetup::default()).await;
     let alice_address = node_alice.local_address().unwrap();
 
     // insert transaction into node_alice
@@ -336,7 +336,7 @@ async fn transaction_two_node() {
         bootnodes: vec![alice_address.to_string()],
         ..Default::default()
     };
-    let node_bob = test_node(setup).await;
+    let node_bob = started_test_node(setup).await;
 
     // check transaction is present in bob's memory pool
     wait_until!(5, node_bob.expect_sync().memory_pool().contains(&entry));
