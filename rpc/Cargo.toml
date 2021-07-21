@@ -73,7 +73,7 @@ version = "1.0.1"
 version = "17"
 
 [dependencies.jsonrpc-core-client]
-version = "17"
+version = "18"
 
 [dependencies.jsonrpc-derive]
 version = "17"
