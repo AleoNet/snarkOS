@@ -35,6 +35,10 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
 
     for _ in 0..n {
         nodes.push(test_node(setup.clone()).await);
+
+        // Nodes are started with a slight delay to avoid having peering intervals in phase (this
+        // is the hypothetical worst case scenario).
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
 
     nodes
@@ -45,17 +49,9 @@ async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     let node = Node::new(environment).unwrap();
 
     node.listen().await.unwrap();
+    node.start_services().await;
 
     node
-}
-
-async fn start_nodes(nodes: &[Node<LedgerStorage>]) {
-    for node in nodes {
-        // Nodes are started with a slight delay to avoid having peering intervals in phase (this
-        // is the hypothetical worst case scenario).
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        node.start_services().await;
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -66,7 +62,6 @@ async fn spawn_nodes_in_a_line() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    start_nodes(&nodes).await;
     connect_nodes(&mut nodes, Topology::Line).await;
 
     // First and Last nodes should have 1 connected peer.
@@ -87,7 +82,6 @@ async fn spawn_nodes_in_a_ring() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    start_nodes(&nodes).await;
     connect_nodes(&mut nodes, Topology::Ring).await;
 
     for node in &nodes {
@@ -103,7 +97,6 @@ async fn spawn_nodes_in_a_star() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    start_nodes(&nodes).await;
     connect_nodes(&mut nodes, Topology::Star).await;
 
     let hub = nodes.first().unwrap();
@@ -120,7 +113,6 @@ async fn spawn_nodes_in_a_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    start_nodes(&nodes).await;
     connect_nodes(&mut nodes, Topology::Mesh).await;
 
     // Set the sleep interval to 200ms to avoid locking issues.
@@ -150,7 +142,6 @@ async fn line_converges_to_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    start_nodes(&nodes).await;
     connect_nodes(&mut nodes, Topology::Line).await;
 
     wait_until!(10, network_density(&nodes) >= 0.2, 200);
@@ -171,7 +162,6 @@ async fn ring_converges_to_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    start_nodes(&nodes).await;
     connect_nodes(&mut nodes, Topology::Ring).await;
 
     wait_until!(10, network_density(&nodes) >= 0.2, 200);
@@ -204,7 +194,6 @@ async fn star_converges_to_mesh() {
     // Insert the bootnode at the head of the list.
     nodes.insert(0, test_node(hub_setup).await);
 
-    start_nodes(&nodes).await;
     connect_nodes(&mut nodes, Topology::Star).await;
 
     wait_until!(15, network_density(&nodes) >= 0.2, 200);
@@ -227,13 +216,9 @@ async fn binary_star_contact() {
         is_bootnode: true,
         ..Default::default()
     };
-    let environment_a = test_config(bootnode_setup.clone());
-    let environment_b = test_config(bootnode_setup.clone());
-    let bootnode_a = Node::new(environment_a).unwrap();
-    let bootnode_b = Node::new(environment_b).unwrap();
 
-    bootnode_a.listen().await.unwrap();
-    bootnode_b.listen().await.unwrap();
+    let bootnode_a = test_node(bootnode_setup.clone()).await;
+    let bootnode_b = test_node(bootnode_setup).await;
 
     let ba = bootnode_a.local_address().unwrap().to_string();
     let bb = bootnode_b.local_address().unwrap().to_string();
@@ -252,10 +237,6 @@ async fn binary_star_contact() {
     // Insert the bootnodes at the begining of the node lists.
     star_a_nodes.insert(0, bootnode_a);
     star_b_nodes.insert(0, bootnode_b);
-
-    // Start the services. The two meshes should still be disconnected.
-    start_nodes(&star_a_nodes).await;
-    start_nodes(&star_b_nodes).await;
 
     // Create the star topologies.
     connect_nodes(&mut star_a_nodes, Topology::Star).await;
