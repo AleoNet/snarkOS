@@ -17,7 +17,7 @@
 use snarkos_network::{message::*, Node, Version};
 use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
-    network::{started_test_node, write_message_to_stream, TestSetup},
+    network::{test_node, write_message_to_stream, TestSetup},
     wait_until,
 };
 
@@ -38,7 +38,7 @@ async fn handshake_responder_side() {
         consensus_setup: None,
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
     let node_listener = node.local_address().unwrap();
 
     // set up a fake node (peer), which is just a socket
@@ -100,7 +100,7 @@ async fn handshake_initiator_side() {
         peer_sync_interval: 1,
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
 
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
@@ -166,7 +166,7 @@ async fn reject_non_version_messages_before_handshake() {
         consensus_setup: None,
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
 
     // start the fake node (peer) which is just a socket
     // note: the connection needs to be re-established as it is reset
@@ -255,7 +255,7 @@ async fn handshake_timeout_initiator_side() {
             .collect(),
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
 
     // the node should start connecting to all the configured bootnodes
     wait_until!(3, node.peer_book.get_active_peer_count() == NUM_BOOTSTRAPPERS as u32);
@@ -274,7 +274,7 @@ async fn handshake_timeout_responder_side() {
         consensus_setup: None,
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
     let node_addr = node.local_address().unwrap();
 
     // set up a "peer" that won't perform a valid handshake

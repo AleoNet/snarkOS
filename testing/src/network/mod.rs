@@ -174,7 +174,7 @@ pub fn test_config(setup: TestSetup) -> Config {
 }
 
 /// Starts a node with the specified bootnodes.
-pub async fn started_test_node(setup: TestSetup) -> Node<LedgerStorage> {
+pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let config = test_config(setup.clone());
     let mut node = Node::new(config).unwrap();
@@ -377,7 +377,7 @@ pub async fn handshaken_peer(node_listener: SocketAddr) -> FakeNode {
 
 pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node<LedgerStorage>, FakeNode) {
     // start a test node and listen for incoming connections
-    let node = started_test_node(node_setup).await;
+    let node = test_node(node_setup).await;
     let node_listener = node.local_address().unwrap();
     let fake_node = handshaken_peer(node_listener).await;
 

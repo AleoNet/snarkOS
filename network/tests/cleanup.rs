@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_testing::{
-    network::{handshaken_peer, started_test_node, TestSetup},
+    network::{handshaken_peer, test_node, TestSetup},
     wait_until,
 };
 
@@ -33,7 +33,7 @@ async fn check_connection_task_cleanup() {
         peer_sync_interval: 3,
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
 
     // Breach the usual ulimit barriers.
     for _ in 0..10_000 {
@@ -56,7 +56,7 @@ async fn check_inactive_conn_cleanup() {
         peer_sync_interval: 10,
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
 
     // A connection with a peer that will remain inactive.
     let _peer = handshaken_peer(node.local_address().unwrap()).await;
@@ -82,7 +82,7 @@ async fn check_node_cleanup() {
         consensus_setup: None,
         ..Default::default()
     };
-    let node = started_test_node(setup).await;
+    let node = test_node(setup).await;
 
     // Keep track of peak heap throughout the iterations.
     let mut peak_heap = PEAK_ALLOC.peak_usage();
