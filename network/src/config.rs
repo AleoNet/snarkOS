@@ -34,8 +34,6 @@ pub struct Config {
     maximum_number_of_connected_peers: u16,
     /// The default bootnodes of the network.
     pub bootnodes: ArcSwap<Vec<SocketAddr>>,
-    /// The initial (non-bootnode) addresses this node should connect to.
-    pub initial_peers: ArcSwap<Vec<SocketAddr>>,
     /// If `true`, initializes this node as a bootnode and forgoes connecting
     /// to the default bootnodes or saved peers in the peer book.
     is_bootnode: bool,
@@ -50,23 +48,15 @@ impl Config {
         desired_address: SocketAddr,
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
-        bootnodes_addrs: Vec<String>,
-        initial_peer_addrs: Vec<String>,
+        bootnodes_addresses: Vec<String>,
         is_bootnode: bool,
         peer_sync_interval: Duration,
     ) -> Result<Self, NetworkError> {
         // Convert the given bootnodes into socket addresses.
-        let mut bootnodes = Vec::with_capacity(bootnodes_addrs.len());
-        for bootnode_addr in bootnodes_addrs.iter() {
-            if let Ok(bootnode) = bootnode_addr.parse::<SocketAddr>() {
+        let mut bootnodes = Vec::with_capacity(bootnodes_addresses.len());
+        for bootnode_address in bootnodes_addresses.iter() {
+            if let Ok(bootnode) = bootnode_address.parse::<SocketAddr>() {
                 bootnodes.push(bootnode);
-            }
-        }
-
-        let mut initial_peers = Vec::with_capacity(initial_peer_addrs.len());
-        for initial_peer_addr in initial_peer_addrs {
-            if let Ok(addr) = initial_peer_addr.parse::<SocketAddr>() {
-                initial_peers.push(addr);
             }
         }
 
@@ -75,7 +65,6 @@ impl Config {
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
             bootnodes: ArcSwap::new(Arc::new(bootnodes)),
-            initial_peers: ArcSwap::new(Arc::new(initial_peers)),
             is_bootnode,
             peer_sync_interval,
         })

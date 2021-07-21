@@ -88,7 +88,6 @@ pub struct Miner {
 pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
     pub bootnodes: Vec<String>,
-    pub initial_peers: Vec<String>,
     #[serde(alias = "mempool_interval")]
     pub mempool_sync_interval: u8,
     pub block_sync_interval: u16,
@@ -140,7 +139,6 @@ impl Default for Config {
                     .iter()
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
-                initial_peers: vec![],
                 mempool_sync_interval: 12,
                 peer_sync_interval: 15,
                 block_sync_interval: 4,
