@@ -93,7 +93,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        // Attempt to connect to the default bootnodes and initial peers of the network if the node has no active
+        // Attempt to connect to the default bootnodes of the network if the node has no active
         // connections.
         if self.peer_book.get_active_peer_count() == 0 {
             self.connect_to_addresses(&self.config.bootnodes()).await;
@@ -152,11 +152,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         let own_address = self.local_address().unwrap();
 
         for node_addr in addrs.iter().filter(|addr| **addr != own_address).copied() {
-            let node = self.clone();
-
-            if node.peer_book.is_connected(node_addr) {
+            if self.peer_book.is_connected(node_addr) {
                 break;
             }
+
+            let node = self.clone();
             task::spawn(async move {
                 match node.initiate_connection(node_addr).await {
                     Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {

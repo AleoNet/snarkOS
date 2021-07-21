@@ -106,10 +106,10 @@ async fn spawn_nodes_in_a_mesh() {
 
     // Set the sleep interval to 200ms to avoid locking issues.
     // Density measurement here is proportional to the min peers: if every node in the network
-    // only connected to the min node count, the total number of connections would be roughly 10
-    // percent of the total possible. With 25 nodes and min at 5 connections each this works out to
+    // only connected to the min node count, the total number of connections would be roughly 20
+    // percent of the total possible. E.g., with 25 nodes and min at 5 connections each this works out to
     // be 125/600 ≈ 0.2.
-    wait_until!(15, network_density(&nodes) >= 0.2, 200);
+    wait_until!(15, network_density(&nodes) >= target_density(N), 200);
 
     // Make sure the node with the largest degree centrality and smallest degree centrality don't
     // have a delta greater than the max-min peer interval allows for. This check also provides
@@ -133,7 +133,7 @@ async fn line_converges_to_mesh() {
     let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Line).await;
 
-    wait_until!(10, network_density(&nodes) >= 0.2, 200);
+    wait_until!(10, network_density(&nodes) >= target_density(N), 200);
     wait_until!(
         10,
         degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
@@ -153,7 +153,7 @@ async fn ring_converges_to_mesh() {
     let mut nodes = test_nodes(N, setup).await;
     connect_nodes(&mut nodes, Topology::Ring).await;
 
-    wait_until!(10, network_density(&nodes) >= 0.2, 200);
+    wait_until!(10, network_density(&nodes) >= target_density(N), 200);
     wait_until!(
         10,
         degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
@@ -185,7 +185,7 @@ async fn star_converges_to_mesh() {
 
     connect_nodes(&mut nodes, Topology::Star).await;
 
-    wait_until!(15, network_density(&nodes) >= 0.2, 200);
+    wait_until!(15, network_density(&nodes) >= target_density(N), 200);
     wait_until!(
         15,
         degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
@@ -255,7 +255,8 @@ async fn binary_star_contact() {
 
 fn target_density(node_count: usize) -> f64 {
     // This is (MIN_PEERS * n) / n * (n + 1) which is the ratio of all nodes having `MIN_PEERS`
-    // connections to the total number of theoretical possible connections in the network.
+    // connections to the total number of theoretical possible connections in the network (the
+    // division by 2 has been simplified in the fraction.)
     MIN_PEERS as f64 / (node_count + 1) as f64
 }
 

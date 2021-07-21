@@ -57,9 +57,6 @@ async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
     for node in nodes {
         if let Some(addr) = prev_node {
             node.connect_to_addresses(&[addr]).await;
-            // let mut initial_peers = (&**node.config.initial_peers.load()).clone();
-            // initial_peers.push(addr);
-            // node.config.initial_peers.store(Arc::new(initial_peers));
         };
 
         // Assumes the node has an established address.
@@ -74,10 +71,6 @@ async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
 
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
-    //  let initial_peers = &nodes.last().unwrap().config.initial_peers;
-    //  let mut initial_peers_handle = (&**initial_peers.load()).clone();
-    //  initial_peers_handle.push(first_addr);
-    //  initial_peers.store(Arc::new(initial_peers_handle));
     nodes.last().unwrap().connect_to_addresses(&[first_addr]).await;
 }
 
