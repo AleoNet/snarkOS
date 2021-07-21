@@ -18,6 +18,7 @@ use snarkos_network::{topology::calculate_density, Node};
 use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{
+        started_test_node,
         test_config,
         topology::{connect_nodes, Topology},
         TestSetup,
@@ -215,7 +216,6 @@ async fn star_converges_to_mesh() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
 async fn binary_star_contact() {
     // Two initally separate star topologies subsequently connected by a single node connecting to
     // their bootnodes.
@@ -277,10 +277,16 @@ async fn binary_star_contact() {
         bootnodes,
         ..Default::default()
     };
-    let solo = test_node(solo_setup).await;
+    let solo = started_test_node(solo_setup).await;
     nodes.push(solo);
 
-    wait_until!(10, network_density(&nodes) >= 0.05);
+    wait_until!(10, network_density(&nodes) >= target_density(nodes.len()));
+}
+
+fn target_density(node_count: usize) -> f64 {
+    // This is (MIN_PEERS * n) / n * (n + 1) which is the ratio of all nodes having `MIN_PEERS`
+    // connections to the total number of theoretical possible connections in the network.
+    MIN_PEERS as f64 / (node_count + 1) as f64
 }
 
 /// Returns the total connection count of the network.
