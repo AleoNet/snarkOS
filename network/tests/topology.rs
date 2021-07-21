@@ -214,6 +214,75 @@ async fn star_converges_to_mesh() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn binary_star_contact() {
+    // Two initally separate star topologies subsequently connected by a single node connecting to
+    // their bootnodes.
+
+    // Setup the bootnodes for each star topology.
+    let bootnode_setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 1,
+        is_bootnode: true,
+        ..Default::default()
+    };
+    let environment_a = test_config(bootnode_setup.clone());
+    let environment_b = test_config(bootnode_setup.clone());
+    let bootnode_a = Node::new(environment_a).unwrap();
+    let bootnode_b = Node::new(environment_b).unwrap();
+
+    bootnode_a.listen().await.unwrap();
+    bootnode_b.listen().await.unwrap();
+
+    let ba = bootnode_a.local_address().unwrap().to_string();
+    let bb = bootnode_b.local_address().unwrap().to_string();
+
+    // Create the nodes to be used as the leafs in the stars.
+    let setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 1,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
+        ..Default::default()
+    };
+    let mut star_a_nodes = test_nodes(N - 1, setup.clone()).await;
+    let mut star_b_nodes = test_nodes(N - 1, setup).await;
+
+    // Insert the bootnodes at the begining of the node lists.
+    star_a_nodes.insert(0, bootnode_a);
+    star_b_nodes.insert(0, bootnode_b);
+
+    // Create the star topologies.
+    connect_nodes(&mut star_a_nodes, Topology::Star);
+    connect_nodes(&mut star_b_nodes, Topology::Star);
+
+    // Start the services. The two meshes should still be disconnected.
+    start_nodes(&star_a_nodes).await;
+    start_nodes(&star_b_nodes).await;
+
+    // Setting up a list of nodes as we will consider them as a whole graph from this point
+    // forwards.
+    star_a_nodes.append(&mut star_b_nodes);
+    let mut nodes = star_a_nodes;
+
+    // Single node to connect to a subset of N and K.
+    let bootnodes = vec![ba, bb];
+
+    let solo_setup = TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 1,
+        min_peers: MIN_PEERS,
+        max_peers: MAX_PEERS,
+        bootnodes,
+        ..Default::default()
+    };
+    let solo = test_node(solo_setup).await;
+    nodes.push(solo);
+
+    wait_until!(10, network_density(&nodes) >= 0.05);
+}
+
 /// Returns the total connection count of the network.
 fn total_connection_count(nodes: &[Node<LedgerStorage>]) -> u32 {
     let mut count = 0;
