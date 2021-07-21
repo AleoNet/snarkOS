@@ -76,11 +76,6 @@ impl Config {
         self.bootnodes.load_full()
     }
 
-    #[inline]
-    pub fn initial_peers(&self) -> Arc<Vec<SocketAddr>> {
-        self.initial_peers.load_full()
-    }
-
     /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.
     #[inline]
     pub fn is_bootnode(&self) -> bool {

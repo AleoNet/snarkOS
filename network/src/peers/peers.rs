@@ -97,7 +97,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // connections.
         if self.peer_book.get_active_peer_count() == 0 {
             self.connect_to_addresses(&self.config.bootnodes()).await;
-            self.connect_to_addresses(&self.config.initial_peers()).await;
         }
 
         if number_to_connect != 0 {
