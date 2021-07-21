@@ -250,7 +250,7 @@ async fn binary_star_contact() {
     let solo = test_node(solo_setup).await;
     nodes.push(solo);
 
-    wait_until!(10, network_density(&nodes) >= target_density(nodes.len()));
+    wait_until!(15, network_density(&nodes) >= target_density(nodes.len()));
 }
 
 fn target_density(node_count: usize) -> f64 {
