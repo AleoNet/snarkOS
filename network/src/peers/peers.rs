@@ -148,7 +148,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     /// This function filters out any peers the node server is
     /// either connnecting to or already connected to.
     ///
-    async fn connect_to_addresses(&self, addrs: &[SocketAddr]) {
+    pub async fn connect_to_addresses(&self, addrs: &[SocketAddr]) {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 

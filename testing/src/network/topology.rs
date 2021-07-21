@@ -36,29 +36,30 @@ pub enum Topology {
 /// started yet, as it uses the bootnodes to establish the connections between nodes.
 ///
 /// When connecting in a `Star`, the first node in the `nodes` will be used as the hub.
-pub fn connect_nodes(nodes: &mut Vec<Node<LedgerStorage>>, topology: Topology) {
+pub async fn connect_nodes(nodes: &mut Vec<Node<LedgerStorage>>, topology: Topology) {
     if nodes.len() < 2 {
         panic!("Can't connect less than two nodes");
     }
 
     match topology {
-        Topology::Line => line(nodes),
-        Topology::Ring => ring(nodes),
-        Topology::Mesh => mesh(nodes),
+        Topology::Line => line(nodes).await,
+        Topology::Ring => ring(nodes).await,
+        Topology::Mesh => mesh(nodes).await,
         Topology::Star => star(nodes),
     }
 }
 
 /// Connects the network nodes in a line topology.
-fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
+async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
     let mut prev_node: Option<SocketAddr> = None;
 
     // Start each node with the previous as a bootnode.
     for node in nodes {
         if let Some(addr) = prev_node {
-            let mut initial_peers = (&**node.config.initial_peers.load()).clone();
-            initial_peers.push(addr);
-            node.config.initial_peers.store(Arc::new(initial_peers));
+            node.connect_to_addresses(&[addr]).await;
+            // let mut initial_peers = (&**node.config.initial_peers.load()).clone();
+            // initial_peers.push(addr);
+            // node.config.initial_peers.store(Arc::new(initial_peers));
         };
 
         // Assumes the node has an established address.
@@ -67,33 +68,34 @@ fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
 }
 
 /// Connects the network nodes in a ring topology.
-fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
+async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Set the nodes up in a line.
-    line(nodes);
+    line(nodes).await;
 
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
-    let initial_peers = &nodes.last().unwrap().config.initial_peers;
-    let mut initial_peers_handle = (&**initial_peers.load()).clone();
-    initial_peers_handle.push(first_addr);
-    initial_peers.store(Arc::new(initial_peers_handle));
+    //  let initial_peers = &nodes.last().unwrap().config.initial_peers;
+    //  let mut initial_peers_handle = (&**initial_peers.load()).clone();
+    //  initial_peers_handle.push(first_addr);
+    //  initial_peers.store(Arc::new(initial_peers_handle));
+    nodes.last().unwrap().connect_to_addresses(&[first_addr]).await;
 }
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
 /// minimum number of connected peers value.
-fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
+async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
     let local_addresses: Vec<SocketAddr> = nodes.iter().map(|node| node.local_address().unwrap()).collect();
 
     for node in nodes {
         use rand::seq::SliceRandom;
-        let random_addrs = local_addresses
+        let random_addrs: Vec<SocketAddr> = local_addresses
             .choose_multiple(
                 &mut rand::thread_rng(),
                 node.config.minimum_number_of_connected_peers().into(),
             )
             .copied()
             .collect();
-        node.config.initial_peers.store(Arc::new(random_addrs));
+        node.connect_to_addresses(&random_addrs).await;
     }
 }
 

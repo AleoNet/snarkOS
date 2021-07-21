@@ -66,8 +66,8 @@ async fn spawn_nodes_in_a_line() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Line);
     start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Line).await;
 
     // First and Last nodes should have 1 connected peer.
     wait_until!(5, nodes.first().unwrap().peer_book.get_active_peer_count() == 1);
@@ -75,7 +75,7 @@ async fn spawn_nodes_in_a_line() {
 
     // All other nodes should have two.
     for node in nodes.iter().take(nodes.len() - 1).skip(1) {
-        wait_until!(5, node.peer_book.get_active_peer_count() == 2);
+        wait_until!(10, node.peer_book.get_active_peer_count() == 2);
     }
 }
 
@@ -87,8 +87,8 @@ async fn spawn_nodes_in_a_ring() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Ring);
     start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Ring).await;
 
     for node in &nodes {
         wait_until!(5, node.peer_book.get_active_peer_count() == 2);
@@ -103,8 +103,8 @@ async fn spawn_nodes_in_a_star() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Star);
     start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Star).await;
 
     let hub = nodes.first().unwrap();
     wait_until!(10, hub.peer_book.get_active_peer_count() as usize == N - 1);
@@ -120,8 +120,8 @@ async fn spawn_nodes_in_a_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Mesh);
     start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Mesh).await;
 
     // Set the sleep interval to 200ms to avoid locking issues.
     // Density measurement here is proportional to the min peers: if every node in the network
@@ -150,8 +150,8 @@ async fn line_converges_to_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Line);
     start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Line).await;
 
     wait_until!(10, network_density(&nodes) >= 0.2, 200);
     wait_until!(
@@ -171,8 +171,8 @@ async fn ring_converges_to_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Ring);
     start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Ring).await;
 
     wait_until!(10, network_density(&nodes) >= 0.2, 200);
     wait_until!(
@@ -204,8 +204,8 @@ async fn star_converges_to_mesh() {
     // Insert the bootnode at the head of the list.
     nodes.insert(0, test_node(hub_setup).await);
 
-    connect_nodes(&mut nodes, Topology::Star);
     start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Star).await;
 
     wait_until!(15, network_density(&nodes) >= 0.2, 200);
     wait_until!(
@@ -253,13 +253,13 @@ async fn binary_star_contact() {
     star_a_nodes.insert(0, bootnode_a);
     star_b_nodes.insert(0, bootnode_b);
 
-    // Create the star topologies.
-    connect_nodes(&mut star_a_nodes, Topology::Star);
-    connect_nodes(&mut star_b_nodes, Topology::Star);
-
     // Start the services. The two meshes should still be disconnected.
     start_nodes(&star_a_nodes).await;
     start_nodes(&star_b_nodes).await;
+
+    // Create the star topologies.
+    connect_nodes(&mut star_a_nodes, Topology::Star).await;
+    connect_nodes(&mut star_b_nodes, Topology::Star).await;
 
     // Setting up a list of nodes as we will consider them as a whole graph from this point
     // forwards.
