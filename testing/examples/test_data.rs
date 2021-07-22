@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
+use snarkos_consensus::{error::ConsensusError, Consensus, MineContext};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
     block::Transactions,

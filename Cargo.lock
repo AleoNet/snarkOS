@@ -796,6 +796,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
+
+[[package]]
 name = "ed25519"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2615,6 +2621,7 @@ dependencies = [
  "snarkos-storage",
  "snarkvm-algorithms",
  "snarkvm-dpc",
+ "snarkvm-parameters",
  "snarkvm-posw",
  "snarkvm-utilities",
  "thiserror",
@@ -2656,12 +2663,16 @@ dependencies = [
  "anyhow",
  "chrono",
  "criterion",
+ "dyn-clone",
  "hex",
+ "indexmap",
+ "lazy_static",
  "metrics",
  "mpmc-map",
  "rand 0.8.4",
  "rand_chacha 0.3.1",
  "rand_xorshift",
+ "smallvec",
  "snarkos-metrics",
  "snarkos-profiler",
  "snarkos-storage",
@@ -2669,6 +2680,7 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
+ "snarkvm-parameters",
  "snarkvm-posw",
  "snarkvm-utilities",
  "thiserror",
@@ -2764,6 +2776,7 @@ name = "snarkos-rpc"
 version = "1.3.12"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64",
  "chrono",
  "derivative",
@@ -2799,16 +2812,19 @@ version = "1.3.12"
 dependencies = [
  "anyhow",
  "arc-swap",
+ "async-trait",
  "bincode",
+ "blake2",
+ "futures 0.3.16",
  "hex",
- "parking_lot",
+ "indexmap",
  "rand 0.8.4",
  "rayon",
  "rocksdb",
  "serde",
+ "smallvec",
  "snarkos-consensus",
  "snarkos-parameters",
- "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",

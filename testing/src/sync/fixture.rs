@@ -16,55 +16,63 @@
 
 use crate::{
     dpc::{generate_test_accounts, setup_or_load_parameters},
-    storage::*,
+    sync::genesis,
 };
-use snarkos_consensus::MerkleTreeLedger;
-use snarkos_parameters::GenesisBlock;
-use snarkos_storage::LedgerStorage;
-use snarkvm_dpc::{
-    testnet1::{instantiated::*, NoopProgram},
-    Account,
-    Block,
-    Storage,
-};
-use snarkvm_parameters::traits::genesis::Genesis;
+use snarkos_consensus::{DynLedger, MerkleLedger};
+use snarkos_storage::{key_value::KeyValueStore, DynStorage, MemDb};
+use snarkvm_algorithms::{MerkleParameters, CRH};
+use snarkvm_dpc::{Account, Block, testnet1::{NoopProgram, Testnet1Components, instantiated::*}};
+use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
-pub static FIXTURE: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(false));
-pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
+pub static FIXTURE: Lazy<Fixture> = Lazy::new(|| setup(false));
+pub static FIXTURE_VK: Lazy<Fixture> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
-pub struct Fixture<S: Storage> {
+pub struct Fixture {
     pub dpc: Arc<Testnet1DPC>,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: Arc<CommitmentMerkleParameters>,
     pub genesis_block: Block<Testnet1Transaction>,
     pub program: NoopProgram<Components>,
     pub rng: ChaChaRng,
-    _storage: PhantomData<S>,
 }
 
-impl<S: Storage> Fixture<S> {
-    pub fn ledger(&self) -> MerkleTreeLedger<S> {
-        initialize_test_blockchain(self.ledger_parameters.clone(), self.genesis_block.clone())
+impl Fixture {
+    pub fn storage(&self) -> DynStorage {
+        Arc::new(KeyValueStore::new(MemDb::new()))
+    }
+
+    pub fn ledger(&self) -> DynLedger {
+        let ledger_parameters = {
+            type Parameters = <Components as Testnet1Components>::MerkleParameters;
+            let parameters: <<Parameters as MerkleParameters>::H as CRH>::Parameters =
+                FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..]).unwrap();
+            let crh = <Parameters as MerkleParameters>::H::from(parameters);
+            Arc::new(Parameters::from(crh))
+        };
+
+        DynLedger(Box::new(
+            MerkleLedger::new(ledger_parameters, &[], &[], &[], &[]).unwrap(),
+        ))
     }
 }
 
-fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
+fn setup(verify_only: bool) -> Fixture {
     let mut rng = ChaChaRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, dpc) = setup_or_load_parameters::<_, S>(verify_only, &mut rng);
+    let (ledger_parameters, dpc) = setup_or_load_parameters::<_>(verify_only, &mut rng);
 
     // Generate addresses
-    let test_accounts = generate_test_accounts::<_, S>(&dpc, &mut rng);
+    let test_accounts = generate_test_accounts::<_>(&dpc, &mut rng);
 
-    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
+    let genesis_block: Block<Testnet1Transaction> = genesis();
 
     let program = dpc.noop_program.clone();
 
@@ -77,6 +85,5 @@ fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
         genesis_block,
         program,
         rng,
-        _storage: PhantomData,
     }
 }

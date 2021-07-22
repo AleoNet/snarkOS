@@ -14,10 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
-use snarkos_storage::LedgerStorage;
+use snarkos_consensus::{ConsensusParameters, MemoryPool};
+use snarkos_storage::{DynStorage, VMBlock};
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{testnet1::instantiated::Components, DPCComponents, Network, TransactionError, TransactionScheme};
+use snarkvm_dpc::{
+    testnet1::instantiated::{Components, Testnet1Transaction},
+    Block,
+    DPCComponents,
+    Network,
+    TransactionError,
+    TransactionScheme,
+};
 use snarkvm_parameters::{global::InnerCircuitIDCRH, testnet1::InnerSNARKVKParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
@@ -139,17 +146,21 @@ impl FromBytes for TestTestnet1Transaction {
     }
 }
 
-pub fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
-    create_test_consensus_from_ledger(Arc::new(FIXTURE_VK.ledger()))
+pub fn create_test_consensus() -> Arc<snarkos_consensus::Consensus> {
+    create_test_consensus_from_ledger(FIXTURE_VK.storage())
 }
 
-pub fn create_test_consensus_from_ledger(
-    ledger: Arc<MerkleTreeLedger<LedgerStorage>>,
-) -> snarkos_consensus::Consensus<LedgerStorage> {
-    snarkos_consensus::Consensus {
+pub fn create_test_consensus_from_ledger(storage: DynStorage) -> Arc<snarkos_consensus::Consensus> {
+    let genesis_block: Block<Testnet1Transaction> = genesis();
+    let ledger = FIXTURE_VK.ledger();
+
+    let genesis_block = <Block<Testnet1Transaction> as VMBlock>::serialize(&genesis_block).unwrap();
+    snarkos_consensus::Consensus::new(
+        TEST_CONSENSUS_PARAMS.clone(),
+        FIXTURE.dpc.clone(),
+        genesis_block,
         ledger,
-        memory_pool: Default::default(),
-        parameters: TEST_CONSENSUS_PARAMS.clone(),
-        dpc: FIXTURE.dpc.clone(),
-    }
+        storage,
+        MemoryPool::new(),
+    )
 }

@@ -21,10 +21,9 @@ use crate::{
     rpc_types::{Meta, RpcCredentials},
     RpcImpl,
 };
-use snarkos_consensus::MerkleTreeLedger;
 use snarkos_metrics::{self as metrics, misc};
 use snarkos_network::Node;
-use snarkvm_dpc::Storage;
+use snarkos_storage::DynStorage;
 
 use hyper::{
     body::HttpBody,
@@ -35,9 +34,8 @@ use hyper::{
 use json_rpc_types as jrt;
 use jsonrpc_core::Params;
 use serde::Serialize;
-use tokio::task;
 
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr};
 
 const METHODS_EXPECTING_PARAMS: [&str; 15] = [
     // public
@@ -60,19 +58,19 @@ const METHODS_EXPECTING_PARAMS: [&str; 15] = [
 ];
 
 #[allow(clippy::too_many_arguments)]
-pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
+pub fn start_rpc_server(
     rpc_addr: SocketAddr,
-    secondary_storage: Arc<MerkleTreeLedger<S>>,
-    node_server: Node<S>,
+    storage: DynStorage,
+    node_server: Node,
     username: Option<String>,
     password: Option<String>,
-) -> task::JoinHandle<()> {
+) -> tokio::task::JoinHandle<()> {
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
         _ => None,
     };
 
-    let rpc_impl = RpcImpl::new(secondary_storage, credentials, node_server);
+    let rpc_impl = RpcImpl::new(storage, credentials, node_server);
 
     let service = make_service_fn(move |_conn| {
         let rpc = rpc_impl.clone();
@@ -81,15 +79,12 @@ pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
 
     let server = Server::bind(&rpc_addr).serve(service);
 
-    task::spawn(async move {
+    tokio::spawn(async move {
         server.await.expect("The RPC server couldn't be started!");
     })
 }
 
-async fn handle_rpc<S: Storage + Send + Sync + 'static>(
-    rpc: RpcImpl<S>,
-    req: hyper::Request<Body>,
-) -> Result<hyper::Response<Body>, Infallible> {
+async fn handle_rpc(rpc: RpcImpl, req: hyper::Request<Body>) -> Result<hyper::Response<Body>, Infallible> {
     // Register the request in the metrics.
     metrics::increment_counter!(misc::RPC_REQUESTS);
 
@@ -149,20 +144,21 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         "getblock" => {
             let result = rpc
                 .get_block(params[0].as_str().unwrap_or("").into())
+                .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getblockcount" => {
-            let result = rpc.get_block_count().map_err(convert_crate_err);
+            let result = rpc.get_block_count().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getbestblockhash" => {
-            let result = rpc.get_best_block_hash().map_err(convert_crate_err);
+            let result = rpc.get_best_block_hash().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getblockhash" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
-                let result = rpc.get_block_hash(height).map_err(convert_crate_err);
+                let result = rpc.get_block_hash(height).await.map_err(convert_crate_err);
                 result_to_response(&req, result)
             }
             Err(_) => {
@@ -173,55 +169,60 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         "getrawtransaction" => {
             let result = rpc
                 .get_raw_transaction(params[0].as_str().unwrap_or("").into())
+                .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "gettransactioninfo" => {
             let result = rpc
                 .get_transaction_info(params[0].as_str().unwrap_or("").into())
+                .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "decoderawtransaction" => {
             let result = rpc
                 .decode_raw_transaction(params[0].as_str().unwrap_or("").into())
+                .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "sendtransaction" => {
             let result = rpc
                 .send_raw_transaction(params[0].as_str().unwrap_or("").into())
+                .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "validaterawtransaction" => {
             let result = rpc
                 .validate_raw_transaction(params[0].as_str().unwrap_or("").into())
+                .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getconnectioncount" => {
-            let result = rpc.get_connection_count().map_err(convert_crate_err);
+            let result = rpc.get_connection_count().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getpeerinfo" => {
-            let result = rpc.get_peer_info().map_err(convert_crate_err);
+            let result = rpc.get_peer_info().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getnodeinfo" => {
-            let result = rpc.get_node_info().map_err(convert_crate_err);
+            let result = rpc.get_node_info().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getnodestats" => {
-            let result = rpc.get_node_stats().map_err(convert_crate_err);
+            let result = rpc.get_node_stats().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getblocktemplate" => {
-            let result = rpc.get_block_template().map_err(convert_crate_err);
+            let result = rpc.get_block_template().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getnetworkgraph" => {
-            let result = rpc.get_network_graph().map_err(convert_crate_err);
+            let result = rpc.get_network_graph().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         // private

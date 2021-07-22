@@ -36,7 +36,7 @@ use std::{net::SocketAddr, sync::Arc};
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
     rpc_addr: SocketAddr,
-    secondary_storage: Arc<MerkleTreeLedger<S>>,
+    storage: Arc<MerkleTreeLedger<S>>,
     node_server: Node<S>,
     username: Option<String>,
     password: Option<String>,
@@ -46,7 +46,7 @@ pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
         _ => None,
     };
 
-    let rpc_impl = RpcImpl::new(secondary_storage, credentials, node_server);
+    let rpc_impl = RpcImpl::new(storage, credentials, node_server);
     let mut io = jsonrpc_core::MetaIoHandler::default();
 
     rpc_impl.add_protected(&mut io);

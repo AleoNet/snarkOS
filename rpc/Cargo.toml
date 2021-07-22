@@ -45,6 +45,9 @@ version = "1.0.40"
 [dependencies.base64]
 version = "0.13.0"
 
+[dependencies.async-trait]
+version = "0.1"
+
 [dependencies.chrono]
 version = "0.4"
 features = [ "serde" ]

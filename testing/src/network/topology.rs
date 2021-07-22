@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::Node;
-use snarkos_storage::LedgerStorage;
 
 use std::{net::SocketAddr, sync::Arc};
 
@@ -36,7 +35,7 @@ pub enum Topology {
 /// started yet, as it uses the bootnodes to establish the connections between nodes.
 ///
 /// When connecting in a `Star`, the first node in the `nodes` will be used as the hub.
-pub async fn connect_nodes(nodes: &mut Vec<Node<LedgerStorage>>, topology: Topology) {
+pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
     if nodes.len() < 2 {
         panic!("Can't connect less than two nodes");
     }
@@ -50,7 +49,7 @@ pub async fn connect_nodes(nodes: &mut Vec<Node<LedgerStorage>>, topology: Topol
 }
 
 /// Connects the network nodes in a line topology.
-async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
+async fn line(nodes: &mut Vec<Node>) {
     let mut prev_node: Option<SocketAddr> = None;
 
     // Start each node with the previous as a bootnode.
@@ -65,7 +64,7 @@ async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
 }
 
 /// Connects the network nodes in a ring topology.
-async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
+async fn ring(nodes: &mut Vec<Node>) {
     // Set the nodes up in a line.
     line(nodes).await;
 
@@ -76,7 +75,7 @@ async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
 /// minimum number of connected peers value.
-async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
+async fn mesh(nodes: &mut Vec<Node>) {
     let local_addresses: Vec<SocketAddr> = nodes.iter().map(|node| node.local_address().unwrap()).collect();
 
     for node in nodes {
@@ -93,7 +92,7 @@ async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
 }
 
 /// Connects the network nodes in a star topology.
-fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
+fn star(nodes: &mut Vec<Node>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().local_address().unwrap();
 

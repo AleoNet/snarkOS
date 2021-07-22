@@ -15,16 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_parameters::GenesisBlock;
+use snarkos_storage::{SerialBlock, SerialTransaction, VMBlock, VMTransaction};
 use snarkvm_dpc::{
     testnet1::{instantiated::*, record::Record as DPCRecord},
     Block,
     BlockHeader,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes_le,
-};
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
 use std::io::{Read, Result as IoResult, Write};
@@ -34,32 +32,32 @@ pub static DATA: Lazy<TestData> = Lazy::new(load_test_data);
 
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
-pub static BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_1].unwrap());
+pub static BLOCK_1: Lazy<SerialBlock> = Lazy::new(|| <Block<Testnet1Transaction> as VMBlock>::serialize(&DATA.block_1).unwrap());
 pub static BLOCK_1_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_1.header.get_hash().0);
 
-pub static BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_2].unwrap());
+pub static BLOCK_2: Lazy<SerialBlock> = Lazy::new(|| <Block<Testnet1Transaction> as VMBlock>::serialize(&DATA.block_2).unwrap());
 pub static BLOCK_2_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_2.header.get_hash().0);
 
-pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_1.transactions.0[0]].unwrap());
-pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_2.transactions.0[0]].unwrap());
+pub static TRANSACTION_1: Lazy<SerialTransaction> = Lazy::new(|| DATA.block_1.transactions.0[0].serialize().unwrap());
+pub static TRANSACTION_2: Lazy<SerialTransaction> = Lazy::new(|| DATA.block_2.transactions.0[0].serialize().unwrap());
 
 // Alternative blocks used for testing syncs and rollbacks
-pub static ALTERNATIVE_BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| {
+pub static ALTERNATIVE_BLOCK_1: Lazy<SerialBlock> = Lazy::new(|| {
     let alternative_block_1 = Block {
         header: DATA.alternative_block_1_header.clone(),
         transactions: DATA.block_1.transactions.clone(),
     };
 
-    to_bytes_le![alternative_block_1].unwrap()
+    <Block<Testnet1Transaction> as VMBlock>::serialize(&alternative_block_1).unwrap()
 });
 
-pub static ALTERNATIVE_BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| {
+pub static ALTERNATIVE_BLOCK_2: Lazy<SerialBlock> = Lazy::new(|| {
     let alternative_block_2 = Block {
         header: DATA.alternative_block_2_header.clone(),
         transactions: DATA.block_2.transactions.clone(),
     };
 
-    to_bytes_le![alternative_block_2].unwrap()
+    <Block<Testnet1Transaction> as VMBlock>::serialize(&alternative_block_2).unwrap()
 });
 
 pub fn genesis() -> Block<Testnet1Transaction> {
@@ -132,10 +130,10 @@ fn load_test_data() -> TestData {
 }
 
 #[derive(Debug)]
-pub struct TestBlocks(pub Vec<Block<Testnet1Transaction>>);
+pub struct TestBlocks(pub Vec<SerialBlock>);
 
 impl TestBlocks {
-    pub fn new(blocks: Vec<Block<Testnet1Transaction>>) -> Self {
+    pub fn new(blocks: Vec<SerialBlock>) -> Self {
         TestBlocks(blocks)
     }
 
@@ -163,11 +161,11 @@ impl TestBlocks {
 
             for _ in 0..count {
                 let block: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
-                blocks.push(block);
+                blocks.push(<Block<Testnet1Transaction> as VMBlock>::serialize(&block).unwrap());
             }
         } else {
             while let Ok(block) = FromBytes::read_le(&mut reader) {
-                blocks.push(block);
+                blocks.push(<Block<Testnet1Transaction> as VMBlock>::serialize(&block).unwrap());
             }
         }
 

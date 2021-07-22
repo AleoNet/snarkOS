@@ -35,6 +35,9 @@ version = "=0.7.6"
 [dependencies.metrics]
 version = "0.17"
 
+[dependencies.snarkvm-parameters]
+version = "=0.7.5"
+
 [dependencies.tokio]
 version = "1"
 
@@ -61,6 +64,9 @@ features = [ "serde" ]
 [dependencies.hex]
 version = "0.4.2"
 
+[dependencies.smallvec]
+version = "1.6"
+
 [dependencies.rand]
 version = "0.8"
 
@@ -69,6 +75,15 @@ version = "1.0"
 
 [dependencies.mpmc-map]
 version = "0.2"
+
+[dependencies.indexmap]
+version = "1.6"
+
+[dependencies.lazy_static]
+version = "1.4"
+
+[dependencies.dyn-clone]
+version = "1.0"
 
 [dependencies.tracing]
 default-features = false

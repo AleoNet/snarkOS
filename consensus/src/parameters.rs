@@ -14,21 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{difficulty::bitcoin_retarget, error::ConsensusError, MerkleTreeLedger};
+use crate::{DeserializedLedger, difficulty::bitcoin_retarget, error::ConsensusError};
 use snarkos_profiler::{end_timer, start_timer};
+use snarkos_storage::SerialBlockHeader;
 use snarkvm_algorithms::SNARK;
 use snarkvm_curves::bls12_377::Bls12_377;
-use snarkvm_dpc::{
-    testnet1::instantiated::*,
-    BlockHeader,
-    DPCComponents,
-    DPCScheme,
-    MerkleRootHash,
-    Network,
-    PedersenMerkleRootHash,
-    ProgramScheme,
-    Storage,
-};
+use snarkvm_dpc::{DPCComponents, DPCScheme, MerkleRootHash, Network, PedersenMerkleRootHash, ProgramScheme, testnet1::instantiated::{Components, Testnet1DPC}};
 use snarkvm_posw::{Marlin, PoswMarlin};
 use snarkvm_utilities::FromBytes;
 
@@ -56,7 +47,7 @@ pub struct ConsensusParameters {
 
 impl ConsensusParameters {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
-    pub fn get_block_difficulty(&self, prev_header: &BlockHeader, block_timestamp: i64) -> u64 {
+    pub fn get_block_difficulty(&self, prev_header: &SerialBlockHeader, block_timestamp: i64) -> u64 {
         bitcoin_retarget(
             block_timestamp,
             prev_header.time,
@@ -74,8 +65,8 @@ impl ConsensusParameters {
     /// 6. The nonce is within the limit.
     pub fn verify_header(
         &self,
-        header: &BlockHeader,
-        parent_header: &BlockHeader,
+        header: &SerialBlockHeader,
+        parent_header: &SerialBlockHeader,
         merkle_root_hash: &MerkleRootHash,
         pedersen_merkle_root_hash: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
@@ -84,10 +75,11 @@ impl ConsensusParameters {
         let now = Utc::now().timestamp();
         let future_timelimit: i64 = now + TWO_HOURS_UNIX;
         let expected_difficulty = self.get_block_difficulty(parent_header, header.time);
+        let parent_hash = parent_header.hash();
 
-        if parent_header.get_hash() != header.previous_block_hash {
+        if parent_hash != header.previous_block_hash {
             return Err(ConsensusError::NoParent(
-                parent_header.get_hash().to_string(),
+                parent_hash.to_string(),
                 header.previous_block_hash.to_string(),
             ));
         } else if header.merkle_root_hash != *merkle_root_hash {
@@ -124,11 +116,11 @@ impl ConsensusParameters {
     // TODO (raychu86): Genericize this model to allow for generic programs.
     /// Generate the birth and death program proofs for a transaction for a given transaction kernel
     #[allow(clippy::type_complexity)]
-    pub fn generate_program_proofs<R: Rng + CryptoRng, S: Storage>(
+    pub fn generate_program_proofs<'a, R: Rng + CryptoRng>(
         dpc: &Testnet1DPC,
-        transaction_kernel: &<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
+        transaction_kernel: &<Testnet1DPC as DPCScheme<DeserializedLedger<'a, Components>>>::TransactionKernel,
         rng: &mut R,
-    ) -> Result<Vec<<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::Execution>, ConsensusError> {
+    ) -> Result<Vec<<Testnet1DPC as DPCScheme<DeserializedLedger<'a, Components>>>::Execution>, ConsensusError> {
         let local_data = transaction_kernel.into_local_data();
 
         let mut program_proofs = Vec::with_capacity(Components::NUM_TOTAL_RECORDS);
@@ -145,8 +137,9 @@ mod tests {
     use super::*;
     use crate::get_block_reward;
     use rand::{thread_rng, Rng};
+    use snarkos_storage::VMBlock;
     use snarkos_testing::sync::DATA;
-    use snarkvm_dpc::{BlockHeaderHash, PedersenMerkleRootHash};
+    use snarkvm_dpc::{Block, PedersenMerkleRootHash, testnet1::instantiated::Testnet1Transaction};
 
     #[test]
     fn test_block_rewards() {
@@ -203,10 +196,10 @@ mod tests {
             authorized_inner_snark_ids: vec![],
         };
 
-        let b1 = DATA.block_1.clone();
+        let b1 = <Block<Testnet1Transaction> as VMBlock>::serialize(&DATA.block_1).unwrap();
         let h1 = b1.header;
 
-        let b2 = DATA.block_2.clone();
+        let b2 = <Block<Testnet1Transaction> as VMBlock>::serialize(&DATA.block_2).unwrap();
         let h2 = b2.header;
         let merkle_root_hash = h2.merkle_root_hash.clone();
         let pedersen_merkle_root = h2.pedersen_merkle_root_hash.clone();
@@ -218,7 +211,7 @@ mod tests {
 
         // invalid parent hash
         let mut h2_err = h2.clone();
-        h2_err.previous_block_hash = BlockHeaderHash([9; 32]);
+        h2_err.previous_block_hash = [9u8; 32].into();
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();

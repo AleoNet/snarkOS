@@ -17,7 +17,8 @@
 #[macro_use]
 extern crate tracing;
 
-use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
+use snarkos_consensus::{error::ConsensusError, Consensus, MineContext};
+use snarkos_storage::{SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
     block::Transactions,
@@ -38,6 +39,7 @@ use tracing_subscriber::EnvFilter;
 use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf, sync::Arc};
 
+<<<<<<< HEAD
 async fn mine_block<S: Storage>(
     miner: &Miner<S>,
     txs: Vec<Testnet1Transaction>,
@@ -45,19 +47,27 @@ async fn mine_block<S: Storage>(
     info!("Mining block!");
 
     let transactions = Transactions(txs);
+=======
+async fn mine_block(
+    miner: &MineContext,
+    transactions: Vec<SerialTransaction>,
+    parent_block_header: &SerialBlockHeader,
+) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
+    info!("Mining block!");
 
-    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
+    let (transactions, coinbase_records) = miner.establish_block(transactions).await?;
+>>>>>>> bb8a80a7... wip
 
-    let header = miner.find_block(&transactions, &previous_block_header)?;
+    let header = miner.find_block(&transactions, parent_block_header)?;
 
-    let block = Block { header, transactions };
+    let block = SerialBlock { header, transactions };
 
-    let old_block_height = miner.consensus.ledger.get_current_block_height();
+    let old_block_height = miner.consensus.storage.canon().await?.block_height;
 
     // Duplicate blocks dont do anything
-    miner.consensus.receive_block(&block, false).await.ok(); // throws a duplicate error -- seemingly intentional
+    miner.consensus.receive_block(block.clone()).await; // throws a duplicate error -- seemingly intentional
 
-    let new_block_height = miner.consensus.ledger.get_current_block_height();
+    let new_block_height = miner.consensus.storage.canon().await?.block_height;
     assert_eq!(old_block_height + 1, new_block_height);
 
     Ok((block, coinbase_records))
@@ -66,6 +76,7 @@ async fn mine_block<S: Storage>(
 /// Spends some value from inputs owned by the sender, to the receiver,
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
+<<<<<<< HEAD
 fn send<R: Rng + CryptoRng, S: Storage>(
     consensus: &Consensus<S>,
     from: &Account<Components>,
@@ -75,6 +86,17 @@ fn send<R: Rng + CryptoRng, S: Storage>(
     rng: &mut R,
     memo: [u8; 32],
 ) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
+=======
+fn send<R: Rng>(
+    consensus: &Consensus,
+    from: &Account<Components>,
+    inputs: Vec<SerialRecord>,
+    receiver: &AccountAddress<Components>,
+    amount: u64,
+    rng: &mut R,
+    memo: [u8; 32],
+) -> Result<(Vec<SerialRecord>, SerialTransaction), ConsensusError> {
+>>>>>>> bb8a80a7... wip
     let mut sum = 0;
     for inp in &inputs {
         sum += inp.value();
@@ -110,19 +132,21 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
     info!("Creating sync");
-    let consensus = Arc::new(crate::create_test_consensus());
+    let consensus = crate::create_test_consensus();
 
     // setup the miner
     info!("Creating miner");
-    let miner = Miner::new(miner_acc.address.clone(), consensus.clone());
+    let miner = MineContext::prepare(miner_acc.address.clone(), consensus.clone()).await?;
     info!("Creating memory pool");
 
     let mut txs = vec![];
     let mut blocks = vec![];
+    let last_block_header = consensus.storage.get_block_hash(0).await?.unwrap();
+    let mut last_block_header = consensus.storage.get_block_header(&last_block_header).await?;
 
     for i in 0..n {
         // mine an empty block
-        let (block, coinbase_records) = mine_block(&miner, txs.clone()).await?;
+        let (block, coinbase_records) = mine_block(&miner, txs.clone(), &last_block_header).await?;
 
         txs.clear();
         let mut memo = [0u8; 32];
@@ -139,6 +163,7 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
         )?;
 
         txs.push(tx);
+        last_block_header = block.header.clone();
         blocks.push(block);
     }
 

@@ -15,22 +15,17 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Node, State};
-use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_storage::BlockHeight;
-use snarkvm_dpc::{
-    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
-    Storage,
-};
+use snarkos_consensus::Consensus;
 
 use atomic_instant::AtomicInstant;
 use std::{sync::Arc, time::Duration};
 
 /// The sync handler of this node.
-pub struct Sync<S: Storage> {
+pub struct Sync {
     /// The core sync objects.
-    pub consensus: Arc<snarkos_consensus::Consensus<S>>,
+    pub consensus: Arc<Consensus>,
     /// If `true`, initializes a mining task on this node.
-    is_miner: bool,
+    pub is_miner: bool,
     /// The interval between each block sync.
     block_sync_interval: Duration,
     /// The interval between each memory pool sync.
@@ -39,10 +34,10 @@ pub struct Sync<S: Storage> {
     last_block_sync: AtomicInstant,
 }
 
-impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
+impl Sync {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        consensus: Arc<snarkos_consensus::Consensus<S>>,
+        consensus: Arc<Consensus>,
         is_miner: bool,
         block_sync_interval: Duration,
         mempool_sync_interval: Duration,
@@ -54,42 +49,6 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
             mempool_sync_interval,
             last_block_sync: AtomicInstant::empty(),
         }
-    }
-
-    /// Returns a reference to the storage system of this node.
-    #[inline]
-    pub fn storage(&self) -> &MerkleTreeLedger<S> {
-        &self.consensus.ledger
-    }
-
-    /// Returns a reference to the memory pool of this node.
-    #[inline]
-    pub fn memory_pool(&self) -> &MemoryPool<Testnet1Transaction> {
-        &self.consensus.memory_pool
-    }
-
-    /// Returns a reference to the sync parameters of this node.
-    #[inline]
-    pub fn consensus_parameters(&self) -> &ConsensusParameters {
-        &self.consensus.parameters
-    }
-
-    /// Returns a reference to the DPC parameters of this node.
-    #[inline]
-    pub fn dpc_parameters(&self) -> &Testnet1DPC {
-        &self.consensus.dpc
-    }
-
-    /// Returns `true` if this node is a mining node. Otherwise, returns `false`.
-    #[inline]
-    pub fn is_miner(&self) -> bool {
-        self.is_miner
-    }
-
-    /// Returns the current block height of the ledger from storage.
-    #[inline]
-    pub fn current_block_height(&self) -> BlockHeight {
-        self.consensus.ledger.get_current_block_height()
     }
 
     /// Checks whether any previous sync attempt has expired.
@@ -120,7 +79,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
     }
 }
 
-impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
+impl Node {
     /// Checks whether the node is currently syncing blocks.
     pub fn is_syncing_blocks(&self) -> bool {
         self.state() == State::Syncing

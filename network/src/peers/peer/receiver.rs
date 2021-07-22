@@ -16,7 +16,6 @@
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};
@@ -26,12 +25,7 @@ use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, Peer
 use super::{network::PeerIOHandle, PeerAction};
 
 impl Peer {
-    pub fn receive<S: Storage + Send + Sync + 'static>(
-        remote_address: SocketAddr,
-        node: Node<S>,
-        stream: TcpStream,
-        event_target: mpsc::Sender<PeerEvent>,
-    ) {
+    pub fn receive(remote_address: SocketAddr, node: Node, stream: TcpStream, event_target: mpsc::Sender<PeerEvent>) {
         let (sender, receiver) = mpsc::channel::<PeerAction>(64);
         tokio::spawn(async move {
             let (mut peer, network) = match Peer::inner_receive(remote_address, stream, node.version()).await {

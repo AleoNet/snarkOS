@@ -20,37 +20,32 @@ pub mod exporter;
 #[cfg(test)]
 pub mod trim;
 
-#[cfg(test)]
-pub mod validator;
+// #[cfg(test)]
+// pub mod validator;
 
-use crate::sync::TestTestnet1Transaction;
-pub use snarkos_storage::{Ledger, LedgerStorage};
-use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
-use snarkvm_dpc::{
-    testnet1::instantiated::CommitmentMerkleParameters,
-    Block,
-    LedgerScheme,
-    Storage,
-    TransactionScheme,
-};
+// pub use snarkos_storage::validator::FixMode;
+use snarkos_consensus::{DynLedger, MerkleLedger};
+use snarkos_storage::{key_value::KeyValueStore, DynStorage, MemDb};
+use snarkvm_algorithms::{MerkleParameters, CRH};
+use snarkvm_dpc::testnet1::{Testnet1Components, instantiated::Components};
 
-use rand::{thread_rng, Rng};
+use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
+use snarkvm_utilities::FromBytes;
 use std::sync::Arc;
 
-pub type Store = Ledger<TestTestnet1Transaction, CommitmentMerkleParameters, LedgerStorage>;
+// Initialize a test blockchain
+pub fn initialize_test_blockchain() -> (DynStorage, DynLedger) {
+    let ledger_parameters = {
+        type Parameters = <Components as Testnet1Components>::MerkleParameters;
+        let parameters: <<Parameters as MerkleParameters>::H as CRH>::Parameters =
+            FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..]).unwrap();
+        let crh = <Parameters as MerkleParameters>::H::from(parameters);
+        Arc::new(Parameters::from(crh))
+    };
 
-pub fn random_storage_path() -> String {
-    let random_path: usize = thread_rng().gen();
-    format!("./test_db-{}", random_path)
-}
-
-// Initialize a test blockchain given genesis attributes
-pub fn initialize_test_blockchain<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage>(
-    parameters: Arc<P>,
-    genesis_block: Block<T>,
-) -> Ledger<T, P, S> {
-    let mut path = std::env::temp_dir();
-    path.push(random_storage_path());
-
-    Ledger::<T, P, S>::new(Some(&path), parameters, genesis_block).unwrap()
+    let ledger = DynLedger(Box::new(
+        MerkleLedger::new(ledger_parameters, &[], &[], &[], &[]).unwrap(),
+    ));
+    let store = Arc::new(KeyValueStore::new(MemDb::new()));
+    (store, ledger)
 }
