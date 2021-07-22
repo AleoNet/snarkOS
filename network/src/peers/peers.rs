@@ -151,11 +151,11 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
-        for node_addr in addrs.iter().filter(|addr| **addr != own_address).copied() {
-            if self.peer_book.is_connected(node_addr) {
-                break;
-            }
-
+        for node_addr in addrs
+            .iter()
+            .filter(|&addr| *addr != own_address && !self.peer_book.is_connected(*addr))
+            .copied()
+        {
             let node = self.clone();
             task::spawn(async move {
                 match node.initiate_connection(node_addr).await {
