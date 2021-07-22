@@ -33,7 +33,7 @@ version = "0.5.4"
 version = "0.5.4"
 
 [dependencies.metrics]
-version = "0.16"
+version = "0.17"
 
 [dependencies.tokio]
 version = "1"
