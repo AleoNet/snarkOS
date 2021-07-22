@@ -71,6 +71,9 @@ features = [ "derive" ]
 [dependencies.thiserror]
 version = "1.0"
 
+[dependencies.tokio]
+version = "1"
+
 [dependencies.tracing]
 default-features = false
 features = [ "log" ]
@@ -84,9 +87,6 @@ version = "0.5.4"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"
-
-[dev-dependencies.tokio]
-version = "1"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.2"

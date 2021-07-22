@@ -29,7 +29,7 @@ async fn valid_storage_validates() {
         consensus.receive_block(&block, false).await.unwrap();
     }
 
-    assert!(consensus.ledger.validate(None, FixMode::Nothing));
+    assert!(consensus.ledger.validate(None, FixMode::Nothing).await);
 }
 
 #[tokio::test]
@@ -51,7 +51,7 @@ async fn validator_vs_a_missing_serial_number() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
     // Currently unsupported.
     // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
 }
@@ -75,7 +75,7 @@ async fn validator_vs_a_missing_commitment() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
     // Currently unsupported
     // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
 }
@@ -99,7 +99,7 @@ async fn validator_vs_a_missing_memorandum() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
     // Currently unsupported
     // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
 }
@@ -123,8 +123,8 @@ async fn validator_vs_a_missing_digest() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents).await);
 }
 
 #[tokio::test]
@@ -151,8 +151,8 @@ async fn validator_vs_a_superfluous_serial_number() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents).await);
 }
 
 #[tokio::test]
@@ -179,8 +179,8 @@ async fn validator_vs_a_superfluous_commitment() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents).await);
 }
 
 #[tokio::test]
@@ -207,8 +207,8 @@ async fn validator_vs_a_superfluous_memorandum() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents).await);
 }
 
 #[tokio::test]
@@ -229,8 +229,8 @@ async fn validator_vs_a_superfluous_digest() {
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents).await);
 }
 
 #[ignore]
@@ -261,6 +261,6 @@ async fn validator_vs_a_very_broken_db() {
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
     let now = std::time::Instant::now();
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing));
+    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
     tracing::info!("Storage validated in {}ms", now.elapsed().as_millis());
 }
