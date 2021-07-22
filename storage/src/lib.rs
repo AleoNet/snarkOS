@@ -14,32 +14,36 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![allow(clippy::needless_lifetimes)]
+
 pub mod exporter;
 pub use exporter::*;
-
-pub mod ledger;
-pub use ledger::*;
-
-pub mod key_value;
-pub use key_value::*;
-
-pub mod objects;
-pub use objects::*;
 
 pub mod trim;
 pub use trim::*;
 
+pub mod storage;
+pub use storage::*;
+
+pub mod key_value;
+pub use key_value::KeyValueStorage;
+
+pub mod objects;
+pub use objects::*;
+
+pub mod digest;
+pub use digest::*;
+
 pub mod mem;
-#[cfg(feature = "mem_storage")]
-pub use mem::MemDb as LedgerStorage;
+pub use mem::MemDb;
 
 #[cfg(feature = "rocksdb_storage")]
 mod rocks;
 #[cfg(feature = "rocksdb_storage")]
-pub use rocks::RocksDb as LedgerStorage;
+pub use rocks::RocksDb;
 
-pub mod validator;
-pub use validator::*;
+// pub mod validator;
+// pub use validator::*;
 
 /// The number of block hashes that are returned by the `Ledger::get_block_locator_hashes` call.
 pub const NUM_LOCATOR_HASHES: u32 = 64;

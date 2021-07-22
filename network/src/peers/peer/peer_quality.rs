@@ -17,11 +17,10 @@
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use snarkos_storage::BlockHeight;
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PeerQuality {
-    pub block_height: BlockHeight,
+    pub block_height: u32,
     pub last_seen: Option<DateTime<Utc>>,
     #[serde(skip)]
     pub expecting_pong: bool,

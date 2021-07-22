@@ -15,20 +15,19 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod miner {
-    use snarkos_consensus::Miner;
+    use snarkos_consensus::MineContext;
+    use snarkos_storage::{SerialBlockHeader, SerialTransaction};
     use snarkos_testing::sync::*;
     use snarkvm_algorithms::traits::{
         commitment::CommitmentScheme,
         encryption::EncryptionScheme,
         signature::SignatureScheme,
     };
-    use snarkvm_dpc::{block::Transactions, Address, BlockHeader, DPCComponents, PrivateKey};
+    use snarkvm_dpc::{Address, DPCComponents, PrivateKey};
     use snarkvm_posw::txids_to_roots;
 
     use rand::{CryptoRng, Rng, SeedableRng};
     use rand_chacha::ChaChaRng;
-
-    use std::sync::Arc;
 
     fn keygen<C: DPCComponents, R: Rng + CryptoRng>(rng: &mut R) -> (PrivateKey<C>, Address<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
@@ -43,17 +42,18 @@ mod miner {
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
-    fn test_find_block(transactions: &Transactions<TestTestnet1Transaction>, parent_header: &BlockHeader) {
-        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
+    async fn test_find_block(transactions: &[SerialTransaction], parent_header: &SerialBlockHeader) {
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let mut rng = ChaChaRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
 
         let (_, miner_address) = keygen(&mut rng);
-        let miner = Miner::new(miner_address, consensus.clone());
+        let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();
 
         let header = miner.find_block(transactions, parent_header).unwrap();
 
+        let transaction_ids = transactions.iter().map(|x| x.id).collect::<Vec<_>>();
         // generate the verifier args
-        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transactions.to_transaction_ids().unwrap());
+        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids[..]);
 
         // ensure that our POSW proof passes
         consensus
@@ -64,8 +64,11 @@ mod miner {
 
     #[tokio::test]
     async fn find_valid_block() {
-        let transactions = Transactions(vec![TestTestnet1Transaction; 3]);
-        let parent_header = genesis().header;
-        test_find_block(&transactions, &parent_header);
+        let transactions = vec![
+            DATA.block_1.transactions[0].clone(),
+            DATA.block_2.transactions[0].clone(),
+        ];
+        let parent_header = genesis().header.into();
+        test_find_block(&transactions, &parent_header).await;
     }
 }

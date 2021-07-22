@@ -16,10 +16,10 @@
 
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
-    use snarkos_consensus::{Consensus, MerkleTreeLedger};
+    use snarkos_consensus::Consensus;
     use snarkos_network::Node;
     use snarkos_rpc::*;
-    use snarkos_storage::LedgerStorage;
+    use snarkos_storage::VMTransaction;
     use snarkos_testing::{
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
@@ -33,7 +33,6 @@ mod protected_rpc_tests {
         },
         Address,
         PrivateKey,
-        RecordScheme,
         ViewKey,
     };
     use snarkvm_utilities::{
@@ -70,18 +69,16 @@ mod protected_rpc_tests {
         }
     }
 
-    async fn initialize_test_rpc(
-        ledger: Arc<MerkleTreeLedger<LedgerStorage>>,
-    ) -> (MetaIoHandler<Meta>, Arc<Consensus<LedgerStorage>>) {
+    async fn initialize_test_rpc(consensus: &Arc<Consensus>) -> MetaIoHandler<Meta> {
         let credentials = RpcCredentials {
             username: TEST_USERNAME.to_string(),
             password: TEST_PASSWORD.to_string(),
         };
 
         let environment = test_config(TestSetup::default());
-        let mut node = Node::new(environment).unwrap();
+
+        let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
-        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus_from_ledger(ledger.clone()));
 
         let node_consensus = snarkos_network::Sync::new(
             consensus.clone(),
@@ -92,23 +89,23 @@ mod protected_rpc_tests {
 
         node.set_sync(node_consensus);
 
-        let rpc_impl = RpcImpl::new(ledger, Some(credentials), node);
+        let rpc_impl = RpcImpl::new(consensus.storage.clone(), Some(credentials), node);
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);
 
-        (io, consensus)
+        io
     }
 
     #[tokio::test]
     async fn test_rpc_authentication() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = invalid_authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -118,15 +115,19 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitment_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        storage.store_record(&DATA.records_1[0]).unwrap();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        consensus
+            .storage
+            .store_records(&[DATA.records_1[0].clone()])
+            .await
+            .unwrap();
 
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
         let method = "getrecordcommitmentcount".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -135,20 +136,24 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitments() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        storage.store_record(&DATA.records_1[0]).unwrap();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        consensus
+            .storage
+            .store_records(&[DATA.records_1[0].clone()])
+            .await
+            .unwrap();
 
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
         let expected_result = Value::Array(vec![Value::String(hex::encode(
-            to_bytes_le![DATA.records_1[0].commitment()].unwrap(),
+            to_bytes_le![&DATA.records_1[0].commitment].unwrap(),
         ))]);
 
         assert_eq!(extracted["result"], expected_result);
@@ -156,19 +161,23 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_raw_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        storage.store_record(&DATA.records_1[0]).unwrap();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        consensus
+            .storage
+            .store_records(&[DATA.records_1[0].clone()])
+            .await
+            .unwrap();
 
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
         let method = "getrawrecord".to_string();
-        let params = hex::encode(to_bytes_le![DATA.records_1[0].commitment()].unwrap());
+        let params = hex::encode(&DATA.records_1[0].commitment);
         let request = format!(
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [\"{}\"] }}",
             method, params
         );
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -179,9 +188,9 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decode_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
         let record = &DATA.records_1[0];
 
@@ -192,20 +201,21 @@ mod protected_rpc_tests {
             method, params
         );
 
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         let record_info: Value = serde_json::from_str(&response).unwrap();
 
         let record_info = record_info["result"].clone();
 
-        let owner = record.owner().to_string();
-        let is_dummy = record.is_dummy();
-        let value = record.value();
-        let birth_program_id = hex::encode(to_bytes_le![record.birth_program_id()].unwrap());
-        let death_program_id = hex::encode(to_bytes_le![record.death_program_id()].unwrap());
-        let serial_number_nonce = hex::encode(to_bytes_le![record.serial_number_nonce()].unwrap());
-        let commitment = hex::encode(to_bytes_le![record.commitment()].unwrap());
-        let commitment_randomness = hex::encode(to_bytes_le![record.commitment_randomness()].unwrap());
+        let owner: Address<Components> = record.owner.clone().into();
+        let owner = owner.to_string();
+        let is_dummy = record.is_dummy;
+        let value = record.value.0;
+        let birth_program_id = hex::encode(&record.birth_program_id);
+        let death_program_id = hex::encode(&record.death_program_id);
+        let serial_number_nonce = hex::encode(&record.serial_number_nonce);
+        let commitment = hex::encode(&record.commitment);
+        let commitment_randomness = hex::encode(&record.commitment_randomness);
 
         assert_eq!(owner, record_info["owner"]);
         assert_eq!(is_dummy, record_info["is_dummy"]);
@@ -219,14 +229,14 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decrypt_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
         let system_parameters = &FIXTURE_VK.dpc.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
 
-        let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
+        let transaction = Testnet1Transaction::deserialize(&TRANSACTION_1).unwrap();
         let ciphertexts = transaction.encrypted_records;
 
         let records = &DATA.records_1;
@@ -253,7 +263,7 @@ mod protected_rpc_tests {
                 "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}] }}",
                 method, params
             );
-            let response = rpc.handle_request_sync(&request, meta.clone()).unwrap();
+            let response = rpc.handle_request(&request, meta.clone()).await.unwrap();
 
             let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -264,12 +274,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_raw_transaction() {
-        let storage = Arc::new(FIXTURE.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
-        let (rpc, consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
-        consensus.receive_block(&DATA.block_1, false).await.unwrap();
+        assert!(consensus.receive_block(BLOCK_1.clone()).await);
 
         let method = "createrawtransaction".to_string();
 
@@ -298,7 +308,7 @@ mod protected_rpc_tests {
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}] }}",
             method, params
         );
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta.clone()).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -316,12 +326,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction_kernel() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
-        let (rpc, consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
-        consensus.receive_block(&DATA.block_1, false).await.unwrap();
+        assert!(consensus.receive_block(BLOCK_1.clone()).await);
 
         let method = "createtransactionkernel".to_string();
 
@@ -350,7 +360,7 @@ mod protected_rpc_tests {
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}] }}",
             method, params
         );
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -363,12 +373,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
-        let (rpc, consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
-        consensus.receive_block(&DATA.block_1, false).await.unwrap();
+        assert!(consensus.receive_block(BLOCK_1.clone()).await);
 
         let method = "createtransaction".to_string();
 
@@ -387,7 +397,7 @@ mod protected_rpc_tests {
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}, \"{}\"] }}",
             method, private_keys_str, transaction_kernel
         );
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         println!("extracted: {}", response);
 
@@ -409,14 +419,14 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_create_account() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
+        let rpc = initialize_test_rpc(&consensus).await;
 
         let method = "createaccount".to_string();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
-        let response = rpc.handle_request_sync(&request, meta.clone()).unwrap();
+        let response = rpc.handle_request(&request, meta.clone()).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -426,7 +436,7 @@ mod protected_rpc_tests {
         let _address = Address::<Components>::from_str(&account.address).unwrap();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
+        let response = rpc.handle_request(&request, meta).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 

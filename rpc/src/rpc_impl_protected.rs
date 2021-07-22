@@ -25,25 +25,18 @@ use crate::{
     transaction_kernel_builder::TransactionKernelBuilder,
     RpcImpl,
 };
-use snarkos_consensus::ConsensusParameters;
+use snarkos_consensus::{CreatePartialTransactionRequest, CreateTransactionRequest};
+use snarkos_storage::VMRecord;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1DPC},
-        EncryptedRecord,
-        Payload,
-        Record,
-        TransactionKernel,
-    },
+    testnet1::{instantiated::Components, EncryptedRecord, Payload, Record as DPCRecord, TransactionKernel},
     Account,
     AccountScheme,
     Address,
     DPCComponents,
-    DPCScheme,
     PrivateKey,
     ProgramScheme,
     RecordScheme as RecordModel,
-    Storage,
     ViewKey,
 };
 use snarkvm_utilities::{
@@ -60,9 +53,9 @@ type JsonRPCError = jsonrpc_core::Error;
 
 /// The following `*_protected` functions wrap an authentication check around sensitive functions
 /// before being exposed as an RPC endpoint
-impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
+impl RpcImpl {
     /// Validate the authentication header in the request metadata
-    pub fn validate_auth(&self, meta: Meta) -> Result<(), JsonRPCError> {
+    pub async fn validate_auth(&self, meta: Meta) -> Result<(), JsonRPCError> {
         if let Some(credentials) = &self.credentials {
             let auth = meta.auth.unwrap_or_else(String::new);
             let basic_auth_encoding = format!(
@@ -80,7 +73,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `create_raw_transaction`
     pub async fn create_raw_transaction_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -90,7 +83,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let val: TransactionInputs = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.create_raw_transaction(val) {
+        match self.create_raw_transaction(val).await {
             Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -98,7 +91,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `create_transaction_kernel`
     pub async fn create_transaction_kernel_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -108,7 +101,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let val: TransactionInputs = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.create_transaction_kernel(val) {
+        match self.create_transaction_kernel(val).await {
             Ok(result) => Ok(serde_json::to_value(result).expect("transaction kernel serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -116,7 +109,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `create_transaction`
     pub async fn create_transaction_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -136,7 +129,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let transaction_kernel: String = serde_json::from_value(value[1].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.create_transaction(private_keys, transaction_kernel) {
+        match self.create_transaction(private_keys, transaction_kernel).await {
             Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -148,11 +141,11 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         params: Params,
         meta: Meta,
     ) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         params.expect_no_params()?;
 
-        match self.get_record_commitment_count() {
+        match self.get_record_commitment_count().await {
             Ok(num_record_commitments) => Ok(Value::from(num_record_commitments)),
             Err(_) => Err(JsonRPCError::invalid_request()),
         }
@@ -160,11 +153,11 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `get_record_commitments`
     pub async fn get_record_commitments_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         params.expect_no_params()?;
 
-        match self.get_record_commitments() {
+        match self.get_record_commitments().await {
             Ok(record_commitments) => Ok(Value::from(record_commitments)),
             Err(_) => Err(JsonRPCError::invalid_request()),
         }
@@ -172,7 +165,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `get_raw_record`
     pub async fn get_raw_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -189,7 +182,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let record_commitment: String = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.get_raw_record(record_commitment) {
+        match self.get_raw_record(record_commitment).await {
             Ok(record) => Ok(Value::from(record)),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -197,7 +190,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `decode_record`
     pub async fn decode_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -214,7 +207,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let record_bytes: String = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.decode_record(record_bytes) {
+        match self.decode_record(record_bytes).await {
             Ok(record) => Ok(serde_json::to_value(record).expect("record deserialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -222,7 +215,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `decrypt_record`
     pub async fn decrypt_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -232,7 +225,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let decrypt_record_input: DecryptRecordInput = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.decrypt_record(decrypt_record_input) {
+        match self.decrypt_record(decrypt_record_input).await {
             Ok(result) => Ok(serde_json::to_value(result).expect("record serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -240,11 +233,11 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Wrap authentication around `create_account`
     pub async fn create_account_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         params.expect_no_params()?;
 
-        match self.create_account() {
+        match self.create_account().await {
             Ok(account) => Ok(serde_json::to_value(account).expect("account serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -252,7 +245,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Disconnects from the given address
     pub async fn disconnect_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -269,7 +262,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
     /// Connects to the given addresses
     pub async fn connect_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
+        self.validate_auth(meta).await?;
 
         let value = match params {
             Params::Array(arr) => arr,
@@ -345,9 +338,10 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
 /// Functions that are sensitive and need to be protected with authentication.
 /// The authentication logic is defined in `validate_auth`
-impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
+#[async_trait::async_trait]
+impl ProtectedRpcFunctions for RpcImpl {
     /// Generate a new account private key, account view key, and account address.
-    fn create_account(&self) -> Result<RpcAccount, RpcError> {
+    async fn create_account(&self) -> Result<RpcAccount, RpcError> {
         let rng = &mut thread_rng();
 
         let account = Account::<Components>::new(
@@ -372,42 +366,54 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
     // TODO (raychu86): Deprecate this rpc endpoint in favor of the more secure offline/online model.
     /// Create a new transaction, returning the encoded transaction and the new records.
-    fn create_raw_transaction(
+    async fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError> {
-        let rng = &mut thread_rng();
-
         assert!(!transaction_input.old_records.is_empty());
         assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
         assert!(!transaction_input.old_account_private_keys.is_empty());
-        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_INPUT_RECORDS);
         assert!(!transaction_input.recipients.is_empty());
         assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
+
+        let consensus = &self.node.expect_sync().consensus;
 
         // Fetch birth/death programs
         let program_id = self.dpc()?.noop_program.id();
         let new_birth_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
         let new_death_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
 
-        // Decode old records
-        let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
-        for record_string in transaction_input.old_records {
-            let record_bytes = hex::decode(record_string)?;
-            old_records.push(Record::<Components>::read_le(&record_bytes[..])?);
-        }
-
-        let mut old_account_private_keys = Vec::with_capacity(transaction_input.old_account_private_keys.len());
+        let mut old_account_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for private_key_string in transaction_input.old_account_private_keys {
             old_account_private_keys.push(PrivateKey::<Components>::from_str(&private_key_string)?);
         }
 
-        let sn_randomness: [u8; 32] = rng.gen();
-        // Fill any unused old_record indices with dummy records
-        while old_records.len() < Components::NUM_OUTPUT_RECORDS {
-            let old_sn_nonce = self.dpc()?.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
+        // Decode old records
+        let mut joint_serial_numbers = vec![];
+        let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
+        for (i, record_string) in transaction_input.old_records.iter().enumerate() {
+            let record_bytes = hex::decode(record_string)?;
+            let old_record = DPCRecord::<Components>::read_le(&record_bytes[..])?;
 
+            let (sn, _) = old_record.to_serial_number(
+                &consensus.dpc.system_parameters.account_signature,
+                old_account_private_keys
+                    .get(i)
+                    .unwrap_or_else(|| old_account_private_keys.last().unwrap()),
+            )?;
+            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
+
+            old_records.push(old_record.serialize()?);
+        }
+
+        let sn_randomness: [u8; 32] = thread_rng().gen();
+
+        // Fill any unused old_record indices with dummy records
+        while old_records.len() < Components::NUM_INPUT_RECORDS {
+            let old_sn_nonce = self.dpc()?.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
             let private_key = old_account_private_keys[0].clone();
+
             let address = Address::<Components>::from_private_key(
                 &self.dpc()?.system_parameters.account_signature,
                 &self.dpc()?.system_parameters.account_commitment,
@@ -415,7 +421,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
                 &private_key,
             )?;
 
-            let dummy_record = Record::<Components>::new(
+            let dummy_record = DPCRecord::<Components>::new(
                 &self.dpc()?.system_parameters.record_commitment,
                 address,
                 true, // The input record is dummy
@@ -424,15 +430,18 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
                 program_id.clone(),
                 program_id.clone(),
                 old_sn_nonce,
-                rng,
+                &mut thread_rng(),
             )?;
 
-            old_records.push(dummy_record);
+            let (sn, _) =
+                dummy_record.to_serial_number(&consensus.dpc.system_parameters.account_signature, &private_key)?;
+            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
+
+            old_records.push(dummy_record.serialize()?);
             old_account_private_keys.push(private_key);
         }
 
         assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
-        assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
         let mut new_record_owners = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
@@ -468,26 +477,44 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         // If the request did not specify a valid memo, generate one from random
         if memo == [0u8; 32] {
-            memo = rng.gen();
+            memo = thread_rng().gen();
+        }
+
+        let mut new_records = vec![];
+        for j in 0..Components::NUM_OUTPUT_RECORDS {
+            new_records.push(
+                DPCRecord::new_full(
+                    &consensus.dpc.system_parameters.serial_number_nonce,
+                    &consensus.dpc.system_parameters.record_commitment,
+                    new_record_owners[j].clone(),
+                    new_is_dummy_flags[j],
+                    new_values[j],
+                    new_payloads[j].clone(),
+                    new_birth_program_ids[j].clone(),
+                    new_death_program_ids[j].clone(),
+                    j as u8,
+                    joint_serial_numbers.clone(),
+                    &mut thread_rng(),
+                )?
+                .serialize()?,
+            );
         }
 
         // Generate transaction
-        let (records, transaction) = self.sync_handler()?.consensus.create_transaction(
-            old_records,
-            old_account_private_keys,
-            new_record_owners,
-            new_birth_program_ids,
-            new_death_program_ids,
-            new_is_dummy_flags,
-            new_values,
-            new_payloads,
-            memo,
-            rng,
-        )?;
+        let response = self
+            .sync_handler()?
+            .consensus
+            .create_transaction(CreateTransactionRequest {
+                old_records,
+                old_account_private_keys: old_account_private_keys.into_iter().map(Into::into).collect(),
+                new_records,
+                memo,
+            })
+            .await?;
 
-        let encoded_transaction = hex::encode(to_bytes_le![transaction]?);
-        let mut encoded_records = Vec::with_capacity(records.len());
-        for record in records {
+        let encoded_transaction = hex::encode(to_bytes_le![response.transaction]?);
+        let mut encoded_records = Vec::with_capacity(response.records.len());
+        for record in response.records {
             encoded_records.push(hex::encode(to_bytes_le![record]?));
         }
 
@@ -498,7 +525,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     }
 
     /// Generates and returns a new transaction kernel.
-    fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError> {
+    async fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError> {
         let rng = &mut thread_rng();
 
         assert!(!transaction_input.old_records.is_empty());
@@ -516,7 +543,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             .iter()
             .zip_eq(&transaction_input.old_account_private_keys)
         {
-            let record = Record::<Components>::from_str(record_string)?;
+            let record = DPCRecord::<Components>::from_str(record_string)?;
             let private_key = PrivateKey::<Components>::from_str(private_key_string)?;
 
             builder = builder.add_input(private_key, record)?;
@@ -555,40 +582,34 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     }
 
     /// Create a new transaction for a given transaction kernel.
-    fn create_transaction(
+    async fn create_transaction(
         &self,
         private_keys: [String; Components::NUM_INPUT_RECORDS],
         transaction_kernel: String,
     ) -> Result<CreateRawTransactionOuput, RpcError> {
-        let rng = &mut thread_rng();
-
         // Decode the private keys
         let mut old_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
-        for private_key in private_keys {
-            old_private_keys.push(PrivateKey::<Components>::from_str(&private_key)?);
+        for private_key in private_keys.iter() {
+            old_private_keys.push(PrivateKey::<Components>::from_str(&private_key)?.into());
         }
 
         // Decode the transaction kernel
         let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
         let transaction_kernel = TransactionKernel::<Components>::read_le(&transaction_kernel_bytes[..])?;
 
-        // Construct the program proofs
-        let program_proofs =
-            ConsensusParameters::generate_program_proofs::<_, S>(self.dpc()?, &transaction_kernel, rng)?;
+        let response = self
+            .node
+            .expect_sync()
+            .consensus
+            .create_partial_transaction(CreatePartialTransactionRequest {
+                kernel: Box::new(transaction_kernel),
+                old_account_private_keys: old_private_keys,
+            })
+            .await?;
 
-        // Online execution to generate a DPC transaction
-        let (records, transaction) = Testnet1DPC::execute_online_phase(
-            self.dpc()?,
-            &old_private_keys,
-            transaction_kernel,
-            program_proofs,
-            &*self.storage,
-            rng,
-        )?;
-
-        let encoded_transaction = hex::encode(to_bytes_le![transaction]?);
-        let mut encoded_records = Vec::with_capacity(records.len());
-        for record in records {
+        let encoded_transaction = hex::encode(to_bytes_le![response.transaction]?);
+        let mut encoded_records = Vec::with_capacity(response.records.len());
+        for record in response.records {
             encoded_records.push(hex::encode(to_bytes_le![record]?));
         }
 
@@ -599,44 +620,32 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     }
 
     /// Returns the number of record commitments that are stored on the full node.
-    fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
+    async fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
         let storage = &self.storage;
-        let primary_height = self.sync_handler()?.current_block_height();
-        storage.catch_up_secondary(false, primary_height)?;
-
-        let record_commitments = storage.get_record_commitments(None)?;
+        let record_commitments = storage.get_record_commitments(None).await?;
 
         Ok(record_commitments.len())
     }
 
     /// Returns a list of record commitments that are stored on the full node.
-    fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        let storage = &self.storage;
-        let primary_height = self.sync_handler()?.current_block_height();
-        storage.catch_up_secondary(false, primary_height)?;
-
-        let record_commitments = storage.get_record_commitments(Some(100))?;
+    async fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
+        let record_commitments = self.storage.get_record_commitments(Some(100)).await?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(hex::encode).collect();
 
         Ok(record_commitment_strings)
     }
 
     /// Returns the hex encoded bytes of a record from its record commitment
-    fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
-        match self
-            .storage
-            .get_record::<Record<Components>>(&hex::decode(record_commitment)?)?
-        {
-            Some(record) => {
-                let record_bytes = to_bytes_le![record]?;
-                Ok(hex::encode(record_bytes))
-            }
+    async fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
+        let decoded = hex::decode(record_commitment)?;
+        match self.storage.get_record(decoded[..].into()).await? {
+            Some(record) => Ok(hex::encode(to_bytes_le![record]?)),
             None => Ok("Record not found".to_string()),
         }
     }
 
     /// Decrypts the record ciphertext and returns the hex encoded bytes of the record.
-    fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
+    async fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
         // Read the encrypted_record
         let encrypted_record_bytes = hex::decode(decryption_input.encrypted_record)?;
         let encrypted_record = EncryptedRecord::<Components>::read_le(&encrypted_record_bytes[..])?;
@@ -652,9 +661,9 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     }
 
     /// Returns information about a record from serialized record bytes.
-    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
+    async fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
         let record_bytes = hex::decode(record_bytes)?;
-        let record = Record::<Components>::read_le(&record_bytes[..])?;
+        let record = DPCRecord::<Components>::read_le(&record_bytes[..])?;
 
         let owner = record.owner().to_string();
         let payload = RPCRecordPayload {
@@ -679,12 +688,12 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         })
     }
 
-    fn disconnect(&self, address: SocketAddr) {
+    async fn disconnect(&self, address: SocketAddr) {
         let node = self.node.clone();
         tokio::spawn(async move { node.disconnect_from_peer(address).await });
     }
 
-    fn connect(&self, addresses: Vec<SocketAddr>) {
+    async fn connect(&self, addresses: Vec<SocketAddr>) {
         let node = self.node.clone();
         tokio::spawn(async move {
             for addr in &addresses {

@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::Storage;
-
 use snarkos_metrics::{self as metrics, inbound::*};
 
 use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload, Peer};
@@ -23,9 +21,9 @@ use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload
 use super::network::PeerIOHandle;
 
 impl Peer {
-    pub(super) async fn inner_dispatch_payload<S: Storage + Sync + Send + 'static>(
+    pub(super) async fn inner_dispatch_payload(
         &mut self,
-        node: &Node<S>,
+        node: &Node,
         network: &mut PeerIOHandle,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {
@@ -78,9 +76,9 @@ impl Peer {
         Ok(())
     }
 
-    pub(super) async fn dispatch_payload<S: Storage + Sync + Send + 'static>(
+    pub(super) async fn dispatch_payload(
         &mut self,
-        node: &Node<S>,
+        node: &Node,
         network: &mut PeerIOHandle,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {

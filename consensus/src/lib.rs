@@ -32,6 +32,7 @@
     private_in_public,
     unsafe_code
 )]
+#![allow(clippy::needless_lifetimes)]
 #![forbid(unsafe_code)]
 
 #[macro_use]
@@ -49,7 +50,7 @@ pub use difficulty::*;
 pub mod error;
 
 pub mod miner;
-pub use miner::Miner;
+pub use miner::MineContext;
 
 pub mod memory_pool;
 pub use memory_pool::MemoryPool;
@@ -57,15 +58,11 @@ pub use memory_pool::MemoryPool;
 pub mod parameters;
 pub use parameters::*;
 
-use snarkos_storage::Ledger;
-use snarkvm_dpc::{
-    testnet1::instantiated::{CommitmentMerkleParameters, Testnet1Transaction},
-    AleoAmount,
-    BlockHeader,
-    BlockHeaderHash,
-};
+pub mod ledger;
+pub use ledger::*;
+use snarkvm_dpc::AleoAmount;
 
-pub type MerkleTreeLedger<S> = Ledger<Testnet1Transaction, CommitmentMerkleParameters, S>;
+pub const OLDEST_FORK_THRESHOLD: usize = 1024;
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> AleoAmount {
@@ -81,8 +78,4 @@ pub fn get_block_reward(block_num: u32) -> AleoAmount {
     let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
 
     AleoAmount::from_bytes(reward)
-}
-
-pub fn is_genesis(block_header: &BlockHeader) -> bool {
-    block_header.previous_block_hash == BlockHeaderHash([0u8; 32])
 }

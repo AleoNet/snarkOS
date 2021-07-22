@@ -15,16 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{message::*, NetworkError, Node};
-use snarkos_consensus::memory_pool::Entry;
-use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Storage};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes_le,
-};
+use snarkos_storage::VMTransaction;
+use snarkvm_dpc::testnet1::instantiated::Testnet1Transaction;
+use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
+use anyhow::*;
 use std::net::SocketAddr;
 
-impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
+impl Node {
     ///
     /// Triggers the memory pool sync with a selected peer.
     ///
@@ -68,34 +66,13 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         &self,
         source: SocketAddr,
         transaction: Vec<u8>,
-    ) -> Result<(), NetworkError> {
+    ) -> Result<()> {
         if let Ok(tx) = Testnet1Transaction::read_le(&*transaction) {
-            let insertion = {
-                let storage = self.expect_sync().storage();
+            let inserted = self.expect_sync().consensus.receive_transaction(tx.serialize()?).await;
 
-                if !self.expect_sync().consensus.verify_transaction(&tx)? {
-                    error!("Received a transaction that was invalid");
-                    return Ok(());
-                }
-
-                if tx.value_balance.is_negative() {
-                    error!("Received a transaction that was a coinbase transaction");
-                    return Ok(());
-                }
-
-                let entry = Entry::<Testnet1Transaction> {
-                    size_in_bytes: transaction.len(),
-                    transaction: tx,
-                };
-
-                self.expect_sync().memory_pool().insert(storage, entry).await
-            };
-
-            if let Ok(inserted) = insertion {
-                if inserted.is_some() {
-                    info!("Transaction added to memory pool.");
-                    self.propagate_memory_pool_transaction(transaction, source).await;
-                }
+            if inserted {
+                info!("Transaction added to memory pool.");
+                self.propagate_memory_pool_transaction(transaction, source).await;
             }
         }
 
@@ -103,19 +80,19 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     }
 
     /// A peer has requested our memory pool transactions.
-    pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) {
-        // TODO (howardwu): This should have been written with Rayon - it is easily parallelizable.
-        let transactions = {
-            let mut txs = vec![];
-
-            for entry in self.expect_sync().memory_pool().transactions.inner().values() {
-                if let Ok(transaction_bytes) = to_bytes_le![entry.transaction] {
-                    txs.push(transaction_bytes);
-                }
-            }
-
-            txs
-        };
+    pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) -> Result<()> {
+        let transactions = self
+            .expect_sync()
+            .consensus
+            .fetch_memory_pool()
+            .await
+            .into_iter()
+            .map(|tx| {
+                let mut out = vec![];
+                tx.write_le(&mut out)?;
+                Ok(out)
+            })
+            .collect::<Result<Vec<Vec<u8>>>>()?;
 
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
@@ -123,38 +100,24 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                 .send_to(remote_address, Payload::MemoryPool(transactions))
                 .await;
         }
+        Ok(())
     }
 
     /// A peer has sent us their memory pool transactions.
     pub(crate) async fn received_memory_pool(&self, transactions: Vec<Vec<u8>>) -> Result<(), NetworkError> {
-        let memory_pool = self.expect_sync().memory_pool();
-        let storage = self.expect_sync().storage();
-
+        // todo: if the txn counts here are large, batch into storage
         for transaction_bytes in transactions {
-            let transaction: Testnet1Transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
-            let entry = Entry::<Testnet1Transaction> {
-                size_in_bytes: transaction_bytes.len(),
-                transaction,
-            };
+            let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
+            let inserted = self
+                .expect_sync()
+                .consensus
+                .receive_transaction(transaction.serialize()?)
+                .await;
 
-            if let Ok(Some(txid)) = memory_pool.insert(storage, entry).await {
-                debug!(
-                    "Transaction added to memory pool with txid: {:?}",
-                    hex::encode(txid.clone())
-                );
+            if inserted {
+                info!("Transaction added to memory pool from batch.");
             }
         }
-
-        // Cleanse and store transactions once batch has been received.
-        debug!("Cleansing memory pool transactions in database");
-        memory_pool
-            .cleanse(storage)
-            .await
-            .unwrap_or_else(|error| debug!("Failed to cleanse memory pool transactions in database {}", error));
-        debug!("Storing memory pool transactions in database");
-        memory_pool
-            .store(storage)
-            .unwrap_or_else(|error| debug!("Failed to store memory pool transaction in database {}", error));
 
         Ok(())
     }

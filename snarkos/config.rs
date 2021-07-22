@@ -109,6 +109,8 @@ pub struct Storage {
     /// the size of the database files, but they will become smaller after a while, when the database has run its
     /// automated maintenance.
     pub trim: bool,
+    /// If `true`, scans superfluous blocks for valid forks at boot time. Can take a while.
+    pub scan_for_forks: bool,
 }
 
 impl Default for Config {
@@ -152,6 +154,7 @@ impl Default for Config {
                 import: None,
                 trim: false,
                 validate: false,
+                scan_for_forks: false,
             },
         }
     }
