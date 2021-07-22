@@ -45,8 +45,12 @@ async fn block_initiator_side() {
 
     // check if the peer has received an automatic Ping message from the node
     wait_until!(5, {
-        let payload = peer.read_payload().await.unwrap();
-        matches!(payload, Payload::Ping(..))
+        loop {
+            let payload = peer.read_payload().await;
+            if matches!(payload, Ok(Payload::Ping(..))) {
+                break true;
+            }
+        }
     });
 
     // wait for the block_sync_interval to "expire"
@@ -238,10 +242,10 @@ async fn transaction_initiator_side() {
         let mut got_getmempool = false;
 
         loop {
-            let payload = peer.read_payload().await.unwrap();
+            let payload = peer.read_payload().await;
             match payload {
-                Payload::Ping(..) => got_ping = true,
-                Payload::GetMemoryPool => got_getmempool = true,
+                Ok(Payload::Ping(..)) => got_ping = true,
+                Ok(Payload::GetMemoryPool) => got_getmempool = true,
                 _ => {}
             }
             if got_ping && got_getmempool {
@@ -278,8 +282,8 @@ async fn transaction_responder_side() {
     // check if the peer has received an automatic Ping message from the node
     wait_until!(5, {
         loop {
-            let payload = peer.read_payload().await.unwrap();
-            if matches!(payload, Payload::Ping(..)) {
+            let payload = peer.read_payload().await;
+            if matches!(payload, Ok(Payload::Ping(..))) {
                 break true;
             }
         }
