@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_storage::{BlockStatus, Digest, VMBlock};
+use snarkvm_utilities::to_bytes_le;
 use tokio::time::sleep;
 
 use crate::{
@@ -22,12 +24,11 @@ use crate::{
     wait_until,
 };
 
-use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
 
-use snarkvm_dpc::{block_header_hash::BlockHeaderHash, testnet1::instantiated::Testnet1Transaction};
+use snarkvm_dpc::{block_header_hash::BlockHeaderHash, testnet1::instantiated::Testnet1Transaction, Block};
 #[cfg(test)]
-use snarkvm_utilities::FromBytes;
+use snarkvm_utilities::ToBytes;
 
 use std::time::Duration;
 
@@ -93,16 +94,33 @@ async fn block_initiator_side() {
     assert!(block_hashes.contains(&block_1_header_hash) && block_hashes.contains(&block_2_header_hash));
 
     // respond with the full blocks
-    let block_1 = Payload::SyncBlock(BLOCK_1.to_vec());
+    let block_1 = Payload::SyncBlock(to_bytes_le![&*BLOCK_1].unwrap());
     peer.write_message(&block_1).await;
 
-    let block_2 = Payload::SyncBlock(BLOCK_2.to_vec());
+    let block_2 = Payload::SyncBlock(to_bytes_le![&*BLOCK_2].unwrap());
     peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
-    let node_storage = node.expect_sync().storage();
-    wait_until!(5, node_storage.block_hash_exists(&block_1_header_hash));
-    wait_until!(1, node_storage.block_hash_exists(&block_2_header_hash));
+    wait_until!(
+        5,
+        matches!(
+            node.storage
+                .get_block_state(&block_1_header_hash.0.into())
+                .await
+                .unwrap(),
+            BlockStatus::Committed(_)
+        )
+    );
+    wait_until!(
+        1,
+        matches!(
+            node.storage
+                .get_block_state(&block_2_header_hash.0.into())
+                .await
+                .unwrap(),
+            BlockStatus::Committed(_)
+        )
+    );
 }
 
 #[tokio::test]
@@ -117,12 +135,8 @@ async fn block_responder_side() {
     });
 
     // insert block into node
-    let block_struct_1 = snarkvm_dpc::Block::deserialize(&BLOCK_1).unwrap();
-    node.expect_sync()
-        .consensus
-        .receive_block(&block_struct_1, false)
-        .await
-        .unwrap();
+    let block_struct_1 = BLOCK_1.clone();
+    assert!(node.expect_sync().consensus.receive_block(block_struct_1.clone()).await);
 
     // send a GetSync with an empty vec as only the genesis block is in the ledger
     let get_sync = Payload::GetSync(vec![]);
@@ -136,10 +150,10 @@ async fn block_responder_side() {
         unreachable!();
     };
 
-    let block_header_hash = sync.first().unwrap();
-
+    let block_header_hash = sync.get(1).unwrap();
+    let block_header_hash_digest: Digest = block_header_hash.0.into();
     // check it matches the block inserted into the node's ledger
-    assert_eq!(*block_header_hash, block_struct_1.header.get_hash());
+    assert_eq!(block_header_hash_digest, block_struct_1.header.hash());
 
     // request the block from the node
     let get_block = Payload::GetBlocks(vec![block_header_hash.clone()]);
@@ -152,7 +166,8 @@ async fn block_responder_side() {
     } else {
         unreachable!();
     };
-    let block = snarkvm_dpc::Block::deserialize(&block).unwrap();
+    let block: Block<Testnet1Transaction> = snarkvm_dpc::Block::deserialize(&block).unwrap();
+    let block = <_ as VMBlock>::serialize(&block).unwrap();
 
     assert_eq!(block, block_struct_1);
 }
@@ -201,12 +216,7 @@ async fn block_two_node() {
     assert_eq!(blocks.len(), NUM_BLOCKS);
 
     for block in blocks {
-        node_alice
-            .expect_sync()
-            .consensus
-            .receive_block(&block, false)
-            .await
-            .unwrap();
+        assert!(node_alice.expect_sync().consensus.receive_block(block).await);
     }
 
     let setup = TestSetup {
@@ -221,11 +231,12 @@ async fn block_two_node() {
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(30, node_bob.expect_sync().current_block_height() as usize == NUM_BLOCKS);
+    wait_until!(30, node_bob.storage.canon().await.unwrap().block_height == NUM_BLOCKS);
 }
 
 #[tokio::test]
 async fn transaction_initiator_side() {
+    // tracing_subscriber::fmt::init();
     // handshake between a fake node and a full node
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
@@ -255,23 +266,19 @@ async fn transaction_initiator_side() {
     });
 
     // Respond with MemoryPool message
-    let memory_pool = Payload::MemoryPool(vec![TRANSACTION_1.to_vec(), TRANSACTION_2.to_vec()]);
+    let memory_pool = Payload::MemoryPool(vec![to_bytes_le![&*TRANSACTION_2].unwrap()]);
     peer.write_message(&memory_pool).await;
 
-    // Create the entries to verify
-    let entry_1 = Entry {
-        size_in_bytes: TRANSACTION_1.len(),
-        transaction: Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap(),
-    };
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-    let entry_2 = Entry {
-        size_in_bytes: TRANSACTION_2.len(),
-        transaction: Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap(),
-    };
-
-    // Verify the transactions have been stored in the node's memory pool
-    wait_until!(1, node.expect_sync().memory_pool().contains(&entry_1));
-    wait_until!(1, node.expect_sync().memory_pool().contains(&entry_2));
+    // Verify the transactions have been recevied (and cannot be received again)
+    assert!(
+        !node
+            .expect_sync()
+            .consensus
+            .receive_transaction(TRANSACTION_2.clone())
+            .await
+    );
 }
 
 #[tokio::test]
@@ -289,22 +296,14 @@ async fn transaction_responder_side() {
         }
     });
 
-    // insert transaction into node
-    let memory_pool = node.expect_sync().memory_pool();
-    let storage = node.expect_sync().storage();
+    // insert transactions into node
 
-    let entry_1 = Entry {
-        size_in_bytes: TRANSACTION_1.len(),
-        transaction: Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap(),
-    };
-
-    let entry_2 = Entry {
-        size_in_bytes: TRANSACTION_2.len(),
-        transaction: Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap(),
-    };
-
-    memory_pool.insert(&storage, entry_1).await.unwrap().unwrap();
-    memory_pool.insert(&storage, entry_2).await.unwrap().unwrap();
+    assert!(
+        node.expect_sync()
+            .consensus
+            .receive_transaction(TRANSACTION_2.clone())
+            .await
+    );
 
     // send a GetMemoryPool message
     let get_memory_pool = Payload::GetMemoryPool;
@@ -319,31 +318,22 @@ async fn transaction_responder_side() {
     };
 
     // check transactions
-    assert!(txs.contains(&TRANSACTION_1.to_vec()));
-    assert!(txs.contains(&TRANSACTION_2.to_vec()));
+    assert!(txs.contains(&to_bytes_le![&*TRANSACTION_2].unwrap()));
 }
 
 #[tokio::test]
 async fn transaction_two_node() {
-    use snarkos_consensus::memory_pool::Entry;
-    use snarkvm_dpc::testnet1::instantiated::Testnet1Transaction;
-    use snarkvm_utilities::bytes::FromBytes;
-
     let node_alice = test_node(TestSetup::default()).await;
     let alice_address = node_alice.local_address().unwrap();
 
     // insert transaction into node_alice
-    let memory_pool = node_alice.expect_sync().memory_pool();
-    let storage = node_alice.expect_sync().storage();
-
-    let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
-    let size = TRANSACTION_1.len();
-    let entry = Entry {
-        size_in_bytes: size,
-        transaction: transaction.clone(),
-    };
-
-    memory_pool.insert(&storage, entry.clone()).await.unwrap().unwrap();
+    assert!(
+        node_alice
+            .expect_sync()
+            .consensus
+            .receive_transaction(TRANSACTION_2.clone())
+            .await
+    );
 
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
@@ -357,5 +347,13 @@ async fn transaction_two_node() {
     let node_bob = test_node(setup).await;
 
     // check transaction is present in bob's memory pool
-    wait_until!(5, node_bob.expect_sync().memory_pool().contains(&entry));
+    wait_until!(
+        5,
+        node_bob
+            .expect_sync()
+            .consensus
+            .fetch_memory_pool()
+            .await
+            .contains(&TRANSACTION_2)
+    );
 }

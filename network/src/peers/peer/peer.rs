@@ -18,7 +18,6 @@ use anyhow::*;
 use chrono::Utc;
 use futures::{select, FutureExt};
 use serde::{Deserialize, Serialize};
-use snarkvm_dpc::Storage;
 use std::{
     net::SocketAddr,
     sync::{
@@ -121,9 +120,9 @@ impl Peer {
         Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64)
     }
 
-    pub(super) async fn run<S: Storage + Send + Sync + 'static>(
+    pub(super) async fn run(
         &mut self,
-        node: Node<S>,
+        node: Node,
         mut network: PeerIOHandle,
         mut receiver: mpsc::Receiver<PeerAction>,
     ) -> Result<(), NetworkError> {

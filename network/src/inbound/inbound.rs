@@ -16,7 +16,6 @@
 
 use std::time::Duration;
 
-use snarkvm_dpc::Storage;
 use tokio::{
     net::TcpListener,
     sync::{mpsc::error::TrySendError, Mutex},
@@ -59,7 +58,7 @@ impl Inbound {
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> Node<S> {
+impl Node {
     /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
         let listener = TcpListener::bind(&self.config.desired_address).await?;
@@ -157,6 +156,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(inbound::GETBLOCKS);
 
                 if self.sync().is_some() {
+                    let hashes = hashes.into_iter().map(|x| x.0.into()).collect();
                     self.received_get_blocks(source, hashes).await?;
                 }
             }
@@ -164,7 +164,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(inbound::GETMEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_get_memory_pool(source).await;
+                    self.received_get_memory_pool(source).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
@@ -178,6 +178,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(inbound::GETSYNC);
 
                 if self.sync().is_some() {
+                    let getsync = getsync.into_iter().map(|x| x.0.into()).collect();
                     self.received_get_sync(source, getsync).await?;
                 }
             }

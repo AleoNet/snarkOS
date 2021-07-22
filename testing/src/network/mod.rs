@@ -25,7 +25,7 @@ pub mod topology;
 use crate::sync::FIXTURE;
 
 use snarkos_network::{errors::*, *};
-use snarkos_storage::LedgerStorage;
+use snarkos_storage::{key_value::KeyValueStore, MemDb};
 
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
@@ -153,10 +153,10 @@ impl Default for TestSetup {
     }
 }
 
-pub fn test_consensus(setup: ConsensusSetup) -> Sync<LedgerStorage> {
-    let consensus = Arc::new(crate::sync::create_test_consensus());
+pub async fn test_consensus(setup: ConsensusSetup) -> snarkos_network::Sync {
+    let consensus = crate::sync::create_test_consensus().await;
 
-    Sync::new(
+    snarkos_network::Sync::new(
         consensus,
         setup.is_miner,
         Duration::from_secs(setup.block_sync_interval),
@@ -179,22 +179,28 @@ pub fn test_config(setup: TestSetup) -> Config {
 }
 
 /// Starts a node with the specified bootnodes.
-pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
+pub async fn test_node(setup: TestSetup) -> Node {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let config = test_config(setup.clone());
-    let mut node = Node::new(config).unwrap();
+    let node = match setup.consensus_setup {
+        None => Node::new(config, Arc::new(KeyValueStore::new(MemDb::new())))
+            .await
+            .unwrap(),
+        Some(consensus_setup) => {
+            let consensus = test_consensus(consensus_setup).await;
+            let mut node = Node::new(config, consensus.consensus.storage.clone()).await.unwrap();
 
-    if let Some(consensus_setup) = setup.consensus_setup {
-        let consensus = test_consensus(consensus_setup);
-        node.set_sync(consensus);
-    }
+            node.set_sync(consensus);
+            node
+        }
+    };
 
     node.listen().await.unwrap();
     node.start_services().await;
 
     if is_miner {
         let miner_address = FIXTURE.test_accounts[0].address.clone();
-        MinerInstance::new(miner_address, node.clone()).spawn();
+        tokio::spawn(MinerInstance::new(miner_address, node.clone()).spawn());
     }
 
     node
@@ -380,7 +386,7 @@ pub async fn handshaken_peer(node_listener: SocketAddr) -> FakeNode {
     FakeNode::new(peer_stream, peer_addr, noise)
 }
 
-pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node<LedgerStorage>, FakeNode) {
+pub async fn handshaken_node_and_peer(node_setup: TestSetup) -> (Node, FakeNode) {
     // start a test node and listen for incoming connections
     let node = test_node(node_setup).await;
     let node_listener = node.local_address().unwrap();

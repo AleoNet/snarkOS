@@ -17,43 +17,44 @@
 use std::{sync::Arc, thread, time::Duration};
 
 use futures::executor::block_on;
-use snarkvm_dpc::{testnet1::instantiated::*, Address, Storage};
+use snarkvm_dpc::{testnet1::instantiated::*, Address};
 use tokio::task;
 use tracing::*;
 
-use snarkos_consensus::Miner;
+use snarkos_consensus::{error::ConsensusError, MineContext};
 use snarkos_metrics::{self as metrics, misc::*};
 
 use crate::{Node, State};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
-pub struct MinerInstance<S: Storage + core::marker::Sync + Send + 'static> {
+pub struct MinerInstance {
     miner_address: Address<Components>,
-    node: Node<S>,
+    node: Node,
 }
 
-impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
+impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(miner_address: Address<Components>, node: Node<S>) -> Self {
+    pub fn new(miner_address: Address<Components>, node: Node) -> Self {
         Self { miner_address, node }
     }
 
     /// Spawns a new miner on a new thread using MinerInstance parameters.
     /// Once a block is found, A block message is sent to all peers.
     /// Calling this function multiple times will spawn additional listeners on separate threads.
-    pub fn spawn(self) -> task::JoinHandle<()> {
+    pub async fn spawn(self) -> Result<task::JoinHandle<()>, ConsensusError> {
         let local_address = self.node.local_address().unwrap();
         info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
-        let miner = Miner::new(
+        let miner = MineContext::prepare(
             self.miner_address.clone(),
             Arc::clone(&self.node.expect_sync().consensus),
-        );
+        )
+        .await?;
         info!("Miner instantiated; starting to mine blocks");
 
         let mut mining_failure_count = 0;
         let mining_failure_threshold = 10;
 
-        task::spawn_blocking(move || {
+        Ok(task::spawn_blocking(move || {
             loop {
                 if self.node.is_shutting_down() {
                     debug!("The node is shutting down, stopping mining");
@@ -104,17 +105,12 @@ impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
 
                 metrics::increment_counter!(BLOCKS_MINED);
 
-                info!("Mined a new block: {:?}", hex::encode(block.header.get_hash().0));
+                info!("Mined a new block: {:?}", hex::encode(block.header.hash().0));
 
-                let serialized_block = if let Ok(block) = block.serialize() {
-                    block
-                } else {
-                    error!("Our own miner baked an unserializable block!");
-                    continue;
-                };
+                let serialized_block = block.serialize();
 
-                block_on(self.node.propagate_block(serialized_block, local_address));
+                self.node.propagate_block(serialized_block, local_address);
             }
-        })
+        }))
     }
 }

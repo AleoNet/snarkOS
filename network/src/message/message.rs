@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_storage::BlockHeight;
 use snarkvm_dpc::BlockHeaderHash;
 
 use std::{fmt, net::SocketAddr};
@@ -85,7 +84,7 @@ pub enum Payload {
     Peers(Vec<SocketAddr>),
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/ping.md"))]
-    Ping(BlockHeight),
+    Ping(u32),
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/pong.md"))]
     Pong,
