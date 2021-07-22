@@ -18,7 +18,6 @@ use snarkos_network::{topology::calculate_density, Node};
 use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{
-        test_config,
         test_node,
         topology::{connect_nodes, Topology},
         TestSetup,
@@ -34,23 +33,14 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node<LedgerStorage>> {
     let mut nodes = Vec::with_capacity(n);
 
     for _ in 0..n {
-        let environment = test_config(setup.clone());
-        let node = Node::new(environment).unwrap();
+        nodes.push(test_node(setup.clone()).await);
 
-        node.listen().await.unwrap();
-        nodes.push(node);
-    }
-
-    nodes
-}
-
-async fn start_nodes(nodes: &[Node<LedgerStorage>]) {
-    for node in nodes {
         // Nodes are started with a slight delay to avoid having peering intervals in phase (this
         // is the hypothetical worst case scenario).
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        node.start_services().await;
     }
+
+    nodes
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -61,8 +51,7 @@ async fn spawn_nodes_in_a_line() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Line);
-    start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Line).await;
 
     // First and Last nodes should have 1 connected peer.
     wait_until!(5, nodes.first().unwrap().peer_book.get_active_peer_count() == 1);
@@ -70,7 +59,7 @@ async fn spawn_nodes_in_a_line() {
 
     // All other nodes should have two.
     for node in nodes.iter().take(nodes.len() - 1).skip(1) {
-        wait_until!(5, node.peer_book.get_active_peer_count() == 2);
+        wait_until!(10, node.peer_book.get_active_peer_count() == 2);
     }
 }
 
@@ -82,8 +71,7 @@ async fn spawn_nodes_in_a_ring() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Ring);
-    start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Ring).await;
 
     for node in &nodes {
         wait_until!(5, node.peer_book.get_active_peer_count() == 2);
@@ -98,8 +86,7 @@ async fn spawn_nodes_in_a_star() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Star);
-    start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Star).await;
 
     let hub = nodes.first().unwrap();
     wait_until!(10, hub.peer_book.get_active_peer_count() as usize == N - 1);
@@ -115,15 +102,14 @@ async fn spawn_nodes_in_a_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Mesh);
-    start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Mesh).await;
 
     // Set the sleep interval to 200ms to avoid locking issues.
     // Density measurement here is proportional to the min peers: if every node in the network
-    // only connected to the min node count, the total number of connections would be roughly 10
-    // percent of the total possible. With 50 nodes and min at 5 connections each this works out to
-    // be 125/1225 ≈ 0.1.
-    wait_until!(15, network_density(&nodes) >= 0.1, 200);
+    // only connected to the min node count, the total number of connections would be roughly 20
+    // percent of the total possible. E.g., with 25 nodes and min at 5 connections each this works out to
+    // be 125/600 ≈ 0.2.
+    wait_until!(15, network_density(&nodes) >= target_density(N), 200);
 
     // Make sure the node with the largest degree centrality and smallest degree centrality don't
     // have a delta greater than the max-min peer interval allows for. This check also provides
@@ -135,8 +121,6 @@ async fn spawn_nodes_in_a_mesh() {
     );
 }
 
-// FIXME: adjust to new peering mechanics.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn line_converges_to_mesh() {
     let setup = TestSetup {
@@ -147,10 +131,9 @@ async fn line_converges_to_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Line);
-    start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Line).await;
 
-    wait_until!(10, network_density(&nodes) >= 0.1, 200);
+    wait_until!(10, network_density(&nodes) >= target_density(N), 200);
     wait_until!(
         10,
         degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
@@ -158,7 +141,6 @@ async fn line_converges_to_mesh() {
     );
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn ring_converges_to_mesh() {
     let setup = TestSetup {
@@ -169,10 +151,9 @@ async fn ring_converges_to_mesh() {
         ..Default::default()
     };
     let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Ring);
-    start_nodes(&nodes).await;
+    connect_nodes(&mut nodes, Topology::Ring).await;
 
-    wait_until!(10, network_density(&nodes) >= 0.1, 200);
+    wait_until!(10, network_density(&nodes) >= target_density(N), 200);
     wait_until!(
         10,
         degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
@@ -180,7 +161,6 @@ async fn ring_converges_to_mesh() {
     );
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn star_converges_to_mesh() {
     let setup = TestSetup {
@@ -190,11 +170,22 @@ async fn star_converges_to_mesh() {
         max_peers: MAX_PEERS,
         ..Default::default()
     };
-    let mut nodes = test_nodes(N, setup).await;
-    connect_nodes(&mut nodes, Topology::Star);
-    start_nodes(&nodes).await;
 
-    wait_until!(15, network_density(&nodes) >= 0.1, 200);
+    // A bootnode will be necessary at the center of the star for peers to get propagated.
+    let hub_setup = TestSetup {
+        is_bootnode: true,
+        ..setup.clone()
+    };
+
+    // Create the regular nodes.
+    let mut nodes = test_nodes(N - 1, setup).await;
+
+    // Insert the bootnode at the head of the list.
+    nodes.insert(0, test_node(hub_setup).await);
+
+    connect_nodes(&mut nodes, Topology::Star).await;
+
+    wait_until!(15, network_density(&nodes) >= target_density(N), 200);
     wait_until!(
         15,
         degree_centrality_delta(&nodes) <= (MAX_PEERS - MIN_PEERS).into(),
@@ -203,7 +194,6 @@ async fn star_converges_to_mesh() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
 async fn binary_star_contact() {
     // Two initally separate star topologies subsequently connected by a single node connecting to
     // their bootnodes.
@@ -215,13 +205,9 @@ async fn binary_star_contact() {
         is_bootnode: true,
         ..Default::default()
     };
-    let environment_a = test_config(bootnode_setup.clone());
-    let environment_b = test_config(bootnode_setup.clone());
-    let bootnode_a = Node::new(environment_a).unwrap();
-    let bootnode_b = Node::new(environment_b).unwrap();
 
-    bootnode_a.listen().await.unwrap();
-    bootnode_b.listen().await.unwrap();
+    let bootnode_a = test_node(bootnode_setup.clone()).await;
+    let bootnode_b = test_node(bootnode_setup).await;
 
     let ba = bootnode_a.local_address().unwrap().to_string();
     let bb = bootnode_b.local_address().unwrap().to_string();
@@ -242,12 +228,8 @@ async fn binary_star_contact() {
     star_b_nodes.insert(0, bootnode_b);
 
     // Create the star topologies.
-    connect_nodes(&mut star_a_nodes, Topology::Star);
-    connect_nodes(&mut star_b_nodes, Topology::Star);
-
-    // Start the services. The two meshes should still be disconnected.
-    start_nodes(&star_a_nodes).await;
-    start_nodes(&star_b_nodes).await;
+    connect_nodes(&mut star_a_nodes, Topology::Star).await;
+    connect_nodes(&mut star_b_nodes, Topology::Star).await;
 
     // Setting up a list of nodes as we will consider them as a whole graph from this point
     // forwards.
@@ -268,7 +250,14 @@ async fn binary_star_contact() {
     let solo = test_node(solo_setup).await;
     nodes.push(solo);
 
-    wait_until!(10, network_density(&nodes) >= 0.05);
+    wait_until!(15, network_density(&nodes) >= target_density(nodes.len()));
+}
+
+fn target_density(node_count: usize) -> f64 {
+    // This is (MIN_PEERS * n) / n * (n + 1) which is the ratio of all nodes having `MIN_PEERS`
+    // connections to the total number of theoretical possible connections in the network (the
+    // division by 2 has been simplified in the fraction.)
+    MIN_PEERS as f64 / (node_count + 1) as f64
 }
 
 /// Returns the total connection count of the network.

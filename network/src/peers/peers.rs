@@ -96,7 +96,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Attempt to connect to the default bootnodes of the network if the node has no active
         // connections.
         if self.peer_book.get_active_peer_count() == 0 {
-            self.connect_to_bootnodes().await;
+            self.connect_to_addresses(&self.config.bootnodes()).await;
         }
 
         if number_to_connect != 0 {
@@ -142,42 +142,33 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     ///
-    /// Broadcasts a connection request to all default bootnodes of the network.
+    /// Broadcasts a connection request to all the supplied addresses.
     ///
-    /// This function attempts to reconnect this node server with any bootnode peer
-    /// that this node may have failed to connect to.
-    ///
-    /// This function filters out any bootnode peers the node server is
+    /// This function filters out any peers the node server is
     /// either connnecting to or already connected to.
     ///
-    async fn connect_to_bootnodes(&self) {
+    pub async fn connect_to_addresses(&self, addrs: &[SocketAddr]) {
         // Local address must be known by now.
         let own_address = self.local_address().unwrap();
 
-        // Iterate through each bootnode address and attempt a connection request.
-        for bootnode_address in self
-            .config
-            .bootnodes()
+        for node_addr in addrs
             .iter()
-            .filter(|peer| **peer != own_address)
+            .filter(|&addr| *addr != own_address && !self.peer_book.is_connected(*addr))
             .copied()
         {
             let node = self.clone();
-            if node.peer_book.is_connected(bootnode_address) {
-                return;
-            }
             task::spawn(async move {
-                match node.initiate_connection(bootnode_address).await {
+                match node.initiate_connection(node_addr).await {
                     Err(NetworkError::PeerAlreadyConnecting) | Err(NetworkError::PeerAlreadyConnected) => {
                         // no issue here, already connecting
                     }
                     Err(e @ NetworkError::TooManyConnections) => {
-                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
+                        warn!("Couldn't connect to peer {}: {}", node_addr, e);
                         // the connection hasn't been established, no need to disconnect
                     }
                     Err(e) => {
-                        warn!("Couldn't connect to bootnode {}: {}", bootnode_address, e);
-                        node.disconnect_from_peer(bootnode_address).await;
+                        warn!("Couldn't connect to peer {}: {}", node_addr, e);
+                        node.disconnect_from_peer(node_addr).await;
                     }
                     Ok(_) => {}
                 }
