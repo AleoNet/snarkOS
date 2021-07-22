@@ -63,6 +63,7 @@ pub mod queues {
 pub mod misc {
     pub const BLOCK_HEIGHT: &str = "snarkos_misc_block_height_total";
     pub const BLOCKS_MINED: &str = "snarkos_misc_blocks_mined_total";
+    pub const CHAIN_BLOCK_HEIGHT: &str = "snarkos_misc_chain_block_height_total";
     pub const DUPLICATE_BLOCKS: &str = "snarkos_misc_duplicate_blocks_total";
     pub const DUPLICATE_SYNC_BLOCKS: &str = "snarkos_misc_duplicate_sync_blocks_total";
     pub const RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";

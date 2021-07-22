@@ -302,6 +302,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         // The node can already be at some non-zero height.
         if let Some(sync) = self.sync() {
             metrics::counter!(misc::BLOCK_HEIGHT, sync.current_block_height() as u64);
+            metrics::counter!(misc::CHAIN_BLOCK_HEIGHT, sync.current_block_height() as u64);
         }
     }
 

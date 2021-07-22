@@ -272,6 +272,7 @@ impl QueueStats {
 
 pub struct MiscStats {
     block_height: DiscreteGauge,
+    chain_block_height: DiscreteGauge,
     /// The number of mined blocks.
     blocks_mined: Counter,
     /// The number of duplicate blocks received.
@@ -286,6 +287,7 @@ impl MiscStats {
     const fn new() -> Self {
         Self {
             block_height: DiscreteGauge::new(),
+            chain_block_height: DiscreteGauge::new(),
             blocks_mined: Counter::new(),
             duplicate_blocks: Counter::new(),
             duplicate_sync_blocks: Counter::new(),
@@ -296,6 +298,7 @@ impl MiscStats {
     pub fn snapshot(&self) -> NodeMiscStats {
         NodeMiscStats {
             block_height: self.block_height.read(),
+            chain_block_height: self.chain_block_height.read(),
             blocks_mined: self.blocks_mined.read(),
             duplicate_blocks: self.duplicate_blocks.read(),
             duplicate_sync_blocks: self.duplicate_sync_blocks.read(),
@@ -365,6 +368,7 @@ impl Recorder for Stats {
             queues::OUTBOUND => &self.queues.outbound,
             // misc
             misc::BLOCK_HEIGHT => &self.misc.block_height,
+            misc::CHAIN_BLOCK_HEIGHT => &self.misc.chain_block_height,
             // connections
             connections::CONNECTING => &self.connections.connecting_peers,
             connections::CONNECTED => &self.connections.connected_peers,

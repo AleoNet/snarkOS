@@ -137,6 +137,11 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
             }
         }
 
+        metrics::gauge!(
+            CHAIN_BLOCK_HEIGHT,
+            self.expect_sync().consensus.ledger.get_current_block_height() as f64
+        );
+
         Ok(())
     }
 

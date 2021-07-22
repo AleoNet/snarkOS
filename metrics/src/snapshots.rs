@@ -119,6 +119,8 @@ pub struct NodeQueueStats {
 pub struct NodeMiscStats {
     /// The current block height of the node.
     pub block_height: u64,
+    /// The current block height of the chain.
+    pub chain_block_height: u64,
     /// The number of blocks the node has mined.
     pub blocks_mined: u64,
     /// The number of duplicate blocks received.
