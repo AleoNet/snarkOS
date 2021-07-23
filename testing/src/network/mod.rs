@@ -102,6 +102,7 @@ pub struct TestSetup {
     pub min_peers: u16,
     pub max_peers: u16,
     pub is_bootnode: bool,
+    pub is_crawler: bool,
     pub bootnodes: Vec<String>,
     pub tokio_handle: Option<runtime::Handle>,
 }
@@ -116,6 +117,7 @@ impl TestSetup {
         min_peers: u16,
         max_peers: u16,
         is_bootnode: bool,
+        is_crawler: bool,
         bootnodes: Vec<String>,
         tokio_handle: Option<runtime::Handle>,
     ) -> Self {
@@ -127,6 +129,7 @@ impl TestSetup {
             min_peers,
             max_peers,
             is_bootnode,
+            is_crawler,
             bootnodes,
             tokio_handle,
         }
@@ -143,6 +146,7 @@ impl Default for TestSetup {
             min_peers: 1,
             max_peers: 100,
             is_bootnode: false,
+            is_crawler: false,
             bootnodes: vec![],
             tokio_handle: None,
         }
@@ -168,6 +172,7 @@ pub fn test_config(setup: TestSetup) -> Config {
         setup.max_peers,
         setup.bootnodes,
         setup.is_bootnode,
+        setup.is_crawler,
         Duration::from_secs(setup.peer_sync_interval),
     )
     .unwrap()

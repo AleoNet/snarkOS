@@ -56,32 +56,44 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
         // Calculate the peer counts to disconnect and connect based on the node type and current
         // peer counts.
-        let (number_to_disconnect, number_to_connect) = match self.config.is_bootnode() {
-            true => {
-                // Bootnodes disconnect down to the min peer count, this to free up room for
-                // the next crawled peers...
-                let number_to_disconnect = active_peer_count.saturating_sub(min_peers);
-                // ...then they connect to disconnected peers leaving 20% of their capacity open
-                // incoming connections.
-                const CRAWLING_CAPACITY_PERCENTAGE: f64 = 0.8;
-                let crawling_capacity = (CRAWLING_CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
-                let number_to_connect = crawling_capacity.saturating_sub(active_peer_count - number_to_disconnect);
+        let (number_to_disconnect, number_to_connect) = if self.config.is_crawler() {
+            // Crawlers disconnect down to the min peer count, this to free up room for
+            // the next crawled peers...
+            let number_to_disconnect = active_peer_count.saturating_sub(min_peers);
+            // ...then they connect to disconnected peers leaving 20% of their capacity open
+            // incoming connections.
+            const CRAWLING_CAPACITY_PERCENTAGE: f64 = 0.8;
+            let crawling_capacity = (CRAWLING_CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
+            let number_to_connect = crawling_capacity.saturating_sub(active_peer_count - number_to_disconnect);
 
-                (number_to_disconnect, number_to_connect)
-            }
-            false => (
+            (number_to_disconnect, number_to_connect)
+        } else if self.config.is_bootnode() {
+            // Bootnodes disconnect down to 80% of their max to leave capacity open for new
+            // connections.
+            const BOOTNODE_CAPACITY_PERCENTAGE: f64 = 0.8;
+            let bootnode_capacity = (BOOTNODE_CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
+
+            (
+                // Bootnodes disconnect down to 80% of their max to leave capacity open for new
+                // connections...
+                active_peer_count.saturating_sub(bootnode_capacity),
+                // ...and don't connect to any peers on their own once above `0` peers.
+                0,
+            )
+        } else {
+            (
                 // Non-bootnodes disconnect if above the max peer count...
                 active_peer_count.saturating_sub(max_peers),
                 // ...and connect if below the min peer count.
                 min_peers.saturating_sub(active_peer_count),
-            ),
+            )
         };
 
         if number_to_disconnect != 0 {
             let mut current_peers = self.peer_book.connected_peers_snapshot().await;
 
-            // Bootnodes will disconnect from random peers...
-            if !self.config.is_bootnode() {
+            // Bootnodes and crawlers will disconnect from random peers...
+            if !self.config.is_bootnode() && !self.config.is_crawler() {
                 // ...while regular peers from the most recently connected.
                 current_peers.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
