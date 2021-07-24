@@ -17,9 +17,11 @@
 use crate::*;
 use arc_swap::ArcSwap;
 use snarkos_parameters::GenesisBlock;
-use snarkvm_algorithms::{merkle_tree::MerkleTree, traits::LoadableMerkleParameters};
-use snarkvm_dpc::{errors::StorageError, Block, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
-use snarkvm_parameters::{traits::genesis::Genesis, LedgerMerkleTreeParameters, Parameter};
+use snarkvm_algorithms::merkle_tree::MerkleTree;
+use snarkvm_dpc::{
+    errors::StorageError, Block, DatabaseTransaction, LedgerScheme, Op, Parameters, Storage, TransactionScheme,
+};
+use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
 
 use std::{
@@ -34,15 +36,14 @@ use std::{
 
 pub type BlockHeight = u32;
 
-pub struct Ledger<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> {
+pub struct Ledger<C: Parameters, T: TransactionScheme, S: Storage> {
     pub current_block_height: AtomicU32,
-    pub ledger_parameters: Arc<P>,
-    pub cm_merkle_tree: ArcSwap<MerkleTree<P>>,
+    pub cm_merkle_tree: ArcSwap<MerkleTree<C::RecordCommitmentTreeParameters>>,
     pub storage: S,
     pub _transaction: PhantomData<T>,
 }
 
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// Create a fresh blockchain, optionally at the specified path.
     /// Warning: if specified, any existing storage at that location is removed.
     pub fn new_empty<PATH: AsRef<Path>>(path: Option<PATH>) -> Result<Self, StorageError> {
@@ -51,12 +52,9 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
             Self::open_at_path(path)
         } else {
-            let crh = P::H::from(FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
-            let ledger_parameters = Arc::new(P::from(crh));
-
             let genesis_block: Block<T> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
 
-            Ok(Self::new(None, ledger_parameters, genesis_block).expect("Ledger could not be instantiated"))
+            Ok(Self::new(None, genesis_block).expect("Ledger could not be instantiated"))
         }
     }
 
@@ -130,9 +128,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
 
-        let crh = P::H::from(FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
-        let ledger_parameters = Arc::new(P::from(crh));
-
         match latest_block_number {
             Some(val) => {
                 let storage = match primary {
@@ -156,13 +151,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
                 let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
 
-                let merkle_tree = MerkleTree::new(ledger_parameters.clone(), &commitments[..])?;
+                let parameters = Arc::new(C::record_commitment_tree_parameters().clone());
+                let merkle_tree = MerkleTree::new(parameters.clone(), &commitments[..])?;
 
                 Ok(Self {
                     current_block_height: AtomicU32::new(bytes_to_u32(&val)),
                     storage,
                     cm_merkle_tree: ArcSwap::new(Arc::new(merkle_tree)),
-                    ledger_parameters,
                     _transaction: PhantomData,
                 })
             }
@@ -171,8 +166,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
                 let genesis_block: Block<T> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
 
-                let ledger_storage = Self::new(Some(path.as_ref()), ledger_parameters, genesis_block)
-                    .expect("Ledger could not be instantiated");
+                let ledger_storage =
+                    Self::new(Some(path.as_ref()), genesis_block).expect("Ledger could not be instantiated");
 
                 // If there did not exist a primary ledger at the path,
                 // then create one and then open the secondary instance.

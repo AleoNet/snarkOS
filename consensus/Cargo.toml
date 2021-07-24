@@ -18,19 +18,24 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "=0.7.5"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "5dfb2ff"
 
 [dependencies.snarkvm-curves]
-version = "=0.7.5"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "5dfb2ff"
 
 [dependencies.snarkvm-dpc]
-version = "=0.7.5"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "5dfb2ff"
 
 [dependencies.snarkvm-posw]
-version = "=0.7.5"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "5dfb2ff"
 
 [dependencies.snarkvm-utilities]
-version = "=0.7.5"
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "5dfb2ff"
 
 [dependencies.metrics]
 version = "0.17"

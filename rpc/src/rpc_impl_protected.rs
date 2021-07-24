@@ -19,32 +19,15 @@
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
 use crate::{
-    error::RpcError,
-    rpc_trait::ProtectedRpcFunctions,
-    rpc_types::*,
-    transaction_kernel_builder::TransactionKernelBuilder,
-    RpcImpl,
+    error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*,
+    transaction_kernel_builder::TransactionKernelBuilder, RpcImpl,
 };
 use snarkos_consensus::ConsensusParameters;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1DPC},
-        EncryptedRecord,
-        Payload,
-        Record,
-        TransactionKernel,
-    },
-    Account,
-    AccountScheme,
-    Address,
-    DPCComponents,
-    DPCScheme,
-    PrivateKey,
-    ProgramScheme,
-    RecordScheme as RecordModel,
-    Storage,
-    ViewKey,
+    testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
+    Account, AccountScheme, Address, DPCScheme, EncryptedRecord, Parameters, Payload, PrivateKey, ProgramScheme,
+    Record, RecordScheme as RecordModel, Storage, TransactionKernel, ViewKey,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -323,18 +306,9 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     fn create_account(&self) -> Result<RpcAccount, RpcError> {
         let rng = &mut thread_rng();
 
-        let account = Account::<Components>::new(
-            &self.dpc()?.system_parameters.account_signature,
-            &self.dpc()?.system_parameters.account_commitment,
-            &self.dpc()?.system_parameters.account_encryption,
-            rng,
-        )?;
+        let account = Account::<Testnet1Parameters>::new(rng)?;
 
-        let view_key = ViewKey::<Components>::from_private_key(
-            &self.dpc()?.system_parameters.account_signature,
-            &self.dpc()?.system_parameters.account_commitment,
-            &account.private_key,
-        )?;
+        let view_key = ViewKey::<Testnet1Parameters>::from_private_key(&account.private_key)?;
 
         Ok(RpcAccount {
             private_key: account.private_key.to_string(),
@@ -352,44 +326,38 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let rng = &mut thread_rng();
 
         assert!(!transaction_input.old_records.is_empty());
-        assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
+        assert!(transaction_input.old_records.len() <= Testnet1Parameters::NUM_INPUT_RECORDS);
         assert!(!transaction_input.old_account_private_keys.is_empty());
-        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.old_account_private_keys.len() <= Testnet1Parameters::NUM_OUTPUT_RECORDS);
         assert!(!transaction_input.recipients.is_empty());
-        assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.recipients.len() <= Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
         // Fetch birth/death programs
         let program_id = self.dpc()?.noop_program.id();
-        let new_birth_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_birth_program_ids = vec![program_id.clone(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![program_id.clone(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
         // Decode old records
         let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
         for record_string in transaction_input.old_records {
             let record_bytes = hex::decode(record_string)?;
-            old_records.push(Record::<Components>::read_le(&record_bytes[..])?);
+            old_records.push(Record::<Testnet1Parameters>::read_le(&record_bytes[..])?);
         }
 
         let mut old_account_private_keys = Vec::with_capacity(transaction_input.old_account_private_keys.len());
         for private_key_string in transaction_input.old_account_private_keys {
-            old_account_private_keys.push(PrivateKey::<Components>::from_str(&private_key_string)?);
+            old_account_private_keys.push(PrivateKey::<Testnet1Parameters>::from_str(&private_key_string)?);
         }
 
         let sn_randomness: [u8; 32] = rng.gen();
         // Fill any unused old_record indices with dummy records
-        while old_records.len() < Components::NUM_OUTPUT_RECORDS {
-            let old_sn_nonce = self.dpc()?.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
+        while old_records.len() < Testnet1Parameters::NUM_OUTPUT_RECORDS {
+            let old_sn_nonce = Testnet1Parameters::serial_number_nonce_crh().hash(&sn_randomness)?;
 
             let private_key = old_account_private_keys[0].clone();
-            let address = Address::<Components>::from_private_key(
-                &self.dpc()?.system_parameters.account_signature,
-                &self.dpc()?.system_parameters.account_commitment,
-                &self.dpc()?.system_parameters.account_encryption,
-                &private_key,
-            )?;
+            let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
-            let dummy_record = Record::<Components>::new(
-                &self.dpc()?.system_parameters.record_commitment,
+            let dummy_record = Record::<Testnet1Parameters>::new(
                 address,
                 true, // The input record is dummy
                 0,
@@ -404,32 +372,32 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             old_account_private_keys.push(private_key);
         }
 
-        assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
-        assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
+        assert_eq!(old_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
+        assert_eq!(old_account_private_keys.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_record_owners = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_is_dummy_flags = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_values = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_record_owners = Vec::with_capacity(Testnet1Parameters::NUM_OUTPUT_RECORDS);
+        let mut new_is_dummy_flags = Vec::with_capacity(Testnet1Parameters::NUM_OUTPUT_RECORDS);
+        let mut new_values = Vec::with_capacity(Testnet1Parameters::NUM_OUTPUT_RECORDS);
         for recipient in transaction_input.recipients {
-            new_record_owners.push(Address::<Components>::from_str(&recipient.address)?);
+            new_record_owners.push(Address::<Testnet1Parameters>::from_str(&recipient.address)?);
             new_is_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_record_owners.len() < Components::NUM_OUTPUT_RECORDS {
+        while new_record_owners.len() < Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_record_owners.push(new_record_owners[0].clone());
             new_is_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_record_owners.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_is_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_record_owners.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_is_dummy_flags.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_values.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
         // Default record payload
-        let new_payloads = vec![Payload::default(); Components::NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![Payload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
         // Decode memo
         let mut memo = [0u8; 32];
@@ -475,11 +443,11 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let rng = &mut thread_rng();
 
         assert!(!transaction_input.old_records.is_empty());
-        assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
+        assert!(transaction_input.old_records.len() <= Testnet1Parameters::NUM_INPUT_RECORDS);
         assert!(!transaction_input.old_account_private_keys.is_empty());
-        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.old_account_private_keys.len() <= Testnet1Parameters::NUM_OUTPUT_RECORDS);
         assert!(!transaction_input.recipients.is_empty());
-        assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.recipients.len() <= Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
         let mut builder = TransactionKernelBuilder::new();
 
@@ -489,15 +457,15 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             .iter()
             .zip_eq(&transaction_input.old_account_private_keys)
         {
-            let record = Record::<Components>::from_str(record_string)?;
-            let private_key = PrivateKey::<Components>::from_str(private_key_string)?;
+            let record = Record::<Testnet1Parameters>::from_str(record_string)?;
+            let private_key = PrivateKey::<Testnet1Parameters>::from_str(private_key_string)?;
 
             builder = builder.add_input(private_key, record)?;
         }
 
         // Add individual transaction outputs to the transaction kernel builder.
         for recipient in &transaction_input.recipients {
-            let address = Address::<Components>::from_str(&recipient.address)?;
+            let address = Address::<Testnet1Parameters>::from_str(&recipient.address)?;
 
             builder = builder.add_output(address, recipient.amount)?;
         }
@@ -530,20 +498,20 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     /// Create a new transaction for a given transaction kernel.
     fn create_transaction(
         &self,
-        private_keys: [String; Components::NUM_INPUT_RECORDS],
+        private_keys: [String; Testnet1Parameters::NUM_INPUT_RECORDS],
         transaction_kernel: String,
     ) -> Result<CreateRawTransactionOuput, RpcError> {
         let rng = &mut thread_rng();
 
         // Decode the private keys
-        let mut old_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        let mut old_private_keys = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
         for private_key in private_keys {
-            old_private_keys.push(PrivateKey::<Components>::from_str(&private_key)?);
+            old_private_keys.push(PrivateKey::<Testnet1Parameters>::from_str(&private_key)?);
         }
 
         // Decode the transaction kernel
         let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
-        let transaction_kernel = TransactionKernel::<Components>::read_le(&transaction_kernel_bytes[..])?;
+        let transaction_kernel = TransactionKernel::<Testnet1Parameters>::read_le(&transaction_kernel_bytes[..])?;
 
         // Construct the program proofs
         let program_proofs =
@@ -598,7 +566,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         match self
             .storage
-            .get_record::<Record<Components>>(&hex::decode(record_commitment)?)?
+            .get_record::<Record<Testnet1Parameters>>(&hex::decode(record_commitment)?)?
         {
             Some(record) => {
                 let record_bytes = to_bytes_le![record]?;
@@ -612,13 +580,13 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
         // Read the encrypted_record
         let encrypted_record_bytes = hex::decode(decryption_input.encrypted_record)?;
-        let encrypted_record = EncryptedRecord::<Components>::read_le(&encrypted_record_bytes[..])?;
+        let encrypted_record = EncryptedRecord::<Testnet1Parameters>::read_le(&encrypted_record_bytes[..])?;
 
         // Read the view key
-        let view_key = ViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
+        let view_key = ViewKey::<Testnet1Parameters>::from_str(&decryption_input.account_view_key)?;
 
         // Decrypt the record ciphertext
-        let record = encrypted_record.decrypt(&self.dpc()?.system_parameters, &view_key)?;
+        let record = encrypted_record.decrypt(&view_key)?;
         let record_bytes = to_bytes_le![record]?;
 
         Ok(hex::encode(record_bytes))
@@ -627,7 +595,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     /// Returns information about a record from serialized record bytes.
     fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
         let record_bytes = hex::decode(record_bytes)?;
-        let record = Record::<Components>::read_le(&record_bytes[..])?;
+        let record = Record::<Testnet1Parameters>::read_le(&record_bytes[..])?;
 
         let owner = record.owner().to_string();
         let payload = RPCRecordPayload {

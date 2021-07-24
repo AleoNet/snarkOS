@@ -17,7 +17,7 @@
 mod consensus_sidechain {
     use snarkos_storage::validator::FixMode;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
+    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, Block};
     use snarkvm_utilities::bytes::FromBytes;
 
     use rand::{seq::IteratorRandom, thread_rng, Rng};

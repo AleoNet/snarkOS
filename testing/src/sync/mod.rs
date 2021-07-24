@@ -17,8 +17,8 @@
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{testnet1::instantiated::Components, DPCComponents, Network, TransactionError, TransactionScheme};
-use snarkvm_parameters::{global::InnerCircuitIDCRH, testnet1::InnerSNARKVKParameters, Parameter};
+use snarkvm_dpc::{testnet1::parameters::Testnet1Parameters, Network, Parameters, TransactionError, TransactionScheme};
+use snarkvm_parameters::{testnet1::InnerSNARKVKParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
@@ -35,16 +35,9 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerCircuitIDCRH as CRH>::Parameters = FromBytes::read_le(InnerCircuitIDCRH::load_bytes().unwrap().as_slice()).unwrap();
-
-    let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerCircuitIDCRH =
-        From::from(inner_snark_verification_key_crh_parameters);
-
-    let inner_snark_id = to_bytes_le![
-        inner_snark_verification_key_crh
-            .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
-            .unwrap()
-    ]
+    let inner_snark_id = to_bytes_le![<Testnet1Parameters as Parameters>::inner_circuit_id_crh()
+        .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
+        .unwrap()]
     .unwrap();
 
     ConsensusParameters {
@@ -65,9 +58,7 @@ impl TransactionScheme for TestTestnet1Transaction {
     type Digest = [u8; 32];
     type EncryptedRecord = [u8; 32];
     type InnerCircuitID = [u8; 32];
-    type LocalDataRoot = [u8; 32];
-    type Memorandum = [u8; 32];
-    type ProgramCommitment = [u8; 32];
+    type Memorandum = [u8; 64];
     type SerialNumber = [u8; 32];
     type Signature = [u8; 32];
     type ValueBalance = i64;
@@ -96,20 +87,12 @@ impl TransactionScheme for TestTestnet1Transaction {
         &[[0u8; 32]; 2]
     }
 
-    fn program_commitment(&self) -> &Self::ProgramCommitment {
-        &[0u8; 32]
-    }
-
-    fn local_data_root(&self) -> &Self::LocalDataRoot {
-        &[0u8; 32]
-    }
-
     fn value_balance(&self) -> i64 {
         0
     }
 
     fn memorandum(&self) -> &Self::Memorandum {
-        &[0u8; 32]
+        &[0u8; 64]
     }
 
     fn signatures(&self) -> &[Self::Signature] {

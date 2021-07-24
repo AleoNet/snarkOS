@@ -15,17 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    dpc::{generate_test_accounts, setup_or_load_parameters},
+    dpc::{generate_test_accounts, setup_or_load_dpc},
     storage::*,
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_parameters::GenesisBlock;
 use snarkos_storage::LedgerStorage;
 use snarkvm_dpc::{
-    testnet1::{instantiated::*, NoopProgram},
-    Account,
-    Block,
-    Storage,
+    testnet1::{parameters::*, NoopProgram},
+    Account, Block, Storage,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
@@ -41,17 +39,16 @@ pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
 // helper for setting up e2e tests
 pub struct Fixture<S: Storage> {
     pub dpc: Arc<Testnet1DPC>,
-    pub test_accounts: [Account<Components>; 3],
-    pub ledger_parameters: Arc<CommitmentMerkleParameters>,
+    pub test_accounts: [Account<Testnet1Parameters>; 3],
     pub genesis_block: Block<Testnet1Transaction>,
-    pub program: NoopProgram<Components>,
+    pub program: NoopProgram<Testnet1Parameters>,
     pub rng: ChaChaRng,
     _storage: PhantomData<S>,
 }
 
 impl<S: Storage> Fixture<S> {
     pub fn ledger(&self) -> MerkleTreeLedger<S> {
-        initialize_test_blockchain(self.ledger_parameters.clone(), self.genesis_block.clone())
+        initialize_test_blockchain(self.genesis_block.clone())
     }
 }
 
@@ -59,10 +56,10 @@ fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
     let mut rng = ChaChaRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, dpc) = setup_or_load_parameters::<_, S>(verify_only, &mut rng);
+    let dpc = setup_or_load_dpc(verify_only, &mut rng);
 
     // Generate addresses
-    let test_accounts = generate_test_accounts::<_, S>(&dpc, &mut rng);
+    let test_accounts = generate_test_accounts(&mut rng);
 
     let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
 
@@ -73,7 +70,6 @@ fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
     Fixture {
         dpc,
         test_accounts,
-        ledger_parameters,
         genesis_block,
         program,
         rng,

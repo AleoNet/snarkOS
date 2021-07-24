@@ -15,11 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_parameters::GenesisBlock;
-use snarkvm_dpc::{
-    testnet1::{instantiated::*, record::Record as DPCRecord},
-    Block,
-    BlockHeader,
-};
+use snarkvm_dpc::{record::Record as DPCRecord, testnet1::parameters::*, Block, BlockHeader};
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -71,8 +67,8 @@ pub fn genesis() -> Block<Testnet1Transaction> {
 pub struct TestData {
     pub block_1: Block<Testnet1Transaction>,
     pub block_2: Block<Testnet1Transaction>,
-    pub records_1: Vec<DPCRecord<Components>>,
-    pub records_2: Vec<DPCRecord<Components>>,
+    pub records_1: Vec<DPCRecord<Testnet1Parameters>>,
+    pub records_2: Vec<DPCRecord<Testnet1Parameters>>,
     pub alternative_block_1_header: BlockHeader,
     pub alternative_block_2_header: BlockHeader,
 }

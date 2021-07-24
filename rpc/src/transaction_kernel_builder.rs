@@ -17,42 +17,33 @@
 use crate::empty_ledger::EmptyLedger;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{CommitmentMerkleParameters, Components, Testnet1DPC, Testnet1Transaction},
-        Payload,
-        Record,
-        TransactionKernel as TransactionKernelNative,
-    },
-    Address,
-    DPCComponents,
-    DPCScheme,
-    PrivateKey,
-    RecordScheme,
-    *,
+    testnet1::parameters::{Testnet1DPC, Testnet1Parameters, Testnet1Transaction},
+    Address, DPCScheme, Parameters, Payload, PrivateKey, Record, RecordScheme,
+    TransactionKernel as TransactionKernelNative, *,
 };
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
 
-pub type MerkleTreeLedger = EmptyLedger<Testnet1Transaction, CommitmentMerkleParameters>;
+pub type MerkleTreeLedger = EmptyLedger<Testnet1Parameters, Testnet1Transaction>;
 
 #[derive(Clone, Debug)]
 pub struct TransactionInput {
-    pub(crate) private_key: PrivateKey<Components>,
-    pub(crate) record: Record<Components>,
+    pub(crate) private_key: PrivateKey<Testnet1Parameters>,
+    pub(crate) record: Record<Testnet1Parameters>,
 }
 
 #[derive(Clone, Debug)]
 pub struct TransactionOutput {
-    pub(crate) recipient: Address<Components>,
+    pub(crate) recipient: Address<Testnet1Parameters>,
     pub(crate) amount: u64,
     // TODO (raychu86): Add support for payloads and birth/death program ids.
     // pub(crate) payload: Option<Vec<u8>>,
 }
 
 pub struct TransactionKernel {
-    pub(crate) transaction_kernel: TransactionKernelNative<Components>,
+    pub(crate) transaction_kernel: TransactionKernelNative<Testnet1Parameters>,
 }
 
 // TODO (raychu86) Look into genericizing this model into `dpc`.
@@ -86,12 +77,16 @@ impl TransactionKernelBuilder {
     /// Returns a new transaction builder with the added transaction input.
     /// Otherwise, returns a `DPCError`.
     ///
-    pub fn add_input(self, private_key: PrivateKey<Components>, record: Record<Components>) -> Result<Self, DPCError> {
-        // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
-        if self.inputs.len() > Components::NUM_INPUT_RECORDS {
+    pub fn add_input(
+        self,
+        private_key: PrivateKey<Testnet1Parameters>,
+        record: Record<Testnet1Parameters>,
+    ) -> Result<Self, DPCError> {
+        // Check that the transaction is limited to `Testnet1Parameters::NUM_INPUT_RECORDS` inputs.
+        if self.inputs.len() > Testnet1Parameters::NUM_INPUT_RECORDS {
             return Err(DPCError::InvalidNumberOfInputs(
                 self.inputs.len() + 1,
-                Components::NUM_INPUT_RECORDS,
+                Testnet1Parameters::NUM_INPUT_RECORDS,
             ));
         }
 
@@ -109,12 +104,12 @@ impl TransactionKernelBuilder {
     /// Returns a new transaction builder with the added transaction output.
     /// Otherwise, returns a `DPCError`.
     ///
-    pub fn add_output(self, recipient: Address<Components>, amount: u64) -> Result<Self, DPCError> {
-        // Check that the transaction is limited to `Components::NUM_OUTPUT_RECORDS` outputs.
-        if self.outputs.len() > Components::NUM_OUTPUT_RECORDS {
+    pub fn add_output(self, recipient: Address<Testnet1Parameters>, amount: u64) -> Result<Self, DPCError> {
+        // Check that the transaction is limited to `Testnet1Parameters::NUM_OUTPUT_RECORDS` outputs.
+        if self.outputs.len() > Testnet1Parameters::NUM_OUTPUT_RECORDS {
             return Err(DPCError::InvalidNumberOfOutputs(
                 self.outputs.len() + 1,
-                Components::NUM_OUTPUT_RECORDS,
+                Testnet1Parameters::NUM_OUTPUT_RECORDS,
             ));
         }
 
@@ -155,25 +150,25 @@ impl TransactionKernelBuilder {
     /// Otherwise, returns `DPCError`.
     ///
     pub fn build<R: Rng + CryptoRng>(&self, rng: &mut R) -> Result<TransactionKernel, DPCError> {
-        // Check that the transaction is limited to `Components::NUM_INPUT_RECORDS` inputs.
+        // Check that the transaction is limited to `Testnet1Parameters::NUM_INPUT_RECORDS` inputs.
         match self.inputs.len() {
             1 | 2 => {}
             num_inputs => {
                 return Err(DPCError::InvalidNumberOfInputs(
                     num_inputs,
-                    Components::NUM_INPUT_RECORDS,
+                    Testnet1Parameters::NUM_INPUT_RECORDS,
                 ));
             }
         }
 
-        // Check that the transaction has at least one output and is limited to `Components::NUM_OUTPUT_RECORDS` outputs.
+        // Check that the transaction has at least one output and is limited to `Testnet1Parameters::NUM_OUTPUT_RECORDS` outputs.
         match self.outputs.len() {
             0 => return Err(DPCError::Message("Transaction kernel is missing outputs".to_string())),
             1 | 2 => {}
             num_inputs => {
                 return Err(DPCError::InvalidNumberOfInputs(
                     num_inputs,
-                    Components::NUM_INPUT_RECORDS,
+                    Testnet1Parameters::NUM_INPUT_RECORDS,
                 ));
             }
         }
@@ -211,14 +206,14 @@ impl TransactionKernelBuilder {
 impl TransactionKernel {
     /// Returns an offline transaction kernel
     pub(crate) fn new<R: Rng + CryptoRng>(
-        spenders: Vec<PrivateKey<Components>>,
-        records_to_spend: Vec<Record<Components>>,
-        recipients: Vec<Address<Components>>,
+        spenders: Vec<PrivateKey<Testnet1Parameters>>,
+        records_to_spend: Vec<Record<Testnet1Parameters>>,
+        recipients: Vec<Address<Testnet1Parameters>>,
         recipient_amounts: Vec<u64>,
         _network_id: u8, // TODO (howardwu): Keep this around to use for network modularization.
         rng: &mut R,
     ) -> Result<Self, DPCError> {
-        let dpc = <Testnet1DPC as DPCScheme<MerkleTreeLedger>>::load(false).unwrap();
+        let dpc = <Testnet1DPC as DPCScheme<Testnet1Parameters>>::load(false).unwrap();
 
         assert!(!spenders.is_empty());
         assert_eq!(spenders.len(), records_to_spend.len());
@@ -237,20 +232,14 @@ impl TransactionKernel {
             old_private_keys.push(private_key);
         }
 
-        while old_records.len() < Components::NUM_INPUT_RECORDS {
+        while old_records.len() < Testnet1Parameters::NUM_INPUT_RECORDS {
             let sn_randomness: [u8; 32] = rng.gen();
-            let old_sn_nonce = dpc.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
+            let old_sn_nonce = Testnet1Parameters::serial_number_nonce_crh().hash(&sn_randomness)?;
 
             let private_key = old_private_keys[0].clone();
-            let address = Address::<Components>::from_private_key(
-                &dpc.system_parameters.account_signature,
-                &dpc.system_parameters.account_commitment,
-                &dpc.system_parameters.account_encryption,
-                &private_key,
-            )?;
+            let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
-            let dummy_record = Record::<Components>::new(
-                &dpc.system_parameters.record_commitment,
+            let dummy_record = Record::<Testnet1Parameters>::new(
                 address,
                 true, // The input record is dummy
                 0,
@@ -265,22 +254,17 @@ impl TransactionKernel {
             old_private_keys.push(private_key);
         }
 
-        assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
+        assert_eq!(old_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
 
         // Enforce that the old record addresses correspond with the private keys
         for (private_key, record) in old_private_keys.iter().zip(&old_records) {
-            let address = Address::<Components>::from_private_key(
-                &dpc.system_parameters.account_signature,
-                &dpc.system_parameters.account_commitment,
-                &dpc.system_parameters.account_encryption,
-                private_key,
-            )?;
+            let address = Address::<Testnet1Parameters>::from_private_key(private_key)?;
 
             assert_eq!(&address, record.owner());
         }
 
-        assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
-        assert_eq!(old_private_keys.len(), Components::NUM_INPUT_RECORDS);
+        assert_eq!(old_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
+        assert_eq!(old_private_keys.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
         let mut new_record_owners = vec![];
@@ -293,19 +277,19 @@ impl TransactionKernel {
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_record_owners.len() < Components::NUM_OUTPUT_RECORDS {
+        while new_record_owners.len() < Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_record_owners.push(new_record_owners[0].clone());
             new_is_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_record_owners.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_is_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_record_owners.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_is_dummy_flags.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_values.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
-        let new_birth_program_ids = vec![dpc.noop_program.id(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![dpc.noop_program.id(); Components::NUM_OUTPUT_RECORDS];
-        let new_payloads: Vec<Payload> = vec![Default::default(); Components::NUM_OUTPUT_RECORDS];
+        let new_birth_program_ids = vec![dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
+        let new_payloads: Vec<Payload> = vec![Default::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
         // Generate a random memo
         let memo = rng.gen();
@@ -313,17 +297,14 @@ impl TransactionKernel {
         // Generate transaction
 
         let mut joint_serial_numbers = vec![];
-        for i in 0..Components::NUM_INPUT_RECORDS {
-            let (sn, _) =
-                old_records[i].to_serial_number(&dpc.system_parameters.account_signature, &old_private_keys[i])?;
+        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
+            let (sn, _) = old_records[i].to_serial_number(&old_private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
         let mut new_records = vec![];
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
+        for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_records.push(Record::new_full(
-                &dpc.system_parameters.serial_number_nonce,
-                &dpc.system_parameters.record_commitment,
                 new_record_owners[j].clone(),
                 new_is_dummy_flags[j],
                 new_values[j],
@@ -337,14 +318,8 @@ impl TransactionKernel {
         }
 
         // Offline execution to generate a DPC transaction
-        let transaction_kernel = <Testnet1DPC as DPCScheme<MerkleTreeLedger>>::execute_offline_phase::<R>(
-            &dpc,
-            &old_private_keys,
-            old_records,
-            new_records,
-            memo,
-            rng,
-        )?;
+        let transaction_kernel =
+            dpc.execute_offline_phase::<R>(&old_private_keys, old_records, new_records, memo, rng)?;
 
         Ok(Self { transaction_kernel })
     }
@@ -363,7 +338,7 @@ impl FromStr for TransactionKernel {
 
     fn from_str(transaction_kernel: &str) -> Result<Self, Self::Err> {
         Ok(Self {
-            transaction_kernel: TransactionKernelNative::<Components>::from_str(transaction_kernel)?,
+            transaction_kernel: TransactionKernelNative::<Testnet1Parameters>::from_str(transaction_kernel)?,
         })
     }
 }

@@ -15,15 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{errors::StorageError, BlockHeaderHash, LedgerScheme, Storage, TransactionScheme};
+use snarkvm_dpc::{errors::StorageError, BlockHeaderHash, LedgerScheme, Parameters, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    has_duplicates,
-    to_bytes_le,
+    has_duplicates, to_bytes_le,
 };
 
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// Returns a transaction location given the transaction ID if it exists. Returns `None` otherwise.
     pub fn get_transaction_location(&self, transaction_id: &[u8]) -> Result<Option<TransactionLocation>, StorageError> {
         match self.storage.get(COL_TRANSACTION_LOCATION, transaction_id)? {
@@ -59,7 +57,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     pub fn transaction_conflicts(&self, transaction: &T) -> bool {
         let transaction_serial_numbers = transaction.old_serial_numbers();
         let transaction_commitments = transaction.new_commitments();
-        let transaction_memo = transaction.memorandum();
 
         // Check if the transactions in the block have duplicate serial numbers
         if has_duplicates(transaction_serial_numbers) {
@@ -71,21 +68,18 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             return true;
         }
 
-        // Check if the transaction memo previously existed in the ledger
-        if self.contains_memo(transaction_memo) {
-            return true;
-        }
-
         // Check if each transaction serial number previously existed in the ledger
         for sn in transaction_serial_numbers {
-            if self.contains_sn(sn) {
+            // TODO (howardwu): Remove the use of ToBytes to FromBytes.
+            if self.contains_serial_number(&FromBytes::read_le(&*sn.to_bytes_le().unwrap()).unwrap()) {
                 return true;
             }
         }
 
         // Check if each transaction commitment previously existed in the ledger
         for cm in transaction_commitments {
-            if self.contains_cm(cm) {
+            // TODO (howardwu): Remove the use of ToBytes to FromBytes.
+            if self.contains_commitment(&FromBytes::read_le(&*cm.to_bytes_le().unwrap()).unwrap()) {
                 return true;
             }
         }

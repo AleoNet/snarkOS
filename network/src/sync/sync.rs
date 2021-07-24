@@ -18,7 +18,7 @@ use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::BlockHeight;
 use snarkvm_dpc::{
-    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
+    testnet1::parameters::{Testnet1DPC, Testnet1Transaction},
     Storage,
 };
 

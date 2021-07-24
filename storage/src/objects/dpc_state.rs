@@ -15,8 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Storage, TransactionScheme};
+use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Parameters, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
@@ -24,7 +23,7 @@ use snarkvm_utilities::{
 
 use std::{collections::HashSet, sync::Arc};
 
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {

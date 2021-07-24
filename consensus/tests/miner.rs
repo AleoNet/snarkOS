@@ -18,11 +18,9 @@ mod miner {
     use snarkos_consensus::Miner;
     use snarkos_testing::sync::*;
     use snarkvm_algorithms::traits::{
-        commitment::CommitmentScheme,
-        encryption::EncryptionScheme,
-        signature::SignatureScheme,
+        commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme,
     };
-    use snarkvm_dpc::{block::Transactions, Address, BlockHeader, DPCComponents, PrivateKey};
+    use snarkvm_dpc::{block::Transactions, Address, BlockHeader, Parameters, PrivateKey};
     use snarkvm_posw::txids_to_roots;
 
     use rand::{CryptoRng, Rng, SeedableRng};
@@ -30,13 +28,9 @@ mod miner {
 
     use std::sync::Arc;
 
-    fn keygen<C: DPCComponents, R: Rng + CryptoRng>(rng: &mut R) -> (PrivateKey<C>, Address<C>) {
-        let sig_params = C::AccountSignature::setup(rng).unwrap();
-        let comm_params = C::AccountCommitment::setup(rng);
-        let enc_params = <C::AccountEncryption as EncryptionScheme>::setup(rng);
-
-        let private_key = PrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
-        let address = Address::from_private_key(&sig_params, &comm_params, &enc_params, &private_key).unwrap();
+    fn keygen<C: Parameters, R: Rng + CryptoRng>(rng: &mut R) -> (PrivateKey<C>, Address<C>) {
+        let private_key = PrivateKey::<C>::new(rng).unwrap();
+        let address = Address::from_private_key(&private_key).unwrap();
 
         (private_key, address)
     }

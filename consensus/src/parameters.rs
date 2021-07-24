@@ -14,20 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{difficulty::bitcoin_retarget, error::ConsensusError, MerkleTreeLedger};
+use crate::{difficulty::bitcoin_retarget, error::ConsensusError};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkvm_algorithms::SNARK;
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::{
-    testnet1::instantiated::*,
-    BlockHeader,
-    DPCComponents,
-    DPCScheme,
-    MerkleRootHash,
-    Network,
-    PedersenMerkleRootHash,
-    ProgramScheme,
-    Storage,
+    testnet1::parameters::*, BlockHeader, DPCScheme, MerkleRootHash, Network, Parameters, PedersenMerkleRootHash,
+    ProgramScheme, Storage,
 };
 use snarkvm_posw::{Marlin, PoswMarlin};
 use snarkvm_utilities::FromBytes;
@@ -126,13 +119,13 @@ impl ConsensusParameters {
     #[allow(clippy::type_complexity)]
     pub fn generate_program_proofs<R: Rng + CryptoRng, S: Storage>(
         dpc: &Testnet1DPC,
-        transaction_kernel: &<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
+        transaction_kernel: &<Testnet1DPC as DPCScheme<Testnet1Parameters>>::TransactionKernel,
         rng: &mut R,
-    ) -> Result<Vec<<Testnet1DPC as DPCScheme<MerkleTreeLedger<S>>>::Execution>, ConsensusError> {
+    ) -> Result<Vec<<Testnet1DPC as DPCScheme<Testnet1Parameters>>::Execution>, ConsensusError> {
         let local_data = transaction_kernel.into_local_data();
 
-        let mut program_proofs = Vec::with_capacity(Components::NUM_TOTAL_RECORDS);
-        for position in 0..Components::NUM_TOTAL_RECORDS {
+        let mut program_proofs = Vec::with_capacity(Testnet1Parameters::NUM_TOTAL_RECORDS);
+        for position in 0..Testnet1Parameters::NUM_TOTAL_RECORDS {
             program_proofs.push(dpc.noop_program.execute(&local_data, position as u8, rng)?);
         }
 

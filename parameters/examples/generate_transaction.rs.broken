@@ -49,10 +49,10 @@ use std::{
 };
 
 /// Generate a blank ledger to facilitate generation of the genesis block
-fn empty_ledger<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage>(
+fn empty_ledger<C: Parameters, T: TransactionScheme, S: Storage>(
     parameters: Arc<P>,
     path: &Path,
-) -> Result<Ledger<T, P, S>, LedgerError> {
+) -> Result<Ledger<C, T, S>, LedgerError> {
     fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
     let storage = S::open(Some(path), None)
         .map(|storage| storage)

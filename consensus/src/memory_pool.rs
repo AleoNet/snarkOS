@@ -23,12 +23,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::error::ConsensusError;
 use mpmc_map::MpmcMap;
 use snarkos_storage::Ledger;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{BlockHeader, LedgerScheme, Storage, TransactionScheme, Transactions};
+use snarkvm_dpc::{BlockHeader, LedgerScheme, Parameters, Storage, TransactionScheme, Transactions};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    has_duplicates,
-    to_bytes_le,
+    has_duplicates, to_bytes_le,
 };
 
 /// Stores a transaction and it's size in the memory pool.
@@ -68,9 +66,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     }
 
     /// Load the memory pool from previously stored state in storage
-    pub async fn from_storage<P: LoadableMerkleParameters, S: Storage>(
-        storage: &Ledger<T, P, S>,
-    ) -> Result<Self, ConsensusError> {
+    pub async fn from_storage<C: Parameters, S: Storage>(storage: &Ledger<C, T, S>) -> Result<Self, ConsensusError> {
         let memory_pool = Self::new();
 
         if let Ok(Some(serialized_transactions)) = storage.get_memory_pool() {
@@ -91,10 +87,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
 
     /// Store the memory pool state to the database
     #[inline]
-    pub fn store<P: LoadableMerkleParameters, S: Storage>(
-        &self,
-        storage: &Ledger<T, P, S>,
-    ) -> Result<(), ConsensusError> {
+    pub fn store<C: Parameters, S: Storage>(&self, storage: &Ledger<C, T, S>) -> Result<(), ConsensusError> {
         let mut transactions = Transactions::<T>::new();
 
         for (_transaction_id, entry) in self.transactions.inner().iter() {
@@ -109,14 +102,13 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     }
 
     /// Adds entry to memory pool if valid in the current ledger.
-    pub async fn insert<P: LoadableMerkleParameters, S: Storage>(
+    pub async fn insert<C: Parameters, S: Storage>(
         &self,
-        storage: &Ledger<T, P, S>,
+        storage: &Ledger<C, T, S>,
         entry: Entry<T>,
     ) -> Result<Option<Vec<u8>>, ConsensusError> {
         let transaction_serial_numbers = entry.transaction.old_serial_numbers();
         let transaction_commitments = entry.transaction.new_commitments();
-        let transaction_memo = entry.transaction.memorandum();
 
         if has_duplicates(transaction_serial_numbers)
             || has_duplicates(transaction_commitments)
@@ -127,29 +119,31 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
 
         let mut holding_serial_numbers = vec![];
         let mut holding_commitments = vec![];
-        let mut holding_memos = Vec::with_capacity(self.transactions.inner().len());
 
         let txns = self.transactions.inner();
         for (_, tx) in txns.iter() {
             holding_serial_numbers.extend(tx.transaction.old_serial_numbers());
             holding_commitments.extend(tx.transaction.new_commitments());
-            holding_memos.push(tx.transaction.memorandum());
         }
 
+        // Check if each transaction serial number previously existed in the ledger
         for sn in transaction_serial_numbers {
-            if storage.contains_sn(sn) || holding_serial_numbers.contains(&sn) {
+            // TODO (howardwu): Remove the use of ToBytes to FromBytes.
+            if holding_serial_numbers.contains(&sn)
+                || storage.contains_serial_number(&FromBytes::read_le(&*sn.to_bytes_le().unwrap()).unwrap())
+            {
                 return Ok(None);
             }
         }
 
+        // Check if each transaction commitment previously existed in the ledger
         for cm in transaction_commitments {
-            if storage.contains_cm(cm) || holding_commitments.contains(&cm) {
+            // TODO (howardwu): Remove the use of ToBytes to FromBytes.
+            if holding_commitments.contains(&cm)
+                || storage.contains_commitment(&FromBytes::read_le(&*cm.to_bytes_le().unwrap()).unwrap())
+            {
                 return Ok(None);
             }
-        }
-
-        if storage.contains_memo(transaction_memo) || holding_memos.contains(&transaction_memo) {
-            return Ok(None);
         }
 
         let transaction_id = entry.transaction.transaction_id()?.to_vec();
@@ -163,10 +157,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
 
     /// Cleanse the memory pool of outdated transactions.
     #[inline]
-    pub async fn cleanse<P: LoadableMerkleParameters, S: Storage>(
-        &self,
-        storage: &Ledger<T, P, S>,
-    ) -> Result<(), ConsensusError> {
+    pub async fn cleanse<C: Parameters, S: Storage>(&self, storage: &Ledger<C, T, S>) -> Result<(), ConsensusError> {
         let new_memory_pool = Self::new();
 
         for (_, entry) in self.clone().transactions.inner().iter() {
@@ -225,9 +216,9 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     }
 
     /// Get candidate transactions for a new block.
-    pub fn get_candidates<P: LoadableMerkleParameters, S: Storage>(
+    pub fn get_candidates<C: Parameters, S: Storage>(
         &self,
-        storage: &Ledger<T, P, S>,
+        storage: &Ledger<C, T, S>,
         max_size: usize,
     ) -> Result<Transactions<T>, ConsensusError> {
         let max_size = max_size - (BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE);
@@ -264,7 +255,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
+    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, Block};
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 
@@ -277,10 +268,13 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction: transaction.clone(),
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction: transaction.clone(),
+                },
+            )
             .await
             .unwrap();
 
@@ -290,10 +284,13 @@ mod tests {
         // Duplicate pushes don't do anything
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -334,10 +331,13 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction: transaction.clone(),
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction: transaction.clone(),
+                },
+            )
             .await
             .unwrap();
 
@@ -364,10 +364,13 @@ mod tests {
 
         let expected_transaction = transaction.clone();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -385,10 +388,13 @@ mod tests {
         let mem_pool = MemoryPool::new();
         let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: TRANSACTION_2.len(),
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: TRANSACTION_2.len(),
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -411,10 +417,13 @@ mod tests {
         let mem_pool = MemoryPool::new();
         let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: TRANSACTION_2.len(),
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: TRANSACTION_2.len(),
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 

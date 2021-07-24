@@ -15,8 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{bytes_to_u32, Ledger, COL_BLOCK_LOCATOR};
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{BlockHeaderHash, Storage, TransactionScheme};
+use snarkvm_dpc::{BlockHeaderHash, Parameters, Storage, TransactionScheme};
 use snarkvm_utilities::ToBytes;
 
 use parking_lot::Mutex;
@@ -78,7 +77,7 @@ impl PartialOrd for BlockLocatorPair {
     }
 }
 
-impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage + Sync> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledger<C, T, S> {
     /// Serializes the node's stored canon blocks into a single file written to `location`; `limit` specifies the limit
     /// on the number of blocks to export, with `0` being no limit (a full export). Returns the number of exported
     /// blocks.

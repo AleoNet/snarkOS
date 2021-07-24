@@ -17,14 +17,8 @@
 use snarkos_parameters::transaction_1::Transaction1;
 
 use snarkvm_dpc::{
-    testnet1::{instantiated::Components, Testnet1Components, Transaction},
-    BlockHeader,
-    BlockHeaderHash,
-    MerkleRootHash,
-    PedersenMerkleRootHash,
-    ProofOfSuccinctWork,
-    TransactionError,
-    Transactions,
+    testnet1::parameters::Testnet1Parameters, BlockHeader, BlockHeaderHash, MerkleRootHash, Parameters,
+    PedersenMerkleRootHash, ProofOfSuccinctWork, Transaction, TransactionError, Transactions,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
@@ -36,7 +30,7 @@ use std::{
     path::PathBuf,
 };
 
-pub fn generate<C: Testnet1Components>() -> Result<Vec<u8>, TransactionError> {
+pub fn generate<C: Parameters>() -> Result<Vec<u8>, TransactionError> {
     // Add transactions to block
     let mut transactions = Transactions::new();
 
@@ -64,7 +58,7 @@ pub fn store(path: &PathBuf, bytes: &[u8]) -> IoResult<()> {
 }
 
 fn main() {
-    let bytes = generate::<Components>().unwrap();
+    let bytes = generate::<Testnet1Parameters>().unwrap();
     let filename = PathBuf::from("block_header.genesis");
     store(&filename, &bytes).unwrap();
 }

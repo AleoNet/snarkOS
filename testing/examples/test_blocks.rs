@@ -20,18 +20,8 @@ extern crate tracing;
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    block::Transactions,
-    testnet1::{
-        instantiated::*,
-        record::{payload::Payload as RecordPayload, Record},
-    },
-    Account,
-    Address,
-    Block,
-    DPCComponents,
-    ProgramScheme,
-    RecordScheme,
-    Storage,
+    block::Transactions, testnet1::parameters::*, Account, Address, Block, Parameters, Payload as RecordPayload,
+    ProgramScheme, Record, RecordScheme, Storage,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -41,7 +31,7 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 async fn mine_block<S: Storage>(
     miner: &Miner<S>,
     txs: Vec<Testnet1Transaction>,
-) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
+) -> Result<(Block<Testnet1Transaction>, Vec<Record<Testnet1Parameters>>), ConsensusError> {
     info!("Mining block!");
 
     let transactions = Transactions(txs);
@@ -68,13 +58,13 @@ async fn mine_block<S: Storage>(
 #[allow(clippy::too_many_arguments)]
 fn send<R: Rng + CryptoRng, S: Storage>(
     consensus: &Consensus<S>,
-    from: &Account<Components>,
-    inputs: Vec<Record<Components>>,
-    receiver: &Address<Components>,
+    from: &Account<Testnet1Parameters>,
+    inputs: Vec<Record<Testnet1Parameters>>,
+    receiver: &Address<Testnet1Parameters>,
     amount: u64,
     rng: &mut R,
     memo: [u8; 32],
-) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
+) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
     let mut sum = 0;
     for inp in &inputs {
         sum += inp.value();
@@ -82,15 +72,15 @@ fn send<R: Rng + CryptoRng, S: Storage>(
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
 
-    let input_programs = vec![FIXTURE.program.id(); Components::NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.id(); Components::NUM_OUTPUT_RECORDS];
+    let input_programs = vec![FIXTURE.program.id(); Testnet1Parameters::NUM_INPUT_RECORDS];
+    let output_programs = vec![FIXTURE.program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
-    let output = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
-    let dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
+    let output = vec![RecordPayload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
+    let dummy_flags = vec![false; Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
-    let from = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS];
+    let from = vec![from.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
     consensus.create_transaction(
         inputs,
         from,
@@ -127,7 +117,7 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
         txs.clear();
         let mut memo = [0u8; 32];
         memo[0] = i as u8;
-        // make a tx which spends 10 to the Testnet1Components receiver
+        // make a tx which spends 10 to the Testnet1Parameters receiver
         let (_records, tx) = send(
             &consensus,
             &miner_acc,

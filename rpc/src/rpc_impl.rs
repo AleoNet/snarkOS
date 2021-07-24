@@ -23,15 +23,12 @@ use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameter
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkvm_dpc::{
-    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
-    BlockHeaderHash,
-    Storage,
-    TransactionScheme,
+    testnet1::parameters::{Testnet1DPC, Testnet1Transaction},
+    BlockHeaderHash, Storage, TransactionScheme,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes_le,
-    CanonicalSerialize,
+    to_bytes_le, CanonicalSerialize,
 };
 
 use chrono::Utc;
@@ -243,8 +240,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             network_id: transaction.network.id(),
             digest: hex::encode(to_bytes_le![transaction.ledger_digest]?),
             transaction_proof: hex::encode(to_bytes_le![transaction.transaction_proof]?),
-            program_commitment: hex::encode(to_bytes_le![transaction.program_commitment]?),
-            local_data_root: hex::encode(to_bytes_le![transaction.local_data_root]?),
             value_balance: transaction.value_balance.0,
             signatures,
             encrypted_records,

@@ -15,23 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{
-    Block,
-    BlockError,
-    BlockHeader,
-    BlockHeaderHash,
-    DatabaseTransaction,
-    Op,
-    Storage,
-    StorageError,
+    Block, BlockError, BlockHeader, BlockHeaderHash, DatabaseTransaction, Op, Parameters, Storage, StorageError,
     TransactionScheme,
 };
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes_le};
 
 use std::sync::atomic::Ordering;
 
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// Commit a transaction to the canon chain
     #[allow(clippy::type_complexity)]
     pub(crate) fn commit_transaction(

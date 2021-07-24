@@ -225,12 +225,6 @@ pub struct TransactionInfo {
     /// Transaction (outer snark) proof
     pub transaction_proof: String,
 
-    /// Program verification key commitment
-    pub program_commitment: String,
-
-    /// Local data root
-    pub local_data_root: String,
-
     /// Transaction value balance
     pub value_balance: i64,
 

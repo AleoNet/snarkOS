@@ -15,17 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    Ledger,
-    TransactionLocation,
-    COL_BLOCK_TRANSACTIONS,
-    COL_COMMITMENT,
-    COL_DIGEST,
-    COL_MEMO,
-    COL_SERIAL_NUMBER,
+    Ledger, TransactionLocation, COL_BLOCK_TRANSACTIONS, COL_COMMITMENT, COL_DIGEST, COL_MEMO, COL_SERIAL_NUMBER,
     COL_TRANSACTION_LOCATION,
 };
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, Op, Storage, TransactionScheme, Transactions};
+use snarkvm_dpc::{
+    Block, BlockHeaderHash, DatabaseTransaction, Op, Parameters, Storage, TransactionScheme, Transactions,
+};
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use rayon::prelude::*;
@@ -117,7 +112,7 @@ pub enum ValidatorAction {
     QueueDatabaseOp(Op),
 }
 
-impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage + Sync> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledger<C, T, S> {
     check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", COL_MEMO);
 
     check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", COL_DIGEST);

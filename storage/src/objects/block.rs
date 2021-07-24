@@ -15,23 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{
-    Block,
-    BlockError,
-    BlockHeaderHash,
-    DatabaseTransaction,
-    Op,
-    Storage,
-    StorageError,
-    TransactionScheme,
+    Block, BlockError, BlockHeaderHash, DatabaseTransaction, Op, Parameters, Storage, StorageError, TransactionScheme,
     Transactions,
 };
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;
 
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// Get the latest block in the chain.
     pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
         self.get_block_from_block_number(self.get_current_block_height())

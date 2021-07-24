@@ -16,17 +16,8 @@
 
 use crate::{error::ConsensusError, Consensus};
 use snarkvm_dpc::{
-    testnet1::{instantiated::*, Record},
-    Address,
-    Block,
-    BlockHeader,
-    DPCComponents,
-    DPCScheme,
-    ProgramScheme,
-    RecordScheme,
-    Storage,
-    TransactionScheme,
-    Transactions,
+    testnet1::parameters::*, Address, Block, BlockHeader, DPCScheme, Parameters, ProgramScheme, Record, RecordScheme,
+    Storage, TransactionScheme, Transactions,
 };
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
@@ -39,7 +30,7 @@ use std::sync::Arc;
 /// Uses a proof of work based algorithm to find valid blocks.
 pub struct Miner<S: Storage> {
     /// The coinbase address that mining rewards are assigned to.
-    address: Address<Components>,
+    address: Address<Testnet1Parameters>,
     /// The sync parameters for the network of this miner.
     pub consensus: Arc<Consensus<S>>,
     /// The mining instance that is initialized with a proving key.
@@ -48,7 +39,7 @@ pub struct Miner<S: Storage> {
 
 impl<S: Storage> Miner<S> {
     /// Creates a new instance of `Miner`.
-    pub fn new(address: Address<Components>, consensus: Arc<Consensus<S>>) -> Self {
+    pub fn new(address: Address<Testnet1Parameters>, consensus: Arc<Consensus<S>>) -> Self {
         Self {
             address,
             consensus,
@@ -71,7 +62,7 @@ impl<S: Storage> Miner<S> {
         &self,
         transactions: &mut Transactions<Testnet1Transaction>,
         rng: &mut R,
-    ) -> Result<Vec<Record<Components>>, ConsensusError> {
+    ) -> Result<Vec<Record<Testnet1Parameters>>, ConsensusError> {
         for transaction in transactions.iter() {
             if self.consensus.parameters.network_id != transaction.network {
                 return Err(ConsensusError::ConflictingNetworkId(
@@ -85,8 +76,8 @@ impl<S: Storage> Miner<S> {
             self.consensus.ledger.get_current_block_height() + 1,
             transactions,
             self.consensus.dpc.noop_program.id(),
-            vec![self.consensus.dpc.noop_program.id(); Components::NUM_OUTPUT_RECORDS],
-            vec![self.consensus.dpc.noop_program.id(); Components::NUM_OUTPUT_RECORDS],
+            vec![self.consensus.dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS],
+            vec![self.consensus.dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS],
             self.address.clone(),
             rng,
         )?;
@@ -100,7 +91,14 @@ impl<S: Storage> Miner<S> {
     pub fn establish_block(
         &self,
         transactions: &Transactions<Testnet1Transaction>,
-    ) -> Result<(BlockHeader, Transactions<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
+    ) -> Result<
+        (
+            BlockHeader,
+            Transactions<Testnet1Transaction>,
+            Vec<Record<Testnet1Parameters>>,
+        ),
+        ConsensusError,
+    > {
         let rng = &mut thread_rng();
         let mut transactions = transactions.clone();
         let coinbase_records = self.add_coinbase_transaction(&mut transactions, rng)?;
@@ -151,7 +149,9 @@ impl<S: Storage> Miner<S> {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(&self) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
+    pub async fn mine_block(
+        &self,
+    ) -> Result<(Block<Testnet1Transaction>, Vec<Record<Testnet1Parameters>>), ConsensusError> {
         let candidate_transactions = self.fetch_memory_pool_transactions()?;
 
         debug!("The miner is creating a block");

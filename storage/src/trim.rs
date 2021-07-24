@@ -15,15 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    Ledger,
-    COL_BLOCK_HEADER,
-    COL_BLOCK_LOCATOR,
-    COL_BLOCK_TRANSACTIONS,
-    COL_CHILD_HASHES,
-    COL_TRANSACTION_LOCATION,
+    Ledger, COL_BLOCK_HEADER, COL_BLOCK_LOCATOR, COL_BLOCK_TRANSACTIONS, COL_CHILD_HASHES, COL_TRANSACTION_LOCATION,
 };
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{BlockHeader, BlockHeaderHash, DatabaseTransaction, Op, Storage, StorageError, TransactionScheme};
+use snarkvm_dpc::{
+    BlockHeader, BlockHeaderHash, DatabaseTransaction, Op, Parameters, Storage, StorageError, TransactionScheme,
+};
 use snarkvm_utilities::FromBytes;
 
 use parking_lot::Mutex;
@@ -40,7 +36,7 @@ struct StorageTrimSummary {
     updated_parents: usize,
 }
 
-impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage + Sync> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledger<C, T, S> {
     /// Removes obsolete objects from the database; can be used for cleanup purposes, but it can also provide
     /// some insight into the features of the chain, e.g. the number of blocks and transactions that were
     /// ultimately not accepted into the canonical chain.

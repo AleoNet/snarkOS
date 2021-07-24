@@ -15,8 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, RecordScheme, Storage, TransactionScheme};
+use snarkvm_dpc::{
+    errors::StorageError, DatabaseTransaction, Op, Parameters, RecordScheme, Storage, TransactionScheme,
+};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
@@ -24,7 +25,7 @@ use snarkvm_utilities::{
 
 // TODO (howardwu): Remove this from `Ledger` as it is not used for ledger state.
 //  This is merely for local node / miner functionality.
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// Get all stored record commitments of the node
     pub fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut record_commitments = vec![];

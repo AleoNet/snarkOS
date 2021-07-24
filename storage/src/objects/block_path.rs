@@ -15,8 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{errors::StorageError, BlockError, BlockHeader, BlockHeaderHash, Storage, TransactionScheme};
+use snarkvm_dpc::{
+    errors::StorageError, BlockError, BlockHeader, BlockHeaderHash, Parameters, Storage, TransactionScheme,
+};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
 
@@ -42,7 +43,7 @@ pub struct SideChainPath {
     pub aggregate_difficulty: u128,
 }
 
-impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();

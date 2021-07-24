@@ -27,17 +27,13 @@ use crate::sync::TestTestnet1Transaction;
 pub use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_dpc::{
-    testnet1::instantiated::CommitmentMerkleParameters,
-    Block,
-    LedgerScheme,
-    Storage,
-    TransactionScheme,
+    testnet1::parameters::Testnet1Parameters, Block, LedgerScheme, Parameters, Storage, TransactionScheme,
 };
 
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
-pub type Store = Ledger<TestTestnet1Transaction, CommitmentMerkleParameters, LedgerStorage>;
+pub type Store = Ledger<Testnet1Parameters, TestTestnet1Transaction, LedgerStorage>;
 
 pub fn random_storage_path() -> String {
     let random_path: usize = thread_rng().gen();
@@ -45,12 +41,11 @@ pub fn random_storage_path() -> String {
 }
 
 // Initialize a test blockchain given genesis attributes
-pub fn initialize_test_blockchain<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage>(
-    parameters: Arc<P>,
+pub fn initialize_test_blockchain<C: Parameters, T: TransactionScheme, S: Storage>(
     genesis_block: Block<T>,
-) -> Ledger<T, P, S> {
+) -> Ledger<C, T, S> {
     let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
-    Ledger::<T, P, S>::new(Some(&path), parameters, genesis_block).unwrap()
+    Ledger::<C, T, S>::new(Some(&path), genesis_block).unwrap()
 }
