@@ -45,7 +45,7 @@ pub async fn connect_nodes(nodes: &mut Vec<Node<LedgerStorage>>, topology: Topol
         Topology::Line => line(nodes).await,
         Topology::Ring => ring(nodes).await,
         Topology::Mesh => mesh(nodes).await,
-        Topology::Star => star(nodes).await,
+        Topology::Star => star(nodes),
     }
 }
 
@@ -56,9 +56,7 @@ async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Start each node with the previous as a bootnode.
     for node in nodes {
         if let Some(addr) = prev_node {
-            let mut bootnodes = (&**node.config.bootnodes.load()).clone();
-            bootnodes.push(addr);
-            node.config.bootnodes.store(Arc::new(bootnodes));
+            node.connect_to_addresses(&[addr]).await;
         };
 
         // Assumes the node has an established address.
@@ -73,10 +71,7 @@ async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
 
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
-    let bootnodes = &nodes.last().unwrap().config.bootnodes;
-    let mut bootnodes_handle = (&**bootnodes.load()).clone();
-    bootnodes_handle.push(first_addr);
-    bootnodes.store(Arc::new(bootnodes_handle));
+    nodes.last().unwrap().connect_to_addresses(&[first_addr]).await;
 }
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
@@ -86,19 +81,19 @@ async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
 
     for node in nodes {
         use rand::seq::SliceRandom;
-        let random_addrs = local_addresses
+        let random_addrs: Vec<SocketAddr> = local_addresses
             .choose_multiple(
                 &mut rand::thread_rng(),
                 node.config.minimum_number_of_connected_peers().into(),
             )
             .copied()
             .collect();
-        node.config.bootnodes.store(Arc::new(random_addrs));
+        node.connect_to_addresses(&random_addrs).await;
     }
 }
 
 /// Connects the network nodes in a star topology.
-async fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
+fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().local_address().unwrap();
 

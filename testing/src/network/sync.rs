@@ -45,8 +45,12 @@ async fn block_initiator_side() {
 
     // check if the peer has received an automatic Ping message from the node
     wait_until!(5, {
-        let payload = peer.read_payload().await.unwrap();
-        matches!(payload, Payload::Ping(..))
+        loop {
+            let payload = peer.read_payload().await;
+            if matches!(payload, Ok(Payload::Ping(..))) {
+                break true;
+            }
+        }
     });
 
     // wait for the block_sync_interval to "expire"
@@ -233,12 +237,22 @@ async fn transaction_initiator_side() {
     let (node, mut peer) = handshaken_node_and_peer(setup).await;
 
     // check if the peer has received a Ping and a GetMemoryPool from the node, in any order
-    for _ in 0usize..2 {
-        wait_until!(5, {
-            let payload = peer.read_payload().await.unwrap();
-            matches!(payload, Payload::Ping(..)) || matches!(payload, Payload::GetMemoryPool)
-        });
-    }
+    wait_until!(5, {
+        let mut got_ping = false;
+        let mut got_getmempool = false;
+
+        loop {
+            let payload = peer.read_payload().await;
+            match payload {
+                Ok(Payload::Ping(..)) => got_ping = true,
+                Ok(Payload::GetMemoryPool) => got_getmempool = true,
+                _ => {}
+            }
+            if got_ping && got_getmempool {
+                break true;
+            }
+        }
+    });
 
     // Respond with MemoryPool message
     let memory_pool = Payload::MemoryPool(vec![TRANSACTION_1.to_vec(), TRANSACTION_2.to_vec()]);
@@ -267,8 +281,12 @@ async fn transaction_responder_side() {
 
     // check if the peer has received an automatic Ping message from the node
     wait_until!(5, {
-        let payload = peer.read_payload().await.unwrap();
-        matches!(payload, Payload::Ping(..))
+        loop {
+            let payload = peer.read_payload().await;
+            if matches!(payload, Ok(Payload::Ping(..))) {
+                break true;
+            }
+        }
     });
 
     // insert transaction into node

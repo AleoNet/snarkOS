@@ -101,6 +101,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
         config.node.is_bootnode,
+        config.node.is_crawler,
         // Set sync intervals for peers, blocks and transactions (memory pool).
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
@@ -108,7 +109,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config).await?;
+    let mut node = Node::new(node_config)?;
 
     let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 
@@ -125,7 +126,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // For extra safety, validate storage too if a trim is requested.
     if config.storage.validate || config.storage.trim {
         let now = std::time::Instant::now();
-        storage.validate(None, snarkos_storage::validator::FixMode::Everything);
+        storage
+            .validate(None, snarkos_storage::validator::FixMode::Everything)
+            .await;
         info!("Storage validated in {}ms", now.elapsed().as_millis());
         if !config.storage.trim {
             return Ok(());

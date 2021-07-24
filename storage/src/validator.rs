@@ -17,6 +17,7 @@
 use crate::{
     Ledger,
     TransactionLocation,
+    COL_BLOCK_TRANSACTIONS,
     COL_COMMITMENT,
     COL_DIGEST,
     COL_MEMO,
@@ -25,18 +26,16 @@ use crate::{
 };
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
-use snarkvm_utilities::{to_bytes_le, ToBytes};
+use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
-use parking_lot::Mutex;
 use rayon::prelude::*;
+use tokio::{sync::mpsc, task};
 use tracing::*;
 
 use std::{
     collections::HashSet,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    mem,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 macro_rules! check_for_superfluous_tx_components {
@@ -44,7 +43,7 @@ macro_rules! check_for_superfluous_tx_components {
         fn $fn_name(
             &self,
             tx_entries: &HashSet<Vec<u8>>,
-            db_ops: &Mutex<Option<DatabaseTransaction>>,
+            db_ops: &mut DatabaseTransaction,
             fix_mode: FixMode,
             is_storage_valid: &AtomicBool,
         ) {
@@ -72,21 +71,17 @@ macro_rules! check_for_superfluous_tx_components {
                     $component_name
                 );
 
-                if let Some(ref mut ops) = &mut *db_ops.lock() {
-                    if [
-                        FixMode::SuperfluousTestnet1TransactionComponents,
-                        FixMode::Everything,
-                    ]
-                    .contains(&fix_mode)
-                    {
-                        for superfluous_item in superfluous_items {
-                            ops.push(Op::Delete {
-                                col: $component_col,
-                                key: superfluous_item.to_vec(),
-                            });
-                        }
-                    } else {
-                        is_storage_valid.store(false, Ordering::SeqCst);
+                if [
+                    FixMode::SuperfluousTestnet1TransactionComponents,
+                    FixMode::Everything,
+                ]
+                .contains(&fix_mode)
+                {
+                    for superfluous_item in superfluous_items {
+                        db_ops.push(Op::Delete {
+                            col: $component_col,
+                            key: superfluous_item.to_vec(),
+                        });
                     }
                 } else {
                     is_storage_valid.store(false, Ordering::SeqCst);
@@ -110,6 +105,18 @@ pub enum FixMode {
     Everything,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ValidatorAction {
+    /// A transaction component from a stored transaction (as opposed to stored in its own column); the first
+    /// value is the index of the component's corresponding dedicated database column, and the second one is
+    /// its serialized value.
+    RegisterTxComponent(u32, Vec<u8>),
+    /// An operation that will be executed as part of a batch database transaction at the end of the validation
+    /// process in case a fix mode other than `FixMode::Nothing` is picked; it will either store a missing value
+    /// or delete a superfluous one.
+    QueueDatabaseOp(Op),
+}
+
 impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage + Sync> Ledger<T, P, S> {
     check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", COL_MEMO);
 
@@ -124,7 +131,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
-    pub fn validate(&self, mut limit: Option<u32>, fix_mode: FixMode) -> bool {
+    pub async fn validate(&self, mut limit: Option<u32>, fix_mode: FixMode) -> bool {
         if limit.is_some()
             && [FixMode::SuperfluousTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode)
         {
@@ -142,12 +149,6 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
             return is_valid.load(Ordering::SeqCst);
         }
-
-        let db_ops = if fix_mode != FixMode::Nothing {
-            Arc::new(Mutex::new(Some(DatabaseTransaction::new())))
-        } else {
-            Arc::new(Mutex::new(None))
-        };
 
         let mut current_height = self.get_current_block_height();
 
@@ -204,44 +205,64 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             debug!("The true block height is {}", current_height);
         }
 
-        let tx_memos = Default::default();
-        let tx_sns = Default::default();
-        let tx_cms = Default::default();
-        let tx_digests = Default::default();
-
         let to_process = if let Some(ref mut limit) = limit {
             *limit
         } else {
             current_height
         };
 
-        (0..=to_process).into_par_iter().for_each(|i| {
-            self.validate_block(
-                current_height - i,
-                &tx_memos,
-                &tx_sns,
-                &tx_cms,
-                &tx_digests,
-                &db_ops,
-                fix_mode,
-                &is_valid,
-            );
+        // Spawn a task intercepting stored tx components and pending database operations from a dedicated channel.
+        let (component_sender, mut component_receiver) = mpsc::unbounded_channel::<ValidatorAction>();
+        let task_handle = task::spawn(async move {
+            let mut db_ops = DatabaseTransaction::new();
+
+            let mut tx_memos: HashSet<Vec<u8>> = Default::default();
+            let mut tx_sns: HashSet<Vec<u8>> = Default::default();
+            let mut tx_cms: HashSet<Vec<u8>> = Default::default();
+            let mut tx_digests: HashSet<Vec<u8>> = Default::default();
+
+            while let Some(action) = component_receiver.recv().await {
+                match action {
+                    ValidatorAction::RegisterTxComponent(col, key) => {
+                        let set = match col {
+                            COL_MEMO => &mut tx_memos,
+                            COL_SERIAL_NUMBER => &mut tx_sns,
+                            COL_COMMITMENT => &mut tx_cms,
+                            COL_DIGEST => &mut tx_digests,
+                            _ => unreachable!(),
+                        };
+                        set.insert(key);
+                    }
+                    ValidatorAction::QueueDatabaseOp(op) => {
+                        db_ops.push(op);
+                    }
+                }
+            }
+
+            (db_ops, tx_memos, tx_sns, tx_cms, tx_digests)
         });
+
+        (0..=to_process).into_par_iter().for_each(|i| {
+            self.validate_block(current_height - i, component_sender.clone(), fix_mode, &is_valid);
+        });
+
+        // Close the channel, breaking the loop in the task checking the receiver.
+        mem::drop(component_sender);
+
+        let (mut db_ops, tx_memos, tx_sns, tx_cms, tx_digests) = task_handle.await.unwrap(); // can't recover if it fails
 
         // Superfluous items can only be removed after a full storage pass.
         if limit.is_none() {
-            self.check_for_superfluous_tx_memos(&*tx_memos.lock(), &db_ops, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_digests(&*tx_digests.lock(), &db_ops, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_sns(&*tx_sns.lock(), &db_ops, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_cms(&*tx_cms.lock(), &db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_memos(&tx_memos, &mut db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_digests(&tx_digests, &mut db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_sns(&tx_sns, &mut db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_cms(&tx_cms, &mut db_ops, fix_mode, &is_valid);
         }
 
-        if let Some(ops) = db_ops.lock().take() {
-            if !ops.0.is_empty() {
-                info!("Fixing the detected storage issues ({} fixes)", ops.0.len());
-                if let Err(e) = self.storage.batch(ops) {
-                    error!("Couldn't fix the storage issues: {}", e);
-                }
+        if fix_mode != FixMode::Nothing && !db_ops.0.is_empty() {
+            info!("Fixing the detected storage issues ({} fixes)", db_ops.0.len());
+            if let Err(e) = self.storage.batch(db_ops) {
+                error!("Couldn't fix the storage issues: {}", e);
             }
         }
 
@@ -257,15 +278,10 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     }
 
     /// Validates the storage of the given block.
-    #[allow(clippy::too_many_arguments)]
     fn validate_block(
         &self,
         block_height: u32,
-        tx_memos: &Mutex<HashSet<Vec<u8>>>,
-        tx_sns: &Mutex<HashSet<Vec<u8>>>,
-        tx_cms: &Mutex<HashSet<Vec<u8>>>,
-        tx_digests: &Mutex<HashSet<Vec<u8>>>,
-        database_fix: &Mutex<Option<DatabaseTransaction>>,
+        component_sender: mpsc::UnboundedSender<ValidatorAction>,
         fix_mode: FixMode,
         is_storage_valid: &AtomicBool,
     ) {
@@ -287,17 +303,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             error!("The header for block at height {} is missing!", block_height);
         }
 
-        self.validate_block_transactions(
-            &block,
-            block_height,
-            tx_memos,
-            tx_sns,
-            tx_cms,
-            tx_digests,
-            database_fix,
-            fix_mode,
-            is_storage_valid,
-        );
+        self.validate_block_transactions(&block, block_height, component_sender, fix_mode, is_storage_valid);
 
         // The genesis block has no parent.
         if block_height == 0 {
@@ -342,48 +348,41 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     }
 
     /// Validates the storage of transactions belonging to the given block.
-    #[allow(clippy::too_many_arguments)]
     fn validate_block_transactions(
         &self,
         block: &Block<T>,
         block_height: u32,
-        tx_memos: &Mutex<HashSet<Vec<u8>>>,
-        tx_sns: &Mutex<HashSet<Vec<u8>>>,
-        tx_cms: &Mutex<HashSet<Vec<u8>>>,
-        tx_digests: &Mutex<HashSet<Vec<u8>>>,
-        database_fix: &Mutex<Option<DatabaseTransaction>>,
+        component_sender: mpsc::UnboundedSender<ValidatorAction>,
         fix_mode: FixMode,
         is_storage_valid: &AtomicBool,
     ) {
-        block.transactions.as_slice().par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
+        let block_hash = block.header.get_hash();
+
+        let block_stored_txs_bytes = match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0) {
+            Ok(Some(txs)) => txs,
+            Ok(None) => {
+                error!("Can't find the transactions stored for block {}", block_hash);
+                is_storage_valid.store(false, Ordering::SeqCst);
+
+                return;
+            }
+            Err(e) => {
+                error!("Can't find the transactions stored for block {}: {}", block_hash, e);
+                is_storage_valid.store(false, Ordering::SeqCst);
+
+                return;
+            }
+        };
+
+        let block_stored_txs: DPCTransactions<T> = FromBytes::read(&block_stored_txs_bytes[..]).unwrap();
+
+        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
             let tx_id = match tx.transaction_id() {
                 Ok(hash) => hash,
                 Err(e) => {
                     error!(
                         "The id of a transaction from block {} can't be parsed: {}",
-                        block.header.get_hash(),
-                        e
-                    );
-                    is_storage_valid.store(false, Ordering::SeqCst);
-
-                    return;
-                }
-            };
-
-            let tx = match self.get_transaction_bytes(&tx_id) {
-                Ok(tx) => match T::read_le(&tx[..]) {
-                    Ok(tx) => tx,
-                    Err(e) => {
-                        error!("Transaction {} can't be parsed: {}", hex::encode(tx_id), e);
-                        is_storage_valid.store(false, Ordering::SeqCst);
-
-                        return;
-                    }
-                },
-                Err(e) => {
-                    error!(
-                        "Transaction {} can't be found in the storage: {}",
-                        hex::encode(tx_id),
+                        block_hash,
                         e
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
@@ -393,57 +392,55 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             };
 
             for sn in tx.old_serial_numbers() {
-                if !self.contains_sn(sn) {
+                let sn = to_bytes![sn].unwrap();
+                if !self.storage.exists(COL_SERIAL_NUMBER, &sn) {
                     error!(
                         "Transaction {} doesn't have an old serial number stored",
                         hex::encode(tx_id)
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                tx_sns.lock().insert(to_bytes_le!(sn).unwrap()); // to_bytes can't fail
+                component_sender.send(ValidatorAction::RegisterTxComponent(COL_SERIAL_NUMBER, sn)).unwrap();
             }
 
             for cm in tx.new_commitments() {
-                if !self.contains_cm(cm) {
+                let cm = to_bytes![cm].unwrap();
+                if !self.storage.exists(COL_COMMITMENT, &cm) {
                     error!(
                         "Transaction {} doesn't have a new commitment stored",
                         hex::encode(tx_id)
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                tx_cms.lock().insert(to_bytes_le!(cm).unwrap()); // to_bytes can't fail
+                component_sender.send(ValidatorAction::RegisterTxComponent(COL_COMMITMENT, cm)).unwrap();
             }
 
-            let tx_digest = tx.ledger_digest();
-            // to_bytes can't fail
-            if !self.storage.exists(COL_DIGEST, &to_bytes_le![tx_digest].unwrap()) {
+            let tx_digest = to_bytes![tx.ledger_digest()].unwrap();
+            if !self.storage.exists(COL_DIGEST, &tx_digest) {
                 warn!(
                     "Transaction {} doesn't have the ledger digest stored",
                     hex::encode(tx_id),
                 );
 
-                if let Some(ref mut db_ops) = &mut *database_fix.lock() {
-                    if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
-                        db_ops.push(Op::Insert {
-                            col: COL_DIGEST,
-                            key: to_bytes_le![tx_digest].unwrap(), // to_bytes can't fail
-                            value: block_height.to_le_bytes().to_vec(),
-                        });
-                    } else {
-                        is_storage_valid.store(false, Ordering::SeqCst);
-                    }
+                if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
+                    let db_op = Op::Insert {
+                        col: COL_DIGEST,
+                        key: tx_digest.clone(),
+                        value: block_height.to_le_bytes().to_vec(),
+                    };
+                    component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
                 } else {
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
             }
-            tx_digests.lock().insert(to_bytes_le!(tx_digest).unwrap()); // to_bytes can't fail
+            component_sender.send(ValidatorAction::RegisterTxComponent(COL_DIGEST, tx_digest)).unwrap();
 
-            let tx_memo = tx.memorandum();
-            if !self.contains_memo(tx_memo) {
+            let tx_memo = to_bytes![tx.memorandum()].unwrap();
+            if !self.storage.exists(COL_MEMO, &tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
-            tx_memos.lock().insert(to_bytes_le!(tx_memo).unwrap()); // to_bytes can't fail
+            component_sender.send(ValidatorAction::RegisterTxComponent(COL_MEMO, tx_memo.to_vec())).unwrap();
 
             match self.get_transaction_location(&tx_id) {
                 Ok(Some(tx_location)) => match self.get_block_number(&BlockHeaderHash(tx_location.block_hash)) {
@@ -465,21 +462,18 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                             BlockHeaderHash(tx_location.block_hash)
                         );
 
-                        if let Some(ref mut db_ops) = &mut *database_fix.lock() {
-                            if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
-                                let corrected_location = TransactionLocation {
-                                    index: block_tx_idx as u32,
-                                    block_hash: block.header.get_hash().0,
-                                };
+                        if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
+                            let corrected_location = TransactionLocation {
+                                index: block_tx_idx as u32,
+                                block_hash: block_hash.0,
+                            };
 
-                                db_ops.push(Op::Insert {
-                                    col: COL_TRANSACTION_LOCATION,
-                                    key: tx_id.to_vec(),
-                                    value: to_bytes_le!(corrected_location).unwrap(), // to_bytes_le can't fail
-                                });
-                            } else {
-                                is_storage_valid.store(false, Ordering::SeqCst);
-                            }
+                            let db_op = Op::Insert {
+                                col: COL_TRANSACTION_LOCATION,
+                                key: tx_id.to_vec(),
+                                value: to_bytes!(corrected_location).unwrap(),
+                            };
+                            component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
                         } else {
                             is_storage_valid.store(false, Ordering::SeqCst);
                         }

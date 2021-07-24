@@ -112,7 +112,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
 
 impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config) -> Result<Self, NetworkError> {
+    pub fn new(config: Config) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
@@ -129,7 +129,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             master_dispatch: RwLock::new(None),
         }));
 
-        if node.config.is_bootnode() {
+        if node.config.is_crawler() {
             // Safe since this can only ever be set here.
             node.known_network.set(KnownNetwork::default()).unwrap();
         }

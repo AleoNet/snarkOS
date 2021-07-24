@@ -15,17 +15,30 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Testnet1Transaction};
-use snarkos_metrics::misc::BLOCK_HEIGHT;
-use snarkos_metrics::{self as metrics, misc::*};
+use snarkos_metrics::{
+    self as metrics,
+    misc::{BLOCK_HEIGHT, *},
+};
 use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
         instantiated::{Components, Testnet1DPC},
-        Payload, Record,
+        Payload,
+        Record,
     },
-    Account, AccountScheme, Address, AleoAmount, Block, DPCComponents, DPCScheme, LedgerScheme, PrivateKey, Storage,
-    StorageError, Transactions,
+    Account,
+    AccountScheme,
+    Address,
+    AleoAmount,
+    Block,
+    DPCComponents,
+    DPCScheme,
+    LedgerScheme,
+    PrivateKey,
+    Storage,
+    StorageError,
+    Transactions,
 };
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes_le, ToBytes};
@@ -374,10 +387,11 @@ impl<S: Storage> Consensus<S> {
 
         let new_record_owners = vec![recipient; Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [
-            vec![total_value_balance.0 as u64],
-            vec![0; Components::NUM_OUTPUT_RECORDS - 1],
-        ]
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Components::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
         .concat();
         let new_payloads = vec![Payload::default(); Components::NUM_OUTPUT_RECORDS];
 
