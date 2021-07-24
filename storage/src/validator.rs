@@ -15,7 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    Ledger, TransactionLocation, COL_BLOCK_TRANSACTIONS, COL_COMMITMENT, COL_DIGEST, COL_MEMO, COL_SERIAL_NUMBER,
+    Ledger,
+    TransactionLocation,
+    COL_BLOCK_TRANSACTIONS,
+    COL_COMMITMENT,
+    COL_DIGEST,
+    COL_MEMO,
+    COL_SERIAL_NUMBER,
     COL_TRANSACTION_LOCATION,
 };
 use snarkvm_algorithms::traits::LoadableMerkleParameters;

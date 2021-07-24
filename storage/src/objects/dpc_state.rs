@@ -123,7 +123,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         let merkle = self.cm_merkle_tree.load();
         self.cm_merkle_tree.store(Arc::new(
-            merkle.rebuild(old_cm_and_indices.into_iter().count(), &new_commitments[..])?,
+            merkle.rebuild(old_cm_and_indices.len(), &new_commitments[..])?,
         ));
 
         Ok(())
