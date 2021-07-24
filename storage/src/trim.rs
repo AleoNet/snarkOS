@@ -15,10 +15,22 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    Ledger, COL_BLOCK_HEADER, COL_BLOCK_LOCATOR, COL_BLOCK_TRANSACTIONS, COL_CHILD_HASHES, COL_TRANSACTION_LOCATION,
+    Ledger,
+    COL_BLOCK_HEADER,
+    COL_BLOCK_LOCATOR,
+    COL_BLOCK_TRANSACTIONS,
+    COL_CHILD_HASHES,
+    COL_TRANSACTION_LOCATION,
 };
 use snarkvm_dpc::{
-    BlockHeader, BlockHeaderHash, DatabaseTransaction, Op, Parameters, Storage, StorageError, TransactionScheme,
+    BlockHeader,
+    BlockHeaderHash,
+    DatabaseTransaction,
+    Op,
+    Parameters,
+    Storage,
+    StorageError,
+    TransactionScheme,
 };
 use snarkvm_utilities::FromBytes;
 

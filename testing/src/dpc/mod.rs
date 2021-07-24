@@ -14,14 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::MerkleTreeLedger;
-use snarkvm_algorithms::{MerkleParameters, CRH};
-use snarkvm_dpc::{testnet1::parameters::*, Account, AccountScheme, DPCScheme, Storage};
-use snarkvm_parameters::Parameter;
-use snarkvm_utilities::FromBytes;
+use snarkvm_dpc::{testnet1::parameters::*, Account, AccountScheme, DPCScheme};
 
 use rand::{CryptoRng, Rng};
-use std::sync::Arc;
 
 pub fn setup_or_load_dpc<R: Rng + CryptoRng>(verify_only: bool, rng: &mut R) -> Testnet1DPC {
     match Testnet1DPC::load(verify_only) {

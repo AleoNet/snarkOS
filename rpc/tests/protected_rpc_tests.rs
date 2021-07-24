@@ -26,14 +26,12 @@ mod protected_rpc_tests {
     };
 
     use snarkvm_dpc::{
-        testnet1::{
-            instantiated::{Components, Testnet1Transaction},
-            record::Record as DPCRecord,
-            TransactionKernel,
-        },
+        record::Record as DPCRecord,
+        testnet1::parameters::{Testnet1Parameters, Testnet1Transaction},
         Address,
         PrivateKey,
         RecordScheme,
+        TransactionKernel,
         ViewKey,
     };
     use snarkvm_utilities::{
@@ -223,7 +221,6 @@ mod protected_rpc_tests {
         let meta = authentication();
         let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
-        let system_parameters = &FIXTURE_VK.dpc.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
 
         let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
@@ -231,12 +228,7 @@ mod protected_rpc_tests {
 
         let records = &DATA.records_1;
 
-        let view_key = ViewKey::from_private_key(
-            &system_parameters.account_signature,
-            &system_parameters.account_commitment,
-            &miner_acc.private_key,
-        )
-        .unwrap();
+        let view_key = ViewKey::from_private_key(&miner_acc.private_key).unwrap();
 
         for (ciphertext, record) in ciphertexts.iter().zip(records) {
             let ciphertext_string = hex::encode(to_bytes_le![ciphertext].unwrap());
@@ -306,7 +298,7 @@ mod protected_rpc_tests {
 
         for record_value in result["encoded_records"].as_array().unwrap() {
             let record_bytes = hex::decode(record_value.as_str().unwrap()).unwrap();
-            let _record: DPCRecord<Components> = FromBytes::read_le(&record_bytes[..]).unwrap();
+            let _record: DPCRecord<Testnet1Parameters> = FromBytes::read_le(&record_bytes[..]).unwrap();
         }
 
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
@@ -357,7 +349,7 @@ mod protected_rpc_tests {
         let result = extracted["result"].clone();
 
         let transaction_kernel_bytes = hex::decode(result.as_str().unwrap()).unwrap();
-        let _transaction_kernel: TransactionKernel<Components> =
+        let _transaction_kernel: TransactionKernel<Testnet1Parameters> =
             FromBytes::read_le(&transaction_kernel_bytes[..]).unwrap();
     }
 
@@ -399,7 +391,7 @@ mod protected_rpc_tests {
 
         for record_value in result["encoded_records"].as_array().unwrap() {
             let record_bytes = hex::decode(record_value.as_str().unwrap()).unwrap();
-            let _record: DPCRecord<Components> = FromBytes::read_le(&record_bytes[..]).unwrap();
+            let _record: DPCRecord<Testnet1Parameters> = FromBytes::read_le(&record_bytes[..]).unwrap();
         }
 
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
@@ -422,8 +414,8 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = Address::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key).unwrap();
+        let _address = Address::<Testnet1Parameters>::from_str(&account.address).unwrap();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
         let response = rpc.handle_request_sync(&request, meta).unwrap();
@@ -432,7 +424,7 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = Address::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key).unwrap();
+        let _address = Address::<Testnet1Parameters>::from_str(&account.address).unwrap();
     }
 }

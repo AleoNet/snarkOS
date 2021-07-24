@@ -16,7 +16,13 @@
 
 use crate::*;
 use snarkvm_dpc::{
-    errors::StorageError, DatabaseTransaction, Op, Parameters, RecordScheme, Storage, TransactionScheme,
+    errors::StorageError,
+    DatabaseTransaction,
+    Op,
+    Parameters,
+    RecordScheme,
+    Storage,
+    TransactionScheme,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},

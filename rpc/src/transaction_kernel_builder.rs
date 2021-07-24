@@ -14,19 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::empty_ledger::EmptyLedger;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Parameters, Testnet1Transaction},
-    Address, DPCScheme, Parameters, Payload, PrivateKey, Record, RecordScheme,
-    TransactionKernel as TransactionKernelNative, *,
+    testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
+    Address,
+    DPCScheme,
+    Parameters,
+    Payload,
+    PrivateKey,
+    Record,
+    RecordScheme,
+    TransactionKernel as TransactionKernelNative,
+    *,
 };
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};
-
-pub type MerkleTreeLedger = EmptyLedger<Testnet1Parameters, Testnet1Transaction>;
 
 #[derive(Clone, Debug)]
 pub struct TransactionInput {
@@ -291,8 +295,8 @@ impl TransactionKernel {
         let new_death_program_ids = vec![dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
         let new_payloads: Vec<Payload> = vec![Default::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
-        // Generate a random memo
-        let memo = rng.gen();
+        // Generate an empty memo
+        let memo = [0u8; 64];
 
         // Generate transaction
 

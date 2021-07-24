@@ -16,8 +16,18 @@
 
 use crate::{error::ConsensusError, Consensus};
 use snarkvm_dpc::{
-    testnet1::parameters::*, Address, Block, BlockHeader, DPCScheme, Parameters, ProgramScheme, Record, RecordScheme,
-    Storage, TransactionScheme, Transactions,
+    testnet1::parameters::*,
+    Address,
+    Block,
+    BlockHeader,
+    DPCScheme,
+    Parameters,
+    ProgramScheme,
+    Record,
+    RecordScheme,
+    Storage,
+    TransactionScheme,
+    Transactions,
 };
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{to_bytes_le, ToBytes};

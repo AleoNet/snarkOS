@@ -55,5 +55,4 @@ pub mod rpc_types;
 #[doc(inline)]
 pub use rpc_types::*;
 
-pub(crate) mod empty_ledger;
 pub(crate) mod transaction_kernel_builder;

@@ -20,8 +20,17 @@ extern crate tracing;
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    block::Transactions, testnet1::parameters::*, Account, Address, Block, Parameters, Payload as RecordPayload,
-    ProgramScheme, Record, RecordScheme, Storage,
+    block::Transactions,
+    testnet1::parameters::*,
+    Account,
+    Address,
+    Block,
+    Parameters,
+    Payload as RecordPayload,
+    ProgramScheme,
+    Record,
+    RecordScheme,
+    Storage,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -63,7 +72,7 @@ fn send<R: Rng + CryptoRng, S: Storage>(
     receiver: &Address<Testnet1Parameters>,
     amount: u64,
     rng: &mut R,
-    memo: [u8; 32],
+    memo: [u8; 64],
 ) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
     let mut sum = 0;
     for inp in &inputs {
@@ -115,7 +124,7 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
         let (block, coinbase_records) = mine_block(&miner, txs.clone()).await?;
 
         txs.clear();
-        let mut memo = [0u8; 32];
+        let mut memo = [0u8; 64];
         memo[0] = i as u8;
         // make a tx which spends 10 to the Testnet1Parameters receiver
         let (_records, tx) = send(

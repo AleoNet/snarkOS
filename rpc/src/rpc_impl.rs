@@ -24,11 +24,14 @@ use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkvm_dpc::{
     testnet1::parameters::{Testnet1DPC, Testnet1Transaction},
-    BlockHeaderHash, Storage, TransactionScheme,
+    BlockHeaderHash,
+    Storage,
+    TransactionScheme,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes_le, CanonicalSerialize,
+    to_bytes_le,
+    CanonicalSerialize,
 };
 
 use chrono::Utc;

@@ -23,8 +23,20 @@ use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
-    Account, AccountScheme, Address, AleoAmount, Block, DPCScheme, LedgerScheme, Parameters, Payload, PrivateKey,
-    Record, Storage, StorageError, Transactions,
+    Account,
+    AccountScheme,
+    Address,
+    AleoAmount,
+    Block,
+    DPCScheme,
+    LedgerScheme,
+    Parameters,
+    Payload,
+    PrivateKey,
+    Record,
+    Storage,
+    StorageError,
+    Transactions,
 };
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes_le, ToBytes};
@@ -354,10 +366,11 @@ impl<S: Storage> Consensus<S> {
 
         let new_record_owners = vec![recipient; Testnet1Parameters::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [
-            vec![total_value_balance.0 as u64],
-            vec![0; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1],
-        ]
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Testnet1Parameters::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
         .concat();
         let new_payloads = vec![Payload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 

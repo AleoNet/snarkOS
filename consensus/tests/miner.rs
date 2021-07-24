@@ -17,9 +17,6 @@
 mod miner {
     use snarkos_consensus::Miner;
     use snarkos_testing::sync::*;
-    use snarkvm_algorithms::traits::{
-        commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme,
-    };
     use snarkvm_dpc::{block::Transactions, Address, BlockHeader, Parameters, PrivateKey};
     use snarkvm_posw::txids_to_roots;
 

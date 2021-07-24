@@ -25,13 +25,16 @@ pub mod validator;
 
 use crate::sync::TestTestnet1Transaction;
 pub use snarkos_storage::{Ledger, LedgerStorage};
-use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_dpc::{
-    testnet1::parameters::Testnet1Parameters, Block, LedgerScheme, Parameters, Storage, TransactionScheme,
+    testnet1::parameters::Testnet1Parameters,
+    Block,
+    LedgerScheme,
+    Parameters,
+    Storage,
+    TransactionScheme,
 };
 
 use rand::{thread_rng, Rng};
-use std::sync::Arc;
 
 pub type Store = Ledger<Testnet1Parameters, TestTestnet1Transaction, LedgerStorage>;
 

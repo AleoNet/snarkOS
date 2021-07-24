@@ -16,7 +16,13 @@
 
 use crate::Ledger;
 use snarkvm_dpc::{
-    errors::StorageError, BlockError, BlockHeader, BlockHeaderHash, Parameters, Storage, TransactionScheme,
+    errors::StorageError,
+    BlockError,
+    BlockHeader,
+    BlockHeaderHash,
+    Parameters,
+    Storage,
+    TransactionScheme,
 };
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;

@@ -29,13 +29,11 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1DPC},
-        Testnet1Components,
-    },
+    testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
     Address,
     DPCScheme,
     Network,
+    Parameters,
     Storage,
 };
 use snarkvm_posw::PoswMarlin;
@@ -166,16 +164,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let memory_pool = MemoryPool::from_storage(&storage).await?;
 
         debug!("Loading Aleo parameters...");
-        let dpc = <Testnet1DPC as DPCScheme<MerkleTreeLedger<LedgerStorage>>>::load(!config.miner.is_miner)?;
+        let dpc = <Testnet1DPC as DPCScheme<Testnet1Parameters>>::load(!config.miner.is_miner)?;
         info!("Loaded Aleo parameters");
 
         // Fetch the set of valid inner circuit IDs.
-        let inner_snark_vk: <<Components as Testnet1Components>::InnerSNARK as SNARK>::VerifyingKey =
+        let inner_snark_vk: <<Testnet1Parameters as Parameters>::InnerSNARK as SNARK>::VerifyingKey =
             dpc.inner_snark_parameters.1.clone().into();
-        let inner_snark_id = dpc
-            .system_parameters
-            .inner_circuit_id_crh
-            .hash(&to_bytes_le![inner_snark_vk]?)?;
+        let inner_snark_id = Testnet1Parameters::inner_circuit_id_crh().hash(&to_bytes_le![inner_snark_vk]?)?;
 
         let authorized_inner_snark_ids = vec![to_bytes_le![inner_snark_id]?];
 
@@ -268,7 +263,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Start the miner task if mining configuration is enabled.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     if config.miner.is_miner {
-        match Address::<Components>::from_str(&config.miner.miner_address) {
+        match Address::<Testnet1Parameters>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
                 let handle = MinerInstance::new(miner_address, node.clone()).spawn();
                 node.register_task(handle);

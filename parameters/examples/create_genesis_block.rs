@@ -17,8 +17,16 @@
 use snarkos_parameters::transaction_1::Transaction1;
 
 use snarkvm_dpc::{
-    testnet1::parameters::Testnet1Parameters, BlockHeader, BlockHeaderHash, MerkleRootHash, Parameters,
-    PedersenMerkleRootHash, ProofOfSuccinctWork, Transaction, TransactionError, Transactions,
+    testnet1::parameters::Testnet1Parameters,
+    BlockHeader,
+    BlockHeaderHash,
+    MerkleRootHash,
+    Parameters,
+    PedersenMerkleRootHash,
+    ProofOfSuccinctWork,
+    Transaction,
+    TransactionError,
+    Transactions,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;

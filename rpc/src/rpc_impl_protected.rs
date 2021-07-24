@@ -19,15 +19,30 @@
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
 use crate::{
-    error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*,
-    transaction_kernel_builder::TransactionKernelBuilder, RpcImpl,
+    error::RpcError,
+    rpc_trait::ProtectedRpcFunctions,
+    rpc_types::*,
+    transaction_kernel_builder::TransactionKernelBuilder,
+    RpcImpl,
 };
 use snarkos_consensus::ConsensusParameters;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
-    Account, AccountScheme, Address, DPCScheme, EncryptedRecord, Parameters, Payload, PrivateKey, ProgramScheme,
-    Record, RecordScheme as RecordModel, Storage, TransactionKernel, ViewKey,
+    Account,
+    AccountScheme,
+    Address,
+    DPCScheme,
+    EncryptedRecord,
+    Parameters,
+    Payload,
+    PrivateKey,
+    ProgramScheme,
+    Record,
+    RecordScheme as RecordModel,
+    Storage,
+    TransactionKernel,
+    ViewKey,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -400,16 +415,11 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let new_payloads = vec![Payload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
         // Decode memo
-        let mut memo = [0u8; 32];
+        let mut memo = [0u8; 64];
         if let Some(memo_string) = transaction_input.memo {
             if let Ok(bytes) = hex::decode(memo_string) {
                 bytes.write_le(&mut memo[..])?;
             }
-        }
-
-        // If the request did not specify a valid memo, generate one from random
-        if memo == [0u8; 32] {
-            memo = rng.gen();
         }
 
         // Generate transaction

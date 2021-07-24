@@ -19,7 +19,14 @@ use arc_swap::ArcSwap;
 use snarkos_parameters::GenesisBlock;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
 use snarkvm_dpc::{
-    errors::StorageError, Block, DatabaseTransaction, LedgerScheme, Op, Parameters, Storage, TransactionScheme,
+    errors::StorageError,
+    Block,
+    DatabaseTransaction,
+    LedgerScheme,
+    Op,
+    Parameters,
+    Storage,
+    TransactionScheme,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;

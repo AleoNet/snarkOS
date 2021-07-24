@@ -23,7 +23,9 @@ use snarkos_parameters::GenesisBlock;
 use snarkos_storage::LedgerStorage;
 use snarkvm_dpc::{
     testnet1::{parameters::*, NoopProgram},
-    Account, Block, Storage,
+    Account,
+    Block,
+    Storage,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;

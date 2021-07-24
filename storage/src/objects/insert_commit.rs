@@ -16,7 +16,15 @@
 
 use crate::*;
 use snarkvm_dpc::{
-    Block, BlockError, BlockHeader, BlockHeaderHash, DatabaseTransaction, Op, Parameters, Storage, StorageError,
+    Block,
+    BlockError,
+    BlockHeader,
+    BlockHeaderHash,
+    DatabaseTransaction,
+    Op,
+    Parameters,
+    Storage,
+    StorageError,
     TransactionScheme,
 };
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes_le};

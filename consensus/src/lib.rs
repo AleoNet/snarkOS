@@ -60,7 +60,9 @@ pub use parameters::*;
 use snarkos_storage::Ledger;
 use snarkvm_dpc::{
     testnet1::parameters::{Testnet1Parameters, Testnet1Transaction},
-    AleoAmount, BlockHeader, BlockHeaderHash,
+    AleoAmount,
+    BlockHeader,
+    BlockHeaderHash,
 };
 
 pub type MerkleTreeLedger<S> = Ledger<Testnet1Parameters, Testnet1Transaction, S>;

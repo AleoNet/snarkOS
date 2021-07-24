@@ -18,7 +18,8 @@ use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
 use snarkvm_dpc::{errors::StorageError, BlockHeaderHash, LedgerScheme, Parameters, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    has_duplicates, to_bytes_le,
+    has_duplicates,
+    to_bytes_le,
 };
 
 impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {

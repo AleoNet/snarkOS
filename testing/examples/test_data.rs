@@ -17,8 +17,17 @@
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    block::Transactions, payload::Payload as RecordPayload, testnet1::parameters::*, Account, Address, Block,
-    Parameters, ProgramScheme, Record, RecordScheme, Storage,
+    block::Transactions,
+    payload::Payload as RecordPayload,
+    testnet1::parameters::*,
+    Account,
+    Address,
+    Block,
+    Parameters,
+    ProgramScheme,
+    Record,
+    RecordScheme,
+    Storage,
 };
 use snarkvm_utilities::bytes::ToBytes;
 
@@ -128,7 +137,7 @@ fn send<R: Rng + CryptoRng, S: Storage>(
         dummy_flags,
         values,
         output,
-        [0u8; 32],
+        [0u8; 64],
         rng,
     )
 }

@@ -19,8 +19,15 @@ use snarkos_profiler::{end_timer, start_timer};
 use snarkvm_algorithms::SNARK;
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::{
-    testnet1::parameters::*, BlockHeader, DPCScheme, MerkleRootHash, Network, Parameters, PedersenMerkleRootHash,
-    ProgramScheme, Storage,
+    testnet1::parameters::*,
+    BlockHeader,
+    DPCScheme,
+    MerkleRootHash,
+    Network,
+    Parameters,
+    PedersenMerkleRootHash,
+    ProgramScheme,
+    Storage,
 };
 use snarkvm_posw::{Marlin, PoswMarlin};
 use snarkvm_utilities::FromBytes;

@@ -18,8 +18,16 @@ mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, Miner};
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{
-        payload::Payload as RecordPayload, record::Record, testnet1::parameters::*, Block, DPCScheme, LedgerScheme,
-        Parameters, ProgramScheme, RecordScheme, Transactions,
+        payload::Payload as RecordPayload,
+        record::Record,
+        testnet1::parameters::*,
+        Block,
+        DPCScheme,
+        LedgerScheme,
+        Parameters,
+        ProgramScheme,
+        RecordScheme,
+        Transactions,
     };
     use snarkvm_utilities::{bytes::ToBytes, to_bytes_le};
 
@@ -77,7 +85,7 @@ mod consensus_dpc {
 
         // Memo is a dummy for now
 
-        let memo = [6u8; 32];
+        let memo = [6u8; 64];
 
         println!("Create a payment transaction");
         // Create the transaction
