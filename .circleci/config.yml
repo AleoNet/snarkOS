@@ -211,6 +211,21 @@ jobs:
       - clear_environment:
           cache_key: snarkos-toolkit-cache
 
+  fmt:
+    docker:
+      - image: howardwu/snarkos-ci:2021-03-25
+    resource_class: xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-fmt-cache
+      - run:
+          name: Check style
+          no_output_timeout: 35m
+          command: cargo fmt --all -- --check
+      - clear_environment:
+          cache_key: snarkos-fmt-cache
+
 workflows:
   version: 2
   main-workflow:
@@ -228,3 +243,4 @@ workflows:
       - snarkos-storage
       - snarkos-testing
       - snarkos-toolkit
+      - fmt
