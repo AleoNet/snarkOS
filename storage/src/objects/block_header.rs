@@ -54,7 +54,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
             }
         }
 
-        self.get_block_hash(0)
+        self.get_block_hash(1)
     }
 
     /// Returns a list of block locator hashes. The purpose of this method is to detect
@@ -79,7 +79,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
             if index < step {
                 // If the genesis block has not already been include, add it to the final output
                 if index != 1 {
-                    block_locator_hashes.push(self.get_block_hash(0)?);
+                    block_locator_hashes.push(self.get_block_hash(1)?);
                 }
                 break;
             }

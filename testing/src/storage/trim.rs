@@ -25,7 +25,7 @@ async fn trim_side_chain_blocks() {
     let consensus = create_test_consensus();
 
     // Register the hash of the genesis block.
-    let genesis_block = consensus.ledger.get_block_from_block_number(0).unwrap();
+    let genesis_block = consensus.ledger.get_block_from_block_number(1).unwrap();
     let genesis_hash = genesis_block.header.get_hash();
 
     // Import a few consecutive blocks from one chain.
