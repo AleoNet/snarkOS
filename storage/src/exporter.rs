@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{bytes_to_u32, Ledger, COL_BLOCK_LOCATOR};
-use snarkvm_dpc::{BlockHeaderHash, Parameters, Storage, TransactionScheme};
+use snarkvm_dpc::{BlockHeaderHash, LedgerScheme, Parameters, Storage};
 use snarkvm_utilities::ToBytes;
 
 use parking_lot::Mutex;
@@ -77,7 +77,7 @@ impl PartialOrd for BlockLocatorPair {
     }
 }
 
-impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
     /// Serializes the node's stored canon blocks into a single file written to `location`; `limit` specifies the limit
     /// on the number of blocks to export, with `0` being no limit (a full export). Returns the number of exported
     /// blocks.
@@ -97,9 +97,10 @@ impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledge
 
         let blocks = Mutex::new(Vec::with_capacity(cmp::min(numbers_and_hashes.len(), number_to_export)));
 
+        // TODO (howardwu): TEMPORARY - Make this `into_iter()` a `into_par_iter()`.
         // Skip the genesis block, as it's always known.
         numbers_and_hashes
-            .into_par_iter()
+            .into_iter()
             .skip(1)
             .take(number_to_export)
             .for_each(|(block_number, block_hash)| {
@@ -112,7 +113,8 @@ impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledge
 
         let mut blocks = blocks.into_inner();
 
-        blocks.par_sort_unstable_by_key(|(block_number, _block)| *block_number);
+        // TODO (howardwu): TEMPORARY - Make this `sort_unstable_by_key()` a `par_sort_unstable_by_key()`.
+        blocks.sort_unstable_by_key(|(block_number, _block)| *block_number);
 
         let mut target_file = BufWriter::new(fs::File::create(location)?);
         for (_block_number, block) in &blocks {

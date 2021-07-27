@@ -21,6 +21,7 @@ use snarkvm_dpc::{
     Block,
     BlockHeader,
     DPCScheme,
+    LedgerScheme,
     Parameters,
     ProgramScheme,
     Record,
@@ -83,7 +84,7 @@ impl<S: Storage> Miner<S> {
         }
 
         let (records, tx) = self.consensus.create_coinbase_transaction(
-            self.consensus.ledger.get_current_block_height() + 1,
+            self.consensus.ledger.block_height(),
             transactions,
             self.consensus.dpc.noop_program.id(),
             vec![self.consensus.dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS],
@@ -120,7 +121,7 @@ impl<S: Storage> Miner<S> {
             &*self.consensus.ledger,
         ));
 
-        let previous_block_header = self.consensus.ledger.get_latest_block()?.header;
+        let previous_block_header = self.consensus.ledger.latest_block()?.header;
 
         Ok((previous_block_header, transactions, coinbase_records))
     }

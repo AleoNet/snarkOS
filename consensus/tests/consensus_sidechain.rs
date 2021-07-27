@@ -17,7 +17,7 @@
 mod consensus_sidechain {
     use snarkos_storage::validator::FixMode;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, Block};
+    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, Block, LedgerScheme};
     use snarkvm_utilities::bytes::FromBytes;
 
     use rand::{seq::IteratorRandom, thread_rng, Rng};
@@ -30,7 +30,7 @@ mod consensus_sidechain {
     async fn new_out_of_order() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
-        let old_block_height = consensus.ledger.get_current_block_height();
+        let old_block_height = consensus.ledger.block_height();
 
         // Find second block
 
@@ -44,7 +44,7 @@ mod consensus_sidechain {
 
         // Check balances after both blocks
 
-        let new_block_height = consensus.ledger.get_current_block_height();
+        let new_block_height = consensus.ledger.block_height();
         assert_eq!(old_block_height + 2, new_block_height);
     }
 
@@ -57,7 +57,7 @@ mod consensus_sidechain {
         let block_1_canon = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
         let block_1_side = Block::<Testnet1Transaction>::read_le(&ALTERNATIVE_BLOCK_1[..]).unwrap();
 
-        let old_block_height = consensus.ledger.get_current_block_height();
+        let old_block_height = consensus.ledger.block_height();
 
         // 1. Receive canonchain block 1.
 
@@ -67,13 +67,13 @@ mod consensus_sidechain {
 
         consensus.receive_block(&block_1_side, false).await.unwrap();
 
-        let new_block_height = consensus.ledger.get_current_block_height();
+        let new_block_height = consensus.ledger.block_height();
 
         assert_eq!(old_block_height + 1, new_block_height);
 
         // 3. Ensure sidechain block 1 rejected.
 
-        let accepted = consensus.ledger.get_latest_block().unwrap();
+        let accepted = consensus.ledger.latest_block().unwrap();
 
         assert_ne!(accepted, block_1_side);
     }
@@ -89,22 +89,22 @@ mod consensus_sidechain {
 
         // 1. Receive shorter chain of block_1_canon.
 
-        let mut old_block_height = consensus.ledger.get_current_block_height();
+        let mut old_block_height = consensus.ledger.block_height();
 
         consensus.receive_block(&block_1_canon, false).await.unwrap();
 
-        let mut new_block_height = consensus.ledger.get_current_block_height();
+        let mut new_block_height = consensus.ledger.block_height();
 
         assert_eq!(old_block_height + 1, new_block_height);
 
         // 2. Receive longer chain of blocks 1 and 2 from the sidechain (the longest chain wins).
 
-        old_block_height = consensus.ledger.get_current_block_height();
+        old_block_height = consensus.ledger.block_height();
 
         consensus.receive_block(&block_1_side, false).await.unwrap();
         consensus.receive_block(&block_2_side, false).await.unwrap();
 
-        new_block_height = consensus.ledger.get_current_block_height();
+        new_block_height = consensus.ledger.block_height();
 
         assert_eq!(old_block_height + 1, new_block_height);
     }
@@ -121,41 +121,41 @@ mod consensus_sidechain {
 
         // 1. Receive irrelevant block.
 
-        let mut old_block_height = consensus.ledger.get_current_block_height();
+        let mut old_block_height = consensus.ledger.block_height();
 
         consensus.receive_block(&block_2_canon, false).await.unwrap();
 
-        let mut new_block_height = consensus.ledger.get_current_block_height();
+        let mut new_block_height = consensus.ledger.block_height();
 
         assert_eq!(old_block_height, new_block_height);
 
         // 2. Receive valid sidechain block
 
-        old_block_height = consensus.ledger.get_current_block_height();
+        old_block_height = consensus.ledger.block_height();
 
         consensus.receive_block(&block_1_side, false).await.unwrap();
 
-        new_block_height = consensus.ledger.get_current_block_height();
+        new_block_height = consensus.ledger.block_height();
 
         assert_eq!(old_block_height + 1, new_block_height);
 
         // 3. Receive valid canon block 1 and accept the previous irrelevant block 2
 
-        old_block_height = consensus.ledger.get_current_block_height();
+        old_block_height = consensus.ledger.block_height();
 
         consensus.receive_block(&block_1_canon, false).await.unwrap();
 
-        new_block_height = consensus.ledger.get_current_block_height();
+        new_block_height = consensus.ledger.block_height();
 
         assert_eq!(old_block_height + 1, new_block_height);
 
         // 4. Receive valid canon block 1 and accept the previous irrelevant block 2
 
-        old_block_height = consensus.ledger.get_current_block_height();
+        old_block_height = consensus.ledger.block_height();
 
         consensus.receive_block(&block_2_side, false).await.unwrap();
 
-        new_block_height = consensus.ledger.get_current_block_height();
+        new_block_height = consensus.ledger.block_height();
 
         assert_eq!(old_block_height, new_block_height);
     }
@@ -169,7 +169,7 @@ mod consensus_sidechain {
         consensus.receive_block(&block_1, false).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
-        let mut block_height = consensus.ledger.get_current_block_height();
+        let mut block_height = consensus.ledger.block_height();
         let mut best_block_number = consensus.ledger.get_best_block_number().unwrap();
         assert_eq!(best_block_number, block_height);
 
@@ -178,7 +178,7 @@ mod consensus_sidechain {
         consensus.receive_block(&block_2, false).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
-        block_height = consensus.ledger.get_current_block_height();
+        block_height = consensus.ledger.block_height();
         best_block_number = consensus.ledger.get_best_block_number().unwrap();
         assert_eq!(best_block_number, block_height);
 
@@ -189,7 +189,7 @@ mod consensus_sidechain {
         consensus.ledger.decommit_latest_block().unwrap();
 
         // Verify that the best block number is the same as the block height.
-        block_height = consensus.ledger.get_current_block_height();
+        block_height = consensus.ledger.block_height();
         best_block_number = consensus.ledger.get_best_block_number().unwrap();
         assert_eq!(best_block_number, block_height);
 
@@ -270,7 +270,7 @@ mod consensus_sidechain {
         for block in blocks2.iter().take(rng.gen_range(0..=25)) {
             consensus1.receive_block(block, false).await.unwrap();
         }
-        let overlap_height = consensus1.ledger.get_current_block_height();
+        let overlap_height = consensus1.ledger.block_height();
 
         // There is some initial overlap between the 2 instances.
         let consensus1_locator_hashes = consensus1.ledger.get_block_locator_hashes().unwrap();
@@ -370,12 +370,12 @@ mod consensus_sidechain {
             consensus.ledger.decommit_latest_block().unwrap();
         }
 
-        assert_eq!(consensus.ledger.get_current_block_height(), 10);
+        assert_eq!(consensus.ledger.block_height(), 10);
 
         // Consensus re-imports 1 block, the rest get fast-forwarded.
         consensus.receive_block(&blocks[10], false).await.unwrap();
 
-        assert_eq!(consensus.ledger.get_current_block_height(), 20);
+        assert_eq!(consensus.ledger.block_height(), 20);
 
         // Verify the integrity of the block storage.
         assert!(consensus.ledger.validate(None, FixMode::Nothing).await);

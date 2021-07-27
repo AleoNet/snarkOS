@@ -15,15 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm_dpc::{
-    errors::StorageError,
-    BlockError,
-    BlockHeader,
-    BlockHeaderHash,
-    Parameters,
-    Storage,
-    TransactionScheme,
-};
+use snarkvm_dpc::{errors::StorageError, BlockError, BlockHeader, BlockHeaderHash, LedgerScheme, Parameters, Storage};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
 
@@ -49,7 +41,7 @@ pub struct SideChainPath {
     pub aggregate_difficulty: u128,
 }
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Get the block's path/origin.
     pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();
@@ -60,8 +52,8 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
         }
 
         // The given block header is valid on the canon chain
-        if self.get_latest_block()?.header.get_hash() == block_header.previous_block_hash {
-            return Ok(BlockPath::CanonChain(self.get_current_block_height() + 1));
+        if self.latest_block()?.header.get_hash() == block_header.previous_block_hash {
+            return Ok(BlockPath::CanonChain(self.block_height()));
         }
 
         let mut side_chain_path = vec![];

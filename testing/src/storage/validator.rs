@@ -16,7 +16,7 @@
 
 use crate::sync::{create_test_consensus, TestBlocks};
 use snarkos_storage::*;
-use snarkvm_dpc::{DatabaseTransaction, Op, Storage};
+use snarkvm_dpc::{DatabaseTransaction, LedgerScheme, Op, Storage};
 
 use rand::prelude::*;
 
@@ -199,39 +199,6 @@ async fn validator_vs_a_superfluous_commitment() {
 }
 
 #[tokio::test]
-async fn validator_vs_a_superfluous_memorandum() {
-    let consensus = create_test_consensus();
-
-    let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
-    for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
-    }
-
-    // Add an extra random memo.
-    let mut database_transaction = DatabaseTransaction::new();
-    let current_memo_idx = consensus.ledger.current_memo_index().unwrap() as u32;
-    database_transaction.push(Op::Insert {
-        col: COL_MEMO,
-        key: vec![9; 32], // apparently a memo filled with zeros is already stored
-        value: (current_memo_idx + 1).to_le_bytes().to_vec(),
-    });
-    database_transaction.push(Op::Insert {
-        col: COL_META,
-        key: KEY_CURR_MEMO_INDEX.as_bytes().to_vec(),
-        value: (current_memo_idx + 1).to_le_bytes().to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
-
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
-    assert!(
-        consensus
-            .ledger
-            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
-            .await
-    );
-}
-
-#[tokio::test]
 async fn validator_vs_a_superfluous_digest() {
     let consensus = create_test_consensus();
 
@@ -245,7 +212,7 @@ async fn validator_vs_a_superfluous_digest() {
     database_transaction.push(Op::Insert {
         col: COL_DIGEST,
         key: vec![0; 32],
-        value: (consensus.ledger.get_current_block_height() + 1).to_le_bytes().to_vec(),
+        value: (consensus.ledger.block_height()).to_le_bytes().to_vec(),
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 

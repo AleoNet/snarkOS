@@ -37,7 +37,6 @@ pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
 
 pub const KEY_CURR_CM_INDEX: &str = "CURRENT_CM_INDEX";
 pub const KEY_CURR_SN_INDEX: &str = "CURRENT_SN_INDEX";
-pub const KEY_CURR_MEMO_INDEX: &str = "CURRENT_MEMO_INDEX";
 pub const KEY_CURR_DIGEST: &str = "CURRENT_DIGEST";
 
 /// Represents address of certain transaction within block

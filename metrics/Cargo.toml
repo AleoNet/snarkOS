@@ -38,4 +38,4 @@ features = [ "macros", "rt-multi-thread" ]
 
 [dev-dependencies.snarkvm-derives]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"

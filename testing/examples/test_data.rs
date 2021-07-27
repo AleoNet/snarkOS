@@ -23,6 +23,7 @@ use snarkvm_dpc::{
     Account,
     Address,
     Block,
+    LedgerScheme,
     Parameters,
     ProgramScheme,
     Record,
@@ -90,12 +91,12 @@ fn mine_block<S: Storage>(
 
     let block = Block { header, transactions };
 
-    let old_block_height = miner.consensus.ledger.get_current_block_height();
+    let old_block_height = miner.consensus.ledger.block_height();
 
     // add it to the chain
     futures::executor::block_on(miner.consensus.receive_block(&block, false))?;
 
-    let new_block_height = miner.consensus.ledger.get_current_block_height();
+    let new_block_height = miner.consensus.ledger.block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     Ok((block, coinbase_records))

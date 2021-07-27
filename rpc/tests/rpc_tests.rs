@@ -24,7 +24,7 @@ mod rpc_tests {
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
     };
-    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, TransactionScheme};
+    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, LedgerScheme, TransactionScheme};
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,
@@ -300,8 +300,8 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_block_template() {
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let curr_height = storage.get_current_block_height();
-        let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);
+        let curr_height = storage.block_height();
+        let latest_block_hash = hex::encode(storage.latest_block().unwrap().header.get_hash().0);
 
         let rpc = initialize_test_rpc(storage).await;
 

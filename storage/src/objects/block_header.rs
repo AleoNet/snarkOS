@@ -15,19 +15,19 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Ledger, COL_BLOCK_HEADER};
-use snarkvm_dpc::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, Parameters, Storage, TransactionScheme};
+use snarkvm_dpc::{
+    errors::StorageError,
+    Block,
+    BlockHeader,
+    BlockHeaderHash,
+    LedgerScheme,
+    Parameters,
+    Storage,
+    Transaction,
+};
 use snarkvm_utilities::FromBytes;
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
-    /// Returns true if the block for the given block header hash exists.
-    pub fn block_hash_exists(&self, block_hash: &BlockHeaderHash) -> bool {
-        if self.is_empty() {
-            return false;
-        }
-
-        self.get_block_header(block_hash).is_ok()
-    }
-
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Get a block header given the block hash.
     pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
         match self.storage.get(COL_BLOCK_HEADER, &block_hash.0)? {
@@ -37,8 +37,8 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     }
 
     /// Returns true if the block corresponding to this block's previous_block_hash exists.
-    pub fn previous_block_hash_exists(&self, block: &Block<T>) -> bool {
-        self.block_hash_exists(&block.header.previous_block_hash)
+    pub fn previous_block_hash_exists(&self, block: &Block<Transaction<C>>) -> bool {
+        self.contains_block_hash(&block.header.previous_block_hash)
     }
 
     /// Returns the latest shared block header hash.
@@ -47,7 +47,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     pub fn get_latest_shared_hash(
         &self,
         block_locator_hashes: Vec<BlockHeaderHash>,
-    ) -> Result<BlockHeaderHash, StorageError> {
+    ) -> anyhow::Result<BlockHeaderHash> {
         for block_hash in block_locator_hashes {
             if self.is_canon(&block_hash) {
                 return Ok(block_hash);
@@ -61,7 +61,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     /// wrong branches in the caller's canon chain.
     pub fn get_block_locator_hashes(&self) -> Result<Vec<BlockHeaderHash>, StorageError> {
         // Start from the latest block and work backwards
-        let mut index = self.get_current_block_height();
+        let mut index = self.block_height();
 
         // Update the step size with each iteration
         let mut step = 1;

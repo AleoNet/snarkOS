@@ -21,26 +21,27 @@ use snarkvm_dpc::{
     BlockHeader,
     BlockHeaderHash,
     DatabaseTransaction,
+    LedgerScheme,
     Op,
     Parameters,
     Storage,
     StorageError,
+    Transaction,
     TransactionScheme,
 };
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes_le};
 
 use std::sync::atomic::Ordering;
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Commit a transaction to the canon chain
     #[allow(clippy::type_complexity)]
     pub(crate) fn commit_transaction(
         &self,
         sn_index: &mut usize,
         cm_index: &mut usize,
-        memo_index: &mut usize,
-        transaction: &T,
-    ) -> Result<(Vec<Op>, Vec<(T::Commitment, usize)>), StorageError> {
+        transaction: &Transaction<C>,
+    ) -> Result<(Vec<Op>, Vec<(C::RecordCommitment, usize)>), StorageError> {
         let old_serial_numbers = transaction.old_serial_numbers();
         let new_commitments = transaction.new_commitments();
 
@@ -77,27 +78,15 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
             *cm_index += 1;
         }
 
-        let memo_bytes = to_bytes_le![transaction.memorandum()]?;
-        if self.get_memo_index(&memo_bytes)?.is_some() {
-            return Err(StorageError::ExistingMemo(memo_bytes.to_vec()));
-        } else {
-            ops.push(Op::Insert {
-                col: COL_MEMO,
-                key: memo_bytes,
-                value: (*memo_index as u32).to_le_bytes().to_vec(),
-            });
-            *memo_index += 1;
-        }
-
         Ok((ops, cms))
     }
 
     /// Insert a block into storage without canonizing/committing it.
-    pub fn insert_only(&self, block: &Block<T>) -> Result<(), StorageError> {
+    pub fn insert_only(&self, block: &Block<Transaction<C>>) -> Result<(), StorageError> {
         let block_hash = block.header.get_hash();
 
         // Check that the block does not already exist.
-        if self.block_hash_exists(&block_hash) {
+        if self.contains_block_hash(&block_hash) {
             return Err(StorageError::BlockError(BlockError::BlockExists(
                 block_hash.to_string(),
             )));
@@ -107,12 +96,10 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
         let mut transaction_serial_numbers = Vec::with_capacity(block.transactions.0.len());
         let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
-        let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
             transaction_serial_numbers.push(transaction.old_serial_numbers());
             transaction_commitments.push(transaction.new_commitments());
-            transaction_memos.push(transaction.memorandum());
         }
 
         // Sanitize the block inputs
@@ -125,11 +112,6 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
         // Check if the transactions in the block have duplicate commitments
         if has_duplicates(transaction_commitments) {
             return Err(StorageError::DuplicateCm);
-        }
-
-        // Check if the transactions in the block have duplicate memos
-        if has_duplicates(transaction_memos) {
-            return Err(StorageError::DuplicateMemo);
         }
 
         for (index, transaction) in block.transactions.0.iter().enumerate() {
@@ -173,7 +155,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     }
 
     /// Commit/canonize a particular block.
-    pub fn commit(&self, block: &Block<T>) -> Result<(), StorageError> {
+    pub fn commit(&self, block: &Block<Transaction<C>>) -> Result<(), StorageError> {
         let block_header_hash = block.header.get_hash();
 
         // Check if the block is already in the canon chain
@@ -185,12 +167,10 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
         let mut transaction_serial_numbers = Vec::with_capacity(block.transactions.0.len());
         let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
-        let mut transaction_memos = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
             transaction_serial_numbers.push(transaction.old_serial_numbers());
             transaction_commitments.push(transaction.new_commitments());
-            transaction_memos.push(transaction.memorandum());
         }
 
         // Sanitize the block inputs
@@ -205,21 +185,15 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
             return Err(StorageError::DuplicateCm);
         }
 
-        // Check if the transactions in the block have duplicate memos
-        if has_duplicates(transaction_memos) {
-            return Err(StorageError::DuplicateMemo);
-        }
-
         let mut sn_index = self.current_sn_index()?;
         let mut cm_index = self.current_cm_index()?;
-        let mut memo_index = self.current_memo_index()?;
 
         // Process the individual transactions
 
         let mut transaction_cms = vec![];
 
         for (index, transaction) in block.transactions.0.iter().enumerate() {
-            let (tx_ops, cms) = self.commit_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
+            let (tx_ops, cms) = self.commit_transaction(&mut sn_index, &mut cm_index, transaction)?;
             database_transaction.push_vec(tx_ops);
             transaction_cms.extend(cms);
 
@@ -246,15 +220,10 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
             key: KEY_CURR_CM_INDEX.as_bytes().to_vec(),
             value: (cm_index as u32).to_le_bytes().to_vec(),
         });
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_CURR_MEMO_INDEX.as_bytes().to_vec(),
-            value: (memo_index as u32).to_le_bytes().to_vec(),
-        });
 
         // Update the best block number
 
-        let height = self.get_current_block_height();
+        let height = self.block_height();
 
         let is_genesis =
             block.header.previous_block_hash == BlockHeaderHash([0u8; 32]) && height == 0 && self.is_empty();
@@ -318,11 +287,11 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     }
 
     /// Insert a block into the storage and commit as part of the longest chain.
-    pub fn insert_and_commit(&self, block: &Block<T>) -> Result<(), StorageError> {
+    pub fn insert_and_commit(&self, block: &Block<Transaction<C>>) -> Result<(), StorageError> {
         let block_hash = block.header.get_hash();
 
         // If the block does not exist in the storage
-        if !self.block_hash_exists(&block_hash) {
+        if !self.contains_block_hash(&block_hash) {
             // Insert it first
             self.insert_only(block)?;
         }
@@ -332,7 +301,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
     /// Returns true if the block exists in the canon chain.
     pub fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
-        self.block_hash_exists(block_hash) && self.get_block_number(block_hash).is_ok()
+        self.contains_block_hash(block_hash) && self.get_block_number(block_hash).is_ok()
     }
 
     /// Returns true if the block corresponding to this block's previous_block_hash is in the canon chain.
@@ -342,7 +311,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
     /// Revert the chain to the state before the fork.
     pub fn revert_for_fork(&self, side_chain_path: &SideChainPath) -> Result<(), StorageError> {
-        let current_block_height = self.get_current_block_height();
+        let current_block_height = self.block_height();
 
         if side_chain_path.new_block_number > current_block_height {
             // Decommit all blocks on canon chain up to the shared block number with the side chain.

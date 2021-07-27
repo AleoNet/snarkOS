@@ -23,20 +23,12 @@ pub mod trim;
 #[cfg(test)]
 pub mod validator;
 
-use crate::sync::TestTestnet1Transaction;
 pub use snarkos_storage::{Ledger, LedgerStorage};
-use snarkvm_dpc::{
-    testnet1::parameters::Testnet1Parameters,
-    Block,
-    LedgerScheme,
-    Parameters,
-    Storage,
-    TransactionScheme,
-};
+use snarkvm_dpc::{testnet1::parameters::Testnet1Parameters, Block, LedgerScheme, Parameters, Storage, Transaction};
 
 use rand::{thread_rng, Rng};
 
-pub type Store = Ledger<Testnet1Parameters, TestTestnet1Transaction, LedgerStorage>;
+pub type Store = Ledger<Testnet1Parameters, LedgerStorage>;
 
 pub fn random_storage_path() -> String {
     let random_path: usize = thread_rng().gen();
@@ -44,11 +36,9 @@ pub fn random_storage_path() -> String {
 }
 
 // Initialize a test blockchain given genesis attributes
-pub fn initialize_test_blockchain<C: Parameters, T: TransactionScheme, S: Storage>(
-    genesis_block: Block<T>,
-) -> Ledger<C, T, S> {
+pub fn initialize_test_blockchain<C: Parameters, S: Storage>(genesis_block: Block<Transaction<C>>) -> Ledger<C, S> {
     let mut path = std::env::temp_dir();
     path.push(random_storage_path());
 
-    Ledger::<C, T, S>::new(Some(&path), genesis_block).unwrap()
+    Ledger::<C, S>::new(Some(&path), genesis_block).unwrap()
 }

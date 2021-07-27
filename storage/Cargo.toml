@@ -25,19 +25,19 @@ test = [ ]
 
 [dependencies.snarkvm-algorithms]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.snarkvm-dpc]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.snarkvm-parameters]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.snarkvm-utilities]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.snarkos-parameters]
 path = "../parameters"
@@ -88,7 +88,7 @@ path = "../consensus"
 
 [dev-dependencies.snarkvm-curves]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"

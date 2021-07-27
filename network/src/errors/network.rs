@@ -22,6 +22,7 @@ use std::{fmt, io::ErrorKind};
 
 #[derive(Debug)]
 pub enum NetworkError {
+    Anyhow(anyhow::Error),
     Bincode(Box<bincode::ErrorKind>),
     BlockError(BlockError),
     CapnProto(capnp::Error),
@@ -109,6 +110,12 @@ impl From<ConsensusError> for NetworkError {
 impl From<StorageError> for NetworkError {
     fn from(error: StorageError) -> Self {
         NetworkError::StorageError(error)
+    }
+}
+
+impl From<anyhow::Error> for NetworkError {
+    fn from(error: anyhow::Error) -> Self {
+        NetworkError::Anyhow(error)
     }
 }
 

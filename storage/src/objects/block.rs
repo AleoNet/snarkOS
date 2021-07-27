@@ -20,10 +20,12 @@ use snarkvm_dpc::{
     BlockError,
     BlockHeaderHash,
     DatabaseTransaction,
+    LedgerScheme,
     Op,
     Parameters,
     Storage,
     StorageError,
+    Transaction,
     TransactionScheme,
     Transactions,
 };
@@ -31,37 +33,16 @@ use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
-    /// Get the latest block in the chain.
-    pub fn get_latest_block(&self) -> Result<Block<T>, StorageError> {
-        self.get_block_from_block_number(self.get_current_block_height())
-    }
-
-    /// Get a block given the block hash.
-    pub fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block<T>, StorageError> {
-        Ok(Block {
-            header: self.get_block_header(block_hash)?,
-            transactions: self.get_block_transactions(block_hash)?,
-        })
-    }
-
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Get a block given the block number.
-    pub fn get_block_from_block_number(&self, block_number: u32) -> Result<Block<T>, StorageError> {
-        if block_number > self.get_current_block_height() {
-            return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_number)));
+    pub fn get_block_from_block_number(&self, block_number: u32) -> anyhow::Result<Block<Transaction<C>>> {
+        if block_number > self.block_height() {
+            return Err(StorageError::BlockError(BlockError::InvalidBlockNumber(block_number)).into());
         }
 
         let block_hash = self.get_block_hash(block_number)?;
 
         self.get_block(&block_hash)
-    }
-
-    /// Get the block hash given a block number.
-    pub fn get_block_hash(&self, block_number: u32) -> Result<BlockHeaderHash, StorageError> {
-        match self.storage.get(COL_BLOCK_LOCATOR, &block_number.to_le_bytes())? {
-            Some(block_header_hash) => Ok(BlockHeaderHash::new(block_header_hash)),
-            None => Err(StorageError::MissingBlockHash(block_number)),
-        }
     }
 
     /// Get the block number given a block hash.
@@ -73,7 +54,10 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     }
 
     /// Get the list of transaction ids given a block hash.
-    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Transactions<T>, StorageError> {
+    pub fn get_block_transactions(
+        &self,
+        block_hash: &BlockHeaderHash,
+    ) -> Result<Transactions<Transaction<C>>, StorageError> {
         match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0)? {
             Some(encoded_block_transactions) => Ok(Transactions::read_le(&encoded_block_transactions[..])?),
             None => Err(StorageError::MissingBlockTransactions(block_hash.to_string())),
@@ -92,7 +76,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     }
 
     /// Returns the block number of a conflicting block that has already been mined.
-    pub fn already_mined(&self, block: &Block<T>) -> Result<Option<u32>, StorageError> {
+    pub fn already_mined(&self, block: &Block<Transaction<C>>) -> Result<Option<u32>, StorageError> {
         // look up new block's previous block by hash
         // if the block after previous_block_number exists, then someone has already mined this new block
         let previous_block_number = self.get_block_number(&block.header.previous_block_hash)?;
@@ -157,7 +141,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
     /// De-commit the latest block and return its header hash.
     pub fn decommit_latest_block(&self) -> Result<BlockHeaderHash, StorageError> {
-        let current_block_height = self.get_current_block_height();
+        let current_block_height = self.block_height();
 
         tracing::debug!("Decommitting block at height {}", current_block_height);
 
@@ -183,7 +167,6 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
         let mut sn_index = self.current_sn_index()?;
         let mut cm_index = self.current_cm_index()?;
-        let mut memo_index = self.current_memo_index()?;
 
         for transaction in self.get_block_transactions(&block_hash)?.0 {
             for sn in transaction.old_serial_numbers() {
@@ -201,12 +184,6 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
                 });
                 cm_index -= 1;
             }
-
-            database_transaction.push(Op::Delete {
-                col: COL_MEMO,
-                key: to_bytes_le![transaction.memorandum()]?,
-            });
-            memo_index -= 1;
         }
 
         // Update the database state for current indexes
@@ -220,11 +197,6 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
             col: COL_META,
             key: KEY_CURR_CM_INDEX.as_bytes().to_vec(),
             value: (cm_index as u32).to_le_bytes().to_vec(),
-        });
-        database_transaction.push(Op::Insert {
-            col: COL_META,
-            key: KEY_CURR_MEMO_INDEX.as_bytes().to_vec(),
-            value: (memo_index as u32).to_le_bytes().to_vec(),
         });
 
         database_transaction.push(Op::Delete {
@@ -254,7 +226,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
     /// Remove the latest `num_blocks` blocks.
     pub fn remove_latest_blocks(&self, num_blocks: u32) -> Result<(), StorageError> {
-        let current_block_height = self.get_current_block_height();
+        let current_block_height = self.block_height();
         if num_blocks > current_block_height {
             return Err(StorageError::InvalidBlockRemovalNum(num_blocks, current_block_height));
         }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Testnet1Transaction};
+use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_metrics::{
     self as metrics,
     misc::{BLOCK_HEIGHT, *},
@@ -22,7 +22,7 @@ use snarkos_metrics::{
 use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
+    testnet1::parameters::{Testnet1DPC, Testnet1Parameters, Testnet1Transaction},
     Account,
     AccountScheme,
     Address,
@@ -88,7 +88,7 @@ impl<S: Storage> Consensus<S> {
 
         // Verify the block header
         if !crate::is_genesis(&block.header) {
-            let parent_block = self.ledger.get_latest_block()?;
+            let parent_block = self.ledger.latest_block()?;
             if let Err(err) =
                 self.parameters
                     .verify_header(&block.header, &parent_block.header, &merkle_root, &pedersen_merkle_root)
@@ -119,7 +119,7 @@ impl<S: Storage> Consensus<S> {
         }
 
         // Check that the block value balances are correct
-        let expected_block_reward = crate::get_block_reward(self.ledger.block_height() as u32).0;
+        let expected_block_reward = crate::get_block_reward(self.ledger.block_height()).0;
         if total_value_balance.0 + expected_block_reward != 0 {
             trace!("total_value_balance: {:?}", total_value_balance);
             trace!("expected_block_reward: {:?}", expected_block_reward);
@@ -179,7 +179,7 @@ impl<S: Storage> Consensus<S> {
 
                             debug!(
                                 "Processing the next known descendant. Height {}",
-                                self.ledger.get_current_block_height() + 1
+                                self.ledger.block_height()
                             );
                             self.process_block(&new_block).await?;
                         }
@@ -207,7 +207,7 @@ impl<S: Storage> Consensus<S> {
                         self.ledger.revert_for_fork(&side_chain_path)?;
 
                         // Update the current block height metric.
-                        metrics::gauge!(BLOCK_HEIGHT, self.ledger.get_current_block_height() as f64);
+                        metrics::gauge!(BLOCK_HEIGHT, self.ledger.block_height() as f64);
 
                         if !side_chain_path.path.is_empty() {
                             for block_hash in side_chain_path.path {
@@ -389,7 +389,7 @@ impl<S: Storage> Consensus<S> {
     }
 
     fn get_canon_difficulty_from_height(&self, height: u32) -> Result<u128, StorageError> {
-        let current_block_height = self.ledger.get_current_block_height();
+        let current_block_height = self.ledger.block_height();
         let path_size = current_block_height - height;
         let mut aggregate_difficulty = 0u128;
 

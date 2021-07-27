@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Parameters, Storage, TransactionScheme};
+use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Parameters, Storage};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
@@ -23,7 +23,7 @@ use snarkvm_utilities::{
 
 use std::{collections::HashSet, sync::Arc};
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Get the current commitment index
     pub fn current_cm_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_CM_INDEX.as_bytes())? {
@@ -36,14 +36,6 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     pub fn current_sn_index(&self) -> Result<usize, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_SN_INDEX.as_bytes())? {
             Some(sn_index_bytes) => Ok(bytes_to_u32(&sn_index_bytes) as usize),
-            None => Ok(0),
-        }
-    }
-
-    /// Get the current memo index
-    pub fn current_memo_index(&self) -> Result<usize, StorageError> {
-        match self.storage.get(COL_META, KEY_CURR_MEMO_INDEX.as_bytes())? {
-            Some(memo_index_bytes) => Ok(bytes_to_u32(&memo_index_bytes) as usize),
             None => Ok(0),
         }
     }
@@ -90,26 +82,13 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
         }
     }
 
-    /// Get memo index
-    pub fn get_memo_index(&self, memo_bytes: &[u8]) -> Result<Option<usize>, StorageError> {
-        match self.storage.get(COL_MEMO, memo_bytes)? {
-            Some(memo_index_bytes) => {
-                let mut memo_index = [0u8; 4];
-                memo_index.copy_from_slice(&memo_index_bytes[0..4]);
-
-                Ok(Some(u32::from_le_bytes(memo_index) as usize))
-            }
-            None => Ok(None),
-        }
-    }
-
     /// Build a new commitment merkle tree from the stored commitments
-    pub fn rebuild_merkle_tree(&self, additional_cms: Vec<(T::Commitment, usize)>) -> Result<(), StorageError> {
+    pub fn rebuild_merkle_tree(&self, additional_cms: Vec<(C::RecordCommitment, usize)>) -> Result<(), StorageError> {
         let mut new_cm_and_indices = additional_cms;
 
         let mut old_cm_and_indices = vec![];
         for (commitment_key, index_value) in self.storage.get_col(COL_COMMITMENT)? {
-            let commitment: T::Commitment = FromBytes::read_le(&commitment_key[..])?;
+            let commitment: C::RecordCommitment = FromBytes::read_le(&commitment_key[..])?;
             let index = bytes_to_u32(&index_value) as usize;
 
             old_cm_and_indices.push((commitment, index));

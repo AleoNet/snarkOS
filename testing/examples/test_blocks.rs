@@ -25,6 +25,7 @@ use snarkvm_dpc::{
     Account,
     Address,
     Block,
+    LedgerScheme,
     Parameters,
     Payload as RecordPayload,
     ProgramScheme,
@@ -51,12 +52,12 @@ async fn mine_block<S: Storage>(
 
     let block = Block { header, transactions };
 
-    let old_block_height = miner.consensus.ledger.get_current_block_height();
+    let old_block_height = miner.consensus.ledger.block_height();
 
     // Duplicate blocks dont do anything
     miner.consensus.receive_block(&block, false).await.ok(); // throws a duplicate error -- seemingly intentional
 
-    let new_block_height = miner.consensus.ledger.get_current_block_height();
+    let new_block_height = miner.consensus.ledger.block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
     Ok((block, coinbase_records))

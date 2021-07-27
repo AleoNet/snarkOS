@@ -58,14 +58,9 @@ pub mod parameters;
 pub use parameters::*;
 
 use snarkos_storage::Ledger;
-use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1Parameters, Testnet1Transaction},
-    AleoAmount,
-    BlockHeader,
-    BlockHeaderHash,
-};
+use snarkvm_dpc::{testnet1::parameters::Testnet1Parameters, AleoAmount, BlockHeader, BlockHeaderHash};
 
-pub type MerkleTreeLedger<S> = Ledger<Testnet1Parameters, Testnet1Transaction, S>;
+pub type MerkleTreeLedger<S> = Ledger<Testnet1Parameters, S>;
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> AleoAmount {

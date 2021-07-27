@@ -45,20 +45,20 @@ path = "snarkos/main.rs"
 
 [dependencies.snarkvm-algorithms]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 default-features = false
 
 [dependencies.snarkvm-dpc]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.snarkvm-posw]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.snarkvm-utilities]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.snarkos-consensus]
 path = "./consensus"

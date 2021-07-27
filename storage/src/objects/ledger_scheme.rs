@@ -16,18 +16,21 @@
 
 use crate::*;
 use snarkvm_algorithms::merkle_tree::*;
-use snarkvm_dpc::{Block, LedgerError, LedgerScheme, Parameters, Storage, TransactionScheme};
+use snarkvm_dpc::{Block, BlockHeaderHash, LedgerError, LedgerScheme, Parameters, Storage, StorageError, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
 };
 
 use arc_swap::ArcSwap;
-use std::{fs, marker::PhantomData, path::Path, sync::Arc};
+use std::{
+    fs,
+    path::Path,
+    sync::{atomic::Ordering, Arc},
+};
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> LedgerScheme<C> for Ledger<C, T, S> {
-    type Block = Block<Self::Transaction>;
-    type Transaction = T;
+impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
+    type Block = Block<Transaction<C>>;
 
     /// Instantiates a new ledger with a genesis block.
     fn new(path: Option<&Path>, genesis_block: Self::Block) -> anyhow::Result<Self> {
@@ -53,7 +56,6 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> LedgerScheme<C> for Ledger
             current_block_height: Default::default(),
             storage,
             cm_merkle_tree: ArcSwap::new(Arc::new(empty_cm_merkle_tree)),
-            _transaction: PhantomData,
         };
 
         ledger_storage.insert_and_commit(&genesis_block)?;
@@ -62,8 +64,35 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> LedgerScheme<C> for Ledger
     }
 
     /// Returns the number of blocks including the genesis block
-    fn block_height(&self) -> usize {
-        self.get_current_block_height() as usize + 1
+    fn block_height(&self) -> u32 {
+        self.current_block_height.load(Ordering::SeqCst)
+    }
+
+    /// Returns the latest block in the ledger.
+    fn latest_block(&self) -> anyhow::Result<Block<Transaction<C>>> {
+        let block_hash = self.get_block_hash(self.block_height())?;
+        Ok(self.get_block(&block_hash)?)
+    }
+
+    /// Returns the block given the block hash.
+    fn get_block(&self, block_hash: &BlockHeaderHash) -> anyhow::Result<Block<Transaction<C>>> {
+        Ok(Block {
+            header: self.get_block_header(block_hash)?,
+            transactions: self.get_block_transactions(block_hash)?,
+        })
+    }
+
+    /// Returns the block hash given a block number.
+    fn get_block_hash(&self, block_number: u32) -> anyhow::Result<BlockHeaderHash> {
+        match self.storage.get(COL_BLOCK_LOCATOR, &block_number.to_le_bytes())? {
+            Some(block_header_hash) => Ok(BlockHeaderHash::new(block_header_hash)),
+            None => Err(StorageError::MissingBlockHash(block_number).into()),
+        }
+    }
+
+    /// Returns true if the given block hash exists in the ledger.
+    fn contains_block_hash(&self, block_hash: &BlockHeaderHash) -> bool {
+        self.get_block_header(block_hash).is_ok()
     }
 
     /// Return a digest of the latest ledger Merkle tree.
@@ -76,7 +105,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> LedgerScheme<C> for Ledger
     }
 
     /// Check that st_{ts} is a valid digest for some (past) ledger state.
-    fn validate_digest(&self, digest: &MerkleTreeDigest<C::RecordCommitmentTreeParameters>) -> bool {
+    fn is_valid_digest(&self, digest: &MerkleTreeDigest<C::RecordCommitmentTreeParameters>) -> bool {
         self.storage.exists(COL_DIGEST, &digest.to_bytes_le().unwrap())
     }
 

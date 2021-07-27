@@ -16,7 +16,7 @@
 
 use crate::sync::{create_test_consensus, TestBlocks};
 use snarkos_storage::*;
-use snarkvm_dpc::BlockHeaderHash;
+use snarkvm_dpc::{BlockHeaderHash, LedgerScheme};
 
 use std::collections::HashSet;
 
@@ -56,7 +56,7 @@ async fn trim_side_chain_blocks() {
     for block in &blocks1 {
         // Check the header.
         let hash = block.header.get_hash();
-        assert!(consensus.ledger.block_hash_exists(&hash));
+        assert!(consensus.ledger.contains_block_hash(&hash));
 
         // Check the txs.
         assert!(consensus.ledger.get_block_transactions(&hash).is_ok());
@@ -76,7 +76,7 @@ async fn trim_side_chain_blocks() {
     for block in blocks1 {
         // Check the header.
         let hash = block.header.get_hash();
-        assert!(!consensus.ledger.block_hash_exists(&hash));
+        assert!(!consensus.ledger.contains_block_hash(&hash));
 
         // Check the txs.
         assert!(consensus.ledger.get_block_transactions(&hash).is_err());

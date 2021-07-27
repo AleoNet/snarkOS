@@ -19,19 +19,19 @@ edition = "2018"
 
 [dependencies.snarkvm-algorithms]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 default-features = false
 
 [dependencies.snarkvm-parameters]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dependencies.arc-swap]
 version = "1.2"
 
 [dependencies.snarkvm-utilities]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 default-features = false
 
 [dependencies.curl]
@@ -40,19 +40,19 @@ optional = true
 
 [dev-dependencies.snarkvm-curves]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dev-dependencies.snarkvm-dpc]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dev-dependencies.snarkvm-marlin]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dev-dependencies.snarkvm-posw]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5dfb2ff"
+rev = "444ae8f"
 
 [dev-dependencies.snarkos-consensus]
 path = "../consensus"

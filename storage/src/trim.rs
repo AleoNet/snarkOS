@@ -48,7 +48,7 @@ struct StorageTrimSummary {
     updated_parents: usize,
 }
 
-impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
     /// Removes obsolete objects from the database; can be used for cleanup purposes, but it can also provide
     /// some insight into the features of the chain, e.g. the number of blocks and transactions that were
     /// ultimately not accepted into the canonical chain.

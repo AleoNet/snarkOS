@@ -67,7 +67,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     }
 
     /// Load the memory pool from previously stored state in storage
-    pub async fn from_storage<C: Parameters, S: Storage>(storage: &Ledger<C, T, S>) -> Result<Self, ConsensusError> {
+    pub async fn from_storage<C: Parameters, S: Storage>(storage: &Ledger<C, S>) -> Result<Self, ConsensusError> {
         let memory_pool = Self::new();
 
         if let Ok(Some(serialized_transactions)) = storage.get_memory_pool() {
@@ -88,7 +88,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
 
     /// Store the memory pool state to the database
     #[inline]
-    pub fn store<C: Parameters, S: Storage>(&self, storage: &Ledger<C, T, S>) -> Result<(), ConsensusError> {
+    pub fn store<C: Parameters, S: Storage>(&self, storage: &Ledger<C, S>) -> Result<(), ConsensusError> {
         let mut transactions = Transactions::<T>::new();
 
         for (_transaction_id, entry) in self.transactions.inner().iter() {
@@ -105,7 +105,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     /// Adds entry to memory pool if valid in the current ledger.
     pub async fn insert<C: Parameters, S: Storage>(
         &self,
-        storage: &Ledger<C, T, S>,
+        storage: &Ledger<C, S>,
         entry: Entry<T>,
     ) -> Result<Option<Vec<u8>>, ConsensusError> {
         let transaction_serial_numbers = entry.transaction.old_serial_numbers();
@@ -158,7 +158,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
 
     /// Cleanse the memory pool of outdated transactions.
     #[inline]
-    pub async fn cleanse<C: Parameters, S: Storage>(&self, storage: &Ledger<C, T, S>) -> Result<(), ConsensusError> {
+    pub async fn cleanse<C: Parameters, S: Storage>(&self, storage: &Ledger<C, S>) -> Result<(), ConsensusError> {
         let new_memory_pool = Self::new();
 
         for (_, entry) in self.clone().transactions.inner().iter() {
@@ -219,7 +219,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     /// Get candidate transactions for a new block.
     pub fn get_candidates<C: Parameters, S: Storage>(
         &self,
-        storage: &Ledger<C, T, S>,
+        storage: &Ledger<C, S>,
         max_size: usize,
     ) -> Result<Transactions<T>, ConsensusError> {
         let max_size = max_size - (BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE);
@@ -388,7 +388,9 @@ mod tests {
 
         mem_pool.store(&blockchain).unwrap();
 
-        let new_mem_pool = MemoryPool::from_storage(&blockchain).await.unwrap();
+        let new_mem_pool = MemoryPool::<Testnet1Transaction>::from_storage(&blockchain)
+            .await
+            .unwrap();
 
         assert_eq!(
             mem_pool.total_size_in_bytes.load(Ordering::SeqCst),

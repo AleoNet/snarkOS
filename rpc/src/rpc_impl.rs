@@ -25,6 +25,7 @@ use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkvm_dpc::{
     testnet1::parameters::{Testnet1DPC, Testnet1Transaction},
     BlockHeaderHash,
+    LedgerScheme,
     Storage,
     TransactionScheme,
 };
@@ -117,7 +118,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         };
 
         let confirmations = match height {
-            Some(block_height) => storage.get_current_block_height() - block_height,
+            Some(block_height) => storage.block_height() - block_height,
             None => 0,
         };
 
@@ -158,7 +159,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let storage = &self.storage;
         let primary_height = self.sync_handler()?.current_block_height();
         storage.catch_up_secondary(false, primary_height)?;
-        let best_block_hash = storage.get_block_hash(storage.get_current_block_height())?;
+        let best_block_hash = storage.get_block_hash(storage.block_height())?;
 
         Ok(hex::encode(&best_block_hash.0))
     }
@@ -354,7 +355,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let primary_height = self.sync_handler()?.current_block_height();
         storage.catch_up_secondary(false, primary_height)?;
 
-        let block_height = storage.get_current_block_height();
+        let block_height = storage.block_height();
         let block = storage.get_block_from_block_number(block_height)?;
 
         let time = Utc::now().timestamp();

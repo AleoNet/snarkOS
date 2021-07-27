@@ -15,14 +15,22 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
-use snarkvm_dpc::{errors::StorageError, BlockHeaderHash, LedgerScheme, Parameters, Storage, TransactionScheme};
+use snarkvm_dpc::{
+    errors::StorageError,
+    BlockHeaderHash,
+    LedgerScheme,
+    Parameters,
+    Storage,
+    Transaction,
+    TransactionScheme,
+};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
     to_bytes_le,
 };
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Returns a transaction location given the transaction ID if it exists. Returns `None` otherwise.
     pub fn get_transaction_location(&self, transaction_id: &[u8]) -> Result<Option<TransactionLocation>, StorageError> {
         match self.storage.get(COL_TRANSACTION_LOCATION, transaction_id)? {
@@ -35,7 +43,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     }
 
     /// Returns a transaction given the transaction ID if it exists. Returns `None` otherwise.
-    pub fn get_transaction(&self, transaction_id: &[u8]) -> Result<Option<T>, StorageError> {
+    pub fn get_transaction(&self, transaction_id: &[u8]) -> Result<Option<Transaction<C>>, StorageError> {
         match self.get_transaction_location(transaction_id)? {
             Some(transaction_location) => {
                 let block_transactions =
@@ -55,7 +63,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
     }
 
     /// Returns true if the transaction has internal parameters that already exist in the ledger.
-    pub fn transaction_conflicts(&self, transaction: &T) -> bool {
+    pub fn transaction_conflicts<T: TransactionScheme>(&self, transaction: &T) -> bool {
         let transaction_serial_numbers = transaction.old_serial_numbers();
         let transaction_commitments = transaction.new_commitments();
 

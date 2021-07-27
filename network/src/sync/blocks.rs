@@ -16,7 +16,7 @@
 
 use std::net::SocketAddr;
 
-use snarkvm_dpc::{Block, BlockHeaderHash, Storage};
+use snarkvm_dpc::{Block, BlockHeaderHash, LedgerScheme, Storage};
 
 use snarkos_consensus::error::ConsensusError;
 use snarkos_metrics::{self as metrics, misc::*};
@@ -139,7 +139,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
         &self,
         remote_address: SocketAddr,
         header_hashes: Vec<BlockHeaderHash>,
-    ) -> Result<(), NetworkError> {
+    ) -> anyhow::Result<()> {
         for hash in header_hashes.into_iter().take(crate::MAX_BLOCK_SYNC_COUNT as usize) {
             let block = self.expect_sync().storage().get_block(&hash)?;
 
@@ -162,7 +162,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
             let storage = self.expect_sync().storage();
 
             let latest_shared_hash = storage.get_latest_shared_hash(block_locator_hashes)?;
-            let current_height = storage.get_current_block_height();
+            let current_height = storage.block_height();
 
             if let Ok(height) = storage.get_block_number(&latest_shared_hash) {
                 if height < current_height {

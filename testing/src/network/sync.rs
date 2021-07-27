@@ -25,7 +25,7 @@ use crate::{
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
 
-use snarkvm_dpc::{block_header_hash::BlockHeaderHash, testnet1::parameters::Testnet1Transaction};
+use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, BlockHeaderHash, LedgerScheme};
 #[cfg(test)]
 use snarkvm_utilities::FromBytes;
 
@@ -101,8 +101,8 @@ async fn block_initiator_side() {
 
     // check the blocks have been added to the node's chain
     let node_storage = node.expect_sync().storage();
-    wait_until!(5, node_storage.block_hash_exists(&block_1_header_hash));
-    wait_until!(1, node_storage.block_hash_exists(&block_2_header_hash));
+    wait_until!(5, node_storage.contains_block_hash(&block_1_header_hash));
+    wait_until!(1, node_storage.contains_block_hash(&block_2_header_hash));
 }
 
 #[tokio::test]

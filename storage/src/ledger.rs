@@ -26,14 +26,13 @@ use snarkvm_dpc::{
     Op,
     Parameters,
     Storage,
-    TransactionScheme,
+    Transaction,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
 
 use std::{
     fs,
-    marker::PhantomData,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -43,14 +42,13 @@ use std::{
 
 pub type BlockHeight = u32;
 
-pub struct Ledger<C: Parameters, T: TransactionScheme, S: Storage> {
+pub struct Ledger<C: Parameters, S: Storage> {
     pub current_block_height: AtomicU32,
     pub cm_merkle_tree: ArcSwap<MerkleTree<C::RecordCommitmentTreeParameters>>,
     pub storage: S,
-    pub _transaction: PhantomData<T>,
 }
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Create a fresh blockchain, optionally at the specified path.
     /// Warning: if specified, any existing storage at that location is removed.
     pub fn new_empty<PATH: AsRef<Path>>(path: Option<PATH>) -> Result<Self, StorageError> {
@@ -59,7 +57,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
             Self::open_at_path(path)
         } else {
-            let genesis_block: Block<T> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
+            let genesis_block: Block<Transaction<C>> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
 
             Ok(Self::new(None, genesis_block).expect("Ledger could not be instantiated"))
         }
@@ -81,17 +79,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
     /// Returns true if there are no blocks in the ledger.
     pub fn is_empty(&self) -> bool {
-        self.get_latest_block().is_err()
-    }
-
-    /// Get the latest block height of the chain.
-    pub fn get_current_block_height(&self) -> BlockHeight {
-        self.current_block_height.load(Ordering::SeqCst)
-    }
-
-    /// Get the latest number of blocks in the chain.
-    pub fn get_block_count(&self) -> BlockHeight {
-        self.get_current_block_height() + 1
+        self.latest_block().is_err()
     }
 
     /// Get the height of the best block on the chain.
@@ -149,7 +137,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
                 let cms = storage.get_col(COL_COMMITMENT)?;
 
                 for (commitment_key, index_value) in cms {
-                    let commitment: T::Commitment = FromBytes::read_le(&commitment_key[..])?;
+                    let commitment: C::RecordCommitment = FromBytes::read_le(&commitment_key[..])?;
                     let index = bytes_to_u32(&index_value) as usize;
 
                     cm_and_indices.push((commitment, index));
@@ -165,13 +153,12 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
                     current_block_height: AtomicU32::new(bytes_to_u32(&val)),
                     storage,
                     cm_merkle_tree: ArcSwap::new(Arc::new(merkle_tree)),
-                    _transaction: PhantomData,
                 })
             }
             None => {
                 // Add genesis block to database
 
-                let genesis_block: Block<T> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
+                let genesis_block: Block<Transaction<C>> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
 
                 let ledger_storage =
                     Self::new(Some(path.as_ref()), genesis_block).expect("Ledger could not be instantiated");
@@ -189,7 +176,7 @@ impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
 
     /// Attempt to catch the secondary read-only storage instance with the primary instance.
     pub fn catch_up_secondary(&self, update_merkle_tree: bool, primary_height: u32) -> Result<(), StorageError> {
-        let secondary_height = self.get_current_block_height();
+        let secondary_height = self.block_height();
 
         // If the primary block height is greater than the secondary block height, attempt to catch up,
         // update the block height and potentially the merkle tree.

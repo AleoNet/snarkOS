@@ -28,9 +28,11 @@ use snarkvm_dpc::{
     Block,
     BlockHeaderHash,
     DatabaseTransaction,
+    LedgerScheme,
     Op,
     Parameters,
     Storage,
+    Transaction,
     TransactionScheme,
     Transactions,
 };
@@ -125,7 +127,7 @@ pub enum ValidatorAction {
     QueueDatabaseOp(Op),
 }
 
-impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
     check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", COL_MEMO);
 
     check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", COL_DIGEST);
@@ -158,7 +160,7 @@ impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledge
             return is_valid.load(Ordering::SeqCst);
         }
 
-        let mut current_height = self.get_current_block_height();
+        let mut current_height = self.block_height();
 
         if current_height == 0 {
             info!("Only the genesis block is currently available; nothing to check.");
@@ -306,7 +308,7 @@ impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledge
         // This is extremely verbose and shouldn't be used outside of debugging.
         // trace!("Validating block at height {} ({})", block_height, block_hash);
 
-        if !self.block_hash_exists(&block_hash) {
+        if !self.contains_block_hash(&block_hash) {
             is_storage_valid.store(false, Ordering::SeqCst);
             error!("The header for block at height {} is missing!", block_height);
         }
@@ -358,7 +360,7 @@ impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledge
     /// Validates the storage of transactions belonging to the given block.
     fn validate_block_transactions(
         &self,
-        block: &Block<T>,
+        block: &Block<Transaction<C>>,
         block_height: u32,
         component_sender: mpsc::UnboundedSender<ValidatorAction>,
         fix_mode: FixMode,
@@ -382,9 +384,10 @@ impl<C: Parameters, T: TransactionScheme + Send + Sync, S: Storage + Sync> Ledge
             }
         };
 
-        let block_stored_txs: Transactions<T> = FromBytes::read_le(&block_stored_txs_bytes[..]).unwrap();
+        let block_stored_txs: Transactions<Transaction<C>> = FromBytes::read_le(&block_stored_txs_bytes[..]).unwrap();
 
-        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
+        // TODO (howardwu): TEMPORARY - Make this `iter()` a `par_iter()`.
+        block_stored_txs.iter().enumerate().for_each(|(block_tx_idx, tx)| {
             let tx_id = match tx.transaction_id() {
                 Ok(hash) => hash,
                 Err(e) => {

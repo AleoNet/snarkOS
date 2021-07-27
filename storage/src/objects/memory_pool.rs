@@ -15,9 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Ledger, COL_META, KEY_MEMORY_POOL};
-use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Parameters, Storage, TransactionScheme};
+use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Parameters, Storage};
 
-impl<C: Parameters, T: TransactionScheme, S: Storage> Ledger<C, T, S> {
+impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Get the stored memory pool transactions.
     pub fn get_memory_pool(&self) -> Result<Option<Vec<u8>>, StorageError> {
         self.storage.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())
