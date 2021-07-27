@@ -21,8 +21,9 @@ mod rpc_tests {
     use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_testing::{
-        network::{test_config, ConsensusSetup, TestSetup},
+        network::{test_config, test_node, ConsensusSetup, TestSetup},
         sync::*,
+        wait_until,
     };
     use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, TransactionScheme};
     use snarkvm_utilities::{
@@ -351,5 +352,47 @@ mod rpc_tests {
         assert_eq!(template.block_height, new_height as u32);
         assert_eq!(template.transactions, expected_transactions);
         assert!(template.coinbase_value >= block_reward.0 as u64);
+    }
+
+    #[tokio::test]
+    async fn test_rpc_getnetworkgraph() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let setup = TestSetup {
+            is_crawler: true,
+            peer_sync_interval: 1,
+            min_peers: 2,
+            ..Default::default()
+        };
+        let (rpc, rpc_node) = initialize_test_rpc(storage, Some(setup)).await;
+        rpc_node.listen().await.unwrap();
+        rpc_node.start_services().await;
+
+        let setup = TestSetup {
+            consensus_setup: None,
+            ..Default::default()
+        };
+        let some_node1 = test_node(setup.clone()).await;
+        let some_node2 = test_node(setup).await;
+
+        rpc_node
+            .connect_to_addresses(&[some_node1.local_address().unwrap()])
+            .await;
+        some_node1
+            .connect_to_addresses(&[some_node2.local_address().unwrap()])
+            .await;
+
+        wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 1);
+        wait_until!(3, some_node1.peer_book.get_connected_peer_count() == 2);
+        wait_until!(3, some_node2.peer_book.get_connected_peer_count() == 1);
+
+        wait_until!(5, !rpc_node.known_network().unwrap().connections().is_empty());
+
+        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"getnetworkgraph\" }}");
+        let response = rpc.io.handle_request(&request).await.unwrap();
+        let value: Value = serde_json::from_str(&response).unwrap();
+        let result: NetworkGraph = serde_json::from_value(value["result"].clone()).unwrap();
+
+        assert_eq!(result.node_count, 2);
+        assert_eq!(result.vertices.len(), 2);
     }
 }
