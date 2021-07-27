@@ -449,7 +449,11 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_disconnect() {
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let (rpc, rpc_node) = initialize_test_rpc(storage, None).await;
+        let setup = TestSetup {
+            consensus_setup: None,
+            ..Default::default()
+        };
+        let (rpc, rpc_node) = initialize_test_rpc(storage, Some(setup)).await;
         rpc_node.listen().await.unwrap();
 
         let setup = TestSetup {
@@ -477,13 +481,13 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_connect() {
         let storage = Arc::new(FIXTURE_VK.ledger());
-        let (rpc, rpc_node) = initialize_test_rpc(storage, None).await;
-        rpc_node.listen().await.unwrap();
-
         let setup = TestSetup {
             consensus_setup: None,
             ..Default::default()
         };
+        let (rpc, rpc_node) = initialize_test_rpc(storage, Some(setup.clone())).await;
+        rpc_node.listen().await.unwrap();
+
         let some_node1 = test_node(setup.clone()).await;
         let some_node2 = test_node(setup).await;
 

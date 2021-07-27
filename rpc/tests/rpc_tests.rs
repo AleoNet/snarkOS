@@ -361,6 +361,7 @@ mod rpc_tests {
             is_crawler: true,
             peer_sync_interval: 1,
             min_peers: 2,
+            consensus_setup: None,
             ..Default::default()
         };
         let (rpc, rpc_node) = initialize_test_rpc(storage, Some(setup)).await;
