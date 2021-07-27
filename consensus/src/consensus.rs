@@ -290,7 +290,7 @@ impl<S: Storage> Consensus<S> {
                 new_payloads[j].clone(),
                 new_birth_program_ids[j].clone(),
                 new_death_program_ids[j].clone(),
-                j as u8,
+                (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
                 joint_serial_numbers.clone(),
                 rng,
             )?);

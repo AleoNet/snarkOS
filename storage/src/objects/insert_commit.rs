@@ -223,15 +223,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
 
         // Update the best block number
 
-        let height = self.block_height();
-
-        let is_genesis =
-            block.header.previous_block_hash == BlockHeaderHash([0u8; 32]) && height == 0 && self.is_empty();
-
-        let mut new_best_block_number = 0;
-        if !is_genesis {
-            new_best_block_number = height + 1;
-        }
+        let new_best_block_number = self.block_height() + 1;
 
         database_transaction.push(Op::Insert {
             col: COL_META,
@@ -252,15 +244,6 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
             value: block_header_hash.0.to_vec(),
         });
 
-        // If it's the genesis block, store its initial applicable digest.
-        if is_genesis {
-            database_transaction.push(Op::Insert {
-                col: COL_DIGEST,
-                key: to_bytes_le![self.current_digest()?]?,
-                value: 0u32.to_le_bytes().to_vec(),
-            });
-        }
-
         // Rebuild the new commitment merkle tree
         self.rebuild_merkle_tree(transaction_cms)?;
         let tree = self.cm_merkle_tree.load();
@@ -279,9 +262,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
 
         self.storage.batch(database_transaction)?;
 
-        if !is_genesis {
-            self.current_block_height.fetch_add(1, Ordering::SeqCst);
-        }
+        self.current_block_height.fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }

@@ -52,15 +52,16 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
         let parameters = Arc::new(C::record_commitment_tree_parameters().clone());
         let empty_cm_merkle_tree = MerkleTree::new(parameters.clone(), leaves)?;
 
-        let ledger_storage = Self {
+        let ledger = Self {
             current_block_height: Default::default(),
             storage,
             cm_merkle_tree: ArcSwap::new(Arc::new(empty_cm_merkle_tree)),
         };
 
-        ledger_storage.insert_and_commit(&genesis_block)?;
+        ledger.insert_and_commit(&genesis_block)?;
+        assert_eq!(1, ledger.block_height());
 
-        Ok(ledger_storage)
+        Ok(ledger)
     }
 
     /// Returns the number of blocks including the genesis block
