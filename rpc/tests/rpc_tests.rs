@@ -36,7 +36,7 @@ mod rpc_tests {
     use std::{net::SocketAddr, sync::Arc, time::Duration};
 
     async fn initialize_test_rpc(consensus: &Arc<Consensus>) -> Rpc {
-        let environment = test_config(TestSetup::default());
+        let environment = test_config(node_setup.unwrap_or_default());
 
         let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
@@ -47,7 +47,6 @@ mod rpc_tests {
             Duration::from_secs(consensus_setup.block_sync_interval),
             Duration::from_secs(consensus_setup.tx_sync_interval),
         );
-
         node.set_sync(node_consensus);
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // wait for genesis to commit
