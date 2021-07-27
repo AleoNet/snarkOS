@@ -21,8 +21,9 @@ mod protected_rpc_tests {
     use snarkos_rpc::*;
     use snarkos_storage::VMTransaction;
     use snarkos_testing::{
-        network::{test_config, ConsensusSetup, TestSetup},
+        network::{test_config, test_node, ConsensusSetup, TestSetup},
         sync::*,
+        wait_until,
     };
 
     use snarkvm_dpc::{
@@ -443,5 +444,57 @@ mod protected_rpc_tests {
 
         let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
         let _address = Address::<Components>::from_str(&account.address).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_rpc_disconnect() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let (rpc, rpc_node) = initialize_test_rpc(storage, None).await;
+        rpc_node.listen().await.unwrap();
+
+        let setup = TestSetup {
+            consensus_setup: None,
+            ..Default::default()
+        };
+        let some_node = test_node(setup).await;
+
+        some_node
+            .connect_to_addresses(&[rpc_node.local_address().unwrap()])
+            .await;
+
+        wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 1);
+
+        let meta = authentication();
+        let request = format!(
+            "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"disconnect\", \"params\": [\"{}\"] }}",
+            some_node.local_address().unwrap()
+        );
+        let _response = rpc.handle_request(&request, meta).await.unwrap();
+
+        wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 0);
+    }
+
+    #[tokio::test]
+    async fn test_rpc_connect() {
+        let storage = Arc::new(FIXTURE_VK.ledger());
+        let (rpc, rpc_node) = initialize_test_rpc(storage, None).await;
+        rpc_node.listen().await.unwrap();
+
+        let setup = TestSetup {
+            consensus_setup: None,
+            ..Default::default()
+        };
+        let some_node1 = test_node(setup.clone()).await;
+        let some_node2 = test_node(setup).await;
+
+        let meta = authentication();
+        let request = format!(
+            "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"connect\", \"params\": [\"{}\", \"{}\"] }}",
+            some_node1.local_address().unwrap(),
+            some_node2.local_address().unwrap()
+        );
+        let _response = rpc.handle_request(&request, meta).await.unwrap();
+
+        wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 2);
     }
 }
