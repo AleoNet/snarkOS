@@ -33,7 +33,7 @@ path = "network/network.rs"
 harness = false
 
 [dependencies.snarkvm-algorithms]
-version = "=0.5.4"
+version = "=0.7.5"
 
 [dependencies.snarkvm-curves]
 version = "=0.5.4"
