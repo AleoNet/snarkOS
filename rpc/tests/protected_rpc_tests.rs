@@ -16,7 +16,7 @@
 
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
-    use snarkos_consensus::Consensus;
+    use snarkos_consensus::MerkleTreeLedger;
     use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_storage::VMTransaction;
@@ -75,8 +75,7 @@ mod protected_rpc_tests {
             password: TEST_PASSWORD.to_string(),
         };
 
-        let environment = test_config(TestSetup::default());
-
+        let environment = test_config(node_setup.unwrap_or_default());
         let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
 
