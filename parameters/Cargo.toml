@@ -42,7 +42,7 @@ version = "=0.5.4"
 version = "=0.5.4"
 
 [dev-dependencies.snarkvm-marlin]
-version = "=0.5.4"
+version = "=0.7.5"
 
 [dev-dependencies.snarkvm-posw]
 version = "=0.5.4"
