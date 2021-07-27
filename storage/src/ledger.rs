@@ -16,7 +16,6 @@
 
 use crate::*;
 use arc_swap::ArcSwap;
-use snarkos_parameters::GenesisBlock;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
 use snarkvm_dpc::{
     errors::StorageError,
@@ -28,7 +27,7 @@ use snarkvm_dpc::{
     Storage,
     Transaction,
 };
-use snarkvm_parameters::traits::genesis::Genesis;
+use snarkvm_parameters::{testnet1::GenesisBlock, traits::genesis::Genesis};
 use snarkvm_utilities::bytes::FromBytes;
 
 use std::{

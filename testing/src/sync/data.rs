@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_parameters::GenesisBlock;
 use snarkvm_dpc::{record::Record as DPCRecord, testnet1::parameters::*, Block, BlockHeader};
-use snarkvm_parameters::traits::genesis::Genesis;
+use snarkvm_parameters::{testnet1::GenesisBlock, traits::genesis::Genesis};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,

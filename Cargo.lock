@@ -2762,26 +2762,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-parameters"
-version = "1.3.11"
-dependencies = [
- "arc-swap",
- "chrono",
- "curl",
- "hex",
- "rand 0.8.4",
- "snarkos-consensus",
- "snarkos-storage",
- "snarkvm-algorithms",
- "snarkvm-curves",
- "snarkvm-dpc",
- "snarkvm-marlin",
- "snarkvm-parameters",
- "snarkvm-posw",
- "snarkvm-utilities",
-]
-
-[[package]]
 name = "snarkos-profiler"
 version = "1.3.11"
 dependencies = [
@@ -2836,7 +2816,6 @@ dependencies = [
  "rocksdb",
  "serde",
  "snarkos-consensus",
- "snarkos-parameters",
  "snarkos-testing",
  "snarkvm-algorithms",
  "snarkvm-curves",
@@ -2862,7 +2841,6 @@ dependencies = [
  "rand_xorshift",
  "snarkos-consensus",
  "snarkos-network",
- "snarkos-parameters",
  "snarkos-storage",
  "snarkvm-algorithms",
  "snarkvm-curves",

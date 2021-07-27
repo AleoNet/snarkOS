@@ -29,7 +29,6 @@ members = [
   "consensus",
   "metrics",
   "network",
-  "parameters",
   "profiler",
   "rpc",
   "storage",
