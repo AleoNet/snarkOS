@@ -34,27 +34,27 @@ harness = false
 
 [dependencies.snarkvm-algorithms]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "444ae8f"
+rev = "7076567"
 
 [dependencies.snarkvm-curves]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "444ae8f"
+rev = "7076567"
 
 [dependencies.snarkvm-dpc]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "444ae8f"
+rev = "7076567"
 
 [dependencies.snarkvm-parameters]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "444ae8f"
+rev = "7076567"
 
 [dependencies.snarkvm-posw]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "444ae8f"
+rev = "7076567"
 
 [dependencies.snarkvm-utilities]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "444ae8f"
+rev = "7076567"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
