@@ -36,6 +36,7 @@ use snarkvm_dpc::{
     Parameters,
     Storage,
 };
+use snarkvm_fields::ToConstraintField;
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
@@ -170,9 +171,11 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         // Fetch the set of valid inner circuit IDs.
         let inner_snark_vk: <<Testnet1Parameters as Parameters>::InnerSNARK as SNARK>::VerifyingKey =
             dpc.inner_snark_parameters.1.clone().into();
-        let inner_snark_id = Testnet1Parameters::inner_circuit_id_crh().hash(&to_bytes_le![inner_snark_vk]?)?;
+        let inner_snark_vk_field_elements = inner_snark_vk.to_field_elements()?;
+        let inner_circuit_id =
+            Testnet1Parameters::inner_circuit_id_crh().hash_field_elements(&inner_snark_vk_field_elements)?;
 
-        let authorized_inner_snark_ids = vec![to_bytes_le![inner_snark_id]?];
+        let authorized_inner_snark_ids = vec![to_bytes_le![inner_circuit_id]?];
 
         // Set the initial sync parameters.
         let consensus_params = ConsensusParameters {

@@ -2644,6 +2644,7 @@ dependencies = [
  "snarkos-storage",
  "snarkvm-algorithms",
  "snarkvm-dpc",
+ "snarkvm-fields",
  "snarkvm-posw",
  "snarkvm-utilities",
  "thiserror",

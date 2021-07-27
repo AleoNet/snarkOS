@@ -51,6 +51,10 @@ default-features = false
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "5b24941"
 
+[dependencies.snarkvm-fields]
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "5b24941"
+
 [dependencies.snarkvm-posw]
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "5b24941"
