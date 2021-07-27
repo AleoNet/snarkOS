@@ -51,6 +51,7 @@ pub struct Config {
     pub miner: Miner,
     pub rpc: JsonRPC,
     pub p2p: P2P,
+    pub storage: Storage,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -72,6 +73,7 @@ pub struct Node {
     pub dir: PathBuf,
     pub db: String,
     pub is_bootnode: bool,
+    pub is_crawler: bool,
     pub ip: String,
     pub port: u16,
     pub verbose: u8,
@@ -95,6 +97,20 @@ pub struct P2P {
     pub max_peers: u16,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Storage {
+    /// If set, the value specifies the limit on the number of blocks to export; `0` means there is no limit.
+    pub export: Option<u32>,
+    /// If set, contains the path to the file contained canon blocks exported using the `--export-canon-blocks` option.
+    pub import: Option<PathBuf>,
+    /// If `true`, checks the node's storage for inconsistencies and attempts to fix any encountered issues.
+    pub validate: bool,
+    /// If `true`, deletes any superfluous (non-canon) items from the node's storage. Note: it can temporarily increase
+    /// the size of the database files, but they will become smaller after a while, when the database has run its
+    /// automated maintenance.
+    pub trim: bool,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -103,6 +119,7 @@ impl Default for Config {
                 dir: Self::snarkos_dir(),
                 db: "snarkos_testnet1".into(),
                 is_bootnode: false,
+                is_crawler: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
                 verbose: 2,
@@ -129,6 +146,12 @@ impl Default for Config {
                 block_sync_interval: 4,
                 min_peers: 20,
                 max_peers: 50,
+            },
+            storage: Storage {
+                export: None,
+                import: None,
+                trim: false,
+                validate: false,
             },
         }
     }
@@ -199,9 +222,14 @@ impl Config {
             // Flags
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
+            "is-crawler" => self.is_crawler(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
+            "trim-storage" => self.trim_storage(arguments.is_present(option)),
+            "validate-storage" => self.validate_storage(arguments.is_present(option)),
             // Options
             "connect" => self.connect(arguments.value_of(option)),
+            "export-canon-blocks" => self.export_canon_blocks(clap::value_t!(arguments.value_of(*option), u32).ok()),
+            "import-canon-blocks" => self.import_canon_blocks(arguments.value_of(option)),
             "ip" => self.ip(arguments.value_of(option)),
             "miner-address" => self.miner_address(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
@@ -249,12 +277,22 @@ impl Config {
         self.rpc.json_rpc = !argument;
     }
 
+    fn import_canon_blocks(&mut self, argument: Option<&str>) {
+        if let Some(path) = argument {
+            self.storage.import = Some(path.to_owned().into());
+        }
+    }
+
     fn is_bootnode(&mut self, argument: bool) {
         self.node.is_bootnode = argument;
     }
 
     fn is_miner(&mut self, argument: bool) {
         self.miner.is_miner = argument;
+    }
+
+    fn is_crawler(&mut self, argument: bool) {
+        self.node.is_crawler = argument;
     }
 
     fn ip(&mut self, argument: Option<&str>) {
@@ -281,6 +319,10 @@ impl Config {
             let bootnodes: Vec<String> = sanitize_bootnodes.split(',').map(|s| s.to_string()).collect();
             self.p2p.bootnodes = bootnodes;
         }
+    }
+
+    fn export_canon_blocks(&mut self, argument: Option<u32>) {
+        self.storage.export = argument;
     }
 
     fn miner_address(&mut self, argument: Option<&str>) {
@@ -331,6 +373,14 @@ impl Config {
         }
     }
 
+    fn trim_storage(&mut self, argument: bool) {
+        self.storage.trim = argument;
+    }
+
+    fn validate_storage(&mut self, argument: bool) {
+        self.storage.validate = argument;
+    }
+
     fn verbose(&mut self, argument: Option<u8>) {
         if let Some(verbose) = argument {
             self.node.verbose = verbose
@@ -352,6 +402,10 @@ impl Config {
             return Err(CliError::MinerBootstrapper);
         }
 
+        if self.node.is_bootnode && self.node.is_crawler {
+            return Err(CliError::CrawlerBootstrapper);
+        }
+
         // TODO (howardwu): Check the memory pool interval.
 
         Ok(())
@@ -365,13 +419,22 @@ impl CLI for ConfigCli {
     type Config = Config;
 
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
-    const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_BOOTNODE, flag::IS_MINER];
+    const FLAGS: &'static [FlagType] = &[
+        flag::NO_JSONRPC,
+        flag::IS_BOOTNODE,
+        flag::IS_MINER,
+        flag::IS_CRAWLER,
+        flag::TRIM_STORAGE,
+        flag::VALIDATE_STORAGE,
+    ];
     const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
         option::PORT,
         option::PATH,
         option::CONNECT,
+        option::EXPORT_CANON_BLOCKS,
+        option::IMPORT_CANON_BLOCKS,
         option::MINER_ADDRESS,
         option::MEMPOOL_INTERVAL,
         option::MIN_PEERS,
@@ -391,8 +454,11 @@ impl CLI for ConfigCli {
         config.parse(arguments, &[
             "network",
             "no-jsonrpc",
+            "export-canon-blocks",
+            "import-canon-blocks",
             "is-bootnode",
             "is-miner",
+            "is-crawler",
             "ip",
             "port",
             "path",
@@ -405,6 +471,8 @@ impl CLI for ConfigCli {
             "rpc-port",
             "rpc-username",
             "rpc-password",
+            "trim-storage",
+            "validate-storage",
             "verbose",
         ]);
 

@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Tx};
+use snarkos_metrics::misc::BLOCK_HEIGHT;
 use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
@@ -34,10 +35,13 @@ use snarkvm_dpc::{
     DPCScheme,
     LedgerScheme,
     Storage,
+    StorageError,
     Transactions as DPCTransactions,
 };
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
+
+use snarkos_metrics::{self as metrics, misc::*};
 
 use rand::Rng;
 
@@ -139,7 +143,7 @@ impl<S: Storage> Consensus<S> {
     }
 
     /// Receive a block from an external source and process it based on ledger state.
-    pub async fn receive_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
+    pub async fn receive_block(&self, block: &Block<Tx>, batch_import: bool) -> Result<(), ConsensusError> {
         // Block is an unknown orphan
         if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
@@ -150,6 +154,7 @@ impl<S: Storage> Consensus<S> {
             if crate::is_genesis(&block.header) && self.ledger.is_empty() {
                 self.process_block(block).await?;
             } else {
+                metrics::increment_counter!(ORPHAN_BLOCKS);
                 self.ledger.insert_only(block)?;
             }
         } else {
@@ -164,25 +169,27 @@ impl<S: Storage> Consensus<S> {
 
                     self.process_block(block).await?;
 
-                    // Attempt to fast forward the block state if the node already stores
-                    // the children of the new canon block.
-                    let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
+                    if !batch_import {
+                        // Attempt to fast forward the block state if the node already stores
+                        // the children of the new canon block.
+                        let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
 
-                    if child_path.len() > 1 {
-                        debug!(
-                            "Attempting to canonize the descendants of block at height {}.",
-                            block_height
-                        );
-                    }
+                        if child_path.len() > 1 {
+                            debug!(
+                                "Attempting to canonize the descendants of block at height {}.",
+                                block_height
+                            );
+                        }
 
-                    for child_block_hash in child_path.into_iter().skip(1) {
-                        let new_block = self.ledger.get_block(&child_block_hash)?;
+                        for child_block_hash in child_path.into_iter().skip(1) {
+                            let new_block = self.ledger.get_block(&child_block_hash)?;
 
-                        debug!(
-                            "Processing the next known descendant. Height {}",
-                            self.ledger.get_current_block_height() + 1
-                        );
-                        self.process_block(&new_block).await?;
+                            debug!(
+                                "Processing the next known descendant. Height {}",
+                                self.ledger.get_current_block_height() + 1
+                            );
+                            self.process_block(&new_block).await?;
+                        }
                     }
                 }
                 BlockPath::SideChain(side_chain_path) => {
@@ -191,17 +198,23 @@ impl<S: Storage> Consensus<S> {
                         side_chain_path.new_block_number
                     );
 
-                    // If the side chain is now longer than the canon chain,
+                    // If the side chain is now heavier than the canon chain,
                     // perform a fork to the side chain.
-                    if side_chain_path.new_block_number > self.ledger.get_current_block_height() {
+                    let canon_difficulty =
+                        self.get_canon_difficulty_from_height(side_chain_path.shared_block_number)?;
+
+                    if side_chain_path.aggregate_difficulty > canon_difficulty {
                         debug!(
-                            "Determined side chain is longer than canon chain by {} blocks",
-                            side_chain_path.new_block_number - self.ledger.get_current_block_height()
+                            "Determined side chain is heavier than canon chain by {}%",
+                            get_delta_percentage(side_chain_path.aggregate_difficulty, canon_difficulty)
                         );
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
                         // Fork to superior side chain
                         self.ledger.revert_for_fork(&side_chain_path)?;
+
+                        // Update the current block height metric.
+                        metrics::gauge!(BLOCK_HEIGHT, self.ledger.get_current_block_height() as f64);
 
                         if !side_chain_path.path.is_empty() {
                             for block_hash in side_chain_path.path {
@@ -214,6 +227,8 @@ impl<S: Storage> Consensus<S> {
                             }
                         }
                     } else {
+                        metrics::increment_counter!(ORPHAN_BLOCKS);
+
                         // If the sidechain is not longer than the main canon chain, simply store the block
                         self.ledger.insert_only(block)?;
                     }
@@ -240,6 +255,9 @@ impl<S: Storage> Consensus<S> {
 
         // 2. Insert/canonize block
         self.ledger.insert_and_commit(block)?;
+
+        // Increment the current block height metric
+        metrics::increment_gauge!(BLOCK_HEIGHT, 1.0);
 
         // 3. Remove transactions from the mempool
         for transaction_id in block.transactions.to_transaction_ids()? {
@@ -382,4 +400,25 @@ impl<S: Storage> Consensus<S> {
             rng,
         )
     }
+
+    fn get_canon_difficulty_from_height(&self, height: u32) -> Result<u128, StorageError> {
+        let current_block_height = self.ledger.get_current_block_height();
+        let path_size = current_block_height - height;
+        let mut aggregate_difficulty = 0u128;
+
+        for i in 0..path_size {
+            let block_header = self
+                .ledger
+                .get_block_header(&self.ledger.get_block_hash(current_block_height - i)?)?;
+
+            aggregate_difficulty += block_header.difficulty_target as u128;
+        }
+
+        Ok(aggregate_difficulty)
+    }
+}
+
+fn get_delta_percentage(side_chain_diff: u128, canon_diff: u128) -> f64 {
+    let delta = side_chain_diff - canon_diff;
+    (delta as f64 / canon_diff as f64) * 100.0
 }

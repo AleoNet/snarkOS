@@ -63,6 +63,8 @@ pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
     pub peer_book: PeerBook,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync<S>>>,
+    /// Tracks the known network crawled by this node.
+    pub known_network: OnceCell<KnownNetwork>,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -110,8 +112,8 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
 
 impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config) -> Result<Self, NetworkError> {
-        Ok(Self(Arc::new(InnerNode {
+    pub fn new(config: Config) -> Result<Self, NetworkError> {
+        let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
             local_address: Default::default(),
@@ -119,12 +121,20 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             inbound: Default::default(),
             peer_book: PeerBook::spawn(),
             sync: Default::default(),
+            known_network: Default::default(),
             launched: Utc::now(),
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),
             master_dispatch: RwLock::new(None),
-        })))
+        }));
+
+        if node.config.is_crawler() {
+            // Safe since this can only ever be set here.
+            node.known_network.set(KnownNetwork::default()).unwrap();
+        }
+
+        Ok(node)
     }
 
     pub fn set_sync(&mut self, sync: Sync<S>) {
@@ -149,6 +159,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     #[doc(hidden)]
     pub fn has_sync(&self) -> bool {
         self.sync().is_some()
+    }
+
+    pub fn known_network(&self) -> Option<&KnownNetwork> {
+        self.known_network.get()
     }
 
     pub async fn start_services(&self) {
@@ -180,6 +194,20 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             }
         });
         self.register_task(peering_task);
+
+        if self.known_network().is_some() {
+            let node_clone = self.clone();
+
+            let known_network_task = task::spawn(async move {
+                loop {
+                    // Should always be present since we check for it before this block.
+                    if let Some(known_network) = node_clone.known_network() {
+                        known_network.update().await
+                    }
+                }
+            });
+            self.register_task(known_network_task);
+        }
 
         let node_clone = self.clone();
         let state_tracking_task = task::spawn(async move {
@@ -296,12 +324,13 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
     pub fn initialize_metrics(&self) {
         debug!("Initializing metrics");
-        let metrics_task = snarkos_metrics::initialize();
-        self.register_task(metrics_task);
+        if let Some(metrics_task) = snarkos_metrics::initialize() {
+            self.register_task(metrics_task);
+        }
 
         // The node can already be at some non-zero height.
         if let Some(sync) = self.sync() {
-            metrics::counter!(misc::BLOCK_HEIGHT, sync.current_block_height() as u64);
+            metrics::gauge!(misc::BLOCK_HEIGHT, sync.current_block_height() as f64);
         }
     }
 

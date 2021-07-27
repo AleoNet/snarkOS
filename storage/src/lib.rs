@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod exporter;
+pub use exporter::*;
+
 pub mod ledger;
 pub use ledger::*;
 
@@ -22,6 +25,9 @@ pub use key_value::*;
 
 pub mod objects;
 pub use objects::*;
+
+pub mod trim;
+pub use trim::*;
 
 pub mod mem;
 #[cfg(feature = "mem_storage")]

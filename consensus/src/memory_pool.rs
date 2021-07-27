@@ -177,7 +177,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
             new_memory_pool.total_size_in_bytes.load(Ordering::SeqCst),
             Ordering::SeqCst,
         );
-        self.transactions.reset(new_memory_pool.transactions.inner_full());
+        self.transactions.reset(new_memory_pool.transactions.inner_full()).await;
 
         Ok(())
     }

@@ -125,6 +125,8 @@ pub struct NodeMiscStats {
     pub duplicate_blocks: u64,
     /// The number of duplicate sync blocks received.
     pub duplicate_sync_blocks: u64,
+    /// The number of orphan blocks received.
+    pub orphan_blocks: u64,
     /// The number of RPC requests received.
     pub rpc_requests: u64,
 }

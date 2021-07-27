@@ -83,7 +83,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             match node_clone
                                 .peer_book
                                 .receive_connection(node_clone.clone(), remote_address, stream)
-                                .await
                             {
                                 Ok(_) => (),
                                 Err(e) => {
@@ -207,7 +206,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             Payload::Peers(peers) => {
                 metrics::increment_counter!(inbound::PEERS);
 
-                self.process_inbound_peers(peers).await;
+                self.process_inbound_peers(source, peers).await;
             }
             Payload::Ping(_) | Payload::Pong => {
                 // Skip as this case is already handled with priority in inbound_handler

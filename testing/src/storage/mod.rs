@@ -15,10 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #[cfg(test)]
-use crate::sync::{create_test_consensus, TestBlocks};
+pub mod exporter;
+
+#[cfg(test)]
+pub mod trim;
+
+#[cfg(test)]
+pub mod validator;
 
 use crate::sync::TestTx;
-pub use snarkos_storage::{validator::FixMode, Ledger, LedgerStorage};
+pub use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_dpc::{
     testnet1::instantiated::CommitmentMerkleParameters,
@@ -47,18 +53,4 @@ pub fn initialize_test_blockchain<T: TransactionScheme, P: LoadableMerkleParamet
     path.push(random_storage_path());
 
     Ledger::<T, P, S>::new(Some(&path), parameters, genesis_block).unwrap()
-}
-
-#[tokio::test]
-async fn valid_storage_validates() {
-    //tracing_subscriber::fmt::init();
-
-    let consensus = create_test_consensus();
-
-    let blocks = TestBlocks::load(Some(10), "test_blocks_100_1").0;
-    for block in blocks {
-        consensus.receive_block(&block).await.unwrap();
-    }
-
-    assert!(consensus.ledger.validate(None, FixMode::Everything));
 }

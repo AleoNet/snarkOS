@@ -65,5 +65,6 @@ pub mod misc {
     pub const BLOCKS_MINED: &str = "snarkos_misc_blocks_mined_total";
     pub const DUPLICATE_BLOCKS: &str = "snarkos_misc_duplicate_blocks_total";
     pub const DUPLICATE_SYNC_BLOCKS: &str = "snarkos_misc_duplicate_sync_blocks_total";
+    pub const ORPHAN_BLOCKS: &str = "snarkos_misc_orphan_blocks_total";
     pub const RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";
 }

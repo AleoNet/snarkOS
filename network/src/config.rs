@@ -37,6 +37,8 @@ pub struct Config {
     /// If `true`, initializes this node as a bootnode and forgoes connecting
     /// to the default bootnodes or saved peers in the peer book.
     is_bootnode: bool,
+    /// If `true`, initializes this node as a crawler.
+    is_crawler: bool,
     /// The interval between each peer sync.
     peer_sync_interval: Duration,
 }
@@ -50,6 +52,7 @@ impl Config {
         maximum_number_of_connected_peers: u16,
         bootnodes_addresses: Vec<String>,
         is_bootnode: bool,
+        is_crawler: bool,
         peer_sync_interval: Duration,
     ) -> Result<Self, NetworkError> {
         // Convert the given bootnodes into socket addresses.
@@ -66,6 +69,7 @@ impl Config {
             maximum_number_of_connected_peers,
             bootnodes: ArcSwap::new(Arc::new(bootnodes)),
             is_bootnode,
+            is_crawler,
             peer_sync_interval,
         })
     }
@@ -80,6 +84,11 @@ impl Config {
     #[inline]
     pub fn is_bootnode(&self) -> bool {
         self.is_bootnode
+    }
+
+    #[inline]
+    pub fn is_crawler(&self) -> bool {
+        self.is_crawler
     }
 
     /// Returns the minimum number of peers this node maintains a connection with.

@@ -79,7 +79,7 @@ mod protected_rpc_tests {
         };
 
         let environment = test_config(TestSetup::default());
-        let mut node = Node::new(environment).await.unwrap();
+        let mut node = Node::new(environment).unwrap();
         let consensus_setup = ConsensusSetup::default();
         let consensus = Arc::new(snarkos_testing::sync::create_test_consensus_from_ledger(ledger.clone()));
 
@@ -269,7 +269,7 @@ mod protected_rpc_tests {
 
         let (rpc, consensus) = initialize_test_rpc(storage).await;
 
-        consensus.receive_block(&DATA.block_1).await.unwrap();
+        consensus.receive_block(&DATA.block_1, false).await.unwrap();
 
         let method = "createrawtransaction".to_string();
 
@@ -321,7 +321,7 @@ mod protected_rpc_tests {
 
         let (rpc, consensus) = initialize_test_rpc(storage).await;
 
-        consensus.receive_block(&DATA.block_1).await.unwrap();
+        consensus.receive_block(&DATA.block_1, false).await.unwrap();
 
         let method = "createtransactionkernel".to_string();
 
@@ -368,7 +368,7 @@ mod protected_rpc_tests {
 
         let (rpc, consensus) = initialize_test_rpc(storage).await;
 
-        consensus.receive_block(&DATA.block_1).await.unwrap();
+        consensus.receive_block(&DATA.block_1, false).await.unwrap();
 
         let method = "createtransaction".to_string();
 

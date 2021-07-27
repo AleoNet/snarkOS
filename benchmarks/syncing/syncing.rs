@@ -39,7 +39,7 @@ fn providing_sync_blocks(c: &mut Criterion) {
 
     let blocks = TestBlocks::load(Some(NUM_BLOCKS), "test_blocks_100_1");
     for block in &blocks.0 {
-        rt.block_on(provider.expect_sync().consensus.receive_block(&block))
+        rt.block_on(provider.expect_sync().consensus.receive_block(&block, false))
             .unwrap()
     }
     assert_eq!(provider.expect_sync().current_block_height() as usize, NUM_BLOCKS);

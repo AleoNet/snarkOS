@@ -282,3 +282,54 @@ pub struct TransactionRecipient {
     /// The amount being sent
     pub amount: u64,
 }
+
+/// The crawled known network and measurements.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NetworkGraph {
+    /// The number of nodes in the known network.
+    pub node_count: usize,
+    /// The number of connections in the known network.
+    pub connection_count: usize,
+    /// The density of the network: actual connections divided by the number of possible
+    /// connections.
+    pub density: f64,
+    /// The fiedler eigenvalue.
+    pub algebraic_connectivity: f64,
+    /// The difference between the node with the largest connection count and the node with the
+    /// lowest.
+    pub degree_centrality_delta: f64,
+
+    /// The potential forks in the network and their member nodes.
+    pub potential_forks: Vec<PotentialFork>,
+
+    /// Known nodes.
+    pub vertices: Vec<Vertice>,
+    /// Known connections.
+    pub edges: Vec<Edge>,
+}
+
+/// A potential fork in the network, maps height to members.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PotentialFork {
+    pub height: u32,
+    pub members: Vec<SocketAddr>,
+}
+
+/// Metadata and measurements pertaining to a node in the graph of the known network.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Vertice {
+    pub addr: SocketAddr,
+    pub is_bootnode: bool,
+
+    // Centrality measurements for the node.
+    pub degree_centrality: u16,
+    pub eigenvector_centrality: f64,
+    pub fiedler_value: f64,
+}
+
+/// A connection in the graph of the known network.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Edge {
+    pub source: SocketAddr,
+    pub target: SocketAddr,
+}

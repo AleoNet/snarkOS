@@ -98,6 +98,11 @@ pub trait RpcFunctions {
     // #[cfg_attr(nightly, doc(include = "../documentation/public_endpoints/getblocktemplate.md"))]
     #[rpc(name = "getblocktemplate")]
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError>;
+
+    // todo: readd in Rust 1.54
+    // #[cfg_attr(nightly, doc(include ="../documentation/public_endpoints/getnetworkgraph.md"))]
+    #[rpc(name = "getnetworkgraph")]
+    fn get_network_graph(&self) -> Result<NetworkGraph, RpcError>;
 }
 
 /// Definition of private RPC endpoints that require authentication.

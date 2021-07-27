@@ -65,15 +65,15 @@ impl PeerBookRef {
                 }
                 PeerEventData::Disconnect(peer, status) => {
                     self.connected_peers.remove(peer.address).await;
-                    self.disconnected_peers.insert(peer.address, peer).await;
+                    if self.disconnected_peers.insert(peer.address, peer).await.is_none() {
+                        metrics::increment_gauge!(DISCONNECTED, 1.0);
+                    }
                     if status == PeerStatus::Connecting {
                         self.pending_connections.fetch_sub(1, Ordering::SeqCst);
                     }
-                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
                 PeerEventData::FailHandshake => {
                     self.pending_connections.fetch_sub(1, Ordering::SeqCst);
-                    metrics::increment_gauge!(DISCONNECTED, 1.0);
                 }
             }
         }
@@ -113,8 +113,16 @@ impl PeerBook {
         self.connected_peers.inner().keys().copied().collect()
     }
 
+    pub fn disconnected_peers(&self) -> Vec<SocketAddr> {
+        self.disconnected_peers.inner().keys().copied().collect()
+    }
+
+    pub fn get_connected_peer_count(&self) -> u32 {
+        self.connected_peers.len() as u32
+    }
+
     pub fn get_active_peer_count(&self) -> u32 {
-        self.connected_peers.len() as u32 + self.pending_connections()
+        self.get_connected_peer_count() + self.pending_connections()
     }
 
     pub fn get_disconnected_peer_count(&self) -> u32 {
@@ -133,12 +141,7 @@ impl PeerBook {
         self.disconnected_peers.get(&address)
     }
 
-    pub fn disconnected_peers(&self) -> Vec<SocketAddr> {
-        self.disconnected_peers.inner().keys().copied().collect()
-    }
-
     async fn take_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
-        metrics::decrement_gauge!(DISCONNECTED, 1.0);
         self.disconnected_peers.remove(address).await
     }
 
@@ -146,7 +149,7 @@ impl PeerBook {
         self.pending_connections.load(Ordering::SeqCst)
     }
 
-    pub async fn receive_connection<S: Storage + Send + Sync + 'static>(
+    pub fn receive_connection<S: Storage + Send + Sync + 'static>(
         &self,
         node: Node<S>,
         address: SocketAddr,
@@ -172,6 +175,7 @@ impl PeerBook {
                 }
             }
             let peer = if let Some(peer) = self.take_disconnected_peer(address).await {
+                metrics::decrement_gauge!(DISCONNECTED, 1.0);
                 peer
             } else {
                 Peer::new(address, node.config.bootnodes().contains(&address))
@@ -229,6 +233,14 @@ impl PeerBook {
         self.map_each_peer(|peer| async move { peer.load().await }).await
     }
 
+    pub fn disconnected_peers_snapshot(&self) -> Vec<Peer> {
+        self.disconnected_peers
+            .inner()
+            .iter()
+            .map(|(_, peer)| peer.clone())
+            .collect()
+    }
+
     ///
     /// Adds the given address to the disconnected peers in this `PeerBook`.
     ///
@@ -238,11 +250,14 @@ impl PeerBook {
         }
 
         // Add the given address to the map of disconnected peers.
-        self.disconnected_peers
+        if self
+            .disconnected_peers
             .insert(address, Peer::new(address, is_bootnode))
-            .await;
-
-        metrics::increment_gauge!(DISCONNECTED, 1.0);
+            .await
+            .is_none()
+        {
+            metrics::increment_gauge!(DISCONNECTED, 1.0);
+        }
 
         debug!("Added {} to the peer book", address);
     }

@@ -58,6 +58,7 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
           "min": 0,
           "thresholds": {
@@ -73,7 +74,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -88,9 +89,9 @@
         "graph": {},
         "legend": {
           "calcs": [
-            "mean",
-            "max",
             "min",
+            "max",
+            "mean",
             "last"
           ],
           "displayMode": "table",
@@ -411,7 +412,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -428,7 +429,8 @@
           "calcs": [
             "min",
             "max",
-            "mean"
+            "mean",
+            "last"
           ],
           "displayMode": "table",
           "placement": "bottom"
@@ -601,7 +603,7 @@
           "expr": "snarkos_handshakes_successes_resp_total",
           "hide": false,
           "interval": "",
-          "legendFormat": "successes as responer",
+          "legendFormat": "successes as responder",
           "refId": "C"
         },
         {
@@ -756,7 +758,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.0.2",
+      "pluginVersion": "8.0.6",
       "targets": [
         {
           "exemplar": true,
@@ -799,6 +801,14 @@
           "interval": "",
           "legendFormat": "RPC requests",
           "refId": "E"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_misc_orphan_blocks_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Orphan blocks",
+          "refId": "F"
         }
       ],
       "timeFrom": null,
@@ -824,5 +834,5 @@
   "timezone": "",
   "title": "snarkOS node",
   "uid": "PAzNcaCGz",
-  "version": 47
+  "version": 53
 }

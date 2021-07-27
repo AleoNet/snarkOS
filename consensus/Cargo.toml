@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-consensus"
-version = "1.3.10"
+version = "1.3.11"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Consensus for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -18,30 +18,37 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.5.4"
+version = "=0.5.4"
 
 [dependencies.snarkvm-curves]
-version = "0.5.4"
+version = "=0.5.4"
 
 [dependencies.snarkvm-dpc]
-version = "0.5.4"
+version = "=0.5.4"
 
 [dependencies.snarkvm-posw]
-version = "0.5.4"
+version = "=0.5.4"
 
 [dependencies.snarkvm-utilities]
-version = "0.5.4"
+version = "=0.5.4"
+
+[dependencies.metrics]
+version = "0.17"
 
 [dependencies.tokio]
 version = "1"
 
+[dependencies.snarkos-metrics]
+path = "../metrics"
+version = "1.3.11"
+
 [dependencies.snarkos-profiler]
 path = "../profiler"
-version = "1.3.10"
+version = "1.3.11"
 
 [dependencies.snarkos-storage]
 path = "../storage"
-version = "1.3.10"
+version = "1.3.11"
 default-features = false
 
 [dependencies.anyhow]
@@ -61,7 +68,7 @@ version = "0.8"
 version = "1.0"
 
 [dependencies.mpmc-map]
-version = "0.1"
+version = "0.2"
 
 [dependencies.tracing]
 default-features = false

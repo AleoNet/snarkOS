@@ -19,7 +19,14 @@ use chrono::Utc;
 use futures::{select, FutureExt};
 use serde::{Deserialize, Serialize};
 use snarkvm_dpc::Storage;
-use std::{net::SocketAddr, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::mpsc;
 
 use super::PeerQuality;
@@ -48,6 +55,12 @@ pub struct Peer {
     pub status: PeerStatus,
     pub quality: PeerQuality,
     pub is_bootnode: bool,
+    #[serde(skip)]
+    pub queued_outbound_message_count: Arc<AtomicUsize>,
+    /// Whether this peer is routable or not.
+    ///
+    /// `None` indicates the node has never attempted a connection with this peer.
+    pub is_routable: Option<bool>,
 }
 
 const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
@@ -60,6 +73,11 @@ impl Peer {
             status: PeerStatus::Disconnected,
             quality: Default::default(),
             is_bootnode,
+            queued_outbound_message_count: Default::default(),
+
+            // Set to `None` since peer creation only ever happens before a connection to the peer,
+            // therefore we don't know if its listener is routable or not.
+            is_routable: None,
         }
     }
 
@@ -151,6 +169,10 @@ impl Peer {
                 },
             }
         }
+
+        let queued_outbound_message_count = self.queued_outbound_message_count.swap(0, Ordering::SeqCst);
+        metrics::decrement_gauge!(snarkos_metrics::queues::OUTBOUND, queued_outbound_message_count as f64);
+
         Ok(())
     }
 
@@ -167,5 +189,9 @@ impl Peer {
     pub(super) fn set_disconnected(&mut self) {
         self.quality.disconnected();
         self.status = PeerStatus::Disconnected;
+    }
+
+    pub(super) fn set_routable(&mut self, is_routable: bool) {
+        self.is_routable = Some(is_routable)
     }
 }

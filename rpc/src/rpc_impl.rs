@@ -21,7 +21,7 @@
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
-use snarkos_network::{Node, Sync};
+use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkvm_dpc::{
     testnet1::{
         instantiated::{Components, Tx},
@@ -39,10 +39,7 @@ use snarkvm_utilities::{
 
 use chrono::Utc;
 
-use std::{
-    ops::Deref,
-    sync::{atomic::Ordering, Arc},
-};
+use std::{ops::Deref, sync::Arc};
 
 /// Implements JSON-RPC HTTP endpoint functions for a node.
 /// The constructor is given Arc::clone() copies of all needed node components.
@@ -94,6 +91,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcImpl<S> {
     pub fn memory_pool(&self) -> Result<&MemoryPool<Tx>, RpcError> {
         Ok(self.sync_handler()?.memory_pool())
     }
+
+    pub fn known_network(&self) -> Result<&KnownNetwork, RpcError> {
+        self.node.known_network().ok_or(RpcError::NoKnownNetwork)
+    }
 }
 
 impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<S> {
@@ -106,7 +107,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         let storage = &self.storage;
 
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         let block_header_hash = BlockHeaderHash::new(block_hash);
         let height = match storage.get_block_number(&block_header_hash) {
@@ -148,17 +150,17 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         }
     }
 
-    /// Returns the number of blocks in the canonical chain.
+    /// Returns the number of blocks in the canonical chain, including the genesis.
     fn get_block_count(&self) -> Result<u32, RpcError> {
-        let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
-        Ok(storage.get_block_count())
+        let primary_height = self.sync_handler()?.current_block_height();
+        Ok(primary_height + 1)
     }
 
     /// Returns the block hash of the head of the canonical chain.
     fn get_best_block_hash(&self) -> Result<String, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
         let best_block_hash = storage.get_block_hash(storage.get_current_block_height())?;
 
         Ok(hex::encode(&best_block_hash.0))
@@ -167,7 +169,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the block hash of the index specified if it exists in the canonical chain.
     fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
         let block_hash = storage.get_block_hash(block_height)?;
 
         Ok(hex::encode(&block_hash.0))
@@ -176,7 +179,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the hex encoded bytes of a transaction from its transaction id.
     fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
         Ok(hex::encode(
             &storage.get_transaction_bytes(&hex::decode(transaction_id)?)?,
         ))
@@ -190,7 +194,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     /// Returns information about a transaction from serialized transaction bytes.
     fn decode_raw_transaction(&self, transaction_bytes: String) -> Result<TransactionInfo, RpcError> {
-        self.storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        self.storage.catch_up_secondary(false, primary_height)?;
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Tx::read(&transaction_bytes[..])?;
 
@@ -260,7 +265,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         let storage = &self.storage;
 
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         if !self.sync_handler()?.consensus.verify_transaction(&transaction)? {
             // TODO (raychu86) Add more descriptive message. (e.g. tx already exists)
@@ -305,7 +311,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         let storage = &self.storage;
 
-        storage.catch_up_secondary(false)?;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         Ok(self.sync_handler()?.consensus.verify_transaction(&transaction)?)
     }
@@ -340,18 +347,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
     /// Returns statistics related to the node.
     fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
-        let mut metrics = NODE_STATS.snapshot();
-
-        // Note: Temporarily overriding node metrics here, as they aren't all correctly updated
-        // @sadroeck - remove me
-        metrics.misc.block_height = self.storage.current_block_height.load(Ordering::Relaxed) as u64;
-        metrics.connections.connected_peers = self.node.peer_book.get_active_peer_count();
-        metrics.connections.disconnected_peers = self.node.peer_book.get_disconnected_peer_count();
-        metrics.misc.block_height = self
-            .node
-            .sync()
-            .map(|sync| sync.current_block_height() as u64)
-            .unwrap_or(0);
+        let metrics = NODE_STATS.snapshot();
 
         Ok(metrics)
     }
@@ -359,7 +355,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the current mempool and sync information known by this node.
     fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
         let storage = &self.storage;
-        storage.catch_up_secondary(false)?;
+
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
 
         let block_height = storage.get_current_block_height();
         let block = storage.get_block_from_block_number(block_height)?;
@@ -384,6 +382,54 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             difficulty_target: self.consensus_parameters()?.get_block_difficulty(&block.header, time),
             transactions: transaction_strings,
             coinbase_value: coinbase_value.0 as u64,
+        })
+    }
+
+    fn get_network_graph(&self) -> Result<NetworkGraph, RpcError> {
+        // Copy the connections as the data must not change throughout the metrics computation.
+        let known_network = self.known_network()?;
+        let connections = known_network.connections();
+
+        // Collect the edges.
+        let edges = connections
+            .iter()
+            .map(|connection| Edge {
+                source: connection.source,
+                target: connection.target,
+            })
+            .collect();
+
+        // Compute the metrics.
+        let network_metrics = NetworkMetrics::new(connections);
+
+        // Collect the vertices with the metrics.
+        let vertices: Vec<Vertice> = network_metrics
+            .centrality
+            .iter()
+            .map(|(addr, node_centrality)| Vertice {
+                addr: *addr,
+                is_bootnode: self.node.config.bootnodes().contains(addr),
+                degree_centrality: node_centrality.degree_centrality,
+                eigenvector_centrality: node_centrality.eigenvector_centrality,
+                fiedler_value: node_centrality.fiedler_value,
+            })
+            .collect();
+
+        let potential_forks = known_network
+            .potential_forks()
+            .into_iter()
+            .map(|(height, members)| PotentialFork { height, members })
+            .collect();
+
+        Ok(NetworkGraph {
+            node_count: network_metrics.node_count,
+            connection_count: network_metrics.connection_count,
+            density: network_metrics.density,
+            algebraic_connectivity: network_metrics.algebraic_connectivity,
+            degree_centrality_delta: network_metrics.degree_centrality_delta,
+            potential_forks,
+            vertices,
+            edges,
         })
     }
 }
