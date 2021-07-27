@@ -24,7 +24,7 @@ version = "=0.5.4"
 version = "=0.5.4"
 
 [dependencies.snarkvm-dpc]
-version = "=0.5.4"
+version = "=0.7.5"
 
 [dependencies.snarkvm-posw]
 version = "=0.5.4"

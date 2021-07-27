@@ -39,7 +39,7 @@ optional = true
 version = "=0.5.4"
 
 [dev-dependencies.snarkvm-dpc]
-version = "=0.5.4"
+version = "=0.7.5"
 
 [dev-dependencies.snarkvm-marlin]
 version = "=0.5.4"

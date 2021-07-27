@@ -31,7 +31,7 @@ default-features = false
 features = [ "wasm" ]
 
 [dependencies.snarkvm-dpc]
-version = "=0.5.4"
+version = "=0.7.5"
 default-features = false
 features = [ "wasm" ]
 
