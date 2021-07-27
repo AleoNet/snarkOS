@@ -21,7 +21,7 @@ mod rpc_tests {
     use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_testing::{
-        network::{test_config, test_node, ConsensusSetup, TestSetup},
+        network::{test_config, test_node, TestSetup},
         sync::*,
         wait_until,
     };
