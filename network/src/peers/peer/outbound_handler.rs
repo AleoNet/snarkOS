@@ -64,9 +64,10 @@ impl PeerHandle {
     }
 
     pub async fn send_payload(&self, payload: Payload) {
-        metrics::increment_gauge!(OUTBOUND, 1.0);
-        self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
-        self.sender.send(PeerAction::Send(payload)).await.ok();
+        if self.sender.send(PeerAction::Send(payload)).await.is_ok() {
+            self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
+            metrics::increment_gauge!(OUTBOUND, 1.0);
+        }
     }
 
     pub async fn cancel_sync(&self) {
@@ -110,8 +111,9 @@ impl Peer {
                 })?;
 
                 metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
-                metrics::decrement_gauge!(OUTBOUND, 1.0);
+
                 self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
+                metrics::decrement_gauge!(OUTBOUND, 1.0);
 
                 match &message {
                     Payload::SyncBlock(_) => trace!("Sent a '{}' message to {}", &message, self.address),
