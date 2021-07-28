@@ -29,7 +29,7 @@ use std::{fs, path::PathBuf};
 /// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &[&str] = &["134.209.169.15:14131"];
+pub const TESTNET_BOOTNODES: &[&str] = &["134.209.169.15:14131", "143.198.167.76:14131"];
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
