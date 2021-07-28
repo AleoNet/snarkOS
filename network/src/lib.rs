@@ -50,7 +50,7 @@ pub mod topology;
 pub use topology::*;
 
 /// The maximum number of block hashes that can be requested or provided in a single batch.
-pub const MAX_BLOCK_SYNC_COUNT: u32 = 64;
+pub const MAX_BLOCK_SYNC_COUNT: u32 = snarkos_storage::NUM_LOCATOR_HASHES;
 /// The maximum amount of time allowed to process a single batch of sync blocks. It should be aligned
 /// with `MAX_BLOCK_SYNC_COUNT`.
 pub const BLOCK_SYNC_EXPIRATION_SECS: u8 = 30;

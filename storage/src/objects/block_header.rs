@@ -61,37 +61,40 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// Returns a list of block locator hashes. The purpose of this method is to detect
     /// wrong branches in the caller's canon chain.
     pub fn get_block_locator_hashes(&self) -> Result<Vec<BlockHeaderHash>, StorageError> {
-        // Start from the latest block and work backwards
-        let mut index = self.get_current_block_height();
+        let block_height = self.get_current_block_height();
 
-        // The number of "chunks" into which the height is to be divided after the quadratic
-        // step used initially grows too high.
-        let divisor = std::cmp::min(16u32, std::cmp::max(index, 1));
+        // Calculate the average distance between block hashes based on the desired number of locator hashes.
+        let mut proportional_step = block_height / crate::NUM_LOCATOR_HASHES;
 
-        // Two different steps used to seek further hashes: a quadratic one and a proportional one.
-        let mut quadratic_step = 4;
-        let mut proportional_step = index / divisor;
-        let mut proportional_step_updated = false;
+        // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
+        // lower than the proportional step distance.
+        let num_quadratic_steps = (proportional_step as f32).log2() as u32;
+        // If the desired number of locator hashes is lower than the height, use the latter as the desired number
+        // of locator hashes.
+        let num_proportional_steps = std::cmp::min(crate::NUM_LOCATOR_HASHES, block_height) - num_quadratic_steps;
 
-        // The output list of block locator hashes
-        let mut block_locator_hashes = vec![];
+        // The output list of block locator hashes.
+        let mut block_locator_hashes = Vec::with_capacity(crate::NUM_LOCATOR_HASHES as usize);
 
-        while index > 0 {
-            block_locator_hashes.push(self.get_block_hash(index)?);
+        let mut hash_index = block_height;
+        let mut quadratic_step = 4; // the size of the first quadratic step
 
-            // Start by using quadratic steps.
-            if proportional_step > quadratic_step {
-                index = index.saturating_sub(quadratic_step);
-                quadratic_step *= 2;
-            } else {
-                // Update the proportional step and use it from now on.
-                if !proportional_step_updated {
-                    proportional_step_updated = true;
-                    proportional_step = index / divisor;
-                }
-                index = index.saturating_sub(proportional_step);
-            }
+        // Skip the 1st quadratic step to include the hash for the top block.
+        for _ in 1..num_quadratic_steps {
+            block_locator_hashes.push(self.get_block_hash(hash_index)?);
+            hash_index = hash_index.saturating_sub(quadratic_step);
+            quadratic_step *= 2;
         }
+
+        // Update the size of the proportional step so that the hashes of the remaining blocks have the same distance
+        // between one another.
+        proportional_step = hash_index / num_proportional_steps;
+
+        for _ in 0..num_proportional_steps {
+            block_locator_hashes.push(self.get_block_hash(hash_index)?);
+            hash_index = hash_index.saturating_sub(proportional_step);
+        }
+
         block_locator_hashes.push(self.get_block_hash(0)?);
 
         Ok(block_locator_hashes)
