@@ -24,26 +24,6 @@ use snarkos_metrics::{self as metrics, misc::*};
 use crate::{master::SyncInbound, message::*, NetworkError, Node};
 
 impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
-    ///
-    /// Sends a `GetSync` request to the given sync node.
-    ///
-    pub async fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = match self.expect_sync().storage().get_block_locator_hashes() {
-            Ok(block_locator_hashes) => block_locator_hashes,
-            _ => {
-                error!("Unable to get block locator hashes from storage");
-                return;
-            }
-        };
-
-        info!("Updating blocks from {}", sync_node);
-
-        // Send a GetSync to the selected sync node.
-        self.peer_book
-            .send_to(sync_node, Payload::GetSync(block_locator_hashes))
-            .await;
-    }
-
     /// Broadcast block to connected peers
     pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
         debug!("Propagating a block to peers");
