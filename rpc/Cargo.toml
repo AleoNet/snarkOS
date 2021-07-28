@@ -19,16 +19,16 @@ edition = "2018"
 
 [dependencies.snarkvm-algorithms]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5b24941"
+rev = "1f8a750"
 default-features = false
 
 [dependencies.snarkvm-dpc]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5b24941"
+rev = "1f8a750"
 
 [dependencies.snarkvm-utilities]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "5b24941"
+rev = "1f8a750"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
