@@ -170,7 +170,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
         // Fetch the set of valid inner circuit IDs.
         let inner_snark_vk: <<Testnet1Parameters as Parameters>::InnerSNARK as SNARK>::VerifyingKey =
-            dpc.inner_snark_parameters.1.clone().into();
+            dpc.inner_snark_parameters.1.clone();
         let inner_snark_vk_field_elements = inner_snark_vk.to_field_elements()?;
         let inner_circuit_id =
             Testnet1Parameters::inner_circuit_id_crh().hash_field_elements(&inner_snark_vk_field_elements)?;

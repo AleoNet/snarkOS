@@ -72,7 +72,7 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
     /// Returns the latest block in the ledger.
     fn latest_block(&self) -> anyhow::Result<Block<Transaction<C>>> {
         let block_hash = self.get_block_hash(self.block_height())?;
-        Ok(self.get_block(&block_hash)?)
+        self.get_block(&block_hash)
     }
 
     /// Returns the block given the block hash.
