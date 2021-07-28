@@ -50,7 +50,7 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
 
         let leaves: &[[u8; 32]] = &[];
         let parameters = Arc::new(C::record_commitment_tree_parameters().clone());
-        let empty_cm_merkle_tree = MerkleTree::new(parameters.clone(), leaves)?;
+        let empty_cm_merkle_tree = MerkleTree::new(parameters, leaves)?;
 
         let ledger = Self {
             current_block_height: Default::default(),

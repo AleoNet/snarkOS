@@ -146,7 +146,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
                 let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
 
                 let parameters = Arc::new(C::record_commitment_tree_parameters().clone());
-                let merkle_tree = MerkleTree::new(parameters.clone(), &commitments[..])?;
+                let merkle_tree = MerkleTree::new(parameters, &commitments[..])?;
 
                 Ok(Self {
                     current_block_height: AtomicU32::new(bytes_to_u32(&val)),
