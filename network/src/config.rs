@@ -86,9 +86,16 @@ impl Config {
         self.is_bootnode
     }
 
+    /// Returns `true` if this node is a crawler. Otherwise, returns `false`.
     #[inline]
     pub fn is_crawler(&self) -> bool {
         self.is_crawler
+    }
+
+    /// Returns `true` if this node is a plain node. Otherwise, returns `false`.
+    #[inline]
+    pub fn is_regular_node(&self) -> bool {
+        !(self.is_bootnode() || self.is_crawler())
     }
 
     /// Returns the minimum number of peers this node maintains a connection with.
