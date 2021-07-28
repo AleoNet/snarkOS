@@ -32,16 +32,16 @@ source $HOME/.cargo/env
 cargo install --path .
 
 echo "=================================================="
-echo " Attention - Please ensure ports 4131 and 3030"
+echo " Attention - Please ensure ports 14131 and 3030"
 echo "             are enabled on your local network."
 echo ""
-echo " Cloud Providers - Enable ports 4131 and 3030"
+echo " Cloud Providers - Enable ports 14131 and 3030"
 echo "                   in your network firewall"
 echo ""
 echo " Home Users - Enable port forwarding or NAT rules"
-echo "              for 4131 and 3030 on your router."
+echo "              for 14131 and 3030 on your router."
 echo "=================================================="
 
 # Open ports on system
-ufw allow 4131/tcp
+ufw allow 14131/tcp
 ufw allow 3030/tcp

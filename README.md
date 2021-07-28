@@ -158,7 +158,7 @@ docker-compose build
 
 #### Docker run
 ``` bash
-docker run -d -p 4131:4131 --name snarkos snarkos
+docker run -d -p 14131:14131 --name snarkos snarkos
 ```
 or
 ```bash
