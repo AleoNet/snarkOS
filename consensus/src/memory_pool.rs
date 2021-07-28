@@ -57,7 +57,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> Clone for MemoryPool<T> {
 }
 
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
-const COINBASE_TRANSACTION_SIZE: usize = 1490; // TODO Find the value for actual coinbase transaction size
+const COINBASE_TRANSACTION_SIZE: usize = 1418; // TODO Find the value for actual coinbase transaction size
 
 impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
