@@ -165,26 +165,22 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
             let current_height = storage.get_current_block_height();
 
             if let Ok(height) = storage.get_block_number(&latest_shared_hash) {
-                if height < current_height {
-                    let mut max_height = current_height;
+                let mut max_height = current_height;
 
-                    // if the requester is behind more than MAX_BLOCK_SYNC_COUNT blocks
-                    if current_height > height + crate::MAX_BLOCK_SYNC_COUNT {
-                        // send no more than MAX_BLOCK_SYNC_COUNT
-                        max_height = height + crate::MAX_BLOCK_SYNC_COUNT;
-                    }
-
-                    let mut block_hashes = Vec::with_capacity((max_height - height) as usize);
-
-                    for block_num in height + 1..=max_height {
-                        block_hashes.push(storage.get_block_hash(block_num)?);
-                    }
-
-                    // send block hashes to requester
-                    block_hashes
-                } else {
-                    vec![]
+                // if the requester is behind more than MAX_BLOCK_SYNC_COUNT blocks
+                if current_height > height + crate::MAX_BLOCK_SYNC_COUNT {
+                    // send no more than MAX_BLOCK_SYNC_COUNT
+                    max_height = height + crate::MAX_BLOCK_SYNC_COUNT;
                 }
+
+                let mut block_hashes = Vec::with_capacity((max_height - height) as usize);
+
+                for block_num in height + 1..=max_height {
+                    block_hashes.push(storage.get_block_hash(block_num)?);
+                }
+
+                // send block hashes to requester
+                block_hashes
             } else {
                 vec![]
             }
