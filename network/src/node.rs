@@ -200,8 +200,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
             let known_network_task = task::spawn(async move {
                 let known_network = node_clone.known_network().unwrap();
-                loop {
-                    known_network.update().await
+                let mut receiver = known_network.take_receiver().unwrap();
+
+                while let Some(message) = receiver.recv().await {
+                    known_network.update(message);
                 }
             });
             self.register_task(known_network_task);

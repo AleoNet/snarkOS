@@ -24,12 +24,8 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
-use parking_lot::RwLock;
-use tokio::sync::{
-    mpsc,
-    mpsc::{Receiver, Sender},
-    Mutex,
-};
+use parking_lot::{Mutex, RwLock};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 // Purges connections that haven't been seen within this time (in hours).
 const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
@@ -110,7 +106,8 @@ pub enum KnownNetworkMessage {
 #[derive(Debug)]
 pub struct KnownNetwork {
     pub sender: Sender<KnownNetworkMessage>,
-    receiver: Mutex<Receiver<KnownNetworkMessage>>,
+    // The `Option` is used in order to be able to extract the `Receiver` into its dedicated task.
+    receiver: Mutex<Option<Receiver<KnownNetworkMessage>>>,
 
     // The nodes and their block height if known.
     nodes: RwLock<HashMap<SocketAddr, u32>>,
@@ -124,7 +121,7 @@ impl Default for KnownNetwork {
 
         Self {
             sender: tx,
-            receiver: Mutex::new(rx),
+            receiver: Mutex::new(Some(rx)),
             nodes: Default::default(),
             connections: Default::default(),
         }
@@ -133,13 +130,16 @@ impl Default for KnownNetwork {
 
 impl KnownNetwork {
     /// Updates the crawled connection set.
-    pub async fn update(&self) {
-        if let Some(message) = self.receiver.lock().await.recv().await {
-            match message {
-                KnownNetworkMessage::Peers(source, peers) => self.update_connections(source, peers),
-                KnownNetworkMessage::Height(source, height) => self.update_height(source, height),
-            }
+    pub fn update(&self, message: KnownNetworkMessage) {
+        match message {
+            KnownNetworkMessage::Peers(source, peers) => self.update_connections(source, peers),
+            KnownNetworkMessage::Height(source, height) => self.update_height(source, height),
         }
+    }
+
+    /// Extracts the receiver that will be reading crawler-related messages.
+    pub fn take_receiver(&self) -> Option<Receiver<KnownNetworkMessage>> {
+        self.receiver.lock().take()
     }
 
     // More convenient for testing.
@@ -560,7 +560,7 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
         let known_network = KnownNetwork {
             sender: tx,
-            receiver: Mutex::new(rx),
+            receiver: Mutex::new(Some(rx)),
             nodes: Default::default(),
             connections: RwLock::new(seeded_connections),
         };
@@ -637,7 +637,7 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
         let known_network = KnownNetwork {
             sender: tx,
-            receiver: Mutex::new(rx),
+            receiver: Mutex::new(Some(rx)),
             nodes: RwLock::new(
                 vec![
                     (addr_b, 24),
