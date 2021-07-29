@@ -170,14 +170,12 @@ impl KnownNetwork {
             .copied()
             .collect();
 
-        // Only retain connections that aren't removed.
-        self.connections
-            .write()
-            .retain(|connection| !connections_to_remove.contains(connection));
-
         // Scope the write lock.
         {
             let mut connections_g = self.connections.write();
+
+            // Remove stale connections.
+            connections_g.retain(|connection| !connections_to_remove.contains(connection));
 
             // Insert new connections, we use replace so the last seen timestamp is overwritten.
             for new_connection in new_connections.into_iter() {
