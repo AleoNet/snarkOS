@@ -86,6 +86,18 @@ impl Connection {
     }
 }
 
+/// Constructs a set of nodes contained from the connection set.
+pub fn nodes_from_connections(connections: &HashSet<Connection>) -> HashSet<SocketAddr> {
+    let mut nodes: HashSet<SocketAddr> = HashSet::new();
+    for connection in connections.iter() {
+        // Using a hashset guarantees uniqueness.
+        nodes.insert(connection.source);
+        nodes.insert(connection.target);
+    }
+
+    nodes
+}
+
 /// Message types passed through the `KnownNetwork` channel.
 pub enum KnownNetworkMessage {
     /// Maps a peer address to its peers.
@@ -178,7 +190,7 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
 
             // Remove the nodes that no longer correspond to connections.
-            let nodes_from_connections = self.nodes_from_connections();
+            let nodes_from_connections = nodes_from_connections(&self.connections());
             nodes_g.retain(|addr, _| nodes_from_connections.contains(addr));
         }
     }
@@ -206,18 +218,6 @@ impl KnownNetwork {
     /// Returns a snapshot of all the nodes.
     pub fn nodes(&self) -> HashMap<SocketAddr, u32> {
         self.nodes.read().clone()
-    }
-
-    /// Constructs a set of nodes contained from the connection set.
-    pub fn nodes_from_connections(&self) -> HashSet<SocketAddr> {
-        let mut nodes: HashSet<SocketAddr> = HashSet::new();
-        for connection in self.connections().iter() {
-            // Using a hashset guarantees uniqueness.
-            nodes.insert(connection.source);
-            nodes.insert(connection.target);
-        }
-
-        nodes
     }
 
     /// Returns a map of the potential forks.
@@ -305,12 +305,7 @@ impl NetworkMetrics {
         }
 
         // Construct the list of nodes from the connections.
-        let mut nodes: HashSet<SocketAddr> = HashSet::new();
-        for connection in connections.iter() {
-            // Using a hashset guarantees uniqueness.
-            nodes.insert(connection.source);
-            nodes.insert(connection.target);
-        }
+        let nodes = nodes_from_connections(&connections);
 
         let node_count = nodes.len();
         let connection_count = connections.len();
