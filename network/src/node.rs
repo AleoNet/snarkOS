@@ -199,11 +199,9 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let node_clone = self.clone();
 
             let known_network_task = task::spawn(async move {
+                let known_network = node_clone.known_network().unwrap();
                 loop {
-                    // Should always be present since we check for it before this block.
-                    if let Some(known_network) = node_clone.known_network() {
-                        known_network.update().await
-                    }
+                    known_network.update().await
                 }
             });
             self.register_task(known_network_task);
