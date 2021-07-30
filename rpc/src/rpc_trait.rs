@@ -159,4 +159,8 @@ pub trait ProtectedRpcFunctions {
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/disconnect.md"))]
     fn disconnect(&self, address: SocketAddr);
+
+    // todo: readd in Rust 1.54
+    // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/connect.md"))]
+    fn connect(&self, addresses: Vec<SocketAddr>);
 }
