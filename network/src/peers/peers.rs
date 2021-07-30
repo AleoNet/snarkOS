@@ -60,8 +60,8 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             // Crawlers disconnect down to the min peer count, this to free up room for
             // the next crawled peers...
             let number_to_disconnect = active_peer_count.saturating_sub(min_peers);
-            // ...then they connect to disconnected peers leaving 20% of their capacity open
-            // incoming connections.
+            // ...then they connect to disconnected peers leaving 20% of their capacity open to
+            // potential incoming connections.
             const CRAWLING_CAPACITY_PERCENTAGE: f64 = 0.8;
             let crawling_capacity = (CRAWLING_CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
             let number_to_connect = crawling_capacity.saturating_sub(active_peer_count - number_to_disconnect);
@@ -92,15 +92,19 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         if number_to_disconnect != 0 {
             let mut current_peers = self.peer_book.connected_peers_snapshot().await;
 
-            // Bootnodes and crawlers will disconnect from random peers...
-            if !self.config.is_bootnode() && !self.config.is_crawler() {
-                // ...while regular peers from the most recently connected.
+            if !self.config.is_regular_node() {
+                // Bootnodes and crawlers will disconnect from their oldest peers...
+                current_peers.sort_unstable_by_key(|peer| cmp::Reverse(peer.quality.last_connected));
+            } else {
+                // ...while regular nodes from the ones most recently connected to.
                 current_peers.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
 
             for _ in 0..number_to_disconnect {
                 if let Some(peer) = current_peers.pop() {
                     self.disconnect_from_peer(peer.address).await;
+                } else {
+                    break;
                 }
             }
         }
@@ -202,22 +206,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 cmp::min(count, self.peer_book.disconnected_peers().len())
             );
 
-            let bootnodes = self.config.bootnodes();
-
-            // Iterate through a selection of random peers and attempt to connect.
+            // Obtain the collection of disconnected peers.
             let mut candidates = self.peer_book.disconnected_peers_snapshot();
 
+            // Bootnodes are connected to in a dedicated method.
+            let bootnodes = self.config.bootnodes();
             candidates.retain(|peer| peer.address != own_address && !bootnodes.contains(&peer.address));
 
-            if self.config.is_bootnode() {
-                // Bootnodes choose peers they haven't dialed in a while.
+            if !self.config.is_regular_node() {
+                // Bootnodes and crawlers prefer peers they haven't dialed in a while.
                 candidates.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
 
-            // Only keep the addresses.
             let addr_iter = candidates.iter().map(|peer| peer.address);
 
-            if self.config.is_bootnode() {
+            if !self.config.is_regular_node() {
                 addr_iter.take(count).collect()
             } else {
                 addr_iter.choose_multiple(&mut rand::thread_rng(), count)
@@ -247,12 +250,13 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     async fn broadcast_getpeers_requests(&self) {
-        // Check that this node is not a bootnode.
-        if !self.config.is_bootnode() {
+        // If the node is not a bootnode or a crawler, check if the request for peers is needed
+        // based on the number of active connections.
+        if self.config.is_regular_node() {
             // Fetch the number of connected and connecting peers.
             let number_of_peers = self.peer_book.get_active_peer_count() as usize;
 
-            // Check if this node server is below the permitted number of connected peers.
+            // Check if this node server is below the minimum desired number of connected peers.
             let min_peers = self.config.minimum_number_of_connected_peers() as usize;
             if number_of_peers >= min_peers {
                 return;

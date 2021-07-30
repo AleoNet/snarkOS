@@ -25,16 +25,8 @@ use crate::{
     COL_TRANSACTION_LOCATION,
 };
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_dpc::{
-    Block,
-    BlockHeaderHash,
-    DatabaseTransaction,
-    Op,
-    Storage,
-    TransactionScheme,
-    Transactions as DPCTransactions,
-};
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, Op, Storage, TransactionScheme, Transactions};
+use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use rayon::prelude::*;
 use tokio::{sync::mpsc, task};
@@ -79,7 +71,12 @@ macro_rules! check_for_superfluous_tx_components {
                     $component_name
                 );
 
-                if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+                if [
+                    FixMode::SuperfluousTestnet1TransactionComponents,
+                    FixMode::Everything,
+                ]
+                .contains(&fix_mode)
+                {
                     for superfluous_item in superfluous_items {
                         db_ops.push(Op::Delete {
                             col: $component_col,
@@ -99,11 +96,11 @@ pub enum FixMode {
     /// Don't fix anything in the storage.
     Nothing,
     /// Update transaction locations if need be.
-    TxLocations,
+    Testnet1TransactionLocations,
     /// Store transaction serial numbers, commitments and memorandums that are missing in the storage.
-    MissingTxComponents,
+    MissingTestnet1TransactionComponents,
     /// Remove transaction serial numbers, commitments and memorandums for missing transactions.
-    SuperfluousTxComponents,
+    SuperfluousTestnet1TransactionComponents,
     /// Apply all the available fixes.
     Everything,
 }
@@ -135,7 +132,9 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
     pub async fn validate(&self, mut limit: Option<u32>, fix_mode: FixMode) -> bool {
-        if limit.is_some() && [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+        if limit.is_some()
+            && [FixMode::SuperfluousTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode)
+        {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
             );
@@ -375,7 +374,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             }
         };
 
-        let block_stored_txs: DPCTransactions<T> = FromBytes::read(&block_stored_txs_bytes[..]).unwrap();
+        let block_stored_txs: Transactions<T> = FromBytes::read_le(&block_stored_txs_bytes[..]).unwrap();
 
         block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
             let tx_id = match tx.transaction_id() {
@@ -393,7 +392,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             };
 
             for sn in tx.old_serial_numbers() {
-                let sn = to_bytes![sn].unwrap();
+                let sn = to_bytes_le![sn].unwrap();
                 if !self.storage.exists(COL_SERIAL_NUMBER, &sn) {
                     error!(
                         "Transaction {} doesn't have an old serial number stored",
@@ -405,7 +404,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             }
 
             for cm in tx.new_commitments() {
-                let cm = to_bytes![cm].unwrap();
+                let cm = to_bytes_le![cm].unwrap();
                 if !self.storage.exists(COL_COMMITMENT, &cm) {
                     error!(
                         "Transaction {} doesn't have a new commitment stored",
@@ -416,14 +415,14 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                 component_sender.send(ValidatorAction::RegisterTxComponent(COL_COMMITMENT, cm)).unwrap();
             }
 
-            let tx_digest = to_bytes![tx.ledger_digest()].unwrap();
+            let tx_digest = to_bytes_le![tx.ledger_digest()].unwrap();
             if !self.storage.exists(COL_DIGEST, &tx_digest) {
                 warn!(
                     "Transaction {} doesn't have the ledger digest stored",
                     hex::encode(tx_id),
                 );
 
-                if [FixMode::MissingTxComponents, FixMode::Everything].contains(&fix_mode) {
+                if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
                     let db_op = Op::Insert {
                         col: COL_DIGEST,
                         key: tx_digest.clone(),
@@ -436,7 +435,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             }
             component_sender.send(ValidatorAction::RegisterTxComponent(COL_DIGEST, tx_digest)).unwrap();
 
-            let tx_memo = to_bytes![tx.memorandum()].unwrap();
+            let tx_memo = to_bytes_le![tx.memorandum()].unwrap();
             if !self.storage.exists(COL_MEMO, &tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 is_storage_valid.store(false, Ordering::SeqCst);
@@ -463,7 +462,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                             BlockHeaderHash(tx_location.block_hash)
                         );
 
-                        if [FixMode::TxLocations, FixMode::Everything].contains(&fix_mode) {
+                        if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
                             let corrected_location = TransactionLocation {
                                 index: block_tx_idx as u32,
                                 block_hash: block_hash.0,
@@ -472,7 +471,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                             let db_op = Op::Insert {
                                 col: COL_TRANSACTION_LOCATION,
                                 key: tx_id.to_vec(),
-                                value: to_bytes!(corrected_location).unwrap(),
+                                value: to_bytes_le!(corrected_location).unwrap(),
                             };
                             component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
                         } else {
