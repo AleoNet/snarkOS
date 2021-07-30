@@ -24,12 +24,8 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
-use parking_lot::RwLock;
-use tokio::sync::{
-    mpsc,
-    mpsc::{Receiver, Sender},
-    Mutex,
-};
+use parking_lot::{Mutex, RwLock};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 // Purges connections that haven't been seen within this time (in hours).
 const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
@@ -86,6 +82,18 @@ impl Connection {
     }
 }
 
+/// Constructs a set of nodes contained from the connection set.
+pub fn nodes_from_connections(connections: &HashSet<Connection>) -> HashSet<SocketAddr> {
+    let mut nodes: HashSet<SocketAddr> = HashSet::new();
+    for connection in connections.iter() {
+        // Using a hashset guarantees uniqueness.
+        nodes.insert(connection.source);
+        nodes.insert(connection.target);
+    }
+
+    nodes
+}
+
 /// Message types passed through the `KnownNetwork` channel.
 pub enum KnownNetworkMessage {
     /// Maps a peer address to its peers.
@@ -98,7 +106,8 @@ pub enum KnownNetworkMessage {
 #[derive(Debug)]
 pub struct KnownNetwork {
     pub sender: Sender<KnownNetworkMessage>,
-    receiver: Mutex<Receiver<KnownNetworkMessage>>,
+    // The `Option` is used in order to be able to extract the `Receiver` into its dedicated task.
+    receiver: Mutex<Option<Receiver<KnownNetworkMessage>>>,
 
     // The nodes and their block height if known.
     nodes: RwLock<HashMap<SocketAddr, u32>>,
@@ -112,7 +121,7 @@ impl Default for KnownNetwork {
 
         Self {
             sender: tx,
-            receiver: Mutex::new(rx),
+            receiver: Mutex::new(Some(rx)),
             nodes: Default::default(),
             connections: Default::default(),
         }
@@ -121,13 +130,16 @@ impl Default for KnownNetwork {
 
 impl KnownNetwork {
     /// Updates the crawled connection set.
-    pub async fn update(&self) {
-        if let Some(message) = self.receiver.lock().await.recv().await {
-            match message {
-                KnownNetworkMessage::Peers(source, peers) => self.update_connections(source, peers),
-                KnownNetworkMessage::Height(source, height) => self.update_height(source, height),
-            }
+    pub fn update(&self, message: KnownNetworkMessage) {
+        match message {
+            KnownNetworkMessage::Peers(source, peers) => self.update_connections(source, peers),
+            KnownNetworkMessage::Height(source, height) => self.update_height(source, height),
         }
+    }
+
+    /// Extracts the receiver that will be reading crawler-related messages.
+    pub fn take_receiver(&self) -> Option<Receiver<KnownNetworkMessage>> {
+        self.receiver.lock().take()
     }
 
     // More convenient for testing.
@@ -158,14 +170,12 @@ impl KnownNetwork {
             .copied()
             .collect();
 
-        // Only retain connections that aren't removed.
-        self.connections
-            .write()
-            .retain(|connection| !connections_to_remove.contains(connection));
-
         // Scope the write lock.
         {
             let mut connections_g = self.connections.write();
+
+            // Remove stale connections.
+            connections_g.retain(|connection| !connections_to_remove.contains(connection));
 
             // Insert new connections, we use replace so the last seen timestamp is overwritten.
             for new_connection in new_connections.into_iter() {
@@ -178,7 +188,7 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
 
             // Remove the nodes that no longer correspond to connections.
-            let nodes_from_connections = self.nodes_from_connections();
+            let nodes_from_connections = nodes_from_connections(&self.connections());
             nodes_g.retain(|addr, _| nodes_from_connections.contains(addr));
         }
     }
@@ -206,18 +216,6 @@ impl KnownNetwork {
     /// Returns a snapshot of all the nodes.
     pub fn nodes(&self) -> HashMap<SocketAddr, u32> {
         self.nodes.read().clone()
-    }
-
-    /// Constructs a set of nodes contained from the connection set.
-    pub fn nodes_from_connections(&self) -> HashSet<SocketAddr> {
-        let mut nodes: HashSet<SocketAddr> = HashSet::new();
-        for connection in self.connections().iter() {
-            // Using a hashset guarantees uniqueness.
-            nodes.insert(connection.source);
-            nodes.insert(connection.target);
-        }
-
-        nodes
     }
 
     /// Returns a map of the potential forks.
@@ -305,12 +303,7 @@ impl NetworkMetrics {
         }
 
         // Construct the list of nodes from the connections.
-        let mut nodes: HashSet<SocketAddr> = HashSet::new();
-        for connection in connections.iter() {
-            // Using a hashset guarantees uniqueness.
-            nodes.insert(connection.source);
-            nodes.insert(connection.target);
-        }
+        let nodes = nodes_from_connections(&connections);
 
         let node_count = nodes.len();
         let connection_count = connections.len();
@@ -565,7 +558,7 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
         let known_network = KnownNetwork {
             sender: tx,
-            receiver: Mutex::new(rx),
+            receiver: Mutex::new(Some(rx)),
             nodes: Default::default(),
             connections: RwLock::new(seeded_connections),
         };
@@ -642,7 +635,7 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
         let known_network = KnownNetwork {
             sender: tx,
-            receiver: Mutex::new(rx),
+            receiver: Mutex::new(Some(rx)),
             nodes: RwLock::new(
                 vec![
                     (addr_b, 24),
