@@ -81,7 +81,7 @@ version = "1"
 version = "1.6"
 
 [dependencies.criterion]
-version = "0.3.4"
+version = "0.3.5"
 features = [ "async_tokio" ]
 
 [dependencies.rand_xorshift]
