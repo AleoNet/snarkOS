@@ -63,24 +63,42 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     pub fn get_block_locator_hashes(&self) -> Result<Vec<BlockHeaderHash>, StorageError> {
         let block_height = self.get_current_block_height();
 
-        // Calculate the average distance between block hashes based on the desired number of locator hashes.
-        let mut proportional_step = block_height / crate::NUM_LOCATOR_HASHES;
-
-        // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
-        // lower than the proportional step distance.
-        let num_quadratic_steps = (proportional_step as f32).log2() as u32;
-        // If the desired number of locator hashes is lower than the height, use the latter as the desired number
-        // of locator hashes.
-        let num_proportional_steps = std::cmp::min(crate::NUM_LOCATOR_HASHES, block_height) - num_quadratic_steps;
+        // The number of locator hashes left to obtain; accounts for the genesis block.
+        let mut num_locator_hashes = std::cmp::min(crate::NUM_LOCATOR_HASHES - 1, block_height);
 
         // The output list of block locator hashes.
-        let mut block_locator_hashes = Vec::with_capacity(crate::NUM_LOCATOR_HASHES as usize);
+        let mut block_locator_hashes = Vec::with_capacity(num_locator_hashes as usize);
 
+        // The index of the current block for which a locator hash is obtained.
         let mut hash_index = block_height;
-        let mut quadratic_step = 4; // the size of the first quadratic step
 
-        // Skip the 1st quadratic step to include the hash for the top block.
-        for _ in 1..num_quadratic_steps {
+        // The number of top blocks to provide locator hashes for.
+        let num_top_blocks = std::cmp::min(10, num_locator_hashes);
+
+        for _ in 0..num_top_blocks {
+            block_locator_hashes.push(self.get_block_hash(hash_index)?);
+            hash_index -= 1; // safe; num_top_blocks is never higher than the height
+        }
+
+        num_locator_hashes -= num_top_blocks;
+        if num_locator_hashes == 0 {
+            block_locator_hashes.push(self.get_block_hash(0)?);
+            return Ok(block_locator_hashes);
+        }
+
+        // Calculate the average distance between block hashes based on the desired number of locator hashes.
+        let mut proportional_step = hash_index / num_locator_hashes;
+
+        // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
+        // lower or close to the proportional step distance.
+        let num_quadratic_steps = (proportional_step as f32).log2() as u32;
+
+        // The remaining hashes should have a proportional index distance between them.
+        let num_proportional_steps = num_locator_hashes - num_quadratic_steps;
+
+        // Obtain a few hashes increasing the distance quadratically.
+        let mut quadratic_step = 4; // the size of the first quadratic step
+        for _ in 0..num_quadratic_steps {
             block_locator_hashes.push(self.get_block_hash(hash_index)?);
             hash_index = hash_index.saturating_sub(quadratic_step);
             quadratic_step *= 2;
@@ -90,8 +108,20 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         // between one another.
         proportional_step = hash_index / num_proportional_steps;
 
+        // Tweak: in order to avoid "jumping" by too many indices with the last step,
+        // increase the value of each step by 1 if the last step is too large. This
+        // can result in the final number of locator hashes being a bit lower, but
+        // it's preferable to having a large gap between values.
+        if hash_index - proportional_step * num_proportional_steps > 2 * proportional_step {
+            proportional_step += 1;
+        }
+
+        // Obtain the rest of hashes with a proportional distance between them.
         for _ in 0..num_proportional_steps {
             block_locator_hashes.push(self.get_block_hash(hash_index)?);
+            if hash_index == 0 {
+                return Ok(block_locator_hashes);
+            }
             hash_index = hash_index.saturating_sub(proportional_step);
         }
 
