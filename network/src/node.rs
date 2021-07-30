@@ -199,6 +199,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let node_clone = self.clone();
 
             let known_network_task = task::spawn(async move {
+                // Safe since we check the presence of `known_network`.
                 let known_network = node_clone.known_network().unwrap();
                 let mut receiver = known_network.take_receiver().unwrap();
 
