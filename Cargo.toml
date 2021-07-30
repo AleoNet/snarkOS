@@ -1,6 +1,6 @@
 [package]
 name = "snarkos"
-version = "1.3.11"
+version = "1.3.12"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -33,7 +33,7 @@ members = [
   "profiler",
   "rpc",
   "storage",
-  "testing",
+  "testing"
 ]
 
 [lib]
@@ -58,20 +58,20 @@ version = "=0.7.5"
 
 [dependencies.snarkos-consensus]
 path = "./consensus"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.snarkos-network]
 path = "./network"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.snarkos-rpc]
 path = "./rpc"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.snarkos-storage]
 path = "./storage"
 features = [ "rocksdb_storage" ]
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.anyhow]
 version = "1.0"

@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-benchmarks"
-version = "1.3.11"
+version = "1.3.12"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Benchmarks for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -52,15 +52,15 @@ version = "=0.7.5"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.snarkos-network]
 path = "../network"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.snarkos-testing]
 path = "../testing"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.csv]
 version = "1"
