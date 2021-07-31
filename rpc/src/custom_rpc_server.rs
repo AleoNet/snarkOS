@@ -39,7 +39,7 @@ use tokio::task;
 
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
-const METHODS_EXPECTING_PARAMS: [&str; 14] = [
+const METHODS_EXPECTING_PARAMS: [&str; 13] = [
     // public
     "getblock",
     "getblockhash",
@@ -53,7 +53,6 @@ const METHODS_EXPECTING_PARAMS: [&str; 14] = [
     "createtransactionkernel",
     "createtransaction",
     "getrawrecord",
-    "decoderecord",
     "decryptrecord",
     "disconnect",
 ];
