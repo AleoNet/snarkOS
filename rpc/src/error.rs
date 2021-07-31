@@ -15,9 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::error::ConsensusError;
-use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::{AccountError, DPCError, RecordError, TransactionError};
-use snarkvm_ledger::prelude::*;
+use snarkvm::{
+    algorithms::CRHError,
+    dpc::{AccountError, DPCError, RecordError, TransactionError},
+    ledger::prelude::*,
+};
 
 use std::fmt::Debug;
 

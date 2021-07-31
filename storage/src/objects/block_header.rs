@@ -15,9 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Ledger, COL_BLOCK_HEADER};
-use snarkvm_dpc::{Parameters, Transaction};
-use snarkvm_ledger::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, LedgerScheme, Storage};
-use snarkvm_utilities::FromBytes;
+use snarkvm::{
+    dpc::{Parameters, Transaction},
+    ledger::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, LedgerScheme, Storage},
+    utilities::FromBytes,
+};
 
 impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Get a block header given the block hash.

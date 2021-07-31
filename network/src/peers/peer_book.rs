@@ -25,7 +25,7 @@ use std::{
 use futures::Future;
 use mpmc_map::MpmcMap;
 use rand::prelude::IteratorRandom;
-use snarkvm_ledger::Storage;
+use snarkvm::ledger::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};

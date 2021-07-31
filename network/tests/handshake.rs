@@ -20,7 +20,7 @@ use snarkos_testing::{
     network::{test_node, write_message_to_stream, TestSetup},
     wait_until,
 };
-use snarkvm_ledger::prelude::*;
+use snarkvm::ledger::prelude::*;
 
 use std::time::Duration;
 

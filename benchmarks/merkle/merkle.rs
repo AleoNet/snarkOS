@@ -18,10 +18,12 @@ use std::sync::Arc;
 
 use criterion::*;
 use rand::Rng;
-use snarkvm_algorithms::{merkle_tree::MerkleTree, MerkleParameters, CRH};
-use snarkvm_dpc::testnet1::instantiated::*;
-use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
-use snarkvm_utilities::bytes::FromBytes;
+use snarkvm::{
+    algorithms::{merkle_tree::MerkleTree, MerkleParameters, CRH},
+    dpc::testnet1::instantiated::*,
+    parameters::{LedgerMerkleTreeParameters, Parameter},
+    utilities::bytes::FromBytes,
+};
 
 fn merkle_build(c: &mut Criterion) {
     let crh_parameters =

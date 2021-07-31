@@ -17,8 +17,10 @@
 use std::{sync::Arc, thread, time::Duration};
 
 use futures::executor::block_on;
-use snarkvm_dpc::{testnet1::*, Address};
-use snarkvm_ledger::Storage;
+use snarkvm::{
+    dpc::{testnet1::*, Address},
+    ledger::Storage,
+};
 use tokio::task;
 use tracing::*;
 

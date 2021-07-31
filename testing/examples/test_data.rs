@@ -16,18 +16,11 @@
 
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
-use snarkvm_dpc::{
-    payload::Payload as RecordPayload,
-    testnet1::*,
-    Account,
-    Address,
-    Parameters,
-    Program,
-    Record,
-    RecordScheme,
+use snarkvm::{
+    dpc::{payload::Payload as RecordPayload, testnet1::*, Account, Address, Parameters, Record, RecordScheme},
+    ledger::{Block, LedgerScheme, Storage, Transactions},
+    utilities::{to_bytes_le, ToBytes},
 };
-use snarkvm_ledger::{Block, LedgerScheme, Storage, Transactions};
-use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf, sync::Arc};

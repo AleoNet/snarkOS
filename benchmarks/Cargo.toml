@@ -32,29 +32,11 @@ name = "network"
 path = "network/network.rs"
 harness = false
 
-[dependencies.snarkvm-algorithms]
+[dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-curves]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-dpc]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-ledger]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-parameters]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-utilities]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
+rev = "2645ecd"
+# path = "../../snarkVM"
+features = ["algorithms", "parameters"]
 
 [dependencies.snarkos-profiler]
 path = "../profiler"

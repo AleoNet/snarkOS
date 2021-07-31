@@ -24,9 +24,11 @@ use crate::{
     COL_SERIAL_NUMBER,
     COL_TRANSACTION_LOCATION,
 };
-use snarkvm_dpc::{Parameters, Transaction, TransactionScheme};
-use snarkvm_ledger::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, Transactions};
-use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
+use snarkvm::{
+    dpc::{Parameters, Transaction, TransactionScheme},
+    ledger::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, Transactions},
+    utilities::{to_bytes_le, FromBytes, ToBytes},
+};
 
 use rayon::prelude::*;
 use tokio::{sync::mpsc, task};
@@ -376,8 +378,7 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
 
         let block_stored_txs: Transactions<Transaction<C>> = FromBytes::read_le(&block_stored_txs_bytes[..]).unwrap();
 
-        // TODO (howardwu): TEMPORARY - Make this `iter()` a `par_iter()`.
-        block_stored_txs.iter().enumerate().for_each(|(block_tx_idx, tx)| {
+        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
             let tx_id = match tx.transaction_id() {
                 Ok(hash) => hash,
                 Err(e) => {

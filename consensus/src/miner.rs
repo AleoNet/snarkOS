@@ -15,16 +15,18 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, Consensus};
-use snarkvm_dpc::{testnet1::*, Address, DPCScheme, Parameters, Program, Record, RecordScheme, TransactionScheme};
-use snarkvm_ledger::{
-    posw::{txids_to_roots, PoswMarlin},
-    Block,
-    BlockHeader,
-    LedgerScheme,
-    Storage,
-    Transactions,
+use snarkvm::{
+    dpc::{testnet1::*, Address, DPCScheme, Parameters, Record, RecordScheme, TransactionScheme},
+    ledger::{
+        posw::{txids_to_roots, PoswMarlin},
+        Block,
+        BlockHeader,
+        LedgerScheme,
+        Storage,
+        Transactions,
+    },
+    utilities::{to_bytes_le, ToBytes},
 };
-use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use chrono::Utc;
 use rand::{thread_rng, CryptoRng, Rng};

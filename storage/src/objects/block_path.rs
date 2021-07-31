@@ -15,8 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm_dpc::Parameters;
-use snarkvm_ledger::{BlockError, BlockHeader, BlockHeaderHash, LedgerScheme, Storage, StorageError};
+use snarkvm::{
+    dpc::Parameters,
+    ledger::{BlockError, BlockHeader, BlockHeaderHash, LedgerScheme, Storage, StorageError},
+};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
 

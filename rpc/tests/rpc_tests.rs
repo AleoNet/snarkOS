@@ -24,12 +24,10 @@ mod rpc_tests {
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
     };
-    use snarkvm_dpc::{testnet1::Testnet1Transaction, TransactionScheme};
-    use snarkvm_ledger::LedgerScheme;
-    use snarkvm_utilities::{
-        bytes::{FromBytes, ToBytes},
-        serialize::CanonicalSerialize,
-        to_bytes_le,
+    use snarkvm::{
+        dpc::{testnet1::Testnet1Transaction, TransactionScheme},
+        ledger::LedgerScheme,
+        utilities::{serialize::CanonicalSerialize, to_bytes_le, FromBytes, ToBytes},
     };
 
     use jsonrpc_test::Rpc;

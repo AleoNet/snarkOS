@@ -23,8 +23,10 @@ use std::{
 use crate::{NetworkError, Node, Payload, Peer};
 use futures::{pin_mut, select, FutureExt};
 use rand::prelude::SliceRandom;
-use snarkvm_algorithms::crh::double_sha256;
-use snarkvm_ledger::{BlockHeader, BlockHeaderHash, Storage};
+use snarkvm::{
+    algorithms::crh::double_sha256,
+    ledger::{BlockHeader, BlockHeaderHash, Storage},
+};
 use tokio::{sync::mpsc, time::Instant};
 
 pub enum SyncInbound {

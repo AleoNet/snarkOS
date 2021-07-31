@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_storage::BlockHeight;
-use snarkvm_ledger::BlockHeaderHash;
+use snarkvm::ledger::BlockHeaderHash;
 
 use std::{fmt, net::SocketAddr};
 

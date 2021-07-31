@@ -25,18 +25,17 @@ mod protected_rpc_tests {
         sync::*,
     };
 
-    use snarkvm_dpc::{
-        record::Record as DPCRecord,
-        testnet1::{Testnet1Parameters, Testnet1Transaction},
-        Address,
-        PrivateKey,
-        RecordScheme,
-        TransactionKernel,
-        ViewKey,
-    };
-    use snarkvm_utilities::{
-        bytes::{FromBytes, ToBytes},
-        to_bytes_le,
+    use snarkvm::{
+        dpc::{
+            record::Record as DPCRecord,
+            testnet1::{Testnet1Parameters, Testnet1Transaction},
+            Address,
+            PrivateKey,
+            RecordScheme,
+            TransactionKernel,
+            ViewKey,
+        },
+        utilities::{to_bytes_le, FromBytes, ToBytes},
     };
 
     use jsonrpc_core::MetaIoHandler;

@@ -17,8 +17,10 @@
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::testnet1::Testnet1Transaction;
-    use snarkvm_ledger::{posw::txids_to_roots, prelude::*};
+    use snarkvm::{
+        dpc::testnet1::Testnet1Transaction,
+        ledger::{posw::txids_to_roots, prelude::*},
+    };
 
     use std::sync::Arc;
 

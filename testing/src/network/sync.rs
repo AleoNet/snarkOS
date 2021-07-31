@@ -24,10 +24,12 @@ use crate::{
 
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
-use snarkvm_dpc::testnet1::Testnet1Transaction;
-use snarkvm_ledger::{Block, BlockHeaderHash, LedgerScheme};
 #[cfg(test)]
-use snarkvm_utilities::FromBytes;
+use snarkvm::utilities::FromBytes;
+use snarkvm::{
+    dpc::testnet1::Testnet1Transaction,
+    ledger::{Block, BlockHeaderHash, LedgerScheme},
+};
 
 use std::time::Duration;
 
@@ -326,8 +328,7 @@ async fn transaction_responder_side() {
 #[tokio::test]
 async fn transaction_two_node() {
     use snarkos_consensus::memory_pool::Entry;
-    use snarkvm_dpc::testnet1::Testnet1Transaction;
-    use snarkvm_utilities::FromBytes;
+    use snarkvm::{dpc::testnet1::Testnet1Transaction, utilities::FromBytes};
 
     let node_alice = test_node(TestSetup::default()).await;
     let alice_address = node_alice.local_address().unwrap();

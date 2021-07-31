@@ -24,8 +24,10 @@ pub mod trim;
 pub mod validator;
 
 pub use snarkos_storage::{Ledger, LedgerStorage};
-use snarkvm_dpc::{testnet1::Testnet1Parameters, Parameters, Transaction};
-use snarkvm_ledger::{Block, LedgerScheme, Storage};
+use snarkvm::{
+    dpc::{testnet1::Testnet1Parameters, Parameters, Transaction},
+    ledger::{Block, LedgerScheme, Storage},
+};
 
 use rand::{thread_rng, Rng};
 

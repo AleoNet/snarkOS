@@ -23,25 +23,11 @@ rocksdb_storage = [ "rocksdb" ]
 mem_storage = [ ]
 test = [ ]
 
-[dependencies.snarkvm-algorithms]
+[dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-dpc]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-ledger]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-parameters]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-utilities]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
+rev = "2645ecd"
+# path = "../../snarkVM"
+features = ["parameters"]
 
 [dependencies.anyhow]
 version = "1.0.40"
@@ -85,10 +71,6 @@ version = "0.1"
 
 [dev-dependencies.snarkos-consensus]
 path = "../consensus"
-
-[dev-dependencies.snarkvm-curves]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"

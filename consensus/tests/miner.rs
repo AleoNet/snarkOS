@@ -17,8 +17,10 @@
 mod miner {
     use snarkos_consensus::Miner;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{Address, Parameters, PrivateKey};
-    use snarkvm_ledger::{posw::txids_to_roots, prelude::*};
+    use snarkvm::{
+        dpc::{Address, Parameters, PrivateKey},
+        ledger::{posw::txids_to_roots, prelude::*},
+    };
 
     use rand::{CryptoRng, Rng, SeedableRng};
     use rand_chacha::ChaChaRng;

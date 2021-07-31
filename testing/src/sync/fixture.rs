@@ -20,10 +20,12 @@ use crate::{
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_storage::LedgerStorage;
-use snarkvm_dpc::{testnet1::*, Account, NoopProgram};
-use snarkvm_ledger::{Block, Storage};
-use snarkvm_parameters::{testnet1::GenesisBlock, traits::genesis::Genesis};
-use snarkvm_utilities::bytes::FromBytes;
+use snarkvm::{
+    dpc::{testnet1::*, Account, NoopProgram},
+    ledger::{Block, Storage},
+    parameters::{testnet1::GenesisBlock, traits::genesis::Genesis},
+    utilities::bytes::FromBytes,
+};
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;

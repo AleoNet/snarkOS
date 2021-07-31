@@ -24,7 +24,7 @@ use crate::{
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_metrics::{self as metrics, misc};
 use snarkos_network::Node;
-use snarkvm_ledger::Storage;
+use snarkvm::ledger::Storage;
 
 use hyper::{
     body::HttpBody,

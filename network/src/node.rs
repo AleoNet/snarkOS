@@ -16,7 +16,7 @@
 
 use crate::{master::SyncInbound, sync::master::SyncMaster, *};
 use snarkos_metrics::{self as metrics, inbound, misc};
-use snarkvm_ledger::Storage;
+use snarkvm::ledger::Storage;
 
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;

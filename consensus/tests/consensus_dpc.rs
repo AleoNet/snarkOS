@@ -17,17 +17,11 @@
 mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, Miner};
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{
-        payload::Payload as RecordPayload,
-        record::Record,
-        testnet1::*,
-        DPCScheme,
-        Parameters,
-        Program,
-        RecordScheme,
+    use snarkvm::{
+        dpc::{payload::Payload as RecordPayload, record::Record, testnet1::*, DPCScheme, Parameters, RecordScheme},
+        ledger::prelude::*,
+        utilities::{to_bytes_le, ToBytes},
     };
-    use snarkvm_ledger::prelude::*;
-    use snarkvm_utilities::{bytes::ToBytes, to_bytes_le};
 
     use std::sync::Arc;
 

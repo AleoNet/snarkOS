@@ -20,21 +20,11 @@ edition = "2018"
 [features]
 prometheus = [ "snarkos-metrics/prometheus" ]
 
-[dependencies.snarkvm-algorithms]
+[dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-dpc]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-ledger]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
-
-[dependencies.snarkvm-utilities]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "0aaec75"
+rev = "2645ecd"
+# path = "../../snarkVM"
+features = ["algorithms"]
 
 [dependencies.snarkos-consensus]
 path = "../consensus"

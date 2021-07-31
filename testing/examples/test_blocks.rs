@@ -19,9 +19,11 @@ extern crate tracing;
 
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
-use snarkvm_dpc::{testnet1::*, Account, Address, Parameters, Payload as RecordPayload, Program, Record, RecordScheme};
-use snarkvm_ledger::{Block, LedgerScheme, Storage, Transactions};
-use snarkvm_utilities::{to_bytes_le, ToBytes};
+use snarkvm::{
+    dpc::{testnet1::*, Account, Address, Parameters, Payload as RecordPayload, Record, RecordScheme},
+    ledger::{Block, LedgerScheme, Storage, Transactions},
+    utilities::{to_bytes_le, ToBytes},
+};
 
 use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf, sync::Arc};

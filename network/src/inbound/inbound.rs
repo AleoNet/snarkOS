@@ -16,7 +16,7 @@
 
 use std::time::Duration;
 
-use snarkvm_ledger::Storage;
+use snarkvm::ledger::Storage;
 use tokio::{
     net::TcpListener,
     sync::{mpsc::error::TrySendError, Mutex},

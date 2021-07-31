@@ -20,7 +20,7 @@ use std::{
 };
 
 use futures::{select, FutureExt};
-use snarkvm_ledger::Storage;
+use snarkvm::ledger::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};

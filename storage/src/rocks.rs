@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::NUM_COLS;
-use snarkvm_ledger::{DatabaseTransaction, Op, Storage, StorageError};
+use snarkvm::ledger::{DatabaseTransaction, Op, Storage, StorageError};
 
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, IteratorMode, Options, WriteBatch, DB};
 use std::path::Path;

@@ -23,12 +23,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::error::ConsensusError;
 use mpmc_map::MpmcMap;
 use snarkos_storage::Ledger;
-use snarkvm_dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, TransactionScheme};
-use snarkvm_ledger::{BlockHeader, LedgerScheme, Storage, Transactions};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    has_duplicates,
-    to_bytes_le,
+use snarkvm::{
+    dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, TransactionScheme},
+    ledger::{BlockHeader, Storage, Transactions},
+    parameters::{testnet1::genesis::Transaction1, Genesis},
+    utilities::{has_duplicates, to_bytes_le, FromBytes, ToBytes},
 };
 
 /// Stores a transaction and it's size in the memory pool.
@@ -58,7 +57,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> Clone for MemoryPool<T> {
 }
 
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
-const COINBASE_TRANSACTION_SIZE: usize = 1418; // TODO Find the value for actual coinbase transaction size
+const COINBASE_TRANSACTION_SIZE: usize = Transaction1::SIZE as usize;
 
 impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
@@ -257,8 +256,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::testnet1::Testnet1Transaction;
-    use snarkvm_ledger::prelude::*;
+    use snarkvm::{dpc::testnet1::Testnet1Transaction, ledger::prelude::*};
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 

@@ -14,20 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{
-    testnet1::{Testnet1DPC, Testnet1Parameters},
-    Address,
-    DPCScheme,
-    Parameters,
-    Payload,
-    PrivateKey,
-    Record,
-    RecordScheme,
-    TransactionKernel as TransactionKernelNative,
-    *,
+use snarkvm::{
+    algorithms::CRH,
+    dpc::{
+        testnet1::{Testnet1DPC, Testnet1Parameters},
+        Address,
+        DPCScheme,
+        Parameters,
+        Payload,
+        PrivateKey,
+        Record,
+        RecordScheme,
+        TransactionKernel as TransactionKernelNative,
+        *,
+    },
+    utilities::{to_bytes_le, ToBytes},
 };
-use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::{fmt, str::FromStr};

@@ -15,11 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_dpc::Parameters;
-use snarkvm_ledger::{DatabaseTransaction, Op, Storage, StorageError};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes_le,
+use snarkvm::{
+    dpc::Parameters,
+    ledger::{DatabaseTransaction, Op, Storage, StorageError},
+    utilities::{FromBytes, ToBytes},
 };
 
 use std::{collections::HashSet, sync::Arc};
@@ -38,14 +37,6 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         match self.storage.get(COL_META, KEY_CURR_SN_INDEX.as_bytes())? {
             Some(sn_index_bytes) => Ok(bytes_to_u32(&sn_index_bytes) as usize),
             None => Ok(0),
-        }
-    }
-
-    /// Get the current ledger digest
-    pub fn current_digest(&self) -> Result<Vec<u8>, StorageError> {
-        match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes())? {
-            Some(current_digest) => Ok(current_digest),
-            None => Ok(to_bytes_le![self.cm_merkle_tree.load().root()].unwrap()),
         }
     }
 

@@ -15,9 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{bytes_to_u32, Ledger, COL_BLOCK_LOCATOR};
-use snarkvm_dpc::Parameters;
-use snarkvm_ledger::{BlockHeaderHash, LedgerScheme, Storage};
-use snarkvm_utilities::ToBytes;
+use snarkvm::{
+    dpc::Parameters,
+    ledger::{BlockHeaderHash, LedgerScheme, Storage},
+    utilities::ToBytes,
+};
 
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -98,10 +100,9 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
 
         let blocks = Mutex::new(Vec::with_capacity(cmp::min(numbers_and_hashes.len(), number_to_export)));
 
-        // TODO (howardwu): TEMPORARY - Make this `into_iter()` a `into_par_iter()`.
         // Skip the genesis block, as it's always known.
         numbers_and_hashes
-            .into_iter()
+            .into_par_iter()
             .skip(1)
             .take(number_to_export)
             .for_each(|(block_number, block_hash)| {
@@ -114,8 +115,7 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
 
         let mut blocks = blocks.into_inner();
 
-        // TODO (howardwu): TEMPORARY - Make this `sort_unstable_by_key()` a `par_sort_unstable_by_key()`.
-        blocks.sort_unstable_by_key(|(block_number, _block)| *block_number);
+        blocks.par_sort_unstable_by_key(|(block_number, _block)| *block_number);
 
         let mut target_file = BufWriter::new(fs::File::create(location)?);
         for (_block_number, block) in &blocks {

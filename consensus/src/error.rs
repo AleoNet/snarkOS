@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::{DPCError, ProgramError, RecordError, TransactionError};
-use snarkvm_ledger::{BlockError, PoswError, StorageError};
+use snarkvm::{
+    algorithms::errors::CRHError,
+    dpc::{DPCError, ProgramError, RecordError, TransactionError},
+    ledger::{BlockError, PoswError, StorageError},
+};
 
 use std::fmt::Debug;
 

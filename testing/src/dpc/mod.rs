@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::{testnet1::*, Account, AccountScheme, DPCScheme};
+use snarkvm::dpc::{testnet1::*, Account, AccountScheme, DPCScheme};
 
 use rand::{CryptoRng, Rng};
 

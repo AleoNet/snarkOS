@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_testing::sync::*;
-use snarkvm_dpc::{block::Transactions, merkle_root};
+use snarkvm::dpc::{block::Transactions, merkle_root};
 use snarkvm_posw::txids_to_roots;
 
 use criterion::{criterion_group, criterion_main, Criterion};

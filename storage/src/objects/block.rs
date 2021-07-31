@@ -15,19 +15,21 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_dpc::{Parameters, Transaction, TransactionScheme};
-use snarkvm_ledger::{
-    Block,
-    BlockError,
-    BlockHeaderHash,
-    DatabaseTransaction,
-    LedgerScheme,
-    Op,
-    Storage,
-    StorageError,
-    Transactions,
+use snarkvm::{
+    dpc::{Parameters, RecordCommitmentTree, Transaction, TransactionScheme},
+    ledger::{
+        Block,
+        BlockError,
+        BlockHeaderHash,
+        DatabaseTransaction,
+        LedgerScheme,
+        Op,
+        Storage,
+        StorageError,
+        Transactions,
+    },
+    utilities::{to_bytes_le, FromBytes, ToBytes},
 };
-use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;
 
@@ -41,14 +43,6 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         let block_hash = self.get_block_hash(block_number)?;
 
         self.get_block(&block_hash)
-    }
-
-    /// Get the block number given a block hash.
-    pub fn get_block_number(&self, block_hash: &BlockHeaderHash) -> Result<u32, StorageError> {
-        match self.storage.get(COL_BLOCK_LOCATOR, &block_hash.0)? {
-            Some(block_num_bytes) => Ok(bytes_to_u32(&block_num_bytes)),
-            None => Err(StorageError::MissingBlockNumber(block_hash.to_string())),
-        }
     }
 
     /// Get the list of transaction ids given a block hash.
@@ -70,23 +64,6 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         match self.storage.get(COL_CHILD_HASHES, &parent_header.0)? {
             Some(encoded_child_block_hashes) => Ok(bincode::deserialize(&encoded_child_block_hashes[..])?),
             None => Ok(vec![]),
-        }
-    }
-
-    /// Returns the block number of a conflicting block that has already been mined.
-    pub fn already_mined(&self, block: &Block<Transaction<C>>) -> Result<Option<u32>, StorageError> {
-        // look up new block's previous block by hash
-        // if the block after previous_block_number exists, then someone has already mined this new block
-        let previous_block_number = self.get_block_number(&block.header.previous_block_hash)?;
-
-        let existing_block_number = previous_block_number + 1;
-
-        if self.get_block_from_block_number(existing_block_number).is_ok() {
-            // the storage has a conflicting block with the same previous_block_hash
-            Ok(Some(existing_block_number))
-        } else {
-            // the new block has no conflicts
-            Ok(None)
         }
     }
 
@@ -158,9 +135,10 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
 
+        // TODO (howardwu): Swap this call to fetch a digest to retrieving it direct from the block header.
         database_transaction.push(Op::Delete {
             col: COL_DIGEST,
-            key: self.current_digest()?,
+            key: self.latest_digest()?.to_bytes_le()?,
         });
 
         let mut sn_index = self.current_sn_index()?;
@@ -220,19 +198,5 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
     pub fn remove_latest_block(&self) -> Result<(), StorageError> {
         let block_hash = self.decommit_latest_block()?;
         self.remove_block(block_hash)
-    }
-
-    /// Remove the latest `num_blocks` blocks.
-    pub fn remove_latest_blocks(&self, num_blocks: u32) -> Result<(), StorageError> {
-        let current_block_height = self.block_height();
-        if num_blocks > current_block_height {
-            return Err(StorageError::InvalidBlockRemovalNum(num_blocks, current_block_height));
-        }
-
-        for _ in 0..num_blocks {
-            self.remove_latest_block()?;
-        }
-
-        Ok(())
     }
 }

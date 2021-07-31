@@ -15,14 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_algorithms::merkle_tree::*;
-use snarkvm_dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, Transaction};
-use snarkvm_ledger::{Block, BlockHeaderHash, LedgerError, LedgerScheme, Storage, StorageError};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes_le,
+use snarkvm::{
+    algorithms::merkle_tree::*,
+    dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, Transaction},
+    ledger::{Block, BlockHeaderHash, LedgerError, LedgerScheme, Storage, StorageError},
+    utilities::{to_bytes_le, FromBytes, ToBytes},
 };
 
+use anyhow::Result;
 use arc_swap::ArcSwap;
 use std::{
     fs,
@@ -34,7 +34,7 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
     type Block = Block<Transaction<C>>;
 
     /// Instantiates a new ledger with a genesis block.
-    fn new(path: Option<&Path>, genesis_block: Self::Block) -> anyhow::Result<Self> {
+    fn new(path: Option<&Path>, genesis_block: Self::Block) -> Result<Self> {
         let storage = if let Some(path) = path {
             fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
 
@@ -60,7 +60,6 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
         };
 
         ledger.insert_and_commit(&genesis_block)?;
-        assert_eq!(1, ledger.block_height());
 
         Ok(ledger)
     }
@@ -71,13 +70,13 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
     }
 
     /// Returns the latest block in the ledger.
-    fn latest_block(&self) -> anyhow::Result<Block<Transaction<C>>> {
+    fn latest_block(&self) -> Result<Block<Transaction<C>>> {
         let block_hash = self.get_block_hash(self.block_height())?;
         self.get_block(&block_hash)
     }
 
     /// Returns the block given the block hash.
-    fn get_block(&self, block_hash: &BlockHeaderHash) -> anyhow::Result<Block<Transaction<C>>> {
+    fn get_block(&self, block_hash: &BlockHeaderHash) -> Result<Block<Transaction<C>>> {
         Ok(Block {
             header: self.get_block_header(block_hash)?,
             transactions: self.get_block_transactions(block_hash)?,
@@ -85,10 +84,18 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
     }
 
     /// Returns the block hash given a block number.
-    fn get_block_hash(&self, block_number: u32) -> anyhow::Result<BlockHeaderHash> {
+    fn get_block_hash(&self, block_number: u32) -> Result<BlockHeaderHash> {
         match self.storage.get(COL_BLOCK_LOCATOR, &block_number.to_le_bytes())? {
             Some(block_header_hash) => Ok(BlockHeaderHash::new(block_header_hash)),
             None => Err(StorageError::MissingBlockHash(block_number).into()),
+        }
+    }
+
+    /// Returns the block number given a block hash.
+    fn get_block_number(&self, block_hash: &BlockHeaderHash) -> Result<u32> {
+        match self.storage.get(COL_BLOCK_LOCATOR, &block_hash.0)? {
+            Some(block_num_bytes) => Ok(bytes_to_u32(&block_num_bytes)),
+            None => Err(StorageError::MissingBlockNumber(block_hash.to_string()).into()),
         }
     }
 
@@ -99,13 +106,13 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
 }
 
 impl<C: Parameters, S: Storage> RecordCommitmentTree<C> for Ledger<C, S> {
-    /// Return a digest of the latest ledger Merkle tree.
-    fn latest_digest(&self) -> Option<MerkleTreeDigest<C::RecordCommitmentTreeParameters>> {
-        let digest = match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes()).unwrap() {
+    /// Return the latest state root of the record commitment tree.
+    fn latest_digest(&self) -> Result<MerkleTreeDigest<C::RecordCommitmentTreeParameters>> {
+        let digest = match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes())? {
             Some(current_digest) => current_digest,
-            None => to_bytes_le![self.cm_merkle_tree.load().root()].unwrap(),
+            None => to_bytes_le![self.cm_merkle_tree.load().root()]?,
         };
-        Some(FromBytes::read_le(digest.as_slice()).unwrap())
+        Ok(FromBytes::read_le(digest.as_slice())?)
     }
 
     /// Check that st_{ts} is a valid digest for some (past) ledger state.
@@ -120,7 +127,7 @@ impl<C: Parameters, S: Storage> RecordCommitmentTree<C> for Ledger<C, S> {
 
     /// Returns the Merkle path to the latest ledger digest
     /// for a given commitment, if it exists in the ledger.
-    fn prove_cm(&self, cm: &C::RecordCommitment) -> anyhow::Result<MerklePath<C::RecordCommitmentTreeParameters>> {
+    fn prove_cm(&self, cm: &C::RecordCommitment) -> Result<MerklePath<C::RecordCommitmentTreeParameters>> {
         let cm_index = self
             .get_cm_index(&cm.to_bytes_le()?)?
             .ok_or(LedgerError::InvalidCmIndex)?;

@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::{record::Record as DPCRecord, testnet1::*};
-use snarkvm_ledger::{Block, BlockHeader};
-use snarkvm_parameters::{testnet1::GenesisBlock, traits::genesis::Genesis};
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes_le,
+use snarkvm::{
+    dpc::{record::Record as DPCRecord, testnet1::*},
+    ledger::{Block, BlockHeader},
+    parameters::{testnet1::GenesisBlock, traits::genesis::Genesis},
+    utilities::{to_bytes_le, FromBytes, ToBytes},
 };
 
 use once_cell::sync::Lazy;
