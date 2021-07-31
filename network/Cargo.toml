@@ -22,7 +22,7 @@ prometheus = [ "snarkos-metrics/prometheus" ]
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "2645ecd"
+rev = "42113fa"
 # path = "../../snarkVM"
 features = ["algorithms"]
 
