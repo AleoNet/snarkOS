@@ -176,44 +176,6 @@ mod protected_rpc_tests {
     }
 
     #[tokio::test]
-    async fn test_rpc_decode_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let meta = authentication();
-        let (rpc, _consensus) = initialize_test_rpc(storage).await;
-
-        let record = &DATA.records_1[0];
-
-        let method = "decoderecord";
-        let params = hex::encode(to_bytes_le![record].unwrap());
-        let request = format!(
-            "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [\"{}\"] }}",
-            method, params
-        );
-
-        let response = rpc.handle_request_sync(&request, meta).unwrap();
-
-        let record_info: Value = serde_json::from_str(&response).unwrap();
-
-        let record_info = record_info["result"].clone();
-
-        let program_id = hex::encode(to_bytes_le![record.program_id()].unwrap());
-        let owner = record.owner().to_string();
-        let is_dummy = record.is_dummy();
-        let value = record.value();
-        let serial_number_nonce = hex::encode(to_bytes_le![record.serial_number_nonce()].unwrap());
-        let commitment = hex::encode(to_bytes_le![record.commitment()].unwrap());
-        let commitment_randomness = hex::encode(to_bytes_le![record.commitment_randomness()].unwrap());
-
-        assert_eq!(program_id, record_info["program_id"]);
-        assert_eq!(owner, record_info["owner"]);
-        assert_eq!(is_dummy, record_info["is_dummy"]);
-        assert_eq!(value, record_info["value"]);
-        assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
-        assert_eq!(commitment, record_info["commitment"]);
-        assert_eq!(commitment_randomness, record_info["commitment_randomness"]);
-    }
-
-    #[tokio::test]
     async fn test_rpc_decrypt_record() {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let meta = authentication();
