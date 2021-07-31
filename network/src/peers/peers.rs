@@ -17,7 +17,7 @@
 use std::{cmp, net::SocketAddr, time::Duration};
 
 use rand::seq::IteratorRandom;
-use snarkvm_dpc::Storage;
+use snarkvm_ledger::Storage;
 use tokio::task;
 
 use snarkos_metrics::{self as metrics, connections::*};

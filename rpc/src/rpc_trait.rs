@@ -149,10 +149,6 @@ pub trait ProtectedRpcFunctions {
     fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 
     // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/decoderecord.md"))]
-    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
-
-    // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/decryptrecord.md"))]
     fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError>;
 

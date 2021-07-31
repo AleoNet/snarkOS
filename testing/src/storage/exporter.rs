@@ -18,7 +18,7 @@ use crate::{
     storage::random_storage_path,
     sync::{create_test_consensus, TestBlocks},
 };
-use snarkvm_dpc::Block;
+use snarkvm_ledger::Block;
 use snarkvm_utilities::FromBytes;
 
 use std::{env, fs, io};

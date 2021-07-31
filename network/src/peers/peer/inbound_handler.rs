@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::Storage;
+use snarkvm_ledger::Storage;
 
 use snarkos_metrics::{self as metrics, inbound::*};
 

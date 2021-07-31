@@ -27,7 +27,7 @@ mod protected_rpc_tests {
 
     use snarkvm_dpc::{
         record::Record as DPCRecord,
-        testnet1::parameters::{Testnet1Parameters, Testnet1Transaction},
+        testnet1::{Testnet1Parameters, Testnet1Transaction},
         Address,
         PrivateKey,
         RecordScheme,
@@ -196,20 +196,18 @@ mod protected_rpc_tests {
 
         let record_info = record_info["result"].clone();
 
+        let program_id = hex::encode(to_bytes_le![record.program_id()].unwrap());
         let owner = record.owner().to_string();
         let is_dummy = record.is_dummy();
         let value = record.value();
-        let birth_program_id = hex::encode(to_bytes_le![record.birth_program_id()].unwrap());
-        let death_program_id = hex::encode(to_bytes_le![record.death_program_id()].unwrap());
         let serial_number_nonce = hex::encode(to_bytes_le![record.serial_number_nonce()].unwrap());
         let commitment = hex::encode(to_bytes_le![record.commitment()].unwrap());
         let commitment_randomness = hex::encode(to_bytes_le![record.commitment_randomness()].unwrap());
 
+        assert_eq!(program_id, record_info["program_id"]);
         assert_eq!(owner, record_info["owner"]);
         assert_eq!(is_dummy, record_info["is_dummy"]);
         assert_eq!(value, record_info["value"]);
-        assert_eq!(birth_program_id, record_info["birth_program_id"]);
-        assert_eq!(death_program_id, record_info["death_program_id"]);
         assert_eq!(serial_number_nonce, record_info["serial_number_nonce"]);
         assert_eq!(commitment, record_info["commitment"]);
         assert_eq!(commitment_randomness, record_info["commitment_randomness"]);

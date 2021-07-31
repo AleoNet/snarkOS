@@ -15,18 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_dpc::{
+use snarkvm_dpc::{Parameters, Transaction, TransactionScheme};
+use snarkvm_ledger::{
     Block,
     BlockError,
     BlockHeaderHash,
     DatabaseTransaction,
     LedgerScheme,
     Op,
-    Parameters,
     Storage,
     StorageError,
-    Transaction,
-    TransactionScheme,
     Transactions,
 };
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};

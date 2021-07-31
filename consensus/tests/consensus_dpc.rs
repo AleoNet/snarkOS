@@ -20,15 +20,13 @@ mod consensus_dpc {
     use snarkvm_dpc::{
         payload::Payload as RecordPayload,
         record::Record,
-        testnet1::parameters::*,
-        Block,
+        testnet1::*,
         DPCScheme,
-        LedgerScheme,
         Parameters,
-        ProgramScheme,
+        Program,
         RecordScheme,
-        Transactions,
     };
+    use snarkvm_ledger::prelude::*;
     use snarkvm_utilities::{bytes::ToBytes, to_bytes_le};
 
     use std::sync::Arc;
@@ -73,15 +71,31 @@ mod consensus_dpc {
 
         let old_account_private_keys = vec![miner_acc.private_key; Testnet1Parameters::NUM_INPUT_RECORDS];
         let old_records = coinbase_records;
-        let new_birth_program_ids = vec![program.id(); Testnet1Parameters::NUM_INPUT_RECORDS];
 
         // OUTPUTS
 
-        let new_record_owners = vec![recipient.address; Testnet1Parameters::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
-        let new_is_dummy_flags = vec![false; Testnet1Parameters::NUM_OUTPUT_RECORDS];
-        let new_values = vec![10; Testnet1Parameters::NUM_OUTPUT_RECORDS];
-        let new_payloads = vec![RecordPayload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
+        let mut joint_serial_numbers = vec![];
+        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
+            let (sn, _) = old_records[i].to_serial_number(&old_account_private_keys[i]).unwrap();
+            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn].unwrap());
+        }
+
+        let mut new_records = vec![];
+        for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
+            new_records.push(
+                Record::new_full(
+                    &program,
+                    recipient.address.clone(),
+                    false,
+                    10,
+                    RecordPayload::default(),
+                    (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
+                    joint_serial_numbers.clone(),
+                    &mut rng,
+                )
+                .unwrap(),
+            );
+        }
 
         // Memo is a dummy for now
 
@@ -90,18 +104,7 @@ mod consensus_dpc {
         println!("Create a payment transaction");
         // Create the transaction
         let (spend_records, transaction) = consensus
-            .create_transaction(
-                old_records,
-                old_account_private_keys,
-                new_record_owners,
-                new_birth_program_ids,
-                new_death_program_ids,
-                new_is_dummy_flags,
-                new_values,
-                new_payloads,
-                memo,
-                &mut rng,
-            )
+            .create_transaction(old_records, old_account_private_keys, new_records, memo, &mut rng)
             .unwrap();
 
         assert_eq!(spend_records.len(), 2);

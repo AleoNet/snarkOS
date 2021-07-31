@@ -19,24 +19,13 @@ extern crate tracing;
 
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
-use snarkvm_dpc::{
-    block::Transactions,
-    testnet1::parameters::*,
-    Account,
-    Address,
-    Block,
-    LedgerScheme,
-    Parameters,
-    Payload as RecordPayload,
-    ProgramScheme,
-    Record,
-    RecordScheme,
-    Storage,
-};
-use tracing_subscriber::EnvFilter;
+use snarkvm_dpc::{testnet1::*, Account, Address, Parameters, Payload as RecordPayload, Program, Record, RecordScheme};
+use snarkvm_ledger::{Block, LedgerScheme, Storage, Transactions};
+use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf, sync::Arc};
+use tracing_subscriber::EnvFilter;
 
 async fn mine_block<S: Storage>(
     miner: &Miner<S>,
@@ -81,28 +70,31 @@ fn send<R: Rng + CryptoRng, S: Storage>(
     }
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
-
-    let input_programs = vec![FIXTURE.program.id(); Testnet1Parameters::NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
-
-    let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
-    let output = vec![RecordPayload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
-    let dummy_flags = vec![false; Testnet1Parameters::NUM_OUTPUT_RECORDS];
+    let to = vec![receiver.clone(), from.address.clone()];
 
+    let mut joint_serial_numbers = vec![];
+    for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
+        let (sn, _) = inputs[i].to_serial_number(&from.private_key)?;
+        joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
+    }
+
+    let mut new_records = vec![];
+    for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
+        new_records.push(Record::new_full(
+            &FIXTURE.program,
+            to[j].clone(),
+            false,
+            values[j],
+            RecordPayload::default(),
+            (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
+            joint_serial_numbers.clone(),
+            rng,
+        )?);
+    }
     let from = vec![from.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
-    consensus.create_transaction(
-        inputs,
-        from,
-        to,
-        input_programs,
-        output_programs,
-        dummy_flags,
-        values,
-        output,
-        memo,
-        rng,
-    )
+
+    consensus.create_transaction(inputs, from, new_records, memo, rng)
 }
 
 async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {

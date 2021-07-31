@@ -20,7 +20,8 @@ use crate::{
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_storage::LedgerStorage;
-use snarkvm_dpc::{testnet1::parameters::*, Account, Block, NoopProgram, Storage};
+use snarkvm_dpc::{testnet1::*, Account, NoopProgram};
+use snarkvm_ledger::{Block, Storage};
 use snarkvm_parameters::{testnet1::GenesisBlock, traits::genesis::Genesis};
 use snarkvm_utilities::bytes::FromBytes;
 

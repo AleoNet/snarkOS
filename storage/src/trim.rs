@@ -22,16 +22,8 @@ use crate::{
     COL_CHILD_HASHES,
     COL_TRANSACTION_LOCATION,
 };
-use snarkvm_dpc::{
-    BlockHeader,
-    BlockHeaderHash,
-    DatabaseTransaction,
-    Op,
-    Parameters,
-    Storage,
-    StorageError,
-    TransactionScheme,
-};
+use snarkvm_dpc::{Parameters, TransactionScheme};
+use snarkvm_ledger::{BlockHeader, BlockHeaderHash, DatabaseTransaction, Op, Storage, StorageError};
 use snarkvm_utilities::FromBytes;
 
 use parking_lot::Mutex;

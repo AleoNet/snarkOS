@@ -24,8 +24,8 @@ use crate::{
 
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
-
-use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, BlockHeaderHash, LedgerScheme};
+use snarkvm_dpc::testnet1::Testnet1Transaction;
+use snarkvm_ledger::{Block, BlockHeaderHash, LedgerScheme};
 #[cfg(test)]
 use snarkvm_utilities::FromBytes;
 
@@ -117,7 +117,7 @@ async fn block_responder_side() {
     });
 
     // insert block into node
-    let block_struct_1 = snarkvm_dpc::Block::deserialize(&BLOCK_1).unwrap();
+    let block_struct_1 = Block::deserialize(&BLOCK_1).unwrap();
     node.expect_sync()
         .consensus
         .receive_block(&block_struct_1, false)
@@ -152,7 +152,7 @@ async fn block_responder_side() {
     } else {
         unreachable!();
     };
-    let block = snarkvm_dpc::Block::deserialize(&block).unwrap();
+    let block = Block::deserialize(&block).unwrap();
 
     assert_eq!(block, block_struct_1);
 }
@@ -326,8 +326,8 @@ async fn transaction_responder_side() {
 #[tokio::test]
 async fn transaction_two_node() {
     use snarkos_consensus::memory_pool::Entry;
-    use snarkvm_dpc::testnet1::parameters::Testnet1Transaction;
-    use snarkvm_utilities::bytes::FromBytes;
+    use snarkvm_dpc::testnet1::Testnet1Transaction;
+    use snarkvm_utilities::FromBytes;
 
     let node_alice = test_node(TestSetup::default()).await;
     let alice_address = node_alice.local_address().unwrap();

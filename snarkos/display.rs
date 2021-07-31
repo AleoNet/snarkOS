@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::Config;
-use snarkvm_dpc::{testnet1::parameters::Testnet1Parameters, Address};
+use snarkvm_dpc::{testnet1::Testnet1Parameters, Address};
 
 use colored::*;
 use std::str::FromStr;

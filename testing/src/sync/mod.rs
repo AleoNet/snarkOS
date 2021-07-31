@@ -17,9 +17,9 @@
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{testnet1::parameters::Testnet1Parameters, Network, Parameters, TransactionError, TransactionScheme};
+use snarkvm_dpc::{testnet1::Testnet1Parameters, Network, Parameters, TransactionError, TransactionScheme};
+use snarkvm_ledger::posw::PoswMarlin;
 use snarkvm_parameters::{testnet1::InnerSNARKVKParameters, Parameter};
-use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;

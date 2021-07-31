@@ -16,7 +16,8 @@
 
 use crate::*;
 use snarkvm_algorithms::merkle_tree::*;
-use snarkvm_dpc::{Block, BlockHeaderHash, LedgerError, LedgerScheme, Parameters, Storage, StorageError, Transaction};
+use snarkvm_dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, Transaction};
+use snarkvm_ledger::{Block, BlockHeaderHash, LedgerError, LedgerScheme, Storage, StorageError};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
@@ -95,7 +96,9 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
     fn contains_block_hash(&self, block_hash: &BlockHeaderHash) -> bool {
         self.get_block_header(block_hash).is_ok()
     }
+}
 
+impl<C: Parameters, S: Storage> RecordCommitmentTree<C> for Ledger<C, S> {
     /// Return a digest of the latest ledger Merkle tree.
     fn latest_digest(&self) -> Option<MerkleTreeDigest<C::RecordCommitmentTreeParameters>> {
         let digest = match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes()).unwrap() {
@@ -115,12 +118,6 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
         self.storage.exists(COL_COMMITMENT, &commitment.to_bytes_le().unwrap())
     }
 
-    /// Returns true if the given serial number exists in the ledger.
-    fn contains_serial_number(&self, serial_number: &C::AccountSignaturePublicKey) -> bool {
-        self.storage
-            .exists(COL_SERIAL_NUMBER, &serial_number.to_bytes_le().unwrap())
-    }
-
     /// Returns the Merkle path to the latest ledger digest
     /// for a given commitment, if it exists in the ledger.
     fn prove_cm(&self, cm: &C::RecordCommitment) -> anyhow::Result<MerklePath<C::RecordCommitmentTreeParameters>> {
@@ -130,5 +127,13 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
         let result = self.cm_merkle_tree.load().generate_proof(cm_index, cm)?;
 
         Ok(result)
+    }
+}
+
+impl<C: Parameters, S: Storage> RecordSerialNumberTree<C> for Ledger<C, S> {
+    /// Returns true if the given serial number exists in the ledger.
+    fn contains_serial_number(&self, serial_number: &C::AccountSignaturePublicKey) -> bool {
+        self.storage
+            .exists(COL_SERIAL_NUMBER, &serial_number.to_bytes_le().unwrap())
     }
 }

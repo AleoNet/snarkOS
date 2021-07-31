@@ -23,7 +23,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::error::ConsensusError;
 use mpmc_map::MpmcMap;
 use snarkos_storage::Ledger;
-use snarkvm_dpc::{BlockHeader, LedgerScheme, Parameters, Storage, TransactionScheme, Transactions};
+use snarkvm_dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, TransactionScheme};
+use snarkvm_ledger::{BlockHeader, LedgerScheme, Storage, Transactions};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -256,7 +257,8 @@ impl<T: TransactionScheme + Send + Sync + 'static> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, Block};
+    use snarkvm_dpc::testnet1::Testnet1Transaction;
+    use snarkvm_ledger::prelude::*;
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 

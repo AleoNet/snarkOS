@@ -16,7 +16,8 @@
 
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::{AccountError, BlockError, DPCError, RecordError, StorageError, TransactionError};
+use snarkvm_dpc::{AccountError, DPCError, RecordError, TransactionError};
+use snarkvm_ledger::prelude::*;
 
 use std::fmt::Debug;
 

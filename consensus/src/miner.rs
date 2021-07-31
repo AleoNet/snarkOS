@@ -15,22 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, Consensus};
-use snarkvm_dpc::{
-    testnet1::parameters::*,
-    Address,
+use snarkvm_dpc::{testnet1::*, Address, DPCScheme, Parameters, Program, Record, RecordScheme, TransactionScheme};
+use snarkvm_ledger::{
+    posw::{txids_to_roots, PoswMarlin},
     Block,
     BlockHeader,
-    DPCScheme,
     LedgerScheme,
-    Parameters,
-    ProgramScheme,
-    Record,
-    RecordScheme,
     Storage,
-    TransactionScheme,
     Transactions,
 };
-use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use chrono::Utc;
@@ -86,9 +79,8 @@ impl<S: Storage> Miner<S> {
         let (records, tx) = self.consensus.create_coinbase_transaction(
             self.consensus.ledger.block_height(),
             transactions,
-            self.consensus.dpc.noop_program.id(),
-            vec![self.consensus.dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS],
-            vec![self.consensus.dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS],
+            vec![&self.consensus.dpc.noop_program; Testnet1Parameters::NUM_OUTPUT_RECORDS],
+            vec![&self.consensus.dpc.noop_program; Testnet1Parameters::NUM_OUTPUT_RECORDS],
             self.address.clone(),
             rng,
         )?;

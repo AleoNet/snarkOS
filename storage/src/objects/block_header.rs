@@ -15,16 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Ledger, COL_BLOCK_HEADER};
-use snarkvm_dpc::{
-    errors::StorageError,
-    Block,
-    BlockHeader,
-    BlockHeaderHash,
-    LedgerScheme,
-    Parameters,
-    Storage,
-    Transaction,
-};
+use snarkvm_dpc::{Parameters, Transaction};
+use snarkvm_ledger::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, LedgerScheme, Storage};
 use snarkvm_utilities::FromBytes;
 
 impl<C: Parameters, S: Storage> Ledger<C, S> {

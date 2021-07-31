@@ -15,15 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Ledger, TransactionLocation, COL_TRANSACTION_LOCATION};
-use snarkvm_dpc::{
-    errors::StorageError,
-    BlockHeaderHash,
-    LedgerScheme,
-    Parameters,
-    Storage,
-    Transaction,
-    TransactionScheme,
-};
+use snarkvm_dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, Transaction, TransactionScheme};
+use snarkvm_ledger::{errors::StorageError, BlockHeaderHash, LedgerScheme, Storage};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,

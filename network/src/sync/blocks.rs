@@ -16,7 +16,7 @@
 
 use std::net::SocketAddr;
 
-use snarkvm_dpc::{Block, BlockHeaderHash, LedgerScheme, Storage};
+use snarkvm_ledger::{Block, BlockHeaderHash, LedgerScheme, Storage};
 
 use snarkos_consensus::error::ConsensusError;
 use snarkos_metrics::{self as metrics, misc::*};

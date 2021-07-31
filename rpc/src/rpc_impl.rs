@@ -23,12 +23,10 @@ use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameter
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Transaction},
-    BlockHeaderHash,
-    LedgerScheme,
-    Storage,
+    testnet1::{Testnet1DPC, Testnet1Transaction},
     TransactionScheme,
 };
+use snarkvm_ledger::prelude::*;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,

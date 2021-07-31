@@ -17,16 +17,8 @@
 use crate::*;
 use arc_swap::ArcSwap;
 use snarkvm_algorithms::merkle_tree::MerkleTree;
-use snarkvm_dpc::{
-    errors::StorageError,
-    Block,
-    DatabaseTransaction,
-    LedgerScheme,
-    Op,
-    Parameters,
-    Storage,
-    Transaction,
-};
+use snarkvm_dpc::{Parameters, Transaction};
+use snarkvm_ledger::{Block, DatabaseTransaction, LedgerScheme, Op, Storage, StorageError};
 use snarkvm_parameters::{testnet1::GenesisBlock, traits::genesis::Genesis};
 use snarkvm_utilities::bytes::FromBytes;
 

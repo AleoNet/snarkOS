@@ -28,7 +28,7 @@ use crate::{
 use snarkos_consensus::ConsensusParameters;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
+    testnet1::{Testnet1DPC, Testnet1Parameters},
     Account,
     AccountScheme,
     Address,
@@ -37,13 +37,13 @@ use snarkvm_dpc::{
     Parameters,
     Payload,
     PrivateKey,
-    ProgramScheme,
+    Program,
     Record,
     RecordScheme as RecordModel,
-    Storage,
     TransactionKernel,
     ViewKey,
 };
+use snarkvm_ledger::prelude::*;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
@@ -193,31 +193,6 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         }
     }
 
-    /// Wrap authentication around `decode_record`
-    pub async fn decode_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
-        self.validate_auth(meta)?;
-
-        let value = match params {
-            Params::Array(arr) => arr,
-            _ => return Err(JsonRPCError::invalid_request()),
-        };
-
-        if value.len() != 1 {
-            return Err(JsonRPCError::invalid_params(format!(
-                "invalid length {}, expected 1 element",
-                value.len()
-            )));
-        }
-
-        let record_bytes: String = serde_json::from_value(value[0].clone())
-            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
-
-        match self.decode_record(record_bytes) {
-            Ok(record) => Ok(serde_json::to_value(record).expect("record deserialization failed")),
-            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
-        }
-    }
-
     /// Wrap authentication around `decrypt_record`
     pub async fn decrypt_record_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
@@ -281,10 +256,6 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
             let rpc = rpc.clone();
             rpc.create_transaction_protected(params, meta)
         });
-        d.add_method_with_meta("decoderecord", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.decode_record_protected(params, meta)
-        });
         d.add_method_with_meta("decryptrecord", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.decrypt_record_protected(params, meta)
@@ -347,11 +318,6 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         assert!(!transaction_input.recipients.is_empty());
         assert!(transaction_input.recipients.len() <= Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
-        // Fetch birth/death programs
-        let program_id = self.dpc()?.noop_program.id();
-        let new_birth_program_ids = vec![program_id.clone(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![program_id.clone(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
-
         // Decode old records
         let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
         for record_string in transaction_input.old_records {
@@ -373,12 +339,11 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
             let dummy_record = Record::<Testnet1Parameters>::new(
+                &self.dpc()?.noop_program,
                 address,
                 true, // The input record is dummy
                 0,
                 Payload::default(),
-                program_id.clone(),
-                program_id.clone(),
                 old_sn_nonce,
                 rng,
             )?;
@@ -411,8 +376,25 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         assert_eq!(new_is_dummy_flags.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
-        // Default record payload
-        let new_payloads = vec![Payload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
+        let mut joint_serial_numbers = vec![];
+        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
+            let (sn, _) = old_records[i].to_serial_number(&old_account_private_keys[i])?;
+            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
+        }
+
+        let mut new_records = vec![];
+        for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
+            new_records.push(Record::new_full(
+                &self.dpc()?.noop_program,
+                new_record_owners[j].clone(),
+                new_is_dummy_flags[j],
+                new_values[j],
+                Payload::default(),
+                (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
+                joint_serial_numbers.clone(),
+                rng,
+            )?);
+        }
 
         // Decode memo
         let mut memo = [0u8; 64];
@@ -426,12 +408,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let (records, transaction) = self.sync_handler()?.consensus.create_transaction(
             old_records,
             old_account_private_keys,
-            new_record_owners,
-            new_birth_program_ids,
-            new_death_program_ids,
-            new_is_dummy_flags,
-            new_values,
-            new_payloads,
+            new_records,
             memo,
             rng,
         )?;
@@ -597,37 +574,8 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         // Decrypt the record ciphertext
         let record = encrypted_record.decrypt(&view_key)?;
-        let record_bytes = to_bytes_le![record]?;
 
-        Ok(hex::encode(record_bytes))
-    }
-
-    /// Returns information about a record from serialized record bytes.
-    fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
-        let record_bytes = hex::decode(record_bytes)?;
-        let record = Record::<Testnet1Parameters>::read_le(&record_bytes[..])?;
-
-        let owner = record.owner().to_string();
-        let payload = RPCRecordPayload {
-            payload: hex::encode(to_bytes_le![record.payload()]?),
-        };
-        let birth_program_id = hex::encode(record.birth_program_id());
-        let death_program_id = hex::encode(record.death_program_id());
-        let serial_number_nonce = hex::encode(to_bytes_le![record.serial_number_nonce()]?);
-        let commitment = hex::encode(to_bytes_le![record.commitment()]?);
-        let commitment_randomness = hex::encode(to_bytes_le![record.commitment_randomness()]?);
-
-        Ok(RecordInfo {
-            owner,
-            is_dummy: record.is_dummy(),
-            value: record.value(),
-            payload,
-            birth_program_id,
-            death_program_id,
-            serial_number_nonce,
-            commitment,
-            commitment_randomness,
-        })
+        Ok(record.to_string())
     }
 
     fn disconnect(&self, address: SocketAddr) {

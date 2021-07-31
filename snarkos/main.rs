@@ -29,15 +29,14 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
+    testnet1::{Testnet1DPC, Testnet1Parameters},
     Address,
     DPCScheme,
     Network,
     Parameters,
-    Storage,
 };
 use snarkvm_fields::ToConstraintField;
-use snarkvm_posw::PoswMarlin;
+use snarkvm_ledger::{posw::PoswMarlin, Storage};
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};

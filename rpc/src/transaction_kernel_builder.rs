@@ -16,7 +16,7 @@
 
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Parameters},
+    testnet1::{Testnet1DPC, Testnet1Parameters},
     Address,
     DPCScheme,
     Parameters,
@@ -244,12 +244,11 @@ impl TransactionKernel {
             let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
             let dummy_record = Record::<Testnet1Parameters>::new(
+                &dpc.noop_program,
                 address,
                 true, // The input record is dummy
                 0,
                 Default::default(),
-                dpc.noop_program.id(),
-                dpc.noop_program.id(),
                 old_sn_nonce,
                 rng,
             )?;
@@ -291,8 +290,7 @@ impl TransactionKernel {
         assert_eq!(new_is_dummy_flags.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
-        let new_birth_program_ids = vec![dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![dpc.noop_program.id(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
+        let new_programs = vec![&dpc.noop_program; Testnet1Parameters::NUM_OUTPUT_RECORDS];
         let new_payloads: Vec<Payload> = vec![Default::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
         // Generate an empty memo
@@ -309,12 +307,11 @@ impl TransactionKernel {
         let mut new_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_records.push(Record::new_full(
+                new_programs[j],
                 new_record_owners[j].clone(),
                 new_is_dummy_flags[j],
                 new_values[j],
                 new_payloads[j].clone(),
-                new_birth_program_ids[j].clone(),
-                new_death_program_ids[j].clone(),
                 j as u8,
                 joint_serial_numbers.clone(),
                 rng,

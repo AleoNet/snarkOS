@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::NUM_COLS;
-use snarkvm_dpc::{DatabaseTransaction, Op, Storage, StorageError};
+use snarkvm_ledger::{DatabaseTransaction, Op, Storage, StorageError};
 
 use parking_lot::RwLock;
 use std::{collections::HashMap, path::Path}; // only used for testing

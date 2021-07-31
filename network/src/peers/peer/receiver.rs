@@ -16,7 +16,7 @@
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use snarkvm_dpc::Storage;
+use snarkvm_ledger::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};

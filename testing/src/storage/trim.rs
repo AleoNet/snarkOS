@@ -16,7 +16,7 @@
 
 use crate::sync::{create_test_consensus, TestBlocks};
 use snarkos_storage::*;
-use snarkvm_dpc::{BlockHeaderHash, LedgerScheme};
+use snarkvm_ledger::{BlockHeaderHash, LedgerScheme};
 
 use std::collections::HashSet;
 

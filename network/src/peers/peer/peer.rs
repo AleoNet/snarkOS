@@ -18,7 +18,7 @@ use anyhow::*;
 use chrono::Utc;
 use futures::{select, FutureExt};
 use serde::{Deserialize, Serialize};
-use snarkvm_dpc::Storage;
+use snarkvm_ledger::Storage;
 use std::{
     net::SocketAddr,
     sync::{

@@ -15,7 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Parameters, RecordScheme, Storage};
+use snarkvm_dpc::{Parameters, RecordScheme};
+use snarkvm_ledger::{errors::StorageError, DatabaseTransaction, Op, Storage};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,

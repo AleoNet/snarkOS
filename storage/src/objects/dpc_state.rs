@@ -15,7 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Parameters, Storage};
+use snarkvm_dpc::Parameters;
+use snarkvm_ledger::{DatabaseTransaction, Op, Storage, StorageError};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
@@ -110,19 +111,19 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Rebuild the stored merkle tree with the current stored commitments
     pub fn update_merkle_tree(&self, new_best_block_number: u32) -> Result<(), StorageError> {
         self.rebuild_merkle_tree(vec![])?;
-        let new_digest = self.cm_merkle_tree.load().root();
+        let new_digest = self.cm_merkle_tree.load().root().to_bytes_le()?;
 
         let mut database_transaction = DatabaseTransaction::new();
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
-            key: to_bytes_le![new_digest]?,
+            key: new_digest.clone(),
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
         database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes_le![new_digest]?,
+            value: new_digest,
         });
 
         self.storage.batch(database_transaction)

@@ -15,7 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{bytes_to_u32, Ledger, COL_BLOCK_LOCATOR};
-use snarkvm_dpc::{BlockHeaderHash, LedgerScheme, Parameters, Storage};
+use snarkvm_dpc::Parameters;
+use snarkvm_ledger::{BlockHeaderHash, LedgerScheme, Storage};
 use snarkvm_utilities::ToBytes;
 
 use parking_lot::Mutex;

@@ -80,10 +80,10 @@ updates:
   - dependency-name: snarkvm-errors
     versions:
     - 0.0.6
-  - dependency-name: snarkvm-models
+  - dependency-name: snarkvm-ledger
     versions:
-    - 0.0.6
-  - dependency-name: snarkvm-posw
+      - 0.0.6
+  - dependency-name: snarkvm-models
     versions:
     - 0.0.6
   - dependency-name: snarkvm-algorithms

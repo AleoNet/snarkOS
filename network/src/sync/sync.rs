@@ -17,11 +17,8 @@
 use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::BlockHeight;
-use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Transaction},
-    LedgerScheme,
-    Storage,
-};
+use snarkvm_dpc::testnet1::{Testnet1DPC, Testnet1Transaction};
+use snarkvm_ledger::{LedgerScheme, Storage};
 
 use atomic_instant::AtomicInstant;
 use std::{sync::Arc, time::Duration};

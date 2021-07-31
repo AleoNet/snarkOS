@@ -20,8 +20,7 @@ use snarkos_testing::{
     network::{test_node, write_message_to_stream, TestSetup},
     wait_until,
 };
-
-use snarkvm_dpc::block_header_hash::BlockHeaderHash;
+use snarkvm_ledger::prelude::*;
 
 use std::time::Duration;
 

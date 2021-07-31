@@ -24,7 +24,7 @@ use crate::{
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_metrics::{self as metrics, misc};
 use snarkos_network::Node;
-use snarkvm_dpc::Storage;
+use snarkvm_ledger::Storage;
 
 use hyper::{
     body::HttpBody,
@@ -262,13 +262,6 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         "getrawrecord" => {
             let result = rpc
                 .get_raw_record_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "decoderecord" => {
-            let result = rpc
-                .decode_record_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
             result_to_response(&req, result)

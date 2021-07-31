@@ -16,7 +16,7 @@
 
 use crate::sync::{create_test_consensus, TestBlocks};
 use snarkos_storage::*;
-use snarkvm_dpc::{DatabaseTransaction, LedgerScheme, Op, Storage};
+use snarkvm_ledger::{DatabaseTransaction, LedgerScheme, Op, Storage};
 
 use rand::prelude::*;
 

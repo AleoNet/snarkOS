@@ -24,7 +24,8 @@ mod rpc_tests {
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
     };
-    use snarkvm_dpc::{testnet1::parameters::Testnet1Transaction, LedgerScheme, TransactionScheme};
+    use snarkvm_dpc::{testnet1::Testnet1Transaction, TransactionScheme};
+    use snarkvm_ledger::LedgerScheme;
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,

@@ -24,18 +24,8 @@ use crate::{
     COL_SERIAL_NUMBER,
     COL_TRANSACTION_LOCATION,
 };
-use snarkvm_dpc::{
-    Block,
-    BlockHeaderHash,
-    DatabaseTransaction,
-    LedgerScheme,
-    Op,
-    Parameters,
-    Storage,
-    Transaction,
-    TransactionScheme,
-    Transactions,
-};
+use snarkvm_dpc::{Parameters, Transaction, TransactionScheme};
+use snarkvm_ledger::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, Transactions};
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use rayon::prelude::*;

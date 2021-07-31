@@ -22,23 +22,19 @@ use snarkos_metrics::{
 use snarkos_storage::BlockPath;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::parameters::{Testnet1DPC, Testnet1Parameters, Testnet1Transaction},
+    testnet1::{Testnet1DPC, Testnet1Parameters, Testnet1Transaction},
     Account,
     AccountScheme,
     Address,
     AleoAmount,
-    Block,
     DPCScheme,
-    LedgerScheme,
     Parameters,
     Payload,
     PrivateKey,
+    Program,
     Record,
-    Storage,
-    StorageError,
-    Transactions,
 };
-use snarkvm_posw::txids_to_roots;
+use snarkvm_ledger::{posw::txids_to_roots, Block, LedgerScheme, Storage, StorageError, Transactions};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use rand::{CryptoRng, Rng};
@@ -266,12 +262,7 @@ impl<S: Storage> Consensus<S> {
         &self,
         old_records: Vec<Record<Testnet1Parameters>>,
         old_private_keys: Vec<PrivateKey<Testnet1Parameters>>,
-        new_record_owners: Vec<Address<Testnet1Parameters>>,
-        new_birth_program_ids: Vec<Vec<u8>>,
-        new_death_program_ids: Vec<Vec<u8>>,
-        new_is_dummy_flags: Vec<bool>,
-        new_values: Vec<u64>,
-        new_payloads: Vec<Payload>,
+        new_records: Vec<Record<Testnet1Parameters>>,
         memo: [u8; 64],
         rng: &mut R,
     ) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
@@ -279,21 +270,6 @@ impl<S: Storage> Consensus<S> {
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
             let (sn, _) = old_records[i].to_serial_number(&old_private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
-        }
-
-        let mut new_records = vec![];
-        for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
-            new_records.push(Record::new_full(
-                new_record_owners[j].clone(),
-                new_is_dummy_flags[j],
-                new_values[j],
-                new_payloads[j].clone(),
-                new_birth_program_ids[j].clone(),
-                new_death_program_ids[j].clone(),
-                (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
-                joint_serial_numbers.clone(),
-                rng,
-            )?);
         }
 
         // Offline execution to generate a DPC transaction
@@ -322,9 +298,8 @@ impl<S: Storage> Consensus<S> {
         &self,
         block_num: u32,
         transactions: &Transactions<Testnet1Transaction>,
-        program_vk_hash: Vec<u8>,
-        new_birth_program_ids: Vec<Vec<u8>>,
-        new_death_program_ids: Vec<Vec<u8>>,
+        old_programs: Vec<&dyn Program<Testnet1Parameters>>,
+        new_programs: Vec<&dyn Program<Testnet1Parameters>>,
         recipient: Address<Testnet1Parameters>,
         rng: &mut R,
     ) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
@@ -346,17 +321,15 @@ impl<S: Storage> Consensus<S> {
         // Generate dummy input records having as address the genesis address.
         let old_account_private_keys = vec![new_account.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
         let mut old_records = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
-        for _ in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
+        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
             let old_record = Record::new(
+                old_programs[i],
                 new_account.address.clone(),
                 true, // The input record is dummy
                 0,
                 Payload::default(),
-                // Filler program input
-                program_vk_hash.clone(),
-                program_vk_hash.clone(),
                 <Testnet1Parameters as Parameters>::serial_number_nonce_crh().hash(&sn_nonce_input)?,
                 rng,
             )?;
@@ -364,7 +337,6 @@ impl<S: Storage> Consensus<S> {
             old_records.push(old_record);
         }
 
-        let new_record_owners = vec![recipient; Testnet1Parameters::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
         let new_values = [vec![total_value_balance.0 as u64], vec![
             0;
@@ -372,20 +344,28 @@ impl<S: Storage> Consensus<S> {
                 - 1
         ]]
         .concat();
-        let new_payloads = vec![Payload::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
 
-        self.create_transaction(
-            old_records,
-            old_account_private_keys,
-            new_record_owners,
-            new_birth_program_ids,
-            new_death_program_ids,
-            new_is_dummy_flags,
-            new_values,
-            new_payloads,
-            [0u8; 64],
-            rng,
-        )
+        let mut joint_serial_numbers = vec![];
+        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
+            let (sn, _) = old_records[i].to_serial_number(&old_account_private_keys[i])?;
+            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
+        }
+
+        let mut new_records = vec![];
+        for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
+            new_records.push(Record::new_full(
+                new_programs[j],
+                recipient.clone(),
+                new_is_dummy_flags[j],
+                new_values[j],
+                Payload::default(),
+                (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
+                joint_serial_numbers.clone(),
+                rng,
+            )?);
+        }
+
+        self.create_transaction(old_records, old_account_private_keys, new_records, [0u8; 64], rng)
     }
 
     fn get_canon_difficulty_from_height(&self, height: u32) -> Result<u128, StorageError> {
