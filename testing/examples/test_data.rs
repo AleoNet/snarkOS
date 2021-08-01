@@ -37,7 +37,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     let (block_1, coinbase_records) = mine_block(&miner, vec![])?;
 
     // make a tx which spends 10 to the Testnet1Testnet1Parameters receiver
-    let (_records_1, tx_1) = send(
+    let tx_1 = send(
         &consensus,
         &miner_acc,
         coinbase_records.clone(),
@@ -102,7 +102,7 @@ fn send<R: Rng + CryptoRng, S: Storage>(
     receiver: &Address<Testnet1Parameters>,
     amount: u64,
     rng: &mut R,
-) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
+) -> Result<Testnet1Transaction, ConsensusError> {
     let mut sum = 0;
     for inp in &old_records {
         sum += inp.value();
@@ -133,7 +133,7 @@ fn send<R: Rng + CryptoRng, S: Storage>(
     }
     let from = vec![from.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
 
-    consensus.create_transaction(old_records, from, new_records, [0u8; 64], rng)
+    consensus.create_transaction(old_records, from, new_records, None, rng)
 }
 
 #[tokio::main]

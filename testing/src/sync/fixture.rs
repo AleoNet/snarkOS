@@ -14,14 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    dpc::{generate_test_accounts, setup_or_load_dpc},
-    storage::*,
-};
+use crate::storage::*;
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_storage::LedgerStorage;
 use snarkvm::{
-    dpc::{testnet1::*, Account, NoopProgram},
+    dpc::{testnet1::*, Account, AccountScheme, DPCScheme, NoopProgram},
     ledger::{Block, Storage},
     parameters::{testnet1::GenesisBlock, traits::genesis::Genesis},
     utilities::bytes::FromBytes,
@@ -29,11 +26,22 @@ use snarkvm::{
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
+use rand::{CryptoRng, Rng};
 use rand_chacha::ChaChaRng;
 use std::{marker::PhantomData, sync::Arc};
 
 pub static FIXTURE: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(false));
 pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
+
+pub fn setup_or_load_dpc<R: Rng + CryptoRng>(verify_only: bool, rng: &mut R) -> Testnet1DPC {
+    match Testnet1DPC::load(verify_only) {
+        Ok(dpc) => dpc,
+        Err(err) => {
+            println!("error - {}, re-running parameter Setup", err);
+            Testnet1DPC::setup(rng).expect("DPC setup failed")
+        }
+    }
+}
 
 // helper for setting up e2e tests
 pub struct Fixture<S: Storage> {
@@ -58,7 +66,10 @@ fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
     let dpc = setup_or_load_dpc(verify_only, &mut rng);
 
     // Generate addresses
-    let test_accounts = generate_test_accounts(&mut rng);
+    let account_0 = Account::<Testnet1Parameters>::new(&mut rng).unwrap();
+    let account_1 = Account::<Testnet1Parameters>::new(&mut rng).unwrap();
+    let account_2 = Account::<Testnet1Parameters>::new(&mut rng).unwrap();
+    let test_accounts = [account_0, account_1, account_2];
 
     let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
 

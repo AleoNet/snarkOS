@@ -18,15 +18,7 @@ use crate::*;
 use snarkvm::{
     dpc::{Parameters, RecordCommitmentTree, Transaction, TransactionScheme},
     ledger::{
-        Block,
-        BlockError,
-        BlockHeader,
-        BlockHeaderHash,
-        BlockScheme,
-        DatabaseTransaction,
-        LedgerScheme,
-        Op,
-        Storage,
+        Block, BlockError, BlockHeader, BlockHeaderHash, BlockScheme, DatabaseTransaction, LedgerScheme, Op, Storage,
         StorageError,
     },
     utilities::{has_duplicates, to_bytes_le, ToBytes},
@@ -43,8 +35,8 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         cm_index: &mut usize,
         transaction: &Transaction<C>,
     ) -> Result<(Vec<Op>, Vec<(C::RecordCommitment, usize)>), StorageError> {
-        let old_serial_numbers = transaction.old_serial_numbers();
-        let new_commitments = transaction.new_commitments();
+        let old_serial_numbers = transaction.serial_numbers();
+        let new_commitments = transaction.commitments();
 
         let mut ops = Vec::with_capacity(old_serial_numbers.len() + new_commitments.len());
         let mut cms = Vec::with_capacity(new_commitments.len());
@@ -104,8 +96,8 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
-            transaction_serial_numbers.push(transaction.old_serial_numbers());
-            transaction_commitments.push(transaction.new_commitments());
+            transaction_serial_numbers.push(transaction.serial_numbers());
+            transaction_commitments.push(transaction.commitments());
         }
 
         // Sanitize the block inputs
@@ -181,8 +173,8 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         let mut transaction_commitments = Vec::with_capacity(block.transactions.0.len());
 
         for transaction in &block.transactions.0 {
-            transaction_serial_numbers.push(transaction.old_serial_numbers());
-            transaction_commitments.push(transaction.new_commitments());
+            transaction_serial_numbers.push(transaction.serial_numbers());
+            transaction_commitments.push(transaction.commitments());
         }
 
         // Sanitize the block inputs

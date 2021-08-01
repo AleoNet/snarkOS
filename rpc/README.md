@@ -461,7 +461,7 @@ curl --user username:password --data-binary '{
 ```
 
 ## createtransaction
-Create a new transaction from a given transaction kernel, returning the encoded transaction and the new records.
+Create a new transaction from a given transaction authorization, returning the encoded transaction and the new records.
 
 ### Protected Endpoint
 
@@ -471,14 +471,13 @@ Yes
 
 |       Parameter      |  Type  | Required |             Description            |
 |:--------------------:|:------:|:--------:|:----------------------------------:|
-| `transaction_kernel` | string |    Yes   | The hex encoded transaction kernel |
+| `transaction_authorization` | string |    Yes   | The hex encoded transaction authorization |
 
 ### Response
 
 |       Parameter       |  Type  |                  Description                  |
 |:---------------------:|:------:|:--------------------------------------------- |
 | `encoded_transaction` | string | The hex encoding of the generated transaction |
-| `encoded_records`     | array  | The hex encodings of the generated records    |
 
 ### Example
 ```ignore
@@ -486,12 +485,12 @@ curl --user username:password --data-binary '{
     "jsonrpc":"2.0",
     "id": "1",
     "method": "createtransaction",
-    "params": ["transaction_kernel_hexstring"]
+    "params": ["transaction_authorization_hexstring"]
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
-## createtransactionkernel
-Create a new transaction kernel.
+## createtransactionauthorization
+Create a new transaction authorization.
 
 ### Protected Endpoint
 
@@ -518,14 +517,14 @@ Transaction Recipient Object
 
 |       Parameter      |  Type  | Required |             Description            |
 |:--------------------:|:------:|:--------:|:----------------------------------:|
-| `transaction_kernel` | string |    Yes   | The hex encoded transaction kernel |
+| `transaction_authorization` | string |    Yes   | The hex encoded transaction authorization |
 
 ### Example
 ```ignore
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",
     "id": "1",
-    "method": "createtransactionkernel",
+    "method": "createtransactionauthorization",
     "params": [
        {
         "old_records": ["record_hexstring"],

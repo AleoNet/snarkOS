@@ -18,7 +18,7 @@ use crate::*;
 use snarkvm::{
     algorithms::merkle_tree::*,
     dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, Transaction},
-    ledger::{Block, BlockHeaderHash, LedgerError, LedgerScheme, Storage, StorageError},
+    ledger::{Block, BlockHeaderHash, BlockScheme, LedgerError, LedgerScheme, Storage, StorageError},
     utilities::{to_bytes_le, FromBytes, ToBytes},
 };
 
@@ -35,6 +35,11 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
 
     /// Instantiates a new ledger with a genesis block.
     fn new(path: Option<&Path>, genesis_block: Self::Block) -> Result<Self> {
+        // Ensure the given block is a genesis block.
+        if !genesis_block.header().is_genesis() {
+            return Err(LedgerError::InvalidGenesisBlockHeader.into());
+        }
+
         let storage = if let Some(path) = path {
             fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
 
@@ -59,6 +64,7 @@ impl<C: Parameters, S: Storage> LedgerScheme<C> for Ledger<C, S> {
             cm_merkle_tree: ArcSwap::new(Arc::new(empty_cm_merkle_tree)),
         };
 
+        debug_assert_eq!(ledger.block_height(), 0, "Uninitialized ledger block height must be 0");
         ledger.insert_and_commit(&genesis_block)?;
 
         Ok(ledger)

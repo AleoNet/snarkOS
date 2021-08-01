@@ -108,8 +108,8 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
         storage: &Ledger<C, S>,
         entry: Entry<T>,
     ) -> Result<Option<Vec<u8>>, ConsensusError> {
-        let transaction_serial_numbers = entry.transaction.old_serial_numbers();
-        let transaction_commitments = entry.transaction.new_commitments();
+        let transaction_serial_numbers = entry.transaction.serial_numbers();
+        let transaction_commitments = entry.transaction.commitments();
 
         if has_duplicates(transaction_serial_numbers)
             || has_duplicates(transaction_commitments)
@@ -123,8 +123,8 @@ impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
 
         let txns = self.transactions.inner();
         for (_, tx) in txns.iter() {
-            holding_serial_numbers.extend(tx.transaction.old_serial_numbers());
-            holding_commitments.extend(tx.transaction.new_commitments());
+            holding_serial_numbers.extend(tx.transaction.serial_numbers());
+            holding_commitments.extend(tx.transaction.commitments());
         }
 
         // Check if each transaction serial number previously existed in the ledger
@@ -269,10 +269,13 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction: transaction.clone(),
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction: transaction.clone(),
+                },
+            )
             .await
             .unwrap();
 
@@ -282,10 +285,13 @@ mod tests {
         // Duplicate pushes don't do anything
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -326,10 +332,13 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction: transaction.clone(),
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction: transaction.clone(),
+                },
+            )
             .await
             .unwrap();
 
@@ -356,10 +365,13 @@ mod tests {
 
         let expected_transaction = transaction.clone();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -377,10 +389,13 @@ mod tests {
         let mem_pool = MemoryPool::new();
         let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: TRANSACTION_2.len(),
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: TRANSACTION_2.len(),
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -405,10 +420,13 @@ mod tests {
         let mem_pool = MemoryPool::new();
         let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: TRANSACTION_2.len(),
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: TRANSACTION_2.len(),
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 

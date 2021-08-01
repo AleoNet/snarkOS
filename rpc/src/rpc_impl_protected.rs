@@ -19,28 +19,16 @@
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
 use crate::{
-    error::RpcError,
-    rpc_trait::ProtectedRpcFunctions,
-    rpc_types::*,
-    transaction_kernel_builder::TransactionKernelBuilder,
-    RpcImpl,
+    error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*,
+    transaction_authorization_builder::TransactionAuthorizationBuilder, RpcImpl,
 };
 use snarkos_consensus::ConsensusParameters;
+use snarkvm::prelude::UniformRand;
 use snarkvm::{
     algorithms::CRH,
     dpc::{
-        testnet1::{Testnet1DPC, Testnet1Parameters},
-        Account,
-        AccountScheme,
-        Address,
-        DPCScheme,
-        EncryptedRecord,
-        Parameters,
-        Payload,
-        PrivateKey,
-        Record,
-        TransactionKernel,
-        ViewKey,
+        testnet1::Testnet1Parameters, Account, AccountScheme, Address, DPCScheme, EncryptedRecord, Parameters, Payload,
+        PrivateKey, Record, TransactionAuthorization, ViewKey,
     },
     ledger::prelude::*,
     utilities::{to_bytes_le, FromBytes, ToBytes},
@@ -91,8 +79,12 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         }
     }
 
-    /// Wrap authentication around `create_transaction_kernel`
-    pub async fn create_transaction_kernel_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+    /// Wrap authentication around `create_transaction_authorization`
+    pub async fn create_transaction_authorization_protected(
+        self,
+        params: Params,
+        meta: Meta,
+    ) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
         let value = match params {
@@ -103,8 +95,8 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let val: TransactionInputs = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.create_transaction_kernel(val) {
-            Ok(result) => Ok(serde_json::to_value(result).expect("transaction kernel serialization failed")),
+        match self.create_transaction_authorization(val) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("transaction authorization serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
     }
@@ -128,10 +120,10 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         let private_keys: [String; 2] = serde_json::from_value(value[0].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        let transaction_kernel: String = serde_json::from_value(value[1].clone())
+        let transaction_authorization: String = serde_json::from_value(value[1].clone())
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
-        match self.create_transaction(private_keys, transaction_kernel) {
+        match self.create_transaction(private_keys, transaction_authorization) {
             Ok(result) => Ok(serde_json::to_value(result).expect("transaction output serialization failed")),
             Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
         }
@@ -245,9 +237,9 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
             let rpc = rpc.clone();
             rpc.create_raw_transaction_protected(params, meta)
         });
-        d.add_method_with_meta("createtransactionkernel", |rpc, params, meta| {
+        d.add_method_with_meta("createtransactionauthorization", |rpc, params, meta| {
             let rpc = rpc.clone();
-            rpc.create_transaction_kernel_protected(params, meta)
+            rpc.create_transaction_authorization_protected(params, meta)
         });
         d.add_method_with_meta("createtransaction", |rpc, params, meta| {
             let rpc = rpc.clone();
@@ -305,7 +297,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
-    ) -> Result<CreateRawTransactionOuput, RpcError> {
+    ) -> Result<CreateRawTransactionOutput, RpcError> {
         let rng = &mut thread_rng();
 
         assert!(!transaction_input.old_records.is_empty());
@@ -393,16 +385,18 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             )?);
         }
 
-        // Decode memo
-        let mut memo = [0u8; 64];
+        // Decode memo.
+        let mut memo = None;
         if let Some(memo_string) = transaction_input.memo {
             if let Ok(bytes) = hex::decode(memo_string) {
-                bytes.write_le(&mut memo[..])?;
+                let mut memo_buffer = [0u8; 64];
+                bytes.write_le(&mut memo_buffer[..])?;
+                memo = Some(memo_buffer);
             }
         }
 
         // Generate transaction
-        let (records, transaction) = self.sync_handler()?.consensus.create_transaction(
+        let transaction = self.sync_handler()?.consensus.create_transaction(
             old_records,
             old_account_private_keys,
             new_records,
@@ -410,20 +404,13 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             rng,
         )?;
 
-        let encoded_transaction = hex::encode(to_bytes_le![transaction]?);
-        let mut encoded_records = Vec::with_capacity(records.len());
-        for record in records {
-            encoded_records.push(hex::encode(to_bytes_le![record]?));
-        }
-
-        Ok(CreateRawTransactionOuput {
-            encoded_transaction,
-            encoded_records,
+        Ok(CreateRawTransactionOutput {
+            encoded_transaction: hex::encode(to_bytes_le![transaction]?),
         })
     }
 
-    /// Generates and returns a new transaction kernel.
-    fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError> {
+    /// Generates and returns a new transaction authorization.
+    fn create_transaction_authorization(&self, transaction_input: TransactionInputs) -> Result<String, RpcError> {
         let rng = &mut thread_rng();
 
         assert!(!transaction_input.old_records.is_empty());
@@ -433,9 +420,9 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         assert!(!transaction_input.recipients.is_empty());
         assert!(transaction_input.recipients.len() <= Testnet1Parameters::NUM_OUTPUT_RECORDS);
 
-        let mut builder = TransactionKernelBuilder::new();
+        let mut builder = TransactionAuthorizationBuilder::new();
 
-        // Add individual transaction inputs to the transaction kernel builder.
+        // Add individual transaction inputs to the transaction authorization builder.
         for (record_string, private_key_string) in transaction_input
             .old_records
             .iter()
@@ -447,79 +434,72 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             builder = builder.add_input(private_key, record)?;
         }
 
-        // Add individual transaction outputs to the transaction kernel builder.
+        // Add individual transaction outputs to the transaction authorization builder.
         for recipient in &transaction_input.recipients {
             let address = Address::<Testnet1Parameters>::from_str(&recipient.address)?;
 
             builder = builder.add_output(address, recipient.amount)?;
         }
 
-        // Decode memo
-        let mut memo = [0u8; 32];
+        // Decode memo.
+        let mut memo = [0u8; 64];
+        (0..64)
+            .map(|_| u8::rand(rng))
+            .collect::<Vec<u8>>()
+            .write_le(&mut memo[..])?;
         if let Some(memo_string) = transaction_input.memo {
             if let Ok(bytes) = hex::decode(memo_string) {
                 bytes.write_le(&mut memo[..])?;
             }
         }
 
-        // If the request did not specify a valid memo, generate one from random.
-        if memo == [0u8; 32] {
-            memo = rng.gen();
-        }
-
-        // Set the memo in the transaction kernel builder.
+        // Set the memo in the transaction authorization builder.
         builder = builder.memo(memo);
 
-        // Set the network id in the transaction kernel builder.
+        // Set the network id in the transaction authorization builder.
         builder = builder.network_id(transaction_input.network_id);
 
-        // Construct the transaction kernel
-        let transaction_kernel = builder.build(rng)?;
+        // Construct the transaction authorization.
+        let authorization = builder.build(rng)?;
 
-        Ok(hex::encode(transaction_kernel.to_bytes()))
+        Ok(hex::encode(authorization.to_bytes()))
     }
 
-    /// Create a new transaction for a given transaction kernel.
+    /// Create a new transaction for a given transaction authorization.
     fn create_transaction(
         &self,
         private_keys: [String; Testnet1Parameters::NUM_INPUT_RECORDS],
-        transaction_kernel: String,
-    ) -> Result<CreateRawTransactionOuput, RpcError> {
+        authorization: String,
+    ) -> Result<CreateRawTransactionOutput, RpcError> {
         let rng = &mut thread_rng();
 
-        // Decode the private keys
+        // Decode the private keys.
         let mut old_private_keys = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
         for private_key in private_keys {
             old_private_keys.push(PrivateKey::<Testnet1Parameters>::from_str(&private_key)?);
         }
 
-        // Decode the transaction kernel
-        let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
-        let transaction_kernel = TransactionKernel::<Testnet1Parameters>::read_le(&transaction_kernel_bytes[..])?;
+        // Decode the transaction authorization.
+        let authorization = TransactionAuthorization::<Testnet1Parameters>::read_le(&hex::decode(authorization)?[..])?;
+
+        // Generate the local data.
+        let local_data = authorization.to_local_data(rng)?;
 
         // Construct the program proofs
-        let program_proofs =
-            ConsensusParameters::generate_program_proofs::<_, S>(self.dpc()?, &transaction_kernel, rng)?;
+        let program_proofs = ConsensusParameters::generate_program_proofs::<S>(self.dpc()?, &local_data)?;
 
-        // Online execution to generate a DPC transaction
-        let (records, transaction) = Testnet1DPC::execute_online_phase(
-            self.dpc()?,
+        // Online execution to generate a transaction
+        let transaction = self.dpc()?.execute(
             &old_private_keys,
-            transaction_kernel,
+            authorization,
+            &local_data,
             program_proofs,
             &*self.storage,
             rng,
         )?;
 
-        let encoded_transaction = hex::encode(to_bytes_le![transaction]?);
-        let mut encoded_records = Vec::with_capacity(records.len());
-        for record in records {
-            encoded_records.push(hex::encode(to_bytes_le![record]?));
-        }
-
-        Ok(CreateRawTransactionOuput {
-            encoded_transaction,
-            encoded_records,
+        Ok(CreateRawTransactionOutput {
+            encoded_transaction: hex::encode(to_bytes_le![transaction]?),
         })
     }
 

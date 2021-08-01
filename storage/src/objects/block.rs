@@ -18,15 +18,7 @@ use crate::*;
 use snarkvm::{
     dpc::{Parameters, RecordCommitmentTree, Transaction, TransactionScheme},
     ledger::{
-        Block,
-        BlockError,
-        BlockHeaderHash,
-        DatabaseTransaction,
-        LedgerScheme,
-        Op,
-        Storage,
-        StorageError,
-        Transactions,
+        Block, BlockError, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, StorageError, Transactions,
     },
     utilities::{to_bytes_le, FromBytes, ToBytes},
 };
@@ -145,7 +137,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         let mut cm_index = self.current_cm_index()?;
 
         for transaction in self.get_block_transactions(&block_hash)?.0 {
-            for sn in transaction.old_serial_numbers() {
+            for sn in transaction.serial_numbers() {
                 database_transaction.push(Op::Delete {
                     col: COL_SERIAL_NUMBER,
                     key: to_bytes_le![sn]?,
@@ -153,7 +145,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
                 sn_index -= 1;
             }
 
-            for cm in transaction.new_commitments() {
+            for cm in transaction.commitments() {
                 database_transaction.push(Op::Delete {
                     col: COL_COMMITMENT,
                     key: to_bytes_le![cm]?,

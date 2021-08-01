@@ -91,14 +91,12 @@ mod consensus_dpc {
             );
         }
 
-        // Memo is a dummy for now
-
-        let memo = [6u8; 64];
+        let spend_records = new_records.clone();
 
         println!("Create a payment transaction");
         // Create the transaction
-        let (spend_records, transaction) = consensus
-            .create_transaction(old_records, old_account_private_keys, new_records, memo, &mut rng)
+        let transaction = consensus
+            .create_transaction(old_records, old_account_private_keys, new_records, None, &mut rng)
             .unwrap();
 
         assert_eq!(spend_records.len(), 2);

@@ -19,11 +19,7 @@ use snarkvm::{
     dpc::{testnet1::*, Address, DPCScheme, Parameters, Record, RecordScheme, TransactionScheme},
     ledger::{
         posw::{txids_to_roots, PoswMarlin},
-        Block,
-        BlockHeader,
-        LedgerScheme,
-        Storage,
-        Transactions,
+        Block, BlockHeader, LedgerScheme, Storage, Transactions,
     },
     utilities::{to_bytes_le, ToBytes},
 };
@@ -78,7 +74,7 @@ impl<S: Storage> Miner<S> {
             }
         }
 
-        let (records, tx) = self.consensus.create_coinbase_transaction(
+        let (records, transaction) = self.consensus.create_coinbase_transaction(
             self.consensus.ledger.block_height(),
             transactions,
             vec![&self.consensus.dpc.noop_program; Testnet1Parameters::NUM_OUTPUT_RECORDS],
@@ -87,7 +83,7 @@ impl<S: Storage> Miner<S> {
             rng,
         )?;
 
-        transactions.push(tx);
+        transactions.push(transaction);
         Ok(records)
     }
 

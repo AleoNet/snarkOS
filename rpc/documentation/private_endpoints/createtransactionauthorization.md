@@ -1,4 +1,4 @@
-Create a new transaction kernel.
+Create a new transaction authorization.
 
 ### Protected Endpoint
 
@@ -23,16 +23,16 @@ Transaction Recipient Object
 
 ### Response
 
-|       Parameter      |  Type  | Required |             Description            |
-|:--------------------:|:------:|:--------:|:----------------------------------:|
-| `transaction_kernel` | string |    Yes   | The hex encoded transaction kernel |
+|           Parameter         |  Type  | Required |                 Description               |
+|:---------------------------:|:------:|:--------:|:-----------------------------------------:|
+| `transaction_authorization` | string |    Yes   | The hex encoded transaction authorization |
 
 ### Example
 ```ignore
 curl --user username:password --data-binary '{ 
     "jsonrpc":"2.0",
     "id": "1",
-    "method": "createtransactionkernel",
+    "method": "createtransactionauthorization",
     "params": [
        {
         "old_records": ["record_hexstring"],

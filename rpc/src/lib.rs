@@ -55,4 +55,4 @@ pub mod rpc_types;
 #[doc(inline)]
 pub use rpc_types::*;
 
-pub(crate) mod transaction_kernel_builder;
+pub(crate) mod transaction_authorization_builder;

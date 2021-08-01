@@ -17,7 +17,6 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 
-pub mod dpc;
 #[cfg(feature = "network")]
 pub mod network;
 pub mod storage;

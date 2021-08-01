@@ -37,11 +37,9 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_snark_id = to_bytes_le![
-        <Testnet1Parameters as Parameters>::inner_circuit_id_crh()
-            .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
-            .unwrap()
-    ]
+    let inner_snark_id = to_bytes_le![<Testnet1Parameters as Parameters>::inner_circuit_id_crh()
+        .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
+        .unwrap()]
     .unwrap();
 
     ConsensusParameters {
@@ -62,7 +60,7 @@ impl TransactionScheme for TestTestnet1Transaction {
     type Digest = [u8; 32];
     type EncryptedRecord = [u8; 32];
     type InnerCircuitID = [u8; 32];
-    type Memorandum = [u8; 64];
+    type Memo = [u8; 64];
     type SerialNumber = [u8; 32];
     type Signature = [u8; 32];
     type ValueBalance = i64;
@@ -83,11 +81,11 @@ impl TransactionScheme for TestTestnet1Transaction {
         &[0u8; 32]
     }
 
-    fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
+    fn serial_numbers(&self) -> &[Self::SerialNumber] {
         &[[0u8; 32]; 2]
     }
 
-    fn new_commitments(&self) -> &[Self::Commitment] {
+    fn commitments(&self) -> &[Self::Commitment] {
         &[[0u8; 32]; 2]
     }
 
@@ -95,7 +93,7 @@ impl TransactionScheme for TestTestnet1Transaction {
         0
     }
 
-    fn memorandum(&self) -> &Self::Memorandum {
+    fn memo(&self) -> &Self::Memo {
         &[0u8; 64]
     }
 

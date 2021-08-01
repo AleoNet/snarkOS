@@ -103,11 +103,9 @@ pub struct BlockTemplate {
 
 /// Output for the `createrawtransaction` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct CreateRawTransactionOuput {
+pub struct CreateRawTransactionOutput {
     /// The newly created transaction from calling the `createrawtransaction` endpoint
     pub encoded_transaction: String,
-    /// The newly created records from calling the `createrawtransaction` endpoint
-    pub encoded_records: Vec<String>,
 }
 
 /// Input for the `decryptrecord` rpc call

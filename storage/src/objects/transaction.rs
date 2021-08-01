@@ -55,8 +55,8 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
 
     /// Returns true if the transaction has internal parameters that already exist in the ledger.
     pub fn transaction_conflicts<T: TransactionScheme>(&self, transaction: &T) -> bool {
-        let transaction_serial_numbers = transaction.old_serial_numbers();
-        let transaction_commitments = transaction.new_commitments();
+        let transaction_serial_numbers = transaction.serial_numbers();
+        let transaction_commitments = transaction.commitments();
 
         // Check if the transactions in the block have duplicate serial numbers
         if has_duplicates(transaction_serial_numbers) {

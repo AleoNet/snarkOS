@@ -24,16 +24,7 @@ use snarkvm::{
     algorithms::CRH,
     dpc::{
         testnet1::{Testnet1DPC, Testnet1Parameters, Testnet1Transaction},
-        Account,
-        AccountScheme,
-        Address,
-        AleoAmount,
-        DPCScheme,
-        Parameters,
-        Payload,
-        PrivateKey,
-        Program,
-        Record,
+        Account, AccountScheme, Address, AleoAmount, DPCScheme, Parameters, Payload, PrivateKey, Program, Record,
     },
     ledger::{posw::txids_to_roots, Block, LedgerScheme, Storage, StorageError, Transactions},
     utilities::{to_bytes_le, ToBytes},
@@ -138,6 +129,7 @@ impl<S: Storage> Consensus<S> {
         // Block is an unknown orphan
         if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
             debug!("Processing a block that is an unknown orphan");
+            println!("ORPHAN");
 
             // There are two possible cases for an unknown orphan.
             // 1) The block is a genesis block, or
@@ -156,6 +148,8 @@ impl<S: Storage> Consensus<S> {
                     return Err(ConsensusError::PreExistingBlock);
                 }
                 BlockPath::CanonChain(block_height) => {
+                    println!("CANON");
+
                     debug!("Processing a block that is on canon chain. Height {}", block_height);
 
                     self.process_block(block).await?;
@@ -184,6 +178,8 @@ impl<S: Storage> Consensus<S> {
                     }
                 }
                 BlockPath::SideChain(side_chain_path) => {
+                    println!("SIDE");
+
                     debug!(
                         "Processing a block that is on side chain. Height {}",
                         side_chain_path.new_block_number
@@ -263,35 +259,33 @@ impl<S: Storage> Consensus<S> {
     pub fn create_transaction<R: Rng + CryptoRng>(
         &self,
         old_records: Vec<Record<Testnet1Parameters>>,
-        old_private_keys: Vec<PrivateKey<Testnet1Parameters>>,
+        private_keys: Vec<PrivateKey<Testnet1Parameters>>,
         new_records: Vec<Record<Testnet1Parameters>>,
-        memo: [u8; 64],
+        memo: Option<[u8; 64]>,
         rng: &mut R,
-    ) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
-        let mut joint_serial_numbers = vec![];
-        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = old_records[i].to_serial_number(&old_private_keys[i])?;
-            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
-        }
+    ) -> Result<Testnet1Transaction, ConsensusError> {
+        // Offline execution to generate a transaction authorization.
+        let authorization = self
+            .dpc
+            .authorize::<R>(&private_keys, old_records, new_records, memo, rng)?;
 
-        // Offline execution to generate a DPC transaction
-        let transaction_kernel =
-            self.dpc
-                .execute_offline_phase::<R>(&old_private_keys, old_records, new_records, memo, rng)?;
+        // Generate the local data.
+        let local_data = authorization.to_local_data(rng)?;
 
-        // Construct the program proofs
-        let program_proofs = ConsensusParameters::generate_program_proofs::<R, S>(&self.dpc, &transaction_kernel, rng)?;
+        // Construct the program proofs.
+        let program_proofs = ConsensusParameters::generate_program_proofs::<S>(&self.dpc, &local_data)?;
 
-        // Online execution to generate a DPC transaction
-        let (new_records, transaction) = self.dpc.execute_online_phase(
-            &old_private_keys,
-            transaction_kernel,
+        // Online execution to generate a transaction.
+        let transaction = self.dpc.execute(
+            &private_keys,
+            authorization,
+            &local_data,
             program_proofs,
             &*self.ledger,
             rng,
         )?;
 
-        Ok((new_records, transaction))
+        Ok(transaction)
     }
 
     /// Generate a coinbase transaction given candidate block transactions
@@ -306,10 +300,8 @@ impl<S: Storage> Consensus<S> {
         rng: &mut R,
     ) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
         let mut total_value_balance = crate::get_block_reward(block_num);
-
         for transaction in transactions.iter() {
             let tx_value_balance = transaction.value_balance;
-
             if tx_value_balance.is_negative() {
                 return Err(ConsensusError::CoinbaseTransactionAlreadyExists());
             }
@@ -321,7 +313,7 @@ impl<S: Storage> Consensus<S> {
         let new_account = Account::new(rng).unwrap();
 
         // Generate dummy input records having as address the genesis address.
-        let old_account_private_keys = vec![new_account.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
+        let private_keys = vec![new_account.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
         let mut old_records = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
             let sn_nonce_input: [u8; 4] = rng.gen();
@@ -340,16 +332,15 @@ impl<S: Storage> Consensus<S> {
         }
 
         let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [vec![total_value_balance.0 as u64], vec![
-            0;
-            Testnet1Parameters::NUM_OUTPUT_RECORDS
-                - 1
-        ]]
+        let new_values = [
+            vec![total_value_balance.0 as u64],
+            vec![0; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1],
+        ]
         .concat();
 
         let mut joint_serial_numbers = vec![];
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = old_records[i].to_serial_number(&old_account_private_keys[i])?;
+            let (sn, _) = old_records[i].to_serial_number(&private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
@@ -367,7 +358,9 @@ impl<S: Storage> Consensus<S> {
             )?);
         }
 
-        self.create_transaction(old_records, old_account_private_keys, new_records, [0u8; 64], rng)
+        let transaction = self.create_transaction(old_records, private_keys, new_records.clone(), None, rng)?;
+
+        Ok((new_records, transaction))
     }
 
     fn get_canon_difficulty_from_height(&self, height: u32) -> Result<u128, StorageError> {

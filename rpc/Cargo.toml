@@ -19,7 +19,7 @@ edition = "2018"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "42113fa"
+rev = "e8c948e"
 # path = "../../snarkVM"
 
 [dependencies.snarkos-consensus]

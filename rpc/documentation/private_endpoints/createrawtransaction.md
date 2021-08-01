@@ -26,7 +26,6 @@ Transaction Recipient Object
 |       Parameter       |  Type  |                  Description                  |
 |:---------------------:|:------:|:--------------------------------------------- |
 | `encoded_transaction` | string | The hex encoding of the generated transaction |
-| `encoded_records`     | array  | The hex encodings of the generated records    |
 
 ### Example
 ```ignore

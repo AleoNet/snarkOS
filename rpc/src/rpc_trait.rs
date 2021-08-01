@@ -116,22 +116,22 @@ pub trait ProtectedRpcFunctions {
     fn create_raw_transaction(
         &self,
         transaction_input: TransactionInputs,
-    ) -> Result<CreateRawTransactionOuput, RpcError>;
+    ) -> Result<CreateRawTransactionOutput, RpcError>;
 
     // todo: readd in Rust 1.54
     // #[cfg_attr(
     //     nightly,
-    //     doc(include = "../documentation/private_endpoints/createtransactionkernel.md")
+    //     doc(include = "../documentation/private_endpoints/createtransactionauthorization.md")
     // )]
-    fn create_transaction_kernel(&self, transaction_input: TransactionInputs) -> Result<String, RpcError>;
+    fn create_transaction_authorization(&self, transaction_input: TransactionInputs) -> Result<String, RpcError>;
 
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createtransaction.md"))]
     fn create_transaction(
         &self,
         private_keys: [String; 2], // TODO (howardwu): Genericize this.
-        transaction_kernel: String,
-    ) -> Result<CreateRawTransactionOuput, RpcError>;
+        transaction_authorization: String,
+    ) -> Result<CreateRawTransactionOutput, RpcError>;
 
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrecordcommitments.md"))]

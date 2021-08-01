@@ -15,13 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    Ledger,
-    TransactionLocation,
-    COL_BLOCK_TRANSACTIONS,
-    COL_COMMITMENT,
-    COL_DIGEST,
-    COL_MEMO,
-    COL_SERIAL_NUMBER,
+    Ledger, TransactionLocation, COL_BLOCK_TRANSACTIONS, COL_COMMITMENT, COL_DIGEST, COL_MEMO, COL_SERIAL_NUMBER,
     COL_TRANSACTION_LOCATION,
 };
 use snarkvm::{
@@ -378,8 +372,8 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
 
         let block_stored_txs: Transactions<Transaction<C>> = FromBytes::read_le(&block_stored_txs_bytes[..]).unwrap();
 
-        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
-            let tx_id = match tx.transaction_id() {
+        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, transaction)| {
+            let tx_id = match transaction.transaction_id() {
                 Ok(hash) => hash,
                 Err(e) => {
                     error!(
@@ -393,7 +387,7 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
                 }
             };
 
-            for sn in tx.old_serial_numbers() {
+            for sn in transaction.serial_numbers() {
                 let sn = to_bytes_le![sn].unwrap();
                 if !self.storage.exists(COL_SERIAL_NUMBER, &sn) {
                     error!(
@@ -405,7 +399,7 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
                 component_sender.send(ValidatorAction::RegisterTxComponent(COL_SERIAL_NUMBER, sn)).unwrap();
             }
 
-            for cm in tx.new_commitments() {
+            for cm in transaction.commitments() {
                 let cm = to_bytes_le![cm].unwrap();
                 if !self.storage.exists(COL_COMMITMENT, &cm) {
                     error!(
@@ -417,7 +411,7 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
                 component_sender.send(ValidatorAction::RegisterTxComponent(COL_COMMITMENT, cm)).unwrap();
             }
 
-            let tx_digest = to_bytes_le![tx.ledger_digest()].unwrap();
+            let tx_digest = to_bytes_le![transaction.ledger_digest()].unwrap();
             if !self.storage.exists(COL_DIGEST, &tx_digest) {
                 warn!(
                     "Transaction {} doesn't have the ledger digest stored",
@@ -437,7 +431,7 @@ impl<C: Parameters, S: Storage + Sync> Ledger<C, S> {
             }
             component_sender.send(ValidatorAction::RegisterTxComponent(COL_DIGEST, tx_digest)).unwrap();
 
-            let tx_memo = to_bytes_le![tx.memorandum()].unwrap();
+            let tx_memo = to_bytes_le![transaction.memo()].unwrap();
             if !self.storage.exists(COL_MEMO, &tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 is_storage_valid.store(false, Ordering::SeqCst);

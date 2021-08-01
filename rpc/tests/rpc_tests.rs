@@ -56,8 +56,9 @@ mod rpc_tests {
 
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
         let transaction_size = transaction_bytes.len();
-        let old_serial_numbers: Vec<Value> = transaction
-            .old_serial_numbers()
+        let network_id = transaction.network.id();
+        let serial_numbers: Vec<Value> = transaction
+            .serial_numbers()
             .iter()
             .map(|sn| {
                 let mut serial_number: Vec<u8> = vec![];
@@ -65,17 +66,16 @@ mod rpc_tests {
                 Value::String(hex::encode(serial_number))
             })
             .collect();
-        let new_commitments: Vec<Value> = transaction
-            .new_commitments()
+        let commitments: Vec<Value> = transaction
+            .commitments()
             .iter()
             .map(|cm| Value::String(hex::encode(to_bytes_le![cm].unwrap())))
             .collect();
-        let memo = hex::encode(transaction.memorandum());
-        let network_id = transaction.network.id();
+        let value_balance = transaction.value_balance;
+        let memo = hex::encode(transaction.memo());
 
         let digest = hex::encode(to_bytes_le![transaction.ledger_digest].unwrap());
-        let transaction_proof = hex::encode(to_bytes_le![transaction.transaction_proof].unwrap());
-        let value_balance = transaction.value_balance;
+        let transaction_proof = hex::encode(to_bytes_le![transaction.proof].unwrap());
         let signatures: Vec<Value> = transaction
             .signatures
             .iter()
@@ -90,14 +90,14 @@ mod rpc_tests {
 
         assert_eq!(transaction_id, transaction_info["txid"]);
         assert_eq!(transaction_size, transaction_info["size"]);
-        assert_eq!(Value::Array(old_serial_numbers), transaction_info["old_serial_numbers"]);
-        assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
+        assert_eq!(network_id, transaction_info["network_id"]);
+        assert_eq!(Value::Array(serial_numbers), transaction_info["old_serial_numbers"]);
+        assert_eq!(Value::Array(commitments), transaction_info["new_commitments"]);
+        assert_eq!(value_balance.0, transaction_info["value_balance"]);
         assert_eq!(memo, transaction_info["memo"]);
 
-        assert_eq!(network_id, transaction_info["network_id"]);
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
-        assert_eq!(value_balance.0, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }
@@ -177,10 +177,10 @@ mod rpc_tests {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(storage).await;
 
-        assert_eq!(rpc.request("getblockhash", &[0u32]), format![
-            r#""{}""#,
-            hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())
-        ]);
+        assert_eq!(
+            rpc.request("getblockhash", &[0u32]),
+            format![r#""{}""#, hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]
+        );
     }
 
     #[tokio::test]
@@ -193,10 +193,10 @@ mod rpc_tests {
         let transaction = &genesis_block.transactions.0[0];
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
 
-        assert_eq!(rpc.request("getrawtransaction", &[transaction_id]), format![
-            r#""{}""#,
-            hex::encode(to_bytes_le![transaction].unwrap())
-        ]);
+        assert_eq!(
+            rpc.request("getrawtransaction", &[transaction_id]),
+            format![r#""{}""#, hex::encode(to_bytes_le![transaction].unwrap())]
+        );
     }
 
     #[tokio::test]
@@ -207,9 +207,10 @@ mod rpc_tests {
         let genesis_block = genesis();
         let transaction = &genesis_block.transactions.0[0];
 
-        let response = rpc.request("gettransactioninfo", &[hex::encode(
-            transaction.transaction_id().unwrap(),
-        )]);
+        let response = rpc.request(
+            "gettransactioninfo",
+            &[hex::encode(transaction.transaction_id().unwrap())],
+        );
 
         let transaction_info: Value = serde_json::from_str(&response).unwrap();
 

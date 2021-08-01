@@ -50,7 +50,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 13] = [
     "validaterawtransaction",
     // private
     "createrawtransaction",
-    "createtransactionkernel",
+    "createtransactionauthorization",
     "createtransaction",
     "getrawrecord",
     "decryptrecord",
@@ -237,9 +237,9 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
                 .map_err(convert_core_err);
             result_to_response(&req, result)
         }
-        "createtransactionkernel" => {
+        "createtransactionauthorization" => {
             let result = rpc
-                .create_transaction_kernel_protected(Params::Array(params), meta)
+                .create_transaction_authorization_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
             result_to_response(&req, result)

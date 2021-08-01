@@ -193,21 +193,21 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
 
-        let mut old_serial_numbers = Vec::with_capacity(transaction.old_serial_numbers().len());
+        let mut old_serial_numbers = Vec::with_capacity(transaction.serial_numbers().len());
 
-        for sn in transaction.old_serial_numbers() {
+        for sn in transaction.serial_numbers() {
             let mut serial_number: Vec<u8> = vec![];
             CanonicalSerialize::serialize(sn, &mut serial_number).unwrap();
             old_serial_numbers.push(hex::encode(serial_number));
         }
 
-        let mut new_commitments = Vec::with_capacity(transaction.new_commitments().len());
+        let mut new_commitments = Vec::with_capacity(transaction.commitments().len());
 
-        for cm in transaction.new_commitments() {
+        for cm in transaction.commitments() {
             new_commitments.push(hex::encode(to_bytes_le![cm]?));
         }
 
-        let memo = hex::encode(to_bytes_le![transaction.memorandum()]?);
+        let memo = hex::encode(to_bytes_le![transaction.memo()]?);
 
         let mut signatures = Vec::with_capacity(transaction.signatures.len());
         for sig in &transaction.signatures {
@@ -239,7 +239,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             memo,
             network_id: transaction.network.id(),
             digest: hex::encode(to_bytes_le![transaction.ledger_digest]?),
-            transaction_proof: hex::encode(to_bytes_le![transaction.transaction_proof]?),
+            transaction_proof: hex::encode(to_bytes_le![transaction.proof]?),
             value_balance: transaction.value_balance.0,
             signatures,
             encrypted_records,
