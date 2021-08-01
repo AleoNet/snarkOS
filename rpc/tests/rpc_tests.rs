@@ -177,10 +177,10 @@ mod rpc_tests {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(storage).await;
 
-        assert_eq!(
-            rpc.request("getblockhash", &[0u32]),
-            format![r#""{}""#, hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]
-        );
+        assert_eq!(rpc.request("getblockhash", &[0u32]), format![
+            r#""{}""#,
+            hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())
+        ]);
     }
 
     #[tokio::test]
@@ -193,10 +193,10 @@ mod rpc_tests {
         let transaction = &genesis_block.transactions.0[0];
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
 
-        assert_eq!(
-            rpc.request("getrawtransaction", &[transaction_id]),
-            format![r#""{}""#, hex::encode(to_bytes_le![transaction].unwrap())]
-        );
+        assert_eq!(rpc.request("getrawtransaction", &[transaction_id]), format![
+            r#""{}""#,
+            hex::encode(to_bytes_le![transaction].unwrap())
+        ]);
     }
 
     #[tokio::test]
@@ -207,10 +207,9 @@ mod rpc_tests {
         let genesis_block = genesis();
         let transaction = &genesis_block.transactions.0[0];
 
-        let response = rpc.request(
-            "gettransactioninfo",
-            &[hex::encode(transaction.transaction_id().unwrap())],
-        );
+        let response = rpc.request("gettransactioninfo", &[hex::encode(
+            transaction.transaction_id().unwrap(),
+        )]);
 
         let transaction_info: Value = serde_json::from_str(&response).unwrap();
 

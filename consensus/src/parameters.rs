@@ -20,11 +20,21 @@ use snarkvm::{
     algorithms::SNARK,
     curves::bls12_377::Bls12_377,
     dpc::{
-        testnet1::*, DPCScheme, LocalData, Network, NoopPrivateVariables, Parameters, Program, ProgramPublicVariables,
+        testnet1::*,
+        DPCScheme,
+        LocalData,
+        Network,
+        NoopPrivateVariables,
+        Parameters,
+        Program,
+        ProgramPublicVariables,
     },
     ledger::{
         posw::{Marlin, PoswMarlin},
-        BlockHeader, MerkleRootHash, PedersenMerkleRootHash, Storage,
+        BlockHeader,
+        MerkleRootHash,
+        PedersenMerkleRootHash,
+        Storage,
     },
     utilities::FromBytes,
 };

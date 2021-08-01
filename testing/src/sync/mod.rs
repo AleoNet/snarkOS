@@ -37,9 +37,11 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_snark_id = to_bytes_le![<Testnet1Parameters as Parameters>::inner_circuit_id_crh()
-        .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
-        .unwrap()]
+    let inner_snark_id = to_bytes_le![
+        <Testnet1Parameters as Parameters>::inner_circuit_id_crh()
+            .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
+            .unwrap()
+    ]
     .unwrap();
 
     ConsensusParameters {

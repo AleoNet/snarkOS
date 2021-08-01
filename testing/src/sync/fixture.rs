@@ -25,8 +25,7 @@ use snarkvm::{
 };
 
 use once_cell::sync::Lazy;
-use rand::SeedableRng;
-use rand::{CryptoRng, Rng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use std::{marker::PhantomData, sync::Arc};
 

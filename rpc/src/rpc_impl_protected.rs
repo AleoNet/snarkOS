@@ -19,18 +19,31 @@
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
 use crate::{
-    error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*,
-    transaction_authorization_builder::TransactionAuthorizationBuilder, RpcImpl,
+    error::RpcError,
+    rpc_trait::ProtectedRpcFunctions,
+    rpc_types::*,
+    transaction_authorization_builder::TransactionAuthorizationBuilder,
+    RpcImpl,
 };
 use snarkos_consensus::ConsensusParameters;
-use snarkvm::prelude::UniformRand;
 use snarkvm::{
     algorithms::CRH,
     dpc::{
-        testnet1::Testnet1Parameters, Account, AccountScheme, Address, DPCScheme, EncryptedRecord, Parameters, Payload,
-        PrivateKey, Record, TransactionAuthorization, ViewKey,
+        testnet1::Testnet1Parameters,
+        Account,
+        AccountScheme,
+        Address,
+        DPCScheme,
+        EncryptedRecord,
+        Parameters,
+        Payload,
+        PrivateKey,
+        Record,
+        TransactionAuthorization,
+        ViewKey,
     },
     ledger::prelude::*,
+    prelude::UniformRand,
     utilities::{to_bytes_le, FromBytes, ToBytes},
 };
 

@@ -19,7 +19,11 @@ use snarkvm::{
     dpc::{testnet1::*, Address, DPCScheme, Parameters, Record, RecordScheme, TransactionScheme},
     ledger::{
         posw::{txids_to_roots, PoswMarlin},
-        Block, BlockHeader, LedgerScheme, Storage, Transactions,
+        Block,
+        BlockHeader,
+        LedgerScheme,
+        Storage,
+        Transactions,
     },
     utilities::{to_bytes_le, ToBytes},
 };

@@ -29,7 +29,11 @@ mod protected_rpc_tests {
         dpc::{
             record::Record as DPCRecord,
             testnet1::{Testnet1Parameters, Testnet1Transaction},
-            Address, PrivateKey, RecordScheme, TransactionAuthorization, ViewKey,
+            Address,
+            PrivateKey,
+            RecordScheme,
+            TransactionAuthorization,
+            ViewKey,
         },
         utilities::{to_bytes_le, FromBytes, ToBytes},
     };

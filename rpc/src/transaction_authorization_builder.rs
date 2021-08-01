@@ -18,8 +18,15 @@ use snarkvm::{
     algorithms::CRH,
     dpc::{
         testnet1::{Testnet1DPC, Testnet1Parameters},
-        Address, DPCScheme, Parameters, Payload, PrivateKey, Record, RecordScheme,
-        TransactionAuthorization as TransactionAuthorizationNative, *,
+        Address,
+        DPCScheme,
+        Parameters,
+        Payload,
+        PrivateKey,
+        Record,
+        RecordScheme,
+        TransactionAuthorization as TransactionAuthorizationNative,
+        *,
     },
     utilities::{to_bytes_le, ToBytes},
 };
@@ -298,7 +305,7 @@ impl TransactionAuthorizationBuilder {
             0 => {
                 return Err(DPCError::Message(
                     "Transaction authorization is missing outputs".to_string(),
-                ))
+                ));
             }
             1 | 2 => {}
             num_inputs => {

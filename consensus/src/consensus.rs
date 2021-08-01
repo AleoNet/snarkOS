@@ -24,7 +24,16 @@ use snarkvm::{
     algorithms::CRH,
     dpc::{
         testnet1::{Testnet1DPC, Testnet1Parameters, Testnet1Transaction},
-        Account, AccountScheme, Address, AleoAmount, DPCScheme, Parameters, Payload, PrivateKey, Program, Record,
+        Account,
+        AccountScheme,
+        Address,
+        AleoAmount,
+        DPCScheme,
+        Parameters,
+        Payload,
+        PrivateKey,
+        Program,
+        Record,
     },
     ledger::{posw::txids_to_roots, Block, LedgerScheme, Storage, StorageError, Transactions},
     utilities::{to_bytes_le, ToBytes},
@@ -332,10 +341,11 @@ impl<S: Storage> Consensus<S> {
         }
 
         let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [
-            vec![total_value_balance.0 as u64],
-            vec![0; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1],
-        ]
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Testnet1Parameters::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
         .concat();
 
         let mut joint_serial_numbers = vec![];
