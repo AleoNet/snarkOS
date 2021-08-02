@@ -24,26 +24,6 @@ use snarkos_metrics::{self as metrics, misc::*};
 use crate::{master::SyncInbound, message::*, NetworkError, Node};
 
 impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
-    ///
-    /// Sends a `GetSync` request to the given sync node.
-    ///
-    pub async fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = match self.expect_sync().storage().get_block_locator_hashes() {
-            Ok(block_locator_hashes) => block_locator_hashes,
-            _ => {
-                error!("Unable to get block locator hashes from storage");
-                return;
-            }
-        };
-
-        info!("Updating blocks from {}", sync_node);
-
-        // Send a GetSync to the selected sync node.
-        self.peer_book
-            .send_to(sync_node, Payload::GetSync(block_locator_hashes))
-            .await;
-    }
-
     /// Broadcast block to connected peers
     pub async fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
         debug!("Propagating a block to peers");
@@ -162,32 +142,25 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
             let storage = self.expect_sync().storage();
 
             let latest_shared_hash = storage.get_latest_shared_hash(block_locator_hashes)?;
+            let shared_height = storage.get_block_number(&latest_shared_hash)?;
             let current_height = storage.get_current_block_height();
 
-            if let Ok(height) = storage.get_block_number(&latest_shared_hash) {
-                if height < current_height {
-                    let mut max_height = current_height;
+            let mut max_sync_height = current_height;
 
-                    // if the requester is behind more than MAX_BLOCK_SYNC_COUNT blocks
-                    if current_height > height + crate::MAX_BLOCK_SYNC_COUNT {
-                        // send no more than MAX_BLOCK_SYNC_COUNT
-                        max_height = height + crate::MAX_BLOCK_SYNC_COUNT;
-                    }
-
-                    let mut block_hashes = Vec::with_capacity((max_height - height) as usize);
-
-                    for block_num in height + 1..=max_height {
-                        block_hashes.push(storage.get_block_hash(block_num)?);
-                    }
-
-                    // send block hashes to requester
-                    block_hashes
-                } else {
-                    vec![]
-                }
-            } else {
-                vec![]
+            // if the requester is behind more than MAX_BLOCK_SYNC_COUNT blocks
+            if current_height > shared_height + crate::MAX_BLOCK_SYNC_COUNT {
+                // send no more than MAX_BLOCK_SYNC_COUNT
+                max_sync_height = shared_height + crate::MAX_BLOCK_SYNC_COUNT;
             }
+
+            let mut block_hashes = Vec::with_capacity((max_sync_height - shared_height) as usize);
+
+            for block_num in shared_height + 1..=max_sync_height {
+                block_hashes.push(storage.get_block_hash(block_num)?);
+            }
+
+            // send block hashes to requester
+            block_hashes
         };
 
         // send a `Sync` message to the connected peer.
