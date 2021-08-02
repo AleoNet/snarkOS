@@ -233,13 +233,10 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size_in_bytes: size,
-                    transaction: transaction.clone(),
-                },
-            )
+            .insert(&blockchain, Entry {
+                size_in_bytes: size,
+                transaction: transaction.clone(),
+            })
             .await
             .unwrap();
 
@@ -249,13 +246,10 @@ mod tests {
         // Duplicate pushes don't do anything
 
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size_in_bytes: size,
-                    transaction,
-                },
-            )
+            .insert(&blockchain, Entry {
+                size_in_bytes: size,
+                transaction,
+            })
             .await
             .unwrap();
 
@@ -296,13 +290,10 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size_in_bytes: size,
-                    transaction: transaction.clone(),
-                },
-            )
+            .insert(&blockchain, Entry {
+                size_in_bytes: size,
+                transaction: transaction.clone(),
+            })
             .await
             .unwrap();
 
@@ -329,13 +320,10 @@ mod tests {
 
         let expected_transaction = transaction.clone();
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size_in_bytes: size,
-                    transaction,
-                },
-            )
+            .insert(&blockchain, Entry {
+                size_in_bytes: size,
+                transaction,
+            })
             .await
             .unwrap();
 
@@ -353,13 +341,10 @@ mod tests {
         let mem_pool = MemoryPool::new();
         let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
-            .insert(
-                &blockchain,
-                Entry {
-                    size_in_bytes: TRANSACTION_2.len(),
-                    transaction,
-                },
-            )
+            .insert(&blockchain, Entry {
+                size_in_bytes: TRANSACTION_2.len(),
+                transaction,
+            })
             .await
             .unwrap();
 

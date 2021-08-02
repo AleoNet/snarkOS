@@ -41,9 +41,11 @@ pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
         target_block_time: 2i64, //unix seconds
         network_id: Network::Testnet1,
         verifier: PoswMarlin::verify_only().unwrap(),
-        authorized_inner_circuit_ids: vec![<Testnet1Parameters as Parameters>::inner_circuit_id()
-            .to_bytes_le()
-            .unwrap()],
+        authorized_inner_circuit_ids: vec![
+            <Testnet1Parameters as Parameters>::inner_circuit_id()
+                .to_bytes_le()
+                .unwrap(),
+        ],
     }
 });
 
