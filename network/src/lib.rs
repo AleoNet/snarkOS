@@ -19,8 +19,7 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 // Documentation
-// todo: readd in Rust 1.54
-// #![doc = include_str!("../documentation/concepts/network_server.md")]
+#![doc = include_str!("../documentation/concepts/network_server.md")]
 
 #[macro_use]
 extern crate derivative;
