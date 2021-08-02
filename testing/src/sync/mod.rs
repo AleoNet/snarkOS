@@ -17,10 +17,8 @@
 use snarkos_consensus::{ConsensusParameters, MerkleTreeLedger};
 use snarkos_storage::LedgerStorage;
 use snarkvm::{
-    algorithms::CRH,
     dpc::{testnet1::Testnet1Parameters, Network, Parameters, TransactionError, TransactionScheme},
     ledger::posw::PoswMarlin,
-    parameters::{testnet1::InnerSNARKVKParameters, Parameter},
     utilities::{FromBytes, ToBytes},
 };
 
@@ -37,17 +35,15 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_circuit_id = <Testnet1Parameters as Parameters>::inner_circuit_id()
-        .to_bytes_le()
-        .unwrap();
-
     ConsensusParameters {
         max_block_size: 1_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 2i64, //unix seconds
         network_id: Network::Testnet1,
         verifier: PoswMarlin::verify_only().unwrap(),
-        authorized_inner_circuit_ids: vec![inner_circuit_id],
+        authorized_inner_circuit_ids: vec![<Testnet1Parameters as Parameters>::inner_circuit_id()
+            .to_bytes_le()
+            .unwrap()],
     }
 });
 

@@ -99,10 +99,9 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let mut requests = vec![];
         for peer in sync_peers.iter() {
             if let Some(handle) = self.node.peer_book.get_peer_handle(peer.address) {
+                let block_locator_hashes = block_locator_hashes.clone();
                 requests.push(async move {
-                    handle
-                        .send_payload(Payload::GetSync(block_locator_hashes.clone()))
-                        .await;
+                    handle.send_payload(Payload::GetSync(block_locator_hashes)).await;
                 });
             }
         }

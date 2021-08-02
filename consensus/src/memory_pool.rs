@@ -220,7 +220,7 @@ impl<T: TransactionScheme + Send + Sync + 'static> Default for MemoryPool<T> {
 mod tests {
     use super::*;
     use snarkos_testing::sync::*;
-    use snarkvm::{dpc::testnet1::Testnet1Transaction, ledger::prelude::*};
+    use snarkvm::{dpc::testnet1::Testnet1Transaction, ledger::prelude::*, utilities::to_bytes_le};
 
     // MemoryPool tests use TRANSACTION_2 because memory pools shouldn't store coinbase transactions
 
@@ -233,10 +233,13 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction: transaction.clone(),
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction: transaction.clone(),
+                },
+            )
             .await
             .unwrap();
 
@@ -246,10 +249,13 @@ mod tests {
         // Duplicate pushes don't do anything
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -290,10 +296,13 @@ mod tests {
         let size = TRANSACTION_2.len();
 
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction: transaction.clone(),
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction: transaction.clone(),
+                },
+            )
             .await
             .unwrap();
 
@@ -320,10 +329,13 @@ mod tests {
 
         let expected_transaction = transaction.clone();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: size,
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: size,
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
@@ -335,50 +347,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn store_memory_pool() {
-        let blockchain = FIXTURE_VK.ledger();
-
-        let mem_pool = MemoryPool::new();
-        let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
-        mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: TRANSACTION_2.len(),
-                transaction,
-            })
-            .await
-            .unwrap();
-
-        assert_eq!(1, mem_pool.transactions.len());
-
-        mem_pool.store(&blockchain).unwrap();
-
-        let new_mem_pool = MemoryPool::<Testnet1Transaction>::from_storage(&blockchain)
-            .await
-            .unwrap();
-
-        assert_eq!(
-            mem_pool.total_size_in_bytes.load(Ordering::SeqCst),
-            new_mem_pool.total_size_in_bytes.load(Ordering::SeqCst)
-        );
-    }
-
-    #[tokio::test]
     async fn cleanse_memory_pool() {
         let blockchain = FIXTURE_VK.ledger();
 
         let mem_pool = MemoryPool::new();
         let transaction = Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap();
         mem_pool
-            .insert(&blockchain, Entry {
-                size_in_bytes: TRANSACTION_2.len(),
-                transaction,
-            })
+            .insert(
+                &blockchain,
+                Entry {
+                    size_in_bytes: TRANSACTION_2.len(),
+                    transaction,
+                },
+            )
             .await
             .unwrap();
 
         assert_eq!(1, mem_pool.transactions.len());
-
-        mem_pool.store(&blockchain).unwrap();
 
         let block_1 = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
         let block_2 = Block::<Testnet1Transaction>::read_le(&BLOCK_2[..]).unwrap();
