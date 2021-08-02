@@ -27,7 +27,6 @@ mod protected_rpc_tests {
 
     use snarkvm::{
         dpc::{
-            record::Record as DPCRecord,
             testnet1::{Testnet1Parameters, Testnet1Transaction},
             Address,
             PrivateKey,
@@ -255,11 +254,6 @@ mod protected_rpc_tests {
 
         let result = extracted["result"].clone();
 
-        for record_value in result["encoded_records"].as_array().unwrap() {
-            let record_bytes = hex::decode(record_value.as_str().unwrap()).unwrap();
-            let _record: DPCRecord<Testnet1Parameters> = FromBytes::read_le(&record_bytes[..]).unwrap();
-        }
-
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
         let transaction_bytes = hex::decode(transaction_string).unwrap();
         let _transaction: Testnet1Transaction = FromBytes::read_le(&transaction_bytes[..]).unwrap();
@@ -347,11 +341,6 @@ mod protected_rpc_tests {
         println!("extracted: {}", extracted);
 
         let result = extracted["result"].clone();
-
-        for record_value in result["encoded_records"].as_array().unwrap() {
-            let record_bytes = hex::decode(record_value.as_str().unwrap()).unwrap();
-            let _record: DPCRecord<Testnet1Parameters> = FromBytes::read_le(&record_bytes[..]).unwrap();
-        }
 
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
         let transaction_bytes = hex::decode(transaction_string).unwrap();

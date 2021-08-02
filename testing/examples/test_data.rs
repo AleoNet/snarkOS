@@ -14,103 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
+use snarkos_consensus::{error::ConsensusError, Miner};
 use snarkos_testing::sync::*;
-use snarkvm::{
-    dpc::{payload::Payload as RecordPayload, testnet1::*, Account, Address, Parameters, Record, RecordScheme},
-    ledger::{Block, LedgerScheme, Storage, Transactions},
-    utilities::{to_bytes_le, ToBytes},
-};
+use snarkvm::utilities::ToBytes;
 
-use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf, sync::Arc};
-//
-// fn mine_block<S: Storage>(
-//     miner: &Miner<S>,
-//     txs: Vec<Testnet1Transaction>,
-// ) -> Result<(Block<Testnet1Transaction>, Vec<Record<Testnet1Parameters>>), ConsensusError> {
-//     let transactions = Transactions(txs);
-//
-//     let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
-//
-//     let header = miner.find_block(&transactions, &previous_block_header)?;
-//
-//     let block = Block { header, transactions };
-//
-//     let old_block_height = miner.consensus.ledger.block_height();
-//
-//     // add it to the chain
-//     futures::executor::block_on(miner.consensus.receive_block(&block, false))?;
-//
-//     let new_block_height = miner.consensus.ledger.block_height();
-//     assert_eq!(old_block_height + 1, new_block_height);
-//
-//     Ok((block, coinbase_records))
-// }
 
-async fn mine_block<S: Storage>(
-    miner: &Miner<S>,
-    txs: Vec<Testnet1Transaction>,
-) -> Result<(Block<Testnet1Transaction>, Vec<Record<Testnet1Parameters>>), ConsensusError> {
-    // Mine a new block.
-    println!("Starting mining...");
-    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&Transactions(txs))?;
-    let header = miner.find_block(&transactions, &previous_block_header)?;
-    let block = Block { header, transactions };
-
-    // Duplicate blocks dont do anything
-    let old_block_height = miner.consensus.ledger.block_height();
-    miner.consensus.receive_block(&block, false).await.ok(); // throws a duplicate error -- seemingly intentional
-    let new_block_height = miner.consensus.ledger.block_height();
-    assert_eq!(old_block_height + 1, new_block_height);
-    println!("Mined block {}", new_block_height);
-
-    Ok((block, coinbase_records))
-}
-
-/// Spends some value from inputs owned by the sender, to the receiver,
-/// and pays back whatever we are left with.
-#[allow(clippy::too_many_arguments)]
-fn create_send_transaction<R: Rng + CryptoRng, S: Storage>(
-    consensus: &Consensus<S>,
-    from: &Account<Testnet1Parameters>,
-    inputs: Vec<Record<Testnet1Parameters>>,
-    receiver: &Address<Testnet1Parameters>,
-    amount: u64,
-    rng: &mut R,
-) -> Result<Testnet1Transaction, ConsensusError> {
-    let mut sum = 0;
-    for input in &inputs {
-        sum += input.value();
-    }
-    assert!(sum >= amount, "not enough balance in inputs");
-    let change = sum - amount;
-    let values = vec![amount, change];
-    let to = vec![receiver.clone(), from.address.clone()];
-
-    let mut joint_serial_numbers = vec![];
-    for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-        let (sn, _) = inputs[i].to_serial_number(&from.private_key)?;
-        joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
-    }
-
-    let mut new_records = vec![];
-    for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
-        new_records.push(Record::new_full(
-            &FIXTURE.program,
-            to[j].clone(),
-            false,
-            values[j],
-            RecordPayload::default(),
-            (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
-            joint_serial_numbers.clone(),
-            rng,
-        )?);
-    }
-    let from = vec![from.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
-
-    consensus.create_transaction(inputs, from, new_records, None, rng)
-}
+mod helpers;
+use helpers::*;
 
 async fn setup_test_data() -> Result<TestData, ConsensusError> {
     let mut rng = FIXTURE.rng.clone();
