@@ -321,36 +321,30 @@ impl<S: Storage> Consensus<S> {
         recipient: Address<Testnet1Parameters>,
         rng: &mut R,
     ) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
+        // Calculate the total value balance of the block.
         let mut total_value_balance = crate::get_block_reward(block_num);
         for transaction in transactions.iter() {
-            let tx_value_balance = transaction.value_balance;
-            if tx_value_balance.is_negative() {
+            if transaction.value_balance.is_negative() {
                 return Err(ConsensusError::CoinbaseTransactionAlreadyExists());
             }
 
             total_value_balance = total_value_balance.add(transaction.value_balance);
         }
 
-        // Generate a new account that owns the dummy input records
-        let new_account = Account::new(rng).unwrap();
-
-        // Generate dummy input records having as address the genesis address.
-        let private_keys = vec![new_account.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
-        let mut old_records = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
+        // Generate noop input records.
+        let noop_account = Account::new(rng)?;
+        let private_keys = vec![noop_account.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
+        let mut input_records = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let sn_nonce_input: [u8; 4] = rng.gen();
-
-            let old_record = Record::new(
+            input_records.push(Record::new(
                 old_programs[i],
-                new_account.address.clone(),
+                noop_account.address.clone(),
                 true, // The input record is dummy
                 0,
                 Payload::default(),
-                <Testnet1Parameters as Parameters>::serial_number_nonce_crh().hash(&sn_nonce_input)?,
+                <Testnet1Parameters as Parameters>::serial_number_nonce_crh().hash(&rng.gen::<[u8; 32]>())?,
                 rng,
-            )?;
-
-            old_records.push(old_record);
+            )?);
         }
 
         let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
@@ -363,7 +357,7 @@ impl<S: Storage> Consensus<S> {
 
         let mut joint_serial_numbers = vec![];
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = old_records[i].to_serial_number(&private_keys[i])?;
+            let (sn, _) = input_records[i].to_serial_number(&private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
@@ -381,7 +375,7 @@ impl<S: Storage> Consensus<S> {
             )?);
         }
 
-        let transaction = self.create_transaction(old_records, private_keys, new_records.clone(), None, rng)?;
+        let transaction = self.create_transaction(input_records, private_keys, new_records.clone(), None, rng)?;
 
         Ok((new_records, transaction))
     }

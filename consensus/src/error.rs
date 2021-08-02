@@ -16,7 +16,7 @@
 
 use snarkvm::{
     algorithms::errors::CRHError,
-    dpc::{DPCError, ProgramError, RecordError, TransactionError},
+    dpc::{AccountError, DPCError, ProgramError, RecordError, TransactionError},
     ledger::{BlockError, PoswError, StorageError},
 };
 
@@ -25,6 +25,9 @@ use std::fmt::Debug;
 /// Possible block verification errors
 #[derive(Debug, Error)]
 pub enum ConsensusError {
+    #[error("{}", _0)]
+    AccountError(#[from] AccountError),
+
     #[error("UTXO has already been spent {:?} index: {:?}", _0, _1)]
     AlreadySpent(Vec<u8>, u32),
 

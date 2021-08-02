@@ -25,22 +25,12 @@ use snarkvm::{
 };
 
 use once_cell::sync::Lazy;
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::{marker::PhantomData, sync::Arc};
 
 pub static FIXTURE: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(false));
 pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
-
-pub fn setup_or_load_dpc<R: Rng + CryptoRng>(verify_only: bool, rng: &mut R) -> Testnet1DPC {
-    match Testnet1DPC::load(verify_only) {
-        Ok(dpc) => dpc,
-        Err(err) => {
-            println!("error - {}, re-running parameter Setup", err);
-            Testnet1DPC::setup(rng).expect("DPC setup failed")
-        }
-    }
-}
 
 // helper for setting up e2e tests
 pub struct Fixture<S: Storage> {
@@ -61,25 +51,26 @@ impl<S: Storage> Fixture<S> {
 fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
     let mut rng = ChaChaRng::seed_from_u64(1231275789u64);
 
-    // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let dpc = setup_or_load_dpc(verify_only, &mut rng);
+    // Setup or load DPC.
+    let dpc = match Testnet1DPC::load(verify_only) {
+        Ok(dpc) => dpc,
+        Err(err) => {
+            println!("error - {}, re-running parameter Setup", err);
+            Testnet1DPC::setup(&mut rng).expect("DPC setup failed")
+        }
+    };
+    let program = dpc.noop_program.clone();
 
-    // Generate addresses
+    // Generate addresses.
     let account_0 = Account::<Testnet1Parameters>::new(&mut rng).unwrap();
     let account_1 = Account::<Testnet1Parameters>::new(&mut rng).unwrap();
     let account_2 = Account::<Testnet1Parameters>::new(&mut rng).unwrap();
     let test_accounts = [account_0, account_1, account_2];
 
-    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
-
-    let program = dpc.noop_program.clone();
-
-    let dpc = Arc::new(dpc);
-
     Fixture {
-        dpc,
+        dpc: Arc::new(dpc),
         test_accounts,
-        genesis_block,
+        genesis_block: FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap(),
         program,
         rng,
         _storage: PhantomData,

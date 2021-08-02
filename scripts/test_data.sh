@@ -6,6 +6,6 @@ printf "\Test data generation starting...\n\n"
 # Generate test data
 
 cd /testing/scripts || printf "\nError - cannot find 'testing/scripts' folder\n\n"
-./generate_test_data.sh
+./test_data.sh
 
 printf "\nTest data generation completed.\n\n"

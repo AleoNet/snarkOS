@@ -25,7 +25,7 @@ use once_cell::sync::Lazy;
 use std::io::{Read, Result as IoResult, Write};
 
 /// Helper providing pre-calculated data for e2e tests
-pub static DATA: Lazy<TestData> = Lazy::new(load_test_data);
+pub static DATA: Lazy<TestData> = Lazy::new(|| TestData::read_le(&include_bytes!("test_data")[..]).unwrap());
 
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
@@ -120,10 +120,6 @@ impl FromBytes for TestData {
             alternative_block_2_header,
         })
     }
-}
-
-fn load_test_data() -> TestData {
-    TestData::read_le(&include_bytes!("test_data")[..]).unwrap()
 }
 
 #[derive(Debug)]
