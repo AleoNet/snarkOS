@@ -27,7 +27,7 @@ use snarkvm::{
     dpc::{Parameters, RecordCommitmentTree, RecordSerialNumberTree, TransactionScheme},
     ledger::{BlockHeader, Storage, Transactions},
     parameters::{testnet1::genesis::Transaction1, Genesis},
-    utilities::{has_duplicates, to_bytes_le, FromBytes, ToBytes},
+    utilities::{has_duplicates, FromBytes, ToBytes},
 };
 
 /// Stores a transaction and it's size in the memory pool.
@@ -35,16 +35,6 @@ use snarkvm::{
 pub struct Entry<T: TransactionScheme> {
     pub size_in_bytes: usize,
     pub transaction: T,
-}
-
-/// Stores transactions received by the server.
-/// Transaction entries will eventually be fetched by the miner and assembled into blocks.
-#[derive(Debug)]
-pub struct MemoryPool<T: TransactionScheme + Send + Sync + 'static> {
-    /// The mapping of all unconfirmed transaction IDs to their corresponding transaction data.
-    pub transactions: MpmcMap<Vec<u8>, Entry<T>>,
-    /// The total size in bytes of the current memory pool.
-    pub total_size_in_bytes: AtomicUsize,
 }
 
 impl<T: TransactionScheme + Send + Sync + 'static> Clone for MemoryPool<T> {
@@ -59,47 +49,21 @@ impl<T: TransactionScheme + Send + Sync + 'static> Clone for MemoryPool<T> {
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
 const COINBASE_TRANSACTION_SIZE: usize = Transaction1::SIZE as usize;
 
+/// Stores transactions received by the server.
+/// Transaction entries will eventually be fetched by the miner and assembled into blocks.
+#[derive(Debug)]
+pub struct MemoryPool<T: TransactionScheme + Send + Sync + 'static> {
+    /// The mapping of all unconfirmed transaction IDs to their corresponding transaction data.
+    pub transactions: MpmcMap<Vec<u8>, Entry<T>>,
+    /// The total size in bytes of the current memory pool.
+    pub total_size_in_bytes: AtomicUsize,
+}
+
 impl<T: TransactionScheme + Send + Sync + 'static> MemoryPool<T> {
     /// Initialize a new memory pool with no transactions
     #[inline]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Load the memory pool from previously stored state in storage
-    pub async fn from_storage<C: Parameters, S: Storage>(storage: &Ledger<C, S>) -> Result<Self, ConsensusError> {
-        let memory_pool = Self::new();
-
-        if let Ok(Some(serialized_transactions)) = storage.get_memory_pool() {
-            if let Ok(transaction_bytes) = Transactions::<T>::read_le(&serialized_transactions[..]) {
-                for transaction in transaction_bytes.0 {
-                    let size = transaction.size();
-                    let entry = Entry {
-                        transaction,
-                        size_in_bytes: size,
-                    };
-                    memory_pool.insert(storage, entry).await?;
-                }
-            }
-        }
-
-        Ok(memory_pool)
-    }
-
-    /// Store the memory pool state to the database
-    #[inline]
-    pub fn store<C: Parameters, S: Storage>(&self, storage: &Ledger<C, S>) -> Result<(), ConsensusError> {
-        let mut transactions = Transactions::<T>::new();
-
-        for (_transaction_id, entry) in self.transactions.inner().iter() {
-            transactions.push(entry.transaction.clone())
-        }
-
-        let serialized_transactions = to_bytes_le![transactions]?.to_vec();
-
-        storage.store_to_memory_pool(serialized_transactions)?;
-
-        Ok(())
     }
 
     /// Adds entry to memory pool if valid in the current ledger.

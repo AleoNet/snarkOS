@@ -32,7 +32,6 @@ pub const COL_CHILD_HASHES: u32 = 10; // block hash -> vector of potential child
 pub const NUM_COLS: u32 = 11;
 
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";
-pub const KEY_MEMORY_POOL: &str = "MEMORY_POOL";
 pub const KEY_PEER_BOOK: &str = "PEER_BOOK";
 
 pub const KEY_CURR_CM_INDEX: &str = "CURRENT_CM_INDEX";

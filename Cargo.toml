@@ -46,7 +46,6 @@ path = "snarkos/main.rs"
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "4c8b7e2"
 # path = "../snarkVM"
-features = ["fields"]
 
 [dependencies.snarkos-consensus]
 path = "./consensus"

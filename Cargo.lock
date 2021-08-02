@@ -2838,7 +2838,6 @@ dependencies = [
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
- "snarkvm-fields",
  "snarkvm-ledger",
  "snarkvm-parameters",
  "snarkvm-utilities",

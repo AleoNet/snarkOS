@@ -151,10 +151,6 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             .cleanse(storage)
             .await
             .unwrap_or_else(|error| debug!("Failed to cleanse memory pool transactions in database {}", error));
-        debug!("Storing memory pool transactions in database");
-        memory_pool
-            .store(storage)
-            .unwrap_or_else(|error| debug!("Failed to store memory pool transaction in database {}", error));
 
         Ok(())
     }

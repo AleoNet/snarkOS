@@ -84,7 +84,6 @@ fn print_welcome(config: &Config) {
 ///
 async fn start_server(config: Config) -> anyhow::Result<()> {
     initialize_logger(&config);
-
     print_welcome(&config);
 
     let address = format!("{}:{}", config.node.ip, config.node.port);
@@ -161,8 +160,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Enable the sync layer.
     {
-        let memory_pool = MemoryPool::from_storage(&storage).await?;
-
         debug!("Loading Aleo parameters...");
         let dpc = <Testnet1DPC as DPCScheme<Testnet1Parameters>>::load(!config.miner.is_miner)?;
         info!("Loaded Aleo parameters");
@@ -184,7 +181,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
         let consensus = Arc::new(Consensus {
             ledger: Arc::clone(&storage),
-            memory_pool,
+            memory_pool: MemoryPool::new(),
             parameters: consensus_params,
             dpc: Arc::new(dpc),
         });
