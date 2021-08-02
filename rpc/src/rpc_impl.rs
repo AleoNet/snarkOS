@@ -391,8 +391,12 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             })
             .collect();
 
-        // Compute the metrics.
-        let network_metrics = NetworkMetrics::new(connections);
+        // Compute the metrics or provide default values if there are no known connections yet.
+        let network_metrics = if !connections.is_empty() {
+            NetworkMetrics::new(connections)
+        } else {
+            NetworkMetrics::default()
+        };
 
         // Collect the vertices with the metrics.
         let vertices: Vec<Vertice> = network_metrics
@@ -413,8 +417,14 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             .map(|(height, members)| PotentialFork { height, members })
             .collect();
 
+        let node_count = if network_metrics.node_count == 0 {
+            known_network.nodes().len()
+        } else {
+            network_metrics.node_count
+        };
+
         Ok(NetworkGraph {
-            node_count: network_metrics.node_count,
+            node_count,
             connection_count: network_metrics.connection_count,
             density: network_metrics.density,
             algebraic_connectivity: network_metrics.algebraic_connectivity,

@@ -25,14 +25,63 @@ pub mod stats;
 /// Re-export metrics macros
 pub use metrics::*;
 
-// TODO: @sadroeck - consolidate exporters
+pub struct CombinedRecorder {
+    #[cfg(feature = "prometheus")]
+    prometheus: metrics_exporter_prometheus::PrometheusRecorder,
+    rpc: &'static stats::Stats,
+}
+
+impl Recorder for CombinedRecorder {
+    fn register_counter(&self, key: &Key, unit: Option<Unit>, desc: Option<&'static str>) {
+        #[cfg(feature = "prometheus")]
+        self.prometheus.register_counter(key, unit.clone(), desc);
+        self.rpc.register_counter(key, unit, desc);
+    }
+
+    fn register_gauge(&self, key: &Key, unit: Option<Unit>, desc: Option<&'static str>) {
+        #[cfg(feature = "prometheus")]
+        self.prometheus.register_gauge(key, unit.clone(), desc);
+        self.rpc.register_gauge(key, unit, desc);
+    }
+
+    fn register_histogram(&self, key: &Key, unit: Option<Unit>, desc: Option<&'static str>) {
+        #[cfg(feature = "prometheus")]
+        self.prometheus.register_histogram(key, unit.clone(), desc);
+        self.rpc.register_histogram(key, unit, desc);
+    }
+
+    fn record_histogram(&self, key: &Key, value: f64) {
+        #[cfg(feature = "prometheus")]
+        self.prometheus.record_histogram(key, value);
+        self.rpc.record_histogram(key, value);
+    }
+
+    fn increment_counter(&self, key: &Key, value: u64) {
+        #[cfg(feature = "prometheus")]
+        self.prometheus.increment_counter(key, value);
+        self.rpc.increment_counter(key, value);
+    }
+
+    fn update_gauge(&self, key: &Key, value: GaugeValue) {
+        #[cfg(feature = "prometheus")]
+        self.prometheus.update_gauge(key, value.clone());
+        self.rpc.update_gauge(key, value);
+    }
+}
+
 #[cfg(feature = "prometheus")]
 pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
     let prometheus_builder = metrics_exporter_prometheus::PrometheusBuilder::new();
 
-    let (recorder, exporter) = prometheus_builder
+    let (prometheus_recorder, exporter) = prometheus_builder
         .build_with_exporter()
         .expect("can't build the prometheus exporter");
+
+    let recorder = CombinedRecorder {
+        prometheus: prometheus_recorder,
+        rpc: &stats::NODE_STATS,
+    };
+
     metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
 
     let metrics_exporter_task = tokio::task::spawn(async move {

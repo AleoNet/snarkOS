@@ -65,6 +65,10 @@ impl PeerBookRef {
                 }
                 PeerEventData::Disconnect(peer, status) => {
                     self.connected_peers.remove(peer.address).await;
+
+                    let queued_outbound_message_count = peer.queued_outbound_message_count.swap(0, Ordering::SeqCst);
+                    metrics::decrement_gauge!(snarkos_metrics::queues::OUTBOUND, queued_outbound_message_count as f64);
+
                     if self.disconnected_peers.insert(peer.address, peer).await.is_none() {
                         metrics::increment_gauge!(DISCONNECTED, 1.0);
                     }

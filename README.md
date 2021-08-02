@@ -40,11 +40,11 @@ enables applications to verify and store state in a publicly verifiable manner.
 
 [mac_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/mac-pass-sm.png
 [mac_badge]: https://img.shields.io/badge/download-testnet1_for_mac-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[0].name&style=for-the-badge
-[mac_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.1.4/aleo-testnet1-v1.1.4-x86_64-apple-darwin.zip
+[mac_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.12/aleo-testnet1-v1.3.12-x86_64-apple-darwin.zip
 
 [linux_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/linux-pass-sm.png
 [linux_badge]: https://img.shields.io/badge/download-testnet1_for_linux-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[1].name&style=for-the-badge
-[linux_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.1.4/aleo-testnet1-v1.1.4-x86_64-unknown-linux-gnu.zip
+[linux_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.12/aleo-testnet1-v1.3.12-x86_64-unknown-linux-gnu.zip
 
 [windows_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/windows-pass-sm.png
 [windows_badge]: https://img.shields.io/badge/download-coming_soon-orange?style=for-the-badge
@@ -177,7 +177,7 @@ snarkos
 
 To start a mining node, run:
 ```
-snarkos --is-miner
+snarkos --is-miner --miner-address {ALEO_ADDRESS}
 ```
 
 To run a node with custom settings, refer to the full list of options and flags available

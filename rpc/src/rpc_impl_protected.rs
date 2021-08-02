@@ -242,6 +242,29 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         Ok(Value::Null)
     }
 
+    /// Connects to the given addresses
+    pub async fn connect_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        let addresses: Vec<SocketAddr> = value
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        for addr in &addresses {
+            self.node.peer_book.add_peer(*addr, false).await;
+        }
+        self.node.connect_to_addresses(&addresses).await;
+
+        Ok(Value::Null)
+    }
+
     /// Expose the protected functions as RPC enpoints
     pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
@@ -281,6 +304,10 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         d.add_method_with_meta("disconnect", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.disconnect_protected(params, meta)
+        });
+        d.add_method_with_meta("connect", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.connect_protected(params, meta)
         });
 
         io.extend_with(d)
@@ -567,5 +594,15 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     fn disconnect(&self, address: SocketAddr) {
         let node = self.node.clone();
         tokio::spawn(async move { node.disconnect_from_peer(address).await });
+    }
+
+    fn connect(&self, addresses: Vec<SocketAddr>) {
+        let node = self.node.clone();
+        tokio::spawn(async move {
+            for addr in &addresses {
+                node.peer_book.add_peer(*addr, false).await;
+            }
+            node.connect_to_addresses(&addresses).await
+        });
     }
 }

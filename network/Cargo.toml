@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-network"
-version = "1.3.11"
+version = "1.3.12"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Network for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -28,11 +28,11 @@ features = ["algorithms"]
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.snarkos-storage]
 path = "../storage"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.futures]
 version = "0.3"
@@ -76,7 +76,7 @@ version = "0.17"
 
 [dependencies.snarkos-metrics]
 path = "../metrics"
-version = "1.3.11"
+version = "1.3.12"
 
 [dependencies.defer]
 version = "0.1"
