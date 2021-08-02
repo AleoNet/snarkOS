@@ -212,7 +212,7 @@ async fn validator_vs_a_superfluous_digest() {
     database_transaction.push(Op::Insert {
         col: COL_DIGEST,
         key: vec![0; 32],
-        value: (consensus.ledger.block_height()).to_le_bytes().to_vec(),
+        value: (consensus.ledger.block_height() + 1).to_le_bytes().to_vec(),
     });
     consensus.ledger.storage.batch(database_transaction).unwrap();
 

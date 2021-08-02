@@ -79,8 +79,8 @@ impl<S: Storage> Consensus<S> {
         //  Instead, inside `verify_header`, check all fields as before, except
         //  now check that the previous block hash is the empty block hash e.g. [0u8; 32].
         // Verify the block header.
-        let block_height = self.ledger.block_height();
-        if block_height > 0 && !block.header.is_genesis() {
+        let current_block_height = self.ledger.block_height();
+        if current_block_height > 0 && !block.header.is_genesis() {
             let parent_block = self.ledger.latest_block()?;
             if let Err(err) =
                 self.parameters
@@ -111,8 +111,8 @@ impl<S: Storage> Consensus<S> {
         }
 
         // Check that the block value balances are correct.
-        if block_height > 0 && !block.header.is_genesis() {
-            let expected_block_reward = crate::get_block_reward(block_height).0;
+        if current_block_height > 0 && !block.header.is_genesis() {
+            let expected_block_reward = crate::get_block_reward(current_block_height + 1).0;
             if total_value_balance.0 + expected_block_reward != 0 {
                 trace!("total_value_balance: {:?}", total_value_balance);
                 trace!("expected_block_reward: {:?}", expected_block_reward);
@@ -131,102 +131,119 @@ impl<S: Storage> Consensus<S> {
         block: &Block<Testnet1Transaction>,
         batch_import: bool,
     ) -> Result<(), ConsensusError> {
-        // Block is an unknown orphan
-        if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
-            debug!("Processing a block that is an unknown orphan");
-            println!("ORPHAN");
+        // Block is a genesis block.
+        if block.header.is_genesis() {
+            debug!("Received a genesis block");
 
+            let canon_genesis_block_hash = self.ledger.get_block_hash(0)?;
+            let canon_genesis_block = self.ledger.get_block(&canon_genesis_block_hash)?;
+
+            match block.header == canon_genesis_block.header {
+                true => debug!("Received the canon genesis block. No action needed"),
+                false => warn!("Received a mismatching genesis block. Peer is on a different chain"),
+            }
+
+            return Ok(());
+        }
+
+        // Block is an unknown orphan block.
+        if !self.ledger.contains_block_hash(&block.header.previous_block_hash) // Is block's previous block hash known to us?
+            // Is block's previous block hash in our canon chain?
+            && !self.ledger.is_canon(&block.header.previous_block_hash)
+        {
+            // TODO (howardwu): Deprecate the genesis case in here.
             // There are two possible cases for an unknown orphan.
             // 1) The block is a genesis block, or
             // 2) The block is unknown and does not correspond with the canon chain.
-            if block.header.is_genesis() && self.ledger.is_empty() {
+            if self.ledger.is_empty() {
+                debug!("Processing an unknown genesis block");
+
                 self.process_block(block).await?;
             } else {
+                debug!("Processing an unknown orphan block");
+
                 metrics::increment_counter!(ORPHAN_BLOCKS);
                 self.ledger.insert_only(block)?;
             }
-        } else {
-            // If the block is not an unknown orphan, find the origin of the block
-            match self.ledger.get_block_path(&block.header)? {
-                BlockPath::ExistingBlock => {
-                    debug!("Received a pre-existing block");
-                    return Err(ConsensusError::PreExistingBlock);
-                }
-                BlockPath::CanonChain(block_height) => {
-                    println!("CANON");
 
-                    debug!("Processing a block that is on canon chain. Height {}", block_height);
+            return Ok(());
+        }
 
-                    self.process_block(block).await?;
+        // If the block is not an unknown orphan block, find the origin of the block.
+        match self.ledger.get_block_path(&block.header)? {
+            BlockPath::ExistingBlock => {
+                debug!("Received a pre-existing block");
+                return Err(ConsensusError::PreExistingBlock);
+            }
+            BlockPath::CanonChain(block_height) => {
+                debug!("Processing a block on the canon chain. Height {}", block_height);
 
-                    if !batch_import {
-                        // Attempt to fast forward the block state if the node already stores
-                        // the children of the new canon block.
-                        let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
+                self.process_block(block).await?;
 
-                        if child_path.len() > 1 {
-                            debug!(
-                                "Attempting to canonize the descendants of block at height {}.",
-                                block_height
-                            );
-                        }
+                if !batch_import {
+                    // Attempt to fast forward the block state if the node already stores
+                    // the children of the new canon block.
+                    let child_path = self.ledger.longest_child_path(block.header.get_hash())?;
 
-                        for child_block_hash in child_path.into_iter().skip(1) {
-                            let new_block = self.ledger.get_block(&child_block_hash)?;
+                    if child_path.len() > 1 {
+                        debug!(
+                            "Attempting to canonize the descendants of block at height {}.",
+                            block_height
+                        );
+                    }
 
-                            debug!(
-                                "Processing the next known descendant. Height {}",
-                                self.ledger.block_height()
-                            );
-                            self.process_block(&new_block).await?;
-                        }
+                    for child_block_hash in child_path.into_iter().skip(1) {
+                        let new_block = self.ledger.get_block(&child_block_hash)?;
+
+                        debug!(
+                            "Processing the next known descendant. Height {}",
+                            self.ledger.block_height() + 1
+                        );
+                        self.process_block(&new_block).await?;
                     }
                 }
-                BlockPath::SideChain(side_chain_path) => {
-                    println!("SIDE");
+            }
+            BlockPath::SideChain(side_chain_path) => {
+                debug!(
+                    "Processing a block on a side chain. Height {}",
+                    side_chain_path.new_block_number
+                );
 
+                // If the side chain is now heavier than the canon chain,
+                // perform a fork to the side chain.
+                let canon_difficulty = self.get_canon_difficulty_from_height(side_chain_path.shared_block_number)?;
+
+                if side_chain_path.aggregate_difficulty > canon_difficulty {
                     debug!(
-                        "Processing a block that is on side chain. Height {}",
-                        side_chain_path.new_block_number
+                        "Determined side chain is heavier than canon chain by {}%",
+                        get_delta_percentage(side_chain_path.aggregate_difficulty, canon_difficulty)
                     );
+                    warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
-                    // If the side chain is now heavier than the canon chain,
-                    // perform a fork to the side chain.
-                    let canon_difficulty =
-                        self.get_canon_difficulty_from_height(side_chain_path.shared_block_number)?;
+                    // Fork to superior side chain
+                    self.ledger.revert_for_fork(&side_chain_path)?;
 
-                    if side_chain_path.aggregate_difficulty > canon_difficulty {
-                        debug!(
-                            "Determined side chain is heavier than canon chain by {}%",
-                            get_delta_percentage(side_chain_path.aggregate_difficulty, canon_difficulty)
-                        );
-                        warn!("A valid fork has been detected. Performing a fork to the side chain.");
+                    // Update the current block height metric.
+                    metrics::gauge!(BLOCK_HEIGHT, self.ledger.block_height() as f64);
 
-                        // Fork to superior side chain
-                        self.ledger.revert_for_fork(&side_chain_path)?;
-
-                        // Update the current block height metric.
-                        metrics::gauge!(BLOCK_HEIGHT, self.ledger.block_height() as f64);
-
-                        if !side_chain_path.path.is_empty() {
-                            for block_hash in side_chain_path.path {
-                                if block_hash == block.header.get_hash() {
-                                    self.process_block(block).await?
-                                } else {
-                                    let new_block = self.ledger.get_block(&block_hash)?;
-                                    self.process_block(&new_block).await?;
-                                }
+                    if !side_chain_path.path.is_empty() {
+                        for block_hash in side_chain_path.path {
+                            if block_hash == block.header.get_hash() {
+                                self.process_block(block).await?
+                            } else {
+                                let new_block = self.ledger.get_block(&block_hash)?;
+                                self.process_block(&new_block).await?;
                             }
                         }
-                    } else {
-                        metrics::increment_counter!(ORPHAN_BLOCKS);
-
-                        // If the sidechain is not longer than the main canon chain, simply store the block
-                        self.ledger.insert_only(block)?;
                     }
+                } else {
+                    metrics::increment_counter!(ORPHAN_BLOCKS);
+
+                    // If the sidechain is not longer than the main canon chain, simply store the block
+                    self.ledger.insert_only(block)?;
                 }
-            };
-        }
+            }
+        };
 
         Ok(())
     }
@@ -337,10 +354,11 @@ impl<S: Storage> Consensus<S> {
         }
 
         let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [
-            vec![total_value_balance.0 as u64],
-            vec![0; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1],
-        ]
+        let new_values = [vec![total_value_balance.0 as u64], vec![
+            0;
+            Testnet1Parameters::NUM_OUTPUT_RECORDS
+                - 1
+        ]]
         .concat();
 
         let mut joint_serial_numbers = vec![];

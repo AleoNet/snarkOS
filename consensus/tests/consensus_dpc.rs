@@ -46,7 +46,7 @@ mod consensus_dpc {
             &*consensus.ledger
         ));
 
-        let block_reward = get_block_reward(consensus.ledger.block_height() as u32);
+        let block_reward = get_block_reward((consensus.ledger.block_height() + 1) as u32);
 
         // dummy outputs have 0 balance, coinbase only pays the miner
         assert_eq!(coinbase_records.len(), 2);
@@ -56,6 +56,7 @@ mod consensus_dpc {
         assert_eq!(coinbase_records[1].value(), 0);
 
         println!("Verifying and receiving the block");
+        assert_eq!(consensus.ledger.block_height(), 1);
         consensus.receive_block(&block, false).await.unwrap();
         assert_eq!(consensus.ledger.block_height(), 2);
 
@@ -121,7 +122,7 @@ mod consensus_dpc {
 
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
         let new_block = Block { header, transactions };
-        let new_block_reward = get_block_reward(consensus.ledger.block_height() as u32);
+        let new_block_reward = get_block_reward((consensus.ledger.block_height() + 1) as u32);
 
         assert_eq!(new_coinbase_records.len(), 2);
         assert!(!new_coinbase_records[0].is_dummy());
@@ -133,9 +134,8 @@ mod consensus_dpc {
         assert_eq!(new_coinbase_records[1].value(), 0);
 
         println!("Verify and receive the block with the new payment transaction");
-
+        assert_eq!(consensus.ledger.block_height(), 2);
         consensus.receive_block(&new_block, false).await.unwrap();
-
         assert_eq!(consensus.ledger.block_height(), 3);
 
         for record in &new_coinbase_records {

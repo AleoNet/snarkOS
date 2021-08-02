@@ -20,7 +20,6 @@ use snarkvm::{
     ledger::{
         Block,
         BlockError,
-        BlockHeader,
         BlockHeaderHash,
         BlockScheme,
         DatabaseTransaction,
@@ -309,11 +308,6 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
     /// Returns true if the block exists in the canon chain.
     pub fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
         self.contains_block_hash(block_hash) && self.get_block_number(block_hash).is_ok()
-    }
-
-    /// Returns true if the block corresponding to this block's previous_block_hash is in the canon chain.
-    pub fn is_previous_block_canon(&self, block_header: &BlockHeader) -> bool {
-        self.is_canon(&block_header.previous_block_hash)
     }
 
     /// Revert the chain to the state before the fork.

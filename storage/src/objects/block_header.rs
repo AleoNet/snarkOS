@@ -16,8 +16,8 @@
 
 use crate::{Ledger, COL_BLOCK_HEADER};
 use snarkvm::{
-    dpc::{Parameters, Transaction},
-    ledger::{errors::StorageError, Block, BlockHeader, BlockHeaderHash, LedgerScheme, Storage},
+    dpc::Parameters,
+    ledger::{BlockHeader, BlockHeaderHash, LedgerScheme, Storage, StorageError},
     utilities::FromBytes,
 };
 
@@ -28,11 +28,6 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
             Some(block_header_bytes) => Ok(BlockHeader::read_le(&block_header_bytes[..])?),
             None => Err(StorageError::MissingBlockHeader(block_hash.to_string())),
         }
-    }
-
-    /// Returns true if the block corresponding to this block's previous_block_hash exists.
-    pub fn previous_block_hash_exists(&self, block: &Block<Transaction<C>>) -> bool {
-        self.contains_block_hash(&block.header.previous_block_hash)
     }
 
     /// Returns the latest shared block header hash.

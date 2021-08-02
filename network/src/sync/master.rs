@@ -90,22 +90,26 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
     }
 
     async fn send_sync_messages(&mut self) -> usize {
-        let sync_nodes = self.find_sync_nodes().await;
+        let sync_peers = self.find_sync_nodes().await;
 
-        info!("requested block information from {} peers", sync_nodes.len());
+        info!("Requesting block information from {} peers", sync_peers.len());
+
         let block_locator_hashes = self.block_locator_hashes();
-        let mut future_set = vec![];
-        for peer in sync_nodes.iter() {
+
+        let mut requests = vec![];
+        for peer in sync_peers.iter() {
             if let Some(handle) = self.node.peer_book.get_peer_handle(peer.address) {
-                let block_locator_hashes = block_locator_hashes.clone();
-                future_set.push(async move {
-                    handle.send_payload(Payload::GetSync(block_locator_hashes)).await;
+                requests.push(async move {
+                    handle
+                        .send_payload(Payload::GetSync(block_locator_hashes.clone()))
+                        .await;
                 });
             }
         }
-        let sent = future_set.len();
-        futures::future::join_all(future_set).await;
-        sent
+
+        let num_requests = requests.len();
+        futures::future::join_all(requests).await;
+        num_requests
     }
 
     /// receives an arbitrary amount of inbound sync messages with a given timeout.
@@ -304,7 +308,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let block_order: Vec<BlockHeaderHash> = early_blocks.into_iter().filter(|x| !ledger.is_canon(x)).collect();
 
         info!(
-            "requesting {} blocks for sync, received headers for {} known blocks",
+            "Requesting {} blocks from network, received headers for {} known blocks",
             block_order.len(),
             early_blocks_count - block_order.len()
         );
@@ -322,7 +326,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let received_blocks = self.receive_sync_blocks(sent_block_requests).await;
 
         info!(
-            "received {}/{} blocks for sync",
+            "Received {}/{} blocks for sync",
             received_blocks.len(),
             sent_block_requests
         );
