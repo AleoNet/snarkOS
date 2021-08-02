@@ -97,7 +97,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let num_proportional_steps = num_locator_hashes - num_quadratic_steps;
 
         // Obtain a few hashes increasing the distance quadratically.
-        let mut quadratic_step = 4; // the size of the first quadratic step
+        let mut quadratic_step = 2; // the size of the first quadratic step
         for _ in 0..num_quadratic_steps {
             block_locator_hashes.push(self.get_block_hash(hash_index)?);
             hash_index = hash_index.saturating_sub(quadratic_step);
