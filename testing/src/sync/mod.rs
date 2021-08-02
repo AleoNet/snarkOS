@@ -21,7 +21,7 @@ use snarkvm::{
     dpc::{testnet1::Testnet1Parameters, Network, Parameters, TransactionError, TransactionScheme},
     ledger::posw::PoswMarlin,
     parameters::{testnet1::InnerSNARKVKParameters, Parameter},
-    utilities::{to_bytes_le, FromBytes, ToBytes},
+    utilities::{FromBytes, ToBytes},
 };
 
 use once_cell::sync::Lazy;
@@ -37,12 +37,9 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_snark_id = to_bytes_le![
-        <Testnet1Parameters as Parameters>::inner_circuit_id_crh()
-            .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
-            .unwrap()
-    ]
-    .unwrap();
+    let inner_circuit_id = <Testnet1Parameters as Parameters>::inner_circuit_id()
+        .to_bytes_le()
+        .unwrap();
 
     ConsensusParameters {
         max_block_size: 1_000_000usize,
@@ -50,7 +47,7 @@ pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
         target_block_time: 2i64, //unix seconds
         network_id: Network::Testnet1,
         verifier: PoswMarlin::verify_only().unwrap(),
-        authorized_inner_snark_ids: vec![inner_snark_id],
+        authorized_inner_circuit_ids: vec![inner_circuit_id],
     }
 });
 

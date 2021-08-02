@@ -56,8 +56,8 @@ pub struct ConsensusParameters {
     pub target_block_time: i64,
     /// The PoSW sync verifier (read-only mode, no proving key loaded).
     pub verifier: PoswMarlin,
-    /// The authorized inner SNARK IDs.
-    pub authorized_inner_snark_ids: Vec<Vec<u8>>,
+    /// The authorized inner circuit IDs.
+    pub authorized_inner_circuit_ids: Vec<Vec<u8>>,
 }
 
 impl ConsensusParameters {
@@ -203,7 +203,7 @@ mod tests {
             target_block_time: 2i64, //unix seconds
             network_id: Network::Mainnet,
             verifier: posw,
-            authorized_inner_snark_ids: vec![],
+            authorized_inner_circuit_ids: vec![],
         };
 
         let b1 = DATA.block_1.clone();

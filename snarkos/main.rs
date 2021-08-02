@@ -28,7 +28,6 @@ use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::LedgerStorage;
 use snarkvm::{
-    algorithms::{CRH, SNARK},
     dpc::{
         testnet1::{Testnet1DPC, Testnet1Parameters},
         Address,
@@ -36,9 +35,8 @@ use snarkvm::{
         Network,
         Parameters,
     },
-    fields::ToConstraintField,
     ledger::{posw::PoswMarlin, Storage},
-    utilities::{to_bytes_le, FromBytes, ToBytes},
+    utilities::{FromBytes, ToBytes},
 };
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
@@ -170,13 +168,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         info!("Loaded Aleo parameters");
 
         // Fetch the set of valid inner circuit IDs.
-        let inner_snark_vk: <<Testnet1Parameters as Parameters>::InnerSNARK as SNARK>::VerifyingKey =
-            dpc.inner_snark_parameters.1.clone();
-        let inner_snark_vk_field_elements = inner_snark_vk.to_field_elements()?;
-        let inner_circuit_id =
-            Testnet1Parameters::inner_circuit_id_crh().hash_field_elements(&inner_snark_vk_field_elements)?;
+        let inner_circuit_id = Testnet1Parameters::inner_circuit_id();
 
-        let authorized_inner_snark_ids = vec![to_bytes_le![inner_circuit_id]?];
+        let authorized_inner_snark_ids = vec![inner_circuit_id.to_bytes_le()?];
 
         // Set the initial sync parameters.
         let consensus_params = ConsensusParameters {
@@ -185,7 +179,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             target_block_time: 10i64,
             network_id: Network::from_id(config.aleo.network_id),
             verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
-            authorized_inner_snark_ids,
+            authorized_inner_circuit_ids: authorized_inner_snark_ids,
         };
 
         let consensus = Arc::new(Consensus {

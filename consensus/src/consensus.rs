@@ -54,7 +54,7 @@ impl<S: Storage> Consensus<S> {
     pub fn verify_transaction(&self, transaction: &Testnet1Transaction) -> Result<bool, ConsensusError> {
         if !self
             .parameters
-            .authorized_inner_snark_ids
+            .authorized_inner_circuit_ids
             .contains(&to_bytes_le![transaction.inner_circuit_id]?)
         {
             return Ok(false);
@@ -68,7 +68,7 @@ impl<S: Storage> Consensus<S> {
         for tx in transactions {
             if !self
                 .parameters
-                .authorized_inner_snark_ids
+                .authorized_inner_circuit_ids
                 .contains(&to_bytes_le![tx.inner_circuit_id]?)
             {
                 return Ok(false);
