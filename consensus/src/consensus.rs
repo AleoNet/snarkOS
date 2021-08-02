@@ -75,8 +75,12 @@ impl<S: Storage> Consensus<S> {
         let transaction_ids: Vec<_> = block.transactions.to_transaction_ids()?;
         let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
 
-        // Verify the block header
-        if !crate::is_genesis(&block.header) {
+        // TODO (howardwu): Change to always `verify_header` (remove the skip genesis conditional).
+        //  Instead, inside `verify_header`, check all fields as before, except
+        //  now check that the previous block hash is the empty block hash e.g. [0u8; 32].
+        // Verify the block header.
+        let block_height = self.ledger.block_height();
+        if block_height > 0 && !block.header.is_genesis() {
             let parent_block = self.ledger.latest_block()?;
             if let Err(err) =
                 self.parameters
@@ -86,14 +90,13 @@ impl<S: Storage> Consensus<S> {
                 return Ok(false);
             }
         }
-        // Verify block amounts and check that there is a single coinbase transaction
 
+        // Verify block amounts and check that there is a single coinbase transaction.
         let mut coinbase_transaction_count = 0;
         let mut total_value_balance = AleoAmount::ZERO;
 
         for transaction in block.transactions.iter() {
             let value_balance = transaction.value_balance;
-
             if value_balance.is_negative() {
                 coinbase_transaction_count += 1;
             }
@@ -101,19 +104,21 @@ impl<S: Storage> Consensus<S> {
             total_value_balance = total_value_balance.add(value_balance);
         }
 
-        // Check that there is only 1 coinbase transaction
+        // Check that there is only 1 coinbase transaction.
         if coinbase_transaction_count > 1 {
             error!("multiple coinbase transactions");
             return Ok(false);
         }
 
-        // Check that the block value balances are correct
-        let expected_block_reward = crate::get_block_reward(self.ledger.block_height()).0;
-        if total_value_balance.0 + expected_block_reward != 0 {
-            trace!("total_value_balance: {:?}", total_value_balance);
-            trace!("expected_block_reward: {:?}", expected_block_reward);
+        // Check that the block value balances are correct.
+        if block_height > 0 && !block.header.is_genesis() {
+            let expected_block_reward = crate::get_block_reward(block_height).0;
+            if total_value_balance.0 + expected_block_reward != 0 {
+                trace!("total_value_balance: {:?}", total_value_balance);
+                trace!("expected_block_reward: {:?}", expected_block_reward);
 
-            return Ok(false);
+                return Ok(false);
+            }
         }
 
         // Check that all the transaction proofs verify
@@ -134,7 +139,7 @@ impl<S: Storage> Consensus<S> {
             // There are two possible cases for an unknown orphan.
             // 1) The block is a genesis block, or
             // 2) The block is unknown and does not correspond with the canon chain.
-            if crate::is_genesis(&block.header) && self.ledger.is_empty() {
+            if block.header.is_genesis() && self.ledger.is_empty() {
                 self.process_block(block).await?;
             } else {
                 metrics::increment_counter!(ORPHAN_BLOCKS);
@@ -332,11 +337,10 @@ impl<S: Storage> Consensus<S> {
         }
 
         let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [vec![total_value_balance.0 as u64], vec![
-            0;
-            Testnet1Parameters::NUM_OUTPUT_RECORDS
-                - 1
-        ]]
+        let new_values = [
+            vec![total_value_balance.0 as u64],
+            vec![0; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1],
+        ]
         .concat();
 
         let mut joint_serial_numbers = vec![];

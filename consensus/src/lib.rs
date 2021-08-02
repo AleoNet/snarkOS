@@ -58,10 +58,7 @@ pub mod parameters;
 pub use parameters::*;
 
 use snarkos_storage::Ledger;
-use snarkvm::{
-    dpc::{testnet1::Testnet1Parameters, AleoAmount},
-    ledger::{BlockHeader, BlockHeaderHash},
-};
+use snarkvm::dpc::{testnet1::Testnet1Parameters, AleoAmount};
 
 pub type MerkleTreeLedger<S> = Ledger<Testnet1Parameters, S>;
 
@@ -79,8 +76,4 @@ pub fn get_block_reward(block_num: u32) -> AleoAmount {
     let reward = initial_reward / (2_u64.pow(num_halves)) as i64;
 
     AleoAmount::from_bytes(reward)
-}
-
-pub fn is_genesis(block_header: &BlockHeader) -> bool {
-    block_header.previous_block_hash == BlockHeaderHash([0u8; 32])
 }
