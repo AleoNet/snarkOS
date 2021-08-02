@@ -42,7 +42,7 @@ curl --user username:password --data-binary '{
                 "amount": amount
         }],
         "memo": "memo_hexstring",
-        "network_id": 0
+        "network_id": 1
        }
     ]
 }' -H 'content-type: application/json' http://127.0.0.1:3030/
