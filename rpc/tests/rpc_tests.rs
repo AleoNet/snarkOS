@@ -91,13 +91,13 @@ mod rpc_tests {
         assert_eq!(transaction_id, transaction_info["txid"]);
         assert_eq!(transaction_size, transaction_info["size"]);
         assert_eq!(network_id, transaction_info["network_id"]);
-        assert_eq!(Value::Array(serial_numbers), transaction_info["old_serial_numbers"]);
-        assert_eq!(Value::Array(commitments), transaction_info["new_commitments"]);
+        assert_eq!(Value::Array(serial_numbers), transaction_info["serial_numbers"]);
+        assert_eq!(Value::Array(commitments), transaction_info["commitments"]);
         assert_eq!(value_balance.0, transaction_info["value_balance"]);
         assert_eq!(memo, transaction_info["memo"]);
 
         assert_eq!(digest, transaction_info["digest"]);
-        assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
+        assert_eq!(transaction_proof, transaction_info["proof"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }

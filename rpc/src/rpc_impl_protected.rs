@@ -292,15 +292,11 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     /// Generate a new account private key, account view key, and account address.
     fn create_account(&self) -> Result<RpcAccount, RpcError> {
-        let rng = &mut thread_rng();
-
-        let account = Account::<Testnet1Parameters>::new(rng)?;
-
-        let view_key = ViewKey::<Testnet1Parameters>::from_private_key(&account.private_key)?;
+        let account = Account::<Testnet1Parameters>::new(&mut thread_rng())?;
 
         Ok(RpcAccount {
             private_key: account.private_key.to_string(),
-            view_key: view_key.to_string(),
+            view_key: account.view_key.to_string(),
             address: account.address.to_string(),
         })
     }
@@ -481,15 +477,15 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     /// Create a new transaction for a given transaction authorization.
     fn create_transaction(
         &self,
-        private_keys: [String; Testnet1Parameters::NUM_INPUT_RECORDS],
+        private_keys_string: [String; Testnet1Parameters::NUM_INPUT_RECORDS],
         authorization: String,
     ) -> Result<CreateRawTransactionOutput, RpcError> {
         let rng = &mut thread_rng();
 
         // Decode the private keys.
-        let mut old_private_keys = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
-        for private_key in private_keys {
-            old_private_keys.push(PrivateKey::<Testnet1Parameters>::from_str(&private_key)?);
+        let mut private_keys = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
+        for private_key in private_keys_string {
+            private_keys.push(PrivateKey::<Testnet1Parameters>::from_str(&private_key)?);
         }
 
         // Decode the transaction authorization.
@@ -503,7 +499,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         // Online execution to generate a transaction
         let transaction = self.dpc()?.execute(
-            &old_private_keys,
+            &private_keys,
             authorization,
             &local_data,
             program_proofs,

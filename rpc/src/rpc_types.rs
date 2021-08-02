@@ -157,6 +157,9 @@ pub struct RPCRecordPayload {
 /// Returned value for the `decoderawrecord` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RecordInfo {
+    /// Program ID
+    pub program_id: String,
+
     /// The record owner
     pub owner: String,
 
@@ -168,12 +171,6 @@ pub struct RecordInfo {
 
     /// Record payload
     pub payload: RPCRecordPayload,
-
-    /// Record birth program id
-    pub birth_program_id: String,
-
-    /// Record death program id
-    pub death_program_id: String,
 
     /// Record serial number nonce
     pub serial_number_nonce: String,
@@ -205,26 +202,26 @@ pub struct TransactionInfo {
     /// Transaction size
     pub size: usize,
 
+    /// Network id of the transaction
+    pub network_id: u8,
+
     /// Transaction inputs
-    pub old_serial_numbers: Vec<String>,
+    pub serial_numbers: Vec<String>,
 
     /// Transaction outputs
-    pub new_commitments: Vec<String>,
+    pub commitments: Vec<String>,
+
+    /// Transaction value balance
+    pub value_balance: i64,
 
     /// Transaction Memo
     pub memo: String,
 
-    /// Network id of the transaction
-    pub network_id: u8,
-
     /// Merkle tree digest
     pub digest: String,
 
-    /// Transaction (outer snark) proof
-    pub transaction_proof: String,
-
-    /// Transaction value balance
-    pub value_balance: i64,
+    /// Transaction (outer circuit) proof
+    pub proof: String,
 
     /// Transaction signatures (Delegated DPC)
     pub signatures: Vec<String>,

@@ -60,6 +60,7 @@ impl TransactionAuthorization {
         recipients: Vec<Address<Testnet1Parameters>>,
         recipient_amounts: Vec<u64>,
         _network_id: u8, // TODO (howardwu): Keep this around to use for network modularization.
+        memo: Option<[u8; 64]>,
         rng: &mut R,
     ) -> Result<Self, DPCError> {
         let dpc = <Testnet1DPC as DPCScheme<Testnet1Parameters>>::load(false).unwrap();
@@ -71,47 +72,42 @@ impl TransactionAuthorization {
         assert_eq!(recipients.len(), recipient_amounts.len());
 
         // Construct the new records
-        let mut old_records = vec![];
+        let mut input_records = vec![];
         for record in records_to_spend {
-            old_records.push(record);
+            input_records.push(record);
         }
 
-        let mut old_private_keys = vec![];
+        let mut private_keys = vec![];
         for private_key in spenders {
-            old_private_keys.push(private_key);
+            private_keys.push(private_key);
         }
 
-        while old_records.len() < Testnet1Parameters::NUM_INPUT_RECORDS {
-            let sn_randomness: [u8; 32] = rng.gen();
-            let old_sn_nonce = Testnet1Parameters::serial_number_nonce_crh().hash(&sn_randomness)?;
-
-            let private_key = old_private_keys[0].clone();
+        while input_records.len() < Testnet1Parameters::NUM_INPUT_RECORDS {
+            let private_key = private_keys[0].clone();
             let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
-            let dummy_record = Record::<Testnet1Parameters>::new(
+            input_records.push(Record::<Testnet1Parameters>::new(
                 &dpc.noop_program,
                 address,
                 true, // The input record is dummy
                 0,
                 Default::default(),
-                old_sn_nonce,
+                Testnet1Parameters::serial_number_nonce_crh().hash(&rng.gen::<[u8; 32]>())?,
                 rng,
-            )?;
-
-            old_records.push(dummy_record);
-            old_private_keys.push(private_key);
+            )?);
+            private_keys.push(private_key);
         }
 
-        assert_eq!(old_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
+        assert_eq!(input_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
 
         // Enforce that the old record addresses correspond with the private keys
-        for (private_key, record) in old_private_keys.iter().zip(&old_records) {
+        for (private_key, record) in private_keys.iter().zip(&input_records) {
             let address = Address::<Testnet1Parameters>::from_private_key(private_key)?;
             assert_eq!(&address, record.owner());
         }
 
-        assert_eq!(old_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
-        assert_eq!(old_private_keys.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
+        assert_eq!(input_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
+        assert_eq!(private_keys.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
         let mut new_record_owners = vec![];
@@ -141,26 +137,26 @@ impl TransactionAuthorization {
 
         let mut joint_serial_numbers = vec![];
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = old_records[i].to_serial_number(&old_private_keys[i])?;
+            let (sn, _) = input_records[i].to_serial_number(&private_keys[i])?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
-        let mut new_records = vec![];
+        let mut output_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
-            new_records.push(Record::new_full(
+            output_records.push(Record::new_full(
                 new_programs[j],
                 new_record_owners[j].clone(),
                 new_is_dummy_flags[j],
                 new_values[j],
                 new_payloads[j].clone(),
-                j as u8,
+                (Testnet1Parameters::NUM_OUTPUT_RECORDS + j) as u8,
                 joint_serial_numbers.clone(),
                 rng,
             )?);
         }
 
         // Offline execution to generate a transaction authorization.
-        let authorization = dpc.authorize::<R>(&old_private_keys, old_records, new_records, None, rng)?;
+        let authorization = dpc.authorize::<R>(&private_keys, input_records, output_records, memo, rng)?;
 
         Ok(Self { authorization })
     }
@@ -341,6 +337,7 @@ impl TransactionAuthorizationBuilder {
             recipients,
             recipient_amounts,
             self.network_id,
+            self.memo,
             rng,
         )
     }

@@ -301,7 +301,7 @@ mod protected_rpc_tests {
 
         let result = extracted["result"].clone();
 
-        // println!("{}", result.as_str().unwrap());
+        println!("{}", result.as_str().unwrap());
         let transaction_authorization_bytes = hex::decode(result.as_str().unwrap()).unwrap();
         let _transaction_authorization: TransactionAuthorization<Testnet1Parameters> =
             FromBytes::read_le(&transaction_authorization_bytes[..]).unwrap();
@@ -328,7 +328,47 @@ mod protected_rpc_tests {
         private_keys_str.push(']');
 
         // Creates a transaction authorization for the test.
-        let transaction_authorization = "0136153000f6a4bbf25e4f11009b1f2eded5ceb5badd731bbba15fa07b3055a407d9159406dad030cf8a070ed760dcc2bfa0be9d260cd45a9669984cd48b91fa0fee3198924d4256870ddbe60e1f23b9b4f9718e1aed35c9c1abb99621f6cb7307371b92f15aad8fdc3233724e4a46b66deb0f3957fffc6bcbe1382dee0d5c390dde16f152eccb15e4196826d25ef849059b0aa9daa63762782bccfeeb593502003404e1247e36d601ae477dd920fd999147a281b7581aaaf0c9f7c3c1fc4c790c1cd1f0080000000045468e6bf9b579faac571053207082d0c7b2f7d94379197aeda3e2d2d1cab7d6cc365b21847bd4546eb4d9a007d2f484ab1e0b635ec8beb2649385bf3875a7183098eca394e25dfb64d00c7480aa3aab39af59a00f0f939e5e3b690c14502011c95097dd6d5928dbb8d5310a5285128000bd7c07340062a88705e9b19130337e258627f1aa675cac4abdc68ee3b81460000080d1f008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000640f949321989c2b4d80e703e8367075f4cfeb837d2a019c7e61d4b05610a010d2614c883d8ab1d8c7db2d9bf3bd8711203cb88486bac5936dcf9b9a0ab09310219eecd0280724104b15a0ff64a02bbab07afedf27270302acf24b4797e182013098eca394e25dfb64d00c7480aa3aab39af59a00f0f939e5e3b690c14502011c95097dd6d5928dbb8d5310a5285128000bd7c07340062a88705e9b19130337e258627f1aa675cac4abdc68ee3b81460000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000304bbbcadd8f60c79f33d37e3fb7ecb5c30d9ed5d380f92c1729ce1f4a402d0813c9e990dfab007b416189a0e249e10f045fe8bbbd91ef4ea55979284b923107a655db3bfb00f8e62f212f0e3a923851c1f11caabee91b358db54407653117043098eca394e25dfb64d00c7480aa3aab39af59a00f0f939e5e3b690c14502011c95097dd6d5928dbb8d5310a5285128000641f0253004f98513578ff6051f4d0829796141dcc3556b7d6d4343f0045270f00640000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006788ba565261708acc2538b53dc35f0b877649a5e72f27099293d0b8b5d2d201de16f152eccb15e4196826d25ef849059b0aa9daa63762782bccfeeb593502001e0cbf44fa307fc2bdab4afe2df494f30b3ca31d9ff5870ba36b1e94777427043098eca394e25dfb64d00c7480aa3aab39af59a00f0f939e5e3b690c14502011c95097dd6d5928dbb8d5310a5285128000641f0253004f98513578ff6051f4d0829796141dcc3556b7d6d4343f0045270f0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a349615f6b3a8b9b5bb15dd39d672508a71b8110e43a71f32bda7d8bbb62550a3404e1247e36d601ae477dd920fd999147a281b7581aaaf0c9f7c3c1fc4c790c91b8b5d32437aa898647372720c1a7e55d67850ab1aeddd90e5c0d8553fd34049d34383e8171ebba87f68814c6e7b4bfbc917937a85dff281b038947723be90371a44d6c35a5fd624e475e5df73cd7ce39c12d5651f14d2623ca9a074db78a03dcd54121809823414a18ef6f738d229ee002ef2a0a23efba2720bddcda4d51037477122806a3e5eced3217e09fd4df5ef1cf41900892e9393d6d35fd08676c03";
+        let transaction_authorization = {
+            let method = "createtransactionauthorization".to_string();
+
+            let [sender, receiver, _] = &FIXTURE_VK.test_accounts;
+
+            let old_records = vec![hex::encode(to_bytes_le![DATA.records_1[0]].unwrap())];
+            let old_account_private_keys = vec![sender.private_key.to_string()];
+
+            let recipients = vec![TransactionRecipient {
+                address: receiver.address.to_string(),
+                amount: 100,
+            }];
+
+            let network_id = 1;
+
+            let params = TransactionInputs {
+                old_records,
+                old_account_private_keys,
+                recipients,
+                memo: None,
+                network_id,
+            };
+
+            let params = serde_json::to_value(params).unwrap();
+            let request = format!(
+                "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}] }}",
+                method, params
+            );
+            let response = rpc.handle_request_sync(&request, meta.clone()).unwrap();
+
+            let extracted: Value = serde_json::from_str(&response).unwrap();
+
+            let result = extracted["result"].clone();
+
+            // println!("{}", result.as_str().unwrap());
+            // let transaction_authorization_bytes = hex::decode(result.as_str().unwrap()).unwrap();
+            // let transaction_authorization: TransactionAuthorization<Testnet1Parameters> =
+            //     FromBytes::read_le(&transaction_authorization_bytes[..]).unwrap();
+            // println!("{:?}", transaction_authorization);
+            result.as_str().unwrap().to_string()
+        };
 
         let request = format!(
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [{}, \"{}\"] }}",

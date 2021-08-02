@@ -59,7 +59,7 @@ pub fn create_send_transaction<R: Rng + CryptoRng, S: Storage>(
     amount: u64,
     rng: &mut R,
 ) -> Result<Testnet1Transaction, ConsensusError> {
-    println!("Preparing transaction...");
+    println!("Creating transaction...");
     let timer = Instant::now();
 
     let mut sum = 0;
@@ -92,9 +92,7 @@ pub fn create_send_transaction<R: Rng + CryptoRng, S: Storage>(
     }
 
     let from = vec![from.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
-    println!("Prepared transaction in {} seconds", timer.elapsed().as_secs());
 
-    println!("Creating transaction...");
     let transaction = consensus.create_transaction(inputs, from, new_records, None, rng);
     println!("Created transaction in {} seconds", timer.elapsed().as_secs());
 
