@@ -28,7 +28,16 @@ use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::{export_canon_blocks, key_value::KeyValueStore, RocksDb, SerialBlock, Storage, VMBlock};
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
-use snarkvm_dpc::{Address, Block, DPCScheme, Network, testnet1::{Testnet1Components, instantiated::{Components, Testnet1DPC, Testnet1Transaction}}};
+use snarkvm_dpc::{
+    testnet1::{
+        instantiated::{Components, Testnet1DPC, Testnet1Transaction},
+        Testnet1Components,
+    },
+    Address,
+    Block,
+    DPCScheme,
+    Network,
+};
 use snarkvm_parameters::{testnet1::GenesisBlock, Genesis, LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};

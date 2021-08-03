@@ -18,7 +18,12 @@ use anyhow::*;
 use std::io::Result as IoResult;
 
 use smallvec::SmallVec;
-use snarkvm_dpc::{AleoAmount, Network, TransactionScheme, testnet1::{Testnet1Components, Transaction}};
+use snarkvm_dpc::{
+    testnet1::{Testnet1Components, Transaction},
+    AleoAmount,
+    Network,
+    TransactionScheme,
+};
 use snarkvm_utilities::{CanonicalDeserialize, CanonicalSerialize, FromBytes, ToBytes, Write};
 
 use crate::{Digest, SerialRecord};
@@ -246,6 +251,9 @@ mod tests {
 
         assert_eq!(base_transaction, reserialized);
 
-        assert_eq!(to_bytes_le![base_transaction].unwrap(), to_bytes_le![deserialized].unwrap());
+        assert_eq!(
+            to_bytes_le![base_transaction].unwrap(),
+            to_bytes_le![deserialized].unwrap()
+        );
     }
 }

@@ -16,7 +16,7 @@
 
 use std::sync::Arc;
 
-use crate::Ledger;
+use crate::{IndexedDigests, Ledger};
 use anyhow::*;
 use indexmap::IndexSet;
 use snarkos_storage::Digest;
@@ -29,7 +29,7 @@ pub struct MerkleLedger<P: MerkleParameters> {
     ledger_digests: IndexSet<Digest>,
     commitments: IndexedMerkleTree<P>,
     serial_numbers: IndexedMerkleTree<P>,
-    memos: IndexedMerkleTree<P>,
+    memos: IndexedDigests,
 }
 
 impl<P: MerkleParameters> MerkleLedger<P> {
@@ -44,7 +44,7 @@ impl<P: MerkleParameters> MerkleLedger<P> {
             ledger_digests: ledger_digests.iter().cloned().collect(),
             commitments: IndexedMerkleTree::new(parameters.clone(), commitments)?,
             serial_numbers: IndexedMerkleTree::new(parameters.clone(), serial_numbers)?,
-            memos: IndexedMerkleTree::new(parameters, memos)?,
+            memos: IndexedDigests::new(memos),
         })
     }
 }
@@ -59,7 +59,7 @@ impl<P: MerkleParameters> Ledger for MerkleLedger<P> {
         let mut new_self = self.clone();
         new_self.commitments.extend(new_commitments)?;
         new_self.serial_numbers.extend(new_serial_numbers)?;
-        new_self.memos.extend(new_memos)?;
+        new_self.memos.extend(new_memos);
 
         let new_digest = new_self.commitments.digest();
         new_self.ledger_digests.insert(new_digest.clone());

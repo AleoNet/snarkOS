@@ -16,14 +16,14 @@
 
 mod miner {
     use snarkos_consensus::MineContext;
-    use snarkos_storage::{SerialBlockHeader, SerialTransaction, VMTransaction};
+    use snarkos_storage::{SerialBlockHeader, SerialTransaction};
     use snarkos_testing::sync::*;
     use snarkvm_algorithms::traits::{
         commitment::CommitmentScheme,
         encryption::EncryptionScheme,
         signature::SignatureScheme,
     };
-    use snarkvm_dpc::{Address, PrivateKey, DPCComponents};
+    use snarkvm_dpc::{Address, DPCComponents, PrivateKey};
     use snarkvm_posw::txids_to_roots;
 
     use rand::{CryptoRng, Rng, SeedableRng};
@@ -43,7 +43,7 @@ mod miner {
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     async fn test_find_block(transactions: &[SerialTransaction], parent_header: &SerialBlockHeader) {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let mut rng = ChaChaRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
 
         let (_, miner_address) = keygen(&mut rng);
@@ -65,8 +65,8 @@ mod miner {
     #[tokio::test]
     async fn find_valid_block() {
         let transactions = vec![
-            DATA.block_1.transactions.0[0].serialize().unwrap(),
-            DATA.block_2.transactions.0[0].serialize().unwrap(),
+            DATA.block_1.transactions[0].clone(),
+            DATA.block_2.transactions[0].clone(),
         ];
         let parent_header = genesis().header.into();
         test_find_block(&transactions, &parent_header).await;

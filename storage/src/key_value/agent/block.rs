@@ -225,16 +225,15 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
     pub(super) fn get_block_locator_hashes(&mut self) -> Result<Vec<Digest>> {
         let canon = self.canon()?;
-        let block_height = canon.block_height;
 
         // The number of locator hashes left to obtain; accounts for the genesis block.
-        let mut num_locator_hashes = std::cmp::min(crate::NUM_LOCATOR_HASHES - 1, block_height);
+        let mut num_locator_hashes = std::cmp::min(crate::NUM_LOCATOR_HASHES - 1, canon.block_height as u32);
 
         // The output list of block locator hashes.
         let mut block_locator_hashes = Vec::with_capacity(num_locator_hashes as usize);
 
         // The index of the current block for which a locator hash is obtained.
-        let mut hash_index = block_height;
+        let mut hash_index = canon.block_height as u32;
 
         // The number of top blocks to provide locator hashes for.
         let num_top_blocks = std::cmp::min(10, num_locator_hashes);

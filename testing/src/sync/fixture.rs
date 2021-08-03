@@ -21,7 +21,11 @@ use crate::{
 use snarkos_consensus::{DynLedger, MerkleLedger};
 use snarkos_storage::{key_value::KeyValueStore, DynStorage, MemDb};
 use snarkvm_algorithms::{MerkleParameters, CRH};
-use snarkvm_dpc::{Account, Block, testnet1::{NoopProgram, Testnet1Components, instantiated::*}};
+use snarkvm_dpc::{
+    testnet1::{instantiated::*, NoopProgram, Testnet1Components},
+    Account,
+    Block,
+};
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 

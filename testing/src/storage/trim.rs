@@ -21,11 +21,10 @@ use std::collections::HashSet;
 
 #[tokio::test]
 async fn trim_side_chain_blocks() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     // Register the hash of the genesis block.
     let genesis_hash = consensus.storage.get_block_hash(0).await.unwrap().unwrap();
-    let genesis_block = consensus.storage.get_block(&genesis_hash).await.unwrap();
 
     // Import a few consecutive blocks from one chain.
     let blocks1 = TestBlocks::load(Some(5), "test_blocks_100_1").0;

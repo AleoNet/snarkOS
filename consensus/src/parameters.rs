@@ -14,12 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{DeserializedLedger, difficulty::bitcoin_retarget, error::ConsensusError};
+use crate::{difficulty::bitcoin_retarget, error::ConsensusError, DeserializedLedger};
 use snarkos_profiler::{end_timer, start_timer};
 use snarkos_storage::SerialBlockHeader;
 use snarkvm_algorithms::SNARK;
 use snarkvm_curves::bls12_377::Bls12_377;
-use snarkvm_dpc::{DPCComponents, DPCScheme, MerkleRootHash, Network, PedersenMerkleRootHash, ProgramScheme, testnet1::instantiated::{Components, Testnet1DPC}};
+use snarkvm_dpc::{
+    testnet1::instantiated::{Components, Testnet1DPC},
+    DPCComponents,
+    DPCScheme,
+    MerkleRootHash,
+    Network,
+    PedersenMerkleRootHash,
+    ProgramScheme,
+};
 use snarkvm_posw::{Marlin, PoswMarlin};
 use snarkvm_utilities::FromBytes;
 
@@ -137,9 +145,8 @@ mod tests {
     use super::*;
     use crate::get_block_reward;
     use rand::{thread_rng, Rng};
-    use snarkos_storage::VMBlock;
     use snarkos_testing::sync::DATA;
-    use snarkvm_dpc::{Block, PedersenMerkleRootHash, testnet1::instantiated::Testnet1Transaction};
+    use snarkvm_dpc::PedersenMerkleRootHash;
 
     #[test]
     fn test_block_rewards() {
@@ -196,10 +203,10 @@ mod tests {
             authorized_inner_snark_ids: vec![],
         };
 
-        let b1 = <Block<Testnet1Transaction> as VMBlock>::serialize(&DATA.block_1).unwrap();
+        let b1 = DATA.block_1.clone();
         let h1 = b1.header;
 
-        let b2 = <Block<Testnet1Transaction> as VMBlock>::serialize(&DATA.block_2).unwrap();
+        let b2 = DATA.block_2.clone();
         let h2 = b2.header;
         let merkle_root_hash = h2.merkle_root_hash.clone();
         let pedersen_merkle_root = h2.pedersen_merkle_root_hash.clone();

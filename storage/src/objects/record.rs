@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::{AleoAmount, RecordScheme, testnet1::{instantiated::Components, Record}};
+use snarkvm_dpc::{
+    testnet1::{instantiated::Components, Payload, Record},
+    AleoAmount,
+    RecordScheme,
+};
 use snarkvm_utilities::{variable_length_integer, FromBytes, ToBytes, Write};
 
 use std::{convert::TryInto, io::Result as IoResult};
@@ -22,7 +26,9 @@ use std::{convert::TryInto, io::Result as IoResult};
 use crate::{Address, Digest};
 use anyhow::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(derivative::Derivative)]
+#[derivative(PartialEq)]
+#[derive(Debug, Clone, Eq)]
 pub struct SerialRecord {
     pub owner: Address,
     pub is_dummy: bool,
@@ -33,6 +39,8 @@ pub struct SerialRecord {
     pub serial_number_nonce: Digest,
     pub commitment: Digest,
     pub commitment_randomness: Digest,
+    #[derivative(PartialEq = "ignore")]
+    pub serial_number_nonce_randomness: Option<Digest>,
 }
 
 impl ToBytes for SerialRecord {
@@ -56,7 +64,7 @@ impl ToBytes for SerialRecord {
 }
 
 pub trait VMRecord: Sized {
-    fn deserialize(record: &SerialRecord) -> IoResult<Self>;
+    fn deserialize(record: &SerialRecord) -> Result<Self>;
 
     fn serialize(&self) -> Result<SerialRecord>;
 }
@@ -69,11 +77,24 @@ fn to_bytes_to_digest<B: ToBytes>(from: &B) -> IoResult<Digest> {
 
 // cannot use parameterized types here because recordscheme doesnt bound Owner associated type
 impl VMRecord for Record<Components> {
-    fn deserialize(record: &SerialRecord) -> IoResult<Self> {
-        //todo: make this not bad
-        let mut buf = vec![];
-        record.write_le(&mut buf)?;
-        Self::read_le(&mut &buf[..])
+    fn deserialize(record: &SerialRecord) -> Result<Self> {
+        let serial_number_nonce_randomness = record
+            .serial_number_nonce_randomness
+            .as_ref()
+            .map(|x| x.bytes().ok_or_else(|| anyhow!("bad length digest")))
+            .transpose()?;
+        Ok(Self::from(
+            record.owner.clone().into(),
+            record.is_dummy,
+            record.value.0 as u64,
+            Payload::from_bytes(&record.payload[..]),
+            record.birth_program_id.to_vec(),
+            record.death_program_id.to_vec(),
+            FromBytes::from_bytes_le(&mut &record.serial_number_nonce.0[..])?,
+            FromBytes::from_bytes_le(&mut &record.commitment.0[..])?,
+            FromBytes::from_bytes_le(&mut &record.commitment_randomness.0[..])?,
+            serial_number_nonce_randomness,
+        ))
     }
 
     fn serialize(&self) -> Result<SerialRecord> {
@@ -87,6 +108,7 @@ impl VMRecord for Record<Components> {
             serial_number_nonce: to_bytes_to_digest(self.serial_number_nonce())?,
             commitment: to_bytes_to_digest(&self.commitment())?,
             commitment_randomness: to_bytes_to_digest(&self.commitment_randomness())?,
+            serial_number_nonce_randomness: self.serial_number_nonce_randomness().map(|x| x.into()),
         })
     }
 }

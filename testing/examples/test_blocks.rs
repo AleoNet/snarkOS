@@ -17,37 +17,21 @@
 #[macro_use]
 extern crate tracing;
 
-use snarkos_consensus::{error::ConsensusError, Consensus, MineContext};
-use snarkos_storage::{SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
+use snarkos_consensus::{error::ConsensusError, Consensus, CreateTransactionRequest, MineContext, TransactionResponse};
+use snarkos_storage::{PrivateKey, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    block::Transactions,
-    testnet1::{
-        instantiated::*,
-        record::{payload::Payload as RecordPayload, Record},
-    },
+    testnet1::{instantiated::*, record::payload::Payload as RecordPayload},
     Account,
     Address,
-    Block,
+    AleoAmount,
     DPCComponents,
-    ProgramScheme,
-    RecordScheme,
-    Storage,
 };
 use tracing_subscriber::EnvFilter;
 
 use rand::{CryptoRng, Rng};
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{fs::File, path::PathBuf};
 
-<<<<<<< HEAD
-async fn mine_block<S: Storage>(
-    miner: &Miner<S>,
-    txs: Vec<Testnet1Transaction>,
-) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
-    info!("Mining block!");
-
-    let transactions = Transactions(txs);
-=======
 async fn mine_block(
     miner: &MineContext,
     transactions: Vec<SerialTransaction>,
@@ -56,7 +40,6 @@ async fn mine_block(
     info!("Mining block!");
 
     let (transactions, coinbase_records) = miner.establish_block(transactions).await?;
->>>>>>> bb8a80a7... wip
 
     let header = miner.find_block(&transactions, parent_block_header)?;
 
@@ -76,55 +59,49 @@ async fn mine_block(
 /// Spends some value from inputs owned by the sender, to the receiver,
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
-<<<<<<< HEAD
-fn send<R: Rng + CryptoRng, S: Storage>(
-    consensus: &Consensus<S>,
-    from: &Account<Components>,
-    inputs: Vec<Record<Components>>,
-    receiver: &Address<Components>,
-    amount: u64,
-    rng: &mut R,
-    memo: [u8; 32],
-) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
-=======
-fn send<R: Rng>(
+async fn send<R: Rng + CryptoRng>(
     consensus: &Consensus,
     from: &Account<Components>,
     inputs: Vec<SerialRecord>,
-    receiver: &AccountAddress<Components>,
-    amount: u64,
+    receiver: &Address<Components>,
+    amount: i64,
     rng: &mut R,
     memo: [u8; 32],
-) -> Result<(Vec<SerialRecord>, SerialTransaction), ConsensusError> {
->>>>>>> bb8a80a7... wip
+) -> Result<TransactionResponse, ConsensusError> {
     let mut sum = 0;
     for inp in &inputs {
-        sum += inp.value();
+        sum += inp.value.0;
     }
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
 
-    let input_programs = vec![FIXTURE.program.id(); Components::NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.id(); Components::NUM_OUTPUT_RECORDS];
-
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
-    let output = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
-    let dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
 
-    let from = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS];
-    consensus.create_transaction(
-        inputs,
-        from,
-        to,
-        input_programs,
-        output_programs,
-        dummy_flags,
-        values,
-        output,
-        memo,
-        rng,
-    )
+    let from: Vec<PrivateKey> = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS]
+        .into_iter()
+        .map(Into::into)
+        .collect();
+
+    let joint_serial_numbers = consensus.calculate_joint_serial_numbers(&inputs[..], &from[..])?;
+    let mut new_records = vec![];
+    for j in 0..Components::NUM_OUTPUT_RECORDS as u8 {
+        new_records.push(consensus.make_dummy_record(
+            &joint_serial_numbers[..],
+            j + Components::NUM_INPUT_RECORDS as u8,
+            to[j as usize].clone().into(),
+            AleoAmount(values[j as usize]),
+            RecordPayload::default(),
+        )?);
+    }
+    consensus
+        .create_transaction(CreateTransactionRequest {
+            old_records: inputs,
+            old_account_private_keys: from,
+            new_records,
+            memo,
+        })
+        .await
 }
 
 async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
@@ -132,7 +109,7 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let mut rng = FIXTURE.rng.clone();
     info!("Creating sync");
-    let consensus = crate::create_test_consensus();
+    let consensus = crate::create_test_consensus().await;
 
     // setup the miner
     info!("Creating miner");
@@ -152,7 +129,7 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
         let mut memo = [0u8; 32];
         memo[0] = i as u8;
         // make a tx which spends 10 to the Testnet1Components receiver
-        let (_records, tx) = send(
+        let response: TransactionResponse = send(
             &consensus,
             &miner_acc,
             coinbase_records.clone(),
@@ -160,9 +137,10 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
             (10 + i).into(),
             &mut rng,
             memo,
-        )?;
+        )
+        .await?;
 
-        txs.push(tx);
+        txs.push(response.transaction);
         last_block_header = block.header.clone();
         blocks.push(block);
     }

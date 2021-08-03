@@ -163,7 +163,7 @@ mod tests {
     use super::*;
     use snarkos_testing::sync::*;
     use snarkvm_algorithms::{MerkleParameters, CRH};
-    use snarkvm_dpc::testnet1::{Testnet1Components, instantiated::Components};
+    use snarkvm_dpc::testnet1::{instantiated::Components, Testnet1Components};
     use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
     use snarkvm_utilities::FromBytes;
 

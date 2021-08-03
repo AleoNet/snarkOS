@@ -25,21 +25,9 @@ use crate::{
     MemoryPool,
 };
 use anyhow::*;
-use snarkos_storage::{
-    BlockStatus,
-    Digest,
-    ForkDescription,
-    SerialBlock,
-    SerialTransaction,
-    Storage,
-    VMTransaction,
-};
+use snarkos_storage::{BlockStatus, Digest, ForkDescription, SerialBlock, SerialTransaction, Storage, VMTransaction};
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::Components,
-        Record as DPCRecord,
-        TransactionKernel,
-    },
+    testnet1::{instantiated::Components, Record as DPCRecord, TransactionKernel},
     DPCScheme,
 };
 use snarkvm_posw::txids_to_roots;

@@ -26,7 +26,10 @@ use snarkos_consensus::{get_block_reward, ConsensusParameters};
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkos_storage::{BlockStatus, Digest, DynStorage, VMTransaction};
-use snarkvm_dpc::{TransactionScheme, testnet1::{instantiated::{Testnet1DPC, Testnet1Transaction}}};
+use snarkvm_dpc::{
+    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
+    TransactionScheme,
+};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,

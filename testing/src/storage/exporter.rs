@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    sync::{create_test_consensus, TestBlocks},
-};
-use rand::{Rng, thread_rng};
+use crate::sync::{create_test_consensus, TestBlocks};
+use rand::{thread_rng, Rng};
 use snarkos_storage::VMBlock;
 use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
 use snarkvm_utilities::FromBytes;
@@ -32,7 +30,7 @@ pub fn random_storage_path() -> String {
 #[tokio::test]
 async fn import_export_blocks() {
     // Create an instance that loads some test blocks.
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
     let test_blocks = TestBlocks::load(Some(10), "test_blocks_100_1").0;
     for block in &test_blocks {
         assert!(consensus.receive_block(block.clone()).await);

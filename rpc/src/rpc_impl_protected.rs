@@ -18,17 +18,27 @@
 //!
 //! See [ProtectedRpcFunctions](../trait.ProtectedRpcFunctions.html) for documentation of private endpoints.
 
-use crate::{RpcImpl, error::RpcError, rpc_trait::ProtectedRpcFunctions, rpc_types::*, transaction_kernel_builder::TransactionKernelBuilder};
+use crate::{
+    error::RpcError,
+    rpc_trait::ProtectedRpcFunctions,
+    rpc_types::*,
+    transaction_kernel_builder::TransactionKernelBuilder,
+    RpcImpl,
+};
 use snarkos_consensus::{CreatePartialTransactionRequest, CreateTransactionRequest};
 use snarkos_storage::VMRecord;
 use snarkvm_algorithms::CRH;
-use snarkvm_dpc::{Account, AccountScheme, Address, DPCComponents, PrivateKey, ProgramScheme, RecordScheme as RecordModel, ViewKey, testnet1::{
-        instantiated::Components,
-        EncryptedRecord,
-        Payload,
-        Record as DPCRecord,
-        TransactionKernel,
-    }};
+use snarkvm_dpc::{
+    testnet1::{instantiated::Components, EncryptedRecord, Payload, Record as DPCRecord, TransactionKernel},
+    Account,
+    AccountScheme,
+    Address,
+    DPCComponents,
+    PrivateKey,
+    ProgramScheme,
+    RecordScheme as RecordModel,
+    ViewKey,
+};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes_le,
@@ -392,12 +402,15 @@ impl ProtectedRpcFunctions for RpcImpl {
         // Fill any unused old_record indices with dummy records
         for i in 0..Components::NUM_OUTPUT_RECORDS {
             let old_sn_nonce = self.dpc()?.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
+            let private_key = old_account_private_keys
+                .get(i)
+                .unwrap_or_else(|| old_account_private_keys.last().unwrap());
 
             let address = Address::<Components>::from_private_key(
                 &self.dpc()?.system_parameters.account_signature,
                 &self.dpc()?.system_parameters.account_commitment,
                 &self.dpc()?.system_parameters.account_encryption,
-                &old_account_private_keys[i],
+                &private_key,
             )?;
 
             let dummy_record = DPCRecord::<Components>::new(
@@ -412,7 +425,8 @@ impl ProtectedRpcFunctions for RpcImpl {
                 &mut thread_rng(),
             )?;
 
-            let (sn, _) = dummy_record.to_serial_number(&consensus.dpc.system_parameters.account_signature, &old_account_private_keys[i])?;
+            let (sn, _) =
+                dummy_record.to_serial_number(&consensus.dpc.system_parameters.account_signature, &private_key)?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
 
             old_records.push(dummy_record.serialize()?);
@@ -460,19 +474,22 @@ impl ProtectedRpcFunctions for RpcImpl {
 
         let mut new_records = vec![];
         for j in 0..Components::NUM_OUTPUT_RECORDS {
-            new_records.push(DPCRecord::new_full(
-                &consensus.dpc.system_parameters.serial_number_nonce,
-                &consensus.dpc.system_parameters.record_commitment,
-                new_record_owners[j].clone().into(),
-                new_is_dummy_flags[j],
-                new_values[j],
-                new_payloads[j].clone(),
-                new_birth_program_ids[j].clone(),
-                new_death_program_ids[j].clone(),
-                j as u8,
-                joint_serial_numbers.clone(),
-                &mut thread_rng(),
-            )?.serialize()?);
+            new_records.push(
+                DPCRecord::new_full(
+                    &consensus.dpc.system_parameters.serial_number_nonce,
+                    &consensus.dpc.system_parameters.record_commitment,
+                    new_record_owners[j].clone().into(),
+                    new_is_dummy_flags[j],
+                    new_values[j],
+                    new_payloads[j].clone(),
+                    new_birth_program_ids[j].clone(),
+                    new_death_program_ids[j].clone(),
+                    j as u8,
+                    joint_serial_numbers.clone(),
+                    &mut thread_rng(),
+                )?
+                .serialize()?,
+            );
         }
 
         // Generate transaction
@@ -562,13 +579,12 @@ impl ProtectedRpcFunctions for RpcImpl {
         private_keys: [String; Components::NUM_INPUT_RECORDS],
         transaction_kernel: String,
     ) -> Result<CreateRawTransactionOuput, RpcError> {
-
         // Decode the private keys
         let mut old_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for private_key in private_keys {
             old_private_keys.push(PrivateKey::<Components>::from_str(&private_key)?.into());
         }
-        
+
         // Decode the transaction kernel
         let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
         let transaction_kernel = TransactionKernel::<Components>::read_le(&transaction_kernel_bytes[..])?;

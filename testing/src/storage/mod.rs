@@ -27,7 +27,7 @@ pub mod trim;
 use snarkos_consensus::{DynLedger, MerkleLedger};
 use snarkos_storage::{key_value::KeyValueStore, DynStorage, MemDb};
 use snarkvm_algorithms::{MerkleParameters, CRH};
-use snarkvm_dpc::testnet1::{Testnet1Components, instantiated::Components};
+use snarkvm_dpc::testnet1::{instantiated::Components, Testnet1Components};
 
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::FromBytes;

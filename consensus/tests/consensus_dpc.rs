@@ -19,7 +19,12 @@ mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, CreateTransactionRequest, MineContext};
     use snarkos_storage::{SerialBlock, VMRecord};
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{DPCComponents, ProgramScheme, RecordScheme, testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record as DPCRecord}};
+    use snarkvm_dpc::{
+        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record as DPCRecord},
+        DPCComponents,
+        ProgramScheme,
+        RecordScheme,
+    };
     use snarkvm_utilities::{to_bytes_le, ToBytes};
 
     #[tokio::test]
@@ -27,8 +32,7 @@ mod consensus_dpc {
         let program = FIXTURE.program.clone();
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
 
-        let consensus = snarkos_testing::sync::create_test_consensus();
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await; // wait for genesis to be queued to commit to storage
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
 
         let miner = MineContext::prepare(miner_acc.address, consensus.clone())
             .await
@@ -58,8 +62,12 @@ mod consensus_dpc {
 
         let mut joint_serial_numbers = vec![];
         for record in &[coinbase_record_0, coinbase_record_1] {
-            let (sn, _) =
-                record.to_serial_number(&consensus.dpc.system_parameters.account_signature, &miner_acc.private_key).unwrap();
+            let (sn, _) = record
+                .to_serial_number(
+                    &consensus.dpc.system_parameters.account_signature,
+                    &miner_acc.private_key,
+                )
+                .unwrap();
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn].unwrap());
         }
 
@@ -91,19 +99,24 @@ mod consensus_dpc {
 
         let mut new_records = vec![];
         for j in 0..Components::NUM_OUTPUT_RECORDS {
-            new_records.push(DPCRecord::new_full(
-                &consensus.dpc.system_parameters.serial_number_nonce,
-                &consensus.dpc.system_parameters.record_commitment,
-                new_record_owners[j].clone().into(),
-                new_is_dummy_flags[j],
-                new_values[j],
-                new_payloads[j].clone(),
-                new_birth_program_ids[j].clone(),
-                new_death_program_ids[j].clone(),
-                j as u8,
-                joint_serial_numbers.clone(),
-                &mut thread_rng(),
-            ).unwrap().serialize().unwrap());
+            new_records.push(
+                DPCRecord::new_full(
+                    &consensus.dpc.system_parameters.serial_number_nonce,
+                    &consensus.dpc.system_parameters.record_commitment,
+                    new_record_owners[j].clone().into(),
+                    new_is_dummy_flags[j],
+                    new_values[j],
+                    new_payloads[j].clone(),
+                    new_birth_program_ids[j].clone(),
+                    new_death_program_ids[j].clone(),
+                    j as u8,
+                    joint_serial_numbers.clone(),
+                    &mut thread_rng(),
+                )
+                .unwrap()
+                .serialize()
+                .unwrap(),
+            );
         }
 
         // Memo is a dummy for now

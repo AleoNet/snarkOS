@@ -153,8 +153,8 @@ impl Default for TestSetup {
     }
 }
 
-pub fn test_consensus(setup: ConsensusSetup) -> snarkos_network::Sync {
-    let consensus = crate::sync::create_test_consensus();
+pub async fn test_consensus(setup: ConsensusSetup) -> snarkos_network::Sync {
+    let consensus = crate::sync::create_test_consensus().await;
 
     snarkos_network::Sync::new(
         consensus,
@@ -187,7 +187,7 @@ pub async fn test_node(setup: TestSetup) -> Node {
             .await
             .unwrap(),
         Some(consensus_setup) => {
-            let consensus = test_consensus(consensus_setup);
+            let consensus = test_consensus(consensus_setup).await;
             let mut node = Node::new(config, consensus.consensus.storage.clone()).await.unwrap();
 
             node.set_sync(consensus);

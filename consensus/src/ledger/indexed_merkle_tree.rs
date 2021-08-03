@@ -16,15 +16,15 @@
 
 use std::sync::Arc;
 
+use crate::IndexedDigests;
 use anyhow::*;
-use indexmap::IndexSet;
 use snarkos_storage::Digest;
 use snarkvm_algorithms::{merkle_tree::MerkleTree, MerkleParameters};
 use snarkvm_utilities::ToBytes;
 
 pub struct IndexedMerkleTree<P: MerkleParameters> {
     tree: MerkleTree<P>,
-    indexed_digests: IndexSet<Digest>,
+    indexed_digests: IndexedDigests,
 }
 
 impl<P: MerkleParameters> Clone for IndexedMerkleTree<P> {
@@ -50,16 +50,14 @@ impl<P: MerkleParameters> IndexedMerkleTree<P> {
     pub fn new(parameters: Arc<P>, leaves: &[Digest]) -> Result<Self> {
         Ok(Self {
             tree: MerkleTree::new(parameters, leaves)?,
-            indexed_digests: leaves.iter().cloned().collect(),
+            indexed_digests: IndexedDigests::new(leaves),
         })
     }
 
     pub fn extend(&mut self, new_leaves: &[Digest]) -> Result<()> {
-        let tree = self
-            .tree
-            .rebuild(self.indexed_digests.len(), new_leaves)?;
+        let tree = self.tree.rebuild(self.indexed_digests.len(), new_leaves)?;
         self.tree = tree;
-        self.indexed_digests.extend(new_leaves.iter().cloned());
+        self.indexed_digests.extend(new_leaves);
         Ok(())
     }
 
@@ -70,21 +68,8 @@ impl<P: MerkleParameters> IndexedMerkleTree<P> {
                 "attempted to remove more items from indexed merkle tree than present"
             ));
         }
-        let old_length = self.indexed_digests.len() - to_remove.len();
-        for i in old_length..self.indexed_digests.len() {
-            if self.indexed_digests[i] != to_remove[i - old_length] {
-                return Err(anyhow!(
-                    "mismatch in attempted pop of merkle tree @ {}: {} != {}",
-                    i,
-                    self.indexed_digests[i],
-                    to_remove[i - old_length]
-                ));
-            }
-        }
-        self.indexed_digests.truncate(old_length);
-        let tree = self
-            .tree
-            .rebuild::<[u8; 32]>(old_length, &[])?;
+        self.indexed_digests.pop(to_remove)?;
+        let tree = self.tree.rebuild::<[u8; 32]>(self.indexed_digests.len(), &[])?;
         self.tree = tree;
 
         Ok(())
@@ -92,10 +77,7 @@ impl<P: MerkleParameters> IndexedMerkleTree<P> {
 
     pub fn clear(&mut self) {
         self.indexed_digests.clear();
-        self.tree = self
-            .tree
-            .rebuild::<[u8; 32]>(0, &[])
-            .unwrap();
+        self.tree = self.tree.rebuild::<[u8; 32]>(0, &[]).unwrap();
     }
 
     pub fn len(&self) -> usize {
@@ -111,7 +93,7 @@ impl<P: MerkleParameters> IndexedMerkleTree<P> {
     }
 
     pub fn index(&self, leaf: &Digest) -> Option<usize> {
-        self.indexed_digests.get_index_of(leaf)
+        self.indexed_digests.index(leaf)
     }
 
     pub fn digest(&self) -> Digest {

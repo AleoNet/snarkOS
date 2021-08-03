@@ -44,7 +44,7 @@ impl<T: AddressContainer> From<T> for Address {
 
 impl Address {
     pub fn into<T: AddressContainer>(self) -> T {
-        T::read_le(&mut &self.0.0[..]).expect("failed to read address")
+        T::read_le(&mut &self.0.0[..]).expect("illegal cross-network address contamination")
     }
 }
 
@@ -67,6 +67,13 @@ impl PrivateKey {
         *self
             .inner
             .downcast()
+            .expect("illegal cross-network private key contamination")
+    }
+
+    pub fn into_ref<T: PrivateKeyContainer>(&self) -> &T {
+        *self
+            .inner
+            .downcast_ref()
             .expect("illegal cross-network private key contamination")
     }
 }

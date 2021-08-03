@@ -31,12 +31,20 @@ use snarkvm_algorithms::{
     MerkleParameters,
     SignatureScheme,
 };
-use snarkvm_dpc::{Block, LedgerScheme, TransactionScheme, testnet1::{Testnet1Components, Transaction}};
+use snarkvm_dpc::{
+    testnet1::{Testnet1Components, Transaction},
+    Block,
+    LedgerScheme,
+    TransactionScheme,
+};
 
 mod merkle;
 pub use merkle::MerkleLedger;
 mod indexed_merkle_tree;
 pub use indexed_merkle_tree::IndexedMerkleTree;
+mod indexed_digests;
+pub use indexed_digests::IndexedDigests;
+
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::{FromBytes, ToBytes};
 
@@ -104,8 +112,10 @@ impl DynLedger {
     pub fn deserialize<'a, C: Testnet1Components>(&'a self) -> DeserializedLedger<'a, C> {
         //todo: cache this
         let crh = <C::MerkleParameters as MerkleParameters>::H::from(
-            FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes().expect("failed to load merkle parameters")[..])
-                .expect("failed to read merkle parameters"),
+            FromBytes::read_le(
+                &LedgerMerkleTreeParameters::load_bytes().expect("failed to load merkle parameters")[..],
+            )
+            .expect("failed to read merkle parameters"),
         );
         let parameters = Arc::new(C::MerkleParameters::from(crh));
 

@@ -16,7 +16,7 @@
 
 use crate::{error::ConsensusError, Consensus};
 use snarkos_storage::{SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
-use snarkvm_dpc::{Address, BlockHeader, BlockHeaderHash, DPCComponents, ProgramScheme, testnet1::instantiated::*};
+use snarkvm_dpc::{testnet1::instantiated::*, Address, BlockHeader, BlockHeaderHash, DPCComponents, ProgramScheme};
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
@@ -43,10 +43,7 @@ pub struct MineContext {
 }
 
 impl MineContext {
-    pub async fn prepare(
-        address: Address<Components>,
-        consensus: Arc<Consensus>,
-    ) -> Result<Self, ConsensusError> {
+    pub async fn prepare(address: Address<Components>, consensus: Arc<Consensus>) -> Result<Self, ConsensusError> {
         let canon = consensus.storage.canon().await?;
 
         let canon_header = consensus.storage.get_block_header(&canon.hash).await?;

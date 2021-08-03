@@ -19,7 +19,7 @@ mod protected_rpc_tests {
     use snarkos_consensus::Consensus;
     use snarkos_network::Node;
     use snarkos_rpc::*;
-    use snarkos_storage::{VMRecord, VMTransaction};
+    use snarkos_storage::VMTransaction;
     use snarkos_testing::{
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
@@ -33,7 +33,6 @@ mod protected_rpc_tests {
         },
         Address,
         PrivateKey,
-        RecordScheme,
         ViewKey,
     };
     use snarkvm_utilities::{
@@ -100,7 +99,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_authentication() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = invalid_authentication();
         let rpc = initialize_test_rpc(&consensus).await;
 
@@ -116,10 +115,10 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitment_count() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         consensus
             .storage
-            .store_records(&[DATA.records_1[0].serialize().unwrap()])
+            .store_records(&[DATA.records_1[0].clone()])
             .await
             .unwrap();
 
@@ -137,10 +136,10 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitments() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         consensus
             .storage
-            .store_records(&[DATA.records_1[0].serialize().unwrap()])
+            .store_records(&[DATA.records_1[0].clone()])
             .await
             .unwrap();
 
@@ -154,7 +153,7 @@ mod protected_rpc_tests {
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
         let expected_result = Value::Array(vec![Value::String(hex::encode(
-            to_bytes_le![DATA.records_1[0].commitment()].unwrap(),
+            to_bytes_le![&DATA.records_1[0].commitment].unwrap(),
         ))]);
 
         assert_eq!(extracted["result"], expected_result);
@@ -162,10 +161,10 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_raw_record() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         consensus
             .storage
-            .store_records(&[DATA.records_1[0].serialize().unwrap()])
+            .store_records(&[DATA.records_1[0].clone()])
             .await
             .unwrap();
 
@@ -173,7 +172,7 @@ mod protected_rpc_tests {
         let rpc = initialize_test_rpc(&consensus).await;
 
         let method = "getrawrecord".to_string();
-        let params = hex::encode(to_bytes_le![DATA.records_1[0].commitment()].unwrap());
+        let params = hex::encode(&DATA.records_1[0].commitment);
         let request = format!(
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": [\"{}\"] }}",
             method, params
@@ -189,7 +188,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decode_record() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
         let rpc = initialize_test_rpc(&consensus).await;
 
@@ -208,14 +207,15 @@ mod protected_rpc_tests {
 
         let record_info = record_info["result"].clone();
 
-        let owner = record.owner().to_string();
-        let is_dummy = record.is_dummy();
-        let value = record.value();
-        let birth_program_id = hex::encode(to_bytes_le![record.birth_program_id()].unwrap());
-        let death_program_id = hex::encode(to_bytes_le![record.death_program_id()].unwrap());
-        let serial_number_nonce = hex::encode(to_bytes_le![record.serial_number_nonce()].unwrap());
-        let commitment = hex::encode(to_bytes_le![record.commitment()].unwrap());
-        let commitment_randomness = hex::encode(to_bytes_le![record.commitment_randomness()].unwrap());
+        let owner: Address<Components> = record.owner.clone().into();
+        let owner = owner.to_string();
+        let is_dummy = record.is_dummy;
+        let value = record.value.0;
+        let birth_program_id = hex::encode(&record.birth_program_id);
+        let death_program_id = hex::encode(&record.death_program_id);
+        let serial_number_nonce = hex::encode(&record.serial_number_nonce);
+        let commitment = hex::encode(&record.commitment);
+        let commitment_randomness = hex::encode(&record.commitment_randomness);
 
         assert_eq!(owner, record_info["owner"]);
         assert_eq!(is_dummy, record_info["is_dummy"]);
@@ -229,18 +229,14 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decrypt_record() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
         let rpc = initialize_test_rpc(&consensus).await;
 
         let system_parameters = &FIXTURE_VK.dpc.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
 
-<<<<<<< HEAD
-        let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
-=======
-        let transaction = Tx::deserialize(&TRANSACTION_1).unwrap();
->>>>>>> bb8a80a7... wip
+        let transaction = Testnet1Transaction::deserialize(&TRANSACTION_1).unwrap();
         let ciphertexts = transaction.encrypted_records;
 
         let records = &DATA.records_1;
@@ -278,7 +274,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_raw_transaction() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
         let rpc = initialize_test_rpc(&consensus).await;
@@ -330,7 +326,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction_kernel() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
         let rpc = initialize_test_rpc(&consensus).await;
@@ -377,7 +373,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
         let rpc = initialize_test_rpc(&consensus).await;
@@ -423,7 +419,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_create_account() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
         let rpc = initialize_test_rpc(&consensus).await;
 

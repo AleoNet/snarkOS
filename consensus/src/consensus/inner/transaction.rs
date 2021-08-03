@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::testnet1::instantiated::{Testnet1DPC, Testnet1Transaction};
 use snarkos_storage::VMRecord;
-use std::io::Result as IoResult;
+use snarkvm_dpc::testnet1::instantiated::{Testnet1DPC, Testnet1Transaction};
 
 use crate::DeserializedLedger;
 
@@ -75,10 +74,10 @@ impl ConsensusInner {
             deserialized.push(Testnet1Transaction::deserialize(transaction)?);
         }
 
-        Ok(self.public.dpc.verify_transactions(
-            &deserialized[..],
-            &self.ledger.deserialize::<Components>(),
-        ))
+        Ok(self
+            .public
+            .dpc
+            .verify_transactions(&deserialized[..], &self.ledger.deserialize::<Components>()))
     }
 
     /// Generate a transaction by spending old records and specifying new record attributes
@@ -97,17 +96,18 @@ impl ConsensusInner {
                 .iter()
                 .map(|x| <DPCRecord<Components> as VMRecord>::deserialize(x))
                 .collect::<Result<Vec<_>, _>>()?,
-            request.new_records.into_iter().map(|x| DPCRecord::<Components>::deserialize(&x)).collect::<IoResult<Vec<_>>>()?,
+            request
+                .new_records
+                .into_iter()
+                .map(|x| DPCRecord::<Components>::deserialize(&x))
+                .collect::<Result<Vec<_>>>()?,
             request.memo,
             &mut rng,
         )?;
 
         // Construct the program proofs
-        let program_proofs = ConsensusParameters::generate_program_proofs(
-            &self.public.dpc,
-            &transaction_kernel,
-            &mut rng,
-        )?;
+        let program_proofs =
+            ConsensusParameters::generate_program_proofs(&self.public.dpc, &transaction_kernel, &mut rng)?;
 
         // Online execution to generate a DPC transaction
         let (new_records, transaction) = self.public.dpc.execute_online_phase(
@@ -140,11 +140,8 @@ impl ConsensusInner {
         let old_private_keys: Vec<_> = request.old_account_private_keys.into_iter().map(|x| x.into()).collect();
 
         // Construct the program proofs
-        let program_proofs = ConsensusParameters::generate_program_proofs(
-            &self.public.dpc,
-            &*transaction_kernel,
-            &mut rng,
-        )?;
+        let program_proofs =
+            ConsensusParameters::generate_program_proofs(&self.public.dpc, &*transaction_kernel, &mut rng)?;
 
         // Online execution to generate a DPC transaction
         let (new_records, transaction) = self.public.dpc.execute_online_phase(

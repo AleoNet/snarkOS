@@ -16,14 +16,14 @@
 
 mod consensus_integration {
     use snarkos_consensus::miner::MineContext;
-    use snarkos_storage::{SerialBlockHeader, SerialTransaction, VMTransaction};
+    use snarkos_storage::{SerialBlockHeader, SerialTransaction};
     use snarkos_testing::sync::*;
     use snarkvm_posw::txids_to_roots;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
     async fn test_find_block(transactions: &[SerialTransaction], parent_header: &SerialBlockHeader) {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();
 
@@ -49,8 +49,8 @@ mod consensus_integration {
     #[tokio::test]
     async fn find_valid_block() {
         let transactions = vec![
-            DATA.block_1.transactions.0[0].serialize().unwrap(),
-            DATA.block_2.transactions.0[0].serialize().unwrap(),
+            DATA.block_1.transactions[0].clone(),
+            DATA.block_2.transactions[0].clone(),
         ];
         let parent_header = genesis().header.into();
         test_find_block(&transactions, &parent_header).await;

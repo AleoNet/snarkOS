@@ -39,10 +39,11 @@ fn providing_sync_blocks(c: &mut Criterion) {
 
     let blocks = TestBlocks::load(Some(NUM_BLOCKS), "test_blocks_100_1");
     for block in &blocks.0 {
-        rt.block_on(provider.expect_sync().consensus.receive_block(&block, false))
-            .unwrap()
+        assert!(rt.block_on(provider.expect_sync().consensus.receive_block(block.clone())));
     }
-    assert_eq!(provider.expect_sync().current_block_height() as usize, NUM_BLOCKS);
+    let canon = rt.block_on(provider.storage.canon()).unwrap();
+
+    assert_eq!(canon.block_height, NUM_BLOCKS);
 
     c.bench_function("providing_sync_blocks", move |b| {
         b.to_async(&rt).iter(|| async {

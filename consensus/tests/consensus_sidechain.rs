@@ -26,7 +26,7 @@ mod consensus_sidechain {
     // After block 1 is received, block 2 should be fetched from storage and added to the chain.
     #[tokio::test]
     async fn new_out_of_order() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
 
         let old_block_height = consensus.storage.canon().await.unwrap().block_height;
 
@@ -50,7 +50,7 @@ mod consensus_sidechain {
     // Treat the first block received as the canonical chain but store and keep the rejected sidechain block in storage.
     #[tokio::test]
     async fn reject() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
 
         let block_1_canon = BLOCK_1.clone();
         let block_1_side = ALTERNATIVE_BLOCK_1.clone();
@@ -80,7 +80,7 @@ mod consensus_sidechain {
     // Receive blocks from a sidechain that overtakes our current canonical chain.
     #[tokio::test]
     async fn accept() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
 
         let block_1_canon = ALTERNATIVE_BLOCK_1.clone();
         let block_1_side = BLOCK_1.clone();
@@ -111,7 +111,8 @@ mod consensus_sidechain {
     // Receive blocks from a sidechain (out of order) that overtakes our current canonical chain.
     #[tokio::test]
     async fn fork_out_of_order() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        // tracing_subscriber::fmt::init();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
 
         let block_1_canon = BLOCK_1.clone();
         let block_2_canon = BLOCK_2.clone();
@@ -146,7 +147,7 @@ mod consensus_sidechain {
 
         new_block_height = consensus.storage.canon().await.unwrap().block_height;
 
-        assert_eq!(old_block_height + 1, new_block_height);
+        assert_eq!(old_block_height, new_block_height);
 
         // 4. Receive valid canon block 1 and accept the previous irrelevant block 2
 
@@ -156,12 +157,12 @@ mod consensus_sidechain {
 
         new_block_height = consensus.storage.canon().await.unwrap().block_height;
 
-        assert_eq!(old_block_height, new_block_height);
+        assert_eq!(old_block_height + 1, new_block_height);
     }
 
     #[tokio::test]
     async fn decommit_one_block() {
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
 
         // Introduce one block.
         let block_1 = BLOCK_1.clone();
@@ -202,8 +203,8 @@ mod consensus_sidechain {
         // tracing_subscriber::fmt::init();
         let mut rng = thread_rng();
 
-        let consensus1 = snarkos_testing::sync::create_test_consensus();
-        let consensus2 = snarkos_testing::sync::create_test_consensus();
+        let consensus1 = snarkos_testing::sync::create_test_consensus().await;
+        let consensus2 = snarkos_testing::sync::create_test_consensus().await;
 
         // Consensus 1 imports a random number of blocks lower than consensus 2.
         let blocks_1 = TestBlocks::load(Some(rng.gen_range(0..=50)), "test_blocks_100_1").0;
@@ -226,7 +227,7 @@ mod consensus_sidechain {
             .unwrap(); // no common blocks
         assert_eq!(
             &consensus2_sync_blocks[0],
-            &consensus2.storage.get_block_hash(0).await.unwrap().unwrap()
+            &consensus2.storage.get_block_hash(1).await.unwrap().unwrap()
         );
 
         // Consensus 1 imports a few random blocks that consensus 2 has.
@@ -258,8 +259,8 @@ mod consensus_sidechain {
         // tracing_subscriber::fmt::init();
         let mut rng = thread_rng();
 
-        let consensus1 = snarkos_testing::sync::create_test_consensus();
-        let consensus2 = snarkos_testing::sync::create_test_consensus();
+        let consensus1 = snarkos_testing::sync::create_test_consensus().await;
+        let consensus2 = snarkos_testing::sync::create_test_consensus().await;
 
         let blocks1 = TestBlocks::load(Some(50), "test_blocks_100_1").0; // side chain blocks
         let blocks2 = TestBlocks::load(Some(100), "test_blocks_100_2").0; // canon blocks
@@ -325,8 +326,8 @@ mod consensus_sidechain {
     async fn forking_back_and_forth() {
         // tracing_subscriber::fmt::init();
 
-        let consensus1 = snarkos_testing::sync::create_test_consensus();
-        let consensus2 = snarkos_testing::sync::create_test_consensus();
+        let consensus1 = snarkos_testing::sync::create_test_consensus().await;
+        let consensus2 = snarkos_testing::sync::create_test_consensus().await;
 
         let blocks1 = TestBlocks::load(Some(10), "test_blocks_100_1").0;
         let blocks2 = TestBlocks::load(Some(10), "test_blocks_100_2").0;
@@ -368,7 +369,7 @@ mod consensus_sidechain {
     async fn decommit_many_and_reimport() {
         // tracing_subscriber::fmt::init();
 
-        let consensus = snarkos_testing::sync::create_test_consensus();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let blocks = TestBlocks::load(Some(20), "test_blocks_100_1").0;
 
         // Consensus imports 20 blocks.

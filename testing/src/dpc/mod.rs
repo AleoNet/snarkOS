@@ -16,11 +16,11 @@
 
 use std::sync::Arc;
 
+use snarkos_consensus::DeserializedLedger;
 use snarkvm_algorithms::{MerkleParameters, CRH};
-use snarkvm_dpc::{Account, DPCScheme, testnet1::{instantiated::*}};
+use snarkvm_dpc::{testnet1::instantiated::*, Account, DPCScheme};
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::FromBytes;
-use snarkos_consensus::DeserializedLedger;
 
 use rand::{CryptoRng, Rng};
 
@@ -47,12 +47,10 @@ pub fn setup_or_load_parameters<R: Rng + CryptoRng>(
     (ledger_merkle_tree_parameters, dpc)
 }
 
-pub fn generate_test_accounts<R: Rng + CryptoRng>(
-    dpc: &Testnet1DPC,
-    rng: &mut R,
-) -> [Account<Components>; 3] {
+pub fn generate_test_accounts<R: Rng + CryptoRng>(dpc: &Testnet1DPC, rng: &mut R) -> [Account<Components>; 3] {
     // TODO (howardwu): Remove DPCScheme<MerkleTreeLedger<S>> usage after decoupling ledger.
-    let genesis_account = <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::create_account(dpc, rng).unwrap();
+    let genesis_account =
+        <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::create_account(dpc, rng).unwrap();
     let account_1 = <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::create_account(dpc, rng).unwrap();
     let account_2 = <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::create_account(dpc, rng).unwrap();
 
