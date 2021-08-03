@@ -32,37 +32,27 @@ pub static DATA: Lazy<TestData> = Lazy::new(load_test_data);
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
 pub static BLOCK_1: Lazy<SerialBlock> = Lazy::new(|| DATA.block_1.clone());
-pub static BLOCK_1_HEADER_HASH: Lazy<Digest> = Lazy::new(|| DATA.block_1.header.hash().clone());
+pub static BLOCK_1_HEADER_HASH: Lazy<Digest> = Lazy::new(|| DATA.block_1.header.hash());
 
 pub static BLOCK_2: Lazy<SerialBlock> = Lazy::new(|| DATA.block_2.clone());
-pub static BLOCK_2_HEADER_HASH: Lazy<Digest> = Lazy::new(|| DATA.block_2.header.hash().clone());
+pub static BLOCK_2_HEADER_HASH: Lazy<Digest> = Lazy::new(|| DATA.block_2.header.hash());
 
 pub static TRANSACTION_1: Lazy<SerialTransaction> = Lazy::new(|| DATA.block_1.transactions[0].clone());
 pub static TRANSACTION_2: Lazy<SerialTransaction> = Lazy::new(|| DATA.block_2.transactions[0].clone());
 
 // Alternative blocks used for testing syncs and rollbacks
-pub static ALTERNATIVE_BLOCK_1: Lazy<SerialBlock> = Lazy::new(|| {
-    let alternative_block_1 = SerialBlock {
-        header: DATA.alternative_block_1_header.clone(),
-        transactions: DATA.block_1.transactions.clone(),
-    };
-
-    alternative_block_1
+pub static ALTERNATIVE_BLOCK_1: Lazy<SerialBlock> = Lazy::new(|| SerialBlock {
+    header: DATA.alternative_block_1_header.clone(),
+    transactions: DATA.block_1.transactions.clone(),
 });
 
-pub static ALTERNATIVE_BLOCK_2: Lazy<SerialBlock> = Lazy::new(|| {
-    let alternative_block_2 = SerialBlock {
-        header: DATA.alternative_block_2_header.clone(),
-        transactions: DATA.block_2.transactions.clone(),
-    };
-
-    alternative_block_2
+pub static ALTERNATIVE_BLOCK_2: Lazy<SerialBlock> = Lazy::new(|| SerialBlock {
+    header: DATA.alternative_block_2_header.clone(),
+    transactions: DATA.block_2.transactions.clone(),
 });
 
 pub fn genesis() -> Block<Testnet1Transaction> {
-    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
-
-    genesis_block
+    FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap()
 }
 
 pub struct TestData {

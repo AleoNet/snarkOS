@@ -117,7 +117,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     }
 
     pub(super) fn delete_block(&mut self, hash: &Digest) -> Result<()> {
-        match self.get_block_state(&hash)? {
+        match self.get_block_state(hash)? {
             BlockStatus::Unknown => return Ok(()),
             BlockStatus::Uncommitted => (),
             BlockStatus::Committed(_) => return Err(anyhow!("attempted to delete committed block")),

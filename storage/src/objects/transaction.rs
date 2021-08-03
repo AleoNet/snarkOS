@@ -234,7 +234,7 @@ mod tests {
             old_serial_numbers: vec![test_serial[..].into(), test_serial[..].into()],
             new_commitments: vec![[3u8; 32].into(), [5u8; 32].into()],
 
-            new_records: vec![record.clone().into(), record.clone().into()],
+            new_records: vec![record.clone(), record],
             program_commitment: [7u8; 32].into(),
             local_data_root: [8u8; 32].into(),
             value_balance: AleoAmount(1000),

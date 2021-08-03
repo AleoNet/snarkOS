@@ -90,9 +90,9 @@ impl VMRecord for Record<Components> {
             Payload::from_bytes(&record.payload[..]),
             record.birth_program_id.to_vec(),
             record.death_program_id.to_vec(),
-            FromBytes::from_bytes_le(&mut &record.serial_number_nonce.0[..])?,
-            FromBytes::from_bytes_le(&mut &record.commitment.0[..])?,
-            FromBytes::from_bytes_le(&mut &record.commitment_randomness.0[..])?,
+            FromBytes::from_bytes_le(&record.serial_number_nonce.0[..])?,
+            FromBytes::from_bytes_le(&record.commitment.0[..])?,
+            FromBytes::from_bytes_le(&record.commitment_randomness.0[..])?,
             serial_number_nonce_randomness,
         ))
     }

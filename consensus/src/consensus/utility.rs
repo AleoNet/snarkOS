@@ -53,10 +53,7 @@ impl Consensus {
         .unwrap();
 
         // Generate dummy input records having as address the genesis address.
-        let old_account_private_keys = vec![new_account.private_key.clone(); Components::NUM_INPUT_RECORDS]
-            .into_iter()
-            .map(|x| x.into())
-            .collect::<Vec<_>>();
+        let old_account_private_keys = vec![new_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
         let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut joint_serial_numbers = vec![];
 
@@ -154,7 +151,7 @@ impl Consensus {
         value: AleoAmount,
         payload: Payload,
     ) -> Result<SerialRecord> {
-        Ok(DPCRecord::new_full(
+        DPCRecord::new_full(
             &self.dpc.system_parameters.serial_number_nonce,
             &self.dpc.system_parameters.record_commitment,
             new_record_owner.into(),
@@ -167,6 +164,6 @@ impl Consensus {
             joint_serial_numbers.to_vec(),
             &mut thread_rng(),
         )?
-        .serialize()?)
+        .serialize()
     }
 }

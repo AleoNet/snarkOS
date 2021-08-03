@@ -43,7 +43,7 @@ impl<P: MerkleParameters> MerkleLedger<P> {
         Ok(Self {
             ledger_digests: ledger_digests.iter().cloned().collect(),
             commitments: IndexedMerkleTree::new(parameters.clone(), commitments)?,
-            serial_numbers: IndexedMerkleTree::new(parameters.clone(), serial_numbers)?,
+            serial_numbers: IndexedMerkleTree::new(parameters, serial_numbers)?,
             memos: IndexedDigests::new(memos),
         })
     }

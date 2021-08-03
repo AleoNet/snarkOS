@@ -99,7 +99,7 @@ impl ConsensusInner {
 
                             for block_hash in fork_path.path {
                                 if &block_hash == hash {
-                                    self.verify_and_commit_block(&hash, block).await?
+                                    self.verify_and_commit_block(hash, block).await?
                                 } else {
                                     let new_block = self.storage.get_block(&block_hash).await?;
                                     self.verify_and_commit_block(&new_block.header.hash(), &new_block)
@@ -124,7 +124,7 @@ impl ConsensusInner {
                 }
             }
         }
-        self.verify_and_commit_block(&hash, block).await?;
+        self.verify_and_commit_block(hash, block).await?;
         Ok(())
     }
 

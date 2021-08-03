@@ -373,7 +373,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         assert!(!transaction_input.old_records.is_empty());
         assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
         assert!(!transaction_input.old_account_private_keys.is_empty());
-        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_INPUT_RECORDS);
         assert!(!transaction_input.recipients.is_empty());
         assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
 
@@ -391,7 +391,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_records.push(DPCRecord::<Components>::read_le(&record_bytes[..])?.serialize()?);
         }
 
-        let mut old_account_private_keys = Vec::with_capacity(transaction_input.old_account_private_keys.len());
+        let mut old_account_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for private_key_string in transaction_input.old_account_private_keys {
             old_account_private_keys.push(PrivateKey::<Components>::from_str(&private_key_string)?);
         }
@@ -400,11 +400,9 @@ impl ProtectedRpcFunctions for RpcImpl {
         let mut joint_serial_numbers = vec![];
 
         // Fill any unused old_record indices with dummy records
-        for i in 0..Components::NUM_OUTPUT_RECORDS {
+        while old_records.len() < Components::NUM_INPUT_RECORDS {
             let old_sn_nonce = self.dpc()?.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
-            let private_key = old_account_private_keys
-                .get(i)
-                .unwrap_or_else(|| old_account_private_keys.last().unwrap());
+            let private_key = old_account_private_keys[0].clone();
 
             let address = Address::<Components>::from_private_key(
                 &self.dpc()?.system_parameters.account_signature,
@@ -430,10 +428,10 @@ impl ProtectedRpcFunctions for RpcImpl {
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
 
             old_records.push(dummy_record.serialize()?);
+            old_account_private_keys.push(private_key);
         }
 
         assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
-        assert_eq!(old_account_private_keys.len(), Components::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
         let mut new_record_owners = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
@@ -478,7 +476,7 @@ impl ProtectedRpcFunctions for RpcImpl {
                 DPCRecord::new_full(
                     &consensus.dpc.system_parameters.serial_number_nonce,
                     &consensus.dpc.system_parameters.record_commitment,
-                    new_record_owners[j].clone().into(),
+                    new_record_owners[j].clone(),
                     new_is_dummy_flags[j],
                     new_values[j],
                     new_payloads[j].clone(),
