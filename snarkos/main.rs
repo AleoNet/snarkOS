@@ -131,7 +131,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if config.storage.trim {
         let now = std::time::Instant::now();
         // There shouldn't be issues after validation, but if there are, ignore them.
-        let _ = snarkos_storage::trim(storage.clone());
+        let _ = snarkos_storage::trim(storage.clone()).await;
         info!("Storage trimmed in {}ms", now.elapsed().as_millis());
         return Ok(());
     }
@@ -139,6 +139,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if let Some(limit) = config.storage.export {
         let mut export_path = path.clone();
         export_path.push("canon_blocks");
+
+        let limit = if limit == 0 { None } else { Some(limit) };
 
         let now = std::time::Instant::now();
         match export_canon_blocks(storage.clone(), limit, &export_path).await {

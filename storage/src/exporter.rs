@@ -23,15 +23,20 @@ use std::{fs, io::BufWriter, path::Path};
 use crate::DynStorage;
 
 /// Serializes the node's stored canon blocks into a single file written to `location`; `limit` specifies the limit
-/// on the number of blocks to export, with `0` being no limit (a full export). Returns the number of exported
+/// on the number of blocks to export, with None being no limit (a full export). Returns the number of exported
 /// blocks.
-pub async fn export_canon_blocks(storage: DynStorage, limit: u32, location: &Path) -> Result<usize, anyhow::Error> {
+pub async fn export_canon_blocks(
+    storage: DynStorage,
+    limit: Option<u32>,
+    location: &Path,
+) -> Result<usize, anyhow::Error> {
     info!("Exporting the node's canon blocks to {}", location.display());
 
-    let blocks = storage.get_canon_blocks(Some(limit)).await?;
+    let blocks = storage.get_canon_blocks(limit.map(|x| x + 1)).await?;
 
     let mut target_file = BufWriter::new(fs::File::create(location)?);
-    for block in &blocks {
+    for block in blocks.iter().skip(1) {
+        // skip genesis block
         block.write_le(&mut target_file)?;
     }
 

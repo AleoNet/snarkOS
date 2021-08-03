@@ -67,17 +67,6 @@ async fn trim_side_chain_blocks() {
 
         // Check the txs.
         consensus.storage.get_block(&hash).await.unwrap();
-
-        // Check tx locations.
-        for tx in &block.transactions {
-            let tx_location = consensus
-                .storage
-                .get_transaction_location(tx.id.into())
-                .await
-                .unwrap()
-                .unwrap();
-            assert!(block_hashes1.contains(&tx_location.block_hash));
-        }
     }
 
     // Trim the storage; only the objects related to canon blocks should remain now.

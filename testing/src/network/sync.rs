@@ -150,7 +150,7 @@ async fn block_responder_side() {
         unreachable!();
     };
 
-    let block_header_hash = sync.first().unwrap();
+    let block_header_hash = sync.get(1).unwrap();
     let block_header_hash_digest: Digest = block_header_hash.0.into();
     // check it matches the block inserted into the node's ledger
     assert_eq!(block_header_hash_digest, block_struct_1.header.hash());
@@ -236,6 +236,7 @@ async fn block_two_node() {
 
 #[tokio::test]
 async fn transaction_initiator_side() {
+    // tracing_subscriber::fmt::init();
     // handshake between a fake node and a full node
     let setup = TestSetup {
         consensus_setup: Some(ConsensusSetup {
@@ -265,27 +266,17 @@ async fn transaction_initiator_side() {
     });
 
     // Respond with MemoryPool message
-    let memory_pool = Payload::MemoryPool(vec![
-        to_bytes_le![&*TRANSACTION_1].unwrap(),
-        to_bytes_le![&*TRANSACTION_2].unwrap(),
-    ]);
+    let memory_pool = Payload::MemoryPool(vec![to_bytes_le![&*TRANSACTION_2].unwrap()]);
     peer.write_message(&memory_pool).await;
 
-    // Verify the transactions have been stored in the node's memory pool (by no longer being valid)
-    wait_until!(
-        1,
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    // Verify the transactions have been recevied (and cannot be received again)
+    assert!(
         !node
             .expect_sync()
             .consensus
-            .verify_transactions(vec![TRANSACTION_1.clone()])
-            .await
-    );
-    wait_until!(
-        1,
-        !node
-            .expect_sync()
-            .consensus
-            .verify_transactions(vec![TRANSACTION_2.clone()])
+            .receive_transaction(TRANSACTION_2.clone())
             .await
     );
 }

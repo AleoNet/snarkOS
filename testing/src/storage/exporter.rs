@@ -39,7 +39,7 @@ async fn import_export_blocks() {
     // Export the canon blocks to a temp file.
     let mut path = env::temp_dir();
     path.push(random_storage_path());
-    snarkos_storage::export_canon_blocks(consensus.storage.clone(), 0, &path)
+    snarkos_storage::export_canon_blocks(consensus.storage.clone(), None, &path)
         .await
         .unwrap();
 
