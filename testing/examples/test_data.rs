@@ -25,14 +25,12 @@ use snarkvm_dpc::{
     DPCComponents,
 };
 
-use rand::{CryptoRng, Rng};
 use snarkvm_utilities::ToBytes;
 use std::{fs::File, path::PathBuf};
 use tracing::info;
 
 async fn setup_test_data() -> Result<TestData, ConsensusError> {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
-    let mut rng = FIXTURE.rng.clone();
     let consensus = snarkos_testing::sync::create_test_consensus().await;
 
     // setup the miner
@@ -51,7 +49,6 @@ async fn setup_test_data() -> Result<TestData, ConsensusError> {
         coinbase_records.clone(),
         &acc_1.address,
         10,
-        &mut rng,
         [0u8; 32],
     )
     .await?;
@@ -109,13 +106,12 @@ async fn mine_block(
 /// Spends some value from inputs owned by the sender, to the receiver,
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
-async fn send<R: Rng + CryptoRng>(
+async fn send(
     consensus: &Consensus,
     from: &Account<Components>,
     inputs: Vec<SerialRecord>,
     receiver: &Address<Components>,
     amount: i64,
-    rng: &mut R,
     memo: [u8; 32],
 ) -> Result<TransactionResponse, ConsensusError> {
     let mut sum = 0;

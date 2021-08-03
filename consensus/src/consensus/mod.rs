@@ -36,7 +36,6 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::{error::ConsensusError, ConsensusParameters, DynLedger, MemoryPool};
 
-use self::message::{ConsensusMessage, TransactionResponse};
 use anyhow::*;
 
 mod inner;

@@ -29,7 +29,6 @@ use snarkvm_dpc::{
 };
 use tracing_subscriber::EnvFilter;
 
-use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf};
 
 async fn mine_block(
@@ -59,13 +58,12 @@ async fn mine_block(
 /// Spends some value from inputs owned by the sender, to the receiver,
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
-async fn send<R: Rng + CryptoRng>(
+async fn send(
     consensus: &Consensus,
     from: &Account<Components>,
     inputs: Vec<SerialRecord>,
     receiver: &Address<Components>,
     amount: i64,
-    rng: &mut R,
     memo: [u8; 32],
 ) -> Result<TransactionResponse, ConsensusError> {
     let mut sum = 0;
@@ -107,7 +105,6 @@ async fn send<R: Rng + CryptoRng>(
 async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     info!("Creating test account");
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
-    let mut rng = FIXTURE.rng.clone();
     info!("Creating sync");
     let consensus = crate::create_test_consensus().await;
 
@@ -135,7 +132,6 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
             coinbase_records.clone(),
             &acc_1.address,
             (10 + i).into(),
-            &mut rng,
             memo,
         )
         .await?;
