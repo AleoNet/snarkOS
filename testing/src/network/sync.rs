@@ -301,12 +301,6 @@ async fn transaction_responder_side() {
     assert!(
         node.expect_sync()
             .consensus
-            .receive_transaction(TRANSACTION_1.clone())
-            .await
-    );
-    assert!(
-        node.expect_sync()
-            .consensus
             .receive_transaction(TRANSACTION_2.clone())
             .await
     );
@@ -324,7 +318,6 @@ async fn transaction_responder_side() {
     };
 
     // check transactions
-    assert!(txs.contains(&to_bytes_le![&*TRANSACTION_1].unwrap()));
     assert!(txs.contains(&to_bytes_le![&*TRANSACTION_2].unwrap()));
 }
 
@@ -338,7 +331,7 @@ async fn transaction_two_node() {
         node_alice
             .expect_sync()
             .consensus
-            .receive_transaction(TRANSACTION_1.clone())
+            .receive_transaction(TRANSACTION_2.clone())
             .await
     );
 
@@ -361,6 +354,6 @@ async fn transaction_two_node() {
             .consensus
             .fetch_memory_pool()
             .await
-            .contains(&TRANSACTION_1)
+            .contains(&TRANSACTION_2)
     );
 }
