@@ -151,7 +151,7 @@ impl Consensus {
     }
 
     /// Diagnostic function to scan for valid forks
-    pub async fn scan_forks(&self) -> Result<()> {
+    pub async fn scan_forks(&self) -> Result<Vec<(Digest, Digest)>> {
         self.send(ConsensusMessage::ScanForks()).await
     }
 

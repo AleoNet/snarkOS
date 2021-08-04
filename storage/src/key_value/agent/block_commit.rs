@@ -24,19 +24,19 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
         let header = self.get_block_header(hash)?;
         let canon_height = self.canon_height()?;
         let mut parent_hash = header.previous_block_hash;
-        for i in 0..=oldest_fork_threshold {
+        for _ in 0..=90000 {
             // check if the part is part of the canon chain
             match self.get_block_state(&parent_hash)? {
                 // This is a canon parent
                 BlockStatus::Committed(block_num) => {
                     // Add the children from the latest block
-                    if block_num + oldest_fork_threshold - i < canon_height as usize {
+                    if canon_height as usize - block_num > oldest_fork_threshold {
                         debug!("exceeded maximum fork length in extended path");
                         return Ok(ForkDescription::TooLong);
                     }
                     let longest_path = self.longest_child_path(hash)?;
+                    debug!("longest child path terminating in {:?}", longest_path.last());
                     side_chain_path.extend(longest_path);
-
                     return Ok(ForkDescription::Path(ForkPath {
                         base_index: block_num as u32,
                         path: side_chain_path.into(),

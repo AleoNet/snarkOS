@@ -25,15 +25,7 @@ use crate::{
     MemoryPool,
 };
 use anyhow::*;
-use snarkos_storage::{
-    BlockStatus,
-    Digest,
-    DynStorage,
-    ForkDescription,
-    SerialBlock,
-    SerialTransaction,
-    VMTransaction,
-};
+use snarkos_storage::{BlockFilter, BlockOrder, BlockStatus, Digest, DynStorage, ForkDescription, SerialBlock, SerialTransaction, VMTransaction};
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, Record as DPCRecord, TransactionKernel},
     DPCScheme,
@@ -68,28 +60,38 @@ struct LedgerData {
 
 impl ConsensusInner {
     /// scans uncommitted blocks for forks
-    async fn scan_forks(&mut self) -> Result<()> {
-        let blocks = self
+    async fn scan_forks(&mut self) -> Result<Vec<(Digest, Digest)>> {
+        let canon_hashes = self
             .storage
-            .get_block_hashes(None, snarkos_storage::BlockFilter::NonCanonOnly)
+            .get_block_hashes(
+                Some(crate::OLDEST_FORK_THRESHOLD as u32 + 1),
+                BlockFilter::CanonOnly(BlockOrder::Descending),
+            )
             .await?;
-        info!("scanning {} blocks for forks", blocks.len());
-        for hash in blocks {
-            let header = self.storage.get_block_header(&hash).await?;
-            let parent_state = self.storage.get_block_state(&header.previous_block_hash).await?;
-            match parent_state {
-                BlockStatus::Unknown => continue, // orphan
-                BlockStatus::Committed(_) => (),  // uncomitted child of canon, could be a fork or a hanging block
-                BlockStatus::Uncommitted => {
-                    // mid-fork or orphan chain, wait for head of fork
-                    continue;
-                }
-            };
-            let block = self.storage.get_block(&hash).await?;
 
-            self.try_commit_block(&hash, &block).await?;
+        if canon_hashes.len() < 2 {
+            // windows will panic if len < 2
+            return Ok(vec![]);
         }
-        Ok(())
+
+        let mut known_forks = vec![];
+
+        for canon_hashes in canon_hashes.windows(2) {
+            // windows will ignore last block (furthest down), so we pull one extra above
+            let target_hash = &canon_hashes[1];
+            let ignore_child_hash = &canon_hashes[0];
+            let children = self.storage.get_block_children(target_hash).await?;
+            if children.len() == 1 && &children[0] == ignore_child_hash {
+                continue;
+            }
+            for child in children {
+                if &child != ignore_child_hash {
+                    known_forks.push((target_hash.clone(), child));
+                }
+            }
+        }
+
+        Ok(known_forks)
     }
 
     fn fresh_ledger(&self, blocks: Vec<SerialBlock>) -> Result<LedgerData> {

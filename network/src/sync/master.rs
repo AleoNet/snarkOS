@@ -80,7 +80,23 @@ impl SyncMaster {
     }
 
     async fn block_locator_hashes(&mut self) -> Result<Vec<Digest>> {
-        match self.node.storage.get_block_locator_hashes().await {
+        let forks_of_interest = self.node.expect_sync().consensus.scan_forks().await?;
+        let blocks_of_interest: Vec<Digest> = forks_of_interest.into_iter().map(|(_canon, fork)| fork).collect();
+        let mut tips_of_blocks_of_interest: Vec<Digest> = Vec::with_capacity(blocks_of_interest.len());
+        for block in blocks_of_interest {
+            let mut fork_path = self.node.storage.longest_child_path(&block).await?;
+            if fork_path.len() < 2 {
+                // a minor fork, we probably don't care
+                continue;
+            }
+            tips_of_blocks_of_interest.push(fork_path.pop().unwrap());
+        }
+        match self
+            .node
+            .storage
+            .get_block_locator_hashes(tips_of_blocks_of_interest, snarkos_consensus::OLDEST_FORK_THRESHOLD)
+            .await
+        {
             Ok(block_locator_hashes) => Ok(block_locator_hashes),
             Err(e) => {
                 error!("Unable to get block locator hashes from storage: {:?}", e);

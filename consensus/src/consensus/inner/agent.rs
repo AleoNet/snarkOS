@@ -37,6 +37,22 @@ impl ConsensusInner {
         // info!("rebuilding canon");
         // self.diff_canon().await?;
         // self.recommit_canon().await?; // TODO: DEFINITELY REMOVE
+        let forks = self.scan_forks().await?;
+        for (canon, fork_child) in forks {
+            let canon_height = match self.storage.get_block_state(&canon).await? {
+                BlockStatus::Committed(n) => n,
+                _ => continue,
+            };
+            let fork_blocks = self.storage.longest_child_path(&fork_child).await?;
+            debug!(
+                "fork detected @ {}/{} -- starts at {}, goes for {} blocks, ending at {}",
+                canon_height,
+                canon,
+                fork_child,
+                fork_blocks.len(),
+                fork_blocks.last().unwrap()
+            );
+        }
         // info!("rebuilt canon");
         if let Err(e) = self.try_to_fast_forward().await {
             match e {

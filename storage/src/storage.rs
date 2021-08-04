@@ -53,11 +53,18 @@ pub struct CanonData {
     pub hash: Digest,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BlockFilter {
-    CanonOnly,
+    CanonOnly(BlockOrder),
     NonCanonOnly,
     All,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BlockOrder {
+    Ascending,
+    Descending,
+    Unordered,
 }
 
 /// An application level storage interface
@@ -100,8 +107,15 @@ pub trait Storage: Send + Sync {
     /// Gets the longest, committed or uncommitted, chain of blocks originating from `block_hash`, including `block_hash`.
     async fn longest_child_path(&self, block_hash: &Digest) -> Result<Vec<Digest>>;
 
+    /// Gets the immediate children of `block_hash`.
+    async fn get_block_children(&self, block_hash: &Digest) -> Result<Vec<Digest>>;
+
     /// Gets a series of hashes used for relaying current block sync state.
-    async fn get_block_locator_hashes(&self) -> Result<Vec<Digest>>;
+    async fn get_block_locator_hashes(
+        &self,
+        points_of_interest: Vec<Digest>,
+        oldest_fork_threshold: usize,
+    ) -> Result<Vec<Digest>>;
 
     /// Find hashes to provide for a syncing node given `block_locator_hashes`.
     async fn find_sync_blocks(&self, block_locator_hashes: &[Digest], block_count: usize) -> Result<Vec<Digest>>;
@@ -161,7 +175,7 @@ pub trait Storage: Send + Sync {
     /// Gets a dump of all stored canon blocks, in block-number ascending order. A maintenance function, not intended for general use.
     async fn get_canon_blocks(&self, limit: Option<u32>) -> Result<Vec<SerialBlock>>;
 
-    /// Similar to `Storage::get_canon_blocks`, gets hashes of all blocks subject to `filter` and `limit` in block-number ascending order. A maintenance function, not intended for general use.
+    /// Similar to `Storage::get_canon_blocks`, gets hashes of all blocks subject to `filter` and `limit` in filter-defined order. A maintenance function, not intended for general use.
     async fn get_block_hashes(&self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>>;
 
     /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
