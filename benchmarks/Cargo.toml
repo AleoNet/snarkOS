@@ -32,6 +32,11 @@ name = "network"
 path = "network/network.rs"
 harness = false
 
+[[bench]]
+name = "network_metrics"
+path = "network/network_metrics.rs"
+harness = false
+
 [dependencies.snarkvm-algorithms]
 version = "=0.7.6"
 
