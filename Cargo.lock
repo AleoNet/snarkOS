@@ -2633,6 +2633,7 @@ dependencies = [
  "csv",
  "derivative",
  "digest 0.7.6",
+ "itertools",
  "rand 0.8.4",
  "rand_xorshift",
  "rayon",
