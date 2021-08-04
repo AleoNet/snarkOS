@@ -19,6 +19,6 @@ The `KeyValueStore` guarantees atomicity and strongly consistent/ordered in the 
 
 ## Dividing Storage and Consensus
 
-There is a good amount of hazyness between where consensus ends and storage begins. In large part, this is due to needing to tightly couple some consensus semantics with hard DB implementations for performance. The result is functions like `Storage::get_block_locator_hashes`.
+There is a good amount of haziness between where consensus ends and storage begins. In large part, this is due to needing to tightly couple some consensus semantics with hard DB implementations for performance. The result is functions like `Storage::get_block_locator_hashes`.
 
 As a standard, we are drawing the line where there is a large series of storage-only calls for one atomic, application-level operation. I.e. commiting a block, inserting a block, getting locator hashes, checking canon state, are all examples of storage level operations. Checking block validity, integrating with ledger/memory pool, and performing transaction validity are not storage heavy operations, so are left in consensus.
