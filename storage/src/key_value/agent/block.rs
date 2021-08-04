@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, convert::TryInto};
+
+use tracing::trace;
+
+use crate::BlockOrder;
 
 use super::*;
 
@@ -224,34 +228,49 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
         })
     }
 
-    pub(super) fn get_block_locator_hashes(&mut self) -> Result<Vec<Digest>> {
+    pub(super) fn get_block_locator_hashes(
+        &mut self,
+        points_of_interest: Vec<Digest>,
+        oldest_fork_threshold: usize,
+    ) -> Result<Vec<Digest>> {
         let canon = self.canon()?;
+        let target_height = canon.block_height as u32;
 
         // The number of locator hashes left to obtain; accounts for the genesis block.
-        let mut num_locator_hashes = std::cmp::min(crate::NUM_LOCATOR_HASHES - 1, canon.block_height as u32);
+        let mut num_locator_hashes = std::cmp::min(crate::NUM_LOCATOR_HASHES - 1, target_height);
 
         // The output list of block locator hashes.
-        let mut block_locator_hashes = Vec::with_capacity(num_locator_hashes as usize);
+        let mut block_locator_hashes = Vec::with_capacity(num_locator_hashes as usize + points_of_interest.len());
+
+        for hash in points_of_interest {
+            trace!("block locator hash -- interesting: block# none: {}", hash);
+            block_locator_hashes.push(hash);
+        }
 
         // The index of the current block for which a locator hash is obtained.
-        let mut hash_index = canon.block_height as u32;
+        let mut hash_index = target_height;
 
         // The number of top blocks to provide locator hashes for.
         let num_top_blocks = std::cmp::min(10, num_locator_hashes);
 
         for _ in 0..num_top_blocks {
-            block_locator_hashes.push(self.get_block_hash_guarded(hash_index)?);
+            let hash = self.get_block_hash_guarded(hash_index)?;
+            trace!("block locator hash -- top: block# {}: {}", hash_index, hash);
+            block_locator_hashes.push(hash);
             hash_index -= 1; // safe; num_top_blocks is never higher than the height
         }
 
         num_locator_hashes -= num_top_blocks;
         if num_locator_hashes == 0 {
-            block_locator_hashes.push(self.get_block_hash_guarded(0)?);
+            let hash = self.get_block_hash_guarded(0)?;
+            trace!("block locator hash -- genesis: block# {}: {}", 0, hash);
+            block_locator_hashes.push(hash);
             return Ok(block_locator_hashes);
         }
 
         // Calculate the average distance between block hashes based on the desired number of locator hashes.
-        let mut proportional_step = hash_index / num_locator_hashes;
+        let mut proportional_step =
+            (hash_index.min(oldest_fork_threshold as u32) / num_locator_hashes).min(crate::NUM_LOCATOR_HASHES - 1);
 
         // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
         // lower or close to the proportional step distance.
@@ -263,14 +282,17 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
         // Obtain a few hashes increasing the distance quadratically.
         let mut quadratic_step = 2; // the size of the first quadratic step
         for _ in 0..num_quadratic_steps {
-            block_locator_hashes.push(self.get_block_hash_guarded(hash_index)?);
+            let hash = self.get_block_hash_guarded(hash_index)?;
+            trace!("block locator hash -- quadratic: block# {}: {}", hash_index, hash);
+            block_locator_hashes.push(hash);
             hash_index = hash_index.saturating_sub(quadratic_step);
             quadratic_step *= 2;
         }
 
         // Update the size of the proportional step so that the hashes of the remaining blocks have the same distance
         // between one another.
-        proportional_step = hash_index / num_proportional_steps;
+        proportional_step =
+            (hash_index.min(oldest_fork_threshold as u32) / num_locator_hashes).min(crate::NUM_LOCATOR_HASHES - 1);
 
         // Tweak: in order to avoid "jumping" by too many indices with the last step,
         // increase the value of each step by 1 if the last step is too large. This
@@ -282,14 +304,18 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
 
         // Obtain the rest of hashes with a proportional distance between them.
         for _ in 0..num_proportional_steps {
-            block_locator_hashes.push(self.get_block_hash_guarded(hash_index)?);
+            let hash = self.get_block_hash_guarded(hash_index)?;
+            trace!("block locator hash -- proportional: block# {}: {}", hash_index, hash);
+            block_locator_hashes.push(hash);
             if hash_index == 0 {
                 return Ok(block_locator_hashes);
             }
             hash_index = hash_index.saturating_sub(proportional_step);
         }
 
-        block_locator_hashes.push(self.get_block_hash_guarded(0)?);
+        let hash = self.get_block_hash_guarded(0)?;
+        trace!("block locator hash -- genesis: block# {}: {}", 0, hash);
+        block_locator_hashes.push(hash);
 
         Ok(block_locator_hashes)
     }
@@ -370,17 +396,30 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
 
     pub(super) fn get_block_hashes(&mut self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>> {
         let mut hashes = match filter {
-            BlockFilter::CanonOnly => {
+            BlockFilter::CanonOnly(BlockOrder::Unordered) => {
                 self.inner().get_column_keys(KeyValueColumn::BlockIndex)?
                     .into_iter()
                     .filter(|key| key.len() != 4) // only interested in block hash keys
                     .map(|key| key[..].into())
                     .collect::<Vec<Digest>>()
             }
+            BlockFilter::CanonOnly(order) => {
+                let mut values = self.inner().get_column(KeyValueColumn::BlockIndex)?
+                    .into_iter()
+                    .filter(|(key, value)| key.len() != 4 && value.len() == 4) // only interested in block hash keys
+                    .map(|(key, value)| (key[..].into(), u32::from_le_bytes((&value[..]).try_into().unwrap())))
+                    .collect::<Vec<(Digest, u32)>>();
+                values.sort_by(|a, b| a.1.cmp(&b.1));
+                match order {
+                    BlockOrder::Ascending => values.into_iter().map(|x| x.0).collect(),
+                    BlockOrder::Descending => values.into_iter().rev().map(|x| x.0).collect(),
+                    BlockOrder::Unordered => unimplemented!(),
+                }
+            }
             BlockFilter::NonCanonOnly => {
                 let all = self.get_block_hashes(None, BlockFilter::All)?;
                 let canon = self
-                    .get_block_hashes(None, BlockFilter::CanonOnly)?
+                    .get_block_hashes(None, BlockFilter::CanonOnly(BlockOrder::Unordered))?
                     .into_iter()
                     .collect::<HashSet<Digest>>();
                 all.into_iter().filter(|hash| !canon.contains(hash)).collect()

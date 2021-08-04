@@ -15,7 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_sidechain {
+<<<<<<< HEAD
     use snarkos_storage::validator::FixMode;
+=======
+    use snarkos_consensus::OLDEST_FORK_THRESHOLD;
+    // use snarkos_storage::validator::FixMode;
+>>>>>>> 3a24d6cb... wip dynamic syncing
     use snarkos_testing::sync::*;
 
     use rand::{seq::IteratorRandom, thread_rng, Rng};
@@ -183,7 +188,13 @@ mod consensus_sidechain {
         assert_eq!(best_block_number, block_height);
 
         // Check if the locator hashes can be found.
-        assert!(consensus.storage.get_block_locator_hashes().await.is_ok());
+        assert!(
+            consensus
+                .storage
+                .get_block_locator_hashes(vec![], snarkos_consensus::OLDEST_FORK_THRESHOLD)
+                .await
+                .is_ok()
+        );
 
         // Decommit a block.
         let canon_hash = consensus.storage.canon().await.unwrap().hash;
@@ -195,7 +206,13 @@ mod consensus_sidechain {
         assert_eq!(best_block_number, block_height);
 
         // Check if the locator hashes can still be found.
-        assert!(consensus.storage.get_block_locator_hashes().await.is_ok());
+        assert!(
+            consensus
+                .storage
+                .get_block_locator_hashes(vec![], snarkos_consensus::OLDEST_FORK_THRESHOLD)
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -219,7 +236,11 @@ mod consensus_sidechain {
         }
 
         // There is no overlap between the 2 instances.
-        let consensus1_locator_hashes = consensus1.storage.get_block_locator_hashes().await.unwrap();
+        let consensus1_locator_hashes = consensus1
+            .storage
+            .get_block_locator_hashes(vec![], OLDEST_FORK_THRESHOLD)
+            .await
+            .unwrap();
         let consensus2_sync_blocks = consensus2
             .storage
             .find_sync_blocks(&consensus1_locator_hashes, 64)
@@ -242,7 +263,11 @@ mod consensus_sidechain {
         }
 
         // The blocks should fully overlap between the 2 instances now.
-        let consensus1_locator_hashes = consensus1.storage.get_block_locator_hashes().await.unwrap();
+        let consensus1_locator_hashes = consensus1
+            .storage
+            .get_block_locator_hashes(vec![], OLDEST_FORK_THRESHOLD)
+            .await
+            .unwrap();
         let consensus2_sync_blocks = consensus2
             .storage
             .find_sync_blocks(&consensus1_locator_hashes, 64)
@@ -277,7 +302,11 @@ mod consensus_sidechain {
         let overlap_height = consensus1.storage.canon().await.unwrap().block_height;
 
         // There is some initial overlap between the 2 instances.
-        let consensus1_locator_hashes = consensus1.storage.get_block_locator_hashes().await.unwrap();
+        let consensus1_locator_hashes = consensus1
+            .storage
+            .get_block_locator_hashes(vec![], OLDEST_FORK_THRESHOLD)
+            .await
+            .unwrap();
         let consensus2_sync_blocks = consensus2
             .storage
             .find_sync_blocks(&consensus1_locator_hashes, 64)
@@ -310,7 +339,11 @@ mod consensus_sidechain {
         }
 
         // The blocks should fully overlap between the 2 instances now.
-        let consensus1_locator_hashes = consensus1.storage.get_block_locator_hashes().await.unwrap();
+        let consensus1_locator_hashes = consensus1
+            .storage
+            .get_block_locator_hashes(vec![], OLDEST_FORK_THRESHOLD)
+            .await
+            .unwrap();
         let consensus2_sync_blocks = consensus2
             .storage
             .find_sync_blocks(&consensus1_locator_hashes, 64)
@@ -354,7 +387,11 @@ mod consensus_sidechain {
         }
 
         // The blocks should fully overlap between the 2 instances now.
-        let consensus1_locator_hashes = consensus1.storage.get_block_locator_hashes().await.unwrap();
+        let consensus1_locator_hashes = consensus1
+            .storage
+            .get_block_locator_hashes(vec![], OLDEST_FORK_THRESHOLD)
+            .await
+            .unwrap();
         let sync_blocks = consensus2
             .storage
             .find_sync_blocks(&consensus1_locator_hashes, 64)

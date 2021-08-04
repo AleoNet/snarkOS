@@ -84,8 +84,20 @@ impl Storage for KeyValueStore {
         self.send(Message::LongestChildPath(block_hash.clone())).await
     }
 
-    async fn get_block_locator_hashes(&self) -> Result<Vec<Digest>> {
-        self.send(Message::GetBlockLocatorHashes()).await
+    async fn get_block_children(&self, block_hash: &Digest) -> Result<Vec<Digest>> {
+        self.send(Message::GetBlockChildren(block_hash.clone())).await
+    }
+
+    async fn get_block_locator_hashes(
+        &self,
+        points_of_interest: Vec<Digest>,
+        oldest_fork_threshold: usize,
+    ) -> Result<Vec<Digest>> {
+        self.send(Message::GetBlockLocatorHashes(
+            points_of_interest,
+            oldest_fork_threshold,
+        ))
+        .await
     }
 
     async fn find_sync_blocks(&self, block_locator_hashes: &[Digest], block_count: usize) -> Result<Vec<Digest>> {

@@ -79,7 +79,8 @@ enum Message {
     DecommitBlocks(Digest),
     Canon(),
     LongestChildPath(Digest),
-    GetBlockLocatorHashes(),
+    GetBlockChildren(Digest),
+    GetBlockLocatorHashes(Vec<Digest>, usize), // points of interest, oldest_fork_threshold
     FindSyncBlocks(Vec<Digest>, usize),
     GetTransactionLocation(Digest),
     GetRecordCommitments(Option<usize>),
@@ -121,7 +122,12 @@ impl fmt::Display for Message {
             Message::DecommitBlocks(hash) => write!(f, "DecommitBlocks({})", hash),
             Message::Canon() => write!(f, "Canon()"),
             Message::LongestChildPath(hash) => write!(f, "LongestChildPath({})", hash),
-            Message::GetBlockLocatorHashes() => write!(f, "GetBlockLocatorHashes()"),
+            Message::GetBlockChildren(hash) => write!(f, "GetBlockChildren({})", hash),
+            Message::GetBlockLocatorHashes(canon_depth_limit, oldest_fork_threshold) => write!(
+                f,
+                "GetBlockLocatorHashes({:?}, {})",
+                canon_depth_limit, oldest_fork_threshold
+            ),
             Message::FindSyncBlocks(hashes, max_block_count) => {
                 write!(f, "FindSyncBlocks(")?;
                 for hash in hashes {

@@ -206,8 +206,11 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
             }
             Message::DecommitBlocks(hash) => Box::new(self.wrap(move |f| f.decommit_blocks(&hash))),
             Message::Canon() => Box::new(self.canon()),
+            Message::GetBlockChildren(hash) => Box::new(self.get_child_block_hashes(&hash)),
             Message::LongestChildPath(hash) => Box::new(self.longest_child_path(&hash)),
-            Message::GetBlockLocatorHashes() => Box::new(self.get_block_locator_hashes()),
+            Message::GetBlockLocatorHashes(points_of_interest, oldest_fork_threshold) => {
+                Box::new(self.get_block_locator_hashes(points_of_interest, oldest_fork_threshold))
+            }
             Message::FindSyncBlocks(hashes, block_count) => Box::new(self.find_sync_blocks(hashes, block_count)),
             Message::GetTransactionLocation(transaction_id) => Box::new(self.get_transaction_location(&transaction_id)),
             Message::GetRecordCommitments(limit) => Box::new(self.get_record_commitments(limit)),
