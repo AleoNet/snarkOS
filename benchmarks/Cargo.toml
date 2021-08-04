@@ -89,3 +89,6 @@ version = "0.3"
 
 [dependencies.tokio]
 version = "1"
+
+[dependencies.itertools]
+version = "0.10"
