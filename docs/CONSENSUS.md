@@ -13,7 +13,7 @@ Calls to storage will be made throughout the `Consensus`'s lfietime; it relies h
 
 ## Interaction with Ledger
 
-The instantiated `Ledger` is exclusively owned by `Consensus` behind an actor model. Consensus owns the task of keep `Ledger` and `Storage` in sync as the set of commitments, serial numbers, etc are changed via commit and decommit operations.
+The instantiated `Ledger` is exclusively owned by `Consensus` behind an actor model. Consensus owns the task of keeping `Ledger` and `Storage` in sync as the set of commitments, serial numbers, etc are changed via commit and decommit operations.
 
 ## Actor Model
 
