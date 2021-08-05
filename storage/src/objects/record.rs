@@ -41,6 +41,8 @@ pub struct SerialRecord {
     pub commitment_randomness: Digest,
     #[derivative(PartialEq = "ignore")]
     pub serial_number_nonce_randomness: Option<Digest>,
+    #[derivative(PartialEq = "ignore")]
+    pub position: Option<u8>,
 }
 
 impl ToBytes for SerialRecord {
@@ -94,6 +96,7 @@ impl VMRecord for Record<Components> {
             FromBytes::from_bytes_le(&record.commitment.0[..])?,
             FromBytes::from_bytes_le(&record.commitment_randomness.0[..])?,
             serial_number_nonce_randomness,
+            record.position,
         ))
     }
 
@@ -109,6 +112,7 @@ impl VMRecord for Record<Components> {
             commitment: to_bytes_to_digest(&self.commitment())?,
             commitment_randomness: to_bytes_to_digest(&self.commitment_randomness())?,
             serial_number_nonce_randomness: self.serial_number_nonce_randomness().map(|x| x.into()),
+            position: *self.position(),
         })
     }
 }

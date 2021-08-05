@@ -21,13 +21,13 @@ edition = "2018"
 prometheus = [ "snarkos-metrics/prometheus" ]
 
 [dependencies.snarkvm-algorithms]
-version = "=0.7.7"
+version = "=0.7.8"
 
 [dependencies.snarkvm-dpc]
-version = "=0.7.7"
+version = "=0.7.8"
 
 [dependencies.snarkvm-utilities]
-version = "=0.7.7"
+version = "=0.7.8"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
