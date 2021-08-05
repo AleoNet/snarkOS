@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use rand_chacha::ChaChaRng;
 use snarkos_storage::VMRecord;
 use snarkvm_dpc::testnet1::instantiated::{Testnet1DPC, Testnet1Transaction};
+use rand::SeedableRng;
 
 use crate::DeserializedLedger;
 
@@ -85,7 +87,8 @@ impl ConsensusInner {
         &self,
         request: CreateTransactionRequest,
     ) -> Result<TransactionResponse, ConsensusError> {
-        let mut rng = thread_rng();
+        println!("request = {:?}", request);
+        let mut rng = ChaChaRng::seed_from_u64(1u64); // thread_rng();
         // Offline execution to generate a DPC transaction
         let old_private_keys: Vec<_> = request.old_account_private_keys.into_iter().map(|x| x.into()).collect();
         let transaction_kernel = <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::execute_offline_phase(
@@ -104,6 +107,7 @@ impl ConsensusInner {
             request.memo,
             &mut rng,
         )?;
+        println!("kernel = {:?}", transaction_kernel);
 
         // Construct the program proofs
         let program_proofs =

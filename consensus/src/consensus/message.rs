@@ -19,6 +19,7 @@ use std::any::Any;
 use snarkos_storage::{PrivateKey, SerialBlock, SerialRecord, SerialTransaction};
 use tokio::sync::oneshot;
 
+#[derive(Debug)]
 pub struct CreateTransactionRequest {
     pub old_records: Vec<SerialRecord>,
     pub old_account_private_keys: Vec<PrivateKey>,

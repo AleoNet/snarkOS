@@ -52,6 +52,9 @@ version = "0.1"
 version = "0.4"
 features = [ "serde" ]
 
+[dependencies.rand_chacha]
+version = "0.3"
+
 [dependencies.derivative]
 version = "2"
 

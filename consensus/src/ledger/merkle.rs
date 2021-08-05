@@ -24,6 +24,7 @@ use snarkvm_algorithms::MerkleParameters;
 
 use super::indexed_merkle_tree::IndexedMerkleTree;
 
+// TODO: make this not-cloneable, as it's very expensive, but necessary without some refactors in snarkVM merkle tree.
 #[derive(Clone)]
 pub struct MerkleLedger<P: MerkleParameters> {
     ledger_digests: IndexSet<Digest>,

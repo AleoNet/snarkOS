@@ -25,6 +25,7 @@ use crate::{
     transaction_kernel_builder::TransactionKernelBuilder,
     RpcImpl,
 };
+use rand_chacha::ChaChaRng;
 use snarkos_consensus::{CreatePartialTransactionRequest, CreateTransactionRequest};
 use snarkos_storage::VMRecord;
 use snarkvm_algorithms::CRH;
@@ -46,7 +47,7 @@ use snarkvm_utilities::{
 
 use itertools::Itertools;
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, SeedableRng};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 type JsonRPCError = jsonrpc_core::Error;
@@ -396,7 +397,8 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_account_private_keys.push(PrivateKey::<Components>::from_str(&private_key_string)?);
         }
 
-        let sn_randomness: [u8; 32] = thread_rng().gen();
+        // let sn_randomness: [u8; 32] = thread_rng().gen();
+        let sn_randomness: [u8; 32] = [0u8; 32]; // thread_rng().gen();
         let mut joint_serial_numbers = vec![];
 
         // Fill any unused old_record indices with dummy records
@@ -420,7 +422,8 @@ impl ProtectedRpcFunctions for RpcImpl {
                 program_id.clone(),
                 program_id.clone(),
                 old_sn_nonce,
-                &mut thread_rng(),
+                // &mut thread_rng(),
+                &mut ChaChaRng::seed_from_u64(1u64),
             )?;
 
             let (sn, _) =

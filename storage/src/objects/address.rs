@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::any::Any;
+use std::{any::Any, fmt};
 
 use snarkvm_dpc::{testnet1::instantiated::Components, Address as AccountAddress, PrivateKey as AccountPrivateKey};
 use snarkvm_utilities::{FromBytes, ToBytes};
@@ -59,6 +59,12 @@ pub struct PrivateKey {
 impl<T: PrivateKeyContainer> From<T> for PrivateKey {
     fn from(other: T) -> Self {
         PrivateKey { inner: Box::new(other) }
+    }
+}
+
+impl fmt::Debug for PrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PrivateKey")
     }
 }
 

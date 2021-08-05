@@ -29,18 +29,20 @@ use snarkvm_utilities::ToBytes;
 use std::{fs::File, path::PathBuf};
 use tracing::info;
 
-async fn setup_test_data() -> Result<TestData, ConsensusError> {
+async fn setup_test_data() -> TestData {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
     let consensus = snarkos_testing::sync::create_test_consensus().await;
 
-    // setup the miner
-    let miner = MineContext::prepare(miner_acc.address.clone(), consensus.clone()).await?;
+    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
-    let canon = consensus.storage.canon().await?;
-    let header = consensus.storage.get_block_header(&canon.hash).await?;
+    // setup the miner
+    let miner = MineContext::prepare(miner_acc.address.clone(), consensus.clone()).await.unwrap();
+
+    let canon = consensus.storage.canon().await.unwrap();
+    let header = consensus.storage.get_block_header(&canon.hash).await.unwrap();
 
     // mine an empty block
-    let (block_1, coinbase_records) = mine_block(&miner, vec![], &header).await?;
+    let (block_1, coinbase_records) = mine_block(&miner, vec![], &header).await.unwrap();
 
     // make a tx which spends 10 to the Testnet1Components receiver
     let response: TransactionResponse = send(
@@ -51,10 +53,10 @@ async fn setup_test_data() -> Result<TestData, ConsensusError> {
         10,
         [0u8; 32],
     )
-    .await?;
+    .await.unwrap();
 
     // mine the block
-    let (block_2, coinbase_records_2) = mine_block(&miner, vec![response.transaction], &block_1.header).await?;
+    let (block_2, coinbase_records_2) = mine_block(&miner, vec![response.transaction], &block_1.header).await.unwrap();
 
     // Find alternative conflicting/late blocks
 
@@ -63,9 +65,9 @@ async fn setup_test_data() -> Result<TestData, ConsensusError> {
         &consensus
             .storage
             .get_block_header(&block_1.header.previous_block_hash)
-            .await?,
-    )?;
-    let alternative_block_2_header = miner.find_block(&block_2.transactions, &alternative_block_1_header)?;
+            .await.unwrap(),
+    ).unwrap();
+    let alternative_block_2_header = miner.find_block(&block_2.transactions, &alternative_block_1_header).unwrap();
 
     let test_data = TestData {
         block_1,
@@ -76,7 +78,7 @@ async fn setup_test_data() -> Result<TestData, ConsensusError> {
         alternative_block_2_header,
     };
 
-    Ok(test_data)
+    test_data
 }
 
 async fn mine_block(
@@ -152,7 +154,7 @@ async fn send(
 
 #[tokio::main]
 pub async fn main() {
-    let test_data = setup_test_data().await.unwrap();
+    let test_data = setup_test_data().await;
 
     const TEST_DATA_FILE: &str = "test_data";
 

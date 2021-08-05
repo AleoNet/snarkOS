@@ -86,7 +86,7 @@ async fn send(
     for j in 0..Components::NUM_OUTPUT_RECORDS as u8 {
         new_records.push(consensus.make_dummy_record(
             &joint_serial_numbers[..],
-            j + Components::NUM_INPUT_RECORDS as u8,
+            j,
             to[j as usize].clone().into(),
             AleoAmount(values[j as usize]),
             RecordPayload::default(),

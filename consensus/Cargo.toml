@@ -96,7 +96,7 @@ path = "../testing"
 [dev-dependencies.criterion]
 version = "0.3"
 
-[dev-dependencies.rand_chacha]
+[dependencies.rand_chacha]
 version = "0.3"
 
 [dev-dependencies.rand_xorshift]
