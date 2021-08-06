@@ -161,8 +161,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    // Enable the sync layer.
-    {
+    // Enable the sync layer for only for client nodes and miners.
+    if !config.node.is_bootnode && !config.node.is_crawler {
         let memory_pool = MemoryPool::from_storage(&storage).await?;
 
         debug!("Loading Aleo parameters...");
