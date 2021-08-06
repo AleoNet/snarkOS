@@ -78,7 +78,7 @@ mod consensus_dpc {
         let mut new_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_records.push(
-                Record::new_full(
+                Record::new_output(
                     &program,
                     recipient.address.clone(),
                     false,

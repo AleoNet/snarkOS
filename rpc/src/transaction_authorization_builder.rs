@@ -15,13 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm::{
-    algorithms::CRH,
     dpc::{
         testnet1::{Testnet1DPC, Testnet1Parameters},
         Address,
         DPCScheme,
         Parameters,
-        Payload,
         PrivateKey,
         Record,
         RecordScheme,
@@ -86,13 +84,9 @@ impl TransactionAuthorization {
             let private_key = private_keys[0].clone();
             let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
-            input_records.push(Record::<Testnet1Parameters>::new(
+            input_records.push(Record::<Testnet1Parameters>::new_noop_input(
                 &dpc.noop_program,
                 address,
-                true, // The input record is dummy
-                0,
-                Default::default(),
-                Testnet1Parameters::serial_number_nonce_crh().hash(&rng.gen::<[u8; 32]>())?,
                 rng,
             )?);
             private_keys.push(private_key);
@@ -111,29 +105,20 @@ impl TransactionAuthorization {
 
         // Decode new recipient data
         let mut new_record_owners = vec![];
-        let mut new_is_dummy_flags = vec![];
         let mut new_values = vec![];
         for (recipient, amount) in recipients.iter().zip(recipient_amounts) {
             new_record_owners.push(recipient.clone());
-            new_is_dummy_flags.push(false);
             new_values.push(amount);
         }
 
         // Fill any unused new_record indices with dummy output values
         while new_record_owners.len() < Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_record_owners.push(new_record_owners[0].clone());
-            new_is_dummy_flags.push(true);
             new_values.push(0);
         }
 
         assert_eq!(new_record_owners.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_is_dummy_flags.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
         assert_eq!(new_values.len(), Testnet1Parameters::NUM_OUTPUT_RECORDS);
-
-        let new_programs = vec![&dpc.noop_program; Testnet1Parameters::NUM_OUTPUT_RECORDS];
-        let new_payloads: Vec<Payload> = vec![Default::default(); Testnet1Parameters::NUM_OUTPUT_RECORDS];
-
-        // Generate transaction
 
         let mut joint_serial_numbers = vec![];
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
@@ -143,12 +128,12 @@ impl TransactionAuthorization {
 
         let mut output_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
-            output_records.push(Record::new_full(
-                new_programs[j],
-                new_record_owners[j].clone(),
-                new_is_dummy_flags[j],
+            output_records.push(Record::new_output(
+                &dpc.noop_program,
+                new_record_owners[j],
+                true,
                 new_values[j],
-                new_payloads[j].clone(),
+                Default::default(),
                 (Testnet1Parameters::NUM_OUTPUT_RECORDS + j) as u8,
                 joint_serial_numbers.clone(),
                 rng,

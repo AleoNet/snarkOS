@@ -25,23 +25,9 @@ use crate::{
     transaction_authorization_builder::TransactionAuthorizationBuilder,
     RpcImpl,
 };
-use snarkos_consensus::ConsensusParameters;
 use snarkvm::{
     algorithms::CRH,
-    dpc::{
-        testnet1::Testnet1Parameters,
-        Account,
-        AccountScheme,
-        Address,
-        DPCScheme,
-        EncryptedRecord,
-        Parameters,
-        Payload,
-        PrivateKey,
-        Record,
-        TransactionAuthorization,
-        ViewKey,
-    },
+    dpc::{prelude::*, testnet1::Testnet1Parameters},
     ledger::prelude::*,
     prelude::UniformRand,
     utilities::{to_bytes_le, FromBytes, ToBytes},
@@ -363,7 +349,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             let private_key = old_account_private_keys[0].clone();
             let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
-            let dummy_record = Record::<Testnet1Parameters>::new(
+            let dummy_record = Record::<Testnet1Parameters>::new_input(
                 &self.dpc()?.noop_program,
                 address,
                 true, // The input record is dummy
@@ -409,7 +395,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         let mut new_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
-            new_records.push(Record::new_full(
+            new_records.push(Record::new_output(
                 &self.dpc()?.noop_program,
                 new_record_owners[j].clone(),
                 new_is_dummy_flags[j],
@@ -518,21 +504,23 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         // Decode the transaction authorization.
         let authorization = TransactionAuthorization::<Testnet1Parameters>::read_le(&hex::decode(authorization)?[..])?;
 
-        // Generate the local data.
-        let local_data = authorization.to_local_data(rng)?;
+        // Fetch the noop circuit ID.
+        let noop_circuit_id = self
+            .dpc()?
+            .noop_program
+            .find_circuit_by_index(0)
+            .ok_or(DPCError::MissingNoopCircuit)?
+            .circuit_id();
 
-        // Construct the program proofs
-        let program_proofs = ConsensusParameters::generate_program_proofs::<S>(self.dpc()?, &local_data)?;
+        // TODO (raychu86): Genericize this model to allow for generic programs.
+        // Construct the executable.
+        let noop = Executable::Noop(Arc::new(self.dpc()?.noop_program.clone()), *noop_circuit_id);
+        let executables = vec![noop.clone(), noop.clone(), noop.clone(), noop];
 
         // Online execution to generate a transaction
-        let transaction = self.dpc()?.execute(
-            &private_keys,
-            authorization,
-            &local_data,
-            program_proofs,
-            &*self.storage,
-            rng,
-        )?;
+        let transaction = self
+            .dpc()?
+            .execute(&private_keys, authorization, executables, &*self.storage, rng)?;
 
         Ok(CreateRawTransactionOutput {
             encoded_transaction: hex::encode(to_bytes_le![transaction]?),

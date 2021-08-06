@@ -291,21 +291,23 @@ impl<S: Storage> Consensus<S> {
             .dpc
             .authorize::<R>(&private_keys, old_records, new_records, memo, rng)?;
 
-        // Generate the local data.
-        let local_data = authorization.to_local_data(rng)?;
+        // Fetch the noop circuit ID.
+        let noop_circuit_id = self
+            .dpc
+            .noop_program
+            .find_circuit_by_index(0)
+            .ok_or(DPCError::MissingNoopCircuit)?
+            .circuit_id();
 
-        // Construct the program proofs.
-        let program_proofs = ConsensusParameters::generate_program_proofs::<S>(&self.dpc, &local_data)?;
+        // TODO (raychu86): Genericize this model to allow for generic programs.
+        // Construct the executable.
+        let noop = Executable::Noop(Arc::new(self.dpc.noop_program.clone()), *noop_circuit_id);
+        let executables = vec![noop.clone(), noop.clone(), noop.clone(), noop];
 
         // Online execution to generate a transaction.
-        let transaction = self.dpc.execute(
-            &private_keys,
-            authorization,
-            &local_data,
-            program_proofs,
-            &*self.ledger,
-            rng,
-        )?;
+        let transaction = self
+            .dpc
+            .execute(&private_keys, authorization, executables, &*self.ledger, rng)?;
 
         Ok(transaction)
     }
@@ -336,7 +338,7 @@ impl<S: Storage> Consensus<S> {
         let private_keys = vec![noop_account.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
         let mut input_records = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            input_records.push(Record::new(
+            input_records.push(Record::new_input(
                 old_programs[i],
                 noop_account.address.clone(),
                 true, // The input record is dummy
@@ -363,7 +365,7 @@ impl<S: Storage> Consensus<S> {
 
         let mut new_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
-            new_records.push(Record::new_full(
+            new_records.push(Record::new_output(
                 new_programs[j],
                 recipient.clone(),
                 new_is_dummy_flags[j],

@@ -19,22 +19,12 @@ use snarkos_profiler::{end_timer, start_timer};
 use snarkvm::{
     algorithms::SNARK,
     curves::bls12_377::Bls12_377,
-    dpc::{
-        testnet1::*,
-        DPCScheme,
-        LocalData,
-        Network,
-        NoopPrivateVariables,
-        Parameters,
-        Program,
-        ProgramPublicVariables,
-    },
+    dpc::Network,
     ledger::{
         posw::{Marlin, PoswMarlin},
         BlockHeader,
         MerkleRootHash,
         PedersenMerkleRootHash,
-        Storage,
     },
     utilities::FromBytes,
 };
@@ -125,21 +115,6 @@ impl ConsensusParameters {
         end_timer!(verification_timer);
 
         Ok(())
-    }
-
-    // TODO (raychu86): Genericize this model to allow for generic programs.
-    /// Generate the birth and death program proofs for a transaction for a given transaction authorization
-    #[allow(clippy::type_complexity)]
-    pub fn generate_program_proofs<S: Storage>(
-        dpc: &Testnet1DPC,
-        local_data: &LocalData<Testnet1Parameters>,
-    ) -> Result<Vec<<Testnet1DPC as DPCScheme<Testnet1Parameters>>::Execution>, ConsensusError> {
-        let mut program_proofs = Vec::with_capacity(Testnet1Parameters::NUM_TOTAL_RECORDS);
-        for position in 0..Testnet1Parameters::NUM_TOTAL_RECORDS {
-            let public = ProgramPublicVariables::<Testnet1Parameters>::new(&local_data.root(), position as u8);
-            program_proofs.push(dpc.noop_program.execute(0, &public, &NoopPrivateVariables::new())?);
-        }
-        Ok(program_proofs)
     }
 }
 
