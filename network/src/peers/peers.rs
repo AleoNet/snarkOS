@@ -16,7 +16,7 @@
 
 use std::{cmp, net::SocketAddr, time::Duration};
 
-use rand::seq::IteratorRandom;
+use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use snarkvm_dpc::Storage;
 use tokio::task;
 
@@ -112,7 +112,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Attempt to connect to the default bootnodes of the network if the node has no active
         // connections.
         if self.peer_book.get_active_peer_count() == 0 {
-            self.connect_to_addresses(&self.config.bootnodes()).await;
+            let random_bootnodes = self
+                .config
+                .bootnodes()
+                .choose_multiple(&mut rand::thread_rng(), 2)
+                .copied()
+                .collect::<Vec<_>>();
+
+            self.connect_to_addresses(&random_bootnodes).await;
         }
 
         if number_to_connect != 0 {
@@ -299,7 +306,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
 
         use crate::Peer;
-        use rand::prelude::SliceRandom;
 
         let connected_peers = self.peer_book.connected_peers_snapshot().await;
 
