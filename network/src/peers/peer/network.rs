@@ -47,7 +47,7 @@ impl PeerIOHandle {
     pub fn take_reader(&mut self) -> PeerReader<OwnedReadHalf> {
         PeerReader {
             reader: self.reader.take().unwrap(),
-            buffer: vec![0u8; crate::MAX_MESSAGE_SIZE].into(),
+            buffer: vec![0u8; crate::NOISE_BUF_LEN],
         }
     }
 }
@@ -55,7 +55,7 @@ impl PeerIOHandle {
 #[doc(hidden)]
 pub struct PeerReader<R: AsyncRead + Unpin + 'static> {
     pub reader: R,
-    pub buffer: Box<[u8]>,
+    pub buffer: Vec<u8>,
 }
 
 impl<R: AsyncRead + Unpin + 'static> PeerReader<R> {
@@ -66,6 +66,11 @@ impl<R: AsyncRead + Unpin + 'static> PeerReader<R> {
         } else if length == 0 {
             return Err(NetworkError::ZeroLengthMessage);
         }
+
+        if self.buffer.len() < length {
+            self.buffer.resize(length, 0);
+        }
+
         self.reader.read_exact(&mut self.buffer[..length]).await?;
         Ok(&self.buffer[..length])
     }

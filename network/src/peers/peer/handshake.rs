@@ -34,7 +34,7 @@ use crate::{
 pub struct HandshakeData {
     pub version: Version,
     pub noise: TransportState,
-    pub buffer: Box<[u8]>,
+    pub buffer: Vec<u8>,
     pub noise_buffer: Box<[u8]>,
 }
 
@@ -53,7 +53,7 @@ async fn responder_handshake<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     let static_key = builder.generate_keypair()?.private;
     let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
     let mut noise = noise_builder.build_responder()?;
-    let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE + 4096].into();
+    let mut buffer: Vec<u8> = vec![0u8; crate::NOISE_BUF_LEN];
     let mut noise_buffer: Box<[u8]> = vec![0u8; crate::NOISE_BUF_LEN].into();
     // <- e
     reader.read_exact(&mut buffer[..1]).await?;
@@ -115,7 +115,7 @@ async fn initiator_handshake<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     let static_key = builder.generate_keypair()?.private;
     let noise_builder = builder.local_private_key(&static_key).psk(3, crate::HANDSHAKE_PSK);
     let mut noise = noise_builder.build_initiator()?;
-    let mut buffer: Box<[u8]> = vec![0u8; crate::MAX_MESSAGE_SIZE + 4096].into();
+    let mut buffer: Vec<u8> = vec![0u8; crate::NOISE_BUF_LEN];
     let mut noise_buffer: Box<[u8]> = vec![0u8; crate::NOISE_BUF_LEN].into();
     // -> e
     let len = noise.write_message(&[], &mut buffer)?;

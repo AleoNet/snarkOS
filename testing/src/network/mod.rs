@@ -212,11 +212,7 @@ impl FakeNode {
         let mut network = PeerIOHandle {
             reader: Some(reader),
             writer,
-            cipher: Cipher::new(
-                noise,
-                vec![0u8; MAX_MESSAGE_SIZE + 4096].into(),
-                vec![0u8; NOISE_BUF_LEN].into(),
-            ),
+            cipher: Cipher::new(noise, vec![0u8; NOISE_BUF_LEN], vec![0u8; NOISE_BUF_LEN].into()),
         };
 
         let reader = network.take_reader();
