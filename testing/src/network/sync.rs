@@ -20,7 +20,7 @@ use tokio::time::sleep;
 
 use crate::{
     network::{handshaken_node_and_peer, test_node, ConsensusSetup, TestSetup},
-    sync::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_1, TRANSACTION_2},
+    sync::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_2},
     wait_until,
 };
 
