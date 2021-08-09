@@ -18,13 +18,13 @@ license = "GPL-3.0"
 edition = "2018"
 
 [[bench]]
-name = "syncing"
-path = "syncing/syncing.rs"
+name = "merkle"
+path = "merkle/merkle.rs"
 harness = false
 
 [[bench]]
-name = "merkle"
-path = "merkle/merkle.rs"
+name = "block_cache"
+path = "network/block_cache.rs"
 harness = false
 
 [[bench]]
