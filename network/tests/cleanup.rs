@@ -72,8 +72,9 @@ async fn check_inactive_conn_cleanup() {
 }
 
 #[tokio::test]
-#[ignore]
-async fn check_node_cleanup() {
+async fn check_node_connections_cleanup() {
+    // The test checks for memory leaks surrounding the node's connection handling.
+
     #[global_allocator]
     static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
@@ -115,7 +116,7 @@ async fn check_node_cleanup() {
 
         // Remove the peer from the peer book, to avoid heap growth from disconnected peer
         // tracking.
-        assert!(node.peer_book.remove_peer(addr).await.is_some());
+        assert!(node.peer_book.remove_disconnected_peer(addr).await.is_some());
 
         // Register the current heap size, after the connection has been dropped.
         let current_heap_size = PEAK_ALLOC.current_usage() - mem_deduction;
@@ -152,4 +153,6 @@ async fn check_node_cleanup() {
     println!("average use: {}kB", avg_heap_use / 1000);
     println!("maximum use: {}kB", PEAK_ALLOC.peak_usage() / 1000);
     println!("growth:      {}B, {:.2}%", heap_growth, growth_percentage);
+
+    assert_eq!(heap_growth, 0);
 }

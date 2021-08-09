@@ -266,7 +266,10 @@ impl PeerBook {
         debug!("Added {} to the peer book", address);
     }
 
-    pub async fn remove_peer(&self, address: SocketAddr) -> Option<Peer> {
+    /// Removes the peer by address from the disconnected peers in this `PeerBook`.
+    ///
+    /// Note: this is currently only used in testing.
+    pub async fn remove_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
         self.disconnected_peers.remove(address).await
     }
 
