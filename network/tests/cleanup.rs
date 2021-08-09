@@ -77,6 +77,11 @@ async fn check_node_cleanup() {
     #[global_allocator]
     static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
+    const NUM_CONNS: usize = 4096;
+
+    // Register the heap use before node setup.
+    let initial_heap_use = PEAK_ALLOC.current_usage();
+
     // Start a node without sync.
     let setup = TestSetup {
         consensus_setup: None,
@@ -84,11 +89,21 @@ async fn check_node_cleanup() {
     };
     let node = test_node(setup).await;
 
-    // Keep track of peak heap throughout the iterations.
-    let mut peak_heap = PEAK_ALLOC.peak_usage();
-    let mut peak_heap_post_1st_conn = 0;
+    // Register the heap use after node setup.
+    let heap_after_node_setup = PEAK_ALLOC.current_usage();
 
-    for i in 0u16..4096 {
+    // Keep track of the average heap use.
+    let mut heap_sizes = Vec::with_capacity(NUM_CONNS);
+
+    // Don't count the vector's heap allocation in the measurments taken in the loop.
+    let mem_deduction = PEAK_ALLOC.current_usage() - heap_after_node_setup;
+
+    // Due to tokio channel internals, a small heap bump occurs after 32 calls to
+    // `mpsc::Sender::send`. If it weren't for that, heap use after the 1st connection (i == 0)
+    // would be registered instead. See: https://github.com/tokio-rs/tokio/issues/4031.
+    let mut heap_after_32_conns = 0;
+
+    for i in 0..NUM_CONNS {
         // Connect a peer.
         let peer = handshaken_peer(node.local_address().unwrap()).await;
         wait_until!(5, node.peer_book.get_active_peer_count() == 1);
@@ -97,32 +112,39 @@ async fn check_node_cleanup() {
         drop(peer);
         wait_until!(5, node.peer_book.get_active_peer_count() == 0);
 
-        // Register heap bump after the connection was dropped.
-        let curr_peak = PEAK_ALLOC.peak_usage();
+        // Register the current heap size, after the connection has been dropped.
+        let current_heap_size = PEAK_ALLOC.current_usage() - mem_deduction;
 
-        // println!(
-        //     "heap bump: {}B at i={} (+{}%)",
-        //     curr_peak,
-        //     i,
-        //     (curr_peak as f64 / peak_heap as f64 - 1.0) * 100.0
-        // );
-
-        if curr_peak > peak_heap {
-            peak_heap = curr_peak;
+        // Register the heap size once the 33rd connection is established and dropped.
+        if i == 32 {
+            heap_after_32_conns = current_heap_size;
         }
 
-        // Register first peak heap for growth evaluation.
-        if i == 0 {
-            peak_heap_post_1st_conn = curr_peak;
-        }
+        // Save the current heap size, used later on to calculate the average.
+        heap_sizes.push(current_heap_size);
     }
 
-    // Register peak heap use.
-    let max_heap_use = PEAK_ALLOC.peak_usage();
-    println!("peak heap use: {:.2}KiB", max_heap_use as f64 / 1024.0);
+    // Calculate the average heap use from the collection of tracked heap sizes.
+    let avg_heap_use = heap_sizes.iter().sum::<usize>() / heap_sizes.len();
 
-    // Allocation growth should be under 5%.
-    let alloc_growth = max_heap_use as f64 / peak_heap_post_1st_conn as f64;
-    println!("alloc growth: {}", alloc_growth);
-    assert!(alloc_growth < 1.05);
+    // Drop the vector of heap sizes so as to leave further measurements unaffected.
+    drop(heap_sizes);
+
+    // Check the final heap use and calculate its total growth (excluding the tokio bump).
+    let final_heap_use = PEAK_ALLOC.current_usage();
+    let heap_growth = final_heap_use - heap_after_32_conns;
+
+    // Division is safe since the heap use cannot be 0, absolute value isn't necessary since heap
+    // use is always positive.
+    let growth_percentage = 100.0 * (final_heap_use as f64 - heap_after_32_conns as f64) / heap_after_32_conns as f64;
+
+    println!("---- heap use summary ----\n");
+    println!("before node setup:     {}kB", initial_heap_use / 1000);
+    println!("after node setup:      {}kB", heap_after_node_setup / 1000);
+    println!("after 32 connections:  {}kB", heap_after_32_conns / 1000);
+    println!("after {} connections: {}kB", NUM_CONNS, final_heap_use / 1000);
+    println!();
+    println!("average use: {}kB", avg_heap_use / 1000);
+    println!("maximum use: {}kB", PEAK_ALLOC.peak_usage() / 1000);
+    println!("growth:      {}B, {:.2}%", heap_growth, growth_percentage);
 }
