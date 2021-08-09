@@ -17,7 +17,7 @@
 use crate::Payload;
 
 use circular_queue::CircularQueue;
-use fxhash::hash64;
+use twox_hash::xxh3::hash64;
 
 pub struct Cache {
     queue: CircularQueue<u64>,
