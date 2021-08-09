@@ -26,7 +26,7 @@ pub struct Cache {
 impl Default for Cache {
     fn default() -> Self {
         Self {
-            queue: CircularQueue::with_capacity(64),
+            queue: CircularQueue::with_capacity(16 * 1024),
         }
     }
 }
@@ -34,7 +34,7 @@ impl Default for Cache {
 impl Cache {
     pub fn contains(&mut self, payload: &Payload) -> bool {
         let hash = if let Payload::Block(bytes) = payload {
-            hash64(&bytes)
+            hash64(bytes)
         } else {
             unreachable!("Only blocks are cached for now");
         };
