@@ -77,7 +77,7 @@ async fn check_node_cleanup() {
     #[global_allocator]
     static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
-    const NUM_CONNS: usize = 4096;
+    const NUM_CONNS: usize = 256;
 
     // Register the heap use before node setup.
     let initial_heap_use = PEAK_ALLOC.current_usage();
@@ -95,7 +95,7 @@ async fn check_node_cleanup() {
     // Keep track of the average heap use.
     let mut heap_sizes = Vec::with_capacity(NUM_CONNS);
 
-    // Don't count the vector's heap allocation in the measurments taken in the loop.
+    // Don't count the vector's heap allocation in the measurements taken in the loop.
     let mem_deduction = PEAK_ALLOC.current_usage() - heap_after_node_setup;
 
     // Due to tokio channel internals, a small heap bump occurs after 32 calls to
@@ -106,11 +106,16 @@ async fn check_node_cleanup() {
     for i in 0..NUM_CONNS {
         // Connect a peer.
         let peer = handshaken_peer(node.local_address().unwrap()).await;
+        let addr = peer.addr;
         wait_until!(5, node.peer_book.get_active_peer_count() == 1);
 
         // Drop the peer stream.
         drop(peer);
         wait_until!(5, node.peer_book.get_active_peer_count() == 0);
+
+        // Remove the peer from the peer book, to avoid heap growth from disconnected peer
+        // tracking.
+        assert!(node.peer_book.remove_peer(addr).await.is_some());
 
         // Register the current heap size, after the connection has been dropped.
         let current_heap_size = PEAK_ALLOC.current_usage() - mem_deduction;
