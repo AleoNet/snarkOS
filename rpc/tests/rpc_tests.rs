@@ -272,7 +272,7 @@ mod rpc_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_validate_transaction() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let rpc = initialize_test_rpc(&consensus).await;
