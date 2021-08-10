@@ -60,22 +60,6 @@ jobs:
       - clear_environment:
           cache_key: snarkos-stable-cache
 
-  codecov:
-    machine:
-      image: ubuntu-1604:202004-01
-      docker_layer_caching: true
-    resource_class: 2xlarge
-    steps:
-      - attach_workspace:
-          at: /home/circleci/project/
-      - run:
-          name: Run kcov
-          command: >
-            cd ~/project/project/ &&
-            docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-            howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
-      - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
-
   snarkos-consensus:
     docker:
       - image: cimg/rust:1.53.0
@@ -198,7 +182,7 @@ jobs:
 
   fmt:
     docker:
-      - image: howardwu/snarkos-ci:2021-03-25
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -207,7 +191,7 @@ jobs:
       - run:
           name: Check style
           no_output_timeout: 35m
-          command: cargo fmt --all -- --check
+          command: cargo +nightly fmt --all -- --check
       - clear_environment:
           cache_key: snarkos-fmt-cache
 
@@ -216,9 +200,6 @@ workflows:
   main-workflow:
     jobs:
       - rust-stable
-      - codecov:
-          requires:
-            - rust-stable
       - snarkos-consensus
       - snarkos-metrics
       - snarkos-network
