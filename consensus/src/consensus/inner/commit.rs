@@ -139,13 +139,13 @@ impl ConsensusInner {
     ) -> Result<(), ConsensusError> {
         match self.storage.get_block_state(hash).await? {
             BlockStatus::Committed(_) => return Ok(()),
-            BlockStatus::Unknown => return Err(ConsensusError::InvalidBlock(hash.0.to_vec())),
+            BlockStatus::Unknown => return Err(ConsensusError::InvalidBlock(hash.clone())),
             BlockStatus::Uncommitted => (),
         }
 
         // 1. Verify that the block valid
         if !self.verify_block(block).await? {
-            return Err(ConsensusError::InvalidBlock(hash.0.to_vec()));
+            return Err(ConsensusError::InvalidBlock(hash.clone()));
         }
 
         // 2. Insert/canonize block

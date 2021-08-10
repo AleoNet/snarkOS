@@ -67,7 +67,14 @@ impl ConsensusInner {
                         response.send(Box::new(true)).ok();
                     }
                     Err(e) => {
-                        error!("failed receiving block: {:?}", e);
+                        match e {
+                            ConsensusError::InvalidBlock(e) => {
+                                debug!("failed receiving block: {:?}", e);
+                            }
+                            e => {
+                                warn!("failed receiving block: {:?}", e);
+                            }
+                        }
                         response.send(Box::new(false)).ok();
                     }
                 },
