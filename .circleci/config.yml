@@ -180,21 +180,6 @@ jobs:
       - clear_environment:
           cache_key: snarkos-testing-cache
 
-  fmt:
-    docker:
-      - image: cimg/rust:1.53.0
-    resource_class: xlarge
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-fmt-cache
-      - run:
-          name: Check style
-          no_output_timeout: 35m
-          command: cargo +nightly fmt --all -- --check
-      - clear_environment:
-          cache_key: snarkos-fmt-cache
-
 workflows:
   version: 2
   main-workflow:
@@ -208,4 +193,3 @@ workflows:
       - snarkos-rpc
       - snarkos-storage
       - snarkos-testing
-      - fmt
