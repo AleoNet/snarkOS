@@ -22,7 +22,7 @@ use tokio::{
     task,
 };
 
-use snarkos_metrics::{self as metrics, connections, inbound, queues};
+use snarkos_metrics::{self as metrics, connections, inbound, misc, queues};
 
 use crate::{errors::NetworkError, message::*, Cache, Node, Receiver, Sender, State};
 
@@ -121,8 +121,17 @@ impl Node {
 
         // Check if the message hasn't already been processed recently if it's a `Block`.
         // The node should also reject them while syncing, as it is bound to receive them later.
-        if matches!(payload, Payload::Block(..)) && (self.state() == State::Syncing || cache.contains(&payload)) {
-            return Ok(());
+        if matches!(payload, Payload::Block(..)) {
+            metrics::increment_counter!(inbound::BLOCKS);
+
+            if cache.contains(&payload) {
+                metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
+                return Ok(());
+            }
+
+            if self.state() == State::Syncing {
+                return Ok(());
+            }
         }
 
         match payload {
@@ -134,7 +143,7 @@ impl Node {
                 }
             }
             Payload::Block(block) => {
-                metrics::increment_counter!(inbound::BLOCKS);
+                // The BLOCKS metric was already updated during the block dedup cache lookup.
 
                 if self.sync().is_some() {
                     self.received_block(source, block, true).await?;

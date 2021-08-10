@@ -18,18 +18,23 @@ license = "GPL-3.0"
 edition = "2018"
 
 [[bench]]
-name = "syncing"
-path = "syncing/syncing.rs"
-harness = false
-
-[[bench]]
 name = "merkle"
 path = "merkle/merkle.rs"
 harness = false
 
 [[bench]]
-name = "network"
-path = "network/network.rs"
+name = "block_cache"
+path = "network/block_cache.rs"
+harness = false
+
+[[bench]]
+name = "messaging"
+path = "network/messaging.rs"
+harness = false
+
+[[bench]]
+name = "syncing"
+path = "network/syncing.rs"
 harness = false
 
 [dependencies.snarkvm-algorithms]
