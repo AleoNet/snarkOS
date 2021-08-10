@@ -24,7 +24,7 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
         let header = self.get_block_header(hash)?;
         let canon_height = self.canon_height()?;
         let mut parent_hash = header.previous_block_hash;
-        for _ in 0..=90000 {
+        for _ in 0..=oldest_fork_threshold {
             // check if the part is part of the canon chain
             match self.get_block_state(&parent_hash)? {
                 // This is a canon parent
