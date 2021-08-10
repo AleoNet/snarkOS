@@ -207,12 +207,13 @@ pub async fn test_node(setup: TestSetup) -> Node {
 }
 
 pub struct FakeNode {
+    pub addr: SocketAddr,
     network: PeerIOHandle,
     reader: PeerReader<OwnedReadHalf>,
 }
 
 impl FakeNode {
-    pub fn new(stream: TcpStream, _peer_addr: SocketAddr, noise: snow::TransportState) -> Self {
+    pub fn new(stream: TcpStream, addr: SocketAddr, noise: snow::TransportState) -> Self {
         let (reader, writer) = stream.into_split();
 
         let mut network = PeerIOHandle {
@@ -223,7 +224,7 @@ impl FakeNode {
 
         let reader = network.take_reader();
 
-        Self { network, reader }
+        Self { addr, network, reader }
     }
 
     pub async fn read_payload(&mut self) -> Result<Payload, NetworkError> {
