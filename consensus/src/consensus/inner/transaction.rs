@@ -31,7 +31,7 @@ impl ConsensusInner {
         match self.verify_transactions(std::iter::once(&*transaction)) {
             Ok(true) => (),
             Ok(false) => {
-                error!("Received a transaction that was invalid");
+                warn!("Received a transaction that was invalid");
                 return false;
             }
             Err(e) => {
