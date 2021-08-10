@@ -157,7 +157,13 @@ impl Node {
 
                 if self.sync().is_some() {
                     let hashes = hashes.into_iter().map(|x| x.0.into()).collect();
-                    self.received_get_blocks(source, hashes).await?;
+
+                    let node_clone = self.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = node_clone.received_get_blocks(source, hashes).await {
+                            warn!("failed to send sync blocks to peer: {:?}", e);
+                        }
+                    });
                 }
             }
             Payload::GetMemoryPool => {
