@@ -24,8 +24,8 @@ use rand::{distributions::Standard, thread_rng, Rng};
 async fn encrypt_and_decrypt_a_big_payload() {
     let (mut node0, mut node1) = spawn_2_fake_nodes().await;
 
-    // account for the overhead of serialization and noise tags
-    let block_size = snarkos_network::MAX_MESSAGE_SIZE / 2;
+    // account for some overhead of serialization and noise tags
+    let block_size = snarkos_network::MAX_MESSAGE_SIZE / 4 * 3;
 
     // create a big block containing random data
     let fake_block_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(block_size).collect();

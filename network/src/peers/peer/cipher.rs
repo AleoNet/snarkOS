@@ -25,13 +25,12 @@ use crate::NetworkError;
 
 pub struct Cipher {
     state: TransportState,
-    buffer: Box<[u8]>,
+    buffer: Vec<u8>,
     noise_buffer: Box<[u8]>,
 }
 
 impl Cipher {
-    pub fn new(state: TransportState, buffer: Box<[u8]>, noise_buffer: Box<[u8]>) -> Self {
-        assert_eq!(buffer.len(), crate::MAX_MESSAGE_SIZE + 4096);
+    pub fn new(state: TransportState, buffer: Vec<u8>, noise_buffer: Box<[u8]>) -> Self {
         assert_eq!(noise_buffer.len(), crate::NOISE_BUF_LEN);
         Self {
             state,
@@ -45,9 +44,10 @@ impl Cipher {
         writer: &mut W,
         data: &[u8],
     ) -> Result<(), NetworkError> {
-        if data.len() > self.buffer.len() {
+        if data.len() > crate::MAX_MESSAGE_SIZE {
             return Err(NetworkError::MessageTooBig(data.len()));
         }
+
         let mut encrypted_len = 0;
         let mut processed_len = 0;
 
@@ -57,6 +57,10 @@ impl Cipher {
                 data[processed_len..].len(),
             );
             let chunk = &data[processed_len..][..chunk_len];
+
+            if self.buffer.len() < encrypted_len + chunk_len + crate::NOISE_TAG_LEN {
+                self.buffer.resize(encrypted_len + chunk_len + crate::NOISE_TAG_LEN, 0);
+            }
 
             encrypted_len += self.state.write_message(chunk, &mut self.buffer[encrypted_len..])?;
             processed_len += chunk_len;
@@ -75,6 +79,10 @@ impl Cipher {
     }
 
     pub fn read_packet(&mut self, payload: &[u8]) -> Result<&[u8], NetworkError> {
+        if self.buffer.len() < payload.len() {
+            self.buffer.resize(payload.len(), 0);
+        }
+
         let mut decrypted_len = 0;
         let mut processed_len = 0;
 
@@ -96,6 +104,9 @@ impl Cipher {
             return Err(NetworkError::MessageTooBig(length));
         } else if length == 0 {
             return Err(NetworkError::ZeroLengthMessage);
+        }
+        if self.buffer.len() < length {
+            self.buffer.resize(length, 0);
         }
         reader.read_exact(&mut self.buffer[..length]).await?;
         // only used in tests, so this is fine
