@@ -413,7 +413,7 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
                 match order {
                     BlockOrder::Ascending => values.into_iter().map(|x| x.0).collect(),
                     BlockOrder::Descending => values.into_iter().rev().map(|x| x.0).collect(),
-                    BlockOrder::Unordered => unimplemented!(),
+                    BlockOrder::Unordered => unreachable!(),
                 }
             }
             BlockFilter::NonCanonOnly => {
