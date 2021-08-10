@@ -34,7 +34,12 @@ impl ConsensusInner {
         // self.diff_canon().await?;
         // self.recommit_canon().await?; // TODO: DEFINITELY REMOVE
         // info!("rebuilt canon");
-        self.try_to_fast_forward().await?;
+        if let Err(e) = self.try_to_fast_forward().await {
+            match e {
+                ConsensusError::InvalidBlock(e) => debug!("invalid block in initial fast-forward: {}", e),
+                e => warn!("failed to perform initial fast-forward: {:?}", e),
+            }
+        };
         info!("fastforwarding complete");
         Ok(())
     }
