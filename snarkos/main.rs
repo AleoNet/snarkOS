@@ -108,25 +108,21 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     )?;
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let storage = Arc::new(KeyValueStore::new(RocksDb::open(&path)?));
-    info!("Storage finished loading");
-
-    // Construct the node instance. Note this does not start the network services.
-    // This is done early on, so that the local address can be discovered
-    // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config, storage.clone()).await?;
+    let mut storage = RocksDb::open(&path)?;
 
     // For extra safety, validate storage too if a trim is requested.
-    // if config.storage.validate || config.storage.trim {
-    //     let now = std::time::Instant::now();
-    //     storage
-    //         .validate(None, snarkos_storage::validator::FixMode::Everything)
-    //         .await;
-    //     info!("Storage validated in {}ms", now.elapsed().as_millis());
-    //     if !config.storage.trim {
-    //         return Ok(());
-    //     }
-    // }
+    if config.storage.validate || config.storage.trim {
+        let now = std::time::Instant::now();
+        storage
+            .validate(None, snarkos_storage::validator::FixMode::Everything)
+            .await;
+        info!("Storage validated in {}ms", now.elapsed().as_millis());
+        if !config.storage.trim {
+            return Ok(());
+        }
+    }
+
+    let storage = Arc::new(KeyValueStore::new(storage));
 
     if config.storage.trim {
         let now = std::time::Instant::now();
@@ -135,6 +131,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         info!("Storage trimmed in {}ms", now.elapsed().as_millis());
         return Ok(());
     }
+
+    info!("Storage is ready");
+
+    // Construct the node instance. Note this does not start the network services.
+    // This is done early on, so that the local address can be discovered
+    // before any other object (miner, RPC) needs to use it.
+    let mut node = Node::new(node_config, storage.clone()).await?;
 
     if let Some(limit) = config.storage.export {
         let mut export_path = path.clone();
