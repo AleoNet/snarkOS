@@ -120,14 +120,9 @@ impl Node {
         // Verify the block and insert it into the storage.
         let block_validity = self.expect_sync().consensus.receive_block(block_struct).await;
 
-        if block_validity {
+        if block_validity && is_block_new {
             // This is a non-sync Block, send it to our peers.
-            if is_block_new {
-                self.propagate_block(block, remote_address);
-            } else {
-                // If it's a valid SyncBlock, bump block height.
-                metrics::increment_counter!(BLOCK_HEIGHT);
-            }
+            self.propagate_block(block, remote_address);
         }
 
         Ok(())
