@@ -30,7 +30,7 @@ use snarkvm::{
 };
 
 use rand::{CryptoRng, Rng};
-use std::{fmt, str::FromStr};
+use std::{fmt, ops::Deref, str::FromStr, sync::Arc};
 
 #[derive(Clone, Debug)]
 pub struct TransactionInput {
@@ -85,7 +85,7 @@ impl TransactionAuthorization {
             let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
             input_records.push(Record::<Testnet1Parameters>::new_noop_input(
-                &dpc.noop_program,
+                dpc.noop_program.deref(),
                 address,
                 rng,
             )?);
@@ -97,7 +97,7 @@ impl TransactionAuthorization {
         // Enforce that the old record addresses correspond with the private keys
         for (private_key, record) in private_keys.iter().zip(&input_records) {
             let address = Address::<Testnet1Parameters>::from_private_key(private_key)?;
-            assert_eq!(&address, record.owner());
+            assert_eq!(address, record.owner());
         }
 
         assert_eq!(input_records.len(), Testnet1Parameters::NUM_INPUT_RECORDS);
@@ -122,26 +122,57 @@ impl TransactionAuthorization {
 
         let mut joint_serial_numbers = vec![];
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = input_records[i].to_serial_number(&private_keys[i])?;
+            let (sn, _) = input_records[i].to_serial_number(private_keys[i].compute_key())?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
         let mut output_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
             output_records.push(Record::new_output(
-                &dpc.noop_program,
+                dpc.noop_program.deref(),
                 new_record_owners[j],
                 true,
                 new_values[j],
                 Default::default(),
                 (Testnet1Parameters::NUM_OUTPUT_RECORDS + j) as u8,
-                joint_serial_numbers.clone(),
+                &joint_serial_numbers,
                 rng,
             )?);
         }
 
+        // TODO (raychu86): Genericize this model to allow for generic programs.
+        let noop = Arc::new(dpc.noop_program.clone());
+
+        let mut builder = StateTransition::builder();
+
+        for (private_key, input_record) in private_keys.iter().zip(input_records.iter()) {
+            builder = builder.add_input(Input::new(
+                private_key.compute_key(),
+                input_record.clone(),
+                None,
+                noop.clone(),
+            )?);
+        }
+
+        for output_record in output_records.iter() {
+            builder = builder.add_output(Output::new(
+                output_record.owner(),
+                AleoAmount::from_bytes(output_record.value() as i64),
+                output_record.payload().clone(),
+                None,
+                noop.clone(),
+            )?);
+        }
+
+        match memo {
+            Some(memo) => builder = builder.append_memo(&memo.to_vec()),
+            None => (),
+        };
+
+        let state = builder.build(noop.clone(), rng)?;
+
         // Offline execution to generate a transaction authorization.
-        let authorization = dpc.authorize::<R>(&private_keys, input_records, output_records, memo, rng)?;
+        let authorization = dpc.authorize::<R>(&private_keys, &state, rng)?;
 
         Ok(Self { authorization })
     }

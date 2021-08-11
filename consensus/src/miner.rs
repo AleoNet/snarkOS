@@ -81,9 +81,7 @@ impl<S: Storage> Miner<S> {
         let (records, transaction) = self.consensus.create_coinbase_transaction(
             self.consensus.ledger.block_height() + 1,
             transactions,
-            vec![&self.consensus.dpc.noop_program; Testnet1Parameters::NUM_OUTPUT_RECORDS],
-            vec![&self.consensus.dpc.noop_program; Testnet1Parameters::NUM_OUTPUT_RECORDS],
-            self.address.clone(),
+            self.address,
             rng,
         )?;
 

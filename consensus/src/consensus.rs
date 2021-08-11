@@ -286,40 +286,59 @@ impl<S: Storage> Consensus<S> {
         memo: Option<[u8; 64]>,
         rng: &mut R,
     ) -> Result<Testnet1Transaction, ConsensusError> {
-        // Offline execution to generate a transaction authorization.
-        let authorization = self
-            .dpc
-            .authorize::<R>(&private_keys, old_records, new_records, memo, rng)?;
-
-        // Fetch the noop circuit ID.
-        let noop_circuit_id = self
-            .dpc
-            .noop_program
-            .find_circuit_by_index(0)
-            .ok_or(DPCError::MissingNoopCircuit)?
-            .circuit_id();
-
         // TODO (raychu86): Genericize this model to allow for generic programs.
-        // Construct the executable.
-        let noop = Executable::Noop(Arc::new(self.dpc.noop_program.clone()), *noop_circuit_id);
-        let executables = vec![noop.clone(), noop.clone(), noop.clone(), noop];
+        let noop = Arc::new(self.dpc.noop_program.clone());
+
+        let mut builder = StateTransition::builder();
+
+        for (private_key, old_record) in private_keys.iter().zip(old_records.iter()) {
+            builder = builder.add_input(Input::new(
+                private_key.compute_key(),
+                old_record.clone(),
+                None,
+                noop.clone(),
+            )?);
+        }
+
+        for new_record in new_records.iter() {
+            builder = builder.add_output(Output::new(
+                new_record.owner(),
+                AleoAmount::from_bytes(new_record.value() as i64),
+                new_record.payload().clone(),
+                None,
+                noop.clone(),
+            )?);
+        }
+
+        match memo {
+            Some(memo) => builder = builder.append_memo(&memo.to_vec()),
+            None => (),
+        };
+
+        let state = builder.build(noop.clone(), rng)?;
+
+        // Offline execution to generate a transaction authorization.
+        let authorization = self.dpc.authorize::<R>(&private_keys, &state, rng)?;
 
         // Online execution to generate a transaction.
+        let compute_keys = private_keys
+            .iter()
+            .take(Testnet1Parameters::NUM_INPUT_RECORDS)
+            .map(|private_key| private_key.compute_key().clone())
+            .collect();
+
         let transaction = self
             .dpc
-            .execute(&private_keys, authorization, executables, &*self.ledger, rng)?;
+            .execute(&compute_keys, authorization, state.executables(), &*self.ledger, rng)?;
 
         Ok(transaction)
     }
 
     /// Generate a coinbase transaction given candidate block transactions
-    #[allow(clippy::too_many_arguments)]
     pub fn create_coinbase_transaction<R: Rng + CryptoRng>(
         &self,
         block_num: u32,
         transactions: &Transactions<Testnet1Transaction>,
-        old_programs: Vec<&dyn Program<Testnet1Parameters>>,
-        new_programs: Vec<&dyn Program<Testnet1Parameters>>,
         recipient: Address<Testnet1Parameters>,
         rng: &mut R,
     ) -> Result<(Vec<Record<Testnet1Parameters>>, Testnet1Transaction), ConsensusError> {
@@ -333,51 +352,13 @@ impl<S: Storage> Consensus<S> {
             total_value_balance = total_value_balance.add(transaction.value_balance);
         }
 
-        // Generate noop input records.
-        let noop_account = Account::new(rng)?;
-        let private_keys = vec![noop_account.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
-        let mut input_records = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
-        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            input_records.push(Record::new_input(
-                old_programs[i],
-                noop_account.address.clone(),
-                true, // The input record is dummy
-                0,
-                Payload::default(),
-                <Testnet1Parameters as Parameters>::serial_number_nonce_crh().hash(&rng.gen::<[u8; 32]>())?,
-                rng,
-            )?);
-        }
-
-        let new_is_dummy_flags = [vec![false], vec![true; Testnet1Parameters::NUM_OUTPUT_RECORDS - 1]].concat();
-        let new_values = [vec![total_value_balance.0 as u64], vec![
-            0;
-            Testnet1Parameters::NUM_OUTPUT_RECORDS
-                - 1
-        ]]
-        .concat();
-
-        let mut joint_serial_numbers = vec![];
-        for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = input_records[i].to_serial_number(&private_keys[i])?;
-            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
-        }
-
-        let mut new_records = vec![];
-        for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
-            new_records.push(Record::new_output(
-                new_programs[j],
-                recipient.clone(),
-                new_is_dummy_flags[j],
-                new_values[j],
-                Payload::default(),
-                (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
-                joint_serial_numbers.clone(),
-                rng,
-            )?);
-        }
-
-        let transaction = self.create_transaction(input_records, private_keys, new_records.clone(), None, rng)?;
+        let noop = Arc::new(self.dpc.noop_program.clone());
+        let state = StateTransition::new_coinbase(recipient, total_value_balance, noop, rng)?;
+        let authorization = self.dpc.authorize::<R>(&vec![], &state, rng)?;
+        let transaction = self
+            .dpc
+            .execute(&vec![], authorization, state.executables(), &*self.ledger, rng)?;
+        let new_records = state.output_records().clone();
 
         Ok((new_records, transaction))
     }

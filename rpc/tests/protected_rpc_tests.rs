@@ -319,7 +319,7 @@ mod protected_rpc_tests {
         let method = "createtransaction".to_string();
 
         let [account, _, _] = &FIXTURE_VK.test_accounts;
-        let account_private_key_string = format!("\"{}\",", account.private_key);
+        let account_private_key_string = format!("\"{}\",", account.private_key());
 
         let mut private_keys_str = String::from("[");
         private_keys_str.push_str(&account_private_key_string);
@@ -404,7 +404,7 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key).unwrap();
+        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key()).unwrap();
         let _address = Address::<Testnet1Parameters>::from_str(&account.address).unwrap();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -414,7 +414,7 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key).unwrap();
+        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key()).unwrap();
         let _address = Address::<Testnet1Parameters>::from_str(&account.address).unwrap();
     }
 }

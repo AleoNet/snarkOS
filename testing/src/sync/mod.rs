@@ -22,6 +22,7 @@ use snarkvm::{
     utilities::{FromBytes, ToBytes},
 };
 
+use anyhow::Result;
 use once_cell::sync::Lazy;
 use std::{
     io::{Read, Result as IoResult, Write},
@@ -62,7 +63,7 @@ impl TransactionScheme for TestTestnet1Transaction {
     type Signature = [u8; 32];
     type ValueBalance = i64;
 
-    fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
+    fn transaction_id(&self) -> Result<[u8; 32]> {
         Ok([0u8; 32])
     }
 
@@ -100,10 +101,6 @@ impl TransactionScheme for TestTestnet1Transaction {
 
     fn encrypted_records(&self) -> &[Self::EncryptedRecord] {
         &[[0u8; 32]; 2]
-    }
-
-    fn size(&self) -> usize {
-        0
     }
 }
 

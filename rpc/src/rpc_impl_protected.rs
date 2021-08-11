@@ -36,7 +36,7 @@ use snarkvm::{
 use itertools::Itertools;
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use rand::{thread_rng, Rng};
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, ops::Deref, str::FromStr, sync::Arc};
 
 type JsonRPCError = jsonrpc_core::Error;
 
@@ -308,7 +308,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         let account = Account::<Testnet1Parameters>::new(&mut thread_rng())?;
 
         Ok(RpcAccount {
-            private_key: account.private_key.to_string(),
+            private_key: account.private_key().to_string(),
             view_key: account.view_key.to_string(),
             address: account.address.to_string(),
         })
@@ -350,13 +350,13 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             let address = Address::<Testnet1Parameters>::from_private_key(&private_key)?;
 
             let dummy_record = Record::<Testnet1Parameters>::new_input(
-                &self.dpc()?.noop_program,
+                self.dpc()?.noop_program.deref(),
                 address,
                 true, // The input record is dummy
                 0,
                 Payload::default(),
                 old_sn_nonce,
-                rng,
+                rng.gen(),
             )?;
 
             old_records.push(dummy_record);
@@ -389,20 +389,20 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
 
         let mut joint_serial_numbers = vec![];
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = old_records[i].to_serial_number(&old_account_private_keys[i])?;
+            let (sn, _) = old_records[i].to_serial_number(&old_account_private_keys[i].compute_key())?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
 
         let mut new_records = vec![];
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_records.push(Record::new_output(
-                &self.dpc()?.noop_program,
+                self.dpc()?.noop_program.deref(),
                 new_record_owners[j].clone(),
                 new_is_dummy_flags[j],
                 new_values[j],
                 Payload::default(),
                 (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
-                joint_serial_numbers.clone(),
+                &joint_serial_numbers,
                 rng,
             )?);
         }
@@ -495,32 +495,28 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     ) -> Result<CreateRawTransactionOutput, RpcError> {
         let rng = &mut thread_rng();
 
-        // Decode the private keys.
-        let mut private_keys = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
+        // Decode the compute keys.
+        let mut compute_keys = Vec::with_capacity(Testnet1Parameters::NUM_INPUT_RECORDS);
         for private_key in private_keys_string {
-            private_keys.push(PrivateKey::<Testnet1Parameters>::from_str(&private_key)?);
+            compute_keys.push(
+                PrivateKey::<Testnet1Parameters>::from_str(&private_key)?
+                    .compute_key()
+                    .clone(),
+            );
         }
 
         // Decode the transaction authorization.
         let authorization = TransactionAuthorization::<Testnet1Parameters>::read_le(&hex::decode(authorization)?[..])?;
 
-        // Fetch the noop circuit ID.
-        let noop_circuit_id = self
-            .dpc()?
-            .noop_program
-            .find_circuit_by_index(0)
-            .ok_or(DPCError::MissingNoopCircuit)?
-            .circuit_id();
-
         // TODO (raychu86): Genericize this model to allow for generic programs.
         // Construct the executable.
-        let noop = Executable::Noop(Arc::new(self.dpc()?.noop_program.clone()), *noop_circuit_id);
+        let noop = Executable::Noop(Arc::new(self.dpc()?.noop_program.clone()));
         let executables = vec![noop.clone(), noop.clone(), noop.clone(), noop];
 
         // Online execution to generate a transaction
         let transaction = self
             .dpc()?
-            .execute(&private_keys, authorization, executables, &*self.storage, rng)?;
+            .execute(&compute_keys, authorization, &executables, &*self.storage, rng)?;
 
         Ok(CreateRawTransactionOutput {
             encoded_transaction: hex::encode(to_bytes_le![transaction]?),

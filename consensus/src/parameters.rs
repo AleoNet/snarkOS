@@ -34,7 +34,6 @@ use chrono::Utc;
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
 /// A data structure containing the sync parameters for a specified network on this node.
-#[derive(Clone, Debug)]
 pub struct ConsensusParameters {
     /// The network ID that these parameters correspond to.
     pub network_id: Network,
