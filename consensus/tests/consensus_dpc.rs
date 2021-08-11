@@ -103,7 +103,7 @@ mod consensus_dpc {
                 DPCRecord::new_full(
                     &consensus.dpc.system_parameters.serial_number_nonce,
                     &consensus.dpc.system_parameters.record_commitment,
-                    new_record_owners[j].clone().into(),
+                    new_record_owners[j].clone(),
                     new_is_dummy_flags[j],
                     new_values[j],
                     new_payloads[j].clone(),

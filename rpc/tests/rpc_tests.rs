@@ -324,8 +324,8 @@ mod rpc_tests {
 
         let peer_info: NodeInfo = serde_json::from_value(result).unwrap();
 
-        assert_eq!(peer_info.is_miner, false);
-        assert_eq!(peer_info.is_syncing, false);
+        assert!(!peer_info.is_miner);
+        assert!(!peer_info.is_syncing);
     }
 
     #[tokio::test]

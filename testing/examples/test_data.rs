@@ -79,16 +79,14 @@ async fn setup_test_data() -> TestData {
         .find_block(&block_2.transactions, &alternative_block_1_header)
         .unwrap();
 
-    let test_data = TestData {
+    TestData {
         block_1,
         block_2,
         records_1: coinbase_records,
         records_2: coinbase_records_2,
         alternative_block_1_header,
         alternative_block_2_header,
-    };
-
-    test_data
+    }
 }
 
 async fn mine_block(
