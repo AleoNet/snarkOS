@@ -353,7 +353,22 @@ impl<S: Storage> Consensus<S> {
         }
 
         let noop = Arc::new(self.dpc.noop_program.clone());
-        let state = StateTransition::new_coinbase(recipient, total_value_balance, noop, rng)?;
+        let state = StateTransition::builder()
+            .add_output(Output::new(
+                recipient,
+                total_value_balance,
+                Payload::default(),
+                None,
+                noop.clone(),
+            )?)
+            .add_output(Output::new(
+                recipient,
+                AleoAmount::from_bytes(0),
+                Payload::default(),
+                None,
+                noop.clone(),
+            )?)
+            .build(noop, rng)?;
         let authorization = self.dpc.authorize::<R>(&vec![], &state, rng)?;
         let transaction = self
             .dpc

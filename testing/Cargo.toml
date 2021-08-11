@@ -30,7 +30,7 @@ network = [
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "db40b21"
+rev = "57ca319"
 # path = "../../snarkVM"
 features = ["curves", "parameters"]
 
