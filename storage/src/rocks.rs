@@ -40,17 +40,17 @@ pub struct RocksDb {
 }
 
 impl KeyValueStorage for RocksDb {
-    fn get<'a>(&'a mut self, column: KeyValueColumn, key: &[u8]) -> Result<Option<Value<'a>>> {
+    fn get<'a>(&'a self, column: KeyValueColumn, key: &[u8]) -> Result<Option<Value<'a>>> {
         let out = self.db().get_cf(self.get_cf_ref(column as u32), key)?;
         Ok(out.map(Cow::Owned))
     }
 
-    fn exists(&mut self, column: KeyValueColumn, key: &[u8]) -> Result<bool> {
+    fn exists(&self, column: KeyValueColumn, key: &[u8]) -> Result<bool> {
         let out = self.db().get_cf(self.get_cf_ref(column as u32), key)?;
         Ok(out.is_some())
     }
 
-    fn get_column<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<(Value<'a>, Value<'a>)>> {
+    fn get_column<'a>(&'a self, column: KeyValueColumn) -> Result<Vec<(Value<'a>, Value<'a>)>> {
         Ok(self
             .db()
             .iterator_cf(self.get_cf_ref(column as u32), IteratorMode::Start)
@@ -58,7 +58,7 @@ impl KeyValueStorage for RocksDb {
             .collect())
     }
 
-    fn get_column_keys<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<Value<'a>>> {
+    fn get_column_keys<'a>(&'a self, column: KeyValueColumn) -> Result<Vec<Value<'a>>> {
         Ok(self
             .db()
             .iterator_cf(self.get_cf_ref(column as u32), IteratorMode::Start)

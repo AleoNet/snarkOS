@@ -41,7 +41,11 @@ impl MemDb {
         }
     }
 
-    fn column(&mut self, column: KeyValueColumn) -> &mut IndexMap<Vec<u8>, Vec<u8>> {
+    fn column(&self, column: KeyValueColumn) -> Option<&IndexMap<Vec<u8>, Vec<u8>>> {
+        self.entries.get(&column)
+    }
+
+    fn column_mut(&mut self, column: KeyValueColumn) -> &mut IndexMap<Vec<u8>, Vec<u8>> {
         self.entries.entry(column).or_insert_with(IndexMap::new)
     }
 
@@ -55,27 +59,33 @@ impl MemDb {
 }
 
 impl KeyValueStorage for MemDb {
-    fn get<'a>(&'a mut self, column: KeyValueColumn, key: &[u8]) -> Result<Option<Value<'a>>> {
-        match self.column(column).get(key) {
+    fn get<'a>(&'a self, column: KeyValueColumn, key: &[u8]) -> Result<Option<Value<'a>>> {
+        match self.column(column).and_then(|col| col.get(key)) {
             Some(value) => Ok(Some(Cow::Borrowed(&value[..]))),
             None => Ok(None),
         }
     }
 
-    fn exists(&mut self, column: KeyValueColumn, key: &[u8]) -> Result<bool> {
-        Ok(self.column(column).contains_key(key))
+    fn exists(&self, column: KeyValueColumn, key: &[u8]) -> Result<bool> {
+        Ok(self.column(column).map(|col| col.contains_key(key)).unwrap_or(false))
     }
 
-    fn get_column_keys<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<Value<'a>>> {
-        Ok(self.column(column).keys().map(|x| Cow::Borrowed(&x[..])).collect())
-    }
-
-    fn get_column<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<(Value<'a>, Value<'a>)>> {
+    fn get_column_keys<'a>(&'a self, column: KeyValueColumn) -> Result<Vec<Value<'a>>> {
         Ok(self
             .column(column)
-            .iter()
-            .map(|(key, value)| (Cow::Borrowed(&key[..]), Cow::Borrowed(&value[..])))
-            .collect())
+            .map(|col| col.keys().map(|x| Cow::Borrowed(&x[..])).collect())
+            .unwrap_or_default())
+    }
+
+    fn get_column<'a>(&'a self, column: KeyValueColumn) -> Result<Vec<(Value<'a>, Value<'a>)>> {
+        Ok(self
+            .column(column)
+            .map(|col| {
+                col.iter()
+                    .map(|(key, value)| (Cow::Borrowed(&key[..]), Cow::Borrowed(&value[..])))
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     fn store(&mut self, column: KeyValueColumn, key: &[u8], value: &[u8]) -> Result<()> {
@@ -83,7 +93,7 @@ impl KeyValueStorage for MemDb {
             column.insert(key.to_vec(), value.to_vec());
             return Ok(());
         }
-        self.column(column).insert(key.to_vec(), value.to_vec());
+        self.column_mut(column).insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
@@ -92,7 +102,7 @@ impl KeyValueStorage for MemDb {
             column.remove(key);
             return Ok(());
         }
-        self.column(column).remove(key);
+        self.column_mut(column).remove(key);
         Ok(())
     }
 
