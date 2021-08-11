@@ -57,7 +57,7 @@ impl Consensus {
         let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         let mut joint_serial_numbers = vec![];
 
-        for i in 0..Components::NUM_INPUT_RECORDS {
+        for old_account_private_key in old_account_private_keys.iter().take(Components::NUM_INPUT_RECORDS) {
             let sn_nonce_input: [u8; 4] = rng.gen();
 
             let old_sn_nonce = <Components as DPCComponents>::SerialNumberNonceCRH::hash(
@@ -78,10 +78,8 @@ impl Consensus {
                 &mut rng,
             )?;
 
-            let (sn, _) = old_record.to_serial_number(
-                &self.dpc.system_parameters.account_signature,
-                &old_account_private_keys[i],
-            )?;
+            let (sn, _) =
+                old_record.to_serial_number(&self.dpc.system_parameters.account_signature, old_account_private_key)?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
 
             old_records.push(old_record.serialize()?);
