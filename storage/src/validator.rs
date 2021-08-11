@@ -48,6 +48,8 @@ macro_rules! check_for_superfluous_tx_components {
                 }
             };
 
+            debug!("there are {} {}s stored", storage_keys.len(), $component_name);
+
             let superfluous_items = storage_keys.difference(tx_entries).collect::<Vec<_>>();
 
             if !superfluous_items.is_empty() {
