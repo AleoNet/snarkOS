@@ -24,8 +24,6 @@
 
 #[macro_use]
 extern crate thiserror;
-#[macro_use]
-extern crate tracing;
 
 pub mod custom_rpc_server;
 #[doc(inline)]

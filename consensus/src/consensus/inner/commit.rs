@@ -45,12 +45,12 @@ impl ConsensusInner {
         match self.storage.get_block_state(&block.header.previous_block_hash).await? {
             BlockStatus::Committed(n) if n == canon.block_height => {
                 debug!("Processing a block that is on canon chain. Height {} -> {}", n, n + 1);
-                // process now
+                metrics::gauge!(BLOCK_HEIGHT, n as f64 + 1.0);
+                // Process the block now.
             }
             BlockStatus::Unknown => {
                 debug!("Processing a block that is an unknown orphan");
-
-                // dont process
+                // Don't process the block.
                 return Ok(());
             }
             _ => {
@@ -83,7 +83,7 @@ impl ConsensusInner {
                                     }
                                 };
 
-                            // remove existing canon chain descendents, if any
+                            // Remove existing canon chain descendents, if any.
                             match self.storage.get_block_hash(canon_branch_number as u32 + 1).await? {
                                 None => (),
                                 Some(hash) => {
@@ -93,7 +93,6 @@ impl ConsensusInner {
 
                             {
                                 let canon = self.storage.canon().await?;
-
                                 metrics::gauge!(BLOCK_HEIGHT, canon.block_height as f64);
                             }
 
@@ -107,24 +106,27 @@ impl ConsensusInner {
                                 }
                             }
                         } else {
-                            // dont process
+                            // Don't process the block.
                             return Ok(());
                         }
                     }
                     ForkDescription::Orphan => {
                         debug!("Processing a block that is on unknown orphan chain");
-                        // dont process
+                        // Don't process the block.
                         return Ok(());
                     }
                     ForkDescription::TooLong => {
                         debug!("Processing a block that is on an over-length fork");
-                        // dont process
+                        // Don't process the block.
                         return Ok(());
                     }
                 }
             }
         }
+
+        // Process the block.
         self.verify_and_commit_block(hash, block).await?;
+
         Ok(())
     }
 

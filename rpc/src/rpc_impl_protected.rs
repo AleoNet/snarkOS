@@ -590,7 +590,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         // Decode the private keys
         let mut old_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
         for private_key in private_keys.iter() {
-            old_private_keys.push(PrivateKey::<Components>::from_str(&private_key)?.into());
+            old_private_keys.push(PrivateKey::<Components>::from_str(private_key)?.into());
         }
 
         // Decode the transaction kernel
