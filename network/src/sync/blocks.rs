@@ -24,7 +24,6 @@ use snarkvm_dpc::{
 };
 
 use snarkos_consensus::error::ConsensusError;
-use snarkos_metrics::{self as metrics, misc::*};
 
 use crate::{master::SyncInbound, message::*, NetworkError, Node};
 use anyhow::*;
