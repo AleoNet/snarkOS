@@ -21,9 +21,10 @@ use crate::{
     TransactionLocation,
 };
 
-use snarkvm_dpc::{BlockHeader, BlockHeaderHash};
+use snarkvm_dpc::{BlockHeader, BlockHeaderHash, Op};
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
+use rayon::prelude::*;
 use tokio::{sync::mpsc, task};
 use tracing::*;
 
@@ -37,7 +38,13 @@ use std::{
 
 macro_rules! check_for_superfluous_tx_components {
     ($fn_name:ident, $component_name:expr, $component_col:expr) => {
-        fn $fn_name(&mut self, tx_entries: &HashSet<Vec<u8>>, fix_mode: FixMode, is_storage_valid: &AtomicBool) {
+        fn $fn_name(
+            &self,
+            tx_entries: &HashSet<Vec<u8>>,
+            db_ops: &mut Vec<Op>,
+            fix_mode: FixMode,
+            is_storage_valid: &AtomicBool,
+        ) {
             let storage_keys = match self.get_column_keys($component_col) {
                 Ok(col) => col.into_iter().map(|k| k.into_owned()).collect::<HashSet<_>>(),
                 Err(e) => {
@@ -66,7 +73,10 @@ macro_rules! check_for_superfluous_tx_components {
                 .contains(&fix_mode)
                 {
                     for superfluous_item in superfluous_items {
-                        self.delete($component_col, superfluous_item).unwrap();
+                        db_ops.push(Op::Delete {
+                            col: $component_col as u32,
+                            key: superfluous_item.to_vec(),
+                        });
                     }
                 } else {
                     is_storage_valid.store(false, Ordering::SeqCst);
@@ -96,6 +106,10 @@ pub enum ValidatorAction {
     /// value is the index of the component's corresponding dedicated database column, and the second one is
     /// its serialized value.
     RegisterTxComponent(KeyValueColumn, Vec<u8>),
+    /// An operation that will be executed as part of a batch database transaction at the end of the validation
+    /// process in case a fix mode other than `FixMode::Nothing` is picked; it will either store a missing value
+    /// or delete a superfluous one.
+    QueueDatabaseOp(Op),
 }
 
 impl RocksDb {
@@ -156,6 +170,8 @@ impl RocksDb {
         // Spawn a task intercepting stored tx components and pending database operations from a dedicated channel.
         let (component_sender, mut component_receiver) = mpsc::unbounded_channel::<ValidatorAction>();
         let task_handle = task::spawn(async move {
+            let mut db_ops = Vec::new();
+
             let mut tx_memos: HashSet<Vec<u8>> = Default::default();
             let mut tx_sns: HashSet<Vec<u8>> = Default::default();
             let mut tx_cms: HashSet<Vec<u8>> = Default::default();
@@ -173,35 +189,48 @@ impl RocksDb {
                         };
                         set.insert(key);
                     }
+                    ValidatorAction::QueueDatabaseOp(op) => {
+                        db_ops.push(op);
+                    }
                 }
             }
 
-            (tx_memos, tx_sns, tx_cms, tx_digests)
+            (db_ops, tx_memos, tx_sns, tx_cms, tx_digests)
         });
 
         let is_valid = AtomicBool::new(true);
 
-        (0..=to_process).into_iter().for_each(|i| {
+        (0..=to_process).into_par_iter().for_each(|i| {
             self.validate_block(current_height - i, component_sender.clone(), fix_mode, &is_valid);
         });
 
         // Close the channel, breaking the loop in the task checking the receiver.
         mem::drop(component_sender);
 
-        let (tx_memos, tx_sns, tx_cms, tx_digests) = task_handle.await.unwrap(); // can't recover if it fails
+        let (mut db_ops, tx_memos, tx_sns, tx_cms, tx_digests) = task_handle.await.unwrap(); // can't recover if it fails
 
         // Superfluous items can only be removed after a full storage pass.
         if limit.is_none() {
-            self.check_for_superfluous_tx_memos(&tx_memos, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_digests(&tx_digests, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_sns(&tx_sns, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_cms(&tx_cms, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_memos(&tx_memos, &mut db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_digests(&tx_digests, &mut db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_sns(&tx_sns, &mut db_ops, fix_mode, &is_valid);
+            self.check_for_superfluous_tx_cms(&tx_cms, &mut db_ops, fix_mode, &is_valid);
         }
 
-        if fix_mode != FixMode::Nothing && self.in_transaction() {
+        if fix_mode != FixMode::Nothing && !db_ops.is_empty() {
             info!("Fixing the detected storage issues");
+            self.begin().unwrap();
+            for op in db_ops {
+                if let Err(e) = match op {
+                    Op::Insert { col, key, value } => self.store(KeyValueColumn::from(col), &key, &value),
+                    Op::Delete { col, key } => self.delete(KeyValueColumn::from(col), &key),
+                } {
+                    error!("Couldn't fix a storage issue: {}", e);
+                }
+            }
             if let Err(e) = self.commit() {
-                error!("Couldn't fix the storage issues: {}", e);
+                error!("Couldn't fix the detected storage issues: {}", e);
+                self.abort().unwrap();
             }
         }
 
@@ -218,7 +247,7 @@ impl RocksDb {
 
     /// Validates the storage of a block at the given height.
     fn validate_block(
-        &mut self,
+        &self,
         block_height: u32,
         component_sender: mpsc::UnboundedSender<ValidatorAction>,
         fix_mode: FixMode,
@@ -293,7 +322,7 @@ impl RocksDb {
 
     /// Validates the storage of transactions belonging to the given block.
     fn validate_block_transactions(
-        &mut self,
+        &self,
         block_hash: &BlockHeaderHash,
         block_height: u32,
         component_sender: mpsc::UnboundedSender<ValidatorAction>,
@@ -318,7 +347,7 @@ impl RocksDb {
 
         let block_stored_txs = SerialBlock::read_transactions(&mut Cursor::new(&block_stored_txs_bytes[..])).unwrap();
 
-        block_stored_txs.iter().enumerate().for_each(|(block_tx_idx, tx)| {
+        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
             for sn in &tx.old_serial_numbers {
                 let sn = to_bytes_le![sn].unwrap();
                 if matches!(self.exists(KeyValueColumn::SerialNumber, &sn), Ok(false) | Err(_)) {
@@ -351,7 +380,12 @@ impl RocksDb {
                 );
 
                 if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
-                    self.store(KeyValueColumn::DigestIndex, &tx_digest, &block_height.to_le_bytes()).unwrap();
+                    let db_op = Op::Insert {
+                        col: KeyValueColumn::DigestIndex as u32,
+                        key: tx_digest.clone(),
+                        value: block_height.to_le_bytes().to_vec(),
+                    };
+                    component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
                 } else {
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
@@ -395,7 +429,13 @@ impl RocksDb {
                                     index: block_tx_idx as u32,
                                     block_hash: block_hash.0.into(),
                                 };
-                                self.store(KeyValueColumn::TransactionLookup, &tx.id, &to_bytes_le!(corrected_location).unwrap()).unwrap();
+
+                                let db_op = Op::Insert {
+                                    col: KeyValueColumn::TransactionLookup as u32,
+                                    key: tx.id.to_vec(),
+                                    value: to_bytes_le!(corrected_location).unwrap(),
+                                };
+                                component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
                             } else {
                                 is_storage_valid.store(false, Ordering::SeqCst);
                             }
