@@ -28,7 +28,7 @@ mod miner {
     use std::sync::Arc;
 
     fn keygen<C: Parameters, R: Rng + CryptoRng>(rng: &mut R) -> (PrivateKey<C>, Address<C>) {
-        let private_key = PrivateKey::<C>::new(rng).unwrap();
+        let private_key = PrivateKey::<C>::new(rng);
         let address = Address::from_private_key(&private_key).unwrap();
 
         (private_key, address)

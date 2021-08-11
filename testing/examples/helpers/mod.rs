@@ -19,11 +19,12 @@ use snarkos_testing::sync::*;
 use snarkvm::{
     dpc::{testnet1::*, Account, Address, Parameters, Payload, Record, RecordScheme},
     ledger::{Block, LedgerScheme, Storage, Transactions},
+    traits::AccountScheme,
     utilities::{to_bytes_le, ToBytes},
 };
 
 use rand::{CryptoRng, Rng};
-use std::time::Instant;
+use std::{ops::Deref, time::Instant};
 
 pub async fn mine_block<S: Storage>(
     miner: &Miner<S>,
@@ -73,25 +74,25 @@ pub fn create_send_transaction<R: Rng + CryptoRng, S: Storage>(
 
     let mut joint_serial_numbers = vec![];
     for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-        let (sn, _) = inputs[i].to_serial_number(&from.private_key)?;
+        let (sn, _) = inputs[i].to_serial_number(from.compute_key())?;
         joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
     }
 
     let mut new_records = vec![];
     for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
         new_records.push(Record::new_output(
-            &FIXTURE.program,
+            FIXTURE.program.deref(),
             to[j].clone(),
             false,
             values[j],
             Payload::default(),
             (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
-            joint_serial_numbers.clone(),
+            &joint_serial_numbers,
             rng,
         )?);
     }
 
-    let from = vec![from.private_key.clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
+    let from = vec![from.private_key().clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
 
     let transaction = consensus.create_transaction(inputs, from, new_records, None, rng);
     println!("Created transaction in {} seconds", timer.elapsed().as_secs());

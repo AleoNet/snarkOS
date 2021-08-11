@@ -34,6 +34,7 @@ mod protected_rpc_tests {
             TransactionAuthorization,
             ViewKey,
         },
+        traits::AccountScheme,
         utilities::{to_bytes_le, FromBytes, ToBytes},
     };
 
@@ -186,7 +187,7 @@ mod protected_rpc_tests {
 
         let records = &DATA.records_1;
 
-        let view_key = ViewKey::from_private_key(&miner_acc.private_key).unwrap();
+        let view_key = ViewKey::from_private_key(&miner_acc.private_key()).unwrap();
 
         for (ciphertext, record) in ciphertexts.iter().zip(records) {
             let ciphertext_string = hex::encode(to_bytes_le![ciphertext].unwrap());
@@ -226,7 +227,7 @@ mod protected_rpc_tests {
         let [sender, receiver, _] = &FIXTURE_VK.test_accounts;
 
         let old_records = vec![hex::encode(to_bytes_le![DATA.records_1[0]].unwrap())];
-        let old_account_private_keys = vec![sender.private_key.to_string()];
+        let old_account_private_keys = vec![sender.private_key().to_string()];
 
         let recipients = vec![TransactionRecipient {
             address: receiver.address.to_string(),
@@ -273,7 +274,7 @@ mod protected_rpc_tests {
         let [sender, receiver, _] = &FIXTURE_VK.test_accounts;
 
         let old_records = vec![hex::encode(to_bytes_le![DATA.records_1[0]].unwrap())];
-        let old_account_private_keys = vec![sender.private_key.to_string()];
+        let old_account_private_keys = vec![sender.private_key().to_string()];
 
         let recipients = vec![TransactionRecipient {
             address: receiver.address.to_string(),
@@ -334,7 +335,7 @@ mod protected_rpc_tests {
             let [sender, receiver, _] = &FIXTURE_VK.test_accounts;
 
             let old_records = vec![hex::encode(to_bytes_le![DATA.records_1[0]].unwrap())];
-            let old_account_private_keys = vec![sender.private_key.to_string()];
+            let old_account_private_keys = vec![sender.private_key().to_string()];
 
             let recipients = vec![TransactionRecipient {
                 address: receiver.address.to_string(),
@@ -404,7 +405,7 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key()).unwrap();
+        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key).unwrap();
         let _address = Address::<Testnet1Parameters>::from_str(&account.address).unwrap();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -414,7 +415,7 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key()).unwrap();
+        let _private_key = PrivateKey::<Testnet1Parameters>::from_str(&account.private_key).unwrap();
         let _address = Address::<Testnet1Parameters>::from_str(&account.address).unwrap();
     }
 }

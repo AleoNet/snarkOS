@@ -20,10 +20,11 @@ mod consensus_dpc {
     use snarkvm::{
         dpc::{payload::Payload as RecordPayload, record::Record, testnet1::*, DPCScheme, Parameters, RecordScheme},
         ledger::prelude::*,
+        traits::AccountScheme,
         utilities::{to_bytes_le, ToBytes},
     };
 
-    use std::sync::Arc;
+    use std::{ops::Deref, sync::Arc};
 
     #[tokio::test]
     async fn dpc_multiple_transactions() {
@@ -64,14 +65,16 @@ mod consensus_dpc {
 
         // INPUTS
 
-        let old_account_private_keys = vec![miner_acc.private_key; Testnet1Parameters::NUM_INPUT_RECORDS];
+        let old_account_private_keys = vec![miner_acc.private_key().clone(); Testnet1Parameters::NUM_INPUT_RECORDS];
         let old_records = coinbase_records;
 
         // OUTPUTS
 
         let mut joint_serial_numbers = vec![];
         for i in 0..Testnet1Parameters::NUM_INPUT_RECORDS {
-            let (sn, _) = old_records[i].to_serial_number(&old_account_private_keys[i]).unwrap();
+            let (sn, _) = old_records[i]
+                .to_serial_number(old_account_private_keys[i].compute_key())
+                .unwrap();
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn].unwrap());
         }
 
@@ -79,13 +82,13 @@ mod consensus_dpc {
         for j in 0..Testnet1Parameters::NUM_OUTPUT_RECORDS {
             new_records.push(
                 Record::new_output(
-                    &program,
+                    program.deref(),
                     recipient.address.clone(),
                     false,
                     10,
                     RecordPayload::default(),
                     (Testnet1Parameters::NUM_INPUT_RECORDS + j) as u8,
-                    joint_serial_numbers.clone(),
+                    &joint_serial_numbers,
                     &mut rng,
                 )
                 .unwrap(),
