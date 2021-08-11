@@ -26,7 +26,7 @@ use crate::{
     RpcImpl,
 };
 use snarkvm::{
-    algorithms::CRH,
+    algorithms::{merkle_tree::MerkleTreeDigest, CRH},
     dpc::{prelude::*, testnet1::Testnet1Parameters},
     ledger::prelude::*,
     prelude::UniformRand,
@@ -251,6 +251,27 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         Ok(Value::Null)
     }
 
+    /// Provides the current ledger digest and returns the Merkle paths for the given commitments
+    pub async fn ledger_commitment_proofs_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+
+        let commitments: Vec<<Testnet1Parameters as Parameters>::RecordCommitment> = value
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match self.ledger_commitment_proofs(commitments) {
+            Ok(result) => Ok(serde_json::to_value(result).expect("record serialization failed")),
+            Err(e) => Err(JsonRPCError::invalid_params(e.to_string())),
+        }
+    }
+
     /// Expose the protected functions as RPC enpoints
     pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
@@ -294,6 +315,10 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         d.add_method_with_meta("connect", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.connect_protected(params, meta)
+        });
+        d.add_method_with_meta("ledgercommitmentproofs", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.ledger_commitment_proofs_protected(params, meta)
         });
 
         io.extend_with(d)
@@ -588,5 +613,36 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
             }
             node.connect_to_addresses(&addresses).await
         });
+    }
+
+    fn ledger_commitment_proofs(
+        &self,
+        cms: Vec<<Testnet1Parameters as Parameters>::RecordCommitment>,
+    ) -> Result<
+        (
+            MerkleTreeDigest<<Testnet1Parameters as Parameters>::RecordCommitmentTreeParameters>,
+            Vec<LeanMerklePath>,
+        ),
+        RpcError,
+    > {
+        // Check the commitment count.
+        let expected_cm_count = <Testnet1Parameters as Parameters>::NUM_INPUT_RECORDS;
+        if cms.len() != expected_cm_count {
+            return Err(RpcError::InvalidCommitmentCount(cms.len(), expected_cm_count));
+        }
+
+        // Fetch the latest digest.
+        let storage = &self.storage;
+        let primary_height = self.sync_handler()?.current_block_height();
+        storage.catch_up_secondary(false, primary_height)?;
+        let latest_digest = self.storage.latest_digest()?;
+
+        // Generate the Merkle path for each commitment to the latest digest.
+        let paths = cms
+            .into_iter()
+            .map(|cm| storage.prove_cm(&cm).map(LeanMerklePath::from))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok((latest_digest, paths))
     }
 }

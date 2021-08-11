@@ -21,6 +21,11 @@ use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
+use snarkvm::{
+    algorithms::{merkle_tree::MerklePath as ParametrizedMerklePath, traits::MerkleParameters},
+    prelude::ToBytes,
+};
+
 /// Defines the authentication format for accessing private endpoints on the RPC server
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcCredentials {
@@ -321,4 +326,21 @@ pub struct Vertice {
 pub struct Edge {
     pub source: SocketAddr,
     pub target: SocketAddr,
+}
+
+// A rendition of snarkvm_dpc::algorithms::MerklePath without parameters and with the path in its
+// serialized (ToBytes::to_bytes_le + hex::encode) form.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LeanMerklePath {
+    pub path: String,
+    pub leaf_index: usize,
+}
+
+impl<P: MerkleParameters> From<ParametrizedMerklePath<P>> for LeanMerklePath {
+    fn from(full_path: ParametrizedMerklePath<P>) -> Self {
+        Self {
+            path: hex::encode(full_path.path.to_bytes_le().unwrap()), // safe, in-memory
+            leaf_index: full_path.leaf_index,
+        }
+    }
 }

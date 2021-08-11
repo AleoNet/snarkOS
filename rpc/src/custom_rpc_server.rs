@@ -39,7 +39,7 @@ use tokio::task;
 
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
-const METHODS_EXPECTING_PARAMS: [&str; 14] = [
+const METHODS_EXPECTING_PARAMS: [&str; 15] = [
     // public
     "getblock",
     "getblockhash",
@@ -56,6 +56,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 14] = [
     "decryptrecord",
     "disconnect",
     "connect",
+    "ledgercommitmentproofs",
 ];
 
 #[allow(clippy::too_many_arguments)]
@@ -283,6 +284,13 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         "connect" => {
             let result = rpc
                 .connect_protected(Params::Array(params), meta)
+                .await
+                .map_err(convert_core_err);
+            result_to_response(&req, result)
+        }
+        "ledgercommitmentproofs" => {
+            let result = rpc
+                .ledger_commitment_proofs_protected(Params::Array(params), meta)
                 .await
                 .map_err(convert_core_err);
             result_to_response(&req, result)
