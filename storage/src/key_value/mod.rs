@@ -45,6 +45,8 @@ pub trait KeyValueStorage {
 
     fn delete(&mut self, column: KeyValueColumn, key: &[u8]) -> Result<()>;
 
+    fn in_transaction(&self) -> bool;
+
     fn begin(&mut self) -> Result<()>;
 
     fn abort(&mut self) -> Result<()>;

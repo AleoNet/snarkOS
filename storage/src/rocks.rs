@@ -84,8 +84,12 @@ impl KeyValueStorage for RocksDb {
         Ok(())
     }
 
+    fn in_transaction(&self) -> bool {
+        self.current_transaction.is_some()
+    }
+
     fn begin(&mut self) -> Result<()> {
-        if self.current_transaction.is_some() {
+        if self.in_transaction() {
             return Err(anyhow!("cannot begin transaction when already in a transaction"));
         }
         self.current_transaction = Some(vec![]);
@@ -93,7 +97,7 @@ impl KeyValueStorage for RocksDb {
     }
 
     fn abort(&mut self) -> Result<()> {
-        if self.current_transaction.is_none() {
+        if !self.in_transaction() {
             return Err(anyhow!("attempted to abort transaction when none is entered"));
         }
         self.current_transaction = None;
@@ -101,7 +105,7 @@ impl KeyValueStorage for RocksDb {
     }
 
     fn commit(&mut self) -> Result<()> {
-        if self.current_transaction.is_none() {
+        if !self.in_transaction() {
             return Err(anyhow!("attempted to commit transaction when none is entered"));
         }
         let operations = self.current_transaction.take().unwrap();
