@@ -33,13 +33,13 @@ use agent::Agent;
 pub type Value<'a> = Cow<'a, [u8]>;
 
 pub trait KeyValueStorage {
-    fn get<'a>(&'a self, column: KeyValueColumn, key: &[u8]) -> Result<Option<Value<'a>>>;
+    fn get<'a>(&'a mut self, column: KeyValueColumn, key: &[u8]) -> Result<Option<Value<'a>>>;
 
-    fn exists(&self, column: KeyValueColumn, key: &[u8]) -> Result<bool>;
+    fn exists(&mut self, column: KeyValueColumn, key: &[u8]) -> Result<bool>;
 
-    fn get_column_keys<'a>(&'a self, column: KeyValueColumn) -> Result<Vec<Value<'a>>>;
+    fn get_column_keys<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<Value<'a>>>;
 
-    fn get_column<'a>(&'a self, column: KeyValueColumn) -> Result<Vec<(Value<'a>, Value<'a>)>>;
+    fn get_column<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<(Value<'a>, Value<'a>)>>;
 
     fn store(&mut self, column: KeyValueColumn, key: &[u8], value: &[u8]) -> Result<()>;
 
