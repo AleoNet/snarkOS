@@ -26,7 +26,15 @@ use snarkos::{
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
-use snarkos_storage::{export_canon_blocks, key_value::KeyValueStore, RocksDb, SerialBlock, Storage, VMBlock};
+use snarkos_storage::{
+    export_canon_blocks,
+    key_value::KeyValueStore,
+    RocksDb,
+    SerialBlock,
+    Storage,
+    VMBlock,
+    Validator,
+};
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
 use snarkvm_dpc::{
     testnet1::{

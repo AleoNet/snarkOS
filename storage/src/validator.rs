@@ -20,7 +20,6 @@ use crate::{
         KeyValueStorage,
         KEY_BEST_BLOCK_NUMBER,
     },
-    RocksDb,
     SerialBlock,
     TransactionLocation,
 };
@@ -147,13 +146,19 @@ check_for_superfluous_tx_components!(check_for_superfluous_tx_sns, "serial numbe
 
 check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment", Commitment);
 
-impl RocksDb {
+#[async_trait::async_trait]
+pub trait Validator {
+    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> Self;
+}
+
+#[async_trait::async_trait]
+impl<T: KeyValueStorage + Send + 'static> Validator for T {
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
     /// at the current block height and goes down until the genesis block, making sure that the block-related data
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
-    pub async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> Self {
+    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> Self {
         if limit.is_some() && [FixMode::SuperfluousTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
