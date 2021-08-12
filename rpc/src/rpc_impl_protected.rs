@@ -264,7 +264,7 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
             .into_iter()
             .map(|value| {
                 <Testnet1Parameters as Parameters>::RecordCommitment::from_bytes_le(
-                    &hex::decode(value.to_string()).unwrap(),
+                    &hex::decode(serde_json::from_value::<String>(value).unwrap()).unwrap(),
                 )
             })
             .collect::<Result<Vec<_>, _>>()
