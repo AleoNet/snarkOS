@@ -108,19 +108,22 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     )?;
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let mut storage = RocksDb::open(&path)?;
+    let storage = RocksDb::open(&path)?;
 
     // For extra safety, validate storage too if a trim is requested.
-    if config.storage.validate || config.storage.trim {
+    let storage = if config.storage.validate || config.storage.trim {
         let now = std::time::Instant::now();
-        storage
+        let moved_storage = storage
             .validate(None, snarkos_storage::validator::FixMode::Everything)
             .await;
         info!("Storage validated in {}ms", now.elapsed().as_millis());
         if !config.storage.trim {
             return Ok(());
         }
-    }
+        moved_storage
+    } else {
+        storage
+    };
 
     let storage = Arc::new(KeyValueStore::new(storage));
 

@@ -24,8 +24,10 @@ use crate::{
 use snarkvm_dpc::{BlockHeader, BlockHeaderHash, Op};
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
-use rayon::prelude::*;
-use tokio::{sync::mpsc, task};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task,
+};
 use tracing::*;
 
 use std::{
@@ -33,22 +35,25 @@ use std::{
     convert::TryInto,
     io::Cursor,
     mem,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 macro_rules! check_for_superfluous_tx_components {
     ($fn_name:ident, $component_name:expr, $component_col:expr) => {
-        fn $fn_name(
-            &self,
+        async fn $fn_name(
             tx_entries: &HashSet<Vec<u8>>,
+            lookup_sender: &mpsc::UnboundedSender<LookupRequest>,
             db_ops: &mut Vec<Op>,
             fix_mode: FixMode,
             is_storage_valid: &AtomicBool,
         ) {
-            let storage_keys = match self.get_column_keys($component_col) {
-                Ok(col) => col.into_iter().map(|k| k.into_owned()).collect::<HashSet<_>>(),
-                Err(e) => {
-                    error!("Couldn't obtain the column with tx {}s: {}", $component_name, e);
+            let storage_keys = match perform_lookup($component_col, LookupKind::GetColumnKeys, lookup_sender).await {
+                LookupResponse::Keys(col) => col.into_iter().collect::<HashSet<_>>(),
+                _ => {
+                    error!("Couldn't obtain the column with tx {}s", $component_name);
                     is_storage_valid.store(false, Ordering::SeqCst);
 
                     return;
@@ -100,6 +105,27 @@ pub enum FixMode {
     Everything,
 }
 
+#[derive(Debug)]
+pub struct LookupRequest {
+    col: KeyValueColumn,
+    kind: LookupKind,
+    tx: oneshot::Sender<LookupResponse>,
+}
+
+#[derive(Debug)]
+pub enum LookupKind {
+    Exists(Vec<u8>),
+    Get(Vec<u8>),
+    GetColumnKeys,
+}
+
+#[derive(Debug)]
+pub enum LookupResponse {
+    Found(bool),
+    Value(Option<Vec<u8>>),
+    Keys(Vec<Vec<u8>>),
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ValidatorAction {
     /// A transaction component from a stored transaction (as opposed to stored in its own column); the first
@@ -112,25 +138,25 @@ pub enum ValidatorAction {
     QueueDatabaseOp(Op),
 }
 
+check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", KeyValueColumn::Memo);
+
+check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", KeyValueColumn::DigestIndex);
+
+check_for_superfluous_tx_components!(
+    check_for_superfluous_tx_sns,
+    "serial number",
+    KeyValueColumn::SerialNumber
+);
+
+check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment", KeyValueColumn::Commitment);
+
 impl RocksDb {
-    check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", KeyValueColumn::Memo);
-
-    check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", KeyValueColumn::DigestIndex);
-
-    check_for_superfluous_tx_components!(
-        check_for_superfluous_tx_sns,
-        "serial number",
-        KeyValueColumn::SerialNumber
-    );
-
-    check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment", KeyValueColumn::Commitment);
-
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
     /// at the current block height and goes down until the genesis block, making sure that the block-related data
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
-    pub async fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> bool {
+    pub async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> Self {
         if limit.is_some()
             && [FixMode::SuperfluousTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode)
         {
@@ -143,7 +169,7 @@ impl RocksDb {
 
         if limit == Some(0) {
             info!("The limit of blocks to validate is 0; nothing to check.");
-            return true;
+            return self;
         }
 
         let current_height = if let Ok(Some(height)) = self.get(KeyValueColumn::Meta, KEY_BEST_BLOCK_NUMBER.as_bytes())
@@ -155,21 +181,49 @@ impl RocksDb {
             )
         } else {
             error!("Can't obtain block height from the storage!");
-            return false;
+            return self;
         };
 
         if current_height == 0 {
             info!("Only the genesis block is currently available; nothing to check.");
-            return true;
+            return self;
         }
 
         debug!("The block height is {}", current_height);
 
         let to_process = limit.unwrap_or(current_height);
 
+        // Spawn a task intercepting database lookup requests and executing them sequentially.
+        let (lookup_sender, mut lookup_receiver) = mpsc::unbounded_channel::<LookupRequest>();
+        let lookup_task_handle = task::spawn(async move {
+            while let Some(LookupRequest { col, kind, tx }) = lookup_receiver.recv().await {
+                match kind {
+                    LookupKind::Get(key) => {
+                        let res = self.get(col, &key).unwrap().map(|v| v.into_owned());
+                        tx.send(LookupResponse::Value(res)).unwrap()
+                    }
+                    LookupKind::Exists(key) => {
+                        let res = self.exists(col, &key).unwrap();
+                        tx.send(LookupResponse::Found(res)).unwrap()
+                    }
+                    LookupKind::GetColumnKeys => {
+                        let res = self
+                            .get_column_keys(col)
+                            .unwrap()
+                            .into_iter()
+                            .map(|v| v.into_owned())
+                            .collect();
+                        tx.send(LookupResponse::Keys(res)).unwrap()
+                    }
+                }
+            }
+
+            self
+        });
+
         // Spawn a task intercepting stored tx components and pending database operations from a dedicated channel.
         let (component_sender, mut component_receiver) = mpsc::unbounded_channel::<ValidatorAction>();
-        let task_handle = task::spawn(async move {
+        let component_task_handle = task::spawn(async move {
             let mut db_ops = Vec::new();
 
             let mut tx_memos: HashSet<Vec<u8>> = Default::default();
@@ -198,39 +252,57 @@ impl RocksDb {
             (db_ops, tx_memos, tx_sns, tx_cms, tx_digests)
         });
 
-        let is_valid = AtomicBool::new(true);
+        let is_valid = Arc::new(AtomicBool::new(true));
 
-        (0..=to_process).into_par_iter().for_each(|i| {
-            self.validate_block(current_height - i, component_sender.clone(), fix_mode, &is_valid);
+        (0..=to_process).into_iter().for_each(|i| {
+            let lookup_sender2 = lookup_sender.clone();
+            let component_sender2 = component_sender.clone();
+            let is_valid2 = is_valid.clone();
+
+            task::spawn(async move {
+                validate_block(
+                    current_height - i,
+                    lookup_sender2,
+                    component_sender2,
+                    fix_mode,
+                    is_valid2,
+                )
+                .await
+            });
         });
 
-        // Close the channel, breaking the loop in the task checking the receiver.
+        // Close the tx component channel, breaking the loop in the task checking the receiver.
         mem::drop(component_sender);
 
-        let (mut db_ops, tx_memos, tx_sns, tx_cms, tx_digests) = task_handle.await.unwrap(); // can't recover if it fails
+        let (mut db_ops, tx_memos, tx_sns, tx_cms, tx_digests) = component_task_handle.await.unwrap(); // can't recover if it fails
 
         // Superfluous items can only be removed after a full storage pass.
         if limit.is_none() {
-            self.check_for_superfluous_tx_memos(&tx_memos, &mut db_ops, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_digests(&tx_digests, &mut db_ops, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_sns(&tx_sns, &mut db_ops, fix_mode, &is_valid);
-            self.check_for_superfluous_tx_cms(&tx_cms, &mut db_ops, fix_mode, &is_valid);
+            check_for_superfluous_tx_memos(&tx_memos, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
+            check_for_superfluous_tx_digests(&tx_digests, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
+            check_for_superfluous_tx_sns(&tx_sns, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
+            check_for_superfluous_tx_cms(&tx_cms, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
         }
+
+        // Close the lookup request channel, breaking the loop in the task checking the receiver.
+        mem::drop(lookup_sender);
+
+        let mut storage = lookup_task_handle.await.unwrap();
 
         if fix_mode != FixMode::Nothing && !db_ops.is_empty() {
             info!("Fixing the detected storage issues");
-            self.begin().unwrap();
+            storage.begin().unwrap();
             for op in db_ops {
                 if let Err(e) = match op {
-                    Op::Insert { col, key, value } => self.store(KeyValueColumn::from(col), &key, &value),
-                    Op::Delete { col, key } => self.delete(KeyValueColumn::from(col), &key),
+                    Op::Insert { col, key, value } => storage.store(KeyValueColumn::from(col), &key, &value),
+                    Op::Delete { col, key } => storage.delete(KeyValueColumn::from(col), &key),
                 } {
                     error!("Couldn't fix a storage issue: {}", e);
                 }
             }
-            if let Err(e) = self.commit() {
+            if let Err(e) = storage.commit() {
                 error!("Couldn't fix the detected storage issues: {}", e);
-                self.abort().unwrap();
+                storage.abort().unwrap();
             }
         }
 
@@ -242,215 +314,308 @@ impl RocksDb {
             error!("The storage is invalid!");
         }
 
-        is_valid
+        storage
     }
+}
 
-    /// Validates the storage of a block at the given height.
-    fn validate_block(
-        &self,
-        block_height: u32,
-        component_sender: mpsc::UnboundedSender<ValidatorAction>,
-        fix_mode: FixMode,
-        is_storage_valid: &AtomicBool,
-    ) {
-        let block_hash = if let Ok(Some(block_hash)) = self.get(KeyValueColumn::BlockIndex, &block_height.to_le_bytes())
-        {
-            BlockHeaderHash::new(block_hash.into_owned())
-        } else {
+async fn perform_lookup(
+    col: KeyValueColumn,
+    kind: LookupKind,
+    req_sender: &mpsc::UnboundedSender<LookupRequest>,
+) -> LookupResponse {
+    let (resp_sender, resp_receiver) = oneshot::channel();
+
+    let req = LookupRequest {
+        col,
+        kind,
+        tx: resp_sender,
+    };
+
+    req_sender.send(req).unwrap();
+    resp_receiver.await.unwrap()
+}
+
+/// Validates the storage of a block at the given height.
+async fn validate_block(
+    block_height: u32,
+    lookup_sender: mpsc::UnboundedSender<LookupRequest>,
+    component_sender: mpsc::UnboundedSender<ValidatorAction>,
+    fix_mode: FixMode,
+    is_storage_valid: Arc<AtomicBool>,
+) {
+    let block_hash = match perform_lookup(
+        KeyValueColumn::BlockIndex,
+        LookupKind::Get(block_height.to_le_bytes().to_vec()),
+        &lookup_sender,
+    )
+    .await
+    {
+        LookupResponse::Value(Some(block_hash)) => BlockHeaderHash::new(block_hash),
+        _ => {
             // Block hash not found; register the failure and attempt to carry on.
             is_storage_valid.store(false, Ordering::SeqCst);
             return;
-        };
+        }
+    };
 
-        // This is extremely verbose and shouldn't be used outside of debugging.
-        // trace!("Validating block at height {} ({})", block_height, block_hash);
+    // This is extremely verbose and shouldn't be used outside of debugging.
+    // trace!("Validating block at height {} ({})", block_height, block_hash);
 
-        let block_header: BlockHeader = match self.get(KeyValueColumn::BlockHeader, &block_hash.0) {
-            Ok(Some(bytes)) => FromBytes::read_le(&*bytes).unwrap(), // TODO: revise new unwraps
-            _ => {
-                is_storage_valid.store(false, Ordering::SeqCst);
-                error!("The header for block at height {} is missing!", block_height);
-                return;
-            }
-        };
-
-        self.validate_block_transactions(&block_hash, block_height, component_sender, fix_mode, is_storage_valid);
-
-        // The genesis block has no parent.
-        if block_height == 0 {
+    let block_header: BlockHeader = match perform_lookup(
+        KeyValueColumn::BlockHeader,
+        LookupKind::Get(block_hash.0.to_vec()),
+        &lookup_sender,
+    )
+    .await
+    {
+        LookupResponse::Value(Some(bytes)) => FromBytes::read_le(&*bytes).unwrap(), // TODO: revise new unwraps; consider spawn_blocking()
+        _ => {
+            is_storage_valid.store(false, Ordering::SeqCst);
+            error!("The header for block at height {} is missing!", block_height);
             return;
         }
+    };
 
-        let previous_hash = match self.get(KeyValueColumn::BlockIndex, &(block_height - 1).to_le_bytes()) {
-            Ok(Some(hash)) => BlockHeaderHash::new(hash.into_owned()),
-            _ => {
-                error!("Couldn't find a block at height {}!", block_height - 1);
-                is_storage_valid.store(false, Ordering::SeqCst);
+    validate_block_transactions(
+        &block_hash,
+        block_height,
+        &lookup_sender,
+        component_sender,
+        fix_mode,
+        &is_storage_valid,
+    )
+    .await;
 
-                return;
-            }
-        };
-
-        if block_header.previous_block_hash != previous_hash {
-            is_storage_valid.store(false, Ordering::SeqCst);
-            error!(
-                "The parent hash of block at height {} doesn't match its child at {}!",
-                block_height,
-                block_height - 1,
-            );
-        }
-
-        match self.get(KeyValueColumn::ChildHashes, &previous_hash.0) {
-            Ok(Some(child_hashes)) => {
-                let child_hashes: Vec<BlockHeaderHash> = bincode::deserialize(&child_hashes).unwrap();
-
-                if !child_hashes.contains(&block_hash) {
-                    is_storage_valid.store(false, Ordering::SeqCst);
-                    error!(
-                        "The list of children hash of block at height {} don't contain the child at {}!",
-                        block_height - 1,
-                        block_height,
-                    );
-                }
-            }
-            _ => {
-                is_storage_valid.store(false, Ordering::SeqCst);
-                error!("Can't find the children of block at height {}!", previous_hash);
-            }
-        }
+    // The genesis block has no parent.
+    if block_height == 0 {
+        return;
     }
 
-    /// Validates the storage of transactions belonging to the given block.
-    fn validate_block_transactions(
-        &self,
-        block_hash: &BlockHeaderHash,
-        block_height: u32,
-        component_sender: mpsc::UnboundedSender<ValidatorAction>,
-        fix_mode: FixMode,
-        is_storage_valid: &AtomicBool,
-    ) {
-        let block_stored_txs_bytes = match self.get(KeyValueColumn::BlockTransactions, &block_hash.0) {
-            Ok(Some(txs)) => txs,
-            Ok(None) => {
-                error!("Can't find the transactions stored for block {}", block_hash);
+    let previous_hash = match perform_lookup(
+        KeyValueColumn::BlockIndex,
+        LookupKind::Get((block_height - 1).to_le_bytes().to_vec()),
+        &lookup_sender,
+    )
+    .await
+    {
+        LookupResponse::Value(Some(hash)) => BlockHeaderHash::new(hash),
+        _ => {
+            error!("Couldn't find a block at height {}!", block_height - 1);
+            is_storage_valid.store(false, Ordering::SeqCst);
+
+            return;
+        }
+    };
+
+    if block_header.previous_block_hash != previous_hash {
+        is_storage_valid.store(false, Ordering::SeqCst);
+        error!(
+            "The parent hash of block at height {} doesn't match its child at {}!",
+            block_height,
+            block_height - 1,
+        );
+    }
+
+    match perform_lookup(
+        KeyValueColumn::ChildHashes,
+        LookupKind::Get(previous_hash.0.to_vec()),
+        &lookup_sender,
+    )
+    .await
+    {
+        LookupResponse::Value(Some(child_hashes)) => {
+            let child_hashes: Vec<BlockHeaderHash> = bincode::deserialize(&child_hashes).unwrap();
+
+            if !child_hashes.contains(&block_hash) {
                 is_storage_valid.store(false, Ordering::SeqCst);
-
-                return;
-            }
-            Err(e) => {
-                error!("Can't find the transactions stored for block {}: {}", block_hash, e);
-                is_storage_valid.store(false, Ordering::SeqCst);
-
-                return;
-            }
-        };
-
-        let block_stored_txs = SerialBlock::read_transactions(&mut Cursor::new(&block_stored_txs_bytes[..])).unwrap();
-
-        block_stored_txs.par_iter().enumerate().for_each(|(block_tx_idx, tx)| {
-            for sn in &tx.old_serial_numbers {
-                let sn = to_bytes_le![sn].unwrap();
-                if matches!(self.exists(KeyValueColumn::SerialNumber, &sn), Ok(false) | Err(_)) {
-                    error!(
-                        "Transaction {} doesn't have an old serial number stored",
-                        hex::encode(tx.id)
-                    );
-                    is_storage_valid.store(false, Ordering::SeqCst);
-                }
-                component_sender.send(ValidatorAction::RegisterTxComponent(KeyValueColumn::SerialNumber, sn)).unwrap();
-            }
-
-            for cm in &tx.new_commitments {
-                let cm = to_bytes_le![cm].unwrap();
-                if matches!(self.exists(KeyValueColumn::Commitment, &cm), Ok(false) | Err(_)) {
-                    error!(
-                        "Transaction {} doesn't have a new commitment stored",
-                        hex::encode(tx.id)
-                    );
-                    is_storage_valid.store(false, Ordering::SeqCst);
-                }
-                component_sender.send(ValidatorAction::RegisterTxComponent(KeyValueColumn::Commitment, cm)).unwrap();
-            }
-
-            let tx_digest = to_bytes_le![tx.ledger_digest].unwrap();
-            if matches!(self.exists(KeyValueColumn::DigestIndex, &tx_digest), Ok(false) | Err(_)) {
-                warn!(
-                    "Transaction {} doesn't have the ledger digest stored",
-                    hex::encode(tx.id),
+                error!(
+                    "The list of children hash of block at height {} don't contain the child at {}!",
+                    block_height - 1,
+                    block_height,
                 );
-
-                if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
-                    let db_op = Op::Insert {
-                        col: KeyValueColumn::DigestIndex as u32,
-                        key: tx_digest.clone(),
-                        value: block_height.to_le_bytes().to_vec(),
-                    };
-                    component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
-                } else {
-                    is_storage_valid.store(false, Ordering::SeqCst);
-                }
             }
-            component_sender.send(ValidatorAction::RegisterTxComponent(KeyValueColumn::DigestIndex, tx_digest.to_vec())).unwrap();
+        }
+        _ => {
+            is_storage_valid.store(false, Ordering::SeqCst);
+            error!("Can't find the children of block at height {}!", previous_hash);
+        }
+    }
+}
 
-            let tx_memo = to_bytes_le![tx.memorandum].unwrap();
-            if matches!(self.exists(KeyValueColumn::Memo, &tx_memo), Ok(false) | Err(_)) {
-                error!("Transaction {} doesn't have its memo stored", hex::encode(tx.id));
+/// Validates the storage of transactions belonging to the given block.
+async fn validate_block_transactions(
+    block_hash: &BlockHeaderHash,
+    block_height: u32,
+    lookup_sender: &mpsc::UnboundedSender<LookupRequest>,
+    component_sender: mpsc::UnboundedSender<ValidatorAction>,
+    fix_mode: FixMode,
+    is_storage_valid: &AtomicBool,
+) {
+    let block_stored_txs_bytes = match perform_lookup(
+        KeyValueColumn::BlockTransactions,
+        LookupKind::Get(block_hash.0.to_vec()),
+        lookup_sender,
+    )
+    .await
+    {
+        LookupResponse::Value(Some(txs)) => txs,
+        _ => {
+            error!("Can't find the transactions stored for block {}", block_hash);
+            is_storage_valid.store(false, Ordering::SeqCst);
+
+            return;
+        }
+    };
+
+    let block_stored_txs =
+        task::spawn_blocking(|| SerialBlock::read_transactions(&mut Cursor::new(block_stored_txs_bytes)).unwrap())
+            .await
+            .unwrap();
+
+    for (block_tx_idx, tx) in block_stored_txs.iter().enumerate() {
+        for sn in &tx.old_serial_numbers {
+            let sn = to_bytes_le![sn].unwrap();
+            let found = perform_lookup(
+                KeyValueColumn::SerialNumber,
+                LookupKind::Exists(sn.clone()),
+                lookup_sender,
+            )
+            .await;
+            if !matches!(found, LookupResponse::Found(true)) {
+                error!(
+                    "Transaction {} doesn't have an old serial number stored",
+                    hex::encode(tx.id)
+                );
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
-            component_sender.send(ValidatorAction::RegisterTxComponent(KeyValueColumn::Memo, tx_memo.to_vec())).unwrap();
+            component_sender
+                .send(ValidatorAction::RegisterTxComponent(KeyValueColumn::SerialNumber, sn))
+                .unwrap();
+        }
 
-            match self.get(KeyValueColumn::TransactionLookup, &tx.id) {
-                Ok(Some(tx_location)) => {
-                    let tx_location = TransactionLocation::read_le(&*tx_location).unwrap();
+        for cm in &tx.new_commitments {
+            let cm = to_bytes_le![cm].unwrap();
+            let found = perform_lookup(
+                KeyValueColumn::Commitment,
+                LookupKind::Exists(cm.clone()),
+                lookup_sender,
+            )
+            .await;
+            if !matches!(found, LookupResponse::Found(true)) {
+                error!(
+                    "Transaction {} doesn't have a new commitment stored",
+                    hex::encode(tx.id)
+                );
+                is_storage_valid.store(false, Ordering::SeqCst);
+            }
+            component_sender
+                .send(ValidatorAction::RegisterTxComponent(KeyValueColumn::Commitment, cm))
+                .unwrap();
+        }
 
-                    match self.get(KeyValueColumn::BlockIndex, &tx_location.block_hash) {
-                        Ok(Some(block_number)) => {
-                            let block_number = u32::from_le_bytes((&*block_number).try_into().unwrap());
+        let tx_digest = to_bytes_le![tx.ledger_digest].unwrap();
+        let found = perform_lookup(
+            KeyValueColumn::Commitment,
+            LookupKind::Exists(tx_digest.clone()),
+            lookup_sender,
+        )
+        .await;
+        if !matches!(found, LookupResponse::Found(true)) {
+            warn!(
+                "Transaction {} doesn't have the ledger digest stored",
+                hex::encode(tx.id),
+            );
 
-                            if block_number != block_height {
-                                error!(
-                                    "The block indicated by the location of tx {} doesn't match the current height ({} != {})",
-                                    hex::encode(tx.id),
-                                    block_number,
-                                    block_height,
-                                );
-                                is_storage_valid.store(false, Ordering::SeqCst);
-                            }
-                        }
-                        _ => {
-                            warn!(
-                                "Can't get the block number for tx {}! The block locator entry for hash {} is missing",
+            if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
+                let db_op = Op::Insert {
+                    col: KeyValueColumn::DigestIndex as u32,
+                    key: tx_digest.clone(),
+                    value: block_height.to_le_bytes().to_vec(),
+                };
+                component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
+            } else {
+                is_storage_valid.store(false, Ordering::SeqCst);
+            }
+        }
+        component_sender
+            .send(ValidatorAction::RegisterTxComponent(
+                KeyValueColumn::DigestIndex,
+                tx_digest.to_vec(),
+            ))
+            .unwrap();
+
+        let tx_memo = to_bytes_le![tx.memorandum].unwrap();
+        let found = perform_lookup(KeyValueColumn::Memo, LookupKind::Exists(tx_memo.clone()), lookup_sender).await;
+        if !matches!(found, LookupResponse::Found(true)) {
+            error!("Transaction {} doesn't have its memo stored", hex::encode(tx.id));
+            is_storage_valid.store(false, Ordering::SeqCst);
+        }
+        component_sender
+            .send(ValidatorAction::RegisterTxComponent(
+                KeyValueColumn::Memo,
+                tx_memo.to_vec(),
+            ))
+            .unwrap();
+
+        match perform_lookup(
+            KeyValueColumn::TransactionLookup,
+            LookupKind::Get(tx.id.to_vec()),
+            lookup_sender,
+        )
+        .await
+        {
+            LookupResponse::Value(Some(tx_location)) => {
+                let tx_location = TransactionLocation::read_le(&*tx_location).unwrap();
+
+                match perform_lookup(
+                    KeyValueColumn::BlockIndex,
+                    LookupKind::Get(tx_location.block_hash.to_vec()),
+                    lookup_sender,
+                )
+                .await
+                {
+                    LookupResponse::Value(Some(block_number)) => {
+                        let block_number = u32::from_le_bytes((&block_number[..]).try_into().unwrap());
+
+                        if block_number != block_height {
+                            error!(
+                                "The block indicated by the location of tx {} doesn't match the current height ({} != {})",
                                 hex::encode(tx.id),
-                                BlockHeaderHash(tx_location.block_hash.bytes::<32>().unwrap())
+                                block_number,
+                                block_height,
                             );
-
-                            if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
-                                let corrected_location = TransactionLocation {
-                                    index: block_tx_idx as u32,
-                                    block_hash: block_hash.0.into(),
-                                };
-
-                                let db_op = Op::Insert {
-                                    col: KeyValueColumn::TransactionLookup as u32,
-                                    key: tx.id.to_vec(),
-                                    value: to_bytes_le!(corrected_location).unwrap(),
-                                };
-                                component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
-                            } else {
-                                is_storage_valid.store(false, Ordering::SeqCst);
-                            }
+                            is_storage_valid.store(false, Ordering::SeqCst);
                         }
                     }
-                },
-                Err(e) => {
-                    error!("Can't get the location of tx {}: {}", hex::encode(tx.id), e);
-                    is_storage_valid.store(false, Ordering::SeqCst);
-                }
-                Ok(None) => {
-                    error!("Can't get the location of tx {}", hex::encode(tx.id));
-                    is_storage_valid.store(false, Ordering::SeqCst);
+                    _ => {
+                        warn!(
+                            "Can't get the block number for tx {}! The block locator entry for hash {} is missing",
+                            hex::encode(tx.id),
+                            BlockHeaderHash(tx_location.block_hash.bytes::<32>().unwrap())
+                        );
+
+                        if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
+                            let corrected_location = TransactionLocation {
+                                index: block_tx_idx as u32,
+                                block_hash: block_hash.0.into(),
+                            };
+
+                            let db_op = Op::Insert {
+                                col: KeyValueColumn::TransactionLookup as u32,
+                                key: tx.id.to_vec(),
+                                value: to_bytes_le!(corrected_location).unwrap(),
+                            };
+                            component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
+                        } else {
+                            is_storage_valid.store(false, Ordering::SeqCst);
+                        }
+                    }
                 }
             }
-        });
+            _ => {
+                error!("Can't get the location of tx {}", hex::encode(tx.id));
+                is_storage_valid.store(false, Ordering::SeqCst);
+            }
+        }
     }
 }
