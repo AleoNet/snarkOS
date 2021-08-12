@@ -262,7 +262,11 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
 
         let commitments: Vec<<Testnet1Parameters as Parameters>::RecordCommitment> = value
             .into_iter()
-            .map(serde_json::from_value)
+            .map(|value| {
+                <Testnet1Parameters as Parameters>::RecordCommitment::from_bytes_le(
+                    &hex::decode(value.to_string()).unwrap(),
+                )
+            })
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
