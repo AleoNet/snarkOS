@@ -52,11 +52,13 @@ impl Peer {
                     self.fail();
                 }
                 metrics::increment_counter!(PONGS);
+                metrics::increment_counter!(ALL_SUCCESSES);
             }
             Payload::Ping(block_height) => {
                 network.write_payload(&Payload::Pong).await?;
                 self.quality.block_height = block_height;
                 metrics::increment_counter!(PINGS);
+                metrics::increment_counter!(ALL_SUCCESSES);
 
                 // Relay the height to the known network.
                 if let Some(known_network) = node.known_network() {
