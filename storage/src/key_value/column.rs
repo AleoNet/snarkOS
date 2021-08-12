@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use num_enum::TryFromPrimitive;
+
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, TryFromPrimitive)]
 pub enum KeyValueColumn {
     Meta = 0,          // MISC Values
     BlockHeader,       // Block hash -> block header
@@ -29,26 +31,6 @@ pub enum KeyValueColumn {
     Records,           // commitment -> record bytes
     ChildHashes,       // block hash -> vector of potential child hashes
     End,               // psuedo-column to signify count of columns
-}
-
-impl From<u32> for KeyValueColumn {
-    fn from(id: u32) -> Self {
-        match id {
-            0 => KeyValueColumn::Meta,
-            1 => KeyValueColumn::BlockHeader,
-            2 => KeyValueColumn::BlockTransactions,
-            3 => KeyValueColumn::BlockIndex,
-            4 => KeyValueColumn::TransactionLookup,
-            5 => KeyValueColumn::Commitment,
-            6 => KeyValueColumn::SerialNumber,
-            7 => KeyValueColumn::Memo,
-            8 => KeyValueColumn::DigestIndex,
-            9 => KeyValueColumn::Records,
-            10 => KeyValueColumn::ChildHashes,
-            11 => KeyValueColumn::End,
-            _ => unreachable!(),
-        }
-    }
 }
 
 pub const KEY_BEST_BLOCK_NUMBER: &str = "BEST_BLOCK_NUMBER";

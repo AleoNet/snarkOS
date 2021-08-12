@@ -285,11 +285,12 @@ impl RocksDb {
 
         if fix_mode != FixMode::Nothing && !db_ops.is_empty() {
             info!("Fixing the detected storage issues");
+
             storage.begin().unwrap();
             for op in db_ops {
                 if let Err(e) = match op {
-                    Op::Insert { col, key, value } => storage.store(KeyValueColumn::from(col), &key, &value),
-                    Op::Delete { col, key } => storage.delete(KeyValueColumn::from(col), &key),
+                    Op::Insert { col, key, value } => storage.store(col.try_into().unwrap(), &key, &value),
+                    Op::Delete { col, key } => storage.delete(col.try_into().unwrap(), &key),
                 } {
                     error!("Couldn't fix a storage issue: {}", e);
                 }
