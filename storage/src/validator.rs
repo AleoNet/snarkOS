@@ -15,11 +15,17 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    key_value::{KeyValueColumn, KeyValueStorage, KEY_BEST_BLOCK_NUMBER},
+    key_value::{
+        KeyValueColumn::{self, *},
+        KeyValueStorage,
+        KEY_BEST_BLOCK_NUMBER,
+    },
     RocksDb,
     SerialBlock,
     TransactionLocation,
 };
+
+use self::LookupKind::*;
 
 use snarkvm_dpc::{BlockHeader, BlockHeaderHash, Op};
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
@@ -50,7 +56,7 @@ macro_rules! check_for_superfluous_tx_components {
             fix_mode: FixMode,
             is_storage_valid: &AtomicBool,
         ) {
-            let storage_keys = match perform_lookup($component_col, LookupKind::GetColumnKeys, lookup_sender).await {
+            let storage_keys = match db_lookup($component_col, GetColumnKeys, lookup_sender).await {
                 LookupResponse::Keys(col) => col.into_iter().collect::<HashSet<_>>(),
                 _ => {
                     error!("Couldn't obtain the column with tx {}s", $component_name);
@@ -71,12 +77,7 @@ macro_rules! check_for_superfluous_tx_components {
                     $component_name
                 );
 
-                if [
-                    FixMode::SuperfluousTestnet1TransactionComponents,
-                    FixMode::Everything,
-                ]
-                .contains(&fix_mode)
-                {
+                if [FixMode::SuperfluousTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
                     for superfluous_item in superfluous_items {
                         db_ops.push(Op::Delete {
                             col: $component_col as u32,
@@ -96,11 +97,11 @@ pub enum FixMode {
     /// Don't fix anything in the storage.
     Nothing,
     /// Update transaction locations if need be.
-    Testnet1TransactionLocations,
+    Testnet1TxLocations,
     /// Store transaction serial numbers, commitments and memorandums that are missing in the storage.
-    MissingTestnet1TransactionComponents,
+    MissingTestnet1TxComponents,
     /// Remove transaction serial numbers, commitments and memorandums for missing transactions.
-    SuperfluousTestnet1TransactionComponents,
+    SuperfluousTestnet1TxComponents,
     /// Apply all the available fixes.
     Everything,
 }
@@ -138,17 +139,13 @@ pub enum ValidatorAction {
     QueueDatabaseOp(Op),
 }
 
-check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", KeyValueColumn::Memo);
+check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", Memo);
 
-check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", KeyValueColumn::DigestIndex);
+check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", DigestIndex);
 
-check_for_superfluous_tx_components!(
-    check_for_superfluous_tx_sns,
-    "serial number",
-    KeyValueColumn::SerialNumber
-);
+check_for_superfluous_tx_components!(check_for_superfluous_tx_sns, "serial number", SerialNumber);
 
-check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment", KeyValueColumn::Commitment);
+check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment", Commitment);
 
 impl RocksDb {
     /// Validates the storage of the canon blocks, their child-parent relationships, and their transactions; starts
@@ -157,9 +154,7 @@ impl RocksDb {
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
     pub async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> Self {
-        if limit.is_some()
-            && [FixMode::SuperfluousTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode)
-        {
+        if limit.is_some() && [FixMode::SuperfluousTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
             );
@@ -172,8 +167,7 @@ impl RocksDb {
             return self;
         }
 
-        let current_height = if let Ok(Some(height)) = self.get(KeyValueColumn::Meta, KEY_BEST_BLOCK_NUMBER.as_bytes())
-        {
+        let current_height = if let Ok(Some(height)) = self.get(Meta, KEY_BEST_BLOCK_NUMBER.as_bytes()) {
             u32::from_le_bytes(
                 (&*height)
                     .try_into()
@@ -198,15 +192,15 @@ impl RocksDb {
         let lookup_task_handle = task::spawn(async move {
             while let Some(LookupRequest { col, kind, tx }) = lookup_receiver.recv().await {
                 match kind {
-                    LookupKind::Get(key) => {
+                    Get(key) => {
                         let res = self.get(col, &key).unwrap().map(|v| v.into_owned());
                         tx.send(LookupResponse::Value(res)).unwrap()
                     }
-                    LookupKind::Exists(key) => {
+                    Exists(key) => {
                         let res = self.exists(col, &key).unwrap();
                         tx.send(LookupResponse::Found(res)).unwrap()
                     }
-                    LookupKind::GetColumnKeys => {
+                    GetColumnKeys => {
                         let res = self
                             .get_column_keys(col)
                             .unwrap()
@@ -235,10 +229,10 @@ impl RocksDb {
                 match action {
                     ValidatorAction::RegisterTxComponent(col, key) => {
                         let set = match col {
-                            KeyValueColumn::Memo => &mut tx_memos,
-                            KeyValueColumn::SerialNumber => &mut tx_sns,
-                            KeyValueColumn::Commitment => &mut tx_cms,
-                            KeyValueColumn::DigestIndex => &mut tx_digests,
+                            Memo => &mut tx_memos,
+                            SerialNumber => &mut tx_sns,
+                            Commitment => &mut tx_cms,
+                            DigestIndex => &mut tx_digests,
                             _ => unreachable!(),
                         };
                         set.insert(key);
@@ -318,7 +312,7 @@ impl RocksDb {
     }
 }
 
-async fn perform_lookup(
+async fn db_lookup(
     col: KeyValueColumn,
     kind: LookupKind,
     req_sender: &mpsc::UnboundedSender<LookupRequest>,
@@ -343,13 +337,7 @@ async fn validate_block(
     fix_mode: FixMode,
     is_storage_valid: Arc<AtomicBool>,
 ) {
-    let block_hash = match perform_lookup(
-        KeyValueColumn::BlockIndex,
-        LookupKind::Get(block_height.to_le_bytes().to_vec()),
-        &lookup_sender,
-    )
-    .await
-    {
+    let block_hash = match db_lookup(BlockIndex, Get(block_height.to_le_bytes().to_vec()), &lookup_sender).await {
         LookupResponse::Value(Some(block_hash)) => BlockHeaderHash::new(block_hash),
         _ => {
             // Block hash not found; register the failure and attempt to carry on.
@@ -361,13 +349,7 @@ async fn validate_block(
     // This is extremely verbose and shouldn't be used outside of debugging.
     // trace!("Validating block at height {} ({})", block_height, block_hash);
 
-    let block_header: BlockHeader = match perform_lookup(
-        KeyValueColumn::BlockHeader,
-        LookupKind::Get(block_hash.0.to_vec()),
-        &lookup_sender,
-    )
-    .await
-    {
+    let block_header: BlockHeader = match db_lookup(BlockHeader, Get(block_hash.0.to_vec()), &lookup_sender).await {
         LookupResponse::Value(Some(bytes)) => FromBytes::read_le(&*bytes).unwrap(), // TODO: revise new unwraps; consider spawn_blocking()
         _ => {
             is_storage_valid.store(false, Ordering::SeqCst);
@@ -391,9 +373,9 @@ async fn validate_block(
         return;
     }
 
-    let previous_hash = match perform_lookup(
-        KeyValueColumn::BlockIndex,
-        LookupKind::Get((block_height - 1).to_le_bytes().to_vec()),
+    let previous_hash = match db_lookup(
+        BlockIndex,
+        Get((block_height - 1).to_le_bytes().to_vec()),
         &lookup_sender,
     )
     .await
@@ -416,13 +398,7 @@ async fn validate_block(
         );
     }
 
-    match perform_lookup(
-        KeyValueColumn::ChildHashes,
-        LookupKind::Get(previous_hash.0.to_vec()),
-        &lookup_sender,
-    )
-    .await
-    {
+    match db_lookup(ChildHashes, Get(previous_hash.0.to_vec()), &lookup_sender).await {
         LookupResponse::Value(Some(child_hashes)) => {
             let child_hashes: Vec<BlockHeaderHash> = bincode::deserialize(&child_hashes).unwrap();
 
@@ -451,13 +427,7 @@ async fn validate_block_transactions(
     fix_mode: FixMode,
     is_storage_valid: &AtomicBool,
 ) {
-    let block_stored_txs_bytes = match perform_lookup(
-        KeyValueColumn::BlockTransactions,
-        LookupKind::Get(block_hash.0.to_vec()),
-        lookup_sender,
-    )
-    .await
-    {
+    let block_stored_txs_bytes = match db_lookup(BlockTransactions, Get(block_hash.0.to_vec()), lookup_sender).await {
         LookupResponse::Value(Some(txs)) => txs,
         _ => {
             error!("Can't find the transactions stored for block {}", block_hash);
@@ -475,12 +445,7 @@ async fn validate_block_transactions(
     for (block_tx_idx, tx) in block_stored_txs.iter().enumerate() {
         for sn in &tx.old_serial_numbers {
             let sn = to_bytes_le![sn].unwrap();
-            let found = perform_lookup(
-                KeyValueColumn::SerialNumber,
-                LookupKind::Exists(sn.clone()),
-                lookup_sender,
-            )
-            .await;
+            let found = db_lookup(SerialNumber, Exists(sn.clone()), lookup_sender).await;
             if !matches!(found, LookupResponse::Found(true)) {
                 error!(
                     "Transaction {} doesn't have an old serial number stored",
@@ -489,18 +454,13 @@ async fn validate_block_transactions(
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
             component_sender
-                .send(ValidatorAction::RegisterTxComponent(KeyValueColumn::SerialNumber, sn))
+                .send(ValidatorAction::RegisterTxComponent(SerialNumber, sn))
                 .unwrap();
         }
 
         for cm in &tx.new_commitments {
             let cm = to_bytes_le![cm].unwrap();
-            let found = perform_lookup(
-                KeyValueColumn::Commitment,
-                LookupKind::Exists(cm.clone()),
-                lookup_sender,
-            )
-            .await;
+            let found = db_lookup(Commitment, Exists(cm.clone()), lookup_sender).await;
             if !matches!(found, LookupResponse::Found(true)) {
                 error!(
                     "Transaction {} doesn't have a new commitment stored",
@@ -509,26 +469,21 @@ async fn validate_block_transactions(
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
             component_sender
-                .send(ValidatorAction::RegisterTxComponent(KeyValueColumn::Commitment, cm))
+                .send(ValidatorAction::RegisterTxComponent(Commitment, cm))
                 .unwrap();
         }
 
         let tx_digest = to_bytes_le![tx.ledger_digest].unwrap();
-        let found = perform_lookup(
-            KeyValueColumn::Commitment,
-            LookupKind::Exists(tx_digest.clone()),
-            lookup_sender,
-        )
-        .await;
+        let found = db_lookup(Commitment, Exists(tx_digest.clone()), lookup_sender).await;
         if !matches!(found, LookupResponse::Found(true)) {
             warn!(
                 "Transaction {} doesn't have the ledger digest stored",
                 hex::encode(tx.id),
             );
 
-            if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
+            if [FixMode::MissingTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
                 let db_op = Op::Insert {
-                    col: KeyValueColumn::DigestIndex as u32,
+                    col: DigestIndex as u32,
                     key: tx_digest.clone(),
                     value: block_height.to_le_bytes().to_vec(),
                 };
@@ -538,42 +493,24 @@ async fn validate_block_transactions(
             }
         }
         component_sender
-            .send(ValidatorAction::RegisterTxComponent(
-                KeyValueColumn::DigestIndex,
-                tx_digest.to_vec(),
-            ))
+            .send(ValidatorAction::RegisterTxComponent(DigestIndex, tx_digest.to_vec()))
             .unwrap();
 
         let tx_memo = to_bytes_le![tx.memorandum].unwrap();
-        let found = perform_lookup(KeyValueColumn::Memo, LookupKind::Exists(tx_memo.clone()), lookup_sender).await;
+        let found = db_lookup(Memo, Exists(tx_memo.clone()), lookup_sender).await;
         if !matches!(found, LookupResponse::Found(true)) {
             error!("Transaction {} doesn't have its memo stored", hex::encode(tx.id));
             is_storage_valid.store(false, Ordering::SeqCst);
         }
         component_sender
-            .send(ValidatorAction::RegisterTxComponent(
-                KeyValueColumn::Memo,
-                tx_memo.to_vec(),
-            ))
+            .send(ValidatorAction::RegisterTxComponent(Memo, tx_memo.to_vec()))
             .unwrap();
 
-        match perform_lookup(
-            KeyValueColumn::TransactionLookup,
-            LookupKind::Get(tx.id.to_vec()),
-            lookup_sender,
-        )
-        .await
-        {
+        match db_lookup(TransactionLookup, Get(tx.id.to_vec()), lookup_sender).await {
             LookupResponse::Value(Some(tx_location)) => {
                 let tx_location = TransactionLocation::read_le(&*tx_location).unwrap();
 
-                match perform_lookup(
-                    KeyValueColumn::BlockIndex,
-                    LookupKind::Get(tx_location.block_hash.to_vec()),
-                    lookup_sender,
-                )
-                .await
-                {
+                match db_lookup(BlockIndex, Get(tx_location.block_hash.to_vec()), lookup_sender).await {
                     LookupResponse::Value(Some(block_number)) => {
                         let block_number = u32::from_le_bytes((&block_number[..]).try_into().unwrap());
 
@@ -594,14 +531,14 @@ async fn validate_block_transactions(
                             BlockHeaderHash(tx_location.block_hash.bytes::<32>().unwrap())
                         );
 
-                        if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
+                        if [FixMode::Testnet1TxLocations, FixMode::Everything].contains(&fix_mode) {
                             let corrected_location = TransactionLocation {
                                 index: block_tx_idx as u32,
                                 block_hash: block_hash.0.into(),
                             };
 
                             let db_op = Op::Insert {
-                                col: KeyValueColumn::TransactionLookup as u32,
+                                col: TransactionLookup as u32,
                                 key: tx.id.to_vec(),
                                 value: to_bytes_le!(corrected_location).unwrap(),
                             };
