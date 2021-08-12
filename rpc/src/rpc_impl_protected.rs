@@ -271,7 +271,11 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
         match self.ledger_commitment_proofs(commitments) {
-            Ok(result) => Ok(serde_json::to_value(result).expect("record serialization failed")),
+            Ok((latest_digest, merkle_paths)) => Ok(serde_json::to_value((
+                hex::encode(latest_digest.to_bytes_le().expect("Failed to serialize latest digest")),
+                merkle_paths,
+            ))
+            .expect("record serialization failed")),
             Err(e) => Err(JsonRPCError::invalid_params(e.to_string())),
         }
     }
