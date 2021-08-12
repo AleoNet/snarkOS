@@ -18,6 +18,10 @@
 
 use crate::{error::RpcError, rpc_types::*};
 use snarkos_metrics::snapshots::NodeStats;
+use snarkvm::{
+    algorithms::merkle_tree::MerkleTreeDigest,
+    dpc::{testnet1::Testnet1Parameters, Parameters},
+};
 
 use jsonrpc_derive::rpc;
 
@@ -159,4 +163,15 @@ pub trait ProtectedRpcFunctions {
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/connect.md"))]
     fn connect(&self, addresses: Vec<SocketAddr>);
+
+    fn ledger_commitment_proofs(
+        &self,
+        commitments: Vec<<Testnet1Parameters as Parameters>::RecordCommitment>,
+    ) -> Result<
+        (
+            MerkleTreeDigest<<Testnet1Parameters as Parameters>::RecordCommitmentTreeParameters>,
+            Vec<LeanMerklePath>,
+        ),
+        RpcError,
+    >;
 }

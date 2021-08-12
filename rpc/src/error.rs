@@ -49,6 +49,9 @@ pub enum RpcError {
     #[error("invalid metadata: {}", _0)]
     InvalidMetadata(String),
 
+    #[error("invalid number of commitments: {} instead of {}", _0, _1)]
+    InvalidCommitmentCount(usize, usize),
+
     #[error("{}", _0)]
     Message(String),
 
