@@ -480,7 +480,7 @@ async fn validate_block_transactions(
         }
 
         let tx_digest = to_bytes_le![tx.ledger_digest].unwrap();
-        let found = db_lookup(Commitment, Exists(tx_digest.clone()), lookup_sender).await;
+        let found = db_lookup(DigestIndex, Exists(tx_digest.clone()), lookup_sender).await;
         if !matches!(found, LookupResponse::Found(true)) {
             warn!(
                 "Transaction {} doesn't have the ledger digest stored",
