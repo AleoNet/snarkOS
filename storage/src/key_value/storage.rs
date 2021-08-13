@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(feature = "test")]
+use crate::key_value::KeyValueColumn;
 use crate::{
     BlockFilter,
     BlockStatus,
@@ -148,5 +150,10 @@ impl Storage for KeyValueStore {
 
     async fn store_init_digest(&self, digest: Digest) -> Result<()> {
         self.send(Message::StoreInitDigest(digest)).await
+    }
+
+    #[cfg(feature = "test")]
+    async fn remove_key(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()> {
+        self.send(Message::RemoveKey(col, key)).await
     }
 }

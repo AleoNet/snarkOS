@@ -164,8 +164,12 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
         self.inner()
             .store(KeyValueColumn::DigestIndex, &digest[..], &0u32.to_le_bytes()[..])?;
         self.inner()
-            .store(KeyValueColumn::DigestIndex, &0u32.to_le_bytes()[..], &digest[..])?;
-        Ok(())
+            .store(KeyValueColumn::DigestIndex, &0u32.to_le_bytes()[..], &digest[..])
+    }
+
+    #[cfg(feature = "test")]
+    fn remove_key(&mut self, col: KeyValueColumn, key: Vec<u8>) -> Result<()> {
+        self.inner().delete(col, &key)
     }
 
     fn wrap<T, F: FnOnce(&mut Self) -> Result<T>>(&mut self, func: F) -> Result<T> {
@@ -215,6 +219,8 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
             Message::GetBlockHashes(limit, filter) => Box::new(self.get_block_hashes(limit, filter)),
             Message::Validate(limit, fix_mode) => Box::new(self.validate(limit, fix_mode)),
             Message::StoreInitDigest(digest) => Box::new(self.wrap(move |f| f.store_init_digest(digest))),
+            #[cfg(feature = "test")]
+            Message::RemoveKey(col, key) => Box::new(self.wrap(move |f| f.remove_key(col, key))),
         }
     }
 

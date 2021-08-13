@@ -94,6 +94,8 @@ enum Message {
     GetBlockHashes(Option<u32>, BlockFilter),
     Validate(Option<u32>, FixMode),
     StoreInitDigest(Digest),
+    #[cfg(feature = "test")]
+    RemoveKey(KeyValueColumn, Vec<u8>),
 }
 
 impl fmt::Display for Message {
@@ -144,6 +146,8 @@ impl fmt::Display for Message {
             Message::GetBlockHashes(limit, filter) => write!(f, "GetBlockHashes({:?}, {:?})", limit, filter),
             Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
             Message::StoreInitDigest(digest) => write!(f, "StoreInitDigest({})", digest),
+            #[cfg(feature = "test")]
+            Message::RemoveKey(col, key) => write!(f, "RemoveKey({:?}, {:?})", col, key),
         }
     }
 }

@@ -17,6 +17,8 @@
 use anyhow::*;
 use std::sync::Arc;
 
+#[cfg(feature = "test")]
+use crate::key_value::KeyValueColumn;
 use crate::{Digest, FixMode, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, TransactionLocation};
 
 /// Current state of a block in storage
@@ -166,6 +168,10 @@ pub trait Storage: Send + Sync {
 
     /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
     async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> bool;
+
+    /// Removes the given key from the given column.
+    #[cfg(feature = "test")]
+    async fn remove_key(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
 }
 
 /// A wrapper over storage implementations
