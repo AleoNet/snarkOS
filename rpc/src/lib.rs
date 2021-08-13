@@ -18,9 +18,8 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 // Documentation
-// #![cfg_attr(nightly, warn(missing_docs))]
-// todo: readd in Rust 1.54
-// #![cfg_attr(nightly, doc(include = "../documentation/concepts/rpc_server.md"))]
+// #![warn(missing_docs)]
+#![doc = include_str!("../documentation/concepts/rpc_server.md")]
 
 #[macro_use]
 extern crate thiserror;

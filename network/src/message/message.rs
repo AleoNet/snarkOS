@@ -61,41 +61,29 @@ impl fmt::Display for Message {
 /// The actual message transmitted over the network.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Payload {
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/block.md"))]
+    #[doc = include_str!("../../documentation/network_messages/block.md")]
     Block(Vec<u8>),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_blocks.md"))]
+    #[doc = include_str!("../../documentation/network_messages/get_blocks.md")]
     GetBlocks(Vec<BlockHeaderHash>),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_memory_pool.md"))]
+    #[doc = include_str!("../../documentation/network_messages/get_memory_pool.md")]
     GetMemoryPool,
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_peers.md"))]
+    #[doc = include_str!("../../documentation/network_messages/get_peers.md")]
     GetPeers,
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/get_sync.md"))]
+    #[doc = include_str!("../../documentation/network_messages/get_sync.md")]
     GetSync(Vec<BlockHeaderHash>),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/memory_pool.md"))]
+    #[doc = include_str!("../../documentation/network_messages/memory_pool.md")]
     MemoryPool(Vec<Vec<u8>>),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/peers.md"))]
+    #[doc = include_str!("../../documentation/network_messages/peers.md")]
     Peers(Vec<SocketAddr>),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/ping.md"))]
+    #[doc = include_str!("../../documentation/network_messages/ping.md")]
     Ping(u32),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/pong.md"))]
+    #[doc = include_str!("../../documentation/network_messages/pong.md")]
     Pong,
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/sync.md"))]
+    #[doc = include_str!("../../documentation/network_messages/sync.md")]
     Sync(Vec<BlockHeaderHash>),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/sync_block.md"))]
+    #[doc = include_str!("../../documentation/network_messages/sync_block.md")]
     SyncBlock(Vec<u8>),
-    // todo: readd in Rust 1.54
-    // #[cfg_attr(nightly, doc(include = "../../documentation/network_messages/transaction.md"))]
+    #[doc = include_str!("../../documentation/network_messages/transaction.md")]
     Transaction(Vec<u8>),
 
     // a placeholder indicating the introduction of a new payload type; used for forward compatibility
