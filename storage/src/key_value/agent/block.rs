@@ -18,10 +18,10 @@ use std::collections::HashSet;
 
 use super::*;
 
-impl<S: KeyValueStorage + 'static> Agent<S> {
+impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
     pub(super) fn get_child_block_hashes(&mut self, hash: &Digest) -> Result<Vec<Digest>> {
         Ok(self
-            .inner
+            .inner()
             .get(KeyValueColumn::ChildHashes, &hash[..])?
             .map(|x| bincode::deserialize::<'_, Vec<BlockHeaderHash>>(&x[..]))
             .transpose()?
@@ -31,7 +31,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
     fn update_child_block_hashes(&mut self, hash: &Digest, new_children: &[Digest]) -> Result<()> {
         if new_children.is_empty() {
-            self.inner.delete(KeyValueColumn::ChildHashes, &hash[..])?;
+            self.inner().delete(KeyValueColumn::ChildHashes, &hash[..])?;
             return Ok(());
         }
 
@@ -43,7 +43,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
         let serialized = bincode::serialize(&serializing)?;
 
-        self.inner
+        self.inner()
             .store(KeyValueColumn::ChildHashes, &hash[..], &serialized[..])?;
         Ok(())
     }
@@ -98,11 +98,12 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
         let mut header = vec![];
         block.header.write_le(&mut header)?;
-        self.inner.store(KeyValueColumn::BlockHeader, &hash[..], &header[..])?;
+        self.inner()
+            .store(KeyValueColumn::BlockHeader, &hash[..], &header[..])?;
 
         let mut transactions = vec![];
         block.write_transactions(&mut transactions)?;
-        self.inner
+        self.inner()
             .store(KeyValueColumn::BlockTransactions, &hash[..], &transactions[..])?;
 
         let mut child_hashes = self.get_child_block_hashes(&block.header.previous_block_hash)?;
@@ -125,9 +126,9 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
         let header = self.get_block_header(hash)?;
 
-        self.inner.delete(KeyValueColumn::BlockHeader, &hash[..])?;
+        self.inner().delete(KeyValueColumn::BlockHeader, &hash[..])?;
 
-        self.inner.delete(KeyValueColumn::BlockTransactions, &hash[..])?;
+        self.inner().delete(KeyValueColumn::BlockTransactions, &hash[..])?;
 
         let mut child_hashes = self.get_child_block_hashes(&header.previous_block_hash)?;
 
@@ -142,7 +143,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
     pub(super) fn get_block_hash(&mut self, block_num: u32) -> Result<Option<Digest>> {
         let hash = self
-            .inner
+            .inner()
             .get(KeyValueColumn::BlockIndex, &block_num.to_le_bytes()[..])?
             .map(|x| x[..].into());
         Ok(hash)
@@ -150,7 +151,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
     fn get_block_hash_guarded(&mut self, block_num: u32) -> Result<Digest> {
         let hash = self
-            .inner
+            .inner()
             .get(KeyValueColumn::BlockIndex, &block_num.to_le_bytes()[..])?
             .map(|x| x[..].into())
             .ok_or_else(|| anyhow!("missing canon hash"))?;
@@ -159,7 +160,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
     pub(super) fn get_block_header(&mut self, hash: &Digest) -> Result<SerialBlockHeader> {
         let header = self
-            .inner
+            .inner()
             .get(KeyValueColumn::BlockHeader, &hash[..])?
             .ok_or_else(|| anyhow!("block header missing"))?;
         let header = SerialBlockHeader::read_le(&mut &header[..])?;
@@ -167,14 +168,14 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     }
 
     pub(super) fn get_block_state(&mut self, hash: &Digest) -> Result<BlockStatus> {
-        let index = self.inner.get(KeyValueColumn::BlockIndex, &hash[..])?;
+        let index = self.inner().get(KeyValueColumn::BlockIndex, &hash[..])?;
         match index {
             Some(index) => {
                 let block_number = Self::read_u32(&index[..])?;
                 Ok(BlockStatus::Committed(block_number as usize))
             }
             None => {
-                if self.inner.exists(KeyValueColumn::BlockHeader, &hash[..])? {
+                if self.inner().exists(KeyValueColumn::BlockHeader, &hash[..])? {
                     Ok(BlockStatus::Uncommitted)
                 } else {
                     Ok(BlockStatus::Unknown)
@@ -194,7 +195,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     pub(super) fn get_block(&mut self, hash: &Digest) -> Result<SerialBlock> {
         let header = self.get_block_header(hash)?;
         let raw_transactions = self
-            .inner
+            .inner()
             .get(KeyValueColumn::BlockTransactions, &hash[..])?
             .ok_or_else(|| anyhow!("missing transactions for block"))?;
         let transactions = SerialBlock::read_transactions(&mut &raw_transactions[..])?;
@@ -327,7 +328,9 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     }
 
     pub(super) fn get_transaction_location(&mut self, transaction_id: &Digest) -> Result<Option<TransactionLocation>> {
-        let location = self.inner.get(KeyValueColumn::TransactionLookup, &transaction_id[..])?;
+        let location = self
+            .inner()
+            .get(KeyValueColumn::TransactionLookup, &transaction_id[..])?;
         match location {
             Some(location) => Ok(Some(TransactionLocation::read_le(&location[..])?)),
             None => Ok(None),
@@ -335,7 +338,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     }
 
     pub(super) fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<SerialBlock>> {
-        let index = self.inner.get_column(KeyValueColumn::BlockIndex)?
+        let index = self.inner().get_column(KeyValueColumn::BlockIndex)?
             .into_iter()
             .filter(|(key, _)| key.len() == 4) // only interested in block index -> block hash maps
             .map(|(key, value)| (Self::read_u32(&key[..]).expect("invalid key"), value[..].into()))
@@ -368,7 +371,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     pub(super) fn get_block_hashes(&mut self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>> {
         let mut hashes = match filter {
             BlockFilter::CanonOnly => {
-                self.inner.get_column_keys(KeyValueColumn::BlockIndex)?
+                self.inner().get_column_keys(KeyValueColumn::BlockIndex)?
                     .into_iter()
                     .filter(|key| key.len() != 4) // only interested in block hash keys
                     .map(|key| key[..].into())
@@ -383,7 +386,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
                 all.into_iter().filter(|hash| !canon.contains(hash)).collect()
             }
             BlockFilter::All => self
-                .inner
+                .inner()
                 .get_column_keys(KeyValueColumn::BlockHeader)?
                 .into_iter()
                 .map(|key| key[..].into())

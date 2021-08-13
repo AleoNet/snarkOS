@@ -91,7 +91,7 @@ macro_rules! check_for_superfluous_tx_components {
     };
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FixMode {
     /// Don't fix anything in the storage.
     Nothing,
@@ -148,7 +148,7 @@ check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment",
 
 #[async_trait::async_trait]
 pub trait Validator {
-    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> Self;
+    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> (bool, Self);
 }
 
 #[async_trait::async_trait]
@@ -158,7 +158,7 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
-    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> Self {
+    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> (bool, Self) {
         if limit.is_some() && [FixMode::SuperfluousTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
@@ -169,7 +169,7 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
 
         if limit == Some(0) {
             info!("The limit of blocks to validate is 0; nothing to check.");
-            return self;
+            return (true, self);
         }
 
         let current_height = if let Ok(Some(height)) = self.get(Meta, KEY_BEST_BLOCK_NUMBER.as_bytes()) {
@@ -180,12 +180,12 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
             )
         } else {
             error!("Can't obtain block height from the storage!");
-            return self;
+            return (false, self);
         };
 
         if current_height == 0 {
             info!("Only the genesis block is currently available; nothing to check.");
-            return self;
+            return (true, self);
         }
 
         debug!("The block height is {}", current_height);
@@ -314,7 +314,7 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
             error!("The storage is invalid!");
         }
 
-        storage
+        (is_valid, storage)
     }
 }
 

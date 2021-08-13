@@ -19,6 +19,7 @@ use crate::{
     BlockStatus,
     CanonData,
     Digest,
+    FixMode,
     ForkDescription,
     SerialBlock,
     SerialBlockHeader,
@@ -139,5 +140,9 @@ impl Storage for KeyValueStore {
 
     async fn get_block_hashes(&self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>> {
         self.send(Message::GetBlockHashes(limit, filter)).await
+    }
+
+    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> bool {
+        self.send(Message::Validate(limit, fix_mode)).await
     }
 }

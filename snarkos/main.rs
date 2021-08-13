@@ -121,7 +121,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // For extra safety, validate storage too if a trim is requested.
     let storage = if config.storage.validate || config.storage.trim {
         let now = std::time::Instant::now();
-        let moved_storage = storage
+        let (_, moved_storage) = storage
             .validate(None, snarkos_storage::validator::FixMode::Everything)
             .await;
         info!("Storage validated in {}ms", now.elapsed().as_millis());

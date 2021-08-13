@@ -17,6 +17,7 @@
 use std::{
     any::Any,
     collections::{HashMap, VecDeque},
+    mem,
 };
 
 use snarkvm_dpc::{
@@ -41,18 +42,23 @@ use crate::{
     SerialTransaction,
     TransactionLocation,
     VMRecord,
+    Validator,
 };
 
 mod block;
 mod block_commit;
 
 pub(super) struct Agent<S: KeyValueStorage + 'static> {
-    inner: S,
+    inner: Option<S>, // the option is only for the purposes of validation, which requires ownership
 }
 
-impl<S: KeyValueStorage + 'static> Agent<S> {
+impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
     pub(super) fn new(inner: S) -> Self {
-        Agent { inner }
+        Agent { inner: Some(inner) }
+    }
+
+    fn inner(&mut self) -> &mut S {
+        self.inner.as_mut().unwrap() // safe, as it's always available
     }
 
     fn read_u32(value: &[u8]) -> Result<u32> {
@@ -65,13 +71,13 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     }
 
     fn read_meta_u32(&mut self, name: &str, default: Option<u32>) -> Result<u32> {
-        let value = self.inner.get(KeyValueColumn::Meta, name.as_bytes())?;
+        let value = self.inner().get(KeyValueColumn::Meta, name.as_bytes())?;
         match value {
             Some(value) => Self::read_u32(&value[..]),
             None => match default {
                 None => Err(anyhow!("missing meta value for {}", name)),
                 Some(default) => {
-                    self.inner
+                    self.inner()
                         .store(KeyValueColumn::Meta, name.as_bytes(), &default.to_le_bytes()[..])?;
                     Ok(default)
                 }
@@ -80,13 +86,13 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     }
 
     fn write_meta_u32(&mut self, name: &str, value: u32) -> Result<()> {
-        self.inner
+        self.inner()
             .store(KeyValueColumn::Meta, name.as_bytes(), &value.to_le_bytes()[..])?;
         Ok(())
     }
 
     fn get_record_commitments(&mut self, limit: Option<usize>) -> Result<Vec<Digest>> {
-        let mut records = self.inner.get_column_keys(KeyValueColumn::Records)?;
+        let mut records = self.inner().get_column_keys(KeyValueColumn::Records)?;
         if let Some(limit) = limit {
             records.truncate(limit);
         }
@@ -98,7 +104,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
     }
 
     fn get_record(&mut self, commitment: &Digest) -> Result<Option<SerialRecord>> {
-        let raw = self.inner.get(KeyValueColumn::Records, &commitment[..])?;
+        let raw = self.inner().get(KeyValueColumn::Records, &commitment[..])?;
         match raw {
             None => Ok(None),
             Some(record) => {
@@ -112,7 +118,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
         for record in records {
             let mut record_data = vec![];
             record.write_le(&mut record_data)?;
-            self.inner
+            self.inner()
                 .store(KeyValueColumn::Records, &record.commitment[..], &record_data[..])?;
         }
         Ok(())
@@ -120,7 +126,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
     fn get_digest_keys(&mut self, column: KeyValueColumn) -> Result<Vec<Digest>> {
         let mut keys = self
-            .inner
+            .inner()
             .get_column(column)?
             .into_iter()
             .filter(|(_, index)| index.len() == 4)
@@ -132,7 +138,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
     fn get_ledger_digests(&mut self) -> Result<Vec<Digest>> {
         let mut keys = self
-            .inner
+            .inner()
             .get_column(KeyValueColumn::DigestIndex)?
             .into_iter()
             .filter(|(index, _)| index.len() == 4)
@@ -142,13 +148,25 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
         Ok(keys.into_iter().map(|(digest, _)| digest).collect())
     }
 
+    fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> bool {
+        let result = if let Some(inner) = mem::take(&mut self.inner) {
+            let (ret, inner) = futures::executor::block_on(inner.validate(limit, fix_mode));
+            self.inner = Some(inner);
+            ret
+        } else {
+            unreachable!()
+        };
+
+        result
+    }
+
     fn wrap<T, F: FnOnce(&mut Self) -> Result<T>>(&mut self, func: F) -> Result<T> {
-        self.inner.begin()?;
+        self.inner().begin()?;
         let out = func(self);
         if out.is_err() {
-            self.inner.abort()?;
+            self.inner().abort()?;
         } else {
-            self.inner.commit()?;
+            self.inner().commit()?;
         }
         out
     }
@@ -187,6 +205,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
             }
             Message::GetCanonBlocks(limit) => Box::new(self.get_canon_blocks(limit)),
             Message::GetBlockHashes(limit, filter) => Box::new(self.get_block_hashes(limit, filter)),
+            Message::Validate(limit, fix_mode) => Box::new(self.validate(limit, fix_mode)),
         }
     }
 

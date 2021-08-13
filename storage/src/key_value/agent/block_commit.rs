@@ -18,7 +18,7 @@ use tracing::*;
 
 use super::*;
 
-impl<S: KeyValueStorage + 'static> Agent<S> {
+impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
     pub(super) fn get_fork_path(&mut self, hash: &Digest, oldest_fork_threshold: usize) -> Result<ForkDescription> {
         let mut side_chain_path = VecDeque::new();
         let header = self.get_block_header(hash)?;
@@ -65,7 +65,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
         let mut commitments = vec![];
         // we are leaving validation to the ledger
         for serial in transaction.old_serial_numbers.iter() {
-            self.inner.store(
+            self.inner().store(
                 KeyValueColumn::SerialNumber,
                 &serial[..],
                 &(*sn_index).to_le_bytes()[..],
@@ -74,7 +74,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
         }
 
         for commitment in transaction.new_commitments.iter() {
-            self.inner.store(
+            self.inner().store(
                 KeyValueColumn::Commitment,
                 &commitment[..],
                 &(*cm_index).to_le_bytes()[..],
@@ -83,7 +83,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
             *cm_index += 1;
         }
 
-        self.inner.store(
+        self.inner().store(
             KeyValueColumn::Memo,
             &transaction.memorandum[..],
             &(*memo_index).to_le_bytes()[..],
@@ -118,7 +118,7 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
             };
             let mut out = vec![];
             transaction_location.write_le(&mut out)?;
-            self.inner
+            self.inner()
                 .store(KeyValueColumn::TransactionLookup, &transaction.id[..], &out[..])?;
         }
 
@@ -134,14 +134,14 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
         let block_num_serialized = &new_best_block_number.to_le_bytes()[..];
 
-        self.inner
+        self.inner()
             .store(KeyValueColumn::BlockIndex, &block_hash[..], block_num_serialized)?;
-        self.inner
+        self.inner()
             .store(KeyValueColumn::BlockIndex, block_num_serialized, &block_hash[..])?;
 
-        self.inner
+        self.inner()
             .store(KeyValueColumn::DigestIndex, &ledger_digest[..], block_num_serialized)?;
-        self.inner
+        self.inner()
             .store(KeyValueColumn::DigestIndex, block_num_serialized, &ledger_digest[..])?;
 
         Ok(BlockStatus::Committed(new_best_block_number as usize))
@@ -155,19 +155,19 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
         transaction: &SerialTransaction,
     ) -> Result<()> {
         for serial in transaction.old_serial_numbers.iter() {
-            self.inner.delete(KeyValueColumn::SerialNumber, &serial[..])?;
+            self.inner().delete(KeyValueColumn::SerialNumber, &serial[..])?;
             *sn_index -= 1;
         }
 
         for commitment in transaction.new_commitments.iter() {
-            self.inner.delete(KeyValueColumn::Commitment, &commitment[..])?;
+            self.inner().delete(KeyValueColumn::Commitment, &commitment[..])?;
             *cm_index -= 1;
         }
 
-        self.inner
+        self.inner()
             .delete(KeyValueColumn::TransactionLookup, &transaction.id[..])?;
 
-        self.inner.delete(KeyValueColumn::Memo, &transaction.memorandum[..])?;
+        self.inner().delete(KeyValueColumn::Memo, &transaction.memorandum[..])?;
         *memo_index -= 1;
 
         Ok(())
@@ -207,17 +207,18 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
 
             let block_number_serialized = &block_number.to_le_bytes()[..];
 
-            self.inner.delete(KeyValueColumn::BlockIndex, &last_hash[..])?;
-            self.inner.delete(KeyValueColumn::BlockIndex, block_number_serialized)?;
+            self.inner().delete(KeyValueColumn::BlockIndex, &last_hash[..])?;
+            self.inner()
+                .delete(KeyValueColumn::BlockIndex, block_number_serialized)?;
 
             let digest = self
-                .inner
+                .inner()
                 .get(KeyValueColumn::DigestIndex, block_number_serialized)?
                 .ok_or_else(|| anyhow!("missing digest for block during decommiting"))?
                 .into_owned();
 
-            self.inner.delete(KeyValueColumn::DigestIndex, &digest)?;
-            self.inner
+            self.inner().delete(KeyValueColumn::DigestIndex, &digest)?;
+            self.inner()
                 .delete(KeyValueColumn::DigestIndex, block_number_serialized)?;
 
             canon_block_number -= 1;
@@ -248,19 +249,19 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
         let mut cm_index = 0u32;
         let mut memo_index = 0u32;
 
-        self.inner.truncate(KeyValueColumn::Commitment)?;
-        self.inner.truncate(KeyValueColumn::SerialNumber)?;
-        self.inner.truncate(KeyValueColumn::Memo)?;
-        self.inner.truncate(KeyValueColumn::DigestIndex)?;
+        self.inner().truncate(KeyValueColumn::Commitment)?;
+        self.inner().truncate(KeyValueColumn::SerialNumber)?;
+        self.inner().truncate(KeyValueColumn::Memo)?;
+        self.inner().truncate(KeyValueColumn::DigestIndex)?;
 
         for commitment in commitments.into_iter() {
-            self.inner
+            self.inner()
                 .store(KeyValueColumn::Commitment, &commitment[..], &cm_index.to_le_bytes()[..])?;
             cm_index += 1;
         }
 
         for serial_number in serial_numbers.into_iter() {
-            self.inner.store(
+            self.inner().store(
                 KeyValueColumn::SerialNumber,
                 &serial_number[..],
                 &sn_index.to_le_bytes()[..],
@@ -269,16 +270,16 @@ impl<S: KeyValueStorage + 'static> Agent<S> {
         }
 
         for memo in memos.into_iter() {
-            self.inner
+            self.inner()
                 .store(KeyValueColumn::Memo, &memo[..], &memo_index.to_le_bytes()[..])?;
             memo_index += 1;
         }
 
         for (i, digest) in digests.into_iter().enumerate() {
             let block_num_serialized = &(i as u32).to_le_bytes()[..];
-            self.inner
+            self.inner()
                 .store(KeyValueColumn::DigestIndex, &digest[..], block_num_serialized)?;
-            self.inner
+            self.inner()
                 .store(KeyValueColumn::DigestIndex, block_num_serialized, &digest[..])?;
         }
 
