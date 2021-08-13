@@ -145,4 +145,8 @@ impl Storage for KeyValueStore {
     async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> bool {
         self.send(Message::Validate(limit, fix_mode)).await
     }
+
+    async fn store_init_digest(&self, digest: Digest) -> Result<()> {
+        self.send(Message::StoreInitDigest(digest)).await
+    }
 }

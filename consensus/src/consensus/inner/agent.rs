@@ -28,6 +28,10 @@ impl ConsensusInner {
             let hash = self.public.genesis_block.header.hash();
             let block = self.public.genesis_block.clone();
             self.storage.insert_block(&block).await?;
+
+            let init_digest = self.ledger.extend(&[], &[], &[])?;
+            self.storage.store_init_digest(init_digest).await?;
+
             self.commit_block(&hash, &block).await?;
         }
         // info!("rebuilding canon");

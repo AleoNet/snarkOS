@@ -93,6 +93,7 @@ enum Message {
     GetCanonBlocks(Option<u32>),
     GetBlockHashes(Option<u32>, BlockFilter),
     Validate(Option<u32>, FixMode),
+    StoreInitDigest(Digest),
 }
 
 impl fmt::Display for Message {
@@ -142,6 +143,7 @@ impl fmt::Display for Message {
             Message::GetCanonBlocks(limit) => write!(f, "GetCanonBlocks({:?})", limit),
             Message::GetBlockHashes(limit, filter) => write!(f, "GetBlockHashes({:?}, {:?})", limit, filter),
             Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
+            Message::StoreInitDigest(digest) => write!(f, "StoreInitDigest({})", digest),
         }
     }
 }

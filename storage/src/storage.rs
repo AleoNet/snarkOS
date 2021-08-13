@@ -123,6 +123,9 @@ pub trait Storage: Send + Sync {
         }
     }
 
+    /// Stores the "pre-genesis" digest; only applicable to the genesis block txs.
+    async fn store_init_digest(&self, digest: Digest) -> Result<()>;
+
     // miner convenience record management functions
 
     /// Gets a list of stored record commitments subject to `limit`.
