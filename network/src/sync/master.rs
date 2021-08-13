@@ -14,15 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-    time::Duration,
-};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
 use crate::{Node, Payload, Peer};
 use anyhow::*;
 use futures::{pin_mut, select, FutureExt};
+use hash_hasher::{HashBuildHasher, HashedMap, HashedSet};
 use rand::prelude::SliceRandom;
 use snarkos_storage::Digest;
 use snarkvm_algorithms::crh::double_sha256;
@@ -198,7 +195,7 @@ impl SyncMaster {
 
     fn order_block_hashes(input: &[(SocketAddr, Vec<Digest>)]) -> Vec<Digest> {
         let mut block_order = vec![];
-        let mut seen = HashSet::<&Digest>::new();
+        let mut seen = HashedSet::<&Digest>::with_hasher(HashBuildHasher::default());
         let mut block_index = 0;
         loop {
             let mut found_row = false;
