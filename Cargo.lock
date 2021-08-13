@@ -2741,6 +2741,7 @@ dependencies = [
  "defer",
  "derivative",
  "futures 0.3.16",
+ "hash_hasher",
  "hex",
  "itertools",
  "log",
