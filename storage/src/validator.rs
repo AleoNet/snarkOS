@@ -502,12 +502,19 @@ async fn validate_block_transactions(
             );
 
             if [FixMode::MissingTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
-                let db_op = Op::Insert {
+                let block_height_bytes = block_height.to_le_bytes().to_vec();
+                let db_op1 = Op::Insert {
                     col: DigestIndex as u32,
                     key: tx_digest.clone(),
-                    value: block_height.to_le_bytes().to_vec(),
+                    value: block_height_bytes.clone(),
                 };
-                component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
+                let db_op2 = Op::Insert {
+                    col: DigestIndex as u32,
+                    key: block_height_bytes,
+                    value: tx_digest.clone(),
+                };
+                component_sender.send(ValidatorAction::QueueDatabaseOp(db_op1)).unwrap();
+                component_sender.send(ValidatorAction::QueueDatabaseOp(db_op2)).unwrap();
             } else {
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
