@@ -168,6 +168,11 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
     }
 
     #[cfg(feature = "test")]
+    fn store_item(&mut self, col: KeyValueColumn, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+        self.inner().store(col, &key, &value)
+    }
+
+    #[cfg(feature = "test")]
     fn delete_item(&mut self, col: KeyValueColumn, key: Vec<u8>) -> Result<()> {
         self.inner().delete(col, &key)
     }
@@ -219,6 +224,8 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
             Message::GetBlockHashes(limit, filter) => Box::new(self.get_block_hashes(limit, filter)),
             Message::Validate(limit, fix_mode) => Box::new(self.validate(limit, fix_mode)),
             Message::StoreInitDigest(digest) => Box::new(self.wrap(move |f| f.store_init_digest(digest))),
+            #[cfg(feature = "test")]
+            Message::StoreItem(col, key, value) => Box::new(self.wrap(move |f| f.store_item(col, key, value))),
             #[cfg(feature = "test")]
             Message::DeleteItem(col, key) => Box::new(self.wrap(move |f| f.delete_item(col, key))),
         }

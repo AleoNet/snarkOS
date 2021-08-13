@@ -95,6 +95,8 @@ enum Message {
     Validate(Option<u32>, FixMode),
     StoreInitDigest(Digest),
     #[cfg(feature = "test")]
+    StoreItem(KeyValueColumn, Vec<u8>, Vec<u8>),
+    #[cfg(feature = "test")]
     DeleteItem(KeyValueColumn, Vec<u8>),
 }
 
@@ -146,6 +148,8 @@ impl fmt::Display for Message {
             Message::GetBlockHashes(limit, filter) => write!(f, "GetBlockHashes({:?}, {:?})", limit, filter),
             Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
             Message::StoreInitDigest(digest) => write!(f, "StoreInitDigest({})", digest),
+            #[cfg(feature = "test")]
+            Message::StoreItem(col, key, value) => write!(f, "StoreItem({:?}, {:?}, {:?})", col, key, value),
             #[cfg(feature = "test")]
             Message::DeleteItem(col, key) => write!(f, "DeleteItem({:?}, {:?})", col, key),
         }

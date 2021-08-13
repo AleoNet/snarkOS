@@ -169,7 +169,11 @@ pub trait Storage: Send + Sync {
     /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
     async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> bool;
 
-    /// Removes the given key from the given column.
+    /// Stores the given key+value pair in the given column.
+    #[cfg(feature = "test")]
+    async fn store_item(&self, col: KeyValueColumn, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
+
+    /// Removes the given key and its corresponding value from the given column.
     #[cfg(feature = "test")]
     async fn delete_item(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
 }
