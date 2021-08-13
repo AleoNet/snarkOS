@@ -171,7 +171,7 @@ pub trait Storage: Send + Sync {
 
     /// Removes the given key from the given column.
     #[cfg(feature = "test")]
-    async fn remove_key(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
+    async fn delete_item(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
 }
 
 /// A wrapper over storage implementations

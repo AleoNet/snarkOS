@@ -153,7 +153,7 @@ impl Storage for KeyValueStore {
     }
 
     #[cfg(feature = "test")]
-    async fn remove_key(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()> {
-        self.send(Message::RemoveKey(col, key)).await
+    async fn delete_item(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()> {
+        self.send(Message::DeleteItem(col, key)).await
     }
 }

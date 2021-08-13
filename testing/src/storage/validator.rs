@@ -47,7 +47,7 @@ async fn validator_vs_a_missing_serial_number() {
     let random_sn = &stored_sns.choose(&mut thread_rng()).unwrap().0;
     consensus
         .storage
-        .remove_key(KeyValueColumn::SerialNumber, random_sn.to_vec())
+        .delete_item(KeyValueColumn::SerialNumber, random_sn.to_vec())
         .await
         .unwrap();
 
@@ -70,7 +70,7 @@ async fn validator_vs_a_missing_commitment() {
     let random_cm = &stored_cms.choose(&mut thread_rng()).unwrap().0;
     consensus
         .storage
-        .remove_key(KeyValueColumn::Commitment, random_cm.to_vec())
+        .delete_item(KeyValueColumn::Commitment, random_cm.to_vec())
         .await
         .unwrap();
 
@@ -93,7 +93,7 @@ async fn validator_vs_a_missing_memorandum() {
     let random_memo = &stored_memos.choose(&mut thread_rng()).unwrap().0;
     consensus
         .storage
-        .remove_key(KeyValueColumn::Memo, random_memo.to_vec())
+        .delete_item(KeyValueColumn::Memo, random_memo.to_vec())
         .await
         .unwrap();
 
@@ -116,7 +116,7 @@ async fn validator_vs_a_missing_digest() {
     let random_digest = &stored_digests.choose(&mut thread_rng()).unwrap().0;
     consensus
         .storage
-        .remove_key(KeyValueColumn::DigestIndex, random_digest.to_vec())
+        .delete_item(KeyValueColumn::DigestIndex, random_digest.to_vec())
         .await
         .unwrap();
 
