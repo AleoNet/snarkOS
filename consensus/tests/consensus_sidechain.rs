@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_sidechain {
-    // use snarkos_storage::validator::FixMode;
+    use snarkos_storage::validator::FixMode;
     use snarkos_testing::sync::*;
 
     use rand::{seq::IteratorRandom, thread_rng, Rng};
@@ -251,7 +251,7 @@ mod consensus_sidechain {
         assert!(consensus2_sync_blocks.is_empty());
 
         // Verify the integrity of the block storage for the first instance.
-        // todo: assert!(consensus1.ledger.validate(None, FixMode::Nothing).await);
+        assert!(consensus1.storage.validate(None, FixMode::Nothing).await);
     }
 
     #[tokio::test]
@@ -319,7 +319,7 @@ mod consensus_sidechain {
         assert!(consensus2_sync_blocks.is_empty());
 
         // Verify the integrity of the block storage for the first instance.
-        // todo: assert!(consensus1.ledger.validate(None, FixMode::Nothing).await);
+        assert!(consensus1.storage.validate(None, FixMode::Nothing).await);
     }
 
     #[tokio::test]
@@ -362,7 +362,7 @@ mod consensus_sidechain {
             .unwrap();
         assert!(sync_blocks.is_empty());
 
-        // todo: assert!(consensus2.ledger.validate(None, FixMode::Nothing).await);
+        assert!(consensus2.storage.validate(None, FixMode::Nothing).await);
     }
 
     #[tokio::test]
@@ -387,6 +387,6 @@ mod consensus_sidechain {
         assert_eq!(consensus.storage.canon().await.unwrap().block_height, 20);
 
         // Verify the integrity of the block storage.
-        // todo: assert!(consensus.ledger.validate(None, FixMode::Nothing).await);
+        assert!(consensus.storage.validate(None, FixMode::Nothing).await);
     }
 }

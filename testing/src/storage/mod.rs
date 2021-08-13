@@ -20,8 +20,8 @@ pub mod exporter;
 #[cfg(test)]
 pub mod trim;
 
-// #[cfg(test)]
-// pub mod validator;
+#[cfg(test)]
+pub mod validator;
 
 // pub use snarkos_storage::validator::FixMode;
 use snarkos_consensus::{DynLedger, MerkleLedger};
