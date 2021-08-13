@@ -56,7 +56,16 @@ macro_rules! check_for_superfluous_tx_components {
             is_storage_valid: &AtomicBool,
         ) {
             let storage_keys = match db_lookup($component_col, GetColumnKeys, lookup_sender).await {
-                LookupResponse::Keys(col) => col.into_iter().collect::<HashSet<_>>(),
+                LookupResponse::Keys(col) => {
+                    if $component_col == KeyValueColumn::DigestIndex {
+                        // the DigestIndex column also contains their indices, similar to BlockIndex
+                        col.into_iter()
+                            .filter(|key| key.len() != 4)
+                            .collect::<HashSet<_>>()
+                    } else {
+                        col.into_iter().collect::<HashSet<_>>()
+                    }
+                }
                 _ => {
                     error!("Couldn't obtain the column with tx {}s", $component_name);
                     is_storage_valid.store(false, Ordering::SeqCst);
@@ -65,7 +74,12 @@ macro_rules! check_for_superfluous_tx_components {
                 }
             };
 
-            debug!("there are {} {}s stored", storage_keys.len(), $component_name);
+            trace!(
+                "there are {} {}s stored individually and {} in txs",
+                storage_keys.len(),
+                $component_name,
+                tx_entries.len()
+            );
 
             let superfluous_items = storage_keys.difference(tx_entries).collect::<Vec<_>>();
 
