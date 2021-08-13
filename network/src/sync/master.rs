@@ -217,8 +217,8 @@ impl SyncMaster {
         block_order
     }
 
-    fn block_peer_map(blocks: &[(SocketAddr, Vec<Digest>)]) -> HashMap<Digest, Vec<SocketAddr>> {
-        let mut block_peer_map = HashMap::new();
+    fn block_peer_map(blocks: &[(SocketAddr, Vec<Digest>)]) -> HashedMap<Digest, Vec<SocketAddr>> {
+        let mut block_peer_map = HashedMap::with_capacity_and_hasher(blocks.len(), HashBuildHasher::default());
         for (addr, hashes) in blocks {
             for hash in hashes {
                 block_peer_map.entry(hash.clone()).or_insert_with(Vec::new).push(*addr);
@@ -231,14 +231,14 @@ impl SyncMaster {
     fn get_peer_blocks(
         &mut self,
         blocks: &[Digest],
-        block_peer_map: &HashMap<Digest, Vec<SocketAddr>>,
+        block_peer_map: &HashedMap<Digest, Vec<SocketAddr>>,
     ) -> (
         Vec<SocketAddr>,
-        HashMap<Digest, SocketAddr>,
+        HashedMap<Digest, SocketAddr>,
         HashMap<SocketAddr, Vec<Digest>>,
     ) {
         let mut peer_block_requests: HashMap<SocketAddr, Vec<Digest>> = HashMap::new();
-        let mut block_peers = HashMap::new();
+        let mut block_peers = HashedMap::with_hasher(HashBuildHasher::default());
         for block in blocks {
             let peers = block_peer_map.get(block);
             if peers.is_none() {
@@ -343,7 +343,8 @@ impl SyncMaster {
 
         self.cancel_outstanding_syncs(&peer_addresses[..]).await;
 
-        let mut blocks_by_hash: HashMap<Digest, _> = HashMap::new();
+        let mut blocks_by_hash: HashedMap<Digest, _> =
+            HashedMap::with_capacity_and_hasher(received_blocks.len(), HashBuildHasher::default());
 
         for block in received_blocks {
             let block_header = &block.block[..BlockHeader::size()];
