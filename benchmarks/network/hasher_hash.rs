@@ -68,8 +68,8 @@ fn hash_maps_get(c: &mut Criterion) {
     for hashes in inputs {
         let size = hashes.len();
 
-        let hash_map: HashMap<[u8; 32], usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
-        let hashed_map: HashedMap<[u8; 32], usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
+        let hash_map: HashMap<Digest, usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
+        let hashed_map: HashedMap<Digest, usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
 
         group.bench_with_input(BenchmarkId::new("HashMap", size), &size, |b, _size| {
             b.iter(|| {
@@ -102,7 +102,7 @@ fn hash_sets_insert(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("HashSet", size), &size, |b, _size| {
             b.iter(|| {
-                let mut set: HashSet<[u8; 32]> = HashSet::default();
+                let mut set: HashSet<Digest> = HashSet::default();
 
                 for hash in &hashes {
                     set.insert(*hash);
@@ -133,8 +133,8 @@ fn hash_sets_contains(c: &mut Criterion) {
     for hashes in inputs {
         let size = hashes.len();
 
-        let hash_set: HashSet<[u8; 32]> = hashes.iter().copied().collect();
-        let hashed_set: HashedSet<[u8; 32]> = hashes.iter().copied().collect();
+        let hash_set: HashSet<Digest> = hashes.iter().copied().collect();
+        let hashed_set: HashedSet<Digest> = hashes.iter().copied().collect();
 
         group.bench_with_input(BenchmarkId::new("HashSet", size), &size, |b, _size| {
             b.iter(|| {
