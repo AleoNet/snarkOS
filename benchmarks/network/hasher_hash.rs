@@ -19,7 +19,10 @@ use hash_hasher::{HashBuildHasher, HashedMap, HashedSet};
 use rand::{thread_rng, Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+};
 
 // The current applicable digest size for blocks.
 //
@@ -37,10 +40,12 @@ fn hash_maps_insert(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("HashMap", size), &size, |b, _size| {
             b.iter(|| {
-                let mut map: HashMap<Digest, usize> = HashMap::default();
+                let mut map: HashMap<Digest, SocketAddr> = HashMap::default();
 
                 for (i, hash) in hashes.iter().enumerate() {
-                    map.insert(*hash, i);
+                    // The sync code typically uses `SocketAddr` as the value for these maps.
+                    let value: SocketAddr = format!("127.0.0.1:{}", i).parse().unwrap();
+                    map.insert(*hash, value);
                 }
             })
         });
@@ -50,7 +55,8 @@ fn hash_maps_insert(c: &mut Criterion) {
                 let mut map = HashedMap::with_hasher(HashBuildHasher::default());
 
                 for (i, hash) in hashes.iter().enumerate() {
-                    map.insert(*hash, i);
+                    let value: SocketAddr = format!("127.0.0.1:{}", i).parse().unwrap();
+                    map.insert(*hash, value);
                 }
             })
         });
@@ -68,8 +74,16 @@ fn hash_maps_get(c: &mut Criterion) {
     for hashes in inputs {
         let size = hashes.len();
 
-        let hash_map: HashMap<Digest, usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
-        let hashed_map: HashedMap<Digest, usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
+        let hash_map: HashMap<Digest, SocketAddr> = hashes
+            .iter()
+            .enumerate()
+            .map(|(i, &hash)| (hash, format!("127.0.0.1:{}", i).parse().unwrap()))
+            .collect();
+        let hashed_map: HashedMap<Digest, SocketAddr> = hashes
+            .iter()
+            .enumerate()
+            .map(|(i, &hash)| (hash, format!("127.0.0.1:{}", i).parse().unwrap()))
+            .collect();
 
         group.bench_with_input(BenchmarkId::new("HashMap", size), &size, |b, _size| {
             b.iter(|| {
