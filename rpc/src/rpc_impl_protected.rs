@@ -635,7 +635,7 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
     > {
         // Check the commitment count.
         let expected_cm_count = <Testnet1Parameters as Parameters>::NUM_INPUT_RECORDS;
-        if cms.len() != expected_cm_count {
+        if cms.len() > expected_cm_count {
             return Err(RpcError::InvalidCommitmentCount(cms.len(), expected_cm_count));
         }
 
