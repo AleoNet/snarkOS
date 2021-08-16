@@ -27,21 +27,10 @@ use std::collections::{HashMap, HashSet};
 type Digest = [u8; 32];
 
 fn hash_maps_insert(c: &mut Criterion) {
-    // Various HashMap uses in snarkOS:
-    //
-    // - HashMap<SocketAddr, Vec<Digest>>
-    // - HashMap<Digest, Vec<SocketAddr>>
-
-    let seed: u64 = thread_rng().gen();
-    let mut rng = XorShiftRng::seed_from_u64(seed);
-
-    let mut inputs = vec![];
-    let sizes = vec![1000, 3000, 5000, 7000];
-    for size in sizes {
-        inputs.push(generate_hashes(&mut rng, size))
-    }
-
     let mut group = c.benchmark_group("hash_maps_insert");
+
+    // Generate the hashes to be used in the benchmarks.
+    let inputs = generate_inputs();
 
     for hashes in inputs {
         let size = hashes.len();
@@ -70,22 +59,43 @@ fn hash_maps_insert(c: &mut Criterion) {
     group.finish();
 }
 
-fn hash_sets_insert(c: &mut Criterion) {
-    // Various HashSet uses in snarkOS:
-    //
-    // - HashSet<Digest>
-    // - HashSet<Vec<u8>> for tx memos, digests, cms, etc...
+fn hash_maps_get(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hash_maps_get");
 
-    let seed: u64 = thread_rng().gen();
-    let mut rng = XorShiftRng::seed_from_u64(seed);
+    // Generate the hashes to be used in the benchmarks.
+    let inputs = generate_inputs();
 
-    let mut inputs = vec![];
-    let sizes = vec![1000, 3000, 5000, 7000];
-    for size in sizes {
-        inputs.push(generate_hashes(&mut rng, size))
+    for hashes in inputs {
+        let size = hashes.len();
+
+        let hash_map: HashMap<[u8; 32], usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
+        let hashed_map: HashedMap<[u8; 32], usize> = hashes.iter().enumerate().map(|(i, &hash)| (hash, i)).collect();
+
+        group.bench_with_input(BenchmarkId::new("HashMap", size), &size, |b, _size| {
+            b.iter(|| {
+                for hash in hashes.iter() {
+                    hash_map.get(hash);
+                }
+            })
+        });
+
+        group.bench_with_input(BenchmarkId::new("HashedMap", size), &size, |b, _size| {
+            b.iter(|| {
+                for hash in hashes.iter() {
+                    hashed_map.get(hash);
+                }
+            })
+        });
     }
 
+    group.finish();
+}
+
+fn hash_sets_insert(c: &mut Criterion) {
     let mut group = c.benchmark_group("hash_sets_insert");
+
+    // Generate the hashes to be used in the benchmarks.
+    let inputs = generate_inputs();
 
     for hashes in inputs {
         let size = hashes.len();
@@ -114,6 +124,51 @@ fn hash_sets_insert(c: &mut Criterion) {
     group.finish();
 }
 
+fn hash_sets_contains(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hash_sets_contains");
+
+    // Generate the hashes to be used in the benchmarks.
+    let inputs = generate_inputs();
+
+    for hashes in inputs {
+        let size = hashes.len();
+
+        let hash_set: HashSet<[u8; 32]> = hashes.iter().copied().collect();
+        let hashed_set: HashedSet<[u8; 32]> = hashes.iter().copied().collect();
+
+        group.bench_with_input(BenchmarkId::new("HashSet", size), &size, |b, _size| {
+            b.iter(|| {
+                for hash in &hashes {
+                    hash_set.contains(hash);
+                }
+            })
+        });
+
+        group.bench_with_input(BenchmarkId::new("HashedSet", size), &size, |b, _size| {
+            b.iter(|| {
+                for hash in &hashes {
+                    hashed_set.contains(hash);
+                }
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn generate_inputs() -> Vec<Vec<Digest>> {
+    let seed: u64 = thread_rng().gen();
+    let mut rng = XorShiftRng::seed_from_u64(seed);
+
+    let mut inputs = vec![];
+    let sizes = vec![1000, 3000, 5000, 7000];
+    for size in sizes {
+        inputs.push(generate_hashes(&mut rng, size))
+    }
+
+    inputs
+}
+
 fn generate_hashes(rng: &mut XorShiftRng, count: usize) -> Vec<Digest> {
     (0..count)
         .map(|_| {
@@ -125,5 +180,11 @@ fn generate_hashes(rng: &mut XorShiftRng, count: usize) -> Vec<Digest> {
         .collect()
 }
 
-criterion_group!(hash_hasher_bench, hash_maps_insert, hash_sets_insert);
+criterion_group!(
+    hash_hasher_bench,
+    hash_maps_insert,
+    hash_maps_get,
+    hash_sets_insert,
+    hash_sets_contains
+);
 criterion_main!(hash_hasher_bench);
