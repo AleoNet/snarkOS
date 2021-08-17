@@ -84,6 +84,10 @@ impl SyncMaster {
         let blocks_of_interest: Vec<Digest> = forks_of_interest.into_iter().map(|(_canon, fork)| fork).collect();
         let mut tips_of_blocks_of_interest: Vec<Digest> = Vec::with_capacity(blocks_of_interest.len());
         for block in blocks_of_interest {
+            if tips_of_blocks_of_interest.len() > crate::MAX_BLOCK_SYNC_COUNT as usize {
+                debug!("reached limit of blocks of interest in sync block locator hashes");
+                continue;
+            }
             let mut fork_path = self.node.storage.longest_child_path(&block).await?;
             if fork_path.len() < 2 {
                 // a minor fork, we probably don't care
