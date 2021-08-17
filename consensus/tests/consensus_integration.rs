@@ -15,6 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_integration {
+    use std::sync::atomic::AtomicBool;
+
     use snarkos_consensus::miner::MineContext;
     use snarkos_storage::{SerialBlockHeader, SerialTransaction};
     use snarkos_testing::sync::*;
@@ -27,7 +29,7 @@ mod consensus_integration {
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();
 
-        let header = miner.find_block(transactions, parent_header).unwrap();
+        let header = miner.find_block(transactions, parent_header, &AtomicBool::new(false)).unwrap();
 
         let expected_prev_block_hash = parent_header.hash();
         assert_eq!(header.previous_block_hash, expected_prev_block_hash);

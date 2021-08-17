@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, sync::atomic::Ordering, time::Duration};
 
 use snarkos_storage::{BlockStatus, Digest, VMBlock};
 use snarkvm_dpc::{
@@ -25,7 +25,7 @@ use snarkvm_dpc::{
 
 use snarkos_consensus::error::ConsensusError;
 
-use crate::{master::SyncInbound, message::*, NetworkError, Node};
+use crate::{NetworkError, Node, State, master::SyncInbound, message::*};
 use anyhow::*;
 use tokio::task;
 
@@ -117,7 +117,8 @@ impl Node {
         .await
         .map_err(|e| NetworkError::Other(e.into()))??;
         let block_struct = <Block<Transaction<Components>> as VMBlock>::serialize(&block_struct)?;
-
+        let previous_block_hash = block_struct.header.previous_block_hash.clone();
+        
         let canon = self.storage.canon().await?;
 
         info!(
@@ -137,6 +138,10 @@ impl Node {
         let block_validity = self.expect_sync().consensus.receive_block(block_struct).await;
 
         if block_validity && is_block_new {
+            if previous_block_hash == canon.hash && self.state() == State::Mining {
+                self.terminator.store(true, Ordering::SeqCst);
+            }
+    
             // This is a non-sync Block, send it to our peers.
             self.propagate_block(block, height, remote_address);
         }

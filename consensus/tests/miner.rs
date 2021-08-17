@@ -15,19 +15,23 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod miner {
-    use snarkos_consensus::MineContext;
+    use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, time::Duration};
+
+    use futures::executor::block_on;
+    use snarkos_consensus::{MineContext, error::ConsensusError};
     use snarkos_storage::{SerialBlockHeader, SerialTransaction};
-    use snarkos_testing::sync::*;
-    use snarkvm_algorithms::traits::{
+    use snarkos_testing::{sync::*, wait_until};
+    use snarkvm_algorithms::{SNARKError, traits::{
         commitment::CommitmentScheme,
         encryption::EncryptionScheme,
         signature::SignatureScheme,
-    };
+    }};
     use snarkvm_dpc::{Address, DPCComponents, PrivateKey};
-    use snarkvm_posw::txids_to_roots;
+    use snarkvm_posw::{error::PoswError, txids_to_roots};
 
     use rand::{CryptoRng, Rng, SeedableRng};
     use rand_chacha::ChaChaRng;
+    use tokio::sync::mpsc;
 
     fn keygen<C: DPCComponents, R: Rng + CryptoRng>(rng: &mut R) -> (PrivateKey<C>, Address<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
@@ -49,7 +53,7 @@ mod miner {
         let (_, miner_address) = keygen(&mut rng);
         let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();
 
-        let header = miner.find_block(transactions, parent_header).unwrap();
+        let header = miner.find_block(transactions, parent_header, &AtomicBool::new(false)).unwrap();
 
         let transaction_ids = transactions.iter().map(|x| x.id).collect::<Vec<_>>();
         // generate the verifier args
@@ -70,5 +74,49 @@ mod miner {
         ];
         let parent_header = genesis().header.into();
         test_find_block(&transactions, &parent_header).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn terminate_on_block() {
+        tracing_subscriber::fmt::init();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        consensus.fetch_memory_pool().await; // just make sure we're fully initialized by blocking on consensus call
+
+        let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
+        let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();
+
+        let (sender, mut receiver) = mpsc::channel(10);
+
+        let terminator = Arc::new(AtomicBool::new(false));
+        let terminator_clone = terminator.clone();
+        tokio::task::spawn_blocking(move || {
+            let sender_clone = sender.clone();
+            let mining = async move {
+                let candidate_transactions = miner.consensus.fetch_memory_pool().await;
+                println!("creating a block");
+        
+                let (transactions, _coinbase_records) = miner.establish_block(candidate_transactions).await?;
+        
+                println!("generated a coinbase transaction");
+                sender_clone.try_send("started").ok().unwrap();
+        
+                miner.find_block(&transactions, &genesis().header.into(), &terminator_clone)?;
+        
+                Ok(())
+            };
+            match block_on(mining) {
+                Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated))) => {
+                    sender.try_send("terminated").ok().unwrap();
+                },
+                Err(e) => panic!("block mining failed for bad reason: {:?}", e),
+                Ok(_) => panic!("block mining passed and shouldn't have"),
+            };
+        });
+        assert_eq!(tokio::time::timeout(Duration::from_secs(60), receiver.recv()).await.unwrap(), Some("started"));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        terminator.store(true, Ordering::SeqCst);
+        
+        wait_until!(100, !terminator.load(Ordering::SeqCst));
+        assert_eq!(receiver.recv().await.unwrap(), "terminated");
     }
 }

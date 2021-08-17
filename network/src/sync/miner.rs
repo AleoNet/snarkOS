@@ -14,15 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::{Arc, atomic::Ordering}, thread, time::Duration};
 
 use futures::executor::block_on;
+use snarkvm_algorithms::SNARKError;
 use snarkvm_dpc::{testnet1::instantiated::*, Address};
 use tokio::task;
 use tracing::*;
 
 use snarkos_consensus::{error::ConsensusError, MineContext};
 use snarkos_metrics::{self as metrics, misc::*};
+use snarkvm_posw::error::PoswError;
 
 use crate::{Node, State};
 
@@ -70,8 +72,10 @@ impl MinerInstance {
                 }
 
                 info!("Starting to mine the next block");
+                // any values in terminator here are stale, we havent pulled the canon block in the miner yet
+                self.node.terminator.store(false, Ordering::SeqCst);
 
-                let (block, _coinbase_records) = match block_on(miner.mine_block()) {
+                let (block, _coinbase_records) = match block_on(miner.mine_block(&self.node.terminator)) {
                     Ok(mined_block) => mined_block,
                     Err(error) => {
                         // It's possible that the node realized that it needs to sync with another one in the

@@ -79,6 +79,7 @@ pub struct InnerNode {
     /// An indicator of whether the node is shutting down.
     shutting_down: AtomicBool,
     pub(crate) master_dispatch: RwLock<Option<mpsc::Sender<SyncInbound>>>,
+    pub terminator: Arc<AtomicBool>,
 }
 
 /// A core data structure for operating the networking stack of this node.
@@ -134,6 +135,7 @@ impl Node {
             threads: Default::default(),
             shutting_down: Default::default(),
             master_dispatch: RwLock::new(None),
+            terminator: Arc::new(AtomicBool::new(false)),
         }));
 
         if node.config.is_crawler() {
