@@ -127,8 +127,7 @@ mod miner {
         );
         tokio::time::sleep(Duration::from_millis(50)).await;
         terminator.store(true, Ordering::SeqCst);
-
-        wait_until!(100, !terminator.load(Ordering::SeqCst));
+        wait_until!(60, !terminator.load(Ordering::SeqCst));
         assert_eq!(receiver.recv().await.unwrap(), "terminated");
     }
 }
