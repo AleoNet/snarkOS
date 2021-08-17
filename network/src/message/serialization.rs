@@ -104,9 +104,12 @@ impl Payload {
             let builder = message.init_root::<payload::Builder>().init_payload_type();
 
             match self {
-                Payload::Block(bytes) => {
+                Payload::Block(bytes, height) => {
                     let mut builder = builder.init_block();
                     builder.set_data(bytes);
+                    if let Some(h) = height {
+                        builder.set_height(*h);
+                    }
                 }
                 Payload::GetBlocks(hashes) => {
                     let mut builder = builder.init_get_blocks(hashes.len() as u32);
@@ -179,9 +182,10 @@ impl Payload {
                         elem_builder.set_hash(&hash.0);
                     }
                 }
-                Payload::SyncBlock(bytes) => {
+                Payload::SyncBlock(bytes, height) => {
                     let mut builder = builder.init_sync_block();
                     builder.set_data(bytes);
+                    builder.set_height(height.unwrap_or(0));
                 }
                 Payload::Transaction(bytes) => {
                     let mut builder = builder.init_transaction();
@@ -199,11 +203,13 @@ impl Payload {
 
 fn deserialize_block(block: block::Reader<'_>, is_sync: bool) -> capnp::Result<Payload> {
     let data = block.get_data()?.to_vec();
+    let height = block.get_height();
+    let height = if height == 0 { None } else { Some(height) };
 
     let payload = if is_sync {
-        Payload::SyncBlock(data)
+        Payload::SyncBlock(data, height)
     } else {
-        Payload::Block(data)
+        Payload::Block(data, height)
     };
 
     Ok(payload)
@@ -300,11 +306,12 @@ mod tests {
     #[test]
     fn serialize_deserialize_payloads_with_blobs() {
         let blob = (0u8..255).collect::<Vec<_>>();
+        let height = Some(1);
 
         for payload in &[
-            Payload::Block(blob.clone()),
+            Payload::Block(blob.clone(), height),
             Payload::MemoryPool(vec![blob.clone(); 10]),
-            Payload::SyncBlock(blob.clone()),
+            Payload::SyncBlock(blob.clone(), height),
             Payload::Transaction(blob),
         ] {
             assert_eq!(

@@ -16,7 +16,7 @@
 
 use std::{net::SocketAddr, time::Duration};
 
-use snarkos_storage::{Digest, VMBlock};
+use snarkos_storage::{BlockStatus, Digest, VMBlock};
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, Transaction},
     Block,
@@ -30,7 +30,7 @@ use anyhow::*;
 
 impl Node {
     /// Broadcast block to connected peers
-    pub fn propagate_block(&self, block_bytes: Vec<u8>, block_miner: SocketAddr) {
+    pub fn propagate_block(&self, block_bytes: Vec<u8>, height: Option<u32>, block_miner: SocketAddr) {
         debug!("Propagating a block to peers");
 
         let connected_peers = self.connected_peers();
@@ -39,7 +39,7 @@ impl Node {
             let mut futures = Vec::with_capacity(connected_peers.len());
             for remote_address in connected_peers.iter() {
                 if remote_address != &block_miner {
-                    futures.push(peer_book.send_to(*remote_address, Payload::Block(block_bytes.clone())));
+                    futures.push(peer_book.send_to(*remote_address, Payload::Block(block_bytes.clone(), height)));
                 }
             }
             tokio::time::timeout(Duration::from_secs(1), futures::future::join_all(futures))
@@ -53,6 +53,7 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         block: Vec<u8>,
+        height: Option<u32>,
         is_block_new: bool,
     ) -> Result<(), NetworkError> {
         let block_size = block.len();
@@ -73,7 +74,7 @@ impl Node {
             let node_clone = self.clone();
             tokio::spawn(async move {
                 if let Err(e) = node_clone
-                    .process_received_block(remote_address, block, is_block_new)
+                    .process_received_block(remote_address, block, height, is_block_new)
                     .await
                 {
                     warn!("error accepting received block: {:?}", e);
@@ -82,7 +83,10 @@ impl Node {
         } else {
             let sender = self.master_dispatch.read().await;
             if let Some(sender) = &*sender {
-                sender.send(SyncInbound::Block(remote_address, block)).await.ok();
+                sender
+                    .send(SyncInbound::Block(remote_address, block, height))
+                    .await
+                    .ok();
             }
         }
         Ok(())
@@ -92,6 +96,7 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         block: Vec<u8>,
+        height: Option<u32>,
         is_block_new: bool,
     ) -> Result<(), NetworkError> {
         let block_struct = match Block::<Transaction<Components>>::deserialize(&block) {
@@ -109,9 +114,14 @@ impl Node {
         let canon = self.storage.canon().await?;
 
         info!(
-            "Received block from {} of epoch {} with hash {} (current head {})",
+            "Received block from {} of epoch {}{} with hash {} (current head {})",
             remote_address,
             block_struct.header.time,
+            if let Some(h) = height {
+                format!(" (peer's height {})", h)
+            } else {
+                "".to_string()
+            },
             block_struct.header.hash(),
             canon.block_height,
         );
@@ -121,7 +131,7 @@ impl Node {
 
         if block_validity && is_block_new {
             // This is a non-sync Block, send it to our peers.
-            self.propagate_block(block, remote_address);
+            self.propagate_block(block, height, remote_address);
         }
 
         Ok(())
@@ -135,10 +145,14 @@ impl Node {
     ) -> Result<(), NetworkError> {
         for hash in header_hashes.into_iter().take(crate::MAX_BLOCK_SYNC_COUNT as usize) {
             let block = self.storage.get_block(&hash).await?;
+            let height = match self.storage.get_block_state(&block.header.hash()).await? {
+                BlockStatus::Committed(h) => Some(h as u32),
+                _ => None,
+            };
 
             // Send a `SyncBlock` message to the connected peer.
             self.peer_book
-                .send_to(remote_address, Payload::SyncBlock(block.serialize()))
+                .send_to(remote_address, Payload::SyncBlock(block.serialize(), height))
                 .await;
         }
 

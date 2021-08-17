@@ -31,7 +31,7 @@ use tokio::{sync::mpsc, time::Instant};
 
 pub enum SyncInbound {
     BlockHashes(SocketAddr, Vec<BlockHeaderHash>),
-    Block(SocketAddr, Vec<u8>),
+    Block(SocketAddr, Vec<u8>, Option<u32>),
 }
 
 pub struct SyncMaster {
@@ -42,6 +42,7 @@ pub struct SyncMaster {
 struct SyncBlock {
     address: SocketAddr,
     block: Vec<u8>,
+    height: Option<u32>,
 }
 
 impl SyncMaster {
@@ -152,7 +153,7 @@ impl SyncMaster {
                 SyncInbound::BlockHashes(addr, hashes) => {
                     received_block_hashes.insert(addr, hashes.into_iter().map(|x| -> Digest { x.0.into() }).collect());
                 }
-                SyncInbound::Block(_, _) => {
+                SyncInbound::Block(..) => {
                     warn!("received sync block prematurely");
                 }
             }
@@ -183,8 +184,8 @@ impl SyncMaster {
                 SyncInbound::BlockHashes(_, _) => {
                     // late, ignored
                 }
-                SyncInbound::Block(address, block) => {
-                    blocks.push(SyncBlock { address, block });
+                SyncInbound::Block(address, block, height) => {
+                    blocks.push(SyncBlock { address, block, height });
                 }
             }
             blocks.len() >= block_count
@@ -357,7 +358,7 @@ impl SyncMaster {
         for (i, hash) in block_order.iter().enumerate() {
             if let Some(block) = blocks_by_hash.remove(hash) {
                 self.node
-                    .process_received_block(block.address, block.block, false)
+                    .process_received_block(block.address, block.block, block.height, false)
                     .await?;
             } else {
                 warn!(

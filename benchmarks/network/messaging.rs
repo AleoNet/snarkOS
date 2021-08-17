@@ -35,7 +35,7 @@ fn send_small_messages(c: &mut Criterion) {
     c.bench_function("send_small_messages", move |b| {
         b.to_async(&rt).iter(|| async {
             let block_size: u16 = thread_rng().gen();
-            let big_block = Payload::Block(fake_block_bytes[..block_size as usize].to_vec());
+            let big_block = Payload::Block(fake_block_bytes[..block_size as usize].to_vec(), Some(1));
 
             // send it from node0 to node1
             node0.lock().await.write_message(&big_block).await;

@@ -210,13 +210,15 @@ async fn reject_non_version_messages_before_handshake() {
     // Block
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
     let block = vec![0u8, 10];
-    write_message_to_stream(Payload::Block(block), &mut peer_stream).await;
+    let height = None;
+    write_message_to_stream(Payload::Block(block, height), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
     // SyncBlock
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
     let sync_block = vec![0u8, 10];
-    write_message_to_stream(Payload::SyncBlock(sync_block), &mut peer_stream).await;
+    let height = Some(1);
+    write_message_to_stream(Payload::SyncBlock(sync_block, height), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
     // Sync

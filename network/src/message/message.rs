@@ -62,7 +62,7 @@ impl fmt::Display for Message {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Payload {
     #[doc = include_str!("../../documentation/network_messages/block.md")]
-    Block(Vec<u8>),
+    Block(Vec<u8>, Option<u32>),
     #[doc = include_str!("../../documentation/network_messages/get_blocks.md")]
     GetBlocks(Vec<BlockHeaderHash>),
     #[doc = include_str!("../../documentation/network_messages/get_memory_pool.md")]
@@ -82,7 +82,7 @@ pub enum Payload {
     #[doc = include_str!("../../documentation/network_messages/sync.md")]
     Sync(Vec<BlockHeaderHash>),
     #[doc = include_str!("../../documentation/network_messages/sync_block.md")]
-    SyncBlock(Vec<u8>),
+    SyncBlock(Vec<u8>, Option<u32>),
     #[doc = include_str!("../../documentation/network_messages/transaction.md")]
     Transaction(Vec<u8>),
 

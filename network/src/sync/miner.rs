@@ -108,8 +108,13 @@ impl MinerInstance {
                 info!("Mined a new block: {:?}", hex::encode(block.header.hash().0));
 
                 let serialized_block = block.serialize();
+                let node_clone = self.node.clone();
+                let new_height = futures::executor::block_on(async move {
+                    node_clone.storage.canon().await.map(|c| c.block_height as u32)
+                })
+                .ok();
 
-                self.node.propagate_block(serialized_block, local_address);
+                self.node.propagate_block(serialized_block, new_height, local_address);
             }
         }))
     }

@@ -37,6 +37,7 @@ struct Transaction {
 
 struct Block {
     data @0 :Data;
+    height @1 :UInt32;
 }
 
 struct Ping {
