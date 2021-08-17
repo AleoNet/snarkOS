@@ -29,7 +29,9 @@ mod consensus_integration {
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();
 
-        let header = miner.find_block(transactions, parent_header, &AtomicBool::new(false)).unwrap();
+        let header = miner
+            .find_block(transactions, parent_header, &AtomicBool::new(false))
+            .unwrap();
 
         let expected_prev_block_hash = parent_header.hash();
         assert_eq!(header.previous_block_hash, expected_prev_block_hash);

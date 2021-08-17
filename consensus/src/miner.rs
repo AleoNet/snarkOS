@@ -18,12 +18,15 @@ use crate::{error::ConsensusError, Consensus};
 use snarkos_storage::{SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
 use snarkvm_algorithms::SNARKError;
 use snarkvm_dpc::{testnet1::instantiated::*, Address, BlockHeader, BlockHeaderHash, DPCComponents, ProgramScheme};
-use snarkvm_posw::{PoswMarlin, error::PoswError, txids_to_roots};
+use snarkvm_posw::{error::PoswError, txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use chrono::Utc;
 use rand::thread_rng;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 lazy_static::lazy_static! {
     /// The mining instance that is initialized with a proving key.
@@ -141,14 +144,16 @@ impl MineContext {
                 // technically a race condition, but non-critical
                 trace!("terminated miner due to canon block received");
                 terminator.store(false, Ordering::SeqCst);
-                return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)))
-            },
-            Err(PoswError::SnarkError(SNARKError::Crate("marlin", message))) if message == "Failed to generate proof - Terminated" => {
+                return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)));
+            }
+            Err(PoswError::SnarkError(SNARKError::Crate("marlin", message)))
+                if message == "Failed to generate proof - Terminated" =>
+            {
                 // todo: remove in snarkvm 0.7.10+
                 trace!("terminated miner due to canon block received");
                 terminator.store(false, Ordering::SeqCst);
-                return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)))
-            },
+                return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)));
+            }
             Err(e) => return Err(e.into()),
             Ok(x) => x,
         };
@@ -167,7 +172,10 @@ impl MineContext {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(&self, terminator: &AtomicBool) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
+    pub async fn mine_block(
+        &self,
+        terminator: &AtomicBool,
+    ) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
         let candidate_transactions = self.consensus.fetch_memory_pool().await;
         debug!("Miner@{}: creating a block", self.block_height);
 

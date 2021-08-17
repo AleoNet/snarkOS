@@ -25,7 +25,7 @@ use snarkvm_dpc::{
 
 use snarkos_consensus::error::ConsensusError;
 
-use crate::{NetworkError, Node, State, master::SyncInbound, message::*};
+use crate::{master::SyncInbound, message::*, NetworkError, Node, State};
 use anyhow::*;
 use tokio::task;
 
@@ -118,7 +118,7 @@ impl Node {
         .map_err(|e| NetworkError::Other(e.into()))??;
         let block_struct = <Block<Transaction<Components>> as VMBlock>::serialize(&block_struct)?;
         let previous_block_hash = block_struct.header.previous_block_hash.clone();
-        
+
         let canon = self.storage.canon().await?;
 
         info!(
@@ -141,7 +141,7 @@ impl Node {
             if previous_block_hash == canon.hash && self.state() == State::Mining {
                 self.terminator.store(true, Ordering::SeqCst);
             }
-    
+
             // This is a non-sync Block, send it to our peers.
             self.propagate_block(block, height, remote_address);
         }

@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{sync::{Arc, atomic::Ordering}, thread, time::Duration};
+use std::{
+    sync::{atomic::Ordering, Arc},
+    thread,
+    time::Duration,
+};
 
 use futures::executor::block_on;
 use snarkvm_algorithms::SNARKError;
