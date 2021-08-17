@@ -33,7 +33,7 @@ impl Peer {
 
         // If message is a `SyncBlock` message, log it as a trace.
         match payload {
-            Payload::SyncBlock(_) => trace!("Received a '{}' message from {}", payload, self.address),
+            Payload::SyncBlock(..) => trace!("Received a '{}' message from {}", payload, self.address),
             _ => debug!("Received a '{}' message from {}", payload, self.address),
         }
 

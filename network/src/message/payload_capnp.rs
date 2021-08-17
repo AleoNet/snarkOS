@@ -1215,6 +1215,10 @@ pub mod block {
     pub fn has_data(&self) -> bool {
       !self.reader.get_pointer_field(0).is_null()
     }
+    #[inline]
+    pub fn get_height(self) -> u32 {
+      self.reader.get_data_field::<u32>(0)
+    }
   }
 
   pub struct Builder<'a> { builder: ::capnp::private::layout::StructBuilder<'a> }
@@ -1280,6 +1284,14 @@ pub mod block {
     pub fn has_data(&self) -> bool {
       !self.builder.get_pointer_field(0).is_null()
     }
+    #[inline]
+    pub fn get_height(self) -> u32 {
+      self.builder.get_data_field::<u32>(0)
+    }
+    #[inline]
+    pub fn set_height(&mut self, value: u32)  {
+      self.builder.set_data_field::<u32>(0, value);
+    }
   }
 
   pub struct Pipeline { _typeless: ::capnp::any_pointer::Pipeline }
@@ -1292,7 +1304,7 @@ pub mod block {
   }
   mod _private {
     use capnp::private::layout;
-    pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 1 };
+    pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 1 };
     pub const TYPE_ID: u64 = 0xd0ca_0d5d_1257_f5d7;
   }
 }

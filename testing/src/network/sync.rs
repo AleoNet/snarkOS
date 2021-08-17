@@ -94,10 +94,10 @@ async fn block_initiator_side() {
     assert!(block_hashes.contains(&block_1_header_hash) && block_hashes.contains(&block_2_header_hash));
 
     // respond with the full blocks
-    let block_1 = Payload::SyncBlock(to_bytes_le![&*BLOCK_1].unwrap());
+    let block_1 = Payload::SyncBlock(to_bytes_le![&*BLOCK_1].unwrap(), Some(1));
     peer.write_message(&block_1).await;
 
-    let block_2 = Payload::SyncBlock(to_bytes_le![&*BLOCK_2].unwrap());
+    let block_2 = Payload::SyncBlock(to_bytes_le![&*BLOCK_2].unwrap(), Some(2));
     peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
@@ -161,7 +161,7 @@ async fn block_responder_side() {
 
     // receive a SyncBlock message with the requested block
     let payload = peer.read_payload().await.unwrap();
-    let block = if let Payload::SyncBlock(block) = payload {
+    let block = if let Payload::SyncBlock(block, Some(1)) = payload {
         block
     } else {
         unreachable!();

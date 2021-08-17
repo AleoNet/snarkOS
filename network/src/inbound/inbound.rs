@@ -142,18 +142,18 @@ impl Node {
                     self.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
-            Payload::Block(block) => {
+            Payload::Block(block, height) => {
                 // The BLOCKS metric was already updated during the block dedup cache lookup.
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, true).await?;
+                    self.received_block(source, block, height, true).await?;
                 }
             }
-            Payload::SyncBlock(block) => {
+            Payload::SyncBlock(block, height) => {
                 metrics::increment_counter!(inbound::SYNCBLOCKS);
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, false).await?;
+                    self.received_block(source, block, height, false).await?;
 
                     // Update the peer and possibly finish the sync process.
                     if let Some(peer) = self.peer_book.get_peer_handle(source) {

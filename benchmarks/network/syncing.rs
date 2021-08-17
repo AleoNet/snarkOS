@@ -68,7 +68,7 @@ fn providing_sync_blocks(c: &mut Criterion) {
             let mut sync_blocks_count = 0;
             loop {
                 let payload = requester.lock().await.read_payload().await.unwrap();
-                if let Payload::SyncBlock(_) = payload {
+                if let Payload::SyncBlock(..) = payload {
                     sync_blocks_count += 1;
                 }
                 if sync_blocks_count == NUM_BLOCKS {

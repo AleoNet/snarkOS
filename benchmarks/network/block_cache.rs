@@ -36,7 +36,7 @@ fn block_cache_perf(c: &mut Criterion) {
             let mut random_bytes = vec![0u8; block_size];
             rng.fill(&mut random_bytes[..]);
 
-            let test_block = Payload::Block(random_bytes);
+            let test_block = Payload::Block(random_bytes, None);
 
             let _check = cache.contains(&test_block);
         })

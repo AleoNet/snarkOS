@@ -33,7 +33,7 @@ impl Default for Cache {
 
 impl Cache {
     pub fn contains(&mut self, payload: &Payload) -> bool {
-        let hash = if let Payload::Block(bytes) = payload {
+        let hash = if let Payload::Block(bytes, _) = payload {
             hash64(bytes)
         } else {
             unreachable!("Only blocks are cached for now");
