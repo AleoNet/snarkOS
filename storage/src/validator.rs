@@ -81,14 +81,17 @@ macro_rules! check_for_superfluous_tx_components {
                 .collect::<Vec<_>>();
             storage_keys_and_indices.sort_unstable_by_key(|(_key, index)| *index);
 
-            let mut kv_pairs = storage_keys_and_indices.windows(2);
-            while let Some(&[(_, idx1), (_, idx2)]) = kv_pairs.next() {
-                if idx2 != idx1 + 1 {
-                    error!(
-                        "The column with tx {}s has incoherent indices! {} is followed by {}",
-                        $component_name, idx1, idx2
-                    );
-                    is_storage_valid.store(false, Ordering::SeqCst);
+            // FIXME: this exclusion should be removed in testnet2; adding "Testnet1" string for extra visibility
+            if $component_col != KeyValueColumn::DigestIndex {
+                let mut kv_pairs = storage_keys_and_indices.windows(2);
+                while let Some(&[(_, idx1), (_, idx2)]) = kv_pairs.next() {
+                    if idx2 != idx1 + 1 {
+                        error!(
+                            "The column with tx {}s has incoherent indices! {} is followed by {}",
+                            $component_name, idx1, idx2
+                        );
+                        is_storage_valid.store(false, Ordering::SeqCst);
+                    }
                 }
             }
 
