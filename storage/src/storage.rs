@@ -17,7 +17,7 @@
 use anyhow::*;
 use std::sync::Arc;
 
-use crate::{Digest, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, TransactionLocation};
+use crate::{Digest, FixMode, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, TransactionLocation};
 
 /// Current state of a block in storage
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -123,6 +123,9 @@ pub trait Storage: Send + Sync {
         }
     }
 
+    /// Stores the "pre-genesis" digest; only applicable to the genesis block txs.
+    async fn store_init_digest(&self, digest: Digest) -> Result<()>;
+
     // miner convenience record management functions
 
     /// Gets a list of stored record commitments subject to `limit`.
@@ -160,6 +163,9 @@ pub trait Storage: Send + Sync {
 
     /// Similar to `Storage::get_canon_blocks`, gets hashes of all blocks subject to `filter` and `limit` in block-number ascending order. A maintenance function, not intended for general use.
     async fn get_block_hashes(&self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>>;
+
+    /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
+    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> bool;
 }
 
 /// A wrapper over storage implementations

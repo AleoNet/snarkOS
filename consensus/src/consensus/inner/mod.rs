@@ -25,7 +25,15 @@ use crate::{
     MemoryPool,
 };
 use anyhow::*;
-use snarkos_storage::{BlockStatus, Digest, ForkDescription, SerialBlock, SerialTransaction, Storage, VMTransaction};
+use snarkos_storage::{
+    BlockStatus,
+    Digest,
+    DynStorage,
+    ForkDescription,
+    SerialBlock,
+    SerialTransaction,
+    VMTransaction,
+};
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, Record as DPCRecord, TransactionKernel},
     DPCScheme,
@@ -47,7 +55,7 @@ pub struct ConsensusInner {
     pub public: Arc<Consensus>,
     pub ledger: DynLedger,
     pub memory_pool: MemoryPool,
-    pub storage: Arc<dyn Storage>,
+    pub storage: DynStorage,
 }
 
 struct LedgerData {

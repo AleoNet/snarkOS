@@ -96,8 +96,12 @@ impl KeyValueStorage for MemDb {
         Ok(())
     }
 
+    fn in_transaction(&self) -> bool {
+        self.transaction.is_some()
+    }
+
     fn begin(&mut self) -> Result<()> {
-        if self.transaction.is_some() {
+        if self.in_transaction() {
             return Err(anyhow!("attempted to restart a transaction"));
         }
         self.transaction = Some(self.entries.clone());
@@ -105,7 +109,7 @@ impl KeyValueStorage for MemDb {
     }
 
     fn abort(&mut self) -> Result<()> {
-        if self.transaction.is_none() {
+        if !self.in_transaction() {
             return Err(anyhow!("attempted to abort when not in a transaction"));
         }
         self.transaction = None;
@@ -113,7 +117,7 @@ impl KeyValueStorage for MemDb {
     }
 
     fn commit(&mut self) -> Result<()> {
-        if self.transaction.is_none() {
+        if !self.in_transaction() {
             return Err(anyhow!("attempted to commit when not in a transaction"));
         }
         self.entries = self.transaction.take().unwrap();

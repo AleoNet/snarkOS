@@ -61,6 +61,9 @@ version = "0.4.2"
 [dependencies.indexmap]
 version = "1.6"
 
+[dependencies.num_enum]
+version = "0.5"
+
 [dependencies.rand]
 version = "0.8"
 

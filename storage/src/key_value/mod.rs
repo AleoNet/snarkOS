@@ -18,7 +18,7 @@ use std::{any::Any, borrow::Cow, fmt};
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{BlockFilter, Digest, SerialBlock, SerialRecord};
+use crate::{BlockFilter, Digest, FixMode, SerialBlock, SerialRecord};
 use anyhow::*;
 
 mod storage;
@@ -44,6 +44,8 @@ pub trait KeyValueStorage {
     fn store(&mut self, column: KeyValueColumn, key: &[u8], value: &[u8]) -> Result<()>;
 
     fn delete(&mut self, column: KeyValueColumn, key: &[u8]) -> Result<()>;
+
+    fn in_transaction(&self) -> bool;
 
     fn begin(&mut self) -> Result<()>;
 
@@ -90,6 +92,8 @@ enum Message {
     ResetLedger(Vec<Digest>, Vec<Digest>, Vec<Digest>, Vec<Digest>),
     GetCanonBlocks(Option<u32>),
     GetBlockHashes(Option<u32>, BlockFilter),
+    Validate(Option<u32>, FixMode),
+    StoreInitDigest(Digest),
 }
 
 impl fmt::Display for Message {
@@ -138,6 +142,8 @@ impl fmt::Display for Message {
             Message::ResetLedger(_, _, _, _) => write!(f, "ResetLedger(..)"),
             Message::GetCanonBlocks(limit) => write!(f, "GetCanonBlocks({:?})", limit),
             Message::GetBlockHashes(limit, filter) => write!(f, "GetBlockHashes({:?}, {:?})", limit, filter),
+            Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
+            Message::StoreInitDigest(digest) => write!(f, "StoreInitDigest({})", digest),
         }
     }
 }

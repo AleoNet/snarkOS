@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use num_enum::TryFromPrimitive;
+
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, TryFromPrimitive)]
 pub enum KeyValueColumn {
     Meta = 0,          // MISC Values
     BlockHeader,       // Block hash -> block header
