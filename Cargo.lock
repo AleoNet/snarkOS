@@ -1101,6 +1101,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62aca2aba2d62b4a7f5b33f3712cb1b0692779a56fb510499d5c0aa594daeaf3"
 
 [[package]]
+name = "hash_hasher"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74721d007512d0cb3338cd20f0654ac913920061a4c4d0d8708edb3f2a698c0c"
+
+[[package]]
 name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2688,6 +2694,7 @@ dependencies = [
  "csv",
  "derivative",
  "digest 0.7.6",
+ "hash_hasher",
  "itertools",
  "rand 0.8.4",
  "rand_xorshift",
@@ -2766,6 +2773,7 @@ dependencies = [
  "defer",
  "derivative",
  "futures 0.3.16",
+ "hash_hasher",
  "hex",
  "itertools",
  "log",

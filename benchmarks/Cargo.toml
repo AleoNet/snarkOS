@@ -42,6 +42,11 @@ name = "network_metrics"
 path = "network/network_metrics.rs"
 harness = false
 
+[[bench]]
+name = "hasher_hash"
+path = "network/hasher_hash.rs"
+harness = false
+
 [dependencies.snarkvm-algorithms]
 version = "=0.7.8"
 
@@ -102,3 +107,6 @@ version = "1"
 
 [dependencies.itertools]
 version = "0.10"
+
+[dependencies.hash_hasher]
+version = "2.0.3"
