@@ -34,9 +34,8 @@ impl ConsensusInner {
 
             self.commit_block(&hash, &block).await?;
         }
-        // info!("rebuilding canon");
-        // self.diff_canon().await?;
-        // self.recommit_canon().await?; // TODO: DEFINITELY REMOVE
+
+        // scan for forks
         let forks = self.scan_forks().await?;
         for (canon, fork_child) in forks {
             let canon_height = match self.storage.get_block_state(&canon).await? {
@@ -53,7 +52,7 @@ impl ConsensusInner {
                 fork_blocks.last().unwrap()
             );
         }
-        // info!("rebuilt canon");
+
         if let Err(e) = self.try_to_fast_forward().await {
             match e {
                 ConsensusError::InvalidBlock(e) => debug!("invalid block in initial fast-forward: {}", e),
