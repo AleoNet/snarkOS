@@ -69,7 +69,7 @@ struct LedgerData {
 }
 
 impl ConsensusInner {
-    /// scans uncommitted blocks for forks
+    /// scans uncommitted blocks with a known path to the canon chain for forks
     async fn scan_forks(&mut self) -> Result<Vec<(Digest, Digest)>> {
         let canon_hashes = self
             .storage
