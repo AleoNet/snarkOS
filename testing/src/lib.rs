@@ -18,6 +18,7 @@
 #![forbid(unsafe_code)]
 
 pub mod dpc;
+pub mod mining;
 #[cfg(feature = "network")]
 pub mod network;
 pub mod storage;

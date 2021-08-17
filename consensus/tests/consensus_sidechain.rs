@@ -15,12 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_sidechain {
-<<<<<<< HEAD
-    use snarkos_storage::validator::FixMode;
-=======
     use snarkos_consensus::OLDEST_FORK_THRESHOLD;
-    // use snarkos_storage::validator::FixMode;
->>>>>>> 3a24d6cb... wip dynamic syncing
+    use snarkos_storage::validator::FixMode;
     use snarkos_testing::sync::*;
 
     use rand::{seq::IteratorRandom, thread_rng, Rng};
