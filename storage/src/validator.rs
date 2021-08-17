@@ -55,15 +55,15 @@ macro_rules! check_for_superfluous_tx_components {
             fix_mode: FixMode,
             is_storage_valid: &AtomicBool,
         ) {
-            let storage_keys = match db_lookup($component_col, GetColumnKeys, lookup_sender).await {
-                LookupResponse::Keys(col) => {
+            let storage_column = match db_lookup($component_col, GetColumn, lookup_sender).await {
+                LookupResponse::Column(col) => {
                     if $component_col == KeyValueColumn::DigestIndex {
                         // the DigestIndex column also contains their indices, similar to BlockIndex
                         col.into_iter()
-                            .filter(|key| key.len() != 4)
-                            .collect::<HashSet<_>>()
+                            .filter(|(key, _idx)| key.len() != 4)
+                            .collect::<Vec<_>>()
                     } else {
-                        col.into_iter().collect::<HashSet<_>>()
+                        col.into_iter().collect::<Vec<_>>()
                     }
                 }
                 _ => {
@@ -73,6 +73,32 @@ macro_rules! check_for_superfluous_tx_components {
                     return;
                 }
             };
+
+            // Check the contiguity of indices.
+            let mut storage_keys_and_indices = storage_column
+                .into_iter()
+                .map(|(key, index_bytes)| (key, u32::from_le_bytes(index_bytes.try_into().unwrap())))
+                .collect::<Vec<_>>();
+            storage_keys_and_indices.sort_unstable_by_key(|(_key, index)| *index);
+
+            // FIXME: this exclusion should be removed in testnet2; adding "Testnet1" string for extra visibility
+            if $component_col != KeyValueColumn::DigestIndex {
+                let mut kv_pairs = storage_keys_and_indices.windows(2);
+                while let Some(&[(_, idx1), (_, idx2)]) = kv_pairs.next() {
+                    if idx2 != idx1 + 1 {
+                        error!(
+                            "The column with tx {}s has incoherent indices! {} is followed by {}",
+                            $component_name, idx1, idx2
+                        );
+                        is_storage_valid.store(false, Ordering::SeqCst);
+                    }
+                }
+            }
+
+            let storage_keys = storage_keys_and_indices
+                .into_iter()
+                .map(|(k, _v)| k)
+                .collect::<HashSet<_>>();
 
             trace!(
                 "there are {} {}s stored individually and {} in txs",
@@ -130,14 +156,14 @@ pub struct LookupRequest {
 pub enum LookupKind {
     Exists(Vec<u8>),
     Get(Vec<u8>),
-    GetColumnKeys,
+    GetColumn,
 }
 
 #[derive(Debug)]
 pub enum LookupResponse {
     Found(bool),
     Value(Option<Vec<u8>>),
-    Keys(Vec<Vec<u8>>),
+    Column(Vec<(Vec<u8>, Vec<u8>)>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -219,14 +245,14 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
                         let res = self.exists(col, &key).unwrap();
                         tx.send(LookupResponse::Found(res)).unwrap()
                     }
-                    GetColumnKeys => {
+                    GetColumn => {
                         let res = self
-                            .get_column_keys(col)
+                            .get_column(col)
                             .unwrap()
                             .into_iter()
-                            .map(|v| v.into_owned())
+                            .map(|(k, v)| (k.into_owned(), v.into_owned()))
                             .collect();
-                        tx.send(LookupResponse::Keys(res)).unwrap()
+                        tx.send(LookupResponse::Column(res)).unwrap()
                     }
                 }
             }
