@@ -21,14 +21,12 @@ use std::{
 };
 
 use futures::executor::block_on;
-use snarkvm_algorithms::SNARKError;
 use snarkvm_dpc::{testnet1::instantiated::*, Address};
 use tokio::task;
 use tracing::*;
 
 use snarkos_consensus::{error::ConsensusError, MineContext};
 use snarkos_metrics::{self as metrics, misc::*};
-use snarkvm_posw::error::PoswError;
 
 use crate::{Node, State};
 
