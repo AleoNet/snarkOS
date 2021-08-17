@@ -178,7 +178,7 @@ pub fn test_config(setup: TestSetup) -> Config {
     .unwrap()
 }
 
-/// Starts a node with the specified bootnodes.
+/// Starts a node with the specified config.
 pub async fn test_node(setup: TestSetup) -> Node {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let config = test_config(setup.clone());

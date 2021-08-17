@@ -21,7 +21,7 @@ mod rpc_tests {
     use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_testing::{
-        network::{test_config, test_node, TestSetup},
+        network::{test_config, test_node, ConsensusSetup, TestSetup},
         sync::*,
         wait_until,
     };
@@ -36,7 +36,7 @@ mod rpc_tests {
     use serde_json::Value;
     use std::{net::SocketAddr, sync::Arc, time::Duration};
 
-    async fn initialize_test_rpc(consensus: &Arc<Consensus>) -> Rpc {
+    async fn initialize_test_rpc(consensus: &Arc<Consensus>, node_setup: Option<TestSetup>) -> (Rpc, Node) {
         let environment = test_config(node_setup.unwrap_or_default());
 
         let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
@@ -52,13 +52,13 @@ mod rpc_tests {
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // wait for genesis to commit
 
-        let rpc_impl = RpcImpl::new(node.storage.clone(), None, node);
+        let rpc_impl = RpcImpl::new(node.storage.clone(), None, node.clone());
 
         let mut io = MetaIoHandler::default();
 
         rpc_impl.add(&mut io);
 
-        Rpc::new(io.iter().map(|(name, proc)| {
+        let rpc = Rpc::new(io.iter().map(|(name, proc)| {
             (name.clone(), match proc {
                 RemoteProcedure::Method(rpc_method) => {
                     struct Handler(Arc<dyn RpcMethod<Meta>>);
@@ -72,7 +72,9 @@ mod rpc_tests {
                 RemoteProcedure::Notification(_) => unimplemented!(),
                 RemoteProcedure::Alias(_) => unimplemented!(),
             })
-        }))
+        }));
+
+        (rpc, node)
     }
 
     fn verify_transaction_info(transaction_bytes: Vec<u8>, transaction_info: Value) {
@@ -143,7 +145,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_block() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let response = rpc.request("getblock", &[hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]);
 
@@ -176,7 +178,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_block_count() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getblockcount".to_string();
 
@@ -188,7 +190,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_best_block_hash() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getbestblockhash".to_string();
 
@@ -203,7 +205,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_block_hash() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert_eq!(rpc.request("getblockhash", &[0u32]), format![
             r#""{}""#,
@@ -214,7 +216,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_raw_transaction() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let genesis_block = genesis();
 
@@ -230,7 +232,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_transaction_info() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let genesis_block = genesis();
         let transaction = &genesis_block.transactions.0[0];
@@ -247,7 +249,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_decode_raw_transaction() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let response = rpc.request("decoderawtransaction", &[hex::encode(
             to_bytes_le![&*TRANSACTION_1].unwrap(),
@@ -262,7 +264,7 @@ mod rpc_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_send_raw_transaction() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert_eq!(
             rpc.request("sendtransaction", &[hex::encode(
@@ -275,7 +277,7 @@ mod rpc_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_validate_transaction() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert_eq!(
             rpc.request("validaterawtransaction", &[hex::encode(
@@ -288,7 +290,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_connection_count() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getconnectioncount".to_string();
 
@@ -300,7 +302,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_peer_info() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getpeerinfo".to_string();
 
@@ -316,7 +318,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_node_info() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getnodeinfo".to_string();
 
@@ -331,7 +333,7 @@ mod rpc_tests {
     #[tokio::test]
     async fn test_rpc_get_block_template() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let canon = consensus.storage.canon().await.unwrap();
         let curr_height = canon.block_height;
@@ -356,7 +358,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_getnetworkgraph() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let setup = TestSetup {
             is_crawler: true,
             peer_sync_interval: 1,
@@ -364,7 +366,7 @@ mod rpc_tests {
             consensus_setup: None,
             ..Default::default()
         };
-        let (rpc, rpc_node) = initialize_test_rpc(storage, Some(setup)).await;
+        let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup.clone())).await;
         rpc_node.listen().await.unwrap();
         rpc_node.start_services().await;
 

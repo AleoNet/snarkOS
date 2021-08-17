@@ -16,7 +16,7 @@
 
 /// Tests for protected RPC endpoints
 mod protected_rpc_tests {
-    use snarkos_consensus::MerkleTreeLedger;
+    use snarkos_consensus::Consensus;
     use snarkos_network::Node;
     use snarkos_rpc::*;
     use snarkos_storage::VMTransaction;
@@ -70,7 +70,10 @@ mod protected_rpc_tests {
         }
     }
 
-    async fn initialize_test_rpc(consensus: &Arc<Consensus>) -> MetaIoHandler<Meta> {
+    async fn initialize_test_rpc(
+        consensus: &Arc<Consensus>,
+        node_setup: Option<TestSetup>,
+    ) -> (MetaIoHandler<Meta>, Node) {
         let credentials = RpcCredentials {
             username: TEST_USERNAME.to_string(),
             password: TEST_PASSWORD.to_string(),
@@ -89,19 +92,19 @@ mod protected_rpc_tests {
 
         node.set_sync(node_consensus);
 
-        let rpc_impl = RpcImpl::new(consensus.storage.clone(), Some(credentials), node);
+        let rpc_impl = RpcImpl::new(consensus.storage.clone(), Some(credentials), node.clone());
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);
 
-        io
+        (io, node)
     }
 
     #[tokio::test]
     async fn test_rpc_authentication() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = invalid_authentication();
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -123,7 +126,7 @@ mod protected_rpc_tests {
             .unwrap();
 
         let meta = authentication();
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getrecordcommitmentcount".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -144,7 +147,7 @@ mod protected_rpc_tests {
             .unwrap();
 
         let meta = authentication();
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getrecordcommitments".to_string();
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
@@ -169,7 +172,7 @@ mod protected_rpc_tests {
             .unwrap();
 
         let meta = authentication();
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getrawrecord".to_string();
         let params = hex::encode(&DATA.records_1[0].commitment);
@@ -190,7 +193,7 @@ mod protected_rpc_tests {
     async fn test_rpc_decode_record() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let record = &DATA.records_1[0];
 
@@ -231,7 +234,7 @@ mod protected_rpc_tests {
     async fn test_rpc_decrypt_record() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let system_parameters = &FIXTURE_VK.dpc.system_parameters;
         let [miner_acc, _, _] = FIXTURE_VK.test_accounts.clone();
@@ -277,7 +280,7 @@ mod protected_rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert!(consensus.receive_block(BLOCK_1.clone()).await);
 
@@ -329,7 +332,7 @@ mod protected_rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert!(consensus.receive_block(BLOCK_1.clone()).await);
 
@@ -376,7 +379,7 @@ mod protected_rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
 
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert!(consensus.receive_block(BLOCK_1.clone()).await);
 
@@ -421,7 +424,7 @@ mod protected_rpc_tests {
     async fn test_create_account() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let meta = authentication();
-        let rpc = initialize_test_rpc(&consensus).await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "createaccount".to_string();
 
@@ -448,12 +451,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_disconnect() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let setup = TestSetup {
             consensus_setup: None,
             ..Default::default()
         };
-        let (rpc, rpc_node) = initialize_test_rpc(storage, Some(setup)).await;
+        let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup)).await;
         rpc_node.listen().await.unwrap();
 
         let setup = TestSetup {
@@ -480,12 +483,12 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_connect() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let setup = TestSetup {
             consensus_setup: None,
             ..Default::default()
         };
-        let (rpc, rpc_node) = initialize_test_rpc(storage, Some(setup.clone())).await;
+        let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup.clone())).await;
         rpc_node.listen().await.unwrap();
 
         let some_node1 = test_node(setup.clone()).await;
