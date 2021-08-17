@@ -15,6 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_dpc {
+    use std::sync::atomic::AtomicBool;
+
     use rand::thread_rng;
     use snarkos_consensus::{get_block_reward, CreateTransactionRequest, MineContext};
     use snarkos_storage::{SerialBlock, VMRecord};
@@ -41,7 +43,7 @@ mod consensus_dpc {
         println!("Creating block with coinbase transaction");
         let (transactions, coinbase_records) = miner.establish_block(vec![]).await.unwrap();
         let previous_block_header = genesis().header.into();
-        let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+        let header = miner.find_block(&transactions, &previous_block_header, &AtomicBool::new(false)).unwrap();
         let previous_block_header = header.clone();
         let block = SerialBlock { header, transactions };
 
@@ -154,7 +156,7 @@ mod consensus_dpc {
 
         assert!(consensus.verify_transactions(transactions.clone()).await);
 
-        let header = miner.find_block(&transactions, &previous_block_header).unwrap();
+        let header = miner.find_block(&transactions, &previous_block_header, &AtomicBool::new(false)).unwrap();
         let new_block = SerialBlock { header, transactions };
         let new_block_reward = get_block_reward(consensus.storage.canon().await.unwrap().block_height as u32);
 

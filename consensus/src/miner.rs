@@ -16,13 +16,14 @@
 
 use crate::{error::ConsensusError, Consensus};
 use snarkos_storage::{SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
+use snarkvm_algorithms::SNARKError;
 use snarkvm_dpc::{testnet1::instantiated::*, Address, BlockHeader, BlockHeaderHash, DPCComponents, ProgramScheme};
-use snarkvm_posw::{txids_to_roots, PoswMarlin};
+use snarkvm_posw::{PoswMarlin, error::PoswError, txids_to_roots};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use chrono::Utc;
 use rand::thread_rng;
-use std::sync::Arc;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 lazy_static::lazy_static! {
     /// The mining instance that is initialized with a proving key.
@@ -119,6 +120,7 @@ impl MineContext {
         &self,
         transactions: &[SerialTransaction],
         parent_header: &SerialBlockHeader,
+        terminator: &AtomicBool,
     ) -> Result<SerialBlockHeader, ConsensusError> {
         let txids = transactions.iter().map(|x| x.id).collect::<Vec<_>>();
         let (merkle_root_hash, pedersen_merkle_root_hash, subroots) = txids_to_roots(&txids);
@@ -127,12 +129,29 @@ impl MineContext {
         let difficulty_target = self.consensus.parameters.get_block_difficulty(parent_header, time);
 
         // TODO: Switch this to use a user-provided RNG
-        let (nonce, proof) = POSW.mine(
+        let mined = POSW.mine(
             &subroots,
             difficulty_target,
+            terminator,
             &mut thread_rng(),
             self.consensus.parameters.max_nonce,
-        )?;
+        );
+        let (nonce, proof) = match mined {
+            Err(PoswError::SnarkError(SNARKError::Terminated)) => {
+                // technically a race condition, but non-critical
+                trace!("terminated miner due to canon block received");
+                terminator.store(false, Ordering::SeqCst);
+                return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)))
+            },
+            Err(PoswError::SnarkError(SNARKError::Crate("marlin", message))) if message == "Failed to generate proof - Terminated" => {
+                // todo: remove in snarkvm 0.7.10+
+                trace!("terminated miner due to canon block received");
+                terminator.store(false, Ordering::SeqCst);
+                return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)))
+            },
+            Err(e) => return Err(e.into()),
+            Ok(x) => x,
+        };
 
         Ok(BlockHeader {
             previous_block_hash: BlockHeaderHash(parent_header.hash().bytes().unwrap()),
@@ -148,7 +167,7 @@ impl MineContext {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(&self) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
+    pub async fn mine_block(&self, terminator: &AtomicBool) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
         let candidate_transactions = self.consensus.fetch_memory_pool().await;
         debug!("Miner@{}: creating a block", self.block_height);
 
@@ -164,7 +183,7 @@ impl MineContext {
             );
         }
 
-        let header = self.find_block(&transactions, &self.canon_header)?;
+        let header = self.find_block(&transactions, &self.canon_header, terminator)?;
 
         debug!("Miner@{}: found a block", self.block_height);
 

@@ -48,22 +48,22 @@ path = "network/hasher_hash.rs"
 harness = false
 
 [dependencies.snarkvm-algorithms]
-version = "=0.7.8"
+version = "=0.7.9"
 
 [dependencies.snarkvm-curves]
-version = "=0.7.8"
+version = "=0.7.9"
 
 [dependencies.snarkvm-dpc]
-version = "=0.7.8"
+version = "=0.7.9"
 
 [dependencies.snarkvm-parameters]
-version = "=0.7.8"
+version = "=0.7.9"
 
 [dependencies.snarkvm-posw]
-version = "=0.7.8"
+version = "=0.7.9"
 
 [dependencies.snarkvm-utilities]
-version = "=0.7.8"
+version = "=0.7.9"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
