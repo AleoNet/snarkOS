@@ -83,7 +83,7 @@ impl SyncMaster {
         for block in blocks_of_interest {
             if tips_of_blocks_of_interest.len() > crate::MAX_BLOCK_SYNC_COUNT as usize {
                 debug!("reached limit of blocks of interest in sync block locator hashes");
-                continue;
+                break;
             }
             let mut fork_path = self.node.storage.longest_child_path(&block).await?;
             if fork_path.len() < 2 {
