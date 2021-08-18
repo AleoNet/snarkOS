@@ -85,7 +85,6 @@ mod miner {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn terminate_on_block() {
-        tracing_subscriber::fmt::init();
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         consensus.fetch_memory_pool().await; // just make sure we're fully initialized by blocking on consensus call
 
