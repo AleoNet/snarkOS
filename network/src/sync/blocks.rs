@@ -27,6 +27,7 @@ use snarkos_consensus::error::ConsensusError;
 
 use crate::{master::SyncInbound, message::*, NetworkError, Node};
 use anyhow::*;
+use tokio::task;
 
 impl Node {
     /// Broadcast block to connected peers
@@ -99,16 +100,22 @@ impl Node {
         height: Option<u32>,
         is_block_new: bool,
     ) -> Result<(), NetworkError> {
-        let block_struct = match Block::<Transaction<Components>>::deserialize(&block) {
-            Ok(block) => block,
-            Err(error) => {
-                error!(
-                    "Failed to deserialize received block from {}: {}",
-                    remote_address, error
-                );
-                return Err(error.into());
-            }
-        };
+        let (block, block_struct) = task::spawn_blocking(move || {
+            let deserialized = match Block::<Transaction<Components>>::deserialize(&block) {
+                Ok(block) => block,
+                Err(error) => {
+                    error!(
+                        "Failed to deserialize received block from {}: {}",
+                        remote_address, error
+                    );
+                    return Err(error);
+                }
+            };
+
+            Ok((block, deserialized))
+        })
+        .await
+        .map_err(|e| NetworkError::Other(e.into()))??;
         let block_struct = <Block<Transaction<Components>> as VMBlock>::serialize(&block_struct)?;
 
         let canon = self.storage.canon().await?;
