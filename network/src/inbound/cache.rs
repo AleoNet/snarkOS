@@ -16,6 +16,8 @@
 
 use crate::Payload;
 
+use snarkvm_dpc::block::BlockHeader;
+
 use circular_queue::CircularQueue;
 use twox_hash::xxh3::hash64;
 
@@ -34,7 +36,7 @@ impl Default for Cache {
 impl Cache {
     pub fn contains(&mut self, payload: &Payload) -> bool {
         let hash = if let Payload::Block(bytes, _) = payload {
-            hash64(bytes)
+            hash64(&bytes[..BlockHeader::size()])
         } else {
             unreachable!("Only blocks are cached for now");
         };
