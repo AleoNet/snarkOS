@@ -17,10 +17,11 @@
 use snarkos_metrics::{
     self as metrics,
     inbound::{self, *},
+    misc,
     outbound,
 };
 
-use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload, Peer};
+use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload, Peer, State};
 
 use super::network::PeerIOHandle;
 
@@ -76,6 +77,21 @@ impl Peer {
                 }
             }
             payload => {
+                // Check if the message hasn't already been processed recently if it's a `Block`.
+                // The node should also reject them while syncing, as it is bound to receive them later.
+                if matches!(payload, Payload::Block(..)) {
+                    metrics::increment_counter!(inbound::BLOCKS);
+
+                    if node.inbound_cache.lock().await.contains(&payload) {
+                        metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
+                        return Ok(());
+                    }
+
+                    if node.state() == State::Syncing {
+                        return Ok(());
+                    }
+                }
+
                 node.route(Message {
                     direction: Direction::Inbound(self.address),
                     payload,

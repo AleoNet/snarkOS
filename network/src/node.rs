@@ -32,7 +32,7 @@ use std::{
     thread,
 };
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{mpsc, Mutex, RwLock},
     task,
     time::sleep,
 };
@@ -60,12 +60,15 @@ pub struct InnerNode {
     pub config: Config,
     /// The inbound handler of this node.
     pub inbound: Inbound,
+    /// The cache of node's inbound messages.
+    pub inbound_cache: Mutex<Cache>,
     /// The list of connected and disconnected peers of this node.
     pub peer_book: PeerBook,
     /// Tracks the known network crawled by this node.
     pub known_network: OnceCell<KnownNetwork>,
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync>>,
+    /// The node's storage.
     pub storage: DynStorage,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
@@ -122,6 +125,7 @@ impl Node {
             config,
             storage,
             inbound: Default::default(),
+            inbound_cache: Default::default(),
             peer_book: PeerBook::spawn(),
             sync: Default::default(),
             known_network: Default::default(),
@@ -172,10 +176,8 @@ impl Node {
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver().await;
         let incoming_task = task::spawn(async move {
-            let mut cache = Cache::default();
-
             loop {
-                if let Err(e) = node_clone.process_incoming_messages(&mut receiver, &mut cache).await {
+                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
                     metrics::increment_counter!(inbound::ALL_FAILURES);
                     error!("Node error: {}", e);
                 } else {

@@ -22,9 +22,9 @@ use tokio::{
     task,
 };
 
-use snarkos_metrics::{self as metrics, connections, inbound, misc, queues};
+use snarkos_metrics::{self as metrics, connections, inbound, queues};
 
-use crate::{errors::NetworkError, message::*, Cache, Node, Receiver, Sender, State};
+use crate::{errors::NetworkError, message::*, Node, Receiver, Sender};
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug)]
@@ -104,11 +104,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn process_incoming_messages(
-        &self,
-        receiver: &mut Receiver,
-        cache: &mut Cache,
-    ) -> Result<(), NetworkError> {
+    pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         metrics::decrement_gauge!(queues::INBOUND, 1.0);
@@ -118,21 +114,6 @@ impl Node {
         } else {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
-
-        // Check if the message hasn't already been processed recently if it's a `Block`.
-        // The node should also reject them while syncing, as it is bound to receive them later.
-        if matches!(payload, Payload::Block(..)) {
-            metrics::increment_counter!(inbound::BLOCKS);
-
-            if cache.contains(&payload) {
-                metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
-                return Ok(());
-            }
-
-            if self.state() == State::Syncing {
-                return Ok(());
-            }
-        }
 
         match payload {
             Payload::Transaction(transaction) => {
