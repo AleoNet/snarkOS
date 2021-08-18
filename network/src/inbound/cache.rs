@@ -28,7 +28,7 @@ pub struct Cache {
 impl Default for Cache {
     fn default() -> Self {
         Self {
-            queue: CircularQueue::with_capacity(16 * 1024),
+            queue: CircularQueue::with_capacity(8 * 1024),
         }
     }
 }
