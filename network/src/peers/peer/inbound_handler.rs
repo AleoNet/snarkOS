@@ -60,6 +60,10 @@ impl Peer {
                 metrics::increment_counter!(PINGS);
                 metrics::increment_counter!(ALL_SUCCESSES);
 
+                // Pongs are sent without going through the outbound handler,
+                // so the outbound metric needs to be incremented here
+                metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
+
                 // Relay the height to the known network.
                 if let Some(known_network) = node.known_network() {
                     let _ = known_network
