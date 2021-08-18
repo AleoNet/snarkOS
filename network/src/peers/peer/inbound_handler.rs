@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_metrics::{self as metrics, inbound::*};
+use snarkos_metrics::{
+    self as metrics,
+    inbound::{self, *},
+    outbound,
+};
 
 use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload, Peer};
 
@@ -52,17 +56,17 @@ impl Peer {
                     self.fail();
                 }
                 metrics::increment_counter!(PONGS);
-                metrics::increment_counter!(ALL_SUCCESSES);
+                metrics::increment_counter!(inbound::ALL_SUCCESSES);
             }
             Payload::Ping(block_height) => {
                 network.write_payload(&Payload::Pong).await?;
                 self.quality.block_height = block_height;
                 metrics::increment_counter!(PINGS);
-                metrics::increment_counter!(ALL_SUCCESSES);
+                metrics::increment_counter!(inbound::ALL_SUCCESSES);
 
                 // Pongs are sent without going through the outbound handler,
                 // so the outbound metric needs to be incremented here
-                metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
+                metrics::increment_counter!(outbound::ALL_SUCCESSES);
 
                 // Relay the height to the known network.
                 if let Some(known_network) = node.known_network() {
