@@ -56,7 +56,7 @@ fn providing_sync_blocks(c: &mut Criterion) {
                 Payload::Sync(hashes) => hashes,
                 Payload::Ping(_) => return,
                 // ignore blocks sent before the sync request
-                Payload::SyncBlock(_) => return,
+                Payload::SyncBlock(..) => return,
                 x => {
                     panic!("unexpected payload: {:?}", x);
                 }
