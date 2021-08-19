@@ -67,10 +67,15 @@ async fn setup_test_data() -> TestData {
                 .get_block_header(&block_1.header.previous_block_hash)
                 .await
                 .unwrap(),
+            &AtomicBool::new(false),
         )
         .unwrap();
     let alternative_block_2_header = miner
-        .find_block(&block_2.transactions, &alternative_block_1_header)
+        .find_block(
+            &block_2.transactions,
+            &alternative_block_1_header,
+            &AtomicBool::new(false),
+        )
         .unwrap();
 
     TestData {
