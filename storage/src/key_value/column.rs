@@ -17,7 +17,7 @@
 use num_enum::TryFromPrimitive;
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, TryFromPrimitive, PartialOrd, Ord)]
 pub enum KeyValueColumn {
     Meta = 0,          // MISC Values
     BlockHeader,       // Block hash -> block header

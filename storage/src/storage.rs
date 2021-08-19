@@ -19,7 +19,16 @@ use std::sync::Arc;
 
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
-use crate::{Digest, FixMode, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, TransactionLocation};
+use crate::{
+    Digest,
+    FixMode,
+    SerialBlock,
+    SerialBlockHeader,
+    SerialRecord,
+    SerialTransaction,
+    TransactionLocation,
+    ValidatorError,
+};
 
 /// Current state of a block in storage
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -181,7 +190,7 @@ pub trait Storage: Send + Sync {
     async fn get_block_hashes(&self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>>;
 
     /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
-    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> bool;
+    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError>;
 
     /// Stores the given key+value pair in the given column.
     #[cfg(feature = "test")]

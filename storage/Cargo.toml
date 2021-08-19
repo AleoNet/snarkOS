@@ -64,6 +64,9 @@ version = "1.6"
 [dependencies.num_enum]
 version = "0.5"
 
+[dependencies.parking_lot]
+version = "0.11"
+
 [dependencies.rand]
 version = "0.8"
 

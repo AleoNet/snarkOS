@@ -272,7 +272,7 @@ mod consensus_sidechain {
         assert!(consensus2_sync_blocks.is_empty());
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.storage.validate(None, FixMode::Nothing).await);
+        assert!(consensus1.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 
     #[tokio::test]
@@ -348,7 +348,7 @@ mod consensus_sidechain {
         assert!(consensus2_sync_blocks.is_empty());
 
         // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.storage.validate(None, FixMode::Nothing).await);
+        assert!(consensus1.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 
     #[tokio::test]
@@ -395,7 +395,7 @@ mod consensus_sidechain {
             .unwrap();
         assert!(sync_blocks.is_empty());
 
-        assert!(consensus2.storage.validate(None, FixMode::Nothing).await);
+        assert!(consensus2.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 
     #[tokio::test]
@@ -420,6 +420,6 @@ mod consensus_sidechain {
         assert_eq!(consensus.storage.canon().await.unwrap().block_height, 20);
 
         // Verify the integrity of the block storage.
-        assert!(consensus.storage.validate(None, FixMode::Nothing).await);
+        assert!(consensus.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 }

@@ -28,6 +28,7 @@ use crate::{
     SerialRecord,
     Storage,
     TransactionLocation,
+    ValidatorError,
 };
 use anyhow::*;
 
@@ -156,7 +157,7 @@ impl Storage for KeyValueStore {
         self.send(Message::GetBlockHashes(limit, filter)).await
     }
 
-    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> bool {
+    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {
         self.send(Message::Validate(limit, fix_mode)).await
     }
 

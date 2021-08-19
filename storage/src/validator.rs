@@ -29,22 +29,14 @@ use self::LookupKind::*;
 use snarkvm_dpc::{BlockHeader, BlockHeaderHash, Op};
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
+use parking_lot::Mutex;
 use tokio::{
     sync::{mpsc, oneshot},
     task,
 };
 use tracing::*;
 
-use std::{
-    collections::HashSet,
-    convert::TryInto,
-    io::Cursor,
-    mem,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{collections::HashSet, convert::TryInto, io::Cursor, mem, sync::Arc};
 
 macro_rules! check_for_superfluous_tx_components {
     ($fn_name:ident, $component_name:expr, $component_col:expr) => {
@@ -53,7 +45,7 @@ macro_rules! check_for_superfluous_tx_components {
             lookup_sender: &mpsc::UnboundedSender<LookupRequest>,
             db_ops: &mut Vec<Op>,
             fix_mode: FixMode,
-            is_storage_valid: &AtomicBool,
+            errors: &mut HashSet<ValidatorError>,
         ) {
             let storage_column = match db_lookup($component_col, GetColumn, lookup_sender).await {
                 LookupResponse::Column(col) => {
@@ -68,7 +60,7 @@ macro_rules! check_for_superfluous_tx_components {
                 }
                 _ => {
                     error!("Couldn't obtain the column with tx {}s", $component_name);
-                    is_storage_valid.store(false, Ordering::SeqCst);
+                    errors.insert(ValidatorError::ColumnMissing($component_col));
 
                     return;
                 }
@@ -90,7 +82,7 @@ macro_rules! check_for_superfluous_tx_components {
                             "The column with tx {}s has incoherent indices! {} is followed by {}",
                             $component_name, idx1, idx2
                         );
-                        is_storage_valid.store(false, Ordering::SeqCst);
+                        errors.insert(ValidatorError::IncontiguousIndex($component_col, idx1, idx2));
                     }
                 }
             }
@@ -124,7 +116,10 @@ macro_rules! check_for_superfluous_tx_components {
                         });
                     }
                 } else {
-                    is_storage_valid.store(false, Ordering::SeqCst);
+                    errors.insert(ValidatorError::SuperfluousTxComponents(
+                        $component_col,
+                        superfluous_items.len(),
+                    ));
                 }
             }
         }
@@ -178,6 +173,30 @@ pub enum ValidatorAction {
     QueueDatabaseOp(Op),
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ValidatorError {
+    /// The block height could not be retrieved from storage.
+    BlockHeightMissing,
+    /// The list of parent block's child hashes did not include the expected child hash.
+    ChildHashMismatch(String, String), // parent hash, child hash
+    /// A column could not be retrieved from storage.
+    ColumnMissing(KeyValueColumn),
+    /// The storage transaction with validator fixed couldn't be committed.
+    FixCommitFailed,
+    /// A storage index that should be contiguous had a "gap"; the 2 `u32` values represent its range.
+    IncontiguousIndex(KeyValueColumn, u32, u32),
+    /// The transaction's location was not found among the canon blocks.
+    NonCanonTxLocation(String, String), // tx id, block hash
+    /// The parent hash indicated by the block header is not equal to the one stored at the previous height.
+    ParentHashMismatch(String, String), // hash indicated by header, hash indicated by height
+    /// An key expected to be present in storage was not found; its value is hex-encoded in the error.
+    StorageEntryMissing(KeyValueColumn, String),
+    /// Transaction components were found in storage, even though they were not present within canon blocks.
+    SuperfluousTxComponents(KeyValueColumn, usize), // the number of superfluous components of the given type
+    /// The current block height is not the one indicated by a transaction location for the current block.
+    TxLocationMismatch(u32, u32), // current height, the height of the block indicated by the tx locator
+}
+
 check_for_superfluous_tx_components!(check_for_superfluous_tx_memos, "memorandum", Memo);
 
 check_for_superfluous_tx_components!(check_for_superfluous_tx_digests, "digest", DigestIndex);
@@ -188,7 +207,7 @@ check_for_superfluous_tx_components!(check_for_superfluous_tx_cms, "commitment",
 
 #[async_trait::async_trait]
 pub trait Validator {
-    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> (bool, Self);
+    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> (Vec<ValidatorError>, Self);
 }
 
 #[async_trait::async_trait]
@@ -197,8 +216,9 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
     /// at the current block height and goes down until the genesis block, making sure that the block-related data
     /// stored in the database is coherent. The optional limit restricts the number of blocks to check, as
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
-    /// the validation process should also attempt to fix the issues it encounters.
-    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> (bool, Self) {
+    /// the validation process should also attempt to fix the issues it encounters. The validator temporarily takes
+    /// ownership of the storage, and later returns it in a tuple, together with a vector of errors it has detected
+    async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> (Vec<ValidatorError>, Self) {
         if limit.is_some() && [FixMode::SuperfluousTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
@@ -209,7 +229,7 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
 
         if limit == Some(0) {
             info!("The limit of blocks to validate is 0; nothing to check.");
-            return (true, self);
+            return (vec![], self);
         }
 
         let current_height = if let Ok(Some(height)) = self.get(Meta, KEY_BEST_BLOCK_NUMBER.as_bytes()) {
@@ -220,12 +240,12 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
             )
         } else {
             error!("Can't obtain block height from the storage!");
-            return (false, self);
+            return (vec![ValidatorError::BlockHeightMissing], self);
         };
 
         if current_height == 0 {
             info!("Only the genesis block is currently available; nothing to check.");
-            return (true, self);
+            return (vec![], self);
         }
 
         debug!("The block height is {}", current_height);
@@ -291,22 +311,16 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
             (db_ops, tx_memos, tx_sns, tx_cms, tx_digests)
         });
 
-        let is_valid = Arc::new(AtomicBool::new(true));
+        // The collection of errors detected by the validator.
+        let errors: Arc<Mutex<HashSet<ValidatorError>>> = Default::default();
 
         (0..=to_process).into_iter().for_each(|i| {
             let lookup_sender2 = lookup_sender.clone();
             let component_sender2 = component_sender.clone();
-            let is_valid2 = is_valid.clone();
+            let errors2 = errors.clone();
 
             task::spawn(async move {
-                validate_block(
-                    current_height - i,
-                    lookup_sender2,
-                    component_sender2,
-                    fix_mode,
-                    is_valid2,
-                )
-                .await
+                validate_block(current_height - i, lookup_sender2, component_sender2, fix_mode, errors2).await
             });
         });
 
@@ -315,12 +329,14 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
 
         let (mut db_ops, tx_memos, tx_sns, tx_cms, tx_digests) = component_task_handle.await.unwrap(); // can't recover if it fails
 
+        let mut errors = Arc::try_unwrap(errors).unwrap().into_inner();
+
         // Superfluous items can only be removed after a full storage pass.
         if limit.is_none() {
-            check_for_superfluous_tx_memos(&tx_memos, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
-            check_for_superfluous_tx_digests(&tx_digests, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
-            check_for_superfluous_tx_sns(&tx_sns, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
-            check_for_superfluous_tx_cms(&tx_cms, &lookup_sender, &mut db_ops, fix_mode, &is_valid).await;
+            check_for_superfluous_tx_memos(&tx_memos, &lookup_sender, &mut db_ops, fix_mode, &mut errors).await;
+            check_for_superfluous_tx_digests(&tx_digests, &lookup_sender, &mut db_ops, fix_mode, &mut errors).await;
+            check_for_superfluous_tx_sns(&tx_sns, &lookup_sender, &mut db_ops, fix_mode, &mut errors).await;
+            check_for_superfluous_tx_cms(&tx_cms, &lookup_sender, &mut db_ops, fix_mode, &mut errors).await;
         }
 
         // Close the lookup request channel, breaking the loop in the task checking the receiver.
@@ -333,20 +349,21 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
 
             storage.begin().unwrap();
             for op in db_ops {
-                if let Err(e) = match op {
-                    Op::Insert { col, key, value } => storage.store(col.try_into().unwrap(), &key, &value),
-                    Op::Delete { col, key } => storage.delete(col.try_into().unwrap(), &key),
-                } {
-                    error!("Couldn't fix a storage issue: {}", e);
+                match op {
+                    Op::Insert { col, key, value } => storage.store(col.try_into().unwrap(), &key, &value).unwrap(),
+                    Op::Delete { col, key } => storage.delete(col.try_into().unwrap(), &key).unwrap(),
                 }
             }
             if let Err(e) = storage.commit() {
                 error!("Couldn't fix the detected storage issues: {}", e);
+                errors.insert(ValidatorError::FixCommitFailed);
                 storage.abort().unwrap();
             }
         }
 
-        let is_valid = is_valid.load(Ordering::SeqCst);
+        let mut errors = errors.into_iter().collect::<Vec<_>>();
+        errors.sort_unstable();
+        let is_valid = errors.is_empty();
 
         if is_valid {
             info!("The storage is valid!");
@@ -354,7 +371,7 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
             error!("The storage is invalid!");
         }
 
-        (is_valid, storage)
+        (errors, storage)
     }
 }
 
@@ -381,13 +398,17 @@ async fn validate_block(
     lookup_sender: mpsc::UnboundedSender<LookupRequest>,
     component_sender: mpsc::UnboundedSender<ValidatorAction>,
     fix_mode: FixMode,
-    is_storage_valid: Arc<AtomicBool>,
+    errors: Arc<Mutex<HashSet<ValidatorError>>>,
 ) {
     let block_hash = match db_lookup(BlockIndex, Get(block_height.to_le_bytes().to_vec()), &lookup_sender).await {
         LookupResponse::Value(Some(block_hash)) => BlockHeaderHash::new(block_hash),
         _ => {
             // Block hash not found; register the failure and attempt to carry on.
-            is_storage_valid.store(false, Ordering::SeqCst);
+            errors.lock().insert(ValidatorError::StorageEntryMissing(
+                BlockIndex,
+                hex::encode(block_height.to_le_bytes()),
+            ));
+            error!("Block at height {} is not stored among canon blocks!", block_height);
             return;
         }
     };
@@ -398,7 +419,10 @@ async fn validate_block(
     let block_header: BlockHeader = match db_lookup(BlockHeader, Get(block_hash.0.to_vec()), &lookup_sender).await {
         LookupResponse::Value(Some(bytes)) => FromBytes::read_le(&*bytes).unwrap(), // TODO: revise new unwraps; consider spawn_blocking()
         _ => {
-            is_storage_valid.store(false, Ordering::SeqCst);
+            errors.lock().insert(ValidatorError::StorageEntryMissing(
+                BlockHeader,
+                hex::encode(&block_hash.0),
+            ));
             error!("The header for block at height {} is missing!", block_height);
             return;
         }
@@ -410,7 +434,7 @@ async fn validate_block(
         &lookup_sender,
         component_sender,
         fix_mode,
-        &is_storage_valid,
+        &errors,
     )
     .await;
 
@@ -428,15 +452,16 @@ async fn validate_block(
     {
         LookupResponse::Value(Some(hash)) => BlockHeaderHash::new(hash),
         _ => {
-            error!("Couldn't find a block at height {}!", block_height - 1);
-            is_storage_valid.store(false, Ordering::SeqCst);
-
+            // This error will be detected individually when analyzing the parent block directly.
             return;
         }
     };
 
     if block_header.previous_block_hash != previous_hash {
-        is_storage_valid.store(false, Ordering::SeqCst);
+        errors.lock().insert(ValidatorError::ParentHashMismatch(
+            hex::encode(&block_header.previous_block_hash.0),
+            hex::encode(&previous_hash.0),
+        ));
         error!(
             "The parent hash of block at height {} doesn't match its child at {}!",
             block_height,
@@ -449,7 +474,10 @@ async fn validate_block(
             let child_hashes: Vec<BlockHeaderHash> = bincode::deserialize(&child_hashes).unwrap();
 
             if !child_hashes.contains(&block_hash) {
-                is_storage_valid.store(false, Ordering::SeqCst);
+                errors.lock().insert(ValidatorError::ChildHashMismatch(
+                    hex::encode(&previous_hash.0),
+                    hex::encode(&block_hash.0),
+                ));
                 error!(
                     "The list of children hash of block at height {} don't contain the child at {}!",
                     block_height - 1,
@@ -458,7 +486,10 @@ async fn validate_block(
             }
         }
         _ => {
-            is_storage_valid.store(false, Ordering::SeqCst);
+            errors.lock().insert(ValidatorError::StorageEntryMissing(
+                ChildHashes,
+                hex::encode(&previous_hash.0),
+            ));
             error!("Can't find the children of block at height {}!", previous_hash);
         }
     }
@@ -471,14 +502,16 @@ async fn validate_block_transactions(
     lookup_sender: &mpsc::UnboundedSender<LookupRequest>,
     component_sender: mpsc::UnboundedSender<ValidatorAction>,
     fix_mode: FixMode,
-    is_storage_valid: &AtomicBool,
+    errors: &Mutex<HashSet<ValidatorError>>,
 ) {
     let block_stored_txs_bytes = match db_lookup(BlockTransactions, Get(block_hash.0.to_vec()), lookup_sender).await {
         LookupResponse::Value(Some(txs)) => txs,
         _ => {
+            errors.lock().insert(ValidatorError::StorageEntryMissing(
+                BlockTransactions,
+                hex::encode(&block_hash.0),
+            ));
             error!("Can't find the transactions stored for block {}", block_hash);
-            is_storage_valid.store(false, Ordering::SeqCst);
-
             return;
         }
     };
@@ -493,11 +526,13 @@ async fn validate_block_transactions(
             let sn = to_bytes_le![sn].unwrap();
             let found = db_lookup(SerialNumber, Exists(sn.clone()), lookup_sender).await;
             if !matches!(found, LookupResponse::Found(true)) {
+                errors
+                    .lock()
+                    .insert(ValidatorError::StorageEntryMissing(SerialNumber, hex::encode(&sn)));
                 error!(
                     "Transaction {} doesn't have an old serial number stored",
                     hex::encode(tx.id)
                 );
-                is_storage_valid.store(false, Ordering::SeqCst);
             }
             component_sender
                 .send(ValidatorAction::RegisterTxComponent(SerialNumber, sn))
@@ -508,11 +543,13 @@ async fn validate_block_transactions(
             let cm = to_bytes_le![cm].unwrap();
             let found = db_lookup(Commitment, Exists(cm.clone()), lookup_sender).await;
             if !matches!(found, LookupResponse::Found(true)) {
+                errors
+                    .lock()
+                    .insert(ValidatorError::StorageEntryMissing(Commitment, hex::encode(&cm)));
                 error!(
                     "Transaction {} doesn't have a new commitment stored",
                     hex::encode(tx.id)
                 );
-                is_storage_valid.store(false, Ordering::SeqCst);
             }
             component_sender
                 .send(ValidatorAction::RegisterTxComponent(Commitment, cm))
@@ -542,7 +579,10 @@ async fn validate_block_transactions(
                 component_sender.send(ValidatorAction::QueueDatabaseOp(db_op1)).unwrap();
                 component_sender.send(ValidatorAction::QueueDatabaseOp(db_op2)).unwrap();
             } else {
-                is_storage_valid.store(false, Ordering::SeqCst);
+                errors.lock().insert(ValidatorError::StorageEntryMissing(
+                    DigestIndex,
+                    hex::encode(&tx_digest),
+                ));
             }
         }
         component_sender
@@ -552,8 +592,10 @@ async fn validate_block_transactions(
         let tx_memo = to_bytes_le![tx.memorandum].unwrap();
         let found = db_lookup(Memo, Exists(tx_memo.clone()), lookup_sender).await;
         if !matches!(found, LookupResponse::Found(true)) {
+            errors
+                .lock()
+                .insert(ValidatorError::StorageEntryMissing(Memo, hex::encode(&tx_memo)));
             error!("Transaction {} doesn't have its memo stored", hex::encode(tx.id));
-            is_storage_valid.store(false, Ordering::SeqCst);
         }
         component_sender
             .send(ValidatorAction::RegisterTxComponent(Memo, tx_memo.to_vec()))
@@ -568,13 +610,15 @@ async fn validate_block_transactions(
                         let block_number = u32::from_le_bytes((&block_number[..]).try_into().unwrap());
 
                         if block_number != block_height {
+                            errors
+                                .lock()
+                                .insert(ValidatorError::TxLocationMismatch(block_height, block_number));
                             error!(
                                 "The block indicated by the location of tx {} doesn't match the current height ({} != {})",
                                 hex::encode(tx.id),
                                 block_number,
                                 block_height,
                             );
-                            is_storage_valid.store(false, Ordering::SeqCst);
                         }
                     }
                     _ => {
@@ -597,14 +641,20 @@ async fn validate_block_transactions(
                             };
                             component_sender.send(ValidatorAction::QueueDatabaseOp(db_op)).unwrap();
                         } else {
-                            is_storage_valid.store(false, Ordering::SeqCst);
+                            errors.lock().insert(ValidatorError::NonCanonTxLocation(
+                                hex::encode(&tx.id),
+                                hex::encode(&tx_location.block_hash),
+                            ));
                         }
                     }
                 }
             }
             _ => {
+                errors.lock().insert(ValidatorError::StorageEntryMissing(
+                    TransactionLookup,
+                    hex::encode(&tx.id),
+                ));
                 error!("Can't get the location of tx {}", hex::encode(tx.id));
-                is_storage_valid.store(false, Ordering::SeqCst);
             }
         }
     }
