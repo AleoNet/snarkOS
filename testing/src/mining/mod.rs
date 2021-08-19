@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use std::sync::atomic::AtomicBool;
+
 use snarkos_consensus::{error::ConsensusError, Consensus, CreateTransactionRequest, MineContext, TransactionResponse};
 use snarkos_storage::{PrivateKey, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
 use snarkvm_dpc::{
@@ -31,7 +33,7 @@ pub async fn mine_block(
 ) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
     let (transactions, coinbase_records) = miner.establish_block(transactions).await?;
 
-    let header = miner.find_block(&transactions, parent_block_header)?;
+    let header = miner.find_block(&transactions, parent_block_header, &AtomicBool::new(false))?;
 
     let block = SerialBlock { header, transactions };
 
