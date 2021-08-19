@@ -24,7 +24,7 @@ use snarkos_testing::{
 };
 use tracing_subscriber::EnvFilter;
 
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::atomic::AtomicBool};
 
 async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     info!("Creating test account");
