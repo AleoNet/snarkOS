@@ -109,9 +109,9 @@ impl Node {
             }
         }
 
-        // Attempt to connect to the default bootnodes of the network if the node has no active
-        // connections.
-        if self.peer_book.get_active_peer_count() == 0 {
+        // Attempt to connect to a few random bootnodes if the node has no active
+        // connections or if it's a bootnode itself.
+        if self.peer_book.get_active_peer_count() == 0 || self.config.is_bootnode() {
             let random_bootnodes = self
                 .config
                 .bootnodes()
