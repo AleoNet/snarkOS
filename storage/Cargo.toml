@@ -25,7 +25,7 @@ test = [ ]
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "57ca319"
+rev = "ef32edc"
 # path = "../../snarkVM"
 features = ["parameters"]
 
