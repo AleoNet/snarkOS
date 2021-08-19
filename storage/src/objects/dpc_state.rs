@@ -128,7 +128,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
             index => {
                 let merkle = self.cm_merkle_tree.load();
                 self.cm_merkle_tree
-                    .store(Arc::new(merkle.rebuild(index - 1, &new_commitments[..])?));
+                    .store(Arc::new(merkle.rebuild(index, &new_commitments[..])?));
             }
         };
 
