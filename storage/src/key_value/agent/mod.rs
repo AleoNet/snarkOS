@@ -43,6 +43,7 @@ use crate::{
     TransactionLocation,
     VMRecord,
     Validator,
+    ValidatorError,
 };
 
 mod block;
@@ -148,16 +149,16 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
         Ok(keys.into_iter().map(|(digest, _)| digest).collect())
     }
 
-    fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> bool {
-        let result = if let Some(inner) = mem::take(&mut self.inner) {
-            let (ret, inner) = futures::executor::block_on(inner.validate(limit, fix_mode));
+    fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {
+        let errors = if let Some(inner) = mem::take(&mut self.inner) {
+            let (errors, inner) = futures::executor::block_on(inner.validate(limit, fix_mode));
             self.inner = Some(inner);
-            ret
+            errors
         } else {
             unreachable!()
         };
 
-        result
+        errors
     }
 
     fn store_init_digest(&mut self, digest: Digest) -> Result<()> {

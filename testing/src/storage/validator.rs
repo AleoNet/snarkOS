@@ -18,6 +18,7 @@ use crate::sync::{create_test_consensus, TestBlocks};
 use snarkos_storage::{
     key_value::{KeyValueColumn, KEY_CURR_CM_INDEX, KEY_CURR_MEMO_INDEX, KEY_CURR_SN_INDEX},
     FixMode,
+    ValidatorError,
 };
 
 use rand::prelude::*;
@@ -31,7 +32,7 @@ async fn valid_storage_validates() {
         consensus.receive_block(block).await;
     }
 
-    assert!(consensus.storage.validate(None, FixMode::Nothing).await);
+    assert!(consensus.storage.validate(None, FixMode::Nothing).await.is_empty());
 }
 
 #[tokio::test]
@@ -52,7 +53,13 @@ async fn validator_vs_a_missing_serial_number() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::SerialNumber,
+        hex::encode(&random_sn)
+    )));
     // Currently unsupported.
     // assert!(consensus.storage.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
@@ -75,7 +82,13 @@ async fn validator_vs_a_missing_commitment() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::Commitment,
+        hex::encode(&random_cm)
+    )));
     // Currently unsupported
     // assert!(consensus.storage.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
@@ -98,7 +111,13 @@ async fn validator_vs_a_missing_memorandum() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::Memo,
+        hex::encode(&random_memo)
+    )));
     // Currently unsupported
     // assert!(consensus.storage.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
@@ -121,12 +140,19 @@ async fn validator_vs_a_missing_digest() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::DigestIndex,
+        hex::encode(&random_digest)
+    )));
     assert!(
         consensus
             .storage
             .validate(None, FixMode::MissingTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
@@ -155,12 +181,19 @@ async fn validator_vs_a_superfluous_serial_number() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(
+        KeyValueColumn::SerialNumber,
+        1
+    )));
+
     assert!(
         consensus
             .storage
             .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
@@ -189,12 +222,16 @@ async fn validator_vs_a_superfluous_commitment() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(KeyValueColumn::Commitment, 1)));
+
     assert!(
         consensus
             .storage
             .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
@@ -223,12 +260,16 @@ async fn validator_vs_a_superfluous_memorandum() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(KeyValueColumn::Memo, 1)));
+
     assert!(
         consensus
             .storage
             .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
@@ -256,11 +297,15 @@ async fn validator_vs_a_superfluous_digest() {
         .await
         .unwrap();
 
-    assert!(!consensus.storage.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(KeyValueColumn::DigestIndex, 1)));
+
     assert!(
         consensus
             .storage
             .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
