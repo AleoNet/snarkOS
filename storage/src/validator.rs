@@ -33,10 +33,11 @@ use parking_lot::Mutex;
 use tokio::{
     sync::{mpsc, oneshot},
     task,
+    time::sleep,
 };
 use tracing::*;
 
-use std::{collections::HashSet, convert::TryInto, io::Cursor, mem, sync::Arc};
+use std::{collections::HashSet, convert::TryInto, io::Cursor, mem, sync::Arc, time::Duration};
 
 macro_rules! check_for_superfluous_tx_components {
     ($fn_name:ident, $component_name:expr, $component_col:expr) => {
@@ -329,6 +330,8 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
 
         let (mut db_ops, tx_memos, tx_sns, tx_cms, tx_digests) = component_task_handle.await.unwrap(); // can't recover if it fails
 
+        // A safety margin allowing all the strong Arc pointers to get dropped.
+        sleep(Duration::from_millis(100)).await;
         let mut errors = Arc::try_unwrap(errors).unwrap().into_inner();
 
         // Superfluous items can only be removed after a full storage pass.
