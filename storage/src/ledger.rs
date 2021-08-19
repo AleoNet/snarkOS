@@ -183,7 +183,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
                 // the secondary instance requires it.
                 if update_merkle_tree {
                     // Update the Merkle tree of the secondary instance.
-                    self.rebuild_merkle_tree(vec![])?;
+                    self.rebuild_merkle_tree()?;
                 }
             }
         }

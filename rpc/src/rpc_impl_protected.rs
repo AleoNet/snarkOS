@@ -642,7 +642,9 @@ impl<S: Storage + Send + Sync + 'static> ProtectedRpcFunctions for RpcImpl<S> {
         // Fetch the latest digest.
         let storage = &self.storage;
         let primary_height = self.sync_handler()?.current_block_height();
-        storage.catch_up_secondary(false, primary_height)?;
+        storage.catch_up_secondary(true, primary_height)?;
+        storage.rebuild_merkle_tree()?;
+
         let latest_digest = self.storage.latest_digest()?;
 
         // Generate the Merkle path for each commitment to the latest digest.

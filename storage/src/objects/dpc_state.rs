@@ -16,6 +16,7 @@
 
 use crate::*;
 use snarkvm::{
+    algorithms::merkle_tree::MerkleTree,
     dpc::Parameters,
     ledger::{DatabaseTransaction, Op, Storage, StorageError},
     utilities::{FromBytes, ToBytes},
@@ -75,7 +76,28 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
     }
 
     /// Build a new commitment merkle tree from the stored commitments
-    pub fn rebuild_merkle_tree(&self, additional_cms: Vec<(C::RecordCommitment, usize)>) -> Result<(), StorageError> {
+    pub fn rebuild_merkle_tree(&self) -> Result<(), StorageError> {
+        let mut cm_and_indices = vec![];
+        for (commitment_key, index_value) in self.storage.get_col(COL_COMMITMENT)? {
+            let commitment: C::RecordCommitment = FromBytes::read_le(&commitment_key[..])?;
+            let index = bytes_to_u32(&index_value) as usize;
+
+            cm_and_indices.push((commitment, index));
+        }
+
+        cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
+
+        let commitments = cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
+        let parameters = Arc::new(C::record_commitment_tree_parameters().clone());
+
+        self.cm_merkle_tree
+            .store(Arc::new(MerkleTree::new(parameters, &commitments[..])?));
+
+        Ok(())
+    }
+
+    /// Build a new commitment merkle tree with new commitments
+    pub fn add_new_commitments(&self, additional_cms: Vec<(C::RecordCommitment, usize)>) -> Result<(), StorageError> {
         let mut new_cm_and_indices = additional_cms;
 
         let mut old_cm_and_indices = vec![];
@@ -91,17 +113,31 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
 
         let new_commitments = new_cm_and_indices.into_iter().map(|(cm, _)| cm).collect::<Vec<_>>();
 
+        // Rebuild the merkle tree if the number of hashed leaves is different from the number of commitments.
         let merkle = self.cm_merkle_tree.load();
-        self.cm_merkle_tree.store(Arc::new(
-            merkle.rebuild(old_cm_and_indices.len(), &new_commitments[..])?,
-        ));
+        if merkle.hashed_leaves().len() != old_cm_and_indices.len() {
+            self.rebuild_merkle_tree()?;
+        }
+
+        match old_cm_and_indices.len() {
+            0 => {
+                let parameters = Arc::new(C::record_commitment_tree_parameters().clone());
+                self.cm_merkle_tree
+                    .store(Arc::new(MerkleTree::new(parameters, &new_commitments[..])?));
+            }
+            index => {
+                let merkle = self.cm_merkle_tree.load();
+                self.cm_merkle_tree
+                    .store(Arc::new(merkle.rebuild(index - 1, &new_commitments[..])?));
+            }
+        };
 
         Ok(())
     }
 
     /// Rebuild the stored merkle tree with the current stored commitments
     pub fn update_merkle_tree(&self, new_best_block_number: u32) -> Result<(), StorageError> {
-        self.rebuild_merkle_tree(vec![])?;
+        self.rebuild_merkle_tree()?;
         let new_digest = self.cm_merkle_tree.load().root().to_bytes_le()?;
 
         let mut database_transaction = DatabaseTransaction::new();

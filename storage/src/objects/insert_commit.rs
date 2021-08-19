@@ -268,7 +268,7 @@ impl<C: Parameters, S: Storage> Ledger<C, S> {
         }
 
         // Rebuild the new commitment merkle tree
-        self.rebuild_merkle_tree(transaction_cms)?;
+        self.add_new_commitments(transaction_cms)?;
         let tree = self.cm_merkle_tree.load();
         let new_digest = tree.root();
 

@@ -19,7 +19,7 @@ edition = "2018"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "57ca319"
+rev = "ef32edc"
 # path = "../../snarkVM"
 features = ["curves", "parameters"]
 
