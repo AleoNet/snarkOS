@@ -21,7 +21,7 @@ use snarkos_testing::{
 };
 
 use snarkvm_utilities::ToBytes;
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::atomic::AtomicBool};
 
 async fn setup_test_data() -> TestData {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
