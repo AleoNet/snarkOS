@@ -83,12 +83,12 @@ impl Peer {
                 if matches!(payload, Payload::Block(..)) {
                     metrics::increment_counter!(inbound::BLOCKS);
 
-                    if node.inbound_cache.contains(&payload).await {
-                        metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
+                    if node.state() == State::Syncing {
                         return Ok(());
                     }
 
-                    if node.state() == State::Syncing {
+                    if node.inbound_cache.contains(&payload).await {
+                        metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
                         return Ok(());
                     }
                 }
