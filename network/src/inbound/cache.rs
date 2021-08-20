@@ -19,32 +19,35 @@ use crate::Payload;
 use snarkvm_dpc::block::BlockHeader;
 
 use circular_queue::CircularQueue;
+use tokio::sync::Mutex;
 use twox_hash::xxh3::hash64;
 
 pub struct Cache {
-    queue: CircularQueue<u64>,
+    queue: Mutex<CircularQueue<u64>>,
 }
 
 impl Default for Cache {
     fn default() -> Self {
         Self {
-            queue: CircularQueue::with_capacity(8 * 1024),
+            queue: Mutex::new(CircularQueue::with_capacity(8 * 1024)),
         }
     }
 }
 
 impl Cache {
-    pub fn contains(&mut self, payload: &Payload) -> bool {
+    pub async fn contains(&self, payload: &Payload) -> bool {
         let hash = if let Payload::Block(bytes, _) = payload {
             hash64(&bytes[..BlockHeader::size()])
         } else {
             unreachable!("Only blocks are cached for now");
         };
 
-        if self.queue.iter().any(|&e| e == hash) {
+        let mut locked_queue = self.queue.lock().await;
+
+        if locked_queue.iter().any(|&e| e == hash) {
             true
         } else {
-            self.queue.push(hash);
+            locked_queue.push(hash);
             false
         }
     }
