@@ -400,7 +400,6 @@ impl SyncMaster {
             }
         }
 
-        self.node.finished_syncing_blocks();
         Ok(())
     }
 }
