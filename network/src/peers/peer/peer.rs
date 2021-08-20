@@ -131,6 +131,11 @@ impl Peer {
         let (sender, mut read_receiver) = mpsc::channel::<Result<Vec<u8>, NetworkError>>(8);
         tokio::spawn(async move {
             loop {
+                // Start the clock on the RTT.
+                //
+                // Syscalls are too slow for this purpose, it's likely best to keep track of this
+                // on the node level with a task.
+
                 if sender
                     .send(reader.read_raw_payload().await.map(|x| x.to_vec()))
                     .await

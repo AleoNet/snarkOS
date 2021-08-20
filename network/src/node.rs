@@ -30,6 +30,7 @@ use std::{
         Arc,
     },
     thread,
+    time::Instant,
 };
 use tokio::{
     sync::{mpsc, Mutex, RwLock},
@@ -80,6 +81,9 @@ pub struct InnerNode {
     shutting_down: AtomicBool,
     pub(crate) master_dispatch: RwLock<Option<mpsc::Sender<SyncInbound>>>,
     pub terminator: Arc<AtomicBool>,
+
+    // Atomic?
+    pub clock: RwLock<Instant>,
 }
 
 /// A core data structure for operating the networking stack of this node.
@@ -136,6 +140,7 @@ impl Node {
             shutting_down: Default::default(),
             master_dispatch: RwLock::new(None),
             terminator: Arc::new(AtomicBool::new(false)),
+            clock: RwLock::new(Instant::now()),
         }));
 
         if node.config.is_crawler() {
@@ -175,6 +180,42 @@ impl Node {
     }
 
     pub async fn start_services(&self) {
+        let node_clone = self.clone();
+        let clock_task = task::spawn(async move {
+            // Reset the time before the loop starts.
+            {
+                let mut time_g = node_clone.clock.write().await;
+                *time_g = Instant::now();
+            }
+
+            let mut count = 0;
+
+            loop {
+                // Reset the clock with a syscall every 10 cycles.
+                if count == 9 {
+                    {
+                        let mut time_g = node_clone.clock.write().await;
+                        *time_g = Instant::now();
+                    }
+
+                    count = 0;
+                } else {
+                    let interval = std::time::Duration::from_millis(10);
+
+                    sleep(interval).await;
+
+                    // Scope the write lock.
+                    {
+                        let mut time_g = node_clone.clock.write().await;
+                        *time_g = time_g.checked_add(interval).unwrap();
+                    }
+
+                    count += 1;
+                }
+            }
+        });
+        self.register_task(clock_task);
+
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver().await;
         let incoming_task = task::spawn(async move {
