@@ -32,11 +32,13 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body,
 };
+use hyper_tungstenite::{is_upgrade_request, tungstenite::Message, upgrade};
 use json_rpc_types as jrt;
 use jsonrpc_core::Params;
 use serde::Serialize;
 use tokio::task;
 
+use futures::{SinkExt, StreamExt};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
 const METHODS_EXPECTING_PARAMS: [&str; 15] = [
@@ -100,212 +102,251 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
         .map(|h| h.to_str().unwrap_or("").to_owned());
     let meta = Meta { auth };
 
-    // Ready the body of the request
-    let mut body = req.into_body();
-    let data = match body.data().await {
-        Some(Ok(data)) => data,
-        err_or_none => {
-            let mut error = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't read the RPC body");
-            if let Some(Err(err)) = err_or_none {
-                error.data = Some(err.to_string());
+    // if the request is a websocket request, then upgrade it
+    if is_upgrade_request(&req) {
+        let (response, stream) = hyper_tungstenite::upgrade(req, None).unwrap();
+
+        tokio::spawn(async move {
+            let mut stream = stream.await.unwrap();
+            stream.send(Message::text("Connected to publisher.")).await;
+
+            // Get transaction id to subscribe to.
+            let transaction_id_message = stream.next().await.unwrap().unwrap();
+            println!("transaction id: {}", transaction_id_message);
+
+            let transaction_id = transaction_id_message.into_text().unwrap();
+
+            // Wait for transaction to be mined.
+            let required_block_confirmations = 1;
+
+            let mut block_height = rpc.get_block_count().unwrap();
+
+            let transaction_info = rpc.get_transaction_info(transaction_id.clone()).unwrap();
+            let transaction_block_number = transaction_info.transaction_metadata.block_number.unwrap();
+
+            while block_height - required_block_confirmations < transaction_block_number {
+                // Wait for 5 second buffer.
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+                block_height = rpc.get_block_count().unwrap();
             }
 
-            let resp = jrt::Response::<(), String>::error(jrt::Version::V2, error, None);
-            let body = serde_json::to_vec(&resp).unwrap_or_default();
+            stream
+                .send(Message::text(format!["Transaction {} Confirmed!", transaction_id]))
+                .await;
 
-            return Ok(hyper::Response::new(body.into()));
-        }
-    };
+            stream.send(Message::Close(None)).await;
+        });
 
-    // Deserialize the JSON-RPC request.
-    let req: jrt::Request<Params> = match serde_json::from_slice(&data) {
-        Ok(req) => req,
-        Err(_) => {
-            let resp = jrt::Response::<(), ()>::error(
-                jrt::Version::V2,
-                jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body"),
-                None,
-            );
-            let body = serde_json::to_vec(&resp).unwrap_or_default();
+        Ok(response)
+    } else {
+        // Ready the body of the request
+        let mut body = req.into_body();
+        let data = match body.data().await {
+            Some(Ok(data)) => data,
+            err_or_none => {
+                let mut error = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't read the RPC body");
+                if let Some(Err(err)) = err_or_none {
+                    error.data = Some(err.to_string());
+                }
 
-            return Ok(hyper::Response::new(body.into()));
-        }
-    };
+                let resp = jrt::Response::<(), String>::error(jrt::Version::V2, error, None);
+                let body = serde_json::to_vec(&resp).unwrap_or_default();
 
-    // Read the request params.
-    let mut params = match read_params(&req) {
-        Ok(params) => params,
-        Err(err) => {
-            let resp = jrt::Response::<(), ()>::error(jrt::Version::V2, err, req.id.clone());
-            let body = serde_json::to_vec(&resp).unwrap_or_default();
+                return Ok(hyper::Response::new(body.into()));
+            }
+        };
 
-            return Ok(hyper::Response::new(body.into()));
-        }
-    };
+        // Deserialize the JSON-RPC request.
+        let req: jrt::Request<Params> = match serde_json::from_slice(&data) {
+            Ok(req) => req,
+            Err(_) => {
+                let resp = jrt::Response::<(), ()>::error(
+                    jrt::Version::V2,
+                    jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body"),
+                    None,
+                );
+                let body = serde_json::to_vec(&resp).unwrap_or_default();
 
-    // Handle the request method.
-    let response = match &*req.method {
-        // public
-        "getblock" => {
-            let result = rpc
-                .get_block(params[0].as_str().unwrap_or("").into())
-                .map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getblockcount" => {
-            let result = rpc.get_block_count().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getbestblockhash" => {
-            let result = rpc.get_best_block_hash().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getblockhash" => match serde_json::from_value::<u32>(params.remove(0)) {
-            Ok(height) => {
-                let result = rpc.get_block_hash(height).map_err(convert_crate_err);
+                return Ok(hyper::Response::new(body.into()));
+            }
+        };
+
+        // Read the request params.
+        let mut params = match read_params(&req) {
+            Ok(params) => params,
+            Err(err) => {
+                let resp = jrt::Response::<(), ()>::error(jrt::Version::V2, err, req.id.clone());
+                let body = serde_json::to_vec(&resp).unwrap_or_default();
+
+                return Ok(hyper::Response::new(body.into()));
+            }
+        };
+
+        // Handle the request method.
+        let response = match &*req.method {
+            // public
+            "getblock" => {
+                let result = rpc
+                    .get_block(params[0].as_str().unwrap_or("").into())
+                    .map_err(convert_crate_err);
                 result_to_response(&req, result)
             }
-            Err(_) => {
-                let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
+            "getblockcount" => {
+                let result = rpc.get_block_count().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getbestblockhash" => {
+                let result = rpc.get_best_block_hash().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getblockhash" => match serde_json::from_value::<u32>(params.remove(0)) {
+                Ok(height) => {
+                    let result = rpc.get_block_hash(height).map_err(convert_crate_err);
+                    result_to_response(&req, result)
+                }
+                Err(_) => {
+                    let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
+                    jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                }
+            },
+            "getrawtransaction" => {
+                let result = rpc
+                    .get_raw_transaction(params[0].as_str().unwrap_or("").into())
+                    .map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "gettransactioninfo" => {
+                let result = rpc
+                    .get_transaction_info(params[0].as_str().unwrap_or("").into())
+                    .map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "decoderawtransaction" => {
+                let result = rpc
+                    .decode_raw_transaction(params[0].as_str().unwrap_or("").into())
+                    .map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "sendtransaction" => {
+                let result = rpc
+                    .send_raw_transaction(params[0].as_str().unwrap_or("").into())
+                    .map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "validaterawtransaction" => {
+                let result = rpc
+                    .validate_raw_transaction(params[0].as_str().unwrap_or("").into())
+                    .map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getconnectioncount" => {
+                let result = rpc.get_connection_count().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getpeerinfo" => {
+                let result = rpc.get_peer_info().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getnodeinfo" => {
+                let result = rpc.get_node_info().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getnodestats" => {
+                let result = rpc.get_node_stats().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getblocktemplate" => {
+                let result = rpc.get_block_template().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            "getnetworkgraph" => {
+                let result = rpc.get_network_graph().map_err(convert_crate_err);
+                result_to_response(&req, result)
+            }
+            // private
+            "createaccount" => {
+                let result = rpc
+                    .create_account_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "createrawtransaction" => {
+                let result = rpc
+                    .create_raw_transaction_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "createtransactionauthorization" => {
+                let result = rpc
+                    .create_transaction_authorization_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "createtransaction" => {
+                let result = rpc
+                    .create_transaction_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "getrecordcommitments" => {
+                let result = rpc
+                    .get_record_commitments_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "getrawrecord" => {
+                let result = rpc
+                    .get_raw_record_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "decryptrecord" => {
+                let result = rpc
+                    .decrypt_record_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "disconnect" => {
+                let result = rpc
+                    .disconnect_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "connect" => {
+                let result = rpc
+                    .connect_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            "ledgercommitmentproofs" => {
+                let result = rpc
+                    .ledger_commitment_proofs_protected(Params::Array(params), meta)
+                    .await
+                    .map_err(convert_core_err);
+                result_to_response(&req, result)
+            }
+            _ => {
+                let err = jrt::Error::from_code(jrt::ErrorCode::MethodNotFound);
                 jrt::Response::error(jrt::Version::V2, err, req.id.clone())
             }
-        },
-        "getrawtransaction" => {
-            let result = rpc
-                .get_raw_transaction(params[0].as_str().unwrap_or("").into())
-                .map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "gettransactioninfo" => {
-            let result = rpc
-                .get_transaction_info(params[0].as_str().unwrap_or("").into())
-                .map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "decoderawtransaction" => {
-            let result = rpc
-                .decode_raw_transaction(params[0].as_str().unwrap_or("").into())
-                .map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "sendtransaction" => {
-            let result = rpc
-                .send_raw_transaction(params[0].as_str().unwrap_or("").into())
-                .map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "validaterawtransaction" => {
-            let result = rpc
-                .validate_raw_transaction(params[0].as_str().unwrap_or("").into())
-                .map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getconnectioncount" => {
-            let result = rpc.get_connection_count().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getpeerinfo" => {
-            let result = rpc.get_peer_info().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getnodeinfo" => {
-            let result = rpc.get_node_info().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getnodestats" => {
-            let result = rpc.get_node_stats().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getblocktemplate" => {
-            let result = rpc.get_block_template().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getnetworkgraph" => {
-            let result = rpc.get_network_graph().map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        // private
-        "createaccount" => {
-            let result = rpc
-                .create_account_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "createrawtransaction" => {
-            let result = rpc
-                .create_raw_transaction_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "createtransactionauthorization" => {
-            let result = rpc
-                .create_transaction_authorization_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "createtransaction" => {
-            let result = rpc
-                .create_transaction_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "getrecordcommitments" => {
-            let result = rpc
-                .get_record_commitments_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "getrawrecord" => {
-            let result = rpc
-                .get_raw_record_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "decryptrecord" => {
-            let result = rpc
-                .decrypt_record_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "disconnect" => {
-            let result = rpc
-                .disconnect_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "connect" => {
-            let result = rpc
-                .connect_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        "ledgercommitmentproofs" => {
-            let result = rpc
-                .ledger_commitment_proofs_protected(Params::Array(params), meta)
-                .await
-                .map_err(convert_core_err);
-            result_to_response(&req, result)
-        }
-        _ => {
-            let err = jrt::Error::from_code(jrt::ErrorCode::MethodNotFound);
-            jrt::Response::error(jrt::Version::V2, err, req.id.clone())
-        }
-    };
+        };
 
-    // Serialize the response object.
-    let body = serde_json::to_vec(&response).unwrap_or_default();
+        // Serialize the response object.
+        let body = serde_json::to_vec(&response).unwrap_or_default();
 
-    // Send the HTTP response.
-    Ok(hyper::Response::new(body.into()))
+        // Send the HTTP response.
+        Ok(hyper::Response::new(body.into()))
+    }
 }
 
 /// Ensures that the params are a non-empty (this assumption is taken advantage of later) array and returns them.

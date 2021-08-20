@@ -54,6 +54,9 @@ version = "0.4.2"
 version = "0.14"
 features = [ "http1", "runtime", "server" ]
 
+[dependencies.hyper-tungstenite]
+version = "0.3.3"
+
 [dependencies.itertools]
 version = "0.10.0"
 
