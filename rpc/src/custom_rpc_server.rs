@@ -39,7 +39,7 @@ use tokio::task;
 
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
-const METHODS_EXPECTING_PARAMS: [&str; 15] = [
+const METHODS_EXPECTING_PARAMS: [&str; 14] = [
     // public
     "getblock",
     "getblockhash",
@@ -56,6 +56,10 @@ const METHODS_EXPECTING_PARAMS: [&str; 15] = [
     "decryptrecord",
     "disconnect",
     "connect",
+];
+
+const METHODS_WITH_OPTIONAL_PARAMS: [&str; 1] = [
+    // private
     "ledgercommitmentproofs",
 ];
 
@@ -315,6 +319,11 @@ fn read_params(req: &jrt::Request<Params>) -> Result<Vec<serde_json::Value>, jrt
             Some(Params::Array(arr)) if !arr.is_empty() => Ok(arr.clone()),
             Some(_) => Err(jrt::Error::from_code(jrt::ErrorCode::InvalidParams)),
             None => Err(jrt::Error::from_code(jrt::ErrorCode::InvalidParams)),
+        }
+    } else if METHODS_WITH_OPTIONAL_PARAMS.contains(&&*req.method) {
+        match &req.params {
+            Some(Params::Array(arr)) => (Ok(arr.clone())),
+            _ => Ok(vec![]),
         }
     } else {
         Ok(vec![]) // unused in methods other than METHODS_EXPECTING_PARAMS

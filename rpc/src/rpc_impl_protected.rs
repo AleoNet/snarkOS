@@ -255,20 +255,24 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
     pub async fn ledger_commitment_proofs_protected(self, params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
         self.validate_auth(meta)?;
 
-        let value = match params {
+        let values = match params {
             Params::Array(arr) => arr,
             _ => return Err(JsonRPCError::invalid_request()),
         };
 
-        let commitments: Vec<<Testnet1Parameters as Parameters>::RecordCommitment> = value
-            .into_iter()
-            .map(|value| {
-                <Testnet1Parameters as Parameters>::RecordCommitment::from_bytes_le(
-                    &hex::decode(serde_json::from_value::<String>(value).unwrap()).unwrap(),
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+        let mut commitments: Vec<<Testnet1Parameters as Parameters>::RecordCommitment> = Vec::new();
+        for val in values {
+            let commitment_string: String = serde_json::from_value(val.clone())
+                .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: Invalid string. {}.", e)))?;
+
+            let commitment_bytes = hex::decode(commitment_string)
+                .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: Invalid hex encoding. {}.", e)))?;
+
+            let commitment = <Testnet1Parameters as Parameters>::RecordCommitment::from_bytes_le(&commitment_bytes)
+                .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: Invalid commitment. {}.", e)))?;
+
+            commitments.push(commitment);
+        }
 
         match self.ledger_commitment_proofs(commitments) {
             Ok((latest_digest, merkle_paths)) => Ok(serde_json::to_value((
