@@ -111,17 +111,19 @@ impl SyncMaster {
         let sync_nodes = self.find_sync_nodes().await?;
 
         info!("requested block information from {} peers", sync_nodes.len());
-        let block_locator_hashes = self.block_locator_hashes().await?;
+        let block_locator_hashes = self
+            .block_locator_hashes()
+            .await?
+            .into_iter()
+            .map(|x| BlockHeaderHash(x.bytes::<32>().unwrap()))
+            .collect::<Vec<_>>();
         let mut future_set = vec![];
+
         for peer in sync_nodes.iter() {
             if let Some(handle) = self.node.peer_book.get_peer_handle(peer.address) {
-                let block_locator_hashes = block_locator_hashes.clone();
-                let block_locator_hashes: Vec<BlockHeaderHash> = block_locator_hashes
-                    .into_iter()
-                    .map(|x| BlockHeaderHash(x.bytes::<32>().unwrap()))
-                    .collect();
+                let locator_hashes = block_locator_hashes.clone();
                 future_set.push(async move {
-                    handle.send_payload(Payload::GetSync(block_locator_hashes)).await;
+                    handle.send_payload(Payload::GetSync(locator_hashes)).await;
                 });
             }
         }
