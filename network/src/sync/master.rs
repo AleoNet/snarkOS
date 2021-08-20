@@ -154,7 +154,7 @@ impl SyncMaster {
                     if handler(msg.unwrap()) {
                         break;
                     }
-                    moving_end = Instant::now() + Duration::from_secs(moving_timeout_sec);
+                    moving_end += Duration::from_secs(moving_timeout_sec);
                 },
                 _ = timeout => {
                     break;
