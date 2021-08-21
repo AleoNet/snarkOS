@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-consensus"
-version = "1.3.13"
+version = "1.3.14"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Consensus for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -43,15 +43,15 @@ version = "1"
 
 [dependencies.snarkos-metrics]
 path = "../metrics"
-version = "1.3.13"
+version = "1.3.14"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
-version = "1.3.13"
+version = "1.3.14"
 
 [dependencies.snarkos-storage]
 path = "../storage"
-version = "1.3.13"
+version = "1.3.14"
 default-features = false
 
 [dependencies.anyhow]

@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-storage"
-version = "1.3.13"
+version = "1.3.14"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Storage for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -37,7 +37,7 @@ version = "=0.7.9"
 
 [dependencies.snarkos-parameters]
 path = "../parameters"
-version = "1.3.13"
+version = "1.3.14"
 
 [dependencies.derivative]
 version = "2.2.0"
@@ -47,7 +47,7 @@ version = "0.9"
 
 [dependencies.smallvec]
 version = "1.6"
-features = ["write"]
+features = [ "write" ]
 
 [dependencies.anyhow]
 version = "1.0.40"
@@ -109,9 +109,6 @@ path = "../consensus"
 
 [dev-dependencies.snarkvm-curves]
 version = "=0.7.9"
-
-#[dev-dependencies.snarkos-testing]
-#path = "../testing"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.2"
