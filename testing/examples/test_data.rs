@@ -14,138 +14,83 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
-use snarkos_testing::sync::*;
-use snarkvm_dpc::{
-    block::Transactions,
-    testnet1::{
-        instantiated::*,
-        record::{payload::Payload as RecordPayload, Record},
-    },
-    Account,
-    Address,
-    Block,
-    DPCComponents,
-    ProgramScheme,
-    RecordScheme,
-    Storage,
+use snarkos_consensus::{MineContext, TransactionResponse};
+use snarkos_testing::{
+    mining::{mine_block, send},
+    sync::*,
 };
-use snarkvm_utilities::bytes::ToBytes;
 
-use rand::{CryptoRng, Rng};
-use std::{fs::File, path::PathBuf, sync::Arc};
+use snarkvm_utilities::ToBytes;
+use std::{fs::File, path::PathBuf, sync::atomic::AtomicBool};
 
-fn setup_test_data() -> Result<TestData, ConsensusError> {
+async fn setup_test_data() -> TestData {
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
-    let mut rng = FIXTURE.rng.clone();
-    let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
+    let consensus = snarkos_testing::sync::create_test_consensus().await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     // setup the miner
-    let miner = Miner::new(miner_acc.address.clone(), consensus.clone());
+    let miner = MineContext::prepare(miner_acc.address.clone(), consensus.clone())
+        .await
+        .unwrap();
+
+    let canon = consensus.storage.canon().await.unwrap();
+    let header = consensus.storage.get_block_header(&canon.hash).await.unwrap();
 
     // mine an empty block
-    let (block_1, coinbase_records) = mine_block(&miner, vec![])?;
+    let (block_1, coinbase_records) = mine_block(&miner, vec![], &header).await.unwrap();
 
     // make a tx which spends 10 to the Testnet1Components receiver
-    let (_records_1, tx_1) = send(
+    let response: TransactionResponse = send(
         &consensus,
         &miner_acc,
         coinbase_records.clone(),
         &acc_1.address,
         10,
-        &mut rng,
-    )?;
+        [0u8; 32],
+    )
+    .await
+    .unwrap();
 
     // mine the block
-    let (block_2, coinbase_records_2) = mine_block(&miner, vec![tx_1])?;
+    let (block_2, coinbase_records_2) = mine_block(&miner, vec![response.transaction], &block_1.header)
+        .await
+        .unwrap();
 
     // Find alternative conflicting/late blocks
 
-    let alternative_block_1_header = miner.find_block(
-        &block_1.transactions,
-        &consensus.ledger.get_block_header(&block_1.header.previous_block_hash)?,
-    )?;
-    let alternative_block_2_header = miner.find_block(&block_2.transactions, &alternative_block_1_header)?;
+    let alternative_block_1_header = miner
+        .find_block(
+            &block_1.transactions,
+            &consensus
+                .storage
+                .get_block_header(&block_1.header.previous_block_hash)
+                .await
+                .unwrap(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
+    let alternative_block_2_header = miner
+        .find_block(
+            &block_2.transactions,
+            &alternative_block_1_header,
+            &AtomicBool::new(false),
+        )
+        .unwrap();
 
-    let test_data = TestData {
+    TestData {
         block_1,
         block_2,
         records_1: coinbase_records,
         records_2: coinbase_records_2,
         alternative_block_1_header,
         alternative_block_2_header,
-    };
-
-    Ok(test_data)
-}
-
-fn mine_block<S: Storage>(
-    miner: &Miner<S>,
-    txs: Vec<Testnet1Transaction>,
-) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
-    let transactions = Transactions(txs);
-
-    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
-
-    let header = miner.find_block(&transactions, &previous_block_header)?;
-
-    let block = Block { header, transactions };
-
-    let old_block_height = miner.consensus.ledger.get_current_block_height();
-
-    // add it to the chain
-    futures::executor::block_on(miner.consensus.receive_block(&block, false))?;
-
-    let new_block_height = miner.consensus.ledger.get_current_block_height();
-    assert_eq!(old_block_height + 1, new_block_height);
-
-    Ok((block, coinbase_records))
-}
-
-/// Spends some value from inputs owned by the sender, to the receiver,
-/// and pays back whatever we are left with.
-#[allow(clippy::too_many_arguments)]
-fn send<R: Rng + CryptoRng, S: Storage>(
-    consensus: &Consensus<S>,
-    from: &Account<Components>,
-    inputs: Vec<Record<Components>>,
-    receiver: &Address<Components>,
-    amount: u64,
-    rng: &mut R,
-) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
-    let mut sum = 0;
-    for inp in &inputs {
-        sum += inp.value();
     }
-    assert!(sum >= amount, "not enough balance in inputs");
-    let change = sum - amount;
-
-    let input_programs = vec![FIXTURE.program.id(); Components::NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.id(); Components::NUM_OUTPUT_RECORDS];
-
-    let to = vec![receiver.clone(), from.address.clone()];
-    let values = vec![amount, change];
-    let output = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
-    let dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
-
-    let from = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS];
-    consensus.create_transaction(
-        inputs,
-        from,
-        to,
-        input_programs,
-        output_programs,
-        dummy_flags,
-        values,
-        output,
-        [0u8; 32],
-        rng,
-    )
 }
 
 #[tokio::main]
 pub async fn main() {
-    let test_data = setup_test_data().unwrap();
+    let test_data = setup_test_data().await;
 
     const TEST_DATA_FILE: &str = "test_data";
 

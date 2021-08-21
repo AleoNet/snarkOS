@@ -47,6 +47,7 @@ pub enum NetworkError {
     StorageError(StorageError),
     SyncIntervalInvalid,
     ZeroLengthMessage,
+    Other(anyhow::Error),
 }
 
 impl NetworkError {
@@ -140,5 +141,11 @@ impl From<NetworkError> for anyhow::Error {
     fn from(error: NetworkError) -> Self {
         error!("{}", error);
         Self::msg(error.to_string())
+    }
+}
+
+impl From<anyhow::Error> for NetworkError {
+    fn from(other: anyhow::Error) -> Self {
+        Self::Other(other)
     }
 }

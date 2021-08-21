@@ -16,8 +16,10 @@
 
 use crate::Payload;
 
+use snarkvm_dpc::block::BlockHeader;
+
 use circular_queue::CircularQueue;
-use fxhash::hash64;
+use twox_hash::xxh3::hash64;
 
 pub struct Cache {
     queue: CircularQueue<u64>,
@@ -26,15 +28,15 @@ pub struct Cache {
 impl Default for Cache {
     fn default() -> Self {
         Self {
-            queue: CircularQueue::with_capacity(64),
+            queue: CircularQueue::with_capacity(8 * 1024),
         }
     }
 }
 
 impl Cache {
     pub fn contains(&mut self, payload: &Payload) -> bool {
-        let hash = if let Payload::Block(bytes) = payload {
-            hash64(&bytes)
+        let hash = if let Payload::Block(bytes, _) = payload {
+            hash64(&bytes[..BlockHeader::size()])
         } else {
             unreachable!("Only blocks are cached for now");
         };

@@ -15,71 +15,113 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_dpc {
-    use snarkos_consensus::{get_block_reward, Miner};
+    use std::sync::atomic::AtomicBool;
+
+    use rand::thread_rng;
+    use snarkos_consensus::{get_block_reward, CreateTransactionRequest, MineContext};
+    use snarkos_storage::{SerialBlock, VMRecord};
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{
-        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record},
-        Block,
+        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record as DPCRecord},
         DPCComponents,
-        DPCScheme,
-        LedgerScheme,
         ProgramScheme,
         RecordScheme,
-        Transactions,
     };
-    use snarkvm_utilities::{bytes::ToBytes, to_bytes_le};
-
-    use std::sync::Arc;
+    use snarkvm_utilities::{to_bytes_le, ToBytes};
 
     #[tokio::test]
     async fn base_dpc_multiple_transactions() {
         let program = FIXTURE.program.clone();
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();
-        let mut rng = FIXTURE.rng.clone();
 
-        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
-        let miner = Miner::new(miner_acc.address, consensus.clone());
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+
+        let miner = MineContext::prepare(miner_acc.address, consensus.clone())
+            .await
+            .unwrap();
 
         println!("Creating block with coinbase transaction");
-        let transactions = Transactions::<Testnet1Transaction>::new();
-        let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions).unwrap();
-        let header = miner.find_block(&transactions, &previous_block_header).unwrap();
-        let block = Block { header, transactions };
+        let (transactions, coinbase_records) = miner.establish_block(vec![]).await.unwrap();
+        let previous_block_header = genesis().header.into();
+        let header = miner
+            .find_block(&transactions, &previous_block_header, &AtomicBool::new(false))
+            .unwrap();
+        let previous_block_header = header.clone();
+        let block = SerialBlock { header, transactions };
 
-        assert!(Testnet1DPC::verify_transactions(
-            &consensus.dpc,
-            &block.transactions,
-            &*consensus.ledger
-        ));
+        assert!(consensus.verify_transactions(block.transactions.clone()).await);
 
-        let block_reward = get_block_reward(consensus.ledger.len() as u32);
+        let block_reward = get_block_reward(consensus.storage.canon().await.unwrap().block_height as u32);
 
         // dummy outputs have 0 balance, coinbase only pays the miner
         assert_eq!(coinbase_records.len(), 2);
-        assert!(!coinbase_records[0].is_dummy());
-        assert!(coinbase_records[1].is_dummy());
-        assert_eq!(coinbase_records[0].value(), block_reward.0 as u64);
-        assert_eq!(coinbase_records[1].value(), 0);
+
+        let coinbase_record_0 = <DPCRecord<Components> as VMRecord>::deserialize(&coinbase_records[0]).unwrap();
+        let coinbase_record_1 = <DPCRecord<Components> as VMRecord>::deserialize(&coinbase_records[1]).unwrap();
+
+        assert!(!coinbase_record_0.is_dummy());
+        assert!(coinbase_record_1.is_dummy());
+        assert_eq!(coinbase_record_0.value(), block_reward.0 as u64);
+        assert_eq!(coinbase_record_1.value(), 0);
+
+        let mut joint_serial_numbers = vec![];
+        for record in &[coinbase_record_0, coinbase_record_1] {
+            let (sn, _) = record
+                .to_serial_number(
+                    &consensus.dpc.system_parameters.account_signature,
+                    &miner_acc.private_key,
+                )
+                .unwrap();
+            joint_serial_numbers.extend_from_slice(&to_bytes_le![sn].unwrap());
+        }
 
         println!("Verifying and receiving the block");
-        consensus.receive_block(&block, false).await.unwrap();
-        assert_eq!(consensus.ledger.len(), 2);
+        assert!(consensus.receive_block(block.clone()).await);
+        assert_eq!(consensus.storage.canon().await.unwrap().block_height, 1);
 
         // Add new block spending records from the previous block
 
         // INPUTS
 
-        let old_account_private_keys = vec![miner_acc.private_key; Components::NUM_INPUT_RECORDS];
+        let old_account_private_keys = vec![miner_acc.private_key; Components::NUM_INPUT_RECORDS]
+            .into_iter()
+            .map(|x| x.into())
+            .collect::<Vec<_>>();
+
         let old_records = coinbase_records;
+
         let new_birth_program_ids = vec![program.id(); Components::NUM_INPUT_RECORDS];
 
         // OUTPUTS
 
         let new_record_owners = vec![recipient.address; Components::NUM_OUTPUT_RECORDS];
+
         let new_death_program_ids = vec![program.id(); Components::NUM_OUTPUT_RECORDS];
         let new_is_dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
         let new_values = vec![10; Components::NUM_OUTPUT_RECORDS];
         let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
+
+        let mut new_records = vec![];
+        for j in 0..Components::NUM_OUTPUT_RECORDS {
+            new_records.push(
+                DPCRecord::new_full(
+                    &consensus.dpc.system_parameters.serial_number_nonce,
+                    &consensus.dpc.system_parameters.record_commitment,
+                    new_record_owners[j].clone(),
+                    new_is_dummy_flags[j],
+                    new_values[j],
+                    new_payloads[j].clone(),
+                    new_birth_program_ids[j].clone(),
+                    new_death_program_ids[j].clone(),
+                    j as u8,
+                    joint_serial_numbers.clone(),
+                    &mut thread_rng(),
+                )
+                .unwrap()
+                .serialize()
+                .unwrap(),
+            );
+        }
 
         // Memo is a dummy for now
 
@@ -87,72 +129,70 @@ mod consensus_dpc {
 
         println!("Create a payment transaction");
         // Create the transaction
-        let (spend_records, transaction) = consensus
-            .create_transaction(
+        let response = consensus
+            .create_transaction(CreateTransactionRequest {
                 old_records,
                 old_account_private_keys,
-                new_record_owners,
-                new_birth_program_ids,
-                new_death_program_ids,
-                new_is_dummy_flags,
-                new_values,
-                new_payloads,
+                new_records,
                 memo,
-                &mut rng,
-            )
+            })
+            .await
             .unwrap();
 
-        assert_eq!(spend_records.len(), 2);
-        assert!(!spend_records[0].is_dummy());
-        assert!(!spend_records[1].is_dummy());
-        assert_eq!(spend_records[0].value(), 10);
-        assert_eq!(spend_records[1].value(), 10);
+        assert_eq!(response.records.len(), 2);
+
+        let spend_record_0 = <DPCRecord<Components> as VMRecord>::deserialize(&response.records[0]).unwrap();
+        let spend_record_1 = <DPCRecord<Components> as VMRecord>::deserialize(&response.records[1]).unwrap();
+        let transaction = response.transaction;
+
+        assert!(!spend_record_0.is_dummy());
+        assert!(!spend_record_1.is_dummy());
+        assert_eq!(spend_record_0.value(), 10);
+        assert_eq!(spend_record_1.value(), 10);
         assert_eq!(transaction.value_balance.0, (block_reward.0 - 20) as i64);
 
-        assert!(Testnet1DPC::verify(&consensus.dpc, &transaction, &*consensus.ledger));
+        assert!(consensus.verify_transactions(vec![transaction.clone()]).await);
 
         println!("Create a new block with the payment transaction");
-        let mut transactions = Transactions::new();
-        transactions.push(transaction);
-        let (previous_block_header, transactions, new_coinbase_records) = miner.establish_block(&transactions).unwrap();
+        let (transactions, new_coinbase_records) = miner.establish_block(vec![transaction.clone()]).await.unwrap();
 
-        assert!(Testnet1DPC::verify_transactions(
-            &consensus.dpc,
-            &transactions,
-            &*consensus.ledger
-        ));
+        assert!(consensus.verify_transactions(transactions.clone()).await);
 
-        let header = miner.find_block(&transactions, &previous_block_header).unwrap();
-        let new_block = Block { header, transactions };
-        let new_block_reward = get_block_reward(consensus.ledger.len() as u32);
+        let header = miner
+            .find_block(&transactions, &previous_block_header, &AtomicBool::new(false))
+            .unwrap();
+        let new_block = SerialBlock { header, transactions };
+        let new_block_reward = get_block_reward(consensus.storage.canon().await.unwrap().block_height as u32);
 
         assert_eq!(new_coinbase_records.len(), 2);
-        assert!(!new_coinbase_records[0].is_dummy());
-        assert!(new_coinbase_records[1].is_dummy());
+        let new_coinbase_record_0 = <DPCRecord<Components> as VMRecord>::deserialize(&new_coinbase_records[0]).unwrap();
+        let new_coinbase_record_1 = <DPCRecord<Components> as VMRecord>::deserialize(&new_coinbase_records[1]).unwrap();
+
+        assert!(!new_coinbase_record_0.is_dummy());
+        assert!(new_coinbase_record_1.is_dummy());
         assert_eq!(
-            new_coinbase_records[0].value(),
+            new_coinbase_record_0.value(),
             (new_block_reward.0 + block_reward.0 - 20) as u64
         );
-        assert_eq!(new_coinbase_records[1].value(), 0);
+        assert_eq!(new_coinbase_record_1.value(), 0);
 
         println!("Verify and receive the block with the new payment transaction");
 
-        consensus.receive_block(&new_block, false).await.unwrap();
+        assert!(consensus.receive_block(new_block).await);
 
-        assert_eq!(consensus.ledger.len(), 3);
+        assert_eq!(consensus.storage.canon().await.unwrap().block_height, 2);
 
         for record in &new_coinbase_records {
-            consensus.ledger.store_record(record).unwrap();
+            consensus.storage.store_records(&[record.clone()]).await.unwrap();
 
-            let reconstruct_record: Option<Record<Components>> = consensus
-                .ledger
-                .get_record(&to_bytes_le![record.commitment()].unwrap().to_vec())
+            let reconstruct_record = consensus
+                .storage
+                .get_record(record.commitment.clone())
+                .await
+                .unwrap()
                 .unwrap();
 
-            assert_eq!(
-                to_bytes_le![reconstruct_record.unwrap()].unwrap(),
-                to_bytes_le![record].unwrap()
-            );
+            assert_eq!(&reconstruct_record, record);
         }
     }
 }

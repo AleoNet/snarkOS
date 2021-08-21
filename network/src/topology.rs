@@ -73,7 +73,7 @@ impl Hash for Connection {
 }
 
 impl Connection {
-    fn new(source: SocketAddr, target: SocketAddr) -> Self {
+    pub fn new(source: SocketAddr, target: SocketAddr) -> Self {
         Connection {
             source,
             target,

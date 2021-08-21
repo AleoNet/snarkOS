@@ -18,37 +18,52 @@ license = "GPL-3.0"
 edition = "2018"
 
 [[bench]]
-name = "syncing"
-path = "syncing/syncing.rs"
-harness = false
-
-[[bench]]
 name = "merkle"
 path = "merkle/merkle.rs"
 harness = false
 
 [[bench]]
-name = "network"
-path = "network/network.rs"
+name = "block_cache"
+path = "network/block_cache.rs"
+harness = false
+
+[[bench]]
+name = "messaging"
+path = "network/messaging.rs"
+harness = false
+
+[[bench]]
+name = "syncing"
+path = "network/syncing.rs"
+harness = false
+
+[[bench]]
+name = "network_metrics"
+path = "network/network_metrics.rs"
+harness = false
+
+[[bench]]
+name = "hasher_hash"
+path = "network/hasher_hash.rs"
 harness = false
 
 [dependencies.snarkvm-algorithms]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-curves]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-dpc]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-parameters]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-posw]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-utilities]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkos-profiler]
 path = "../profiler"
@@ -89,3 +104,9 @@ version = "0.3"
 
 [dependencies.tokio]
 version = "1"
+
+[dependencies.itertools]
+version = "0.10"
+
+[dependencies.hash_hasher]
+version = "2.0.3"

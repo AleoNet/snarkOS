@@ -116,7 +116,7 @@ impl Peer {
                 metrics::decrement_gauge!(OUTBOUND, 1.0);
 
                 match &message {
-                    Payload::SyncBlock(_) => trace!("Sent a '{}' message to {}", &message, self.address),
+                    Payload::SyncBlock(..) => trace!("Sent a '{}' message to {}", &message, self.address),
                     _ => debug!("Sent a '{}' message to {}", &message, self.address),
                 }
                 Ok(PeerResponse::None)

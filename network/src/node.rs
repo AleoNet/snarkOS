@@ -16,11 +16,12 @@
 
 use crate::{master::SyncInbound, sync::master::SyncMaster, *};
 use snarkos_metrics::{self as metrics, inbound, misc};
-use snarkvm_dpc::Storage;
 
+use anyhow::*;
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use rand::{thread_rng, Rng};
+use snarkos_storage::DynStorage;
 use std::{
     net::SocketAddr,
     ops::Deref,
@@ -31,7 +32,7 @@ use std::{
     thread,
 };
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{mpsc, Mutex, RwLock},
     task,
     time::sleep,
 };
@@ -48,7 +49,7 @@ pub enum State {
 pub struct StateCode(AtomicU8);
 
 /// The internal state of a node.
-pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
+pub struct InnerNode {
     /// The node's random numeric identifier.
     pub id: u64,
     /// The current state of the node.
@@ -59,12 +60,16 @@ pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
     pub config: Config,
     /// The inbound handler of this node.
     pub inbound: Inbound,
+    /// The cache of node's inbound messages.
+    pub inbound_cache: Mutex<Cache>,
     /// The list of connected and disconnected peers of this node.
     pub peer_book: PeerBook,
-    /// The sync handler of this node.
-    pub sync: OnceCell<Arc<Sync<S>>>,
     /// Tracks the known network crawled by this node.
     pub known_network: OnceCell<KnownNetwork>,
+    /// The sync handler of this node.
+    pub sync: OnceCell<Arc<Sync>>,
+    /// The node's storage.
+    pub storage: DynStorage,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -74,22 +79,23 @@ pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
     /// An indicator of whether the node is shutting down.
     shutting_down: AtomicBool,
     pub(crate) master_dispatch: RwLock<Option<mpsc::Sender<SyncInbound>>>,
+    pub terminator: Arc<AtomicBool>,
 }
 
 /// A core data structure for operating the networking stack of this node.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct Node<S: Storage + core::marker::Sync + Send + 'static>(Arc<InnerNode<S>>);
+pub struct Node(Arc<InnerNode>);
 
-impl<S: Storage + core::marker::Sync + Send + 'static> Deref for Node<S> {
-    type Target = Arc<InnerNode<S>>;
+impl Deref for Node {
+    type Target = Arc<InnerNode>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
+impl Node {
     /// Returns the current state of the node.
     #[inline]
     pub fn state(&self) -> State {
@@ -110,15 +116,17 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
     }
 }
 
-impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
+impl Node {
     /// Creates a new instance of `Node`.
-    pub fn new(config: Config) -> Result<Self, NetworkError> {
+    pub async fn new(config: Config, storage: DynStorage) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
             local_address: Default::default(),
             config,
+            storage,
             inbound: Default::default(),
+            inbound_cache: Default::default(),
             peer_book: PeerBook::spawn(),
             sync: Default::default(),
             known_network: Default::default(),
@@ -127,6 +135,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             threads: Default::default(),
             shutting_down: Default::default(),
             master_dispatch: RwLock::new(None),
+            terminator: Arc::new(AtomicBool::new(false)),
         }));
 
         if node.config.is_crawler() {
@@ -137,7 +146,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         Ok(node)
     }
 
-    pub fn set_sync(&mut self, sync: Sync<S>) {
+    pub fn set_sync(&mut self, sync: Sync) {
         if self.sync.set(Arc::new(sync)).is_err() {
             panic!("sync was set more than once!");
         }
@@ -145,13 +154,13 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
 
     /// Returns a reference to the sync objects.
     #[inline]
-    pub fn sync(&self) -> Option<&Arc<Sync<S>>> {
+    pub fn sync(&self) -> Option<&Arc<Sync>> {
         self.sync.get()
     }
 
     /// Returns a reference to the sync objects, expecting them to be available.
     #[inline]
-    pub fn expect_sync(&self) -> &Sync<S> {
+    pub fn expect_sync(&self) -> &Sync {
         self.sync().expect("no sync!")
     }
 
@@ -169,10 +178,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver().await;
         let incoming_task = task::spawn(async move {
-            let mut cache = Cache::default();
-
             loop {
-                if let Err(e) = node_clone.process_incoming_messages(&mut receiver, &mut cache).await {
+                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
                     metrics::increment_counter!(inbound::ALL_FAILURES);
                     error!("Node error: {}", e);
                 } else {
@@ -182,7 +189,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         });
         self.register_task(incoming_task);
 
-        let node_clone: Node<S> = self.clone();
+        let node_clone: Node = self.clone();
         let peer_sync_interval = self.config.peer_sync_interval();
         let peering_task = task::spawn(async move {
             loop {
@@ -323,16 +330,15 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             .expect("local address was set more than once!");
     }
 
-    pub fn initialize_metrics(&self) {
+    pub async fn initialize_metrics(&self) -> Result<()> {
         debug!("Initializing metrics");
         if let Some(metrics_task) = snarkos_metrics::initialize() {
             self.register_task(metrics_task);
         }
 
         // The node can already be at some non-zero height.
-        if let Some(sync) = self.sync() {
-            metrics::gauge!(misc::BLOCK_HEIGHT, sync.current_block_height() as f64);
-        }
+        metrics::gauge!(misc::BLOCK_HEIGHT, self.storage.canon().await?.block_height as f64);
+        Ok(())
     }
 
     pub fn version(&self) -> Version {
@@ -343,7 +349,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         )
     }
 
-    pub async fn run_sync(&self) -> Result<(), NetworkError> {
+    pub async fn run_sync(&self) -> Result<()> {
         let (master, sender) = SyncMaster::new(self.clone());
         *self.master_dispatch.write().await = Some(sender);
         master.run().await

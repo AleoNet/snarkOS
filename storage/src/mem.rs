@@ -14,72 +14,113 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::NUM_COLS;
-use snarkvm_dpc::{DatabaseTransaction, Op, Storage, StorageError};
+use std::borrow::Cow;
 
-use parking_lot::RwLock;
-use std::{collections::HashMap, path::Path}; // only used for testing
+use crate::{
+    key_value::{KeyValueColumn, Value},
+    KeyValueStorage,
+};
+use anyhow::*;
+use indexmap::IndexMap;
 
-#[allow(clippy::type_complexity)]
+type Store = IndexMap<KeyValueColumn, IndexMap<Vec<u8>, Vec<u8>>>;
+
+/// used in tests as a memory-only DB
+#[derive(Default)]
 pub struct MemDb {
-    pub cols: RwLock<Vec<HashMap<Box<[u8]>, Box<[u8]>>>>,
+    // incredibly naive transaction model: copy the database proactively and reset if the transaction is aborted
+    transaction: Option<Store>,
+    entries: Store,
 }
 
-impl Storage for MemDb {
-    const IN_MEMORY: bool = true;
-
-    fn open(_path: Option<&Path>, _secondary_path: Option<&Path>) -> Result<Self, StorageError> {
-        // the paths are just ignored
-
-        Ok(Self {
-            cols: RwLock::new(vec![Default::default(); NUM_COLS as usize]),
-        })
+impl MemDb {
+    pub fn new() -> Self {
+        MemDb {
+            transaction: None,
+            entries: IndexMap::new(),
+        }
     }
 
-    fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
-        Ok(self.cols.read()[col as usize].get(key).map(|v| v.to_vec()))
+    fn column(&mut self, column: KeyValueColumn) -> &mut IndexMap<Vec<u8>, Vec<u8>> {
+        self.entries.entry(column).or_insert_with(IndexMap::new)
     }
 
-    #[allow(clippy::type_complexity)]
-    fn get_col(&self, col: u32) -> Result<Vec<(Box<[u8]>, Box<[u8]>)>, StorageError> {
-        Ok(self.cols.read()[col as usize].clone().into_iter().collect())
+    fn transaction_column(&mut self, column: KeyValueColumn) -> Option<&mut IndexMap<Vec<u8>, Vec<u8>>> {
+        if let Some(transaction) = self.transaction.as_mut() {
+            Some(transaction.entry(column).or_insert_with(IndexMap::new))
+        } else {
+            None
+        }
+    }
+}
+
+impl KeyValueStorage for MemDb {
+    fn get<'a>(&'a mut self, column: KeyValueColumn, key: &[u8]) -> Result<Option<Value<'a>>> {
+        match self.column(column).get(key) {
+            Some(value) => Ok(Some(Cow::Borrowed(&value[..]))),
+            None => Ok(None),
+        }
     }
 
-    fn get_keys(&self, col: u32) -> Result<Vec<Box<[u8]>>, StorageError> {
-        Ok(self.cols.read()[col as usize].keys().cloned().collect())
+    fn exists(&mut self, column: KeyValueColumn, key: &[u8]) -> Result<bool> {
+        Ok(self.column(column).contains_key(key))
     }
 
-    fn put<K: AsRef<[u8]>, V: AsRef<[u8]>>(&self, col: u32, key: K, value: V) -> Result<(), StorageError> {
-        self.cols.write()[col as usize].insert(key.as_ref().into(), value.as_ref().into());
-        Ok(())
+    fn get_column_keys<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<Value<'a>>> {
+        Ok(self.column(column).keys().map(|x| Cow::Borrowed(&x[..])).collect())
     }
 
-    fn batch(&self, transaction: DatabaseTransaction) -> Result<(), StorageError> {
-        if transaction.0.is_empty() {
+    fn get_column<'a>(&'a mut self, column: KeyValueColumn) -> Result<Vec<(Value<'a>, Value<'a>)>> {
+        Ok(self
+            .column(column)
+            .iter()
+            .map(|(key, value)| (Cow::Borrowed(&key[..]), Cow::Borrowed(&value[..])))
+            .collect())
+    }
+
+    fn store(&mut self, column: KeyValueColumn, key: &[u8], value: &[u8]) -> Result<()> {
+        if let Some(column) = self.transaction_column(column) {
+            column.insert(key.to_vec(), value.to_vec());
             return Ok(());
         }
-
-        let mut cols = self.cols.write();
-        for operation in transaction.0 {
-            match operation {
-                Op::Insert { col, key, value } => {
-                    cols[col as usize].insert(key.into(), value.into());
-                }
-                Op::Delete { col, key } => {
-                    cols[col as usize].remove(&Box::from(key));
-                }
-            }
-        }
-
+        self.column(column).insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
-    fn exists(&self, col: u32, key: &[u8]) -> bool {
-        self.cols.read()[col as usize].contains_key(key)
+    fn delete(&mut self, column: KeyValueColumn, key: &[u8]) -> Result<()> {
+        if let Some(column) = self.transaction_column(column) {
+            column.remove(key);
+            return Ok(());
+        }
+        self.column(column).remove(key);
+        Ok(())
     }
 
-    fn try_catch_up_with_primary(&self) -> Result<(), StorageError> {
-        // used only in Ledger::catch_up_secondary, doesn't cause an early return
-        Err(StorageError::Message("MemDb has no secondary instance".into()))
+    fn in_transaction(&self) -> bool {
+        self.transaction.is_some()
+    }
+
+    fn begin(&mut self) -> Result<()> {
+        if self.in_transaction() {
+            return Err(anyhow!("attempted to restart a transaction"));
+        }
+        self.transaction = Some(self.entries.clone());
+        Ok(())
+    }
+
+    fn abort(&mut self) -> Result<()> {
+        if !self.in_transaction() {
+            return Err(anyhow!("attempted to abort when not in a transaction"));
+        }
+        self.transaction = None;
+        Ok(())
+    }
+
+    fn commit(&mut self) -> Result<()> {
+        if !self.in_transaction() {
+            return Err(anyhow!("attempted to commit when not in a transaction"));
+        }
+        self.entries = self.transaction.take().unwrap();
+        Ok(())
     }
 }

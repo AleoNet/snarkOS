@@ -15,30 +15,33 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod consensus_integration {
-    use snarkos_consensus::miner::Miner;
-    use snarkos_testing::sync::*;
-    use snarkvm_dpc::{block::Transactions, testnet1::instantiated::Testnet1Transaction, BlockHeader};
-    use snarkvm_posw::txids_to_roots;
+    use std::sync::atomic::AtomicBool;
 
-    use std::sync::Arc;
+    use snarkos_consensus::miner::MineContext;
+    use snarkos_storage::{SerialBlockHeader, SerialTransaction};
+    use snarkos_testing::sync::*;
+    use snarkvm_posw::txids_to_roots;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
-    fn test_find_block(transactions: &Transactions<Testnet1Transaction>, parent_header: &BlockHeader) {
-        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
+    async fn test_find_block(transactions: &[SerialTransaction], parent_header: &SerialBlockHeader) {
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
-        let miner = Miner::new(miner_address, consensus.clone());
+        let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();
 
-        let header = miner.find_block(transactions, parent_header).unwrap();
+        let header = miner
+            .find_block(transactions, parent_header, &AtomicBool::new(false))
+            .unwrap();
 
-        let expected_prev_block_hash = parent_header.get_hash();
+        let expected_prev_block_hash = parent_header.hash();
         assert_eq!(header.previous_block_hash, expected_prev_block_hash);
 
-        let expected_merkle_root_hash = snarkvm_dpc::merkle_root(&transactions.to_transaction_ids().unwrap());
+        let transaction_ids = transactions.iter().map(|x| x.id).collect::<Vec<_>>();
+        let expected_merkle_root_hash = snarkvm_dpc::merkle_root(&transaction_ids[..]);
         assert_eq!(&header.merkle_root_hash.0[..], &expected_merkle_root_hash[..]);
 
         // generate the verifier args
-        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transactions.to_transaction_ids().unwrap());
+        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids[..]);
 
         // ensure that our POSW proof passes
         consensus
@@ -49,11 +52,11 @@ mod consensus_integration {
 
     #[tokio::test]
     async fn find_valid_block() {
-        let transactions = Transactions(vec![
-            DATA.block_1.transactions.0[0].clone(),
-            DATA.block_2.transactions.0[0].clone(),
-        ]);
-        let parent_header = genesis().header;
-        test_find_block(&transactions, &parent_header);
+        let transactions = vec![
+            DATA.block_1.transactions[0].clone(),
+            DATA.block_2.transactions[0].clone(),
+        ];
+        let parent_header = genesis().header.into();
+        test_find_block(&transactions, &parent_header).await;
     }
 }

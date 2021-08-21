@@ -25,18 +25,16 @@ use std::{
 use futures::Future;
 use mpmc_map::MpmcMap;
 use rand::prelude::IteratorRandom;
-use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};
-use snarkos_storage::BlockHeight;
 
 use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};
 
 ///
 /// A data structure for storing the history of all peers with this node server.
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PeerBook {
     disconnected_peers: MpmcMap<SocketAddr, Peer>,
     connected_peers: MpmcMap<SocketAddr, PeerHandle>,
@@ -153,22 +151,13 @@ impl PeerBook {
         self.pending_connections.load(Ordering::SeqCst)
     }
 
-    pub fn receive_connection<S: Storage + Send + Sync + 'static>(
-        &self,
-        node: Node<S>,
-        address: SocketAddr,
-        stream: TcpStream,
-    ) -> Result<(), NetworkError> {
+    pub fn receive_connection(&self, node: Node, address: SocketAddr, stream: TcpStream) -> Result<(), NetworkError> {
         self.pending_connections.fetch_add(1, Ordering::SeqCst);
         Peer::receive(address, node, stream, self.peer_events.clone());
         Ok(())
     }
 
-    pub async fn get_or_connect<S: Storage + Send + Sync + 'static>(
-        &self,
-        node: Node<S>,
-        address: SocketAddr,
-    ) -> Result<Option<PeerHandle>, NetworkError> {
+    pub async fn get_or_connect(&self, node: Node, address: SocketAddr) -> Result<Option<PeerHandle>, NetworkError> {
         if let Some(active_handler) = self.connected_peers.get(&address) {
             Ok(Some(active_handler))
         } else {
@@ -266,6 +255,13 @@ impl PeerBook {
         debug!("Added {} to the peer book", address);
     }
 
+    /// Removes the peer by address from the disconnected peers in this `PeerBook`.
+    ///
+    /// Note: this is currently only used in testing.
+    pub async fn remove_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
+        self.disconnected_peers.remove(address).await
+    }
+
     ///
     /// Returns the `SocketAddr` of the last seen peer to be used as a sync node, or `None`.
     ///
@@ -278,7 +274,7 @@ impl PeerBook {
     }
 
     /// returns (peer, count_total_higher)
-    pub async fn random_higher_peer(&self, block_height: BlockHeight) -> Option<(Peer, usize)> {
+    pub async fn random_higher_peer(&self, block_height: u32) -> Option<(Peer, usize)> {
         let peers = self
             .connected_peers_snapshot()
             .await

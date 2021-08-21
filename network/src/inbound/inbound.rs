@@ -16,7 +16,6 @@
 
 use std::time::Duration;
 
-use snarkvm_dpc::Storage;
 use tokio::{
     net::TcpListener,
     sync::{mpsc::error::TrySendError, Mutex},
@@ -25,7 +24,7 @@ use tokio::{
 
 use snarkos_metrics::{self as metrics, connections, inbound, queues};
 
-use crate::{errors::NetworkError, message::*, Cache, Node, Receiver, Sender, State};
+use crate::{errors::NetworkError, message::*, Node, Receiver, Sender};
 
 /// A stateless component for handling inbound network traffic.
 #[derive(Debug)]
@@ -59,7 +58,7 @@ impl Inbound {
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> Node<S> {
+impl Node {
     /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
         let listener = TcpListener::bind(&self.config.desired_address).await?;
@@ -105,11 +104,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
         Ok(())
     }
 
-    pub async fn process_incoming_messages(
-        &self,
-        receiver: &mut Receiver,
-        cache: &mut Cache,
-    ) -> Result<(), NetworkError> {
+    pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
         let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         metrics::decrement_gauge!(queues::INBOUND, 1.0);
@@ -120,12 +115,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
 
-        // Check if the message hasn't already been processed recently if it's a `Block`.
-        // The node should also reject them while syncing, as it is bound to receive them later.
-        if matches!(payload, Payload::Block(..)) && (self.state() == State::Syncing || cache.contains(&payload)) {
-            return Ok(());
-        }
-
         match payload {
             Payload::Transaction(transaction) => {
                 metrics::increment_counter!(inbound::TRANSACTIONS);
@@ -134,18 +123,18 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                     self.received_memory_pool_transaction(source, transaction).await?;
                 }
             }
-            Payload::Block(block) => {
-                metrics::increment_counter!(inbound::BLOCKS);
+            Payload::Block(block, height) => {
+                // The BLOCKS metric was already updated during the block dedup cache lookup.
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, true).await?;
+                    self.received_block(source, block, height, true).await?;
                 }
             }
-            Payload::SyncBlock(block) => {
+            Payload::SyncBlock(block, height) => {
                 metrics::increment_counter!(inbound::SYNCBLOCKS);
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, false).await?;
+                    self.received_block(source, block, height, false).await?;
 
                     // Update the peer and possibly finish the sync process.
                     if let Some(peer) = self.peer_book.get_peer_handle(source) {
@@ -157,14 +146,21 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(inbound::GETBLOCKS);
 
                 if self.sync().is_some() {
-                    self.received_get_blocks(source, hashes).await?;
+                    let hashes = hashes.into_iter().map(|x| x.0.into()).collect();
+
+                    let node_clone = self.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = node_clone.received_get_blocks(source, hashes).await {
+                            warn!("failed to send sync blocks to peer: {:?}", e);
+                        }
+                    });
                 }
             }
             Payload::GetMemoryPool => {
                 metrics::increment_counter!(inbound::GETMEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_get_memory_pool(source).await;
+                    self.received_get_memory_pool(source).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
@@ -178,6 +174,7 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                 metrics::increment_counter!(inbound::GETSYNC);
 
                 if self.sync().is_some() {
+                    let getsync = getsync.into_iter().map(|x| x.0.into()).collect();
                     self.received_get_sync(source, getsync).await?;
                 }
             }

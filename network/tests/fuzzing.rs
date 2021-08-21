@@ -334,6 +334,7 @@ async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
     let mut rng = thread_rng();
     let random_len: usize = rng.gen_range(1..(64 * 1024));
     let blob: Vec<u8> = rng.sample_iter(Standard).take(random_len).collect();
+    let height = Some(1);
 
     let addrs: Vec<SocketAddr> = [
         "0.0.0.0:0",
@@ -348,9 +349,9 @@ async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
     .collect();
 
     for payload in &[
-        Payload::Block(blob.clone()),
+        Payload::Block(blob.clone(), height),
         Payload::MemoryPool(vec![blob.clone(); 10]),
-        Payload::SyncBlock(blob.clone()),
+        Payload::SyncBlock(blob.clone(), height),
         Payload::Transaction(blob.clone()),
         Payload::Peers(addrs.clone()),
         Payload::Ping(thread_rng().gen()),
@@ -398,6 +399,7 @@ async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     let mut rng = thread_rng();
     let random_len: usize = rng.gen_range(1..(64 * 1024));
     let blob: Vec<u8> = rng.sample_iter(Standard).take(random_len).collect();
+    let height = None;
 
     let addrs: Vec<SocketAddr> = [
         "0.0.0.0:0",
@@ -412,9 +414,9 @@ async fn fuzzing_corrupted_payloads_with_bodies_post_handshake() {
     .collect();
 
     for payload in &[
-        Payload::Block(blob.clone()),
+        Payload::Block(blob.clone(), height),
         Payload::MemoryPool(vec![blob.clone(); 10]),
-        Payload::SyncBlock(blob.clone()),
+        Payload::SyncBlock(blob.clone(), height),
         Payload::Transaction(blob.clone()),
         Payload::Peers(addrs.clone()),
         Payload::Ping(thread_rng().gen()),

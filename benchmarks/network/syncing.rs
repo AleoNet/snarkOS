@@ -22,7 +22,6 @@ use snarkos_testing::{
     sync::TestBlocks,
 };
 
-// FIXME(ljedrz/nkls): gracefully shut the node and peer down once shutdown is implemented
 fn providing_sync_blocks(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -38,13 +37,16 @@ fn providing_sync_blocks(c: &mut Criterion) {
     const NUM_BLOCKS: usize = 10;
 
     let blocks = TestBlocks::load(Some(NUM_BLOCKS), "test_blocks_100_1");
-    for block in &blocks.0 {
-        rt.block_on(provider.expect_sync().consensus.receive_block(&block, false))
-            .unwrap()
-    }
-    assert_eq!(provider.expect_sync().current_block_height() as usize, NUM_BLOCKS);
 
-    c.bench_function("providing_sync_blocks", move |b| {
+    for block in &blocks.0 {
+        assert!(rt.block_on(provider.expect_sync().consensus.receive_block(block.clone())));
+    }
+
+    let canon = rt.block_on(provider.storage.canon()).unwrap();
+
+    assert_eq!(canon.block_height, NUM_BLOCKS);
+
+    c.bench_function("providing_sync_blocks", |b| {
         b.to_async(&rt).iter(|| async {
             let get_sync = Payload::GetSync(vec![]);
             requester.lock().await.write_message(&get_sync).await;
@@ -53,6 +55,8 @@ fn providing_sync_blocks(c: &mut Criterion) {
             let hashes = match requester.lock().await.read_payload().await.unwrap() {
                 Payload::Sync(hashes) => hashes,
                 Payload::Ping(_) => return,
+                // ignore blocks sent before the sync request
+                Payload::SyncBlock(..) => return,
                 x => {
                     panic!("unexpected payload: {:?}", x);
                 }
@@ -64,7 +68,7 @@ fn providing_sync_blocks(c: &mut Criterion) {
             let mut sync_blocks_count = 0;
             loop {
                 let payload = requester.lock().await.read_payload().await.unwrap();
-                if let Payload::SyncBlock(_) = payload {
+                if let Payload::SyncBlock(..) = payload {
                     sync_blocks_count += 1;
                 }
                 if sync_blocks_count == NUM_BLOCKS {
@@ -73,6 +77,8 @@ fn providing_sync_blocks(c: &mut Criterion) {
             }
         })
     });
+
+    rt.block_on(provider.shut_down());
 }
 
 criterion_group!(block_sync_benches, providing_sync_blocks);

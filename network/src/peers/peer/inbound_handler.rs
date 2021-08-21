@@ -14,18 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::Storage;
+use snarkos_metrics::{
+    self as metrics,
+    inbound::{self, *},
+    misc,
+    outbound,
+};
 
-use snarkos_metrics::{self as metrics, inbound::*};
-
-use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload, Peer};
+use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload, Peer, State};
 
 use super::network::PeerIOHandle;
 
 impl Peer {
-    pub(super) async fn inner_dispatch_payload<S: Storage + Sync + Send + 'static>(
+    pub(super) async fn inner_dispatch_payload(
         &mut self,
-        node: &Node<S>,
+        node: &Node,
         network: &mut PeerIOHandle,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {
@@ -35,7 +38,7 @@ impl Peer {
 
         // If message is a `SyncBlock` message, log it as a trace.
         match payload {
-            Payload::SyncBlock(_) => trace!("Received a '{}' message from {}", payload, self.address),
+            Payload::SyncBlock(..) => trace!("Received a '{}' message from {}", payload, self.address),
             _ => debug!("Received a '{}' message from {}", payload, self.address),
         }
 
@@ -54,11 +57,17 @@ impl Peer {
                     self.fail();
                 }
                 metrics::increment_counter!(PONGS);
+                metrics::increment_counter!(inbound::ALL_SUCCESSES);
             }
             Payload::Ping(block_height) => {
                 network.write_payload(&Payload::Pong).await?;
                 self.quality.block_height = block_height;
                 metrics::increment_counter!(PINGS);
+                metrics::increment_counter!(inbound::ALL_SUCCESSES);
+
+                // Pongs are sent without going through the outbound handler,
+                // so the outbound metric needs to be incremented here
+                metrics::increment_counter!(outbound::ALL_SUCCESSES);
 
                 // Relay the height to the known network.
                 if let Some(known_network) = node.known_network() {
@@ -68,6 +77,21 @@ impl Peer {
                 }
             }
             payload => {
+                // Check if the message hasn't already been processed recently if it's a `Block`.
+                // The node should also reject them while syncing, as it is bound to receive them later.
+                if matches!(payload, Payload::Block(..)) {
+                    metrics::increment_counter!(inbound::BLOCKS);
+
+                    if node.inbound_cache.lock().await.contains(&payload) {
+                        metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
+                        return Ok(());
+                    }
+
+                    if node.state() == State::Syncing {
+                        return Ok(());
+                    }
+                }
+
                 node.route(Message {
                     direction: Direction::Inbound(self.address),
                     payload,
@@ -78,9 +102,9 @@ impl Peer {
         Ok(())
     }
 
-    pub(super) async fn dispatch_payload<S: Storage + Sync + Send + 'static>(
+    pub(super) async fn dispatch_payload(
         &mut self,
-        node: &Node<S>,
+        node: &Node,
         network: &mut PeerIOHandle,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {

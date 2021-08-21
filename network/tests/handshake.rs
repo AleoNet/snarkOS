@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::{message::*, Node, Version};
-use snarkos_storage::LedgerStorage;
 use snarkos_testing::{
     network::{test_node, write_message_to_stream, TestSetup},
     wait_until,
@@ -145,7 +144,7 @@ async fn handshake_initiator_side() {
     assert_eq!(node.peer_book.get_active_peer_count(), 1);
 }
 
-async fn assert_node_rejected_message(node: &Node<LedgerStorage>, peer_stream: &mut TcpStream) {
+async fn assert_node_rejected_message(node: &Node, peer_stream: &mut TcpStream) {
     // read the response from the stream
     let mut buffer = String::new();
     let bytes_read = peer_stream.read_to_string(&mut buffer).await.unwrap();
@@ -211,13 +210,15 @@ async fn reject_non_version_messages_before_handshake() {
     // Block
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
     let block = vec![0u8, 10];
-    write_message_to_stream(Payload::Block(block), &mut peer_stream).await;
+    let height = None;
+    write_message_to_stream(Payload::Block(block, height), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
     // SyncBlock
     let mut peer_stream = TcpStream::connect(node.local_address().unwrap()).await.unwrap();
     let sync_block = vec![0u8, 10];
-    write_message_to_stream(Payload::SyncBlock(sync_block), &mut peer_stream).await;
+    let height = Some(1);
+    write_message_to_stream(Payload::SyncBlock(sync_block, height), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
     // Sync

@@ -23,21 +23,30 @@ use snarkos::{
     display::render_welcome,
     errors::NodeError,
 };
-use snarkos_consensus::{Consensus, ConsensusParameters, MemoryPool, MerkleTreeLedger};
+use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
-use snarkos_storage::LedgerStorage;
-use snarkvm_algorithms::{CRH, SNARK};
+use snarkos_storage::{
+    export_canon_blocks,
+    key_value::KeyValueStore,
+    RocksDb,
+    SerialBlock,
+    Storage,
+    VMBlock,
+    Validator,
+};
+use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
 use snarkvm_dpc::{
     testnet1::{
-        instantiated::{Components, Testnet1DPC},
+        instantiated::{Components, Testnet1DPC, Testnet1Transaction},
         Testnet1Components,
     },
     Address,
+    Block,
     DPCScheme,
     Network,
-    Storage,
 };
+use snarkvm_parameters::{testnet1::GenesisBlock, Genesis, LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
@@ -106,49 +115,49 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
 
-    // Construct the node instance. Note this does not start the network services.
-    // This is done early on, so that the local address can be discovered
-    // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config)?;
-
-    let is_storage_in_memory = LedgerStorage::IN_MEMORY;
-
-    let storage = if is_storage_in_memory {
-        Arc::new(MerkleTreeLedger::<LedgerStorage>::new_empty(
-            None::<std::path::PathBuf>,
-        )?)
-    } else {
-        info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-        Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
-    };
-    info!("Storage finished loading");
+    info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
+    let storage = RocksDb::open(&path)?;
 
     // For extra safety, validate storage too if a trim is requested.
-    if config.storage.validate || config.storage.trim {
+    let storage = if config.storage.validate || config.storage.trim {
         let now = std::time::Instant::now();
-        storage
+        let (_, moved_storage) = storage
             .validate(None, snarkos_storage::validator::FixMode::Everything)
             .await;
         info!("Storage validated in {}ms", now.elapsed().as_millis());
         if !config.storage.trim {
             return Ok(());
         }
-    }
+        moved_storage
+    } else {
+        storage
+    };
+
+    let storage = Arc::new(KeyValueStore::new(storage));
 
     if config.storage.trim {
         let now = std::time::Instant::now();
         // There shouldn't be issues after validation, but if there are, ignore them.
-        let _ = storage.trim();
+        let _ = snarkos_storage::trim(storage.clone()).await;
         info!("Storage trimmed in {}ms", now.elapsed().as_millis());
         return Ok(());
     }
+
+    info!("Storage is ready");
+
+    // Construct the node instance. Note this does not start the network services.
+    // This is done early on, so that the local address can be discovered
+    // before any other object (miner, RPC) needs to use it.
+    let mut node = Node::new(node_config, storage.clone()).await?;
 
     if let Some(limit) = config.storage.export {
         let mut export_path = path.clone();
         export_path.push("canon_blocks");
 
+        let limit = if limit == 0 { None } else { Some(limit) };
+
         let now = std::time::Instant::now();
-        match storage.export_canon_blocks(limit, &export_path) {
+        match export_canon_blocks(storage.clone(), limit, &export_path).await {
             Ok(num_exported) => {
                 info!(
                     "{} canon blocks exported to {} in {}ms",
@@ -163,10 +172,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Enable the sync layer.
     {
-        let memory_pool = MemoryPool::from_storage(&storage).await?;
+        let memory_pool = MemoryPool::new(); // from_storage(&storage).await?;
 
         debug!("Loading Aleo parameters...");
-        let dpc = <Testnet1DPC as DPCScheme<MerkleTreeLedger<LedgerStorage>>>::load(!config.miner.is_miner)?;
+        let dpc = <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::load(!config.miner.is_miner)?;
         info!("Loaded Aleo parameters");
 
         // Fetch the set of valid inner circuit IDs.
@@ -189,12 +198,43 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
             authorized_inner_snark_ids,
         };
 
-        let consensus = Arc::new(Consensus {
-            ledger: Arc::clone(&storage),
+        let ledger_parameters = {
+            type Parameters = <Components as Testnet1Components>::MerkleParameters;
+            let parameters: <<Parameters as MerkleParameters>::H as CRH>::Parameters =
+                FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes()?[..])?;
+            let crh = <Parameters as MerkleParameters>::H::from(parameters);
+            Arc::new(Parameters::from(crh))
+        };
+        info!("Loading Ledger");
+        let ledger_digests = storage.get_ledger_digests().await?;
+        let commitments = storage.get_commitments().await?;
+        let serial_numbers = storage.get_serial_numbers().await?;
+        let memos = storage.get_memos().await?;
+        info!("Initializing Ledger");
+        let ledger = DynLedger(Box::new(MerkleLedger::new(
+            ledger_parameters,
+            &ledger_digests[..],
+            &commitments[..],
+            &serial_numbers[..],
+            &memos[..],
+        )?));
+
+        let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
+        let genesis_block: SerialBlock = <Block<Testnet1Transaction> as VMBlock>::serialize(&genesis_block)?;
+
+        let consensus = Consensus::new(
+            consensus_params,
+            Arc::new(dpc),
+            genesis_block,
+            ledger,
+            storage.clone(),
             memory_pool,
-            parameters: consensus_params,
-            dpc: Arc::new(dpc),
-        });
+        );
+        info!("Loaded Ledger");
+
+        if config.storage.scan_for_forks {
+            consensus.scan_forks().await?;
+        }
 
         if let Some(import_path) = config.storage.import {
             info!("Importing canon blocks from {}", import_path.display());
@@ -204,9 +244,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
             let mut processed = 0usize;
             let mut imported = 0usize;
-            while let Ok(block) = FromBytes::read_le(&mut blocks) {
+            while let Ok(block) = Block::<Testnet1Transaction>::read_le(&mut blocks) {
+                let block = <Block<Testnet1Transaction> as VMBlock>::serialize(&block)?;
                 // Skip possible duplicate blocks etc.
-                if consensus.receive_block(&block, true).await.is_ok() {
+                if consensus.receive_block(block).await {
                     imported += 1;
                 }
                 processed += 1;
@@ -231,28 +272,20 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     // Initialize metrics framework
-    node.initialize_metrics();
+    node.initialize_metrics().await?;
 
     // Start listening for incoming connections.
     node.listen().await?;
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
-        let secondary_storage = if is_storage_in_memory {
-            // In-memory storage doesn't require a secondary instance.
-            storage
-        } else {
-            // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-            Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?)
-        };
-
         let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
             .parse()
             .expect("Invalid RPC server address!");
 
         let rpc_handle = start_rpc_server(
             rpc_address,
-            secondary_storage,
+            storage,
             node.clone(),
             config.rpc.username,
             config.rpc.password,
@@ -270,7 +303,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     if config.miner.is_miner {
         match Address::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn().await?;
                 node.register_task(handle);
             }
             Err(_) => info!(

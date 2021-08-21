@@ -19,8 +19,7 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 // Documentation
-// todo: readd in Rust 1.54
-// #![doc = include_str!("../documentation/concepts/network_server.md")]
+#![doc = include_str!("../documentation/concepts/network_server.md")]
 
 #[macro_use]
 extern crate derivative;
@@ -50,7 +49,7 @@ pub mod topology;
 pub use topology::*;
 
 /// The maximum number of block hashes that can be requested or provided in a single batch.
-pub const MAX_BLOCK_SYNC_COUNT: u32 = snarkos_storage::NUM_LOCATOR_HASHES;
+pub const MAX_BLOCK_SYNC_COUNT: u32 = snarkos_storage::NUM_LOCATOR_HASHES * 2;
 /// The maximum amount of time allowed to process a single batch of sync blocks. It should be aligned
 /// with `MAX_BLOCK_SYNC_COUNT`.
 pub const BLOCK_SYNC_EXPIRATION_SECS: u8 = 30;

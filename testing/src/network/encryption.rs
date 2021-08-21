@@ -24,12 +24,13 @@ use rand::{distributions::Standard, thread_rng, Rng};
 async fn encrypt_and_decrypt_a_big_payload() {
     let (mut node0, mut node1) = spawn_2_fake_nodes().await;
 
-    // account for the overhead of serialization and noise tags
-    let block_size = snarkos_network::MAX_MESSAGE_SIZE / 2;
+    // account for some overhead of serialization and noise tags
+    let block_size = snarkos_network::MAX_MESSAGE_SIZE / 4 * 3;
 
     // create a big block containing random data
     let fake_block_bytes: Vec<u8> = (&mut thread_rng()).sample_iter(Standard).take(block_size).collect();
-    let big_block = Payload::Block(fake_block_bytes.clone());
+    let fake_block_height = Some(1);
+    let big_block = Payload::Block(fake_block_bytes.clone(), fake_block_height);
 
     let reading_task = tokio::spawn(async move { node1.read_payload().await.unwrap() });
 
@@ -38,8 +39,8 @@ async fn encrypt_and_decrypt_a_big_payload() {
     let payload = reading_task.await.unwrap();
 
     // check if node1 received the expected data
-    if let Payload::Block(bytes) = payload {
-        assert!(bytes == fake_block_bytes);
+    if let Payload::Block(bytes, height) = payload {
+        assert!((bytes, height) == (fake_block_bytes, fake_block_height));
     } else {
         panic!("wrong payload received");
     }
@@ -55,15 +56,16 @@ async fn encrypt_and_decrypt_small_payloads() {
         // create a small block containing random data
         let block_size: u8 = rng.gen();
         let fake_block_bytes: Vec<u8> = (&mut rng).sample_iter(Standard).take(block_size as usize).collect();
-        let big_block = Payload::Block(fake_block_bytes.clone());
+        let fake_block_height = Some(1);
+        let big_block = Payload::Block(fake_block_bytes.clone(), fake_block_height);
 
         // send it from node0 to node1
         node0.write_message(&big_block).await;
         let payload = node1.read_payload().await.unwrap();
 
         // check if node1 received the expected data
-        if let Payload::Block(bytes) = payload {
-            assert!(bytes == fake_block_bytes);
+        if let Payload::Block(bytes, height) = payload {
+            assert!((bytes, height) == (fake_block_bytes, fake_block_height));
         } else {
             panic!("wrong payload received");
         }

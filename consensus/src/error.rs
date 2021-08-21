@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_storage::Digest;
 use snarkvm_algorithms::errors::CRHError;
 use snarkvm_dpc::{BlockError, DPCError, ProgramError, RecordError, StorageError, TransactionError};
 use snarkvm_posw::error::PoswError;
@@ -54,7 +55,7 @@ pub enum ConsensusError {
     FuturisticTimestamp(i64, i64),
 
     #[error("invalid block {:?}", _0)]
-    InvalidBlock(Vec<u8>),
+    InvalidBlock(Digest),
 
     #[error("invalid coinbase transaction")]
     InvalidCoinbaseTransaction,

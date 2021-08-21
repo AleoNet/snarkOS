@@ -17,21 +17,21 @@
 use std::{cmp, net::SocketAddr, time::Duration};
 
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
-use snarkvm_dpc::Storage;
 use tokio::task;
 
 use snarkos_metrics::{self as metrics, connections::*};
 
 use crate::{message::*, KnownNetworkMessage, NetworkError, Node};
+use anyhow::*;
 
-impl<S: Storage + core::marker::Sync + Send> Node<S> {
+impl Node {
     /// Obtain a list of addresses of connected peers for this node.
     pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.peer_book.connected_peers()
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> Node<S> {
+impl Node {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///
@@ -109,9 +109,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             }
         }
 
-        // Attempt to connect to the default bootnodes of the network if the node has no active
-        // connections.
-        if self.peer_book.get_active_peer_count() == 0 {
+        // Attempt to connect to a few random bootnodes if the node has no active
+        // connections or if it's a bootnode itself.
+        if self.peer_book.get_active_peer_count() == 0 || self.config.is_bootnode() {
             let random_bootnodes = self
                 .config
                 .bootnodes()
@@ -132,7 +132,9 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
             self.broadcast_getpeers_requests().await;
 
             // Send a `Ping` to every connected peer.
-            self.broadcast_pings().await;
+            if let Err(e) = self.broadcast_pings().await {
+                error!("failed to broadcast pings: {:?}", e);
+            }
         }
     }
 
@@ -276,17 +278,14 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
     }
 
     /// Broadcasts a `Ping` message to all connected peers.
-    async fn broadcast_pings(&self) {
+    async fn broadcast_pings(&self) -> Result<()> {
         trace!("Broadcasting `Ping` messages");
 
         // Consider peering tests that don't use the sync layer.
-        let current_block_height = if let Some(sync) = self.sync() {
-            sync.current_block_height()
-        } else {
-            0
-        };
+        let current_block_height = self.storage.canon().await?.block_height as u32;
 
         self.peer_book.broadcast(Payload::Ping(current_block_height)).await;
+        Ok(())
     }
 
     ///

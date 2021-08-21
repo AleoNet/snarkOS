@@ -29,22 +29,22 @@ network = [
 ]
 
 [dependencies.snarkvm-algorithms]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-curves]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-dpc]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-parameters]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-posw]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkvm-utilities]
-version = "=0.7.6"
+version = "=0.7.9"
 
 [dependencies.snarkos-consensus]
 path = "../consensus"
@@ -70,6 +70,9 @@ version = "1.0.40"
 
 [dependencies.bincode]
 version = "1.3.1"
+
+[dependencies.hex]
+version = "0.4"
 
 [dependencies.once_cell]
 version = "1.8"

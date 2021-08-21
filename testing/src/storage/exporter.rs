@@ -14,34 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    storage::random_storage_path,
-    sync::{create_test_consensus, TestBlocks},
-};
-use snarkvm_dpc::Block;
+use crate::sync::{create_test_consensus, TestBlocks};
+use rand::{thread_rng, Rng};
+use snarkos_storage::VMBlock;
+use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
 use snarkvm_utilities::FromBytes;
 
 use std::{env, fs, io};
 
+pub fn random_storage_path() -> String {
+    let random_path: usize = thread_rng().gen();
+    format!("./test_db-{}", random_path)
+}
+
 #[tokio::test]
 async fn import_export_blocks() {
     // Create an instance that loads some test blocks.
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
     let test_blocks = TestBlocks::load(Some(10), "test_blocks_100_1").0;
     for block in &test_blocks {
-        consensus.receive_block(block, false).await.unwrap();
+        assert!(consensus.receive_block(block.clone()).await);
     }
 
     // Export the canon blocks to a temp file.
     let mut path = env::temp_dir();
     path.push(random_storage_path());
-    consensus.ledger.export_canon_blocks(0, &path).unwrap();
+    snarkos_storage::export_canon_blocks(consensus.storage.clone(), None, &path)
+        .await
+        .unwrap();
 
     // Ensure that the exported blocks are the same as the ones initially imported.
     let mut imported_blocks = io::Cursor::new(fs::read(&path).unwrap());
 
     for test_block in test_blocks {
-        let imported_block: Block<_> = FromBytes::read_le(&mut imported_blocks).unwrap();
+        let imported_block: Block<Testnet1Transaction> = FromBytes::read_le(&mut imported_blocks).unwrap();
+        let imported_block = <Block<_> as VMBlock>::serialize(&imported_block).unwrap();
         assert_eq!(imported_block, test_block);
     }
 

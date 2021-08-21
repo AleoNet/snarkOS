@@ -17,128 +17,51 @@
 #[macro_use]
 extern crate tracing;
 
-use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
-use snarkos_testing::sync::*;
-use snarkvm_dpc::{
-    block::Transactions,
-    testnet1::{
-        instantiated::*,
-        record::{payload::Payload as RecordPayload, Record},
-    },
-    Account,
-    Address,
-    Block,
-    DPCComponents,
-    ProgramScheme,
-    RecordScheme,
-    Storage,
+use snarkos_consensus::{error::ConsensusError, MineContext, TransactionResponse};
+use snarkos_testing::{
+    mining::{mine_block, send},
+    sync::*,
 };
 use tracing_subscriber::EnvFilter;
 
-use rand::{CryptoRng, Rng};
-use std::{fs::File, path::PathBuf, sync::Arc};
-
-async fn mine_block<S: Storage>(
-    miner: &Miner<S>,
-    txs: Vec<Testnet1Transaction>,
-) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
-    info!("Mining block!");
-
-    let transactions = Transactions(txs);
-
-    let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
-
-    let header = miner.find_block(&transactions, &previous_block_header)?;
-
-    let block = Block { header, transactions };
-
-    let old_block_height = miner.consensus.ledger.get_current_block_height();
-
-    // Duplicate blocks dont do anything
-    miner.consensus.receive_block(&block, false).await.ok(); // throws a duplicate error -- seemingly intentional
-
-    let new_block_height = miner.consensus.ledger.get_current_block_height();
-    assert_eq!(old_block_height + 1, new_block_height);
-
-    Ok((block, coinbase_records))
-}
-
-/// Spends some value from inputs owned by the sender, to the receiver,
-/// and pays back whatever we are left with.
-#[allow(clippy::too_many_arguments)]
-fn send<R: Rng + CryptoRng, S: Storage>(
-    consensus: &Consensus<S>,
-    from: &Account<Components>,
-    inputs: Vec<Record<Components>>,
-    receiver: &Address<Components>,
-    amount: u64,
-    rng: &mut R,
-    memo: [u8; 32],
-) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
-    let mut sum = 0;
-    for inp in &inputs {
-        sum += inp.value();
-    }
-    assert!(sum >= amount, "not enough balance in inputs");
-    let change = sum - amount;
-
-    let input_programs = vec![FIXTURE.program.id(); Components::NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.id(); Components::NUM_OUTPUT_RECORDS];
-
-    let to = vec![receiver.clone(), from.address.clone()];
-    let values = vec![amount, change];
-    let output = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
-    let dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
-
-    let from = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS];
-    consensus.create_transaction(
-        inputs,
-        from,
-        to,
-        input_programs,
-        output_programs,
-        dummy_flags,
-        values,
-        output,
-        memo,
-        rng,
-    )
-}
+use std::{fs::File, path::PathBuf};
 
 async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
     info!("Creating test account");
     let [miner_acc, acc_1, _] = FIXTURE.test_accounts.clone();
-    let mut rng = FIXTURE.rng.clone();
     info!("Creating sync");
-    let consensus = Arc::new(crate::create_test_consensus());
+    let consensus = crate::create_test_consensus().await;
 
     // setup the miner
     info!("Creating miner");
-    let miner = Miner::new(miner_acc.address.clone(), consensus.clone());
+    let miner = MineContext::prepare(miner_acc.address.clone(), consensus.clone()).await?;
     info!("Creating memory pool");
 
     let mut txs = vec![];
     let mut blocks = vec![];
+    let last_block_header = consensus.storage.get_block_hash(0).await?.unwrap();
+    let mut last_block_header = consensus.storage.get_block_header(&last_block_header).await?;
 
     for i in 0..n {
         // mine an empty block
-        let (block, coinbase_records) = mine_block(&miner, txs.clone()).await?;
+        let (block, coinbase_records) = mine_block(&miner, txs.clone(), &last_block_header).await?;
 
         txs.clear();
         let mut memo = [0u8; 32];
         memo[0] = i as u8;
         // make a tx which spends 10 to the Testnet1Components receiver
-        let (_records, tx) = send(
+        let response: TransactionResponse = send(
             &consensus,
             &miner_acc,
             coinbase_records.clone(),
             &acc_1.address,
             (10 + i).into(),
-            &mut rng,
             memo,
-        )?;
+        )
+        .await?;
 
-        txs.push(tx);
+        txs.push(response.transaction);
+        last_block_header = block.header.clone();
         blocks.push(block);
     }
 

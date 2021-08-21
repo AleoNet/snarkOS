@@ -16,13 +16,14 @@
 
 /// Tests for public RPC endpoints
 mod rpc_tests {
-    use snarkos_consensus::{get_block_reward, MerkleTreeLedger};
+    use jsonrpc_core::{MetaIoHandler, Params, RemoteProcedure, RpcMethod};
+    use snarkos_consensus::{get_block_reward, Consensus};
     use snarkos_network::Node;
     use snarkos_rpc::*;
-    use snarkos_storage::LedgerStorage;
     use snarkos_testing::{
-        network::{test_config, ConsensusSetup, TestSetup},
+        network::{test_config, test_node, ConsensusSetup, TestSetup},
         sync::*,
+        wait_until,
     };
     use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, TransactionScheme};
     use snarkvm_utilities::{
@@ -35,21 +36,45 @@ mod rpc_tests {
     use serde_json::Value;
     use std::{net::SocketAddr, sync::Arc, time::Duration};
 
-    async fn initialize_test_rpc(ledger: Arc<MerkleTreeLedger<LedgerStorage>>) -> Rpc {
-        let environment = test_config(TestSetup::default());
-        let mut node = Node::new(environment).unwrap();
+    async fn initialize_test_rpc(consensus: &Arc<Consensus>, node_setup: Option<TestSetup>) -> (Rpc, Node) {
+        let environment = test_config(node_setup.unwrap_or_default());
+
+        let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
-        let consensus = Arc::new(snarkos_testing::sync::create_test_consensus_from_ledger(ledger.clone()));
 
         let node_consensus = snarkos_network::Sync::new(
-            consensus,
+            consensus.clone(),
             consensus_setup.is_miner,
             Duration::from_secs(consensus_setup.block_sync_interval),
             Duration::from_secs(consensus_setup.tx_sync_interval),
         );
         node.set_sync(node_consensus);
 
-        Rpc::new(RpcImpl::new(ledger, None, node).to_delegate())
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // wait for genesis to commit
+
+        let rpc_impl = RpcImpl::new(node.storage.clone(), None, node.clone());
+
+        let mut io = MetaIoHandler::default();
+
+        rpc_impl.add(&mut io);
+
+        let rpc = Rpc::new(io.iter().map(|(name, proc)| {
+            (name.clone(), match proc {
+                RemoteProcedure::Method(rpc_method) => {
+                    struct Handler(Arc<dyn RpcMethod<Meta>>);
+                    impl RpcMethod<()> for Handler {
+                        fn call(&self, params: Params, _: ()) -> jsonrpc_core::BoxFuture<jsonrpc_core::Result<Value>> {
+                            self.0.call(params, Meta { auth: None })
+                        }
+                    }
+                    RemoteProcedure::Method(Arc::new(Handler(rpc_method.clone())))
+                }
+                RemoteProcedure::Notification(_) => unimplemented!(),
+                RemoteProcedure::Alias(_) => unimplemented!(),
+            })
+        }));
+
+        (rpc, node)
     }
 
     fn verify_transaction_info(transaction_bytes: Vec<u8>, transaction_info: Value) {
@@ -107,10 +132,10 @@ mod rpc_tests {
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }
 
-    fn make_request_no_params(rpc: &Rpc, method: String) -> Value {
+    async fn make_request_no_params(rpc: &Rpc, method: String) -> Value {
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method,);
 
-        let response = rpc.io.handle_request_sync(&request).unwrap();
+        let response = rpc.io.handle_request(&request).await.unwrap();
 
         let extracted: Value = serde_json::from_str(&response).unwrap();
 
@@ -119,8 +144,8 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_block() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let response = rpc.request("getblock", &[hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]);
 
@@ -152,24 +177,24 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_block_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getblockcount".to_string();
 
-        let result = make_request_no_params(&rpc, method);
+        let result = make_request_no_params(&rpc, method).await;
 
         assert_eq!(result.as_u64().unwrap(), 1u64);
     }
 
     #[tokio::test]
     async fn test_rpc_get_best_block_hash() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getbestblockhash".to_string();
 
-        let result = make_request_no_params(&rpc, method);
+        let result = make_request_no_params(&rpc, method).await;
 
         assert_eq!(
             result.as_str().unwrap(),
@@ -179,8 +204,8 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_block_hash() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert_eq!(rpc.request("getblockhash", &[0u32]), format![
             r#""{}""#,
@@ -190,8 +215,8 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let genesis_block = genesis();
 
@@ -206,8 +231,8 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_transaction_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let genesis_block = genesis();
         let transaction = &genesis_block.transactions.0[0];
@@ -223,61 +248,65 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decode_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let response = rpc.request("decoderawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]);
+        let response = rpc.request("decoderawtransaction", &[hex::encode(
+            to_bytes_le![&*TRANSACTION_1].unwrap(),
+        )]);
 
         let transaction_info: Value = serde_json::from_str(&response).unwrap();
 
-        verify_transaction_info(TRANSACTION_1.to_vec(), transaction_info);
+        verify_transaction_info(to_bytes_le![&*TRANSACTION_1].unwrap(), transaction_info);
     }
 
     // multithreaded necessary due to use of non-async jsonrpc & internal use of async
     #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_send_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
-
-        let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert_eq!(
-            rpc.request("sendtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),
-            format![r#""{}""#, hex::encode(transaction.transaction_id().unwrap())]
+            rpc.request("sendtransaction", &[hex::encode(
+                to_bytes_le![&*TRANSACTION_2].unwrap()
+            )]),
+            format![r#""{}""#, hex::encode(&TRANSACTION_2.id[..])]
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_validate_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         assert_eq!(
-            rpc.request("validaterawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),
+            rpc.request("validaterawtransaction", &[hex::encode(
+                to_bytes_le![&*TRANSACTION_2].unwrap()
+            )]),
             "true"
         );
     }
 
     #[tokio::test]
     async fn test_rpc_get_connection_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getconnectioncount".to_string();
 
-        let result = make_request_no_params(&rpc, method);
+        let result = make_request_no_params(&rpc, method).await;
 
         assert_eq!(result.as_u64().unwrap(), 0u64);
     }
 
     #[tokio::test]
     async fn test_rpc_get_peer_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getpeerinfo".to_string();
 
-        let result = make_request_no_params(&rpc, method);
+        let result = make_request_no_params(&rpc, method).await;
 
         let peer_info: PeerInfo = serde_json::from_value(result).unwrap();
 
@@ -288,41 +317,85 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_node_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let rpc = initialize_test_rpc(storage).await;
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getnodeinfo".to_string();
 
-        let result = make_request_no_params(&rpc, method);
+        let result = make_request_no_params(&rpc, method).await;
 
         let peer_info: NodeInfo = serde_json::from_value(result).unwrap();
 
-        assert_eq!(peer_info.is_miner, false);
-        assert_eq!(peer_info.is_syncing, false);
+        assert!(!peer_info.is_miner);
+        assert!(!peer_info.is_syncing);
     }
 
     #[tokio::test]
     async fn test_rpc_get_block_template() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
-        let curr_height = storage.get_current_block_height();
-        let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let rpc = initialize_test_rpc(storage).await;
+        let canon = consensus.storage.canon().await.unwrap();
+        let curr_height = canon.block_height;
+        let latest_block_hash = canon.hash;
 
         let method = "getblocktemplate".to_string();
 
-        let result = make_request_no_params(&rpc, method);
+        let result = make_request_no_params(&rpc, method).await;
 
         let template: BlockTemplate = serde_json::from_value(result).unwrap();
 
         let expected_transactions: Vec<String> = vec![];
 
         let new_height = curr_height + 1;
-        let block_reward = get_block_reward(new_height);
+        let block_reward = get_block_reward(new_height as u32);
 
-        assert_eq!(template.previous_block_hash, latest_block_hash);
-        assert_eq!(template.block_height, new_height);
+        assert_eq!(template.previous_block_hash, hex::encode(&latest_block_hash[..]));
+        assert_eq!(template.block_height, new_height as u32);
         assert_eq!(template.transactions, expected_transactions);
         assert!(template.coinbase_value >= block_reward.0 as u64);
+    }
+
+    #[tokio::test]
+    async fn test_rpc_getnetworkgraph() {
+        let consensus = snarkos_testing::sync::create_test_consensus().await;
+        let setup = TestSetup {
+            is_crawler: true,
+            peer_sync_interval: 1,
+            min_peers: 2,
+            consensus_setup: None,
+            ..Default::default()
+        };
+        let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup.clone())).await;
+        rpc_node.listen().await.unwrap();
+        rpc_node.start_services().await;
+
+        let setup = TestSetup {
+            consensus_setup: None,
+            ..Default::default()
+        };
+        let some_node1 = test_node(setup.clone()).await;
+        let some_node2 = test_node(setup).await;
+
+        rpc_node
+            .connect_to_addresses(&[some_node1.local_address().unwrap()])
+            .await;
+        some_node1
+            .connect_to_addresses(&[some_node2.local_address().unwrap()])
+            .await;
+
+        wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 1);
+        wait_until!(3, some_node1.peer_book.get_connected_peer_count() == 2);
+        wait_until!(3, some_node2.peer_book.get_connected_peer_count() == 1);
+
+        wait_until!(5, !rpc_node.known_network().unwrap().connections().is_empty());
+
+        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"getnetworkgraph\" }}");
+        let response = rpc.io.handle_request(&request).await.unwrap();
+        let value: Value = serde_json::from_str(&response).unwrap();
+        let result: NetworkGraph = serde_json::from_value(value["result"].clone()).unwrap();
+
+        assert_eq!(result.node_count, 2);
+        assert_eq!(result.vertices.len(), 2);
     }
 }

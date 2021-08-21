@@ -15,277 +15,297 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::sync::{create_test_consensus, TestBlocks};
-use snarkos_storage::*;
-use snarkvm_dpc::{DatabaseTransaction, Op, Storage};
+use snarkos_storage::{
+    key_value::{KeyValueColumn, KEY_CURR_CM_INDEX, KEY_CURR_MEMO_INDEX, KEY_CURR_SN_INDEX},
+    FixMode,
+    ValidatorError,
+};
 
 use rand::prelude::*;
 
 #[tokio::test]
 async fn valid_storage_validates() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
-    assert!(consensus.ledger.validate(None, FixMode::Nothing).await);
+    assert!(consensus.storage.validate(None, FixMode::Nothing).await.is_empty());
 }
 
 #[tokio::test]
 async fn validator_vs_a_missing_serial_number() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Remove a random tx serial number.
-    let stored_sns = consensus.ledger.storage.get_col(COL_SERIAL_NUMBER).unwrap();
+    let stored_sns = consensus.storage.get_serial_numbers().await.unwrap();
     let random_sn = &stored_sns.choose(&mut thread_rng()).unwrap().0;
-    let mut database_transaction = DatabaseTransaction::new();
-    database_transaction.push(Op::Delete {
-        col: COL_SERIAL_NUMBER,
-        key: random_sn.to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    consensus
+        .storage
+        .delete_item(KeyValueColumn::SerialNumber, random_sn.to_vec())
+        .await
+        .unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::SerialNumber,
+        hex::encode(&random_sn)
+    )));
     // Currently unsupported.
-    // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
+    // assert!(consensus.storage.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
 
 #[tokio::test]
 async fn validator_vs_a_missing_commitment() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Remove a random tx commitment.
-    let stored_cms = consensus.ledger.storage.get_col(COL_COMMITMENT).unwrap();
+    let stored_cms = consensus.storage.get_commitments().await.unwrap();
     let random_cm = &stored_cms.choose(&mut thread_rng()).unwrap().0;
-    let mut database_transaction = DatabaseTransaction::new();
-    database_transaction.push(Op::Delete {
-        col: COL_COMMITMENT,
-        key: random_cm.to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    consensus
+        .storage
+        .delete_item(KeyValueColumn::Commitment, random_cm.to_vec())
+        .await
+        .unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::Commitment,
+        hex::encode(&random_cm)
+    )));
     // Currently unsupported
-    // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
+    // assert!(consensus.storage.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
 
 #[tokio::test]
 async fn validator_vs_a_missing_memorandum() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Remove a random memo.
-    let stored_memos = consensus.ledger.storage.get_col(COL_MEMO).unwrap();
+    let stored_memos = consensus.storage.get_memos().await.unwrap();
     let random_memo = &stored_memos.choose(&mut thread_rng()).unwrap().0;
-    let mut database_transaction = DatabaseTransaction::new();
-    database_transaction.push(Op::Delete {
-        col: COL_MEMO,
-        key: random_memo.to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    consensus
+        .storage
+        .delete_item(KeyValueColumn::Memo, random_memo.to_vec())
+        .await
+        .unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::Memo,
+        hex::encode(&random_memo)
+    )));
     // Currently unsupported
-    // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
+    // assert!(consensus.storage.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
 
 #[tokio::test]
 async fn validator_vs_a_missing_digest() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Remove a random digest.
-    let stored_digests = consensus.ledger.storage.get_col(COL_DIGEST).unwrap();
+    let stored_digests = consensus.storage.get_ledger_digests().await.unwrap();
     let random_digest = &stored_digests.choose(&mut thread_rng()).unwrap().0;
-    let mut database_transaction = DatabaseTransaction::new();
-    database_transaction.push(Op::Delete {
-        col: COL_DIGEST,
-        key: random_digest.to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    consensus
+        .storage
+        .delete_item(KeyValueColumn::DigestIndex, random_digest.to_vec())
+        .await
+        .unwrap();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+
+    assert!(errors.len() <= 2); // the index could have become incontiguous too
+    assert!(errors.contains(&ValidatorError::StorageEntryMissing(
+        KeyValueColumn::DigestIndex,
+        hex::encode(&random_digest)
+    )));
     assert!(
         consensus
-            .ledger
-            .validate(None, FixMode::MissingTestnet1TransactionComponents)
+            .storage
+            .validate(None, FixMode::MissingTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_serial_number() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Add an extra random tx serial number.
-    let mut database_transaction = DatabaseTransaction::new();
-    let current_sn_idx = consensus.ledger.current_sn_index().unwrap() as u32;
-    database_transaction.push(Op::Insert {
-        col: COL_SERIAL_NUMBER,
-        key: vec![0; 32],
-        value: (current_sn_idx + 1).to_le_bytes().to_vec(),
-    });
-    database_transaction.push(Op::Insert {
-        col: COL_META,
-        key: KEY_CURR_SN_INDEX.as_bytes().to_vec(),
-        value: (current_sn_idx + 1).to_le_bytes().to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    let next_sn_idx = consensus.storage.get_serial_numbers().await.unwrap().len();
+    let sn_idx = (next_sn_idx as u32).to_le_bytes().to_vec();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    consensus
+        .storage
+        .store_item(KeyValueColumn::SerialNumber, vec![0; 32], sn_idx.clone())
+        .await
+        .unwrap();
+
+    consensus
+        .storage
+        .store_item(KeyValueColumn::Meta, KEY_CURR_SN_INDEX.as_bytes().to_vec(), sn_idx)
+        .await
+        .unwrap();
+
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(
+        KeyValueColumn::SerialNumber,
+        1
+    )));
+
     assert!(
         consensus
-            .ledger
-            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+            .storage
+            .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_commitment() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Add an extra random tx commitment.
-    let mut database_transaction = DatabaseTransaction::new();
-    let current_cm_idx = consensus.ledger.current_cm_index().unwrap() as u32;
-    database_transaction.push(Op::Insert {
-        col: COL_COMMITMENT,
-        key: vec![0; 32],
-        value: (current_cm_idx + 1).to_le_bytes().to_vec(),
-    });
-    database_transaction.push(Op::Insert {
-        col: COL_META,
-        key: KEY_CURR_CM_INDEX.as_bytes().to_vec(),
-        value: (current_cm_idx + 1).to_le_bytes().to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    let next_cm_idx = consensus.storage.get_commitments().await.unwrap().len();
+    let cm_idx = (next_cm_idx as u32).to_le_bytes().to_vec();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    consensus
+        .storage
+        .store_item(KeyValueColumn::Commitment, vec![0; 32], cm_idx.clone())
+        .await
+        .unwrap();
+
+    consensus
+        .storage
+        .store_item(KeyValueColumn::Meta, KEY_CURR_CM_INDEX.as_bytes().to_vec(), cm_idx)
+        .await
+        .unwrap();
+
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(KeyValueColumn::Commitment, 1)));
+
     assert!(
         consensus
-            .ledger
-            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+            .storage
+            .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_memorandum() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Add an extra random memo.
-    let mut database_transaction = DatabaseTransaction::new();
-    let current_memo_idx = consensus.ledger.current_memo_index().unwrap() as u32;
-    database_transaction.push(Op::Insert {
-        col: COL_MEMO,
-        key: vec![9; 32], // apparently a memo filled with zeros is already stored
-        value: (current_memo_idx + 1).to_le_bytes().to_vec(),
-    });
-    database_transaction.push(Op::Insert {
-        col: COL_META,
-        key: KEY_CURR_MEMO_INDEX.as_bytes().to_vec(),
-        value: (current_memo_idx + 1).to_le_bytes().to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    let next_memo_idx = consensus.storage.get_memos().await.unwrap().len();
+    let memo_idx = (next_memo_idx as u32).to_le_bytes().to_vec();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    consensus
+        .storage
+        .store_item(KeyValueColumn::Memo, vec![9; 32], memo_idx.clone())
+        .await
+        .unwrap();
+
+    consensus
+        .storage
+        .store_item(KeyValueColumn::Meta, KEY_CURR_MEMO_INDEX.as_bytes().to_vec(), memo_idx)
+        .await
+        .unwrap();
+
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(KeyValueColumn::Memo, 1)));
+
     assert!(
         consensus
-            .ledger
-            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+            .storage
+            .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
 }
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_digest() {
-    let consensus = create_test_consensus();
+    let consensus = create_test_consensus().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
+        consensus.receive_block(block).await;
     }
 
     // Add an extra random digest.
-    let mut database_transaction = DatabaseTransaction::new();
-    database_transaction.push(Op::Insert {
-        col: COL_DIGEST,
-        key: vec![0; 32],
-        value: (consensus.ledger.get_current_block_height() + 1).to_le_bytes().to_vec(),
-    });
-    consensus.ledger.storage.batch(database_transaction).unwrap();
+    let digest_height = 6u32.to_le_bytes().to_vec();
 
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
+    consensus
+        .storage
+        .store_item(KeyValueColumn::DigestIndex, vec![0; 32], digest_height.clone())
+        .await
+        .unwrap();
+
+    consensus
+        .storage
+        .store_item(KeyValueColumn::DigestIndex, digest_height.clone(), vec![0; 32])
+        .await
+        .unwrap();
+
+    let errors = consensus.storage.validate(None, FixMode::Nothing).await;
+    assert_eq!(errors.len(), 1);
+    assert!(errors.contains(&ValidatorError::SuperfluousTxComponents(KeyValueColumn::DigestIndex, 1)));
+
     assert!(
         consensus
-            .ledger
-            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+            .storage
+            .validate(None, FixMode::SuperfluousTestnet1TxComponents)
             .await
+            .is_empty()
     );
-}
-
-#[ignore]
-#[tokio::test]
-async fn validator_vs_a_very_broken_db() {
-    tracing_subscriber::fmt::init();
-
-    let consensus = create_test_consensus();
-
-    let blocks = TestBlocks::load(Some(10), "test_blocks_100_1").0;
-    for block in blocks {
-        consensus.receive_block(&block, false).await.unwrap();
-    }
-
-    let mut database_transaction = DatabaseTransaction::new();
-
-    // Delete all tx-related items.
-    for col in [COL_SERIAL_NUMBER, COL_COMMITMENT, COL_MEMO, COL_DIGEST].iter() {
-        let stored_col = consensus.ledger.storage.get_col(*col).unwrap();
-        for key in stored_col.into_iter().map(|(key, _val)| key) {
-            database_transaction.push(Op::Delete {
-                col: *col,
-                key: key.into_vec(),
-            });
-        }
-    }
-
-    consensus.ledger.storage.batch(database_transaction).unwrap();
-
-    let now = std::time::Instant::now();
-    assert!(!consensus.ledger.validate(None, FixMode::Nothing).await);
-    tracing::info!("Storage validated in {}ms", now.elapsed().as_millis());
 }

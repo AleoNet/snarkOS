@@ -20,7 +20,6 @@ use std::{
 };
 
 use futures::{select, FutureExt};
-use snarkvm_dpc::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};
@@ -32,7 +31,7 @@ use super::{network::PeerIOHandle, PeerAction};
 const CONNECTION_TIMEOUT_SECS: u64 = 3;
 
 impl Peer {
-    pub fn connect<S: Storage + Send + Sync + 'static>(mut self, node: Node<S>, event_target: mpsc::Sender<PeerEvent>) {
+    pub fn connect(mut self, node: Node, event_target: mpsc::Sender<PeerEvent>) {
         let (sender, receiver) = mpsc::channel::<PeerAction>(64);
         tokio::spawn(async move {
             self.set_connecting();
