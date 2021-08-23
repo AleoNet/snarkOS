@@ -117,6 +117,8 @@ pub struct NodeQueueStats {
     pub peer_events: u64,
     /// The number of queued storage requests.
     pub storage: u64,
+    /// The number of queued sync items.
+    pub sync_items: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

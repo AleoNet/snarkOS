@@ -60,6 +60,7 @@ pub mod queues {
     pub const OUTBOUND: &str = "snarkos_queues_outbound_total";
     pub const PEER_EVENTS: &str = "snarkos_queues_peer_events_total";
     pub const STORAGE: &str = "snarkos_queues_storage_total";
+    pub const SYNC_ITEMS: &str = "snarkos_queues_sync_items_total";
 }
 
 pub mod misc {

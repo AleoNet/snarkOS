@@ -256,6 +256,8 @@ pub struct QueueStats {
     peer_events: DiscreteGauge,
     /// The number of queued storage requests.
     storage: DiscreteGauge,
+    /// The number of queued sync items.
+    sync_items: DiscreteGauge,
 }
 
 impl QueueStats {
@@ -265,6 +267,7 @@ impl QueueStats {
             outbound: DiscreteGauge::new(),
             peer_events: DiscreteGauge::new(),
             storage: DiscreteGauge::new(),
+            sync_items: DiscreteGauge::new(),
         }
     }
 
@@ -274,6 +277,7 @@ impl QueueStats {
             outbound: self.outbound.read(),
             peer_events: self.peer_events.read(),
             storage: self.storage.read(),
+            sync_items: self.sync_items.read(),
         }
     }
 }

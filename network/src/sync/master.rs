@@ -149,6 +149,7 @@ impl SyncMaster {
                     if msg.is_none() {
                         break;
                     }
+                    metrics::decrement_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
                     if handler(msg.unwrap()) {
                         break;
                     }
@@ -391,5 +392,11 @@ impl SyncMaster {
 
         self.node.finished_syncing_blocks();
         Ok(())
+    }
+}
+
+impl Drop for SyncMaster {
+    fn drop(&mut self) {
+        metrics::gauge!(snarkos_metrics::queues::SYNC_ITEMS, 0.0);
     }
 }
