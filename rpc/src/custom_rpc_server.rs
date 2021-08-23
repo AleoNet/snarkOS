@@ -108,7 +108,11 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
 
         tokio::spawn(async move {
             let mut stream = stream.await.unwrap();
-            stream.send(Message::text("Connected to publisher.")).await;
+            stream
+                .send(Message::text(
+                    "Connected to publisher. Please wait for the transaction to be mined...",
+                ))
+                .await;
 
             // Get transaction id to subscribe to.
             let transaction_id_message = stream.next().await.unwrap().unwrap();
@@ -117,10 +121,13 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
             let transaction_id = transaction_id_message.into_text().unwrap();
 
             // Wait for transaction to be mined.
+            while rpc.get_transaction_info(transaction_id.clone()).is_err() {
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            }
+
+            // Wait for required block confirmations
             let required_block_confirmations = 1;
-
             let mut block_height = rpc.get_block_count().unwrap();
-
             let transaction_info = rpc.get_transaction_info(transaction_id.clone()).unwrap();
             let transaction_block_number = transaction_info.transaction_metadata.block_number.unwrap();
 
