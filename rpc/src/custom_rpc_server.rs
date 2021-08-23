@@ -39,7 +39,12 @@ use serde::Serialize;
 use tokio::task;
 
 use futures::{SinkExt, StreamExt};
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{
+    convert::Infallible,
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 const METHODS_EXPECTING_PARAMS: [&str; 15] = [
     // public
@@ -117,12 +122,22 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
             // Get transaction id to subscribe to.
             let transaction_id_message = stream.next().await.unwrap().unwrap();
             println!("transaction id: {}", transaction_id_message);
-
             let transaction_id = transaction_id_message.into_text().unwrap();
+
+            // Start a timer
+            let start = Instant::now();
 
             // Wait for transaction to be mined.
             while rpc.get_transaction_info(transaction_id.clone()).is_err() {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+                // if we have not seen the transaction in 5 minutes, then close pipe
+                if start.elapsed() > Duration::from_secs(300) {
+                    stream
+                        .send(Message::text(format!["Transaction {} not found", transaction_id]))
+                        .await;
+                    stream.send(Message::Close(None)).await;
+                }
             }
 
             // Wait for required block confirmations
@@ -139,7 +154,11 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
             }
 
             stream
-                .send(Message::text(format!["Transaction {} Confirmed!", transaction_id]))
+                .send(Message::text(format![
+                    "Transaction {} confirmed in {} seconds!",
+                    transaction_id,
+                    start.elapsed().as_secs()
+                ]))
                 .await;
 
             stream.send(Message::Close(None)).await;
