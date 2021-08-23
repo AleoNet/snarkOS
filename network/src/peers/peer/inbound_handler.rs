@@ -87,7 +87,7 @@ impl Peer {
                         return Ok(());
                     }
 
-                    if node.inbound_cache.contains(&payload).await {
+                    if node.inbound_cache.lock().await.contains(&payload) {
                         metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
                         return Ok(());
                     }
