@@ -30,7 +30,7 @@ impl Node {
         if let Some(sync_node) = sync_node {
             info!("Updating memory pool from {}", sync_node);
 
-            self.peer_book.send_to(sync_node, Payload::GetMemoryPool).await;
+            self.peer_book.send_to(sync_node, Payload::GetMemoryPool, None).await;
         } else {
             debug!("No sync node is registered, memory pool could not be synced");
         }
@@ -52,7 +52,7 @@ impl Node {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
                 self.peer_book
-                    .send_to(remote_address, Payload::Transaction(transaction_bytes.clone()))
+                    .send_to(remote_address, Payload::Transaction(transaction_bytes.clone()), None)
                     .await;
             }
         }
@@ -97,7 +97,7 @@ impl Node {
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
             self.peer_book
-                .send_to(remote_address, Payload::MemoryPool(transactions))
+                .send_to(remote_address, Payload::MemoryPool(transactions), None)
                 .await;
         }
         Ok(())

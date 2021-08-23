@@ -121,7 +121,7 @@ impl SyncMaster {
                     .map(|x| BlockHeaderHash(x.bytes::<32>().unwrap()))
                     .collect();
                 future_set.push(async move {
-                    handle.send_payload(Payload::GetSync(block_locator_hashes)).await;
+                    handle.send_payload(Payload::GetSync(block_locator_hashes), None).await;
                 });
             }
         }
@@ -293,7 +293,7 @@ impl SyncMaster {
                     .collect();
                 future_set.push(async move {
                     peer.expecting_sync_blocks(request.len() as u32).await;
-                    peer.send_payload(Payload::GetBlocks(request)).await;
+                    peer.send_payload(Payload::GetBlocks(request), None).await;
                 });
             }
         }

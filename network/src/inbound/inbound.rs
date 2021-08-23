@@ -199,7 +199,7 @@ impl Node {
             Payload::GetPeers => {
                 metrics::increment_counter!(inbound::GETPEERS);
 
-                self.send_peers(source).await;
+                self.send_peers(source, time_received).await;
             }
             Payload::Peers(peers) => {
                 metrics::increment_counter!(inbound::PEERS);

@@ -40,7 +40,7 @@ impl Node {
             let mut futures = Vec::with_capacity(connected_peers.len());
             for remote_address in connected_peers.iter() {
                 if remote_address != &block_miner {
-                    futures.push(peer_book.send_to(*remote_address, Payload::Block(block_bytes.clone(), height)));
+                    futures.push(peer_book.send_to(*remote_address, Payload::Block(block_bytes.clone(), height), None));
                 }
             }
             tokio::time::timeout(Duration::from_secs(1), futures::future::join_all(futures))
@@ -165,7 +165,7 @@ impl Node {
 
             // Send a `SyncBlock` message to the connected peer.
             self.peer_book
-                .send_to(remote_address, Payload::SyncBlock(block.serialize(), height))
+                .send_to(remote_address, Payload::SyncBlock(block.serialize(), height), None)
                 .await;
         }
 
@@ -188,7 +188,9 @@ impl Node {
             .ok_or_else(|| anyhow!("invalid block header size in locator hash"))?;
 
         // send a `Sync` message to the connected peer.
-        self.peer_book.send_to(remote_address, Payload::Sync(sync_hashes)).await;
+        self.peer_book
+            .send_to(remote_address, Payload::Sync(sync_hashes), None)
+            .await;
 
         Ok(())
     }
