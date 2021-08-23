@@ -128,19 +128,23 @@ impl Peer {
     ) -> Result<(), NetworkError> {
         let mut reader = network.take_reader();
 
-        let (sender, mut read_receiver) = mpsc::channel::<Result<Vec<u8>, NetworkError>>(8);
+        let (sender, mut read_receiver) = mpsc::channel::<(std::time::Instant, Result<Vec<u8>, NetworkError>)>(8);
         tokio::spawn(async move {
             loop {
                 // Start the clock on the RTT.
                 //
                 // Syscalls are too slow for this purpose, it's likely best to keep track of this
                 // on the node level with a task.
+                //
+                // Prototype with syscall, then switch to using internal clock.
+                //
+                // Also interesting to track: messages/s?
 
-                if sender
-                    .send(reader.read_raw_payload().await.map(|x| x.to_vec()))
-                    .await
-                    .is_err()
-                {
+                let raw_payload = reader.read_raw_payload().await.map(|x| x.to_vec());
+
+                let time_received = std::time::Instant::now();
+
+                if sender.send((time_received, raw_payload)).await.is_err() {
                     break;
                 }
             }
@@ -162,14 +166,14 @@ impl Peer {
                     if data.is_none() {
                         break;
                     }
-                    let data = match data.unwrap() {
+                    let (time_received, data) = match data.unwrap() {
                         // decrypt
-                        Ok(data) => network.read_payload(&data[..]),
-                        Err(e) => Err(e)
+                        (time_received, Ok(data)) => (time_received, network.read_payload(&data[..])),
+                        (time_recieved, Err(e)) => (time_recieved, Err(e))
                     };
 
                     let deserialized = self.deserialize_payload(data);
-                    self.dispatch_payload(&node, &mut network, deserialized).await?;
+                    self.dispatch_payload(&node, &mut network, time_received, deserialized).await?;
                 },
             }
         }

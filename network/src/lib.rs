@@ -88,6 +88,6 @@ pub const OUTBOUND_CHANNEL_DEPTH: usize = 1024;
 // TODO (raychu86): Establish a formal node version.
 pub const PROTOCOL_VERSION: u64 = 2;
 
-pub(crate) type Sender = tokio::sync::mpsc::Sender<Message>;
+pub(crate) type Sender = tokio::sync::mpsc::Sender<(std::time::Instant, Message)>;
 
-pub(crate) type Receiver = tokio::sync::mpsc::Receiver<Message>;
+pub(crate) type Receiver = tokio::sync::mpsc::Receiver<(std::time::Instant, Message)>;

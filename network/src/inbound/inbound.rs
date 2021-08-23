@@ -105,7 +105,8 @@ impl Node {
     }
 
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
-        let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
+        let (time_received, Message { direction, payload }) =
+            receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         metrics::decrement_gauge!(queues::INBOUND, 1.0);
 
@@ -219,13 +220,13 @@ impl Node {
     }
 
     #[inline]
-    pub(crate) fn route(&self, response: Message) {
-        match self.inbound.sender.try_send(response) {
-            Err(TrySendError::Full(msg)) => {
+    pub(crate) fn route(&self, time_received: std::time::Instant, response: Message) {
+        match self.inbound.sender.try_send((time_received, response)) {
+            Err(TrySendError::Full((_, msg))) => {
                 metrics::increment_counter!(inbound::ALL_FAILURES);
                 error!("Failed to route a {}: the inbound channel is full", msg);
             }
-            Err(TrySendError::Closed(msg)) => {
+            Err(TrySendError::Closed((_, msg))) => {
                 // TODO: this shouldn't happen, but is critical if it does
                 error!("Failed to route a {}: the inbound channel is closed", msg);
             }
