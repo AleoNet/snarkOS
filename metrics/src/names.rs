@@ -56,6 +56,7 @@ pub mod handshakes {
 }
 
 pub mod queues {
+    pub const CONSENSUS: &str = "snarkos_queues_consensus_total";
     pub const INBOUND: &str = "snarkos_queues_inbound_total";
     pub const OUTBOUND: &str = "snarkos_queues_outbound_total";
     pub const PEER_EVENTS: &str = "snarkos_queues_peer_events_total";

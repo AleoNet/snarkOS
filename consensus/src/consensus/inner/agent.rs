@@ -69,6 +69,8 @@ impl ConsensusInner {
             .expect("failed to initialize ledger & storage with genesis block");
 
         while let Some((message, response)) = receiver.recv().await {
+            metrics::decrement_gauge!(snarkos_metrics::queues::CONSENSUS, 1.0);
+
             match message {
                 ConsensusMessage::ReceiveTransaction(transaction) => {
                     response.send(Box::new(self.receive_transaction(transaction))).ok();

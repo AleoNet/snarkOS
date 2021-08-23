@@ -248,6 +248,8 @@ impl HandshakeStats {
 }
 
 pub struct QueueStats {
+    /// The number of queued consensus items.
+    consensus: DiscreteGauge,
     /// The number of messages queued in the common inbound channel.
     inbound: DiscreteGauge,
     /// The number of messages queued in the individual outbound channels.
@@ -263,6 +265,7 @@ pub struct QueueStats {
 impl QueueStats {
     const fn new() -> Self {
         Self {
+            consensus: DiscreteGauge::new(),
             inbound: DiscreteGauge::new(),
             outbound: DiscreteGauge::new(),
             peer_events: DiscreteGauge::new(),
@@ -273,6 +276,7 @@ impl QueueStats {
 
     pub fn snapshot(&self) -> NodeQueueStats {
         NodeQueueStats {
+            consensus: self.consensus.read(),
             inbound: self.inbound.read(),
             outbound: self.outbound.read(),
             peer_events: self.peer_events.read(),
