@@ -22,6 +22,7 @@ use std::{
     time::Instant,
 };
 
+use snarkos_storage::SerialBlock;
 use tokio::sync::{mpsc, oneshot};
 
 use snarkos_metrics::{self as metrics, queues::*};
@@ -33,6 +34,7 @@ use super::network::PeerIOHandle;
 pub(super) enum PeerAction {
     Disconnect,
     Send(Payload, Option<Instant>),
+    SendBlock(SerialBlock, u32), // block, height
     Get(oneshot::Sender<Peer>),
     QualityJudgement,
     CancelSync,
@@ -70,6 +72,13 @@ impl PeerHandle {
         }
     }
 
+    pub async fn send_block(&self, payload: SerialBlock, height: u32) {
+        if self.sender.send(PeerAction::SendBlock(payload, height)).await.is_ok() {
+            self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
+            metrics::increment_gauge!(OUTBOUND, 1.0);
+        }
+    }
+
     pub async fn cancel_sync(&self) {
         self.sender.send(PeerAction::CancelSync).await.ok();
     }
@@ -100,11 +109,38 @@ impl Peer {
     ) -> Result<PeerResponse, NetworkError> {
         match message {
             PeerAction::Disconnect => Ok(PeerResponse::Disconnect),
+            PeerAction::SendBlock(block, height) => {
+                // check if they sent us the block recently
+                let block = block.serialize();
+
+                self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
+                metrics::decrement_gauge!(OUTBOUND, 1.0);
+
+                if self.block_received_cache.contains(&block[..]) {
+                    metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
+                    return Ok(PeerResponse::None);
+                }
+                
+                let message = Payload::Block(block, Some(height));
+
+                network.write_payload(&message).await.map_err(|e| {
+                    metrics::increment_counter!(metrics::outbound::ALL_FAILURES);
+                    e
+                })?;
+
+                metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
+
+                debug!("Sent a '{}' message to {}", &message, self.address);
+                Ok(PeerResponse::None)
+            }
             PeerAction::Send(message, time_received) => {
                 if matches!(message, Payload::Ping(_)) {
                     self.quality.expecting_pong = true;
                     self.quality.last_ping_sent = Some(Instant::now());
                 }
+
+                self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
+                metrics::decrement_gauge!(OUTBOUND, 1.0);
 
                 network.write_payload(&message).await.map_err(|e| {
                     metrics::increment_counter!(metrics::outbound::ALL_FAILURES);
@@ -123,9 +159,6 @@ impl Peer {
                 }
 
                 metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
-
-                self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
-                metrics::decrement_gauge!(OUTBOUND, 1.0);
 
                 match &message {
                     Payload::SyncBlock(..) => trace!("Sent a '{}' message to {}", &message, self.address),

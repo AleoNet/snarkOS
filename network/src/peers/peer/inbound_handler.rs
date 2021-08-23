@@ -34,9 +34,8 @@ impl Peer {
         node: &Node,
         network: &mut PeerIOHandle,
         time_received: Option<Instant>,
-        payload: Result<Payload, NetworkError>,
+        payload: Payload,
     ) -> Result<(), NetworkError> {
-        let payload = payload?;
         self.quality.see();
         self.quality.num_messages_received += 1;
         metrics::increment_counter!(inbound::ALL_SUCCESSES);
@@ -70,12 +69,18 @@ impl Peer {
 
                 if node.sync().is_some() {
                     let node = node.clone();
+                    self.block_received_cache.push(&block[..]);
                     task::spawn(async move {
                         // Check if the message hasn't already been processed recently if it's a `Block`.
                         // The node should also reject them while syncing, as it is bound to receive them later.
-                        if node.inbound_cache.lock().await.contains(&block) {
-                            metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
-                            return;
+                        {
+                            let mut inbound_cache = node.inbound_cache.lock().await;
+                            if inbound_cache.contains(&block[..]) {
+                                metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
+                                return;
+                            } else {
+                                inbound_cache.push(&block[..]);
+                            }
                         }
 
                         if node.state() == State::Syncing {
@@ -247,7 +252,11 @@ impl Peer {
         time_received: Option<Instant>,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {
-        match self.inner_dispatch_payload(node, network, time_received, payload).await {
+        let result = match payload {
+            Ok(payload) => self.inner_dispatch_payload(node, network, time_received, payload).await,
+            Err(e) => Err(e)
+        };
+        match result {
             Ok(()) => (),
             Err(e) => {
                 if e.is_trivial() {
