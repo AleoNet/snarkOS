@@ -26,6 +26,107 @@
   "panels": [
     {
       "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "rgba(128, 128, 128, 0)",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "rgb(140, 140, 140)",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 2,
+        "x": 0,
+        "y": 0
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "snarkos_misc_block_height_total",
+          "format": "time_series",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "block height",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_misc_blocks_mined_total",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "mined blocks",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_misc_duplicate_blocks_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "duplicate Blocks",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_misc_duplicate_sync_blocks_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "duplicate SyncBlocks",
+          "refId": "D"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_misc_rpc_requests_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "RPC requests",
+          "refId": "E"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_misc_orphan_blocks_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Orphan blocks",
+          "refId": "F"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "miscellaneous",
+      "type": "stat"
+    },
+    {
+      "datasource": null,
       "description": "",
       "fieldConfig": {
         "defaults": {
@@ -55,14 +156,7 @@
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "spanNulls": true
           },
           "decimals": 0,
           "mappings": [],
@@ -86,8 +180,8 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 11,
-        "x": 0,
+        "w": 10,
+        "x": 2,
         "y": 0
       },
       "id": 6,
@@ -105,6 +199,9 @@
         },
         "tooltip": {
           "mode": "multi"
+        },
+        "tooltipOptions": {
+          "mode": "single"
         }
       },
       "pluginVersion": "7.5.6",
@@ -141,28 +238,470 @@
     },
     {
       "datasource": null,
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
             "hideFrom": {
+              "graph": false,
               "legend": false,
               "tooltip": false,
               "viz": false
-            }
+            },
+            "lineInterpolation": "smooth",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true
           },
-          "mappings": []
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          },
+          "unit": "none"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 7,
-        "x": 11,
+        "h": 14,
+        "w": 12,
+        "x": 12,
         "y": 0
+      },
+      "id": 10,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "mean",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_inbound_total",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "inbound network messages",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_outbound_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "outbound network message",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_storage_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "storage requests",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_peer_events_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "peer events",
+          "refId": "D"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_sync_items_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "sync items",
+          "refId": "E"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_consensus_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "consensus requests",
+          "refId": "F"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "queued messages",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 10
+      },
+      "id": 14,
+      "options": {
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "snarkos_connections_all_accepted_total",
+          "interval": "",
+          "legendFormat": "accepted",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_connections_all_rejected_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "rejected",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_connections_all_initiated_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "initiated",
+          "refId": "C"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "all connections",
+      "type": "piechart"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 10
+      },
+      "id": 8,
+      "options": {
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "snarkos_handshakes_successes_init_total",
+          "interval": "",
+          "legendFormat": "successes as inititiator",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_handshakes_failures_init_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "failures as initiator",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_handshakes_successes_resp_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "successes as responder",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_handshakes_failures_resp_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "failures as responder",
+          "refId": "D"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_handshakes_timeouts_init_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "timeouts as initiator",
+          "refId": "E"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_handshakes_timeouts_resp_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "timeouts as responder",
+          "refId": "F"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "handshakes",
+      "type": "piechart"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 10,
+              "type": "log"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "id": 18,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getpeers_sum[$__rate_interval])/rate(snarkos_internal_rtt_getpeers_count[$__rate_interval])",
+          "interval": "",
+          "legendFormat": "GetPeers",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getsync_sum[$__rate_interval])/rate(snarkos_internal_rtt_getsync_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "GetSync",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getblocks_sum[$__rate_interval])/rate(snarkos_internal_rtt_getblocks_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "GetBlocks",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getmemorypool_sum[$__rate_interval])/rate(snarkos_internal_rtt_getmemorypool_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "GetMemoryPool",
+          "refId": "D"
+        }
+      ],
+      "title": "average internal RTT per message type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
       },
       "id": 2,
       "options": {
@@ -192,6 +731,7 @@
         {
           "exemplar": true,
           "expr": "snarkos_inbound_blocks_total",
+          "format": "time_series",
           "hide": false,
           "interval": "",
           "legendFormat": "Block",
@@ -294,85 +834,6 @@
     },
     {
       "datasource": null,
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
-      "id": 14,
-      "options": {
-        "displayLabels": [],
-        "legend": {
-          "displayMode": "list",
-          "placement": "right",
-          "values": [
-            "percent"
-          ]
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "tooltip": {
-          "mode": "single"
-        }
-      },
-      "pluginVersion": "7.5.6",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "snarkos_connections_all_accepted_total",
-          "interval": "",
-          "legendFormat": "accepted",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_connections_all_rejected_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "rejected",
-          "refId": "B"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_connections_all_initiated_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "initiated",
-          "refId": "C"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "all connections",
-      "type": "piechart"
-    },
-    {
-      "datasource": null,
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -388,30 +849,18 @@
             "hideFrom": {
               "graph": false,
               "legend": false,
-              "tooltip": false,
-              "viz": false
+              "tooltip": false
             },
             "lineInterpolation": "smooth",
-            "lineStyle": {
-              "fill": "solid"
-            },
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "spanNulls": true
           },
           "mappings": [],
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -420,142 +869,30 @@
                 "value": null
               },
               {
-                "color": "#EAB839",
-                "value": 500
-              },
-              {
                 "color": "red",
-                "value": 1000
+                "value": 80
               }
             ]
           },
-          "unit": "none"
+          "unit": "s"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 15,
-        "w": 11,
-        "x": 0,
-        "y": 10
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 25
       },
-      "id": 10,
+      "id": 20,
       "options": {
         "graph": {},
         "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "mean",
-            "last"
-          ],
+          "calcs": [],
           "displayMode": "table",
           "placement": "bottom"
         },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "7.5.6",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "snarkos_queues_inbound_total",
-          "instant": false,
-          "interval": "",
-          "legendFormat": "inbound network messages",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_queues_outbound_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "outbound network message",
-          "refId": "B"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_queues_storage_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "storage requests",
-          "refId": "C"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_queues_peer_events_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "peer events",
-          "refId": "D"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_queues_sync_items_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "sync items",
-          "refId": "E"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_queues_consensus_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "consensus requests",
-          "refId": "F"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "queued messages",
-      "type": "timeseries"
-    },
-    {
-      "datasource": null,
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 7,
-        "x": 11,
-        "y": 10
-      },
-      "id": 8,
-      "options": {
-        "displayLabels": [],
-        "legend": {
-          "displayMode": "list",
-          "placement": "right",
-          "values": [
-            "percent"
-          ]
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "tooltip": {
+        "tooltipOptions": {
           "mode": "single"
         }
       },
@@ -563,56 +900,46 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_successes_init_total",
+          "expr": "histogram_quantile(0.999, sum(rate(snarkos_internal_rtt_getpeers_bucket[$__rate_interval])) by (le))",
           "interval": "",
-          "legendFormat": "successes as inititiator",
+          "legendFormat": "P999",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_failures_init_total",
+          "expr": "histogram_quantile(0.99, sum(rate(snarkos_internal_rtt_getpeers_bucket[$__rate_interval])) by (le))",
           "hide": false,
           "interval": "",
-          "legendFormat": "failures as initiator",
+          "legendFormat": "P99",
           "refId": "B"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_successes_resp_total",
+          "expr": "histogram_quantile(0.90, sum(rate(snarkos_internal_rtt_getpeers_bucket[$__rate_interval])) by (le))",
           "hide": false,
           "interval": "",
-          "legendFormat": "successes as responder",
+          "legendFormat": "P90",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_failures_resp_total",
+          "expr": "histogram_quantile(0.75, sum(rate(snarkos_internal_rtt_getpeers_bucket[$__rate_interval])) by (le))",
           "hide": false,
           "interval": "",
-          "legendFormat": "failures as responder",
+          "legendFormat": "P75",
           "refId": "D"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_timeouts_init_total",
+          "expr": "histogram_quantile(0.5, sum(rate(snarkos_internal_rtt_getpeers_bucket[$__rate_interval])) by (le))",
           "hide": false,
           "interval": "",
-          "legendFormat": "timeouts as initiator",
+          "legendFormat": "P50",
           "refId": "E"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_handshakes_timeouts_resp_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "timeouts as responder",
-          "refId": "F"
         }
       ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "handshakes",
-      "type": "piechart"
+      "title": "internal RTT percentiles (GetPeers)",
+      "type": "timeseries"
     },
     {
       "datasource": null,
@@ -622,22 +949,28 @@
           "color": {
             "mode": "palette-classic"
           },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
+        "h": 8,
         "w": 6,
-        "x": 18,
-        "y": 10
+        "x": 0,
+        "y": 26
       },
       "id": 16,
       "options": {
@@ -645,9 +978,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "right",
-          "values": [
-            "percent"
-          ]
+          "values": []
         },
         "pieType": "pie",
         "reduceOptions": {
@@ -657,10 +988,7 @@
           "fields": "",
           "values": false
         },
-        "text": {},
-        "tooltip": {
-          "mode": "single"
-        }
+        "text": {}
       },
       "pluginVersion": "7.5.6",
       "targets": [
@@ -680,6 +1008,8 @@
           "refId": "B"
         }
       ],
+      "timeFrom": null,
+      "timeShift": null,
       "title": "all processed inbound messages",
       "type": "piechart"
     },
@@ -691,22 +1021,28 @@
           "color": {
             "mode": "palette-classic"
           },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
+        "h": 8,
         "w": 6,
-        "x": 18,
-        "y": 20
+        "x": 6,
+        "y": 26
       },
       "id": 4,
       "options": {
@@ -753,111 +1089,10 @@
       "timeShift": null,
       "title": "outbound messages",
       "type": "piechart"
-    },
-    {
-      "datasource": null,
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "rgba(128, 128, 128, 0)",
-            "mode": "fixed"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "rgb(140, 140, 140)",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 11,
-        "x": 0,
-        "y": 25
-      },
-      "id": 12,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "8.1.2",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "snarkos_misc_block_height_total",
-          "format": "time_series",
-          "hide": false,
-          "instant": false,
-          "interval": "",
-          "legendFormat": "block height",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_misc_blocks_mined_total",
-          "instant": false,
-          "interval": "",
-          "legendFormat": "mined blocks",
-          "refId": "B"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_misc_duplicate_blocks_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "duplicate Blocks",
-          "refId": "C"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_misc_duplicate_sync_blocks_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "duplicate SyncBlocks",
-          "refId": "D"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_misc_rpc_requests_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "RPC requests",
-          "refId": "E"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_misc_orphan_blocks_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "Orphan blocks",
-          "refId": "F"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "miscellaneous",
-      "type": "stat"
     }
   ],
   "refresh": "5s",
-  "schemaVersion": 30,
+  "schemaVersion": 27,
   "style": "dark",
   "tags": [
     "prometheus"
@@ -866,12 +1101,12 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "snarkOS node",
   "uid": "PAzNcaCGz",
-  "version": 55
+  "version": 10
 }
