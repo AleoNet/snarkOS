@@ -252,6 +252,8 @@ pub struct QueueStats {
     inbound: DiscreteGauge,
     /// The number of messages queued in the individual outbound channels.
     outbound: DiscreteGauge,
+    /// The number of queued peer events.
+    peer_events: DiscreteGauge,
     /// The number of queued storage requests.
     storage: DiscreteGauge,
 }
@@ -261,6 +263,7 @@ impl QueueStats {
         Self {
             inbound: DiscreteGauge::new(),
             outbound: DiscreteGauge::new(),
+            peer_events: DiscreteGauge::new(),
             storage: DiscreteGauge::new(),
         }
     }
@@ -269,6 +272,7 @@ impl QueueStats {
         NodeQueueStats {
             inbound: self.inbound.read(),
             outbound: self.outbound.read(),
+            peer_events: self.peer_events.read(),
             storage: self.storage.read(),
         }
     }
@@ -372,6 +376,7 @@ impl Recorder for Stats {
             // queues
             queues::INBOUND => &self.queues.inbound,
             queues::OUTBOUND => &self.queues.outbound,
+            queues::PEER_EVENTS => &self.queues.peer_events,
             queues::STORAGE => &self.queues.storage,
             // misc
             misc::BLOCK_HEIGHT => &self.misc.block_height,

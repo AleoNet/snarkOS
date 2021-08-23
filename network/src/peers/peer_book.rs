@@ -53,6 +53,8 @@ impl PeerBookRef {
     // gets terminated when sender is dropped from PeerBook
     async fn handle_peer_events(self, mut receiver: mpsc::Receiver<PeerEvent>) {
         while let Some(event) = receiver.recv().await {
+            metrics::decrement_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
+
             match event.data {
                 PeerEventData::Connected(handle) => {
                     self.pending_connections.fetch_sub(1, Ordering::SeqCst);

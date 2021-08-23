@@ -113,6 +113,8 @@ pub struct NodeQueueStats {
     pub inbound: u64,
     /// The number of messages queued in the individual outbound channels.
     pub outbound: u64,
+    /// The number of queued peer events.
+    pub peer_events: u64,
     /// The number of queued storage requests.
     pub storage: u64,
 }
