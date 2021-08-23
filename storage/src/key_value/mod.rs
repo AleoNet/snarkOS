@@ -20,6 +20,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::{BlockFilter, Digest, FixMode, SerialBlock, SerialRecord};
 use anyhow::*;
+use snarkos_metrics::{self as metrics, queues};
 
 mod storage;
 pub use storage::*;
@@ -179,6 +180,7 @@ impl KeyValueStore {
     async fn send<T: Send + Sync + 'static>(&self, message: Message) -> T {
         let (sender, receiver) = oneshot::channel();
         self.sender.send((message, sender)).await.ok();
+        metrics::increment_gauge!(queues::STORAGE, 1.0);
         *receiver
             .await
             .ok()

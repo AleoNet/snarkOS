@@ -237,6 +237,7 @@ impl<S: KeyValueStorage + Validator + 'static> Agent<S> {
 
     pub(super) fn agent(mut self, mut receiver: mpsc::Receiver<MessageWrapper>) {
         while let Some((message, response)) = receiver.blocking_recv() {
+            metrics::decrement_gauge!(queues::STORAGE, 1.0);
             let out = self.handle_message(message);
             response.send(out).ok();
         }

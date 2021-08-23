@@ -58,6 +58,7 @@ pub mod handshakes {
 pub mod queues {
     pub const INBOUND: &str = "snarkos_queues_inbound_total";
     pub const OUTBOUND: &str = "snarkos_queues_outbound_total";
+    pub const STORAGE: &str = "snarkos_queues_storage_total";
 }
 
 pub mod misc {

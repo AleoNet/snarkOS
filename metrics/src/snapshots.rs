@@ -113,6 +113,8 @@ pub struct NodeQueueStats {
     pub inbound: u64,
     /// The number of messages queued in the individual outbound channels.
     pub outbound: u64,
+    /// The number of queued storage requests.
+    pub storage: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
