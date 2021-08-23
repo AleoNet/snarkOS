@@ -1101,12 +1101,12 @@
     "list": []
   },
   "time": {
-    "from": "now-1m",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "snarkOS node",
   "uid": "PAzNcaCGz",
-  "version": 10
+  "version": 11
 }
