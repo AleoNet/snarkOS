@@ -71,5 +71,9 @@ pub mod misc {
     pub const DUPLICATE_SYNC_BLOCKS: &str = "snarkos_misc_duplicate_sync_blocks_total";
     pub const ORPHAN_BLOCKS: &str = "snarkos_misc_orphan_blocks_total";
     pub const RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";
-    pub const INTERNAL_RTT: &str = "snarkos_misc_internal_rtt";
+}
+
+pub mod internal_rtt {
+    pub const GETSYNC: &str = "snarkos_internal_rtt_getsync";
+    pub const GETPEERS: &str = "snarkos_internal_rtt_getpeers";
 }

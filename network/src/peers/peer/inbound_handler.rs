@@ -30,7 +30,7 @@ impl Peer {
         &mut self,
         node: &Node,
         network: &mut PeerIOHandle,
-        time_received: std::time::Instant,
+        time_received: Option<std::time::Instant>,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {
         let payload = payload?;
@@ -107,7 +107,7 @@ impl Peer {
         &mut self,
         node: &Node,
         network: &mut PeerIOHandle,
-        time_received: std::time::Instant,
+        time_received: Option<std::time::Instant>,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {
         match self.inner_dispatch_payload(node, network, time_received, payload).await {

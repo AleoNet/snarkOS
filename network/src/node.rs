@@ -30,7 +30,7 @@ use std::{
         Arc,
     },
     thread,
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tokio::{
     sync::{mpsc, Mutex, RwLock},
@@ -177,6 +177,14 @@ impl Node {
 
     pub fn known_network(&self) -> Option<&KnownNetwork> {
         self.known_network.get()
+    }
+
+    pub async fn clock_now(&self) -> Instant {
+        *self.clock.read().await
+    }
+
+    pub async fn clock_elapsed(&self, start: &Instant) -> Duration {
+        self.clock_now().await - *start
     }
 
     pub async fn start_services(&self) {

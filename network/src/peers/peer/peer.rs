@@ -128,7 +128,8 @@ impl Peer {
     ) -> Result<(), NetworkError> {
         let mut reader = network.take_reader();
 
-        let (sender, mut read_receiver) = mpsc::channel::<(std::time::Instant, Result<Vec<u8>, NetworkError>)>(8);
+        let (sender, mut read_receiver) =
+            mpsc::channel::<(Option<std::time::Instant>, Result<Vec<u8>, NetworkError>)>(8);
         tokio::spawn(async move {
             loop {
                 // Start the clock on the RTT.
@@ -142,7 +143,9 @@ impl Peer {
 
                 let raw_payload = reader.read_raw_payload().await.map(|x| x.to_vec());
 
-                let time_received = std::time::Instant::now();
+                // let time_received = std::time::Instant::now();
+                // let time_received = node_clone.clock_now().await;
+                let time_received = None;
 
                 if sender.send((time_received, raw_payload)).await.is_err() {
                     break;
@@ -166,13 +169,22 @@ impl Peer {
                     if data.is_none() {
                         break;
                     }
-                    let (time_received, data) = match data.unwrap() {
+                    let (_time_received, data) = match data.unwrap() {
                         // decrypt
                         (time_received, Ok(data)) => (time_received, network.read_payload(&data[..])),
                         (time_recieved, Err(e)) => (time_recieved, Err(e))
                     };
 
                     let deserialized = self.deserialize_payload(data);
+
+                    use crate::message::Payload;
+
+                    let time_received = if let Ok(Payload::GetPeers) | Ok(Payload::GetBlocks(_)) = deserialized {
+                        Some(std::time::Instant::now())
+                    } else {
+                        None
+                    };
+
                     self.dispatch_payload(&node, &mut network, time_received, deserialized).await?;
                 },
             }

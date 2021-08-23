@@ -105,13 +105,20 @@ impl Peer {
                     self.quality.expecting_pong = true;
                     self.quality.last_ping_sent = Some(Instant::now());
                 }
+
+                let histogram = match &message {
+                    Payload::SyncBlock(_, _) => Some(metrics::internal_rtt::GETSYNC),
+                    Payload::Peers(_) => Some(metrics::internal_rtt::GETPEERS),
+                    _ => None,
+                };
+
                 network.write_payload(&message).await.map_err(|e| {
                     metrics::increment_counter!(metrics::outbound::ALL_FAILURES);
                     e
                 })?;
 
-                if let Some(time_received) = time_received {
-                    metrics::histogram!(metrics::misc::INTERNAL_RTT, time_received.elapsed());
+                if let (Some(time_received), Some(histogram)) = (time_received, histogram) {
+                    metrics::histogram!(histogram, time_received.elapsed());
                 }
 
                 metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);

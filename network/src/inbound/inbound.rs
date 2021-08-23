@@ -151,7 +151,11 @@ impl Node {
 
                     let node_clone = self.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = node_clone.received_get_blocks(source, hashes).await {
+                        if let Err(e) = node_clone
+                            // TODO: handle unwrap.
+                            .received_get_blocks(source, hashes, time_received.unwrap())
+                            .await
+                        {
                             warn!("failed to send sync blocks to peer: {:?}", e);
                         }
                     });
@@ -199,7 +203,8 @@ impl Node {
             Payload::GetPeers => {
                 metrics::increment_counter!(inbound::GETPEERS);
 
-                self.send_peers(source, time_received).await;
+                // TODO: handle unrwap.
+                self.send_peers(source, time_received.unwrap()).await;
             }
             Payload::Peers(peers) => {
                 metrics::increment_counter!(inbound::PEERS);
@@ -220,7 +225,7 @@ impl Node {
     }
 
     #[inline]
-    pub(crate) fn route(&self, time_received: std::time::Instant, response: Message) {
+    pub(crate) fn route(&self, time_received: Option<std::time::Instant>, response: Message) {
         match self.inbound.sender.try_send((time_received, response)) {
             Err(TrySendError::Full((_, msg))) => {
                 metrics::increment_counter!(inbound::ALL_FAILURES);
