@@ -156,6 +156,8 @@ pub struct OutboundStats {
     all_successes: Counter,
     /// The number of messages that failed to be sent to peers.
     all_failures: Counter,
+    /// The number of messages that were going to be sent to a peer, but was blocked at the last minute by a cache.
+    all_cache_hits: Counter,
 }
 
 impl OutboundStats {
@@ -163,6 +165,7 @@ impl OutboundStats {
         Self {
             all_successes: Counter::new(),
             all_failures: Counter::new(),
+            all_cache_hits: Counter::new(),
         }
     }
 
@@ -409,6 +412,7 @@ impl Recorder for Stats {
             // outbound
             outbound::ALL_SUCCESSES => &self.outbound.all_successes,
             outbound::ALL_FAILURES => &self.outbound.all_failures,
+            outbound::ALL_CACHE_HITS => &self.outbound.all_cache_hits,
             // connections
             connections::ALL_ACCEPTED => &self.connections.all_accepted,
             connections::ALL_INITIATED => &self.connections.all_initiated,

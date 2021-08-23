@@ -78,6 +78,9 @@ pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 /// The maximum number of peers shared at once in response to a `GetPeers` message.
 pub const SHARED_PEER_COUNT: usize = 25;
 
+pub const BLOCK_CACHE_SIZE: usize = 64;
+pub const PEER_BLOCK_CACHE_SIZE: usize = 8;
+
 /// The version of the network protocol; it can be incremented in order to force users to update.
 /// FIXME: probably doesn't need to be a u64, could also be more informative than just a number
 // TODO (raychu86): Establish a formal node version.

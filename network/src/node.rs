@@ -61,7 +61,7 @@ pub struct InnerNode {
     /// The pre-configured parameters of this node.
     pub config: Config,
     /// The cache of node's inbound messages.
-    pub inbound_cache: Mutex<Cache>,
+    pub inbound_cache: Mutex<Cache<{ crate::BLOCK_CACHE_SIZE }>>,
     /// The list of connected and disconnected peers of this node.
     pub peer_book: PeerBook,
     /// Tracks the known network crawled by this node.

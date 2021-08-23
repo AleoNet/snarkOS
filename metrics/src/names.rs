@@ -35,6 +35,7 @@ pub mod inbound {
 pub mod outbound {
     pub const ALL_SUCCESSES: &str = "snarkos_outbound_all_successes_total";
     pub const ALL_FAILURES: &str = "snarkos_outbound_all_failures_total";
+    pub const ALL_CACHE_HITS: &str = "snarkos_outbound_all_cache_hits_total";
 }
 
 pub mod connections {
