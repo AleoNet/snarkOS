@@ -107,8 +107,10 @@ impl Peer {
                 }
 
                 let histogram = match &message {
-                    Payload::SyncBlock(_, _) => Some(metrics::internal_rtt::GETSYNC),
                     Payload::Peers(_) => Some(metrics::internal_rtt::GETPEERS),
+                    Payload::Sync(_) => Some(metrics::internal_rtt::GETSYNC),
+                    Payload::SyncBlock(_, _) => Some(metrics::internal_rtt::GETBLOCKS),
+                    Payload::MemoryPool(_) => Some(metrics::internal_rtt::GETMEMORYPOOL),
                     _ => None,
                 };
 

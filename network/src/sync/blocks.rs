@@ -155,7 +155,7 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         header_hashes: Vec<Digest>,
-        time_received: std::time::Instant,
+        time_received: Option<std::time::Instant>,
     ) -> Result<(), NetworkError> {
         for (i, hash) in header_hashes
             .into_iter()
@@ -169,7 +169,7 @@ impl Node {
             };
 
             let time_received = if i == crate::MAX_BLOCK_SYNC_COUNT as usize - 1 {
-                Some(time_received)
+                time_received
             } else {
                 None
             };
@@ -192,6 +192,7 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         block_locator_hashes: Vec<Digest>,
+        time_received: Option<std::time::Instant>,
     ) -> Result<(), NetworkError> {
         let sync_hashes = self
             .storage
@@ -204,7 +205,7 @@ impl Node {
 
         // send a `Sync` message to the connected peer.
         self.peer_book
-            .send_to(remote_address, Payload::Sync(sync_hashes), None)
+            .send_to(remote_address, Payload::Sync(sync_hashes), time_received)
             .await;
 
         Ok(())

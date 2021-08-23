@@ -71,7 +71,10 @@ impl Recorder for CombinedRecorder {
 
 #[cfg(feature = "prometheus")]
 pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
-    let prometheus_builder = metrics_exporter_prometheus::PrometheusBuilder::new();
+    let prometheus_builder = metrics_exporter_prometheus::PrometheusBuilder::new().set_buckets(&[
+        0.00001, 0.000025, 0.00005, 0.000075, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0,
+        30.0,
+    ]);
 
     let (prometheus_recorder, exporter) = prometheus_builder
         .build_with_exporter()

@@ -80,7 +80,11 @@ impl Node {
     }
 
     /// A peer has requested our memory pool transactions.
-    pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) -> Result<()> {
+    pub(crate) async fn received_get_memory_pool(
+        &self,
+        remote_address: SocketAddr,
+        time_received: Option<std::time::Instant>,
+    ) -> Result<()> {
         let transactions = self
             .expect_sync()
             .consensus
@@ -97,7 +101,7 @@ impl Node {
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
             self.peer_book
-                .send_to(remote_address, Payload::MemoryPool(transactions), None)
+                .send_to(remote_address, Payload::MemoryPool(transactions), time_received)
                 .await;
         }
         Ok(())

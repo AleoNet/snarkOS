@@ -301,7 +301,7 @@ impl Node {
         }
     }
 
-    pub(crate) async fn send_peers(&self, remote_address: SocketAddr, time_received: std::time::Instant) {
+    pub(crate) async fn send_peers(&self, remote_address: SocketAddr, time_received: Option<std::time::Instant>) {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
 
         use crate::Peer;
@@ -350,7 +350,7 @@ impl Node {
             .collect();
 
         self.peer_book
-            .send_to(remote_address, Payload::Peers(peers), Some(time_received))
+            .send_to(remote_address, Payload::Peers(peers), time_received)
             .await;
     }
 

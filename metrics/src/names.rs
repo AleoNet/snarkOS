@@ -74,6 +74,8 @@ pub mod misc {
 }
 
 pub mod internal_rtt {
-    pub const GETSYNC: &str = "snarkos_internal_rtt_getsync";
     pub const GETPEERS: &str = "snarkos_internal_rtt_getpeers";
+    pub const GETSYNC: &str = "snarkos_internal_rtt_getsync";
+    pub const GETBLOCKS: &str = "snarkos_internal_rtt_getblocks";
+    pub const GETMEMORYPOOL: &str = "snarkos_internal_rtt_getmemorypool";
 }

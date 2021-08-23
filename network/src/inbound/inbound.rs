@@ -151,11 +151,7 @@ impl Node {
 
                     let node_clone = self.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = node_clone
-                            // TODO: handle unwrap.
-                            .received_get_blocks(source, hashes, time_received.unwrap())
-                            .await
-                        {
+                        if let Err(e) = node_clone.received_get_blocks(source, hashes, time_received).await {
                             warn!("failed to send sync blocks to peer: {:?}", e);
                         }
                     });
@@ -165,7 +161,7 @@ impl Node {
                 metrics::increment_counter!(inbound::GETMEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_get_memory_pool(source).await?;
+                    self.received_get_memory_pool(source, time_received).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
@@ -180,7 +176,7 @@ impl Node {
 
                 if self.sync().is_some() {
                     let getsync = getsync.into_iter().map(|x| x.0.into()).collect();
-                    self.received_get_sync(source, getsync).await?;
+                    self.received_get_sync(source, getsync, time_received).await?;
                 }
             }
             Payload::Sync(sync) => {
@@ -203,8 +199,7 @@ impl Node {
             Payload::GetPeers => {
                 metrics::increment_counter!(inbound::GETPEERS);
 
-                // TODO: handle unrwap.
-                self.send_peers(source, time_received.unwrap()).await;
+                self.send_peers(source, time_received).await;
             }
             Payload::Peers(peers) => {
                 metrics::increment_counter!(inbound::PEERS);

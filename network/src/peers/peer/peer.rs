@@ -179,10 +179,12 @@ impl Peer {
 
                     use crate::message::Payload;
 
-                    let time_received = if let Ok(Payload::GetPeers) | Ok(Payload::GetBlocks(_)) = deserialized {
-                        Some(std::time::Instant::now())
-                    } else {
-                        None
+                    let time_received = match deserialized {
+                        Ok(Payload::GetPeers)
+                        | Ok(Payload::GetSync(_))
+                        | Ok(Payload::GetBlocks(_))
+                        | Ok(Payload::GetMemoryPool) => Some(std::time::Instant::now()),
+                        _ => None,
                     };
 
                     self.dispatch_payload(&node, &mut network, time_received, deserialized).await?;
