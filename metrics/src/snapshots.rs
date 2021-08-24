@@ -143,12 +143,12 @@ pub struct NodeMiscStats {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeInternalRttStats {
-    /// The average internal RTT for `GetPeer` queries.
+    /// The average internal RTT for `GetPeer` queries (in seconds).
     pub getpeers: f64,
-    /// The average internal RTT for `GetSync` queries.
+    /// The average internal RTT for `GetSync` queries (in seconds).
     pub getsync: f64,
-    /// The average internal RTT for `GetBlocks` queries.
+    /// The average internal RTT for `GetBlocks` queries (in seconds).
     pub getblocks: f64,
-    /// The average internal RTT for `GetMemoryPool` queries.
+    /// The average internal RTT for `GetMemoryPool` queries (in seconds).
     pub getmemorypool: f64,
 }

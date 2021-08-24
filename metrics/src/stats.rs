@@ -46,7 +46,7 @@ pub struct Stats {
     queues: QueueStats,
     /// Miscellaneous stats related to the node.
     misc: MiscStats,
-    /// The node's internal RTT from message received to response sent.
+    /// The node's internal RTT from message received to response sent (in seconds).
     internal_rtt: InternalRtt,
 }
 
