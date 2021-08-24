@@ -18,7 +18,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [features]
-default = [ "rocksdb_storage", "sqlite_storage" ] # TODO: remove sqlite default
+default = [ "rocksdb_storage" ]
 rocksdb_storage = [ "rocksdb" ]
 sqlite_storage = [ "rusqlite" ]
 mem_storage = [ ]
