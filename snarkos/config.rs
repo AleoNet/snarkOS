@@ -111,7 +111,7 @@ pub struct Storage {
     pub trim: bool,
     /// If `true`, scans superfluous blocks for valid forks at boot time. Can take a while.
     pub scan_for_forks: bool,
-    /// If `true`, uses sqlite instead of rocksdb for backend storage. Requires `snarkos_storage/sqlite_storage` feature.
+    /// If `true`, uses sqlite instead of rocksdb for backend storage. Requires `sqlite` feature.
     pub use_sqlite: bool,
 }
 

@@ -32,11 +32,13 @@ use snarkos_storage::{
     AsyncStorage,
     RocksDb,
     SerialBlock,
-    SqliteStorage,
     Storage,
     VMBlock,
     Validator,
 };
+#[cfg(feature = "sqlite")]
+use snarkos_storage::SqliteStorage;
+
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
 use snarkvm_dpc::{
     testnet1::{
@@ -119,15 +121,22 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
     let storage = if config.storage.use_sqlite {
-        let mut sqlite_path = path.clone();
-        sqlite_path.push("sqlite.db");
-
-        if config.storage.validate {
-            error!("validator not implemented for sqlite");
+        #[cfg(feature = "sqlite")]
+        {
+            let mut sqlite_path = path.clone();
+            sqlite_path.push("sqlite.db");
+    
+            if config.storage.validate {
+                error!("validator not implemented for sqlite");
+                return Ok(());
+            }
+    
+            Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))    
+        }
+        #[cfg(not(feature = "sqlite"))] {
+            error!("cannot use sqlite storage without `sqlite` compilation feature");
             return Ok(());
         }
-
-        Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
     } else {
         let storage = RocksDb::open(&path)?;
 
