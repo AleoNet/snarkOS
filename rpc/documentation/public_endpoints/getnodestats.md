@@ -45,8 +45,12 @@ None
 | `misc.duplicate_sync_blocks`     | u64  | The number of duplicate sync blocks received                                 |
 | `outbound.all_successes`         | u64  | The number of successfully sent messages                                     |
 | `outbound.all_failures`          | u64  | The number of failures to send messages                                      |
-| `queues.inbound`                 | u32  | The number of messages queued in the common inbound channel                  |
-| `queues.outbound`                | u32  | The number of messages queued in the individual outbound channels            |
+| `queues.consensus`               | u64  | The number of queued consensus requests                                      |
+| `queues.inbound`                 | u64  | The number of messages queued in the common inbound channel                  |
+| `queues.outbound`                | u64  | The number of messages queued in the individual outbound channels            |
+| `queues.peer_events`             | u64  | The number of queued peer events                                             |
+| `queues.storage`                 | u64  | The number of queued storage requests                                        |
+| `queues.sync_items`              | u64  | The number of queued sync items                                              |
 
 ### Example
 ```ignore
