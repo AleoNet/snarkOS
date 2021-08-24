@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{any::Any, fmt};
+use std::{any::Any, fmt, str::FromStr};
 
 use snarkvm_dpc::{testnet1::instantiated::Components, Address as AccountAddress, PrivateKey as AccountPrivateKey};
 use snarkvm_utilities::{FromBytes, ToBytes};
@@ -45,6 +45,22 @@ impl<T: AddressContainer> From<T> for Address {
 impl Address {
     pub fn into<T: AddressContainer>(self) -> T {
         T::read_le(&mut &self.0.0[..]).expect("illegal cross-network address contamination")
+    }
+}
+
+impl fmt::Display for Address {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let testnet1_address: AccountAddress<Components> = self.clone().into();
+        testnet1_address.fmt(f)
+    }
+}
+
+impl FromStr for Address {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let testnet1_address: AccountAddress<Components> = FromStr::from_str(s)?;
+        Ok(testnet1_address.into())
     }
 }
 

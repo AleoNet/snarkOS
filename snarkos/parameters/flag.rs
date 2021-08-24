@@ -30,3 +30,5 @@ pub const LIST: &str = "[list] -l --list 'List all available releases of snarkOS
 pub const TRIM_STORAGE: &str = "[trim-storage] --trim-storage 'Remove non-canon items from the node's storage'";
 
 pub const VALIDATE_STORAGE: &str = "[validate-storage] --validate-storage 'Check the integrity of the node's storage and attempt to fix encountered issues'";
+
+pub const SQLITE: &str = "[sqlite] --sqlite 'Uses a sqlite backend instead of rocksdb'";

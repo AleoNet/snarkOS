@@ -29,8 +29,10 @@ use snarkos_rpc::start_rpc_server;
 use snarkos_storage::{
     export_canon_blocks,
     key_value::KeyValueStore,
+    AsyncStorage,
     RocksDb,
     SerialBlock,
+    SqliteStorage,
     Storage,
     VMBlock,
     Validator,
@@ -116,24 +118,36 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     )?;
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let storage = RocksDb::open(&path)?;
+    let storage = if config.storage.use_sqlite {
+        let mut sqlite_path = path.clone();
+        sqlite_path.push("sqlite.db");
 
-    // For extra safety, validate storage too if a trim is requested.
-    let storage = if config.storage.validate || config.storage.trim {
-        let now = std::time::Instant::now();
-        let (_, moved_storage) = storage
-            .validate(None, snarkos_storage::validator::FixMode::Everything)
-            .await;
-        info!("Storage validated in {}ms", now.elapsed().as_millis());
-        if !config.storage.trim {
+        if config.storage.validate {
+            error!("validator not implemented for sqlite");
             return Ok(());
         }
-        moved_storage
-    } else {
-        storage
-    };
 
-    let storage = Arc::new(KeyValueStore::new(storage));
+        Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
+    } else {
+        let storage = RocksDb::open(&path)?;
+
+        // For extra safety, validate storage too if a trim is requested.
+        let storage = if config.storage.validate || config.storage.trim {
+            let now = std::time::Instant::now();
+            let (_, moved_storage) = storage
+                .validate(None, snarkos_storage::validator::FixMode::Everything)
+                .await;
+            info!("Storage validated in {}ms", now.elapsed().as_millis());
+            if !config.storage.trim {
+                return Ok(());
+            }
+            moved_storage
+        } else {
+            storage
+        };
+
+        Arc::new(AsyncStorage::new(KeyValueStore::new(storage)))
+    };
 
     if config.storage.trim {
         let now = std::time::Instant::now();
