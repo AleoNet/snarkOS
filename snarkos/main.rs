@@ -303,7 +303,7 @@ async fn start_server(config: Config, rt_handle: runtime::Handle) -> anyhow::Res
     if config.miner.is_miner {
         match Address::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
-                let handle = MinerInstance::new(miner_address, node.clone()).spawn().await?;
+                let handle = MinerInstance::new(miner_address, node.clone()).spawn();
                 node.register_task(handle);
             }
             Err(_) => info!(

@@ -123,3 +123,9 @@ impl From<std::io::Error> for ConsensusError {
         ConsensusError::Crate("std::io", format!("{:?}", error))
     }
 }
+
+impl From<tokio::task::JoinError> for ConsensusError {
+    fn from(error: tokio::task::JoinError) -> Self {
+        ConsensusError::Crate("tokio", error.to_string())
+    }
+}
