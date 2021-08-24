@@ -238,7 +238,6 @@ impl Node {
                     let is_syncing_blocks = node_clone.is_syncing_blocks();
 
                     if !is_syncing_blocks {
-                        node_clone.register_block_sync_attempt();
                         if let Err(e) = node_clone.run_sync().await {
                             error!("failed sync process: {:?}", e);
                         }

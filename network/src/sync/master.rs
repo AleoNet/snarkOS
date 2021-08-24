@@ -71,8 +71,10 @@ impl SyncMaster {
             interesting_peers.truncate(i + 1);
         }
 
-        info!("found {} interesting peers for sync", interesting_peers.len());
-        debug!("sync interesting peers = {:?}", interesting_peers);
+        if !interesting_peers.is_empty() {
+            info!("found {} interesting peers for sync", interesting_peers.len());
+            debug!("sync interesting peers = {:?}", interesting_peers);
+        }
 
         Ok(interesting_peers)
     }
@@ -107,9 +109,7 @@ impl SyncMaster {
         }
     }
 
-    async fn send_sync_messages(&mut self) -> Result<usize> {
-        let sync_nodes = self.find_sync_nodes().await?;
-
+    async fn send_sync_messages(&mut self, sync_nodes: Vec<Peer>) -> Result<usize> {
         info!("requested block information from {} peers", sync_nodes.len());
         let block_locator_hashes = self.block_locator_hashes().await?;
         let mut future_set = vec![];
@@ -314,7 +314,15 @@ impl SyncMaster {
     }
 
     pub async fn run(mut self) -> Result<()> {
-        let hash_requests_sent = self.send_sync_messages().await?;
+        let sync_nodes = self.find_sync_nodes().await?;
+
+        if sync_nodes.is_empty() {
+            return Ok(());
+        }
+
+        self.node.register_block_sync_attempt();
+
+        let hash_requests_sent = self.send_sync_messages(sync_nodes).await?;
 
         if hash_requests_sent == 0 {
             return Ok(());
