@@ -19,6 +19,7 @@ edition = "2018"
 
 [features]
 prometheus = [ "snarkos-metrics/prometheus" ]
+test = []
 
 [dependencies.snarkvm-algorithms]
 version = "=0.7.9"

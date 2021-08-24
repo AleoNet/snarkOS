@@ -65,8 +65,15 @@ impl MinerInstance {
                     break;
                 }
 
-                // Don't mine if the node is currently syncing.
-                if self.node.state() == State::Syncing {
+                // Don't mine if the node is currently syncing; also ensure that it's not just a short "break" from syncing blocks.
+                if self.node.state() == State::Syncing
+                    || self
+                        .node
+                        .expect_sync()
+                        .time_since_last_block_sync()
+                        .map(|elapsed| elapsed < Duration::from_secs(60))
+                        .unwrap_or(false)
+                {
                     thread::sleep(Duration::from_secs(15));
                     continue;
                 } else {

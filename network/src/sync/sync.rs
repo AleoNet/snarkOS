@@ -69,6 +69,15 @@ impl Sync {
         self.block_sync_interval
     }
 
+    /// Returns the duration since last block sync.
+    pub fn time_since_last_block_sync(&self) -> Option<Duration> {
+        if self.last_block_sync.is_empty() {
+            None
+        } else {
+            Some(self.last_block_sync.elapsed())
+        }
+    }
+
     /// Returns the interval between each memory pool sync.
     pub fn mempool_sync_interval(&self) -> Duration {
         self.mempool_sync_interval
