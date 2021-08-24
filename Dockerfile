@@ -1,4 +1,4 @@
-FROM rust:1.54.0
+FROM rust:1.54.0 as builder
 
 RUN apt-get update \
  && apt-get install -y \
@@ -15,4 +15,14 @@ COPY . .
 
 RUN cargo build --release
 
-CMD ["./target/release/snarkos"]
+
+FROM debian:buster-slim
+
+RUN apt-get update \
+  && apt-get install -y libssl1.1 libcurl4 \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY --from=builder /usr/src/snarkOS/target/release/snarkos /usr/local/bin/
+
+CMD ["snarkos"]
