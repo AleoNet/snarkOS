@@ -106,20 +106,19 @@ impl Peer {
                     self.quality.last_ping_sent = Some(Instant::now());
                 }
 
-                let histogram = match &message {
-                    Payload::Peers(_) => Some(metrics::internal_rtt::GETPEERS),
-                    Payload::Sync(_) => Some(metrics::internal_rtt::GETSYNC),
-                    Payload::SyncBlock(_, _) => Some(metrics::internal_rtt::GETBLOCKS),
-                    Payload::MemoryPool(_) => Some(metrics::internal_rtt::GETMEMORYPOOL),
-                    _ => None,
-                };
-
                 network.write_payload(&message).await.map_err(|e| {
                     metrics::increment_counter!(metrics::outbound::ALL_FAILURES);
                     e
                 })?;
 
-                if let (Some(time_received), Some(histogram)) = (time_received, histogram) {
+                // Stop the clock on the internal RTT.
+                if let (Some(time_received), Some(histogram)) = (time_received, match &message {
+                    Payload::Peers(_) => Some(metrics::internal_rtt::GETPEERS),
+                    Payload::Sync(_) => Some(metrics::internal_rtt::GETSYNC),
+                    Payload::SyncBlock(_, _) => Some(metrics::internal_rtt::GETBLOCKS),
+                    Payload::MemoryPool(_) => Some(metrics::internal_rtt::GETMEMORYPOOL),
+                    _ => None,
+                }) {
                     metrics::histogram!(histogram, time_received.elapsed());
                 }
 

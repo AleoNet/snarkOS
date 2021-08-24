@@ -157,7 +157,7 @@ impl Peer {
                     if data.is_none() {
                         break;
                     }
-                    let  data = match data.unwrap() {
+                    let data = match data.unwrap() {
                         // decrypt
                         Ok(data) => network.read_payload(&data[..]),
                         Err(e) => Err(e)

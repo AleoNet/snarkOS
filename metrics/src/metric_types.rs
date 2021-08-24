@@ -138,6 +138,7 @@ pub struct CircularHistogram(OnceCell<RwLock<CircularQueue<f64>>>);
 #[allow(dead_code)]
 impl CircularHistogram {
     pub(crate) const fn new() -> Self {
+        // The cell allows the creation of the object in a const fn.
         Self(OnceCell::new())
     }
 

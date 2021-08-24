@@ -329,7 +329,7 @@ impl MiscStats {
     }
 }
 
-/// Each histogram holds the last 1024 measurements for internal RTT for the indicated message
+/// Each histogram holds the last `QUEUE_CAPACITY` (see `metric_types` mod) measurements for internal RTT for the indicated message
 /// type. The snapshot produced for the RPC stats is the average RTT for each set.
 pub struct InternalRtt {
     getpeers: CircularHistogram,
