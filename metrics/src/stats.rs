@@ -17,12 +17,13 @@
 use metrics::{GaugeValue, Key, Recorder, Unit};
 
 use crate::{
-    metric_types::{Counter, DiscreteGauge},
+    metric_types::{CircularHistogram, Counter, DiscreteGauge},
     names::*,
     snapshots::{
         NodeConnectionStats,
         NodeHandshakeStats,
         NodeInboundStats,
+        NodeInternalRttStats,
         NodeMiscStats,
         NodeOutboundStats,
         NodeQueueStats,
@@ -45,6 +46,8 @@ pub struct Stats {
     queues: QueueStats,
     /// Miscellaneous stats related to the node.
     misc: MiscStats,
+    /// The node's internal RTT from message received to response sent (in seconds).
+    internal_rtt: InternalRtt,
 }
 
 impl Stats {
@@ -56,6 +59,7 @@ impl Stats {
             handshakes: HandshakeStats::new(),
             queues: QueueStats::new(),
             misc: MiscStats::new(),
+            internal_rtt: InternalRtt::new(),
         }
     }
 
@@ -67,6 +71,7 @@ impl Stats {
             handshakes: self.handshakes.snapshot(),
             queues: self.queues.snapshot(),
             misc: self.misc.snapshot(),
+            internal_rtt: self.internal_rtt.snapshot(),
         }
     }
 }
@@ -324,6 +329,35 @@ impl MiscStats {
     }
 }
 
+/// Each histogram holds the last `QUEUE_CAPACITY` (see `metric_types` mod) measurements for internal RTT for the indicated message
+/// type. The snapshot produced for the RPC stats is the average RTT for each set.
+pub struct InternalRtt {
+    getpeers: CircularHistogram,
+    getsync: CircularHistogram,
+    getblocks: CircularHistogram,
+    getmemorypool: CircularHistogram,
+}
+
+impl InternalRtt {
+    const fn new() -> Self {
+        Self {
+            getpeers: CircularHistogram::new(),
+            getsync: CircularHistogram::new(),
+            getblocks: CircularHistogram::new(),
+            getmemorypool: CircularHistogram::new(),
+        }
+    }
+
+    pub fn snapshot(&self) -> NodeInternalRttStats {
+        NodeInternalRttStats {
+            getpeers: self.getpeers.average(),
+            getsync: self.getsync.average(),
+            getblocks: self.getblocks.average(),
+            getmemorypool: self.getmemorypool.average(),
+        }
+    }
+}
+
 impl Recorder for Stats {
     // The following are unused in Stats
     fn register_counter(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
@@ -332,7 +366,17 @@ impl Recorder for Stats {
 
     fn register_histogram(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
 
-    fn record_histogram(&self, _key: &Key, _value: f64) {}
+    fn record_histogram(&self, key: &Key, value: f64) {
+        let metric = match key.name() {
+            internal_rtt::GETPEERS => &self.internal_rtt.getpeers,
+            internal_rtt::GETSYNC => &self.internal_rtt.getsync,
+            internal_rtt::GETBLOCKS => &self.internal_rtt.getblocks,
+            internal_rtt::GETMEMORYPOOL => &self.internal_rtt.getmemorypool,
+            _ => return,
+        };
+
+        metric.push(value);
+    }
 
     fn increment_counter(&self, key: &Key, value: u64) {
         let metric = match key.name() {

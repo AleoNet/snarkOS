@@ -32,7 +32,7 @@ use super::network::PeerIOHandle;
 
 pub(super) enum PeerAction {
     Disconnect,
-    Send(Payload),
+    Send(Payload, Option<Instant>),
     Get(oneshot::Sender<Peer>),
     QualityJudgement,
     CancelSync,
@@ -63,8 +63,8 @@ impl PeerHandle {
         self.sender.send(PeerAction::Disconnect).await.is_ok()
     }
 
-    pub async fn send_payload(&self, payload: Payload) {
-        if self.sender.send(PeerAction::Send(payload)).await.is_ok() {
+    pub async fn send_payload(&self, payload: Payload, time_received: Option<Instant>) {
+        if self.sender.send(PeerAction::Send(payload, time_received)).await.is_ok() {
             self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
             metrics::increment_gauge!(OUTBOUND, 1.0);
         }
@@ -100,15 +100,27 @@ impl Peer {
     ) -> Result<PeerResponse, NetworkError> {
         match message {
             PeerAction::Disconnect => Ok(PeerResponse::Disconnect),
-            PeerAction::Send(message) => {
+            PeerAction::Send(message, time_received) => {
                 if matches!(message, Payload::Ping(_)) {
                     self.quality.expecting_pong = true;
                     self.quality.last_ping_sent = Some(Instant::now());
                 }
+
                 network.write_payload(&message).await.map_err(|e| {
                     metrics::increment_counter!(metrics::outbound::ALL_FAILURES);
                     e
                 })?;
+
+                // Stop the clock on the internal RTT.
+                if let (Some(time_received), Some(histogram)) = (time_received, match &message {
+                    Payload::Peers(_) => Some(metrics::internal_rtt::GETPEERS),
+                    Payload::Sync(_) => Some(metrics::internal_rtt::GETSYNC),
+                    Payload::SyncBlock(_, _) => Some(metrics::internal_rtt::GETBLOCKS),
+                    Payload::MemoryPool(_) => Some(metrics::internal_rtt::GETMEMORYPOOL),
+                    _ => None,
+                }) {
+                    metrics::histogram!(histogram, time_received.elapsed());
+                }
 
                 metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
 

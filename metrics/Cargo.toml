@@ -21,12 +21,21 @@ edition = "2018"
 std = [ ]
 prometheus = [ "metrics-exporter-prometheus" ]
 
+[dependencies.circular-queue]
+version = "0.2"
+
 [dependencies.metrics]
 version = "0.17"
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.6"
 optional = true
+
+[dependencies.once_cell]
+version = "1.8.0"
+
+[dependencies.parking_lot]
+version = "0.11.1"
 
 [dependencies.serde]
 version = "1.0"

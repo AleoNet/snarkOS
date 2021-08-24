@@ -17,7 +17,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Returned value for the `getnodestats` rpc call
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeStats {
     /// Stats related to messages received by the node.
     pub inbound: NodeInboundStats,
@@ -31,6 +31,8 @@ pub struct NodeStats {
     pub queues: NodeQueueStats,
     /// Miscellaneous stats related to the node.
     pub misc: NodeMiscStats,
+    /// The node's internal RTT from message received to response sent.
+    pub internal_rtt: NodeInternalRttStats,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -137,4 +139,16 @@ pub struct NodeMiscStats {
     pub orphan_blocks: u64,
     /// The number of RPC requests received.
     pub rpc_requests: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NodeInternalRttStats {
+    /// The average internal RTT for `GetPeer` queries (in seconds).
+    pub getpeers: f64,
+    /// The average internal RTT for `GetSync` queries (in seconds).
+    pub getsync: f64,
+    /// The average internal RTT for `GetBlocks` queries (in seconds).
+    pub getblocks: f64,
+    /// The average internal RTT for `GetMemoryPool` queries (in seconds).
+    pub getmemorypool: f64,
 }

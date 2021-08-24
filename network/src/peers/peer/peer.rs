@@ -24,12 +24,12 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::mpsc;
 
 use super::PeerQuality;
-use crate::{NetworkError, Node};
+use crate::{message::Payload, NetworkError, Node};
 
 use super::{network::*, outbound_handler::*};
 
@@ -164,7 +164,16 @@ impl Peer {
                     };
 
                     let deserialized = self.deserialize_payload(data);
-                    self.dispatch_payload(&node, &mut network, deserialized).await?;
+
+                    let time_received = match deserialized {
+                        Ok(Payload::GetPeers)
+                        | Ok(Payload::GetSync(_))
+                        | Ok(Payload::GetBlocks(_))
+                        | Ok(Payload::GetMemoryPool) => Some(Instant::now()),
+                        _ => None,
+                    };
+
+                    self.dispatch_payload(&node, &mut network, time_received, deserialized).await?;
                 },
             }
         }

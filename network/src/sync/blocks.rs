@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, sync::atomic::Ordering, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::atomic::Ordering,
+    time::{Duration, Instant},
+};
 
 use snarkos_storage::{BlockStatus, Digest, VMBlock};
 use snarkvm_dpc::{
@@ -40,7 +44,7 @@ impl Node {
             let mut futures = Vec::with_capacity(connected_peers.len());
             for remote_address in connected_peers.iter() {
                 if remote_address != &block_miner {
-                    futures.push(peer_book.send_to(*remote_address, Payload::Block(block_bytes.clone(), height)));
+                    futures.push(peer_book.send_to(*remote_address, Payload::Block(block_bytes.clone(), height), None));
                 }
             }
             tokio::time::timeout(Duration::from_secs(1), futures::future::join_all(futures))
@@ -155,17 +159,33 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         header_hashes: Vec<Digest>,
+        time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
-        for hash in header_hashes.into_iter().take(crate::MAX_BLOCK_SYNC_COUNT as usize) {
+        for (i, hash) in header_hashes
+            .into_iter()
+            .take(crate::MAX_BLOCK_SYNC_COUNT as usize)
+            .enumerate()
+        {
             let block = self.storage.get_block(&hash).await?;
             let height = match self.storage.get_block_state(&block.header.hash()).await? {
                 BlockStatus::Committed(h) => Some(h as u32),
                 _ => None,
             };
 
+            // Only stop the clock on internal RTT for the last block in the response.
+            let time_received = if i == crate::MAX_BLOCK_SYNC_COUNT as usize - 1 {
+                time_received
+            } else {
+                None
+            };
+
             // Send a `SyncBlock` message to the connected peer.
             self.peer_book
-                .send_to(remote_address, Payload::SyncBlock(block.serialize(), height))
+                .send_to(
+                    remote_address,
+                    Payload::SyncBlock(block.serialize(), height),
+                    time_received,
+                )
                 .await;
         }
 
@@ -177,6 +197,7 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         block_locator_hashes: Vec<Digest>,
+        time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
         let sync_hashes = self
             .storage
@@ -188,7 +209,9 @@ impl Node {
             .ok_or_else(|| anyhow!("invalid block header size in locator hash"))?;
 
         // send a `Sync` message to the connected peer.
-        self.peer_book.send_to(remote_address, Payload::Sync(sync_hashes)).await;
+        self.peer_book
+            .send_to(remote_address, Payload::Sync(sync_hashes), time_received)
+            .await;
 
         Ok(())
     }

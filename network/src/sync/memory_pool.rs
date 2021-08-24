@@ -20,7 +20,7 @@ use snarkvm_dpc::testnet1::instantiated::Testnet1Transaction;
 use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use anyhow::*;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Instant};
 
 impl Node {
     ///
@@ -30,7 +30,7 @@ impl Node {
         if let Some(sync_node) = sync_node {
             info!("Updating memory pool from {}", sync_node);
 
-            self.peer_book.send_to(sync_node, Payload::GetMemoryPool).await;
+            self.peer_book.send_to(sync_node, Payload::GetMemoryPool, None).await;
         } else {
             debug!("No sync node is registered, memory pool could not be synced");
         }
@@ -52,7 +52,7 @@ impl Node {
             if remote_address != transaction_sender && remote_address != local_address {
                 // Send a `Transaction` message to the connected peer.
                 self.peer_book
-                    .send_to(remote_address, Payload::Transaction(transaction_bytes.clone()))
+                    .send_to(remote_address, Payload::Transaction(transaction_bytes.clone()), None)
                     .await;
             }
         }
@@ -80,7 +80,11 @@ impl Node {
     }
 
     /// A peer has requested our memory pool transactions.
-    pub(crate) async fn received_get_memory_pool(&self, remote_address: SocketAddr) -> Result<()> {
+    pub(crate) async fn received_get_memory_pool(
+        &self,
+        remote_address: SocketAddr,
+        time_received: Option<Instant>,
+    ) -> Result<()> {
         let transactions = self
             .expect_sync()
             .consensus
@@ -97,7 +101,7 @@ impl Node {
         if !transactions.is_empty() {
             // Send a `MemoryPool` message to the connected peer.
             self.peer_book
-                .send_to(remote_address, Payload::MemoryPool(transactions))
+                .send_to(remote_address, Payload::MemoryPool(transactions), time_received)
                 .await;
         }
         Ok(())

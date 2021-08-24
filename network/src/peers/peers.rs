@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cmp, net::SocketAddr, time::Duration};
+use std::{
+    cmp,
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use tokio::task;
@@ -301,7 +305,7 @@ impl Node {
         }
     }
 
-    pub(crate) async fn send_peers(&self, remote_address: SocketAddr) {
+    pub(crate) async fn send_peers(&self, remote_address: SocketAddr, time_received: Option<Instant>) {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
 
         use crate::Peer;
@@ -349,7 +353,9 @@ impl Node {
             .copied()
             .collect();
 
-        self.peer_book.send_to(remote_address, Payload::Peers(peers)).await;
+        self.peer_book
+            .send_to(remote_address, Payload::Peers(peers), time_received)
+            .await;
     }
 
     /// A node has sent their list of peer addresses.

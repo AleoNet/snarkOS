@@ -16,6 +16,8 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use circular_queue::CircularQueue;
+
 /// Mimics a [`metrics-core`] monotonically increasing [`Counter`] type
 pub struct Counter(AtomicU64);
 
@@ -122,5 +124,43 @@ impl Gauge {
                 return;
             }
         }
+    }
+}
+
+use once_cell::sync::OnceCell;
+use parking_lot::RwLock;
+
+const QUEUE_CAPACITY: usize = 256;
+
+/// A histogram backed by a circular queue.
+pub struct CircularHistogram(OnceCell<RwLock<CircularQueue<f64>>>);
+
+#[allow(dead_code)]
+impl CircularHistogram {
+    pub(crate) const fn new() -> Self {
+        // The cell allows the creation of the object in a const fn.
+        Self(OnceCell::new())
+    }
+
+    /// Push the value into the queue.
+    #[inline]
+    pub(crate) fn push(&self, val: f64) {
+        self.0
+            .get_or_init(|| RwLock::new(CircularQueue::with_capacity(QUEUE_CAPACITY)))
+            .write()
+            .push(val);
+    }
+
+    /// Computes the average over the stored values in the queue.
+    #[inline]
+    pub(crate) fn average(&self) -> f64 {
+        let queue_r = self
+            .0
+            .get_or_init(|| RwLock::new(CircularQueue::with_capacity(QUEUE_CAPACITY)))
+            .read();
+
+        let sum: f64 = queue_r.iter().copied().sum();
+
+        sum / queue_r.len() as f64
     }
 }

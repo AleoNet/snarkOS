@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::{
     net::TcpListener,
@@ -105,7 +105,8 @@ impl Node {
     }
 
     pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
-        let Message { direction, payload } = receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
+        let (time_received, Message { direction, payload }) =
+            receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
 
         metrics::decrement_gauge!(queues::INBOUND, 1.0);
 
@@ -150,7 +151,7 @@ impl Node {
 
                     let node_clone = self.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = node_clone.received_get_blocks(source, hashes).await {
+                        if let Err(e) = node_clone.received_get_blocks(source, hashes, time_received).await {
                             warn!("failed to send sync blocks to peer: {:?}", e);
                         }
                     });
@@ -160,7 +161,7 @@ impl Node {
                 metrics::increment_counter!(inbound::GETMEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_get_memory_pool(source).await?;
+                    self.received_get_memory_pool(source, time_received).await?;
                 }
             }
             Payload::MemoryPool(mempool) => {
@@ -175,7 +176,7 @@ impl Node {
 
                 if self.sync().is_some() {
                     let getsync = getsync.into_iter().map(|x| x.0.into()).collect();
-                    self.received_get_sync(source, getsync).await?;
+                    self.received_get_sync(source, getsync, time_received).await?;
                 }
             }
             Payload::Sync(sync) => {
@@ -198,7 +199,7 @@ impl Node {
             Payload::GetPeers => {
                 metrics::increment_counter!(inbound::GETPEERS);
 
-                self.send_peers(source).await;
+                self.send_peers(source, time_received).await;
             }
             Payload::Peers(peers) => {
                 metrics::increment_counter!(inbound::PEERS);
@@ -219,13 +220,13 @@ impl Node {
     }
 
     #[inline]
-    pub(crate) fn route(&self, response: Message) {
-        match self.inbound.sender.try_send(response) {
-            Err(TrySendError::Full(msg)) => {
+    pub(crate) fn route(&self, time_received: Option<Instant>, response: Message) {
+        match self.inbound.sender.try_send((time_received, response)) {
+            Err(TrySendError::Full((_, msg))) => {
                 metrics::increment_counter!(inbound::ALL_FAILURES);
                 error!("Failed to route a {}: the inbound channel is full", msg);
             }
-            Err(TrySendError::Closed(msg)) => {
+            Err(TrySendError::Closed((_, msg))) => {
                 // TODO: this shouldn't happen, but is critical if it does
                 error!("Failed to route a {}: the inbound channel is closed", msg);
             }
