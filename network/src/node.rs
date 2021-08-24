@@ -229,8 +229,26 @@ impl Node {
         self.register_task(state_tracking_task);
 
         if self.sync().is_some() {
-            let bootnodes = self.config.bootnodes();
+            let node_clone = self.clone();
+            let block_sync_interval = node_clone.expect_sync().block_sync_interval();
+            let sync_block_task = task::spawn(async move {
+                loop {
+                    let is_syncing_blocks = node_clone.is_syncing_blocks();
 
+                    if !is_syncing_blocks {
+                        node_clone.register_block_sync_attempt();
+                        if let Err(e) = node_clone.run_sync().await {
+                            error!("failed sync process: {:?}", e);
+                        }
+                        node_clone.finished_syncing_blocks();
+                    }
+
+                    sleep(block_sync_interval).await;
+                }
+            });
+            self.register_task(sync_block_task);
+
+            let bootnodes = self.config.bootnodes();
             let node_clone = self.clone();
             let mempool_sync_interval = node_clone.expect_sync().mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
@@ -270,25 +288,6 @@ impl Node {
                 }
             });
             self.register_task(sync_mempool_task);
-
-            let node_clone = self.clone();
-            let block_sync_interval = node_clone.expect_sync().block_sync_interval();
-            let sync_block_task = task::spawn(async move {
-                loop {
-                    let is_syncing_blocks = node_clone.is_syncing_blocks();
-
-                    if !is_syncing_blocks {
-                        node_clone.register_block_sync_attempt();
-                        if let Err(e) = node_clone.run_sync().await {
-                            error!("failed sync process: {:?}", e);
-                        }
-                        node_clone.finished_syncing_blocks();
-                    }
-
-                    sleep(block_sync_interval).await;
-                }
-            });
-            self.register_task(sync_block_task);
         }
     }
 
