@@ -22,6 +22,8 @@ use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use rand::{thread_rng, Rng};
 use snarkos_storage::DynStorage;
+#[cfg(not(feature = "test"))]
+use std::time::Duration;
 use std::{
     net::SocketAddr,
     ops::Deref,
@@ -254,6 +256,15 @@ impl Node {
             let sync_mempool_task = task::spawn(async move {
                 loop {
                     if !node_clone.is_syncing_blocks() {
+                        // Ensure that it's not just a short "break" from syncing blocks
+                        #[cfg(not(feature = "test"))]
+                        if let Some(elapsed) = node_clone.expect_sync().time_since_last_block_sync() {
+                            if elapsed < Duration::from_secs(60) {
+                                sleep(mempool_sync_interval).await;
+                                continue;
+                            }
+                        }
+
                         // TODO (howardwu): Add some random sync nodes beyond this approach
                         //  to ensure some diversity in mempool state that is fetched.
                         //  For now, this is acceptable because we propogate the mempool to

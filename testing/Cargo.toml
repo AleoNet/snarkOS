@@ -54,6 +54,7 @@ version = "1.3.14"
 path = "../network"
 version = "1.3.14"
 optional = true
+features = [ "test" ]
 
 [dependencies.snarkos-parameters]
 path = "../parameters"
