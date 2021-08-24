@@ -248,24 +248,40 @@ impl HandshakeStats {
 }
 
 pub struct QueueStats {
+    /// The number of queued consensus items.
+    consensus: DiscreteGauge,
     /// The number of messages queued in the common inbound channel.
     inbound: DiscreteGauge,
     /// The number of messages queued in the individual outbound channels.
     outbound: DiscreteGauge,
+    /// The number of queued peer events.
+    peer_events: DiscreteGauge,
+    /// The number of queued storage requests.
+    storage: DiscreteGauge,
+    /// The number of queued sync items.
+    sync_items: DiscreteGauge,
 }
 
 impl QueueStats {
     const fn new() -> Self {
         Self {
+            consensus: DiscreteGauge::new(),
             inbound: DiscreteGauge::new(),
             outbound: DiscreteGauge::new(),
+            peer_events: DiscreteGauge::new(),
+            storage: DiscreteGauge::new(),
+            sync_items: DiscreteGauge::new(),
         }
     }
 
     pub fn snapshot(&self) -> NodeQueueStats {
         NodeQueueStats {
+            consensus: self.consensus.read(),
             inbound: self.inbound.read(),
             outbound: self.outbound.read(),
+            peer_events: self.peer_events.read(),
+            storage: self.storage.read(),
+            sync_items: self.sync_items.read(),
         }
     }
 }
@@ -368,6 +384,8 @@ impl Recorder for Stats {
             // queues
             queues::INBOUND => &self.queues.inbound,
             queues::OUTBOUND => &self.queues.outbound,
+            queues::PEER_EVENTS => &self.queues.peer_events,
+            queues::STORAGE => &self.queues.storage,
             // misc
             misc::BLOCK_HEIGHT => &self.misc.block_height,
             // connections

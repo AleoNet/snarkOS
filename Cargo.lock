@@ -2884,6 +2884,7 @@ dependencies = [
  "serde",
  "smallvec",
  "snarkos-consensus",
+ "snarkos-metrics",
  "snarkos-parameters",
  "snarkvm-algorithms",
  "snarkvm-curves",

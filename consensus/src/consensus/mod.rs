@@ -90,6 +90,7 @@ impl Consensus {
     async fn send<T: Send + Sync + 'static>(&self, message: ConsensusMessage) -> T {
         let (sender, receiver) = oneshot::channel();
         self.sender.send((message, sender)).await.ok();
+        metrics::increment_gauge!(snarkos_metrics::queues::CONSENSUS, 1.0);
         *receiver
             .await
             .ok()

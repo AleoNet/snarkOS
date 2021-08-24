@@ -41,6 +41,7 @@ impl Peer {
                         })
                         .await
                         .ok();
+                    metrics::increment_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
                     return;
                 }
                 Ok(x) => x,
@@ -58,6 +59,8 @@ impl Peer {
                 })
                 .await
                 .ok();
+            metrics::increment_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
+
             if let Err(e) = peer.run(node, network, receiver).await {
                 if !e.is_trivial() {
                     peer.fail();
@@ -81,6 +84,7 @@ impl Peer {
                 })
                 .await
                 .ok();
+            metrics::increment_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
         });
     }
 

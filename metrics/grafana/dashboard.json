@@ -8,6 +8,12 @@
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
@@ -311,7 +317,7 @@
         "x": 18,
         "y": 0
       },
-      "id": 16,
+      "id": 14,
       "options": {
         "displayLabels": [],
         "legend": {
@@ -338,21 +344,31 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_all_successes_total",
+          "expr": "snarkos_connections_all_accepted_total",
           "interval": "",
-          "legendFormat": "valid",
+          "legendFormat": "accepted",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_all_failures_total",
+          "expr": "snarkos_connections_all_rejected_total",
           "hide": false,
           "interval": "",
-          "legendFormat": "invalid",
+          "legendFormat": "rejected",
           "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_connections_all_initiated_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "initiated",
+          "refId": "C"
         }
       ],
-      "title": "all processed inbound messages",
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "all connections",
       "type": "piechart"
     },
     {
@@ -395,6 +411,7 @@
             }
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -417,8 +434,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 5,
+        "h": 15,
+        "w": 11,
         "x": 0,
         "y": 10
       },
@@ -446,7 +463,7 @@
           "expr": "snarkos_queues_inbound_total",
           "instant": false,
           "interval": "",
-          "legendFormat": "inbound",
+          "legendFormat": "inbound network messages",
           "refId": "A"
         },
         {
@@ -454,85 +471,46 @@
           "expr": "snarkos_queues_outbound_total",
           "hide": false,
           "interval": "",
-          "legendFormat": "outbound",
+          "legendFormat": "outbound network message",
           "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_storage_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "storage requests",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_peer_events_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "peer events",
+          "refId": "D"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_sync_items_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "sync items",
+          "refId": "E"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_queues_consensus_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "consensus requests",
+          "refId": "F"
         }
       ],
       "timeFrom": null,
       "timeShift": null,
       "title": "queued messages",
       "type": "timeseries"
-    },
-    {
-      "datasource": null,
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 6,
-        "x": 5,
-        "y": 10
-      },
-      "id": 4,
-      "options": {
-        "displayLabels": [],
-        "legend": {
-          "displayMode": "list",
-          "placement": "right",
-          "values": [
-            "percent"
-          ]
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "tooltip": {
-          "mode": "single"
-        }
-      },
-      "pluginVersion": "7.5.6",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "snarkos_outbound_all_successes_total",
-          "interval": "",
-          "legendFormat": "delivered",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_outbound_all_failures_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "lost",
-          "refId": "B"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "outbound messages",
-      "type": "piechart"
     },
     {
       "datasource": null,
@@ -661,7 +639,7 @@
         "x": 18,
         "y": 10
       },
-      "id": 14,
+      "id": 16,
       "options": {
         "displayLabels": [],
         "legend": {
@@ -688,31 +666,92 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_connections_all_accepted_total",
+          "expr": "snarkos_inbound_all_successes_total",
           "interval": "",
-          "legendFormat": "accepted",
+          "legendFormat": "valid",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_connections_all_rejected_total",
+          "expr": "snarkos_inbound_all_failures_total",
           "hide": false,
           "interval": "",
-          "legendFormat": "rejected",
+          "legendFormat": "invalid",
           "refId": "B"
+        }
+      ],
+      "title": "all processed inbound messages",
+      "type": "piechart"
+    },
+    {
+      "datasource": null,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 18,
+        "y": 20
+      },
+      "id": 4,
+      "options": {
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "snarkos_outbound_all_successes_total",
+          "interval": "",
+          "legendFormat": "delivered",
+          "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_connections_all_initiated_total",
+          "expr": "snarkos_outbound_all_failures_total",
           "hide": false,
           "interval": "",
-          "legendFormat": "initiated",
-          "refId": "C"
+          "legendFormat": "lost",
+          "refId": "B"
         }
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "all connections",
+      "title": "outbound messages",
       "type": "piechart"
     },
     {
@@ -737,10 +776,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 11,
         "x": 0,
-        "y": 20
+        "y": 25
       },
       "id": 12,
       "options": {
@@ -758,7 +797,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.0.6",
+      "pluginVersion": "8.1.2",
       "targets": [
         {
           "exemplar": true,
@@ -834,5 +873,5 @@
   "timezone": "",
   "title": "snarkOS node",
   "uid": "PAzNcaCGz",
-  "version": 53
+  "version": 55
 }

@@ -109,10 +109,18 @@ pub struct NodeHandshakeStats {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeQueueStats {
+    /// The number of queued consensus requests.
+    pub consensus: u64,
     /// The number of messages queued in the common inbound channel.
     pub inbound: u64,
     /// The number of messages queued in the individual outbound channels.
     pub outbound: u64,
+    /// The number of queued peer events.
+    pub peer_events: u64,
+    /// The number of queued storage requests.
+    pub storage: u64,
+    /// The number of queued sync items.
+    pub sync_items: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
