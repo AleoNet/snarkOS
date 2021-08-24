@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 
 use tokio::{
     net::TcpListener,
+    runtime,
     sync::{mpsc::error::TrySendError, Mutex},
     task,
 };
@@ -104,9 +105,13 @@ impl Node {
         Ok(())
     }
 
-    pub async fn process_incoming_messages(&self, receiver: &mut Receiver) -> Result<(), NetworkError> {
+    pub fn process_incoming_messages(
+        &self,
+        receiver: &mut Receiver,
+        rt_handle: &runtime::Handle,
+    ) -> Result<(), NetworkError> {
         let (time_received, Message { direction, payload }) =
-            receiver.recv().await.ok_or(NetworkError::ReceiverFailedToParse)?;
+            receiver.blocking_recv().ok_or(NetworkError::ReceiverFailedToParse)?;
 
         metrics::decrement_gauge!(queues::INBOUND, 1.0);
 
@@ -116,26 +121,49 @@ impl Node {
             unreachable!("All messages processed sent to the inbound receiver are Inbound");
         };
 
+        let node = self.clone();
+        rt_handle.spawn(async move { node.process_incoming_message(payload, source).await });
+
+        Ok(())
+    }
+
+    pub async fn process_incoming_message(&self, payload: Payload, source: SocketAddr) {
         match payload {
             Payload::Transaction(transaction) => {
                 metrics::increment_counter!(inbound::TRANSACTIONS);
 
                 if self.sync().is_some() {
-                    self.received_memory_pool_transaction(source, transaction).await?;
+                    if let Err(e) = self.received_memory_pool_transaction(source, transaction).await {
+                        warn!("Received an invalid transaction from a peer: {}", e);
+                        if let Some(peer) = self.peer_book.get_peer_handle(source) {
+                            peer.fail().await;
+                        }
+                    }
                 }
             }
             Payload::Block(block, height) => {
                 // The BLOCKS metric was already updated during the block dedup cache lookup.
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, height, true).await?;
+                    if let Err(e) = self.received_block(source, block, height, true).await {
+                        warn!("Received an invalid block from a peer: {}", e);
+                        if let Some(peer) = self.peer_book.get_peer_handle(source) {
+                            peer.fail().await;
+                        }
+                    }
                 }
             }
             Payload::SyncBlock(block, height) => {
                 metrics::increment_counter!(inbound::SYNCBLOCKS);
 
                 if self.sync().is_some() {
-                    self.received_block(source, block, height, false).await?;
+                    if let Err(e) = self.received_block(source, block, height, false).await {
+                        warn!("Received an invalid block from a peer: {}", e);
+                        if let Some(peer) = self.peer_book.get_peer_handle(source) {
+                            peer.fail().await;
+                        }
+                        return;
+                    };
 
                     // Update the peer and possibly finish the sync process.
                     if let Some(peer) = self.peer_book.get_peer_handle(source) {
@@ -149,26 +177,30 @@ impl Node {
                 if self.sync().is_some() {
                     let hashes = hashes.into_iter().map(|x| x.0.into()).collect();
 
-                    let node_clone = self.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = node_clone.received_get_blocks(source, hashes, time_received).await {
-                            warn!("failed to send sync blocks to peer: {:?}", e);
-                        }
-                    });
+                    if let Err(e) = self.received_get_blocks(source, hashes, time_received).await {
+                        warn!("failed to send sync blocks to peer: {:?}", e);
+                    }
                 }
             }
             Payload::GetMemoryPool => {
                 metrics::increment_counter!(inbound::GETMEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_get_memory_pool(source, time_received).await?;
+                    if let Err(e) = self.received_get_memory_pool(source, time_received).await {
+                        warn!("Failed to procure the memory pool for a peer: {:?}", e);
+                    }
                 }
             }
             Payload::MemoryPool(mempool) => {
                 metrics::increment_counter!(inbound::MEMORYPOOL);
 
                 if self.sync().is_some() {
-                    self.received_memory_pool(mempool).await?;
+                    if let Err(e) = self.received_memory_pool(mempool).await {
+                        warn!("Received an invalid memory pool from a peer: {}", e);
+                        if let Some(peer) = self.peer_book.get_peer_handle(source) {
+                            peer.fail().await;
+                        }
+                    }
                 }
             }
             Payload::GetSync(getsync) => {
@@ -176,7 +208,9 @@ impl Node {
 
                 if self.sync().is_some() {
                     let getsync = getsync.into_iter().map(|x| x.0.into()).collect();
-                    self.received_get_sync(source, getsync, time_received).await?;
+                    if let Err(e) = self.received_get_sync(source, getsync, time_received).await {
+                        warn!("Failed to procure sync blocks for a peer: {}", e);
+                    }
                 }
             }
             Payload::Sync(sync) => {
@@ -198,12 +232,10 @@ impl Node {
             }
             Payload::GetPeers => {
                 metrics::increment_counter!(inbound::GETPEERS);
-
                 self.send_peers(source, time_received).await;
             }
             Payload::Peers(peers) => {
                 metrics::increment_counter!(inbound::PEERS);
-
                 self.process_inbound_peers(source, peers).await;
             }
             Payload::Ping(_) | Payload::Pong => {
@@ -215,8 +247,6 @@ impl Node {
                 warn!("Unknown payload received; this could indicate that the client you're using is out-of-date");
             }
         }
-
-        Ok(())
     }
 
     #[inline]

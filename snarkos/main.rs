@@ -93,7 +93,7 @@ fn print_welcome(config: &Config) {
 /// 6. Starts miner thread.
 /// 7. Starts network server listener.
 ///
-async fn start_server(config: Config) -> anyhow::Result<()> {
+async fn start_server(config: Config, rt_handle: runtime::Handle) -> anyhow::Result<()> {
     initialize_logger(&config);
 
     print_welcome(&config);
@@ -296,7 +296,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     // Start the network services
-    node.start_services().await;
+    node.start_services(rt_handle).await;
 
     // Start the miner task if mining configuration is enabled.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -327,8 +327,9 @@ fn main() -> Result<(), NodeError> {
         .enable_all()
         .thread_stack_size(8 * 1024 * 1024)
         .build()?;
+    let rt_handle = runtime.handle().clone();
 
-    runtime.block_on(start_server(config))?;
+    runtime.block_on(start_server(config, rt_handle))?;
 
     Ok(())
 }

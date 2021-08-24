@@ -34,6 +34,7 @@ use std::{
     thread,
 };
 use tokio::{
+    runtime,
     sync::{mpsc, Mutex, RwLock},
     task,
     time::sleep,
@@ -176,12 +177,12 @@ impl Node {
         self.known_network.get()
     }
 
-    pub async fn start_services(&self) {
+    pub async fn start_services(&self, rt_handle: runtime::Handle) {
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver().await;
-        let incoming_task = task::spawn(async move {
+        let incoming_thread = thread::spawn(move || {
             loop {
-                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
+                if let Err(e) = node_clone.process_incoming_messages(&mut receiver, &rt_handle) {
                     metrics::increment_counter!(inbound::ALL_FAILURES);
                     error!("Node error: {}", e);
                 } else {
@@ -189,7 +190,7 @@ impl Node {
                 }
             }
         });
-        self.register_task(incoming_task);
+        self.register_thread(incoming_thread);
 
         let node_clone: Node = self.clone();
         let peer_sync_interval = self.config.peer_sync_interval();
