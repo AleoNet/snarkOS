@@ -17,9 +17,9 @@
 use std::{any::Any, fmt};
 
 use anyhow::*;
+use snarkos_metrics::{self as metrics, queues};
 use tokio::sync::{mpsc, oneshot};
 use tracing::log::trace;
-use snarkos_metrics::{self as metrics, queues};
 
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;

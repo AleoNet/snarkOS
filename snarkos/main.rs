@@ -26,6 +26,8 @@ use snarkos::{
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
+#[cfg(feature = "sqlite")]
+use snarkos_storage::SqliteStorage;
 use snarkos_storage::{
     export_canon_blocks,
     key_value::KeyValueStore,
@@ -36,8 +38,6 @@ use snarkos_storage::{
     VMBlock,
     Validator,
 };
-#[cfg(feature = "sqlite")]
-use snarkos_storage::SqliteStorage;
 
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
 use snarkvm_dpc::{
@@ -125,15 +125,16 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         {
             let mut sqlite_path = path.clone();
             sqlite_path.push("sqlite.db");
-    
+
             if config.storage.validate {
                 error!("validator not implemented for sqlite");
                 return Ok(());
             }
-    
-            Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))    
+
+            Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
         }
-        #[cfg(not(feature = "sqlite"))] {
+        #[cfg(not(feature = "sqlite"))]
+        {
             error!("cannot use sqlite storage without `sqlite` compilation feature");
             return Ok(());
         }
