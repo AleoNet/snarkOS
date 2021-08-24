@@ -296,7 +296,7 @@ async fn start_server(config: Config, rt_handle: runtime::Handle) -> anyhow::Res
     }
 
     // Start the network services
-    node.start_services(rt_handle).await;
+    node.start_services(Some(rt_handle)).await;
 
     // Start the miner task if mining configuration is enabled.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;

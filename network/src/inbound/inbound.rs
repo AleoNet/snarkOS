@@ -16,9 +16,10 @@
 
 use std::time::{Duration, Instant};
 
+#[cfg(not(feature = "test"))]
+use tokio::runtime;
 use tokio::{
     net::TcpListener,
-    runtime,
     sync::{mpsc::error::TrySendError, Mutex},
     task,
 };
@@ -105,26 +106,37 @@ impl Node {
         Ok(())
     }
 
-    pub fn process_incoming_messages(
-        &self,
-        receiver: &mut Receiver,
-        rt_handle: &runtime::Handle,
-    ) -> Result<(), NetworkError> {
-        let (time_received, Message { direction, payload }) =
-            receiver.blocking_recv().ok_or(NetworkError::ReceiverFailedToParse)?;
+    #[cfg(not(feature = "test"))]
+    pub fn process_incoming_messages(&self, receiver: &mut Receiver, rt_handle: &runtime::Handle) {
+        while let Some((time_received, Message { direction, payload })) = receiver.blocking_recv() {
+            metrics::decrement_gauge!(queues::INBOUND, 1.0);
+            metrics::increment_counter!(inbound::ALL_SUCCESSES);
 
-        metrics::decrement_gauge!(queues::INBOUND, 1.0);
+            let source = if let Direction::Inbound(addr) = direction {
+                addr
+            } else {
+                unreachable!("All messages processed sent to the inbound receiver are Inbound");
+            };
 
-        let source = if let Direction::Inbound(addr) = direction {
-            addr
-        } else {
-            unreachable!("All messages processed sent to the inbound receiver are Inbound");
-        };
+            let node = self.clone();
+            rt_handle.spawn(async move { node.process_incoming_message(payload, source).await });
+        }
+    }
 
-        let node = self.clone();
-        rt_handle.spawn(async move { node.process_incoming_message(payload, source).await });
+    #[cfg(feature = "test")]
+    pub async fn process_incoming_messages(&self, receiver: &mut Receiver) {
+        while let Some((time_received, Message { direction, payload })) = receiver.recv().await {
+            metrics::decrement_gauge!(queues::INBOUND, 1.0);
+            metrics::increment_counter!(inbound::ALL_SUCCESSES);
 
-        Ok(())
+            let source = if let Direction::Inbound(addr) = direction {
+                addr
+            } else {
+                unreachable!("All messages processed sent to the inbound receiver are Inbound");
+            };
+
+            self.process_incoming_message(payload, source).await;
+        }
     }
 
     pub async fn process_incoming_message(&self, payload: Payload, source: SocketAddr) {
