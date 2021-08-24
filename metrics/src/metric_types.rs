@@ -130,7 +130,7 @@ impl Gauge {
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 
-const QUEUE_CAPACITY: usize = 1024;
+const QUEUE_CAPACITY: usize = 256;
 
 /// A histogram backed by a circular queue.
 pub struct CircularHistogram(OnceCell<RwLock<CircularQueue<f64>>>);

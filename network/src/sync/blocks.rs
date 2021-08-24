@@ -172,6 +172,7 @@ impl Node {
                 _ => None,
             };
 
+            // Only stop the clock on internal RTT for the last block in the response.
             let time_received = if i == crate::MAX_BLOCK_SYNC_COUNT as usize - 1 {
                 time_received
             } else {
