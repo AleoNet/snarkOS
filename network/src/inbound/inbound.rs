@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::{
     net::TcpListener,
@@ -220,7 +220,7 @@ impl Node {
     }
 
     #[inline]
-    pub(crate) fn route(&self, time_received: Option<std::time::Instant>, response: Message) {
+    pub(crate) fn route(&self, time_received: Option<Instant>, response: Message) {
         match self.inbound.sender.try_send((time_received, response)) {
             Err(TrySendError::Full((_, msg))) => {
                 metrics::increment_counter!(inbound::ALL_FAILURES);

@@ -24,12 +24,12 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::mpsc;
 
 use super::PeerQuality;
-use crate::{NetworkError, Node};
+use crate::{message::Payload, NetworkError, Node};
 
 use super::{network::*, outbound_handler::*};
 
@@ -128,26 +128,14 @@ impl Peer {
     ) -> Result<(), NetworkError> {
         let mut reader = network.take_reader();
 
-        let (sender, mut read_receiver) =
-            mpsc::channel::<(Option<std::time::Instant>, Result<Vec<u8>, NetworkError>)>(8);
+        let (sender, mut read_receiver) = mpsc::channel::<Result<Vec<u8>, NetworkError>>(8);
         tokio::spawn(async move {
             loop {
-                // Start the clock on the RTT.
-                //
-                // Syscalls are too slow for this purpose, it's likely best to keep track of this
-                // on the node level with a task.
-                //
-                // Prototype with syscall, then switch to using internal clock.
-                //
-                // Also interesting to track: messages/s?
-
-                let raw_payload = reader.read_raw_payload().await.map(|x| x.to_vec());
-
-                // let time_received = std::time::Instant::now();
-                // let time_received = node_clone.clock_now().await;
-                let time_received = None;
-
-                if sender.send((time_received, raw_payload)).await.is_err() {
+                if sender
+                    .send(reader.read_raw_payload().await.map(|x| x.to_vec()))
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -169,21 +157,19 @@ impl Peer {
                     if data.is_none() {
                         break;
                     }
-                    let (_time_received, data) = match data.unwrap() {
+                    let  data = match data.unwrap() {
                         // decrypt
-                        (time_received, Ok(data)) => (time_received, network.read_payload(&data[..])),
-                        (time_recieved, Err(e)) => (time_recieved, Err(e))
+                        Ok(data) => network.read_payload(&data[..]),
+                        Err(e) => Err(e)
                     };
 
                     let deserialized = self.deserialize_payload(data);
-
-                    use crate::message::Payload;
 
                     let time_received = match deserialized {
                         Ok(Payload::GetPeers)
                         | Ok(Payload::GetSync(_))
                         | Ok(Payload::GetBlocks(_))
-                        | Ok(Payload::GetMemoryPool) => Some(std::time::Instant::now()),
+                        | Ok(Payload::GetMemoryPool) => Some(Instant::now()),
                         _ => None,
                     };
 

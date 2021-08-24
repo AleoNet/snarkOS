@@ -32,7 +32,7 @@ use super::network::PeerIOHandle;
 
 pub(super) enum PeerAction {
     Disconnect,
-    Send(Payload, Option<std::time::Instant>),
+    Send(Payload, Option<Instant>),
     Get(oneshot::Sender<Peer>),
     QualityJudgement,
     CancelSync,
@@ -63,7 +63,7 @@ impl PeerHandle {
         self.sender.send(PeerAction::Disconnect).await.is_ok()
     }
 
-    pub async fn send_payload(&self, payload: Payload, time_received: Option<std::time::Instant>) {
+    pub async fn send_payload(&self, payload: Payload, time_received: Option<Instant>) {
         if self.sender.send(PeerAction::Send(payload, time_received)).await.is_ok() {
             self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
             metrics::increment_gauge!(OUTBOUND, 1.0);

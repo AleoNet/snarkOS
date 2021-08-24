@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, sync::atomic::Ordering, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::atomic::Ordering,
+    time::{Duration, Instant},
+};
 
 use snarkos_storage::{BlockStatus, Digest, VMBlock};
 use snarkvm_dpc::{
@@ -155,7 +159,7 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         header_hashes: Vec<Digest>,
-        time_received: Option<std::time::Instant>,
+        time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
         for (i, hash) in header_hashes
             .into_iter()
@@ -192,7 +196,7 @@ impl Node {
         &self,
         remote_address: SocketAddr,
         block_locator_hashes: Vec<Digest>,
-        time_received: Option<std::time::Instant>,
+        time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
         let sync_hashes = self
             .storage

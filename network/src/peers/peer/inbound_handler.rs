@@ -25,12 +25,14 @@ use crate::{Direction, KnownNetworkMessage, Message, NetworkError, Node, Payload
 
 use super::network::PeerIOHandle;
 
+use std::time::Instant;
+
 impl Peer {
     pub(super) async fn inner_dispatch_payload(
         &mut self,
         node: &Node,
         network: &mut PeerIOHandle,
-        time_received: Option<std::time::Instant>,
+        time_received: Option<Instant>,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {
         let payload = payload?;
@@ -107,7 +109,7 @@ impl Peer {
         &mut self,
         node: &Node,
         network: &mut PeerIOHandle,
-        time_received: Option<std::time::Instant>,
+        time_received: Option<Instant>,
         payload: Result<Payload, NetworkError>,
     ) -> Result<(), NetworkError> {
         match self.inner_dispatch_payload(node, network, time_received, payload).await {

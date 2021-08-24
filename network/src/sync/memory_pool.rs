@@ -20,7 +20,7 @@ use snarkvm_dpc::testnet1::instantiated::Testnet1Transaction;
 use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
 use anyhow::*;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Instant};
 
 impl Node {
     ///
@@ -83,7 +83,7 @@ impl Node {
     pub(crate) async fn received_get_memory_pool(
         &self,
         remote_address: SocketAddr,
-        time_received: Option<std::time::Instant>,
+        time_received: Option<Instant>,
     ) -> Result<()> {
         let transactions = self
             .expect_sync()

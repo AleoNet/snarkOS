@@ -20,6 +20,7 @@ use std::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
+    time::Instant,
 };
 
 use futures::Future;
@@ -219,12 +220,7 @@ impl PeerBook {
         .await;
     }
 
-    pub async fn send_to(
-        &self,
-        address: SocketAddr,
-        payload: Payload,
-        time_received: Option<std::time::Instant>,
-    ) -> Option<()> {
+    pub async fn send_to(&self, address: SocketAddr, payload: Payload, time_received: Option<Instant>) -> Option<()> {
         self.connected_peers
             .get(&address)?
             .send_payload(payload, time_received)
