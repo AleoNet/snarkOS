@@ -139,7 +139,7 @@ impl fmt::Display for Message {
 }
 
 pub(super) struct Agent<S: SyncStorage + 'static> {
-    inner: S, // the option is only for the purposes of validation, which requires ownership
+    inner: S,
 }
 
 impl<S: SyncStorage + 'static> Agent<S> {
