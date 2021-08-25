@@ -93,7 +93,7 @@ impl SqliteStorage {
                 block_order INTEGER NOT NULL
             );
             CREATE UNIQUE INDEX transaction_block_ordering ON transaction_blocks(block_id, block_order);
-            CREATE INDEX transaction_block_looukp ON transaction_blocks(transaction_id);
+            CREATE INDEX transaction_block_lookup ON transaction_blocks(transaction_id);
             ")?;
         }
 
