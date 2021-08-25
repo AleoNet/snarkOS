@@ -158,7 +158,8 @@ impl SyncStorage for SqliteStorage {
         let hash = block.header.hash();
         let mut block_query = self.conn.prepare_cached(
             r"
-        INSERT INTO blocks (hash,
+        INSERT INTO blocks (
+            hash,
             previous_block_id,
             previous_block_hash,
             merkle_root_hash,
