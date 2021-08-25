@@ -417,7 +417,6 @@ impl SyncStorage for SqliteStorage {
 
     fn commit_block(&mut self, hash: &Digest, ledger_digest: &Digest) -> Result<BlockStatus> {
         let canon = self.canon()?;
-        // let block = self.get_block(hash)?;
         match self.get_block_state(hash)? {
             BlockStatus::Committed(_) => {
                 return Err(anyhow!("attempted to recommit block {}", hex::encode(hash)).into());
