@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::{Duration, Instant};
+use std::{
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 #[cfg(not(feature = "test"))]
 use tokio::runtime;
@@ -119,7 +122,7 @@ impl Node {
             };
 
             let node = self.clone();
-            rt_handle.spawn(async move { node.process_incoming_message(payload, source).await });
+            rt_handle.spawn(async move { node.process_incoming_message(payload, source, time_received).await });
         }
     }
 
@@ -135,11 +138,11 @@ impl Node {
                 unreachable!("All messages processed sent to the inbound receiver are Inbound");
             };
 
-            self.process_incoming_message(payload, source).await;
+            self.process_incoming_message(payload, source, time_received).await;
         }
     }
 
-    pub async fn process_incoming_message(&self, payload: Payload, source: SocketAddr) {
+    pub async fn process_incoming_message(&self, payload: Payload, source: SocketAddr, time_received: Option<Instant>) {
         match payload {
             Payload::Transaction(transaction) => {
                 metrics::increment_counter!(inbound::TRANSACTIONS);

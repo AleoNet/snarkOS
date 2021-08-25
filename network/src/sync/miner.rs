@@ -76,7 +76,7 @@ impl MinerInstance {
                         .map(|elapsed| elapsed < Duration::from_secs(60))
                         .unwrap_or(false)
                 {
-                    sleep(Duration::from_secs(15));
+                    sleep(Duration::from_secs(15)).await;
                     continue;
                 } else {
                     self.node.set_state(State::Mining);
