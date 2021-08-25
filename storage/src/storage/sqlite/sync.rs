@@ -583,7 +583,8 @@ impl SyncStorage for SqliteStorage {
     fn store_init_digest(&mut self, digest: &Digest) -> Result<()> {
         let mut block_query = self.conn.prepare_cached(
             r"
-        INSERT INTO blocks (hash,
+        INSERT INTO blocks (
+            hash,
             previous_block_hash,
             merkle_root_hash,
             pedersen_merkle_root_hash,
