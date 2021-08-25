@@ -125,12 +125,14 @@ pub struct NodeQueueStats {
     pub sync_items: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeMiscStats {
     /// The current block height of the node.
     pub block_height: u64,
     /// The number of blocks the node has mined.
     pub blocks_mined: u64,
+    /// The average block processing time (in seconds).
+    pub block_processing_time: f64,
     /// The number of duplicate blocks received.
     pub duplicate_blocks: u64,
     /// The number of duplicate sync blocks received.
