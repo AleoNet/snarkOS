@@ -246,7 +246,7 @@ impl SyncStorage for SqliteStorage {
                 block_order
             )
             VALUES (
-                ?,
+                (SELECT id FROM transactions WHERE transaction_id = ?),
                 ?,
                 ?
             )
@@ -272,8 +272,7 @@ impl SyncStorage for SqliteStorage {
                 transaction.memorandum,
                 transaction.inner_circuit_id,
             ])?;
-            let transaction_id = self.conn.last_insert_rowid();
-            transaction_block_query.execute([transaction_id as usize, block_id as usize, i])?;
+            transaction_block_query.execute(params![&transaction.id[..], block_id as usize, i])?;
         }
         Ok(())
     }
@@ -722,7 +721,7 @@ impl SyncStorage for SqliteStorage {
         transactions.new_commitment2
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
-        INNER JOIN blocks ON blocks.id = transaction_blocks.id
+        INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
         WHERE blocks.canon_height IS NOT NULL
         ORDER BY blocks.canon_height ASC, transaction_blocks.block_order ASC
         ",
@@ -744,7 +743,7 @@ impl SyncStorage for SqliteStorage {
         transactions.old_serial_number2
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
-        INNER JOIN blocks ON blocks.id = transaction_blocks.id
+        INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
         WHERE blocks.canon_height IS NOT NULL
         ORDER BY blocks.canon_height ASC, transaction_blocks.block_order ASC
         ",
@@ -765,7 +764,7 @@ impl SyncStorage for SqliteStorage {
         transactions.memo
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
-        INNER JOIN blocks ON blocks.id = transaction_blocks.id
+        INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
         WHERE blocks.canon_height IS NOT NULL
         ORDER BY blocks.canon_height ASC, transaction_blocks.block_order ASC
         ",

@@ -159,6 +159,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Arc::new(AsyncStorage::new(KeyValueStore::new(storage)))
     };
 
+    if let Some(max_head) = config.storage.max_head {
+        let canon_next = storage.get_block_hash(max_head + 1).await?;
+        if let Some(canon_next) = canon_next {
+            storage.decommit_blocks(&canon_next).await?;
+        }
+    }
+
     if config.storage.trim {
         let now = std::time::Instant::now();
         // There shouldn't be issues after validation, but if there are, ignore them.
