@@ -48,7 +48,7 @@ pub struct ForkPath {
     /// Set of digests from `base_index`'s corresponding block to the target block
     pub path: Vec<Digest>,
     /// Tree of all descendent blocks to the target block
-    pub tail: DigestTree,
+    // pub tail: DigestTree,
 }
 
 pub enum ForkDescription {
