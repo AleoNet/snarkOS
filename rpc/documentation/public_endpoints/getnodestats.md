@@ -41,6 +41,7 @@ None
 | `internal_rtt.getmemorypool`     | f64  | The average internal RTT for GetMemoryPool messages in seconds               |
 | `misc.block_height`              | u32  | The current block height of the node                                         |
 | `misc.blocks_mined`              | u32  | The number of blocks the node has mined                                      |
+| `misc.block_processing_time`     | f64  | The block processing time in seconds                                         |
 | `misc.duplicate_blocks`          | u64  | The number of duplicate blocks received                                      |
 | `misc.duplicate_sync_blocks`     | u64  | The number of duplicate sync blocks received                                 |
 | `outbound.all_successes`         | u64  | The number of successfully sent messages                                     |
