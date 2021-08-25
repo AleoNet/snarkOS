@@ -220,7 +220,7 @@ pub struct AsyncStorage {
 impl AsyncStorage {
     pub fn new<S: SyncStorage + Send + 'static>(inner: S) -> AsyncStorage {
         let (sender, receiver) = mpsc::channel(256);
-        tokio::task::spawn_blocking(move || Agent::new(inner).agent(receiver));
+        std::thread::spawn(move || Agent::new(inner).agent(receiver));
         Self { sender }
     }
 

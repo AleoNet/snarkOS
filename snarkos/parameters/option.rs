@@ -100,6 +100,13 @@ pub const RPC_IP: OptionType = (
     &[],
 );
 
+pub const MAX_HEAD: OptionType = (
+    "[max-head] --max-head=[max-head] 'If head of canon at boot is greater than `max-head`, then it will be reverted to `max-head`.'",
+    &[],
+    &[],
+    &[],
+);
+
 pub const RPC_PORT: OptionType = (
     "[rpc-port] --rpc-port=[rpc-port] 'Specify the port the json rpc server is run on'",
     &["no_jsonrpc"],

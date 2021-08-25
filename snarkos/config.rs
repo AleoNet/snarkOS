@@ -113,6 +113,8 @@ pub struct Storage {
     pub scan_for_forks: bool,
     /// If `true`, uses sqlite instead of rocksdb for backend storage. Requires `sqlite` feature.
     pub use_sqlite: bool,
+    /// If `Some`, will reset canon to at most this block height.
+    pub max_head: Option<u32>,
 }
 
 impl Default for Config {
@@ -158,6 +160,7 @@ impl Default for Config {
                 validate: false,
                 scan_for_forks: false,
                 use_sqlite: false,
+                max_head: None,
             },
         }
     }
@@ -250,6 +253,7 @@ impl Config {
             "rpc-username" => self.rpc_username(arguments.value_of(option)),
             "rpc-password" => self.rpc_password(arguments.value_of(option)),
             "verbose" => self.verbose(clap::value_t!(arguments.value_of(*option), u8).ok()),
+            "max-head" => self.storage.max_head = clap::value_t!(arguments.value_of(*option), u32).ok(),
             _ => (),
         });
     }
@@ -453,6 +457,7 @@ impl CLI for ConfigCli {
         option::RPC_USERNAME,
         option::RPC_PASSWORD,
         option::VERBOSE,
+        option::MAX_HEAD,
     ];
     const SUBCOMMANDS: &'static [SubCommandType] = &[subcommand::UPDATE];
 
@@ -483,6 +488,7 @@ impl CLI for ConfigCli {
             "trim-storage",
             "validate-storage",
             "verbose",
+            "max-head",
         ]);
 
         if let ("update", Some(arguments)) = arguments.subcommand() {
