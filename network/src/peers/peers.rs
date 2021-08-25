@@ -386,7 +386,7 @@ impl Node {
         let max_peers = self.config.maximum_number_of_connected_peers() as usize;
 
         if num_connected > max_peers {
-            warn!(
+            debug!(
                 "Max number of connections ({} connected; max: {}) reached",
                 num_connected, max_peers
             );
