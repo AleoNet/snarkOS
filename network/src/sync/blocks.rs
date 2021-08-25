@@ -28,6 +28,7 @@ use snarkvm_dpc::{
 };
 
 use snarkos_consensus::error::ConsensusError;
+use snarkos_metrics as metrics;
 
 use crate::{master::SyncInbound, message::*, NetworkError, Node, State};
 use anyhow::*;
@@ -75,6 +76,8 @@ impl Node {
             )));
         }
 
+        // Set to `true` if the block was sent in a `Block` messages, `false` if it was sent in a
+        // `SyncBlock` message.
         if is_block_new {
             let node_clone = self.clone();
             if let Err(e) = node_clone
@@ -103,6 +106,8 @@ impl Node {
         height: Option<u32>,
         is_block_new: bool,
     ) -> Result<(), NetworkError> {
+        let now = Instant::now();
+
         let (block, block_struct) = task::spawn_blocking(move || {
             let deserialized = match Block::<Transaction<Components>>::deserialize(&block) {
                 Ok(block) => block,
@@ -148,6 +153,8 @@ impl Node {
             // This is a non-sync Block, send it to our peers.
             self.propagate_block(block, height, remote_address);
         }
+
+        metrics::histogram!(metrics::misc::BLOCK_PROCESSING_TIME, now.elapsed());
 
         Ok(())
     }
