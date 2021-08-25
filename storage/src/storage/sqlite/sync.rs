@@ -93,7 +93,7 @@ impl SqliteStorage {
                 block_order INTEGER NOT NULL
             );
             CREATE UNIQUE INDEX transaction_block_ordering ON transaction_blocks(block_id, block_order);
-            CREATE INDEX transaction_block_looukp ON transaction_blocks(transaction_id);
+            CREATE INDEX transaction_block_lookup ON transaction_blocks(transaction_id);
             ")?;
         }
 
@@ -158,7 +158,8 @@ impl SyncStorage for SqliteStorage {
         let hash = block.header.hash();
         let mut block_query = self.conn.prepare_cached(
             r"
-        INSERT INTO blocks (hash,
+        INSERT INTO blocks (
+            hash,
             previous_block_id,
             previous_block_hash,
             merkle_root_hash,
@@ -416,7 +417,6 @@ impl SyncStorage for SqliteStorage {
 
     fn commit_block(&mut self, hash: &Digest, ledger_digest: &Digest) -> Result<BlockStatus> {
         let canon = self.canon()?;
-        // let block = self.get_block(hash)?;
         match self.get_block_state(hash)? {
             BlockStatus::Committed(_) => {
                 return Err(anyhow!("attempted to recommit block {}", hex::encode(hash)).into());
@@ -582,7 +582,8 @@ impl SyncStorage for SqliteStorage {
     fn store_init_digest(&mut self, digest: &Digest) -> Result<()> {
         let mut block_query = self.conn.prepare_cached(
             r"
-        INSERT INTO blocks (hash,
+        INSERT INTO blocks (
+            hash,
             previous_block_hash,
             merkle_root_hash,
             pedersen_merkle_root_hash,
