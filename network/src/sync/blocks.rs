@@ -77,14 +77,12 @@ impl Node {
 
         if is_block_new {
             let node_clone = self.clone();
-            tokio::spawn(async move {
-                if let Err(e) = node_clone
-                    .process_received_block(remote_address, block, height, is_block_new)
-                    .await
-                {
-                    warn!("error accepting received block: {:?}", e);
-                }
-            });
+            if let Err(e) = node_clone
+                .process_received_block(remote_address, block, height, is_block_new)
+                .await
+            {
+                warn!("error accepting received block: {:?}", e);
+            }
         } else {
             let sender = self.master_dispatch.read().await;
             if let Some(sender) = &*sender {

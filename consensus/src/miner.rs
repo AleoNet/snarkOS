@@ -27,6 +27,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use tokio::task;
 
 lazy_static::lazy_static! {
     /// The mining instance that is initialized with a proving key.
@@ -37,6 +38,7 @@ lazy_static::lazy_static! {
 
 /// Compiles transactions into blocks to be submitted to the network.
 /// Uses a proof of work based algorithm to find valid blocks.
+#[derive(Clone)]
 pub struct MineContext {
     /// The coinbase address that mining rewards are assigned to.
     address: Address<Components>,
@@ -84,7 +86,7 @@ impl MineContext {
             .consensus
             .create_coinbase_transaction(
                 self.block_height as u32 + 1,
-                transactions,
+                transactions.clone(),
                 program_vk_hash,
                 new_birth_programs,
                 new_death_programs,
@@ -174,7 +176,7 @@ impl MineContext {
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
     pub async fn mine_block(
         &self,
-        terminator: &AtomicBool,
+        terminator: Arc<AtomicBool>,
     ) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
         let candidate_transactions = self.consensus.fetch_memory_pool().await;
         debug!("Miner@{}: creating a block", self.block_height);
@@ -191,7 +193,9 @@ impl MineContext {
             );
         }
 
-        let header = self.find_block(&transactions, &self.canon_header, terminator)?;
+        let ctx = self.clone();
+        let txs = transactions.clone();
+        let header = task::spawn_blocking(move || ctx.find_block(&txs, &ctx.canon_header, &terminator)).await??;
 
         debug!("Miner@{}: found a block", self.block_height);
 

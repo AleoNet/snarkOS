@@ -16,16 +16,14 @@
 
 use std::{
     sync::{atomic::Ordering, Arc},
-    thread,
     time::Duration,
 };
 
-use futures::executor::block_on;
 use snarkvm_dpc::{testnet1::instantiated::*, Address};
-use tokio::task;
+use tokio::{task, time::sleep};
 use tracing::*;
 
-use snarkos_consensus::{error::ConsensusError, MineContext};
+use snarkos_consensus::MineContext;
 use snarkos_metrics::{self as metrics, misc::*};
 
 use crate::{Node, State};
@@ -45,20 +43,24 @@ impl MinerInstance {
     /// Spawns a new miner on a new thread using MinerInstance parameters.
     /// Once a block is found, A block message is sent to all peers.
     /// Calling this function multiple times will spawn additional listeners on separate threads.
-    pub async fn spawn(self) -> Result<task::JoinHandle<()>, ConsensusError> {
-        let local_address = self.node.local_address().unwrap();
-        info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
-        let miner = MineContext::prepare(
-            self.miner_address.clone(),
-            Arc::clone(&self.node.expect_sync().consensus),
-        )
-        .await?;
-        info!("Miner instantiated; starting to mine blocks");
+    pub fn spawn(self) -> task::JoinHandle<()> {
+        task::spawn(async move {
+            let local_address = self.node.local_address().unwrap();
 
-        let mut mining_failure_count = 0;
-        let mining_failure_threshold = 10;
+            info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
 
-        Ok(task::spawn_blocking(move || {
+            let miner = MineContext::prepare(
+                self.miner_address.clone(),
+                Arc::clone(&self.node.expect_sync().consensus),
+            )
+            .await
+            .expect("Couldn't initialize the miner!");
+
+            info!("Miner instantiated; starting to mine blocks");
+
+            let mut mining_failure_count = 0;
+            let mining_failure_threshold = 10;
+
             loop {
                 if self.node.is_shutting_down() {
                     debug!("The node is shutting down, stopping mining");
@@ -74,7 +76,7 @@ impl MinerInstance {
                         .map(|elapsed| elapsed < Duration::from_secs(60))
                         .unwrap_or(false)
                 {
-                    thread::sleep(Duration::from_secs(15));
+                    sleep(Duration::from_secs(15)).await;
                     continue;
                 } else {
                     self.node.set_state(State::Mining);
@@ -84,7 +86,7 @@ impl MinerInstance {
                 // any values in terminator here are stale, we havent pulled the canon block in the miner yet
                 self.node.terminator.store(false, Ordering::SeqCst);
 
-                let (block, _coinbase_records) = match block_on(miner.mine_block(&self.node.terminator)) {
+                let (block, _coinbase_records) = match miner.mine_block(self.node.terminator.clone()).await {
                     Ok(mined_block) => mined_block,
                     Err(error) => {
                         // It's possible that the node realized that it needs to sync with another one in the
@@ -122,13 +124,10 @@ impl MinerInstance {
 
                 let serialized_block = block.serialize();
                 let node_clone = self.node.clone();
-                let new_height = futures::executor::block_on(async move {
-                    node_clone.storage.canon().await.map(|c| c.block_height as u32)
-                })
-                .ok();
+                let new_height = node_clone.storage.canon().await.map(|c| c.block_height as u32).ok();
 
                 self.node.propagate_block(serialized_block, new_height, local_address);
             }
-        }))
+        })
     }
 }

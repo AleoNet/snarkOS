@@ -44,6 +44,7 @@ mod message;
 pub use message::*;
 mod utility;
 
+#[derive(Clone)]
 pub struct Consensus {
     pub parameters: ConsensusParameters,
     pub dpc: Arc<Testnet1DPC>,

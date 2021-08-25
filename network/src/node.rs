@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{master::SyncInbound, sync::master::SyncMaster, *};
-use snarkos_metrics::{self as metrics, inbound, misc};
+use snarkos_metrics::{self as metrics, misc};
 
 use anyhow::*;
 use chrono::{DateTime, Utc};
@@ -34,6 +34,7 @@ use std::{
     thread,
 };
 use tokio::{
+    runtime,
     sync::{mpsc, Mutex, RwLock},
     task,
     time::sleep,
@@ -176,20 +177,24 @@ impl Node {
         self.known_network.get()
     }
 
-    pub async fn start_services(&self) {
+    pub async fn start_services(&self, _rt_handle: Option<runtime::Handle>) {
         let node_clone = self.clone();
         let mut receiver = self.inbound.take_receiver().await;
-        let incoming_task = task::spawn(async move {
-            loop {
-                if let Err(e) = node_clone.process_incoming_messages(&mut receiver).await {
-                    metrics::increment_counter!(inbound::ALL_FAILURES);
-                    error!("Node error: {}", e);
-                } else {
-                    metrics::increment_counter!(inbound::ALL_SUCCESSES);
-                }
-            }
-        });
-        self.register_task(incoming_task);
+
+        #[cfg(not(feature = "test"))]
+        {
+            // The runtime handle is available outside of tests.
+            let rt_handle = _rt_handle.unwrap();
+            let incoming_thread =
+                thread::spawn(move || node_clone.process_incoming_messages(&mut receiver, &rt_handle));
+            self.register_thread(incoming_thread);
+        }
+
+        #[cfg(feature = "test")]
+        {
+            let incoming_task = task::spawn(async move { node_clone.process_incoming_messages(&mut receiver).await });
+            self.register_task(incoming_task);
+        }
 
         let node_clone: Node = self.clone();
         let peer_sync_interval = self.config.peer_sync_interval();

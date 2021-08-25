@@ -67,13 +67,13 @@ impl Node {
         source: SocketAddr,
         transaction: Vec<u8>,
     ) -> Result<()> {
-        if let Ok(tx) = Testnet1Transaction::read_le(&*transaction) {
-            let inserted = self.expect_sync().consensus.receive_transaction(tx.serialize()?).await;
+        let tx = Testnet1Transaction::read_le(&*transaction)?;
 
-            if inserted {
-                info!("Transaction added to memory pool.");
-                self.propagate_memory_pool_transaction(transaction, source).await;
-            }
+        let inserted = self.expect_sync().consensus.receive_transaction(tx.serialize()?).await;
+
+        if inserted {
+            info!("Transaction added to memory pool.");
+            self.propagate_memory_pool_transaction(transaction, source).await;
         }
 
         Ok(())
