@@ -21,6 +21,7 @@ use std::sync::Arc;
 use crate::key_value::KeyValueColumn;
 use crate::{
     Digest,
+    DigestTree,
     FixMode,
     SerialBlock,
     SerialBlockHeader,
@@ -46,6 +47,8 @@ pub struct ForkPath {
     pub base_index: u32,
     /// Set of digests from `base_index`'s corresponding block to the target block
     pub path: Vec<Digest>,
+    /// Tree of all descendent blocks to the target block
+    pub tail: DigestTree,
 }
 
 pub enum ForkDescription {
@@ -117,6 +120,9 @@ pub trait Storage: Send + Sync {
 
     /// Gets the longest, committed or uncommitted, chain of blocks originating from `block_hash`, including `block_hash`.
     async fn longest_child_path(&self, block_hash: &Digest) -> Result<Vec<Digest>>;
+
+    /// Gets a tree structure representing all the descendents of [`block_hash`]
+    async fn get_block_digest_tree(&self, block_hash: &Digest) -> Result<DigestTree>;
 
     /// Gets the immediate children of `block_hash`.
     async fn get_block_children(&self, block_hash: &Digest) -> Result<Vec<Digest>>;

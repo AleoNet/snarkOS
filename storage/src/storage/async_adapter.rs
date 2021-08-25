@@ -28,6 +28,7 @@ use crate::{
     BlockStatus,
     CanonData,
     Digest,
+    DigestTree,
     FixMode,
     ForkDescription,
     SerialBlock,
@@ -53,6 +54,7 @@ enum Message {
     DecommitBlocks(Digest),
     Canon(),
     LongestChildPath(Digest),
+    GetBlockDigestTree(Digest),
     GetBlockChildren(Digest),
     GetBlockLocatorHashes(Vec<Digest>, usize), // points of interest, oldest_fork_threshold
     FindSyncBlocks(Vec<Digest>, usize),
@@ -97,6 +99,7 @@ impl fmt::Display for Message {
             Message::DecommitBlocks(hash) => write!(f, "DecommitBlocks({})", hash),
             Message::Canon() => write!(f, "Canon()"),
             Message::LongestChildPath(hash) => write!(f, "LongestChildPath({})", hash),
+            Message::GetBlockDigestTree(hash) => write!(f, "GetBlockDigestTree({})", hash),
             Message::GetBlockChildren(hash) => write!(f, "GetBlockChildren({})", hash),
             Message::GetBlockLocatorHashes(canon_depth_limit, oldest_fork_threshold) => write!(
                 f,
@@ -171,6 +174,7 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::Canon() => Box::new(self.inner.canon()),
             Message::GetBlockChildren(hash) => Box::new(self.inner.get_block_children(&hash)),
             Message::LongestChildPath(hash) => Box::new(self.inner.longest_child_path(&hash)),
+            Message::GetBlockDigestTree(hash) => Box::new(self.inner.get_block_digest_tree(&hash)),
             Message::GetBlockLocatorHashes(points_of_interest, oldest_fork_threshold) => Box::new(
                 self.inner
                     .get_block_locator_hashes(points_of_interest, oldest_fork_threshold),
@@ -287,6 +291,10 @@ impl Storage for AsyncStorage {
 
     async fn longest_child_path(&self, block_hash: &Digest) -> Result<Vec<Digest>> {
         self.send(Message::LongestChildPath(block_hash.clone())).await
+    }
+
+    async fn get_block_digest_tree(&self, block_hash: &Digest) -> Result<DigestTree> {
+        self.send(Message::GetBlockDigestTree(block_hash.clone())).await
     }
 
     async fn get_block_children(&self, block_hash: &Digest) -> Result<Vec<Digest>> {

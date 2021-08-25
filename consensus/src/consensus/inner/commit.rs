@@ -16,6 +16,7 @@
 
 use super::*;
 use snarkos_metrics as metrics;
+use snarkos_storage::DigestTree;
 use snarkvm_dpc::AleoAmount;
 
 impl ConsensusInner {
@@ -237,19 +238,39 @@ impl ConsensusInner {
 
     pub(super) async fn try_to_fast_forward(&mut self) -> Result<(), ConsensusError> {
         let canon = self.storage.canon().await?;
-        let children = self.storage.longest_child_path(&canon.hash).await?;
-        if children.len() > 1 {
-            debug!(
-                "Attempting to canonize the descendants of block at height {}.",
-                canon.block_height
-            );
+        let mut children = self.storage.get_block_digest_tree(&canon.hash).await?;
+        if matches!(&children, DigestTree::Leaf(x) if x == &canon.hash) {
+            return Ok(());
         }
-
-        for child_block_hash in children.into_iter().skip(1) {
-            let new_block = self.storage.get_block(&child_block_hash).await?;
-
+        debug!(
+            "Attempting to canonize the descendants of block at height {}.",
+            canon.block_height
+        );
+        loop {
+            let mut sub_children = children.children().to_vec();
+            if sub_children.is_empty() {
+                break;
+            }
+            sub_children.sort_by(|a, b| b.longest_length().cmp(&a.longest_length()));
             debug!("Processing the next known descendant.");
-            self.try_commit_block(&child_block_hash, &new_block).await?;
+            let mut last_error = None;
+            for child in sub_children {
+                let new_block = self.storage.get_block(child.root()).await?;
+                match self.try_commit_block(child.root(), &new_block).await {
+                    Ok(()) => {
+                        children = child;
+                        last_error = None;
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("failed to commit descendent block, trying sibling... error: {:?}", e);
+                        last_error = Some(e);
+                    }
+                }
+            }
+            if let Some(last_error) = last_error {
+                return Err(last_error);
+            }
         }
         Ok(())
     }

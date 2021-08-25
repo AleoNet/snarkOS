@@ -204,28 +204,6 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
             .unwrap_or_else(Vec::new))
     }
 
-    fn longest_child_path(&mut self, block_hash: &Digest) -> Result<Vec<Digest>> {
-        let mut round = vec![vec![block_hash.clone()]];
-        let mut next_round = vec![];
-        loop {
-            for path in &round {
-                let children = self.get_block_children(path.last().unwrap())?;
-                next_round.extend(children.into_iter().map(|x| {
-                    let mut path = path.clone();
-                    path.push(x);
-                    path
-                }));
-            }
-            if next_round.is_empty() {
-                break;
-            }
-            round = next_round;
-            next_round = vec![];
-        }
-
-        Ok(round.into_iter().max_by_key(|x| x.len()).unwrap())
-    }
-
     fn insert_block(&mut self, block: &SerialBlock) -> Result<()> {
         let hash = block.header.hash();
         match self.get_block_state(&hash)? {

@@ -26,6 +26,7 @@ use crate::{
     BlockStatus,
     CanonData,
     Digest,
+    DigestTree,
     FixMode,
     ForkDescription,
     ForkPath,
@@ -143,6 +144,25 @@ pub trait SyncStorage {
         }
 
         Ok(round.into_iter().max_by_key(|x| x.len()).unwrap())
+    }
+
+    /// Gets a tree structure representing all the descendents of [`block_hash`]
+    fn get_block_digest_tree(&mut self, block_hash: &Digest) -> Result<DigestTree> {
+        let children = self.get_block_children(block_hash)?;
+        if children.len() == 1 {
+            return Ok(DigestTree::Leaf(block_hash.clone()));
+        }
+        let mut out_children = Vec::with_capacity(children.len());
+        let mut longest_tree_len = 0usize;
+        for child in children {
+            let subtree = self.get_block_digest_tree(&child)?;
+            let len = subtree.longest_length() + 1;
+            if len > longest_tree_len {
+                longest_tree_len = len;
+            }
+            out_children.push(subtree);
+        }
+        Ok(DigestTree::Node(block_hash.clone(), out_children, longest_tree_len))
     }
 
     /// Gets the immediate children of `block_hash`.

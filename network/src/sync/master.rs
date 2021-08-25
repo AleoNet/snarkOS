@@ -79,6 +79,7 @@ impl SyncMaster {
 
     async fn block_locator_hashes(&mut self) -> Result<Vec<Digest>> {
         let forks_of_interest = self.node.expect_sync().consensus.scan_forks().await?;
+        trace!("sync found {} forks", forks_of_interest.len());
         let blocks_of_interest: Vec<Digest> = forks_of_interest.into_iter().map(|(_canon, fork)| fork).collect();
         let mut tips_of_blocks_of_interest: Vec<Digest> = Vec::with_capacity(blocks_of_interest.len());
         for block in blocks_of_interest {
