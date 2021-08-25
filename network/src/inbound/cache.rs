@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Payload;
-
 use snarkvm_dpc::block::BlockHeader;
 
 use circular_queue::CircularQueue;
@@ -34,12 +32,8 @@ impl Default for Cache {
 }
 
 impl Cache {
-    pub fn contains(&mut self, payload: &Payload) -> bool {
-        let hash = if let Payload::Block(bytes, _) = payload {
-            hash64(&bytes[..BlockHeader::size()])
-        } else {
-            unreachable!("Only blocks are cached for now");
-        };
+    pub fn contains(&mut self, block_bytes: &[u8]) -> bool {
+        let hash = hash64(&block_bytes[..BlockHeader::size()]);
 
         if self.queue.iter().any(|&e| e == hash) {
             true

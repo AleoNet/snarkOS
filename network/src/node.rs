@@ -34,7 +34,6 @@ use std::{
     thread,
 };
 use tokio::{
-    runtime,
     sync::{mpsc, Mutex, RwLock},
     task,
     time::sleep,
@@ -61,8 +60,6 @@ pub struct InnerNode {
     pub local_address: OnceCell<SocketAddr>,
     /// The pre-configured parameters of this node.
     pub config: Config,
-    /// The inbound handler of this node.
-    pub inbound: Inbound,
     /// The cache of node's inbound messages.
     pub inbound_cache: Mutex<Cache>,
     /// The list of connected and disconnected peers of this node.
@@ -128,7 +125,6 @@ impl Node {
             local_address: Default::default(),
             config,
             storage,
-            inbound: Default::default(),
             inbound_cache: Default::default(),
             peer_book: PeerBook::spawn(),
             sync: Default::default(),
@@ -177,25 +173,7 @@ impl Node {
         self.known_network.get()
     }
 
-    pub async fn start_services(&self, _rt_handle: Option<runtime::Handle>) {
-        let node_clone = self.clone();
-        let mut receiver = self.inbound.take_receiver().await;
-
-        #[cfg(not(feature = "test"))]
-        {
-            // The runtime handle is available outside of tests.
-            let rt_handle = _rt_handle.unwrap();
-            let incoming_thread =
-                thread::spawn(move || node_clone.process_incoming_messages(&mut receiver, &rt_handle));
-            self.register_thread(incoming_thread);
-        }
-
-        #[cfg(feature = "test")]
-        {
-            let incoming_task = task::spawn(async move { node_clone.process_incoming_messages(&mut receiver).await });
-            self.register_task(incoming_task);
-        }
-
+    pub async fn start_services(&self) {
         let node_clone: Node = self.clone();
         let peer_sync_interval = self.config.peer_sync_interval();
         let peering_task = task::spawn(async move {

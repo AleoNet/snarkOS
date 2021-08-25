@@ -196,7 +196,7 @@ pub async fn test_node(setup: TestSetup) -> Node {
     };
 
     node.listen().await.unwrap();
-    node.start_services(None).await;
+    node.start_services().await;
 
     if is_miner {
         let miner_address = FIXTURE.test_accounts[0].address.clone();

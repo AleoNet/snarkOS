@@ -163,12 +163,13 @@ impl Node {
     pub(crate) async fn received_get_blocks(
         &self,
         remote_address: SocketAddr,
-        header_hashes: Vec<Digest>,
+        header_hashes: Vec<BlockHeaderHash>,
         time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
         for (i, hash) in header_hashes
             .into_iter()
             .take(crate::MAX_BLOCK_SYNC_COUNT as usize)
+            .map(|x| -> Digest { x.0.into() })
             .enumerate()
         {
             let block = self.storage.get_block(&hash).await?;
@@ -201,9 +202,11 @@ impl Node {
     pub(crate) async fn received_get_sync(
         &self,
         remote_address: SocketAddr,
-        block_locator_hashes: Vec<Digest>,
+        block_locator_hashes: Vec<BlockHeaderHash>,
         time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
+        let block_locator_hashes = block_locator_hashes.into_iter().map(|x| x.0.into()).collect::<Vec<_>>();
+
         let sync_hashes = self
             .storage
             .find_sync_blocks(&block_locator_hashes[..], crate::MAX_BLOCK_SYNC_COUNT as usize)
