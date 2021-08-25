@@ -152,7 +152,7 @@ impl<S: SyncStorage + 'static> Agent<S> {
     }
 
     fn handle_message(&mut self, message: Message) -> Box<dyn Any + Send + Sync> {
-        trace!("received message: {}", message);
+        trace!("received storage request: {}", message);
         match message {
             Message::InsertBlock(block) => Box::new(self.wrap(move |f| f.insert_block(&block))),
             Message::DeleteBlock(hash) => Box::new(self.wrap(move |f| f.delete_block(&hash))),
