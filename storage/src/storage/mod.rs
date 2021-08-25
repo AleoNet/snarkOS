@@ -26,6 +26,8 @@ pub mod sync;
 pub use sync::*;
 pub mod async_adapter;
 pub use async_adapter::*;
+pub mod digest_tree;
+pub use digest_tree::*;
 
 pub mod key_value;
 pub use key_value::KeyValueStorage;

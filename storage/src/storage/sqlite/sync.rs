@@ -498,8 +498,7 @@ impl SyncStorage for SqliteStorage {
         let mut stmt = self.conn.prepare_cached(
             r"
             SELECT blocks.hash FROM blocks
-            INNER JOIN blocks parent ON parent.id = blocks.previous_block_id
-            WHERE parent.hash = ?
+            WHERE blocks.previous_block_hash = ?
             ORDER BY blocks.hash
         ",
         )?;
