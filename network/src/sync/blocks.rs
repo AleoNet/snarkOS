@@ -60,7 +60,7 @@ impl Node {
         remote_address: SocketAddr,
         block: Vec<u8>,
         height: Option<u32>,
-        is_block_new: bool,
+        is_non_sync: bool,
     ) -> Result<(), NetworkError> {
         let block_size = block.len();
         let max_block_size = self.expect_sync().max_block_size();
@@ -78,10 +78,10 @@ impl Node {
 
         // Set to `true` if the block was sent in a `Block` messages, `false` if it was sent in a
         // `SyncBlock` message.
-        if is_block_new {
+        if is_non_sync {
             let node_clone = self.clone();
             if let Err(e) = node_clone
-                .process_received_block(remote_address, block, height, is_block_new)
+                .process_received_block(remote_address, block, height, is_non_sync)
                 .await
             {
                 warn!("error accepting received block: {:?}", e);
@@ -104,7 +104,7 @@ impl Node {
         remote_address: SocketAddr,
         block: Vec<u8>,
         height: Option<u32>,
-        is_block_new: bool,
+        is_non_sync: bool,
     ) -> Result<(), NetworkError> {
         let now = Instant::now();
 
@@ -145,7 +145,7 @@ impl Node {
         // Verify the block and insert it into the storage.
         let block_validity = self.expect_sync().consensus.receive_block(block_struct).await;
 
-        if block_validity && is_block_new {
+        if block_validity && is_non_sync {
             if previous_block_hash == canon.hash && self.state() == State::Mining {
                 self.terminator.store(true, Ordering::SeqCst);
             }
