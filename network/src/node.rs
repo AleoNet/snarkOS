@@ -232,6 +232,11 @@ impl Node {
             });
             self.register_task(sync_block_task);
 
+            // An arbitrary short delay before mempool sync attempts begin, to ensure that block sync
+            // has been attempted first.
+            #[cfg(not(feature = "test"))]
+            sleep(Duration::from_secs(5)).await;
+
             let bootnodes = self.config.bootnodes();
             let node_clone = self.clone();
             let mempool_sync_interval = node_clone.expect_sync().mempool_sync_interval();
