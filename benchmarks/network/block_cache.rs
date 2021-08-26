@@ -18,7 +18,7 @@ use criterion::*;
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use snarkos_network::{Cache, Payload};
+use snarkos_network::Cache;
 
 fn block_cache_perf(c: &mut Criterion) {
     const MIN_BLOCK_SIZE: usize = 1024; // 1KiB
@@ -36,9 +36,7 @@ fn block_cache_perf(c: &mut Criterion) {
             let mut random_bytes = vec![0u8; block_size];
             rng.fill(&mut random_bytes[..]);
 
-            let test_block = Payload::Block(random_bytes, None);
-
-            let _check = cache.contains(&test_block);
+            let _check = cache.contains(&random_bytes);
         })
     });
 }

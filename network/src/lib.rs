@@ -78,8 +78,6 @@ pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 /// The maximum number of peers shared at once in response to a `GetPeers` message.
 pub const SHARED_PEER_COUNT: usize = 25;
 
-/// The depth of the common inbound channel.
-pub const INBOUND_CHANNEL_DEPTH: usize = 4096;
 /// The depth of the per-connection outbound channels.
 pub const OUTBOUND_CHANNEL_DEPTH: usize = 1024;
 
@@ -87,7 +85,3 @@ pub const OUTBOUND_CHANNEL_DEPTH: usize = 1024;
 /// FIXME: probably doesn't need to be a u64, could also be more informative than just a number
 // TODO (raychu86): Establish a formal node version.
 pub const PROTOCOL_VERSION: u64 = 2;
-
-pub(crate) type Sender = tokio::sync::mpsc::Sender<(Option<std::time::Instant>, Message)>;
-
-pub(crate) type Receiver = tokio::sync::mpsc::Receiver<(Option<std::time::Instant>, Message)>;
