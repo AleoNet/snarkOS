@@ -27,6 +27,7 @@ mod consensus_sidechain {
     // After block 1 is received, block 2 should be fetched from storage and added to the chain.
     #[tokio::test]
     async fn new_out_of_order() {
+        tracing_subscriber::fmt::init();
         let consensus = snarkos_testing::sync::create_test_consensus().await;
 
         let old_block_height = consensus.storage.canon().await.unwrap().block_height;

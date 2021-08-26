@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MemoryPool};
-use snarkos_storage::{key_value::KeyValueStore, AsyncStorage, DynStorage, MemDb, VMBlock};
+use snarkos_storage::VMBlock;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::instantiated::{Components, Testnet1Transaction},
