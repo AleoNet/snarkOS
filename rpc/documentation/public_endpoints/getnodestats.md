@@ -11,9 +11,10 @@ None
 | `connections.all_accepted`       | u64  | The number of connection requests the node has received                      |
 | `connections.all_initiated`      | u64  | The number of connection requests the node has made                          |
 | `connections.all_rejected`       | u64  | The number of connection requests the node has rejected                      |
-| `connections.connected_peers`    | u16  | The number of currently connected peers                                      |
-| `connections.connecting_peers`   | u16  | The number of currently connecting peers                                     |
-| `connections.disconnected_peers` | u16  | The number of known disconnected peers                                       |
+| `connections.average_duration`   | f64  | The average connection duration in seconds                                   |
+| `connections.connected_peers`    | u32  | The number of currently connected peers                                      |
+| `connections.connecting_peers`   | u32  | The number of currently connecting peers                                     |
+| `connections.disconnected_peers` | u32  | The number of known disconnected peers                                       |
 | `handshakes.failures_init`       | u64  | The number of failed handshakes as the initiator                             |
 | `handshakes.failures_resp`       | u64  | The number of failed handshakes as the responder                             |
 | `handshakes.successes_init`      | u64  | The number of successful handshakes as the initiator                         |
