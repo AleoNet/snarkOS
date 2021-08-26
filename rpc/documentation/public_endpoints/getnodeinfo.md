@@ -14,6 +14,8 @@ None
 | `launched`       | timestamp     | The timestamp of when the node was launched   |
 | `listening_addr` | SocketAddr    | The configured listening address of the node  |
 | `version`        | string        | The version of the client binary              |
+| `min_peers`      | number        | The minimum desired number of connected peers |
+| `max_peers`      | number        | The maximum allowed number of connected peers |
 
 ### Example
 ```ignore
