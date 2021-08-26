@@ -25,7 +25,7 @@ pub mod topology;
 use crate::sync::FIXTURE;
 
 use snarkos_network::{errors::*, *};
-use snarkos_storage::{key_value::KeyValueStore, MemDb};
+use snarkos_storage::{AsyncStorage, SqliteStorage};
 
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
@@ -183,9 +183,12 @@ pub async fn test_node(setup: TestSetup) -> Node {
     let is_miner = setup.consensus_setup.as_ref().map(|c| c.is_miner) == Some(true);
     let config = test_config(setup.clone());
     let node = match setup.consensus_setup {
-        None => Node::new(config, Arc::new(KeyValueStore::new(MemDb::new())))
-            .await
-            .unwrap(),
+        None => Node::new(
+            config,
+            Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap())),
+        )
+        .await
+        .unwrap(),
         Some(consensus_setup) => {
             let consensus = test_consensus(consensus_setup).await;
             let mut node = Node::new(config, consensus.consensus.storage.clone()).await.unwrap();

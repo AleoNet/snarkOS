@@ -91,7 +91,8 @@ pub trait SyncStorage {
                         return Ok(ForkDescription::TooLong);
                     }
                     let longest_path = self.longest_child_path(hash)?;
-                    debug!("longest child path terminating in {:?}", longest_path.last());
+                    // let descendents = self.get_block_digest_tree(hash)?;
+                    debug!("longest child path terminating in {:?}", longest_path.len());
                     side_chain_path.extend(longest_path);
                     return Ok(ForkDescription::Path(ForkPath {
                         base_index: block_num as u32,

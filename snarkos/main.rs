@@ -26,14 +26,13 @@ use snarkos::{
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
-#[cfg(feature = "sqlite")]
-use snarkos_storage::SqliteStorage;
 use snarkos_storage::{
     export_canon_blocks,
     key_value::KeyValueStore,
     AsyncStorage,
     RocksDb,
     SerialBlock,
+    SqliteStorage,
     Storage,
     VMBlock,
     Validator,
@@ -120,25 +119,19 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     )?;
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let storage = if config.storage.use_sqlite {
-        #[cfg(feature = "sqlite")]
-        {
-            let mut sqlite_path = path.clone();
-            sqlite_path.push("sqlite.db");
+    let storage = {
+        let mut sqlite_path = path.clone();
+        sqlite_path.push("sqlite.db");
 
-            if config.storage.validate {
-                error!("validator not implemented for sqlite");
-                return Ok(());
-            }
-
-            Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
-        }
-        #[cfg(not(feature = "sqlite"))]
-        {
-            error!("cannot use sqlite storage without `sqlite` compilation feature");
+        if config.storage.validate {
+            error!("validator not implemented for sqlite");
             return Ok(());
         }
-    } else {
+
+        Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
+    };
+
+    /*
         let storage = RocksDb::open(&path)?;
 
         // For extra safety, validate storage too if a trim is requested.
@@ -157,7 +150,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         };
 
         Arc::new(AsyncStorage::new(KeyValueStore::new(storage)))
-    };
+
+    */
 
     if let Some(max_head) = config.storage.max_head {
         let canon_next = storage.get_block_hash(max_head + 1).await?;
