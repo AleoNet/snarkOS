@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::sync::{create_test_consensus, TestBlocks};
+use crate::sync::{create_test_consensus_memdb, TestBlocks};
 use snarkos_storage::{
     key_value::{KeyValueColumn, KEY_CURR_CM_INDEX, KEY_CURR_MEMO_INDEX, KEY_CURR_SN_INDEX},
     FixMode,
@@ -25,7 +25,7 @@ use rand::prelude::*;
 
 #[tokio::test]
 async fn valid_storage_validates() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -37,7 +37,7 @@ async fn valid_storage_validates() {
 
 #[tokio::test]
 async fn validator_vs_a_missing_serial_number() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -66,7 +66,7 @@ async fn validator_vs_a_missing_serial_number() {
 
 #[tokio::test]
 async fn validator_vs_a_missing_commitment() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -95,7 +95,7 @@ async fn validator_vs_a_missing_commitment() {
 
 #[tokio::test]
 async fn validator_vs_a_missing_memorandum() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -124,7 +124,7 @@ async fn validator_vs_a_missing_memorandum() {
 
 #[tokio::test]
 async fn validator_vs_a_missing_digest() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -158,7 +158,7 @@ async fn validator_vs_a_missing_digest() {
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_serial_number() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -199,7 +199,7 @@ async fn validator_vs_a_superfluous_serial_number() {
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_commitment() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -237,7 +237,7 @@ async fn validator_vs_a_superfluous_commitment() {
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_memorandum() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
@@ -275,7 +275,7 @@ async fn validator_vs_a_superfluous_memorandum() {
 
 #[tokio::test]
 async fn validator_vs_a_superfluous_digest() {
-    let consensus = create_test_consensus().await;
+    let consensus = create_test_consensus_memdb().await;
 
     let blocks = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     for block in blocks {
