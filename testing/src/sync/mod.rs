@@ -147,14 +147,6 @@ impl FromBytes for TestTestnet1Transaction {
 }
 
 pub async fn create_test_consensus() -> Arc<snarkos_consensus::Consensus> {
-    create_test_consensus_with_storage(FIXTURE_VK.storage()).await
-}
-
-pub async fn create_test_consensus_memdb() -> Arc<snarkos_consensus::Consensus> {
-    create_test_consensus_with_storage(Arc::new(AsyncStorage::new(KeyValueStore::new(MemDb::new())))).await
-}
-
-pub async fn create_test_consensus_with_storage(storage: DynStorage) -> Arc<snarkos_consensus::Consensus> {
     let genesis_block: Block<Testnet1Transaction> = genesis();
     let ledger = FIXTURE_VK.ledger();
 
@@ -164,7 +156,7 @@ pub async fn create_test_consensus_with_storage(storage: DynStorage) -> Arc<snar
         FIXTURE.dpc.clone(),
         genesis_block,
         ledger,
-        storage,
+        FIXTURE_VK.storage(),
         MemoryPool::new(),
     );
     tokio::time::sleep(tokio::time::Duration::from_millis(25)).await; // plenty of time to let consensus setup genesis block
