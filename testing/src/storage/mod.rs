@@ -25,7 +25,7 @@ pub mod validator;
 
 // pub use snarkos_storage::validator::FixMode;
 use snarkos_consensus::{DynLedger, MerkleLedger};
-use snarkos_storage::{key_value::KeyValueStore, DynStorage, MemDb};
+use snarkos_storage::{AsyncStorage, DynStorage, SqliteStorage};
 use snarkvm_algorithms::{MerkleParameters, CRH};
 use snarkvm_dpc::testnet1::{instantiated::Components, Testnet1Components};
 
@@ -46,6 +46,6 @@ pub fn initialize_test_blockchain() -> (DynStorage, DynLedger) {
     let ledger = DynLedger(Box::new(
         MerkleLedger::new(ledger_parameters, &[], &[], &[], &[]).unwrap(),
     ));
-    let store = Arc::new(KeyValueStore::new(MemDb::new()));
+    let store = Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap()));
     (store, ledger)
 }

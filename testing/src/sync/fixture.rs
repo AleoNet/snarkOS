@@ -19,7 +19,7 @@ use crate::{
     sync::genesis,
 };
 use snarkos_consensus::{DynLedger, MerkleLedger};
-use snarkos_storage::{key_value::KeyValueStore, DynStorage, MemDb};
+use snarkos_storage::{AsyncStorage, DynStorage, SqliteStorage};
 use snarkvm_algorithms::{MerkleParameters, CRH};
 use snarkvm_dpc::{
     testnet1::{instantiated::*, NoopProgram, Testnet1Components},
@@ -49,7 +49,7 @@ pub struct Fixture {
 
 impl Fixture {
     pub fn storage(&self) -> DynStorage {
-        Arc::new(KeyValueStore::new(MemDb::new()))
+        Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap()))
     }
 
     pub fn ledger(&self) -> DynLedger {

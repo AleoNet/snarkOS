@@ -141,7 +141,6 @@ optional = true
 [features]
 default = [ ]
 prometheus = [ "snarkos-network/prometheus" ]
-sqlite = [ "snarkos-storage/sqlite_storage" ]
 compile_capnp_schema = [ "capnpc" ]
 noconfig = [ ]
 

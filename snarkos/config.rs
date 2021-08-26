@@ -111,8 +111,6 @@ pub struct Storage {
     pub trim: bool,
     /// If `true`, scans superfluous blocks for valid forks at boot time. Can take a while.
     pub scan_for_forks: bool,
-    /// If `true`, uses sqlite instead of rocksdb for backend storage. Requires `sqlite` feature.
-    pub use_sqlite: bool,
     /// If `Some`, will reset canon to at most this block height.
     pub max_head: Option<u32>,
 }
@@ -159,7 +157,6 @@ impl Default for Config {
                 trim: false,
                 validate: false,
                 scan_for_forks: false,
-                use_sqlite: false,
                 max_head: None,
             },
         }
@@ -235,7 +232,6 @@ impl Config {
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
             "validate-storage" => self.validate_storage(arguments.is_present(option)),
-            "sqlite" => self.storage.use_sqlite = arguments.is_present(option),
             // Options
             "connect" => self.connect(arguments.value_of(option)),
             "export-canon-blocks" => self.export_canon_blocks(clap::value_t!(arguments.value_of(*option), u32).ok()),
@@ -471,7 +467,6 @@ impl CLI for ConfigCli {
             "import-canon-blocks",
             "is-bootnode",
             "is-miner",
-            "sqlite",
             "is-crawler",
             "ip",
             "port",
