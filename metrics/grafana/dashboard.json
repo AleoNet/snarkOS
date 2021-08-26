@@ -26,6 +26,117 @@
   "panels": [
     {
       "datasource": null,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "decimals": 0,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "mean",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "snarkos_connections_connected_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "connected",
+          "refId": "D"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_connections_disconnected_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "disconnected",
+          "refId": "E"
+        },
+        {
+          "exemplar": true,
+          "expr": "snarkos_connections_connecting_total",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "connecting",
+          "refId": "F"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "states of current connections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -46,9 +157,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 2,
-        "x": 0,
+        "h": 5,
+        "w": 12,
+        "x": 12,
         "y": 0
       },
       "id": 12,
@@ -127,117 +238,6 @@
     },
     {
       "datasource": null,
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "smooth",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true
-          },
-          "decimals": 0,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 10,
-        "x": 2,
-        "y": 0
-      },
-      "id": 6,
-      "options": {
-        "graph": {},
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "mean",
-            "last"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        },
-        "tooltipOptions": {
-          "mode": "single"
-        }
-      },
-      "pluginVersion": "7.5.6",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "snarkos_connections_connected_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "connected",
-          "refId": "D"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_connections_disconnected_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "disconnected",
-          "refId": "E"
-        },
-        {
-          "exemplar": true,
-          "expr": "snarkos_connections_connecting_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "connecting",
-          "refId": "F"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "states of current connections",
-      "type": "timeseries"
-    },
-    {
-      "datasource": null,
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -292,10 +292,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 14,
+        "h": 15,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 5
       },
       "id": 10,
       "options": {
@@ -568,112 +568,6 @@
     },
     {
       "datasource": null,
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "log": 10,
-              "type": "log"
-            },
-            "showPoints": "never",
-            "spanNulls": true
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 12,
-        "x": 12,
-        "y": 14
-      },
-      "id": 18,
-      "options": {
-        "graph": {},
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltipOptions": {
-          "mode": "single"
-        }
-      },
-      "pluginVersion": "7.5.6",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "rate(snarkos_internal_rtt_getpeers_sum[$__rate_interval])/rate(snarkos_internal_rtt_getpeers_count[$__rate_interval])",
-          "interval": "",
-          "legendFormat": "GetPeers",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "rate(snarkos_internal_rtt_getsync_sum[$__rate_interval])/rate(snarkos_internal_rtt_getsync_count[$__rate_interval])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "GetSync",
-          "refId": "B"
-        },
-        {
-          "exemplar": true,
-          "expr": "rate(snarkos_internal_rtt_getblocks_sum[$__rate_interval])/rate(snarkos_internal_rtt_getblocks_count[$__rate_interval])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "GetBlocks",
-          "refId": "C"
-        },
-        {
-          "exemplar": true,
-          "expr": "rate(snarkos_internal_rtt_getmemorypool_sum[$__rate_interval])/rate(snarkos_internal_rtt_getmemorypool_count[$__rate_interval])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "GetMemoryPool",
-          "refId": "D"
-        }
-      ],
-      "title": "average internal RTT per message type",
-      "type": "timeseries"
-    },
-    {
-      "datasource": null,
       "description": "",
       "fieldConfig": {
         "defaults": {
@@ -855,7 +749,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 10,
+              "type": "log"
             },
             "showPoints": "never",
             "spanNulls": true
@@ -882,13 +777,204 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 25
+        "y": 20
+      },
+      "id": 18,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getpeers_sum[$__rate_interval])/rate(snarkos_internal_rtt_getpeers_count[$__rate_interval])",
+          "interval": "",
+          "legendFormat": "GetPeers",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getsync_sum[$__rate_interval])/rate(snarkos_internal_rtt_getsync_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "GetSync",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getblocks_sum[$__rate_interval])/rate(snarkos_internal_rtt_getblocks_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "GetBlocks",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_getmemorypool_sum[$__rate_interval])/rate(snarkos_internal_rtt_getmemorypool_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "GetMemoryPool",
+          "refId": "D"
+        }
+      ],
+      "title": "average internal RTT per message type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 10,
+              "type": "log"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "id": 22,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_misc_block_processing_time_sum[$__rate_interval])/rate(snarkos_misc_block_processing_time_count[$__rate_interval])",
+          "interval": "",
+          "legendFormat": "time",
+          "refId": "A"
+        }
+      ],
+      "title": "average block processing time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 31
       },
       "id": 20,
       "options": {
         "graph": {},
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "min",
+            "max",
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -970,7 +1056,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 26
+        "y": 36
       },
       "id": 16,
       "options": {
@@ -1042,7 +1128,7 @@
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 26
+        "y": 36
       },
       "id": 4,
       "options": {
@@ -1108,5 +1194,5 @@
   "timezone": "",
   "title": "snarkOS node",
   "uid": "PAzNcaCGz",
-  "version": 11
+  "version": 16
 }
