@@ -19,17 +19,14 @@ edition = "2018"
 
 [features]
 std = [ ]
-prometheus = [ "metrics-exporter-prometheus" ]
+prometheus = [ "metrics-catalogue/prometheus" ]
 
 [dependencies.circular-queue]
 version = "0.2"
 
-[dependencies.metrics]
-version = "0.17"
-
-[dependencies.metrics-exporter-prometheus]
-version = "0.6"
-optional = true
+[dependencies.metrics-catalogue]
+version = "0.4"
+default-features = false
 
 [dependencies.once_cell]
 version = "1.8.0"

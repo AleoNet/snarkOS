@@ -23,7 +23,7 @@ use futures::Future;
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use serde::{de::DeserializeOwned, Serialize};
 use snarkos_consensus::{get_block_reward, ConsensusParameters};
-use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
+use snarkos_metrics::STATS;
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkos_storage::{BlockStatus, Digest, DynStorage, VMTransaction};
 use snarkvm_dpc::{
@@ -38,6 +38,7 @@ use snarkvm_utilities::{
 
 use chrono::Utc;
 
+use snarkos_metrics::snapshots::NodeStats;
 use std::{ops::Deref, sync::Arc};
 
 type JsonRPCError = jsonrpc_core::Error;
@@ -420,9 +421,7 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns statistics related to the node.
     async fn get_node_stats(&self) -> Result<NodeStats, RpcError> {
-        let metrics = NODE_STATS.snapshot();
-
-        Ok(metrics)
+        Ok(STATS.snapshot())
     }
 
     /// Returns the current mempool and sync information known by this node.

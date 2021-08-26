@@ -14,25 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use metrics::{GaugeValue, Key, Recorder, Unit};
+use metrics_catalogue::*;
 
-use crate::{
-    metric_types::{CircularHistogram, Counter, DiscreteGauge},
-    names::*,
-    snapshots::{
-        NodeConnectionStats,
-        NodeHandshakeStats,
-        NodeInboundStats,
-        NodeInternalRttStats,
-        NodeMiscStats,
-        NodeOutboundStats,
-        NodeQueueStats,
-        NodeStats,
-    },
+use crate::snapshots::{
+    NodeConnectionStats,
+    NodeHandshakeStats,
+    NodeInboundStats,
+    NodeInternalRttStats,
+    NodeMiscStats,
+    NodeOutboundStats,
+    NodeQueueStats,
+    NodeStats,
 };
 
-pub static NODE_STATS: Stats = Stats::new();
-
+#[derive(Catalogue)]
+#[metric(root, "snarkos", separator = "_")]
 pub struct Stats {
     /// Stats related to messages received by the node.
     inbound: InboundStats,
@@ -51,18 +47,6 @@ pub struct Stats {
 }
 
 impl Stats {
-    const fn new() -> Self {
-        Self {
-            inbound: InboundStats::new(),
-            outbound: OutboundStats::new(),
-            connections: ConnectionStats::new(),
-            handshakes: HandshakeStats::new(),
-            queues: QueueStats::new(),
-            misc: MiscStats::new(),
-            internal_rtt: InternalRtt::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeStats {
         NodeStats {
             inbound: self.inbound.snapshot(),
@@ -76,6 +60,7 @@ impl Stats {
     }
 }
 
+#[derive(Catalogue)]
 pub struct InboundStats {
     /// The number of successfully processed inbound messages.
     all_successes: Counter,
@@ -110,26 +95,6 @@ pub struct InboundStats {
 }
 
 impl InboundStats {
-    const fn new() -> Self {
-        Self {
-            all_successes: Counter::new(),
-            all_failures: Counter::new(),
-            blocks: Counter::new(),
-            getblocks: Counter::new(),
-            getmemorypool: Counter::new(),
-            getpeers: Counter::new(),
-            getsync: Counter::new(),
-            memorypool: Counter::new(),
-            peers: Counter::new(),
-            pings: Counter::new(),
-            pongs: Counter::new(),
-            syncs: Counter::new(),
-            syncblocks: Counter::new(),
-            transactions: Counter::new(),
-            unknown: Counter::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeInboundStats {
         NodeInboundStats {
             all_successes: self.all_successes.read(),
@@ -151,6 +116,7 @@ impl InboundStats {
     }
 }
 
+#[derive(Catalogue)]
 pub struct OutboundStats {
     /// The number of messages successfully sent by the node.
     all_successes: Counter,
@@ -161,14 +127,6 @@ pub struct OutboundStats {
 }
 
 impl OutboundStats {
-    const fn new() -> Self {
-        Self {
-            all_successes: Counter::new(),
-            all_failures: Counter::new(),
-            all_cache_hits: Counter::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeOutboundStats {
         NodeOutboundStats {
             all_successes: self.all_successes.read(),
@@ -177,6 +135,7 @@ impl OutboundStats {
     }
 }
 
+#[derive(Catalogue)]
 pub struct ConnectionStats {
     /// The number of all connections the node has accepted.
     all_accepted: Counter,
@@ -191,22 +150,10 @@ pub struct ConnectionStats {
     /// Number of known disconnected peers.
     disconnected_peers: DiscreteGauge,
     /// Tracks connection durations (once closed).
-    duration: CircularHistogram,
+    duration: Histogram<60>,
 }
 
 impl ConnectionStats {
-    const fn new() -> Self {
-        Self {
-            all_accepted: Counter::new(),
-            all_initiated: Counter::new(),
-            all_rejected: Counter::new(),
-            connecting_peers: DiscreteGauge::new(),
-            connected_peers: DiscreteGauge::new(),
-            disconnected_peers: DiscreteGauge::new(),
-            duration: CircularHistogram::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeConnectionStats {
         NodeConnectionStats {
             all_accepted: self.all_accepted.read(),
@@ -220,6 +167,7 @@ impl ConnectionStats {
     }
 }
 
+#[derive(Catalogue)]
 pub struct HandshakeStats {
     /// The number of failed handshakes as the initiator.
     failures_init: Counter,
@@ -236,17 +184,6 @@ pub struct HandshakeStats {
 }
 
 impl HandshakeStats {
-    const fn new() -> Self {
-        Self {
-            failures_init: Counter::new(),
-            failures_resp: Counter::new(),
-            successes_init: Counter::new(),
-            successes_resp: Counter::new(),
-            timeouts_init: Counter::new(),
-            timeouts_resp: Counter::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeHandshakeStats {
         NodeHandshakeStats {
             successes_init: self.successes_init.read(),
@@ -259,6 +196,7 @@ impl HandshakeStats {
     }
 }
 
+#[derive(Catalogue)]
 pub struct QueueStats {
     /// The number of queued consensus items.
     consensus: DiscreteGauge,
@@ -275,35 +213,25 @@ pub struct QueueStats {
 }
 
 impl QueueStats {
-    const fn new() -> Self {
-        Self {
-            consensus: DiscreteGauge::new(),
-            inbound: DiscreteGauge::new(),
-            outbound: DiscreteGauge::new(),
-            peer_events: DiscreteGauge::new(),
-            storage: DiscreteGauge::new(),
-            sync_items: DiscreteGauge::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeQueueStats {
         NodeQueueStats {
-            consensus: self.consensus.read(),
-            inbound: self.inbound.read(),
-            outbound: self.outbound.read(),
-            peer_events: self.peer_events.read(),
-            storage: self.storage.read(),
-            sync_items: self.sync_items.read(),
+            consensus: self.consensus.read() as u64,
+            inbound: self.inbound.read() as u64,
+            outbound: self.outbound.read() as u64,
+            peer_events: self.peer_events.read() as u64,
+            storage: self.storage.read() as u64,
+            sync_items: self.sync_items.read() as u64,
         }
     }
 }
 
+#[derive(Catalogue)]
 pub struct MiscStats {
     block_height: DiscreteGauge,
     /// The number of mined blocks.
     blocks_mined: Counter,
     /// The processing time for a block.
-    block_processing_time: CircularHistogram,
+    block_processing_time: Histogram<60>,
     /// The number of duplicate blocks received.
     duplicate_blocks: Counter,
     /// The number of duplicate sync blocks received.
@@ -315,50 +243,30 @@ pub struct MiscStats {
 }
 
 impl MiscStats {
-    const fn new() -> Self {
-        Self {
-            block_height: DiscreteGauge::new(),
-            blocks_mined: Counter::new(),
-            block_processing_time: CircularHistogram::new(),
-            duplicate_blocks: Counter::new(),
-            duplicate_sync_blocks: Counter::new(),
-            orphan_blocks: Counter::new(),
-            rpc_requests: Counter::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeMiscStats {
         NodeMiscStats {
-            block_height: self.block_height.read(),
-            blocks_mined: self.blocks_mined.read(),
+            block_height: self.block_height.read() as u64,
+            blocks_mined: self.blocks_mined.read() as u64,
             block_processing_time: self.block_processing_time.average(),
-            duplicate_blocks: self.duplicate_blocks.read(),
-            duplicate_sync_blocks: self.duplicate_sync_blocks.read(),
-            orphan_blocks: self.orphan_blocks.read(),
-            rpc_requests: self.rpc_requests.read(),
+            duplicate_blocks: self.duplicate_blocks.read() as u64,
+            duplicate_sync_blocks: self.duplicate_sync_blocks.read() as u64,
+            orphan_blocks: self.orphan_blocks.read() as u64,
+            rpc_requests: self.rpc_requests.read() as u64,
         }
     }
 }
 
 /// Each histogram holds the last `QUEUE_CAPACITY` (see `metric_types` mod) measurements for internal RTT for the indicated message
 /// type. The snapshot produced for the RPC stats is the average RTT for each set.
+#[derive(Catalogue)]
 pub struct InternalRtt {
-    getpeers: CircularHistogram,
-    getsync: CircularHistogram,
-    getblocks: CircularHistogram,
-    getmemorypool: CircularHistogram,
+    getpeers: Histogram<60>,
+    getsync: Histogram<60>,
+    getblocks: Histogram<60>,
+    getmemorypool: Histogram<60>,
 }
 
 impl InternalRtt {
-    const fn new() -> Self {
-        Self {
-            getpeers: CircularHistogram::new(),
-            getsync: CircularHistogram::new(),
-            getblocks: CircularHistogram::new(),
-            getmemorypool: CircularHistogram::new(),
-        }
-    }
-
     pub fn snapshot(&self) -> NodeInternalRttStats {
         NodeInternalRttStats {
             getpeers: self.getpeers.average(),
@@ -369,95 +277,14 @@ impl InternalRtt {
     }
 }
 
-impl Recorder for Stats {
-    // The following are unused in Stats
-    fn register_counter(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
+trait HistogramExt {
+    fn average(&self) -> f64;
+}
 
-    fn register_gauge(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
-
-    fn register_histogram(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
-
-    fn record_histogram(&self, key: &Key, value: f64) {
-        let metric = match key.name() {
-            connections::DURATION => &self.connections.duration,
-            misc::BLOCK_PROCESSING_TIME => &self.misc.block_processing_time,
-            internal_rtt::GETPEERS => &self.internal_rtt.getpeers,
-            internal_rtt::GETSYNC => &self.internal_rtt.getsync,
-            internal_rtt::GETBLOCKS => &self.internal_rtt.getblocks,
-            internal_rtt::GETMEMORYPOOL => &self.internal_rtt.getmemorypool,
-            _ => return,
-        };
-
-        metric.push(value);
-    }
-
-    fn increment_counter(&self, key: &Key, value: u64) {
-        let metric = match key.name() {
-            // inbound
-            inbound::ALL_SUCCESSES => &self.inbound.all_successes,
-            inbound::ALL_FAILURES => &self.inbound.all_failures,
-            inbound::BLOCKS => &self.inbound.blocks,
-            inbound::GETBLOCKS => &self.inbound.getblocks,
-            inbound::GETMEMORYPOOL => &self.inbound.getmemorypool,
-            inbound::GETPEERS => &self.inbound.getpeers,
-            inbound::GETSYNC => &self.inbound.getsync,
-            inbound::MEMORYPOOL => &self.inbound.memorypool,
-            inbound::PEERS => &self.inbound.peers,
-            inbound::PINGS => &self.inbound.pings,
-            inbound::PONGS => &self.inbound.pongs,
-            inbound::SYNCS => &self.inbound.syncs,
-            inbound::SYNCBLOCKS => &self.inbound.syncblocks,
-            inbound::TRANSACTIONS => &self.inbound.transactions,
-            inbound::UNKNOWN => &self.inbound.unknown,
-            // outbound
-            outbound::ALL_SUCCESSES => &self.outbound.all_successes,
-            outbound::ALL_FAILURES => &self.outbound.all_failures,
-            outbound::ALL_CACHE_HITS => &self.outbound.all_cache_hits,
-            // connections
-            connections::ALL_ACCEPTED => &self.connections.all_accepted,
-            connections::ALL_INITIATED => &self.connections.all_initiated,
-            connections::ALL_REJECTED => &self.connections.all_rejected,
-            // handshakes
-            handshakes::FAILURES_INIT => &self.handshakes.failures_init,
-            handshakes::FAILURES_RESP => &self.handshakes.failures_resp,
-            handshakes::SUCCESSES_INIT => &self.handshakes.successes_init,
-            handshakes::SUCCESSES_RESP => &self.handshakes.successes_resp,
-            handshakes::TIMEOUTS_INIT => &self.handshakes.timeouts_init,
-            handshakes::TIMEOUTS_RESP => &self.handshakes.timeouts_resp,
-            // misc
-            misc::BLOCKS_MINED => &self.misc.blocks_mined,
-            misc::DUPLICATE_BLOCKS => &self.misc.duplicate_blocks,
-            misc::DUPLICATE_SYNC_BLOCKS => &self.misc.duplicate_sync_blocks,
-            misc::ORPHAN_BLOCKS => &self.misc.orphan_blocks,
-            misc::RPC_REQUESTS => &self.misc.rpc_requests,
-            _ => {
-                return;
-            }
-        };
-        metric.increment(value);
-    }
-
-    fn update_gauge(&self, key: &Key, value: GaugeValue) {
-        let metric = match key.name() {
-            // queues
-            queues::INBOUND => &self.queues.inbound,
-            queues::OUTBOUND => &self.queues.outbound,
-            queues::PEER_EVENTS => &self.queues.peer_events,
-            queues::STORAGE => &self.queues.storage,
-            // misc
-            misc::BLOCK_HEIGHT => &self.misc.block_height,
-            // connections
-            connections::CONNECTING => &self.connections.connecting_peers,
-            connections::CONNECTED => &self.connections.connected_peers,
-            connections::DISCONNECTED => &self.connections.disconnected_peers,
-            _ => {
-                return;
-            }
-        };
-        match value {
-            GaugeValue::Increment(val) => metric.increase(val),
-            GaugeValue::Decrement(val) => metric.decrease(val),
-            GaugeValue::Absolute(val) => metric.set(val),
-        }
+impl<const N: u64> HistogramExt for Histogram<N> {
+    #[inline]
+    fn average(&self) -> f64 {
+        let values = self.read();
+        values.iter().sum::<f64>() / (values.len() as f64)
     }
 }

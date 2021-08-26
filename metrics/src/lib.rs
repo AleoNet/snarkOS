@@ -23,80 +23,22 @@ pub mod snapshots;
 pub mod stats;
 
 /// Re-export metrics macros
-pub use metrics::*;
+pub use metrics_catalogue::*;
 
-pub struct CombinedRecorder {
+pub static STATS: stats::Stats = stats::Stats::new();
+
+pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
+    set_recorder(&STATS).expect("can't set the metrics recorder");
+
     #[cfg(feature = "prometheus")]
-    prometheus: metrics_exporter_prometheus::PrometheusRecorder,
-    rpc: &'static stats::Stats,
-}
+    {
+        let server = prometheus::Server::default()
+            .run(&STATS)
+            .expect("can't await the prometheus exporter");
 
-impl Recorder for CombinedRecorder {
-    fn register_counter(&self, key: &Key, unit: Option<Unit>, desc: Option<&'static str>) {
-        #[cfg(feature = "prometheus")]
-        self.prometheus.register_counter(key, unit.clone(), desc);
-        self.rpc.register_counter(key, unit, desc);
+        let metrics_exporter_task = tokio::task::spawn(async move { server.await.expect("Prometheus server stopped") });
+        Some(metrics_exporter_task)
     }
-
-    fn register_gauge(&self, key: &Key, unit: Option<Unit>, desc: Option<&'static str>) {
-        #[cfg(feature = "prometheus")]
-        self.prometheus.register_gauge(key, unit.clone(), desc);
-        self.rpc.register_gauge(key, unit, desc);
-    }
-
-    fn register_histogram(&self, key: &Key, unit: Option<Unit>, desc: Option<&'static str>) {
-        #[cfg(feature = "prometheus")]
-        self.prometheus.register_histogram(key, unit.clone(), desc);
-        self.rpc.register_histogram(key, unit, desc);
-    }
-
-    fn record_histogram(&self, key: &Key, value: f64) {
-        #[cfg(feature = "prometheus")]
-        self.prometheus.record_histogram(key, value);
-        self.rpc.record_histogram(key, value);
-    }
-
-    fn increment_counter(&self, key: &Key, value: u64) {
-        #[cfg(feature = "prometheus")]
-        self.prometheus.increment_counter(key, value);
-        self.rpc.increment_counter(key, value);
-    }
-
-    fn update_gauge(&self, key: &Key, value: GaugeValue) {
-        #[cfg(feature = "prometheus")]
-        self.prometheus.update_gauge(key, value.clone());
-        self.rpc.update_gauge(key, value);
-    }
-}
-
-#[cfg(feature = "prometheus")]
-pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
-    let prometheus_builder = metrics_exporter_prometheus::PrometheusBuilder::new().set_buckets(&[
-        0.00001, 0.000025, 0.00005, 0.000075, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0,
-        30.0,
-    ]);
-
-    let (prometheus_recorder, exporter) = prometheus_builder
-        .build_with_exporter()
-        .expect("can't build the prometheus exporter");
-
-    let recorder = CombinedRecorder {
-        prometheus: prometheus_recorder,
-        rpc: &stats::NODE_STATS,
-    };
-
-    metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
-
-    let metrics_exporter_task = tokio::task::spawn(async move {
-        exporter.await.expect("can't await the prometheus exporter");
-    });
-
-    Some(metrics_exporter_task)
-}
-
-#[cfg(not(feature = "prometheus"))]
-pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
-    metrics::set_recorder(&crate::stats::NODE_STATS).expect("couldn't initialize the metrics recorder!");
-
+    #[cfg(not(feature = "prometheus"))]
     None
 }
