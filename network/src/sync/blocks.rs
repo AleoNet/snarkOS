@@ -76,7 +76,7 @@ impl Node {
             )));
         }
 
-        // Set to `true` if the block was sent in a `Block` messages, `false` if it was sent in a
+        // Set to `true` if the block was sent in a `Block` message, `false` if it was sent in a
         // `SyncBlock` message.
         if is_non_sync {
             let node_clone = self.clone();
