@@ -85,14 +85,14 @@ pub struct NodeConnectionStats {
     pub all_initiated: u64,
     /// The number of rejected inbound connection requests.
     pub all_rejected: u64,
+    /// The average connection duration (in seconds).
+    pub average_duration: f64,
     /// Number of currently connecting peers.
     pub connecting_peers: u32,
     /// Number of currently connected peers.
     pub connected_peers: u32,
     /// Number of known disconnected peers.
     pub disconnected_peers: u32,
-    /// The average connection duration (in seconds).
-    pub average_connection_duration: f64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
