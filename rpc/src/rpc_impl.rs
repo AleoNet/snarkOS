@@ -413,6 +413,8 @@ impl RpcFunctions for RpcImpl {
             is_syncing: self.node.is_syncing_blocks(),
             launched: self.node.launched,
             version: env!("CARGO_PKG_VERSION").into(),
+            min_peers: self.node.config.minimum_number_of_connected_peers(),
+            max_peers: self.node.config.maximum_number_of_connected_peers(),
         })
     }
 

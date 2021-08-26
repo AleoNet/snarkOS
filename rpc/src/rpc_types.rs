@@ -140,6 +140,12 @@ pub struct NodeInfo {
 
     /// The version of the client binary.
     pub version: String,
+
+    // The minimum desired number of connected peers.
+    pub min_peers: u16,
+
+    // The maximum allowed number of connected peers.
+    pub max_peers: u16,
 }
 
 /// Returned value for the `getpeerinfo` rpc call
