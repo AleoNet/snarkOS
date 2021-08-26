@@ -23,14 +23,11 @@ impl ConsensusInner {
     async fn init(&mut self) -> Result<()> {
         let canon = self.storage.canon().await?;
         // no blocks present/genesis situation
-        if canon.block_height == 0 && canon.hash.is_empty() {
+        if canon.is_empty() {
             // no blocks
             let hash = self.public.genesis_block.header.hash();
             let block = self.public.genesis_block.clone();
             self.storage.insert_block(&block).await?;
-
-            let init_digest = self.ledger.extend(&[], &[], &[])?;
-            self.storage.store_init_digest(init_digest).await?;
 
             self.commit_block(&hash, &block).await?;
         }

@@ -42,6 +42,7 @@ fn read_static_blob<const S: usize>(row: &Row, index: usize) -> rusqlite::Result
 }
 
 impl SqliteStorage {
+    /// Counter used for tracking migrations, incremented on each schema change, and checked in [`migrate`] function below to update schema.
     const SCHEMA_INDEX: u32 = 2;
 
     fn migrate(&self, from: u32) -> Result<()> {
@@ -343,26 +344,13 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_states(&mut self, hashes: &[Digest]) -> Result<Vec<BlockStatus>> {
+        // intentional N+1 query since rusqlite doesn't support WHERE ... IN here and it doesn't matter at the moment
         let mut out = Vec::with_capacity(hashes.len());
         for hash in hashes {
             let state = self.get_block_state(hash)?;
             out.push(state);
         }
         Ok(out)
-        // let dyn_hashes: Vec<&dyn ToSql> = hashes.iter().map(|x| -> &dyn ToSql { x }).collect::<Vec<_>>();
-        // let mut stmt = self.conn.prepare_cached("SELECT hash, canon_height FROM blocks WHERE hash IN rarray(?)")?;
-        // let mut output = IndexMap::<Digest, BlockStatus>::new();
-        // for hash in hashes {
-        //     output.insert(hash.clone(), BlockStatus::Unknown);
-        // }
-        // for row in stmt.query_map(&dyn_hashes[..], |row| Ok((row.get(0)?, row.get(1)?)))? {
-        //     let (hash, canon_height): (Digest, Option<usize>) = row?;
-        //     *output.get_mut(&hash).unwrap() = match canon_height {
-        //         Some(height) => BlockStatus::Committed(height),
-        //         None => BlockStatus::Uncommitted,
-        //     };
-        // }
-        // Ok(output.into_iter().map(|x| x.1).collect())
     }
 
     fn get_block(&mut self, hash: &Digest) -> Result<SerialBlock> {
@@ -424,9 +412,10 @@ impl SyncStorage for SqliteStorage {
             BlockStatus::Unknown => return Err(anyhow!("attempted to commit unknown block")),
             _ => (),
         }
+        let next_canon_height = if canon.is_empty() { 0 } else { canon.block_height + 1 };
         self.conn.execute(
             r"UPDATE blocks SET canon_height = ?, canon_ledger_digest = ? WHERE hash = ?",
-            params![canon.block_height + 1, ledger_digest, hash],
+            params![next_canon_height, ledger_digest, hash],
         )?;
         self.get_block_state(hash)
     }
@@ -516,7 +505,7 @@ impl SyncStorage for SqliteStorage {
         transaction_blocks.block_order,
         blocks.hash
         FROM transactions
-        INNER JOIN transaction_blocks ON transaction_blocks.tranasction_id = transactions.id
+        INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
         INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
         WHERE transactions.transaction_id = ? AND blocks.canon_height IS NOT NULL
         ",
@@ -577,51 +566,6 @@ impl SyncStorage for SqliteStorage {
                 },
             )
             .map_err(Into::into)
-    }
-
-    fn store_init_digest(&mut self, digest: &Digest) -> Result<()> {
-        let mut block_query = self.conn.prepare_cached(
-            r"
-        INSERT INTO blocks (
-            hash,
-            previous_block_hash,
-            merkle_root_hash,
-            pedersen_merkle_root_hash,
-            proof,
-            time,
-            difficulty_target,
-            nonce,
-            canon_height,
-            canon_ledger_digest
-            )
-            VALUES (
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?
-            )
-        ",
-        )?;
-        let empty = [0u8; 32];
-        block_query.execute::<&[&dyn ToSql]>(params![
-            &digest,
-            &empty[..],
-            &empty[..],
-            &empty[..],
-            &empty[..],
-            0u32,
-            0u32,
-            0u32,
-            0u32,
-            &empty[..]
-        ])?;
-        Ok(())
     }
 
     fn get_record_commitments(&mut self, limit: Option<usize>) -> Result<Vec<Digest>> {
@@ -896,7 +840,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn validate(&mut self, _limit: Option<u32>, _fix_mode: FixMode) -> Vec<ValidatorError> {
-        unimplemented!()
+        warn!("called validator on sqlite, which is a NOP");
+        vec![]
     }
 
     #[cfg(feature = "test")]

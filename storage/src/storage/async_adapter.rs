@@ -71,7 +71,6 @@ enum Message {
     GetCanonBlocks(Option<u32>),
     GetBlockHashes(Option<u32>, BlockFilter),
     Validate(Option<u32>, FixMode),
-    StoreInitDigest(Digest),
     #[cfg(feature = "test")]
     StoreItem(KeyValueColumn, Vec<u8>, Vec<u8>),
     #[cfg(feature = "test")]
@@ -132,7 +131,6 @@ impl fmt::Display for Message {
             Message::GetCanonBlocks(limit) => write!(f, "GetCanonBlocks({:?})", limit),
             Message::GetBlockHashes(limit, filter) => write!(f, "GetBlockHashes({:?}, {:?})", limit, filter),
             Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
-            Message::StoreInitDigest(digest) => write!(f, "StoreInitDigest({})", digest),
             #[cfg(feature = "test")]
             Message::StoreItem(col, key, value) => write!(f, "StoreItem({:?}, {:?}, {:?})", col, key, value),
             #[cfg(feature = "test")]
@@ -197,7 +195,6 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::GetCanonBlocks(limit) => Box::new(self.inner.get_canon_blocks(limit)),
             Message::GetBlockHashes(limit, filter) => Box::new(self.inner.get_block_hashes(limit, filter)),
             Message::Validate(limit, fix_mode) => Box::new(self.inner.validate(limit, fix_mode)),
-            Message::StoreInitDigest(digest) => Box::new(self.wrap(move |f| f.store_init_digest(&digest))),
             #[cfg(feature = "test")]
             Message::StoreItem(col, key, value) => Box::new(self.wrap(move |f| f.store_item(col, key, value))),
             #[cfg(feature = "test")]
@@ -375,10 +372,6 @@ impl Storage for AsyncStorage {
 
     async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {
         self.send(Message::Validate(limit, fix_mode)).await
-    }
-
-    async fn store_init_digest(&self, digest: Digest) -> Result<()> {
-        self.send(Message::StoreInitDigest(digest)).await
     }
 
     #[cfg(feature = "test")]

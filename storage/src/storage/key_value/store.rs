@@ -476,7 +476,7 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         self.write_meta_u32(KEY_CURR_CM_INDEX, cm_index)?;
         self.write_meta_u32(KEY_CURR_MEMO_INDEX, memo_index)?;
 
-        let is_genesis = canon.block_height == 0 && canon.hash.is_empty();
+        let is_genesis = canon.is_empty();
 
         let new_best_block_number = if is_genesis { 0 } else { canon.block_height as u32 + 1 };
 
@@ -668,13 +668,6 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         };
 
         errors
-    }
-
-    fn store_init_digest(&mut self, digest: &Digest) -> Result<()> {
-        self.inner()
-            .store(KeyValueColumn::DigestIndex, &digest[..], &0u32.to_le_bytes()[..])?;
-        self.inner()
-            .store(KeyValueColumn::DigestIndex, &0u32.to_le_bytes()[..], &digest[..])
     }
 
     #[cfg(feature = "test")]
