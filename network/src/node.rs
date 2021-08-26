@@ -218,13 +218,15 @@ impl Node {
             let block_sync_interval = node_clone.expect_sync().block_sync_interval();
             let sync_block_task = task::spawn(async move {
                 loop {
-                    let is_syncing_blocks = node_clone.is_syncing_blocks();
+                    if node_clone.peer_book.get_connected_peer_count() != 0 {
+                        let is_syncing_blocks = node_clone.is_syncing_blocks();
 
-                    if !is_syncing_blocks {
-                        if let Err(e) = node_clone.run_sync().await {
-                            error!("failed sync process: {:?}", e);
+                        if !is_syncing_blocks {
+                            if let Err(e) = node_clone.run_sync().await {
+                                error!("failed sync process: {:?}", e);
+                            }
+                            node_clone.finished_syncing_blocks();
                         }
-                        node_clone.finished_syncing_blocks();
                     }
 
                     sleep(block_sync_interval).await;
