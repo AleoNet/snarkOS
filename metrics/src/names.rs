@@ -44,6 +44,7 @@ pub mod connections {
     pub const CONNECTING: &str = "snarkos_connections_connecting_total";
     pub const CONNECTED: &str = "snarkos_connections_connected_total";
     pub const DISCONNECTED: &str = "snarkos_connections_disconnected_total";
+    pub const AVERAGE_TIME: &str = "snarkos_connections_average_time";
 }
 
 pub mod handshakes {

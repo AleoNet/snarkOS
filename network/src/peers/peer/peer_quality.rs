@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_metrics as metrics;
+
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
@@ -69,11 +71,19 @@ impl PeerQuality {
     }
 
     pub fn disconnected(&mut self) {
+        let disconnect_timestamp = chrono::Utc::now();
+
         self.see();
-        self.last_disconnected = Some(chrono::Utc::now());
+        self.last_disconnected = Some(disconnect_timestamp);
         self.disconnected_count += 1;
         self.expecting_pong = false;
         self.remaining_sync_blocks = 0;
         self.total_sync_blocks = 0;
+
+        if let Some(last_connected) = self.last_connected {
+            if let Ok(elapsed) = disconnect_timestamp.signed_duration_since(last_connected).to_std() {
+                metrics::histogram!(metrics::connections::AVERAGE_TIME, elapsed);
+            }
+        }
     }
 }
