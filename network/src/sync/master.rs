@@ -391,10 +391,10 @@ impl SyncMaster {
                     .await?;
             } else {
                 warn!(
-                    "did not receive block {}/{} '{}' by deadline for sync from {}",
+                    "did not receive block {}/{} ({}...) from {} by sync deadline",
                     i,
                     block_order.len(),
-                    hash,
+                    &hash.to_string()[..8],
                     block_peers.get(hash).map(|x| x.to_string()).unwrap_or_default(),
                 );
             }
