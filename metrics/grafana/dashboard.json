@@ -79,7 +79,7 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 12,
+        "w": 6,
         "x": 0,
         "y": 0
       },
@@ -133,6 +133,86 @@
       "timeFrom": null,
       "timeShift": null,
       "title": "states of current connections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 24,
+      "interval": null,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.6",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_connections_average_duration_sum[$__rate_interval])/rate(snarkos_connections_average_duration_count[$__rate_interval])",
+          "interval": "",
+          "legendFormat": "values (rolling average on short interval)",
+          "refId": "A"
+        }
+      ],
+      "title": "connection duration",
       "type": "timeseries"
     },
     {
@@ -1194,5 +1274,5 @@
   "timezone": "",
   "title": "snarkOS node",
   "uid": "PAzNcaCGz",
-  "version": 16
+  "version": 18
 }
