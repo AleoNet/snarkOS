@@ -150,7 +150,7 @@ pub trait SyncStorage {
     /// Gets a tree structure representing all the descendents of [`block_hash`]
     fn get_block_digest_tree(&mut self, block_hash: &Digest) -> Result<DigestTree> {
         let children = self.get_block_children(block_hash)?;
-        if children.len() == 1 {
+        if children.is_empty() {
             return Ok(DigestTree::Leaf(block_hash.clone()));
         }
         let mut out_children = Vec::with_capacity(children.len());

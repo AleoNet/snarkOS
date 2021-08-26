@@ -58,6 +58,7 @@ pub enum ForkDescription {
     Orphan,
 }
 
+#[derive(Debug)]
 pub struct CanonData {
     /// Current block height of canon
     pub block_height: usize,
