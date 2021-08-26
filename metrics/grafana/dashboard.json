@@ -111,7 +111,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_connections_connected_total",
+          "expr": "snarkos_connections_connected",
           "hide": false,
           "interval": "",
           "legendFormat": "connected",
@@ -119,7 +119,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_connections_disconnected_total",
+          "expr": "snarkos_connections_disconnected",
           "hide": false,
           "interval": "",
           "legendFormat": "disconnected",
@@ -127,7 +127,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_connections_connecting_total",
+          "expr": "snarkos_connections_connecting",
           "hide": false,
           "interval": "",
           "legendFormat": "connecting",
@@ -186,7 +186,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_misc_block_height_total",
+          "expr": "snarkos_misc_block_height",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -196,7 +196,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_blocks_mined_total",
+          "expr": "snarkos_misc_blocks_mined",
           "instant": false,
           "interval": "",
           "legendFormat": "mined blocks",
@@ -204,7 +204,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_duplicate_blocks_total",
+          "expr": "snarkos_misc_duplicate_blocks",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate Blocks",
@@ -212,7 +212,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_duplicate_sync_blocks_total",
+          "expr": "snarkos_misc_duplicate_sync_blocks",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate SyncBlocks",
@@ -220,7 +220,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_rpc_requests_total",
+          "expr": "snarkos_misc_rpc_requests",
           "hide": false,
           "interval": "",
           "legendFormat": "RPC requests",
@@ -228,7 +228,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_orphan_blocks_total",
+          "expr": "snarkos_misc_orphan_blocks",
           "hide": false,
           "interval": "",
           "legendFormat": "Orphan blocks",
@@ -329,7 +329,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_queues_inbound_total",
+          "expr": "snarkos_queues_inbound",
           "instant": false,
           "interval": "",
           "legendFormat": "inbound network messages",
@@ -337,7 +337,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_queues_outbound_total",
+          "expr": "snarkos_queues_outbound",
           "hide": false,
           "interval": "",
           "legendFormat": "outbound network message",
@@ -345,7 +345,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_queues_storage_total",
+          "expr": "snarkos_queues_storage",
           "hide": false,
           "interval": "",
           "legendFormat": "storage requests",
@@ -353,7 +353,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_queues_peer_events_total",
+          "expr": "snarkos_queues_peer_events",
           "hide": false,
           "interval": "",
           "legendFormat": "peer events",
@@ -361,7 +361,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_queues_sync_items_total",
+          "expr": "snarkos_queues_sync_items",
           "hide": false,
           "interval": "",
           "legendFormat": "sync items",
@@ -369,7 +369,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_queues_consensus_total",
+          "expr": "snarkos_queues_consensus",
           "hide": false,
           "interval": "",
           "legendFormat": "consensus requests",
@@ -437,14 +437,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_connections_all_accepted_total",
+          "expr": "snarkos_connections_all_accepted",
           "interval": "",
           "legendFormat": "accepted",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_connections_all_rejected_total",
+          "expr": "snarkos_connections_all_rejected",
           "hide": false,
           "interval": "",
           "legendFormat": "rejected",
@@ -452,7 +452,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_connections_all_initiated_total",
+          "expr": "snarkos_connections_all_initiated",
           "hide": false,
           "interval": "",
           "legendFormat": "initiated",
@@ -515,14 +515,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_successes_init_total",
+          "expr": "snarkos_handshakes_successes_init",
           "interval": "",
           "legendFormat": "successes as inititiator",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_failures_init_total",
+          "expr": "snarkos_handshakes_failures_init",
           "hide": false,
           "interval": "",
           "legendFormat": "failures as initiator",
@@ -530,7 +530,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_successes_resp_total",
+          "expr": "snarkos_handshakes_successes_resp",
           "hide": false,
           "interval": "",
           "legendFormat": "successes as responder",
@@ -538,7 +538,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_failures_resp_total",
+          "expr": "snarkos_handshakes_failures_resp",
           "hide": false,
           "interval": "",
           "legendFormat": "failures as responder",
@@ -546,7 +546,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_timeouts_init_total",
+          "expr": "snarkos_handshakes_timeouts_init",
           "hide": false,
           "interval": "",
           "legendFormat": "timeouts as initiator",
@@ -554,7 +554,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_handshakes_timeouts_resp_total",
+          "expr": "snarkos_handshakes_timeouts_resp",
           "hide": false,
           "interval": "",
           "legendFormat": "timeouts as responder",
@@ -618,7 +618,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_blocks_total",
+          "expr": "snarkos_inbound_blocks",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -627,7 +627,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_getblocks_total",
+          "expr": "snarkos_inbound_getblocks",
           "hide": false,
           "interval": "",
           "legendFormat": "GetBlocks",
@@ -635,7 +635,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_getmemorypool_total",
+          "expr": "snarkos_inbound_getmemorypool",
           "hide": false,
           "interval": "",
           "legendFormat": "GetMemoryPool",
@@ -643,7 +643,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_getpeers_total",
+          "expr": "snarkos_inbound_getpeers",
           "hide": false,
           "interval": "",
           "legendFormat": "GetPeers",
@@ -651,7 +651,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_getsync_total",
+          "expr": "snarkos_inbound_getsync",
           "hide": false,
           "interval": "",
           "legendFormat": "GetSync",
@@ -659,7 +659,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_memorypool_total",
+          "expr": "snarkos_inbound_memorypool",
           "hide": false,
           "interval": "",
           "legendFormat": "MemoryPool",
@@ -667,7 +667,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_peers_total",
+          "expr": "snarkos_inbound_peers",
           "hide": false,
           "interval": "",
           "legendFormat": "Peers",
@@ -675,7 +675,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_pings_total",
+          "expr": "snarkos_inbound_pings",
           "hide": false,
           "interval": "",
           "legendFormat": "Ping",
@@ -683,7 +683,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_pongs_total",
+          "expr": "snarkos_inbound_pongs",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -692,7 +692,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_syncs_total",
+          "expr": "snarkos_inbound_syncs",
           "hide": false,
           "interval": "",
           "legendFormat": "Sync",
@@ -700,7 +700,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_syncblocks_total",
+          "expr": "snarkos_inbound_syncblocks",
           "hide": false,
           "interval": "",
           "legendFormat": "SyncBlock",
@@ -708,7 +708,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_transactions_total",
+          "expr": "snarkos_inbound_transactions",
           "hide": false,
           "interval": "",
           "legendFormat": "Transaction",
@@ -1099,14 +1099,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_all_successes_total",
+          "expr": "snarkos_inbound_all_successes",
           "interval": "",
           "legendFormat": "valid",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_inbound_all_failures_total",
+          "expr": "snarkos_inbound_all_failures",
           "hide": false,
           "interval": "",
           "legendFormat": "invalid",
@@ -1170,14 +1170,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_outbound_all_successes_total",
+          "expr": "snarkos_outbound_all_successes",
           "interval": "",
           "legendFormat": "delivered",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "snarkos_outbound_all_failures_total",
+          "expr": "snarkos_outbound_all_failures",
           "hide": false,
           "interval": "",
           "legendFormat": "lost",
