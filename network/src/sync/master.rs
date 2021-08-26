@@ -73,7 +73,7 @@ impl SyncMaster {
 
         if !interesting_peers.is_empty() {
             info!("found {} interesting peers for sync", interesting_peers.len());
-            debug!("sync interesting peers = {:?}", interesting_peers);
+            trace!("sync interesting peers = {:?}", interesting_peers);
         }
 
         Ok(interesting_peers)
