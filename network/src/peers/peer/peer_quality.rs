@@ -82,7 +82,7 @@ impl PeerQuality {
 
         if let Some(last_connected) = self.last_connected {
             if let Ok(elapsed) = disconnect_timestamp.signed_duration_since(last_connected).to_std() {
-                metrics::histogram!(metrics::connections::AVERAGE_TIME, elapsed);
+                metrics::histogram!(metrics::connections::DURATION, elapsed);
             }
         }
     }
