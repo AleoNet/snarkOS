@@ -298,9 +298,6 @@ pub trait SyncStorage {
     /// Gets a transaction from a transaction id
     fn get_transaction(&mut self, transaction_id: &Digest) -> Result<SerialTransaction>;
 
-    /// Stores the "pre-genesis" digest; only applicable to the genesis block txs.
-    fn store_init_digest(&mut self, digest: &Digest) -> Result<()>;
-
     // miner convenience record management functions
 
     /// Gets a list of stored record commitments subject to `limit`.

@@ -65,6 +65,12 @@ pub struct CanonData {
     pub hash: Digest,
 }
 
+impl CanonData {
+    pub fn is_empty(&self) -> bool {
+        self.block_height == 0 && self.hash.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum BlockFilter {
     CanonOnly(BlockOrder),
@@ -151,9 +157,6 @@ pub trait Storage: Send + Sync {
             Err(anyhow!("missing transaction in block"))
         }
     }
-
-    /// Stores the "pre-genesis" digest; only applicable to the genesis block txs.
-    async fn store_init_digest(&self, digest: Digest) -> Result<()>;
 
     // miner convenience record management functions
 

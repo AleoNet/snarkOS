@@ -34,5 +34,8 @@ pub use digest::*;
 pub mod validator;
 pub use validator::*;
 
+pub mod migrate;
+pub use migrate::*;
+
 /// The number of block hashes that are returned by the `Ledger::get_block_locator_hashes` call.
 pub const NUM_LOCATOR_HASHES: u32 = 64;

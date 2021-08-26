@@ -30,12 +30,11 @@ use snarkos_storage::{
     export_canon_blocks,
     key_value::KeyValueStore,
     AsyncStorage,
+    DynStorage,
     RocksDb,
     SerialBlock,
     SqliteStorage,
-    Storage,
     VMBlock,
-    Validator,
 };
 
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
@@ -119,7 +118,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     )?;
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let storage = {
+    let storage: DynStorage = {
         let mut sqlite_path = path.clone();
         sqlite_path.push("sqlite.db");
 
@@ -131,27 +130,17 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
     };
 
-    /*
-        let storage = RocksDb::open(&path)?;
+    if storage.canon().await?.block_height == 0 {
+        let mut rocks_identity_path = path.clone();
+        rocks_identity_path.push("IDENTITY");
+        if rocks_identity_path.exists() {
+            info!("Empty sqlite DB with existing rocksdb found, migrating...");
+            let rocks_storage = RocksDb::open(&path)?;
+            let rocks_storage: DynStorage = Arc::new(AsyncStorage::new(KeyValueStore::new(rocks_storage)));
 
-        // For extra safety, validate storage too if a trim is requested.
-        let storage = if config.storage.validate || config.storage.trim {
-            let now = std::time::Instant::now();
-            let (_, moved_storage) = storage
-                .validate(None, snarkos_storage::validator::FixMode::Everything)
-                .await;
-            info!("Storage validated in {}ms", now.elapsed().as_millis());
-            if !config.storage.trim {
-                return Ok(());
-            }
-            moved_storage
-        } else {
-            storage
-        };
-
-        Arc::new(AsyncStorage::new(KeyValueStore::new(storage)))
-
-    */
+            snarkos_storage::migrate(&rocks_storage, &storage).await?;
+        }
+    }
 
     if let Some(max_head) = config.storage.max_head {
         let canon_next = storage.get_block_hash(max_head + 1).await?;
