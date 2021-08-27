@@ -42,7 +42,7 @@ fn providing_sync_blocks(c: &mut Criterion) {
         assert!(rt.block_on(provider.expect_sync().consensus.receive_block(block.clone())));
     }
 
-    let canon = rt.block_on(provider.storage.canon()).unwrap();
+    let canon = rt.block_on(provider.expect_storage().canon()).unwrap();
 
     assert_eq!(canon.block_height, NUM_BLOCKS);
 
