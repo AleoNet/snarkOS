@@ -52,7 +52,7 @@ use snarkvm_parameters::{testnet1::GenesisBlock, Genesis, LedgerMerkleTreeParame
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+use std::{fs, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use tokio::runtime;
 use tracing_subscriber::EnvFilter;
@@ -105,6 +105,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     let mut path = config.node.dir.clone();
     path.push(&config.node.db);
+
+    if !path.exists() {
+        fs::create_dir(&path)?;
+    }
 
     let node_config = NodeConfig::new(
         desired_address,
