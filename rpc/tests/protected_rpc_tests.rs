@@ -80,7 +80,7 @@ mod protected_rpc_tests {
         };
 
         let environment = test_config(node_setup.unwrap_or_default());
-        let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
+        let mut node = Node::new(environment, Some(consensus.storage.clone())).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
 
         let node_consensus = snarkos_network::Sync::new(
@@ -92,7 +92,7 @@ mod protected_rpc_tests {
 
         node.set_sync(node_consensus);
 
-        let rpc_impl = RpcImpl::new(consensus.storage.clone(), Some(credentials), node.clone());
+        let rpc_impl = RpcImpl::new(Some(consensus.storage.clone()), Some(credentials), node.clone());
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);

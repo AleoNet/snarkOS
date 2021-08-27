@@ -104,7 +104,7 @@ async fn block_initiator_side() {
     wait_until!(
         5,
         matches!(
-            node.storage
+            node.expect_storage()
                 .get_block_state(&block_1_header_hash.0.into())
                 .await
                 .unwrap(),
@@ -114,7 +114,7 @@ async fn block_initiator_side() {
     wait_until!(
         1,
         matches!(
-            node.storage
+            node.expect_storage()
                 .get_block_state(&block_2_header_hash.0.into())
                 .await
                 .unwrap(),
@@ -227,7 +227,10 @@ async fn block_two_node() {
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(30, node_bob.storage.canon().await.unwrap().block_height == NUM_BLOCKS);
+    wait_until!(
+        30,
+        node_bob.expect_storage().canon().await.unwrap().block_height == NUM_BLOCKS
+    );
 }
 
 #[tokio::test]
