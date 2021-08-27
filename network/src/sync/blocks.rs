@@ -130,15 +130,14 @@ impl Node {
         let canon = self.storage.canon().await?;
 
         info!(
-            "Received block from {} of epoch {}{} with hash {} (current head {})",
+            "Got a block from {} ({}) with hash {}... (current head {})",
             remote_address,
-            block_struct.header.time,
             if let Some(h) = height {
-                format!(" (peer's height {})", h)
+                format!("peer's height {}", h)
             } else {
-                "".to_string()
+                format!("epoch {}", block_struct.header.time)
             },
-            block_struct.header.hash(),
+            &block_struct.header.hash().to_string()[..8],
             canon.block_height,
         );
 

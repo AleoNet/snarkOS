@@ -218,19 +218,26 @@ impl Node {
             let block_sync_interval = node_clone.expect_sync().block_sync_interval();
             let sync_block_task = task::spawn(async move {
                 loop {
-                    let is_syncing_blocks = node_clone.is_syncing_blocks();
+                    if node_clone.peer_book.get_connected_peer_count() != 0 {
+                        let is_syncing_blocks = node_clone.is_syncing_blocks();
 
-                    if !is_syncing_blocks {
-                        if let Err(e) = node_clone.run_sync().await {
-                            error!("failed sync process: {:?}", e);
+                        if !is_syncing_blocks {
+                            if let Err(e) = node_clone.run_sync().await {
+                                error!("failed sync process: {:?}", e);
+                            }
+                            node_clone.finished_syncing_blocks();
                         }
-                        node_clone.finished_syncing_blocks();
                     }
 
                     sleep(block_sync_interval).await;
                 }
             });
             self.register_task(sync_block_task);
+
+            // An arbitrary short delay before mempool sync attempts begin, to ensure that block sync
+            // has been attempted first.
+            #[cfg(not(feature = "test"))]
+            sleep(Duration::from_secs(5)).await;
 
             let bootnodes = self.config.bootnodes();
             let node_clone = self.clone();

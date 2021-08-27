@@ -73,7 +73,7 @@ impl SyncMaster {
 
         if !interesting_peers.is_empty() {
             info!("found {} interesting peers for sync", interesting_peers.len());
-            debug!("sync interesting peers = {:?}", interesting_peers);
+            trace!("sync interesting peers = {:?}", interesting_peers);
         }
 
         Ok(interesting_peers)
@@ -112,17 +112,19 @@ impl SyncMaster {
 
     async fn send_sync_messages(&mut self, sync_nodes: Vec<Peer>) -> Result<usize> {
         info!("requested block information from {} peers", sync_nodes.len());
-        let block_locator_hashes = self.block_locator_hashes().await?;
+        let block_locator_hashes = self
+            .block_locator_hashes()
+            .await?
+            .into_iter()
+            .map(|x| BlockHeaderHash(x.bytes::<32>().unwrap()))
+            .collect::<Vec<_>>();
         let mut future_set = vec![];
+
         for peer in sync_nodes.iter() {
             if let Some(handle) = self.node.peer_book.get_peer_handle(peer.address) {
-                let block_locator_hashes = block_locator_hashes.clone();
-                let block_locator_hashes: Vec<BlockHeaderHash> = block_locator_hashes
-                    .into_iter()
-                    .map(|x| BlockHeaderHash(x.bytes::<32>().unwrap()))
-                    .collect();
+                let locator_hashes = block_locator_hashes.clone();
                 future_set.push(async move {
-                    handle.send_payload(Payload::GetSync(block_locator_hashes), None).await;
+                    handle.send_payload(Payload::GetSync(locator_hashes), None).await;
                 });
             }
         }
@@ -154,7 +156,7 @@ impl SyncMaster {
                     if handler(msg.unwrap()) {
                         break;
                     }
-                    moving_end = Instant::now() + Duration::from_secs(moving_timeout_sec);
+                    moving_end += Duration::from_secs(moving_timeout_sec);
                 },
                 _ = timeout => {
                     break;
@@ -390,16 +392,15 @@ impl SyncMaster {
                     .await?;
             } else {
                 warn!(
-                    "did not receive block {}/{} '{}' by deadline for sync from {}",
+                    "did not receive block {}/{} ({}...) from {} by sync deadline",
                     i,
                     block_order.len(),
-                    hash,
+                    &hash.to_string()[..8],
                     block_peers.get(hash).map(|x| x.to_string()).unwrap_or_default(),
                 );
             }
         }
 
-        self.node.finished_syncing_blocks();
         Ok(())
     }
 }
