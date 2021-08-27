@@ -261,7 +261,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         node.set_sync(sync);
     }
 
-    // Initialize metrics framework
+    // Initialize metrics framework.
     node.initialize_metrics().await?;
 
     // Start listening for incoming connections.
