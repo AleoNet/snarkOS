@@ -124,7 +124,12 @@ impl MinerInstance {
 
                 let serialized_block = block.serialize();
                 let node_clone = self.node.clone();
-                let new_height = node_clone.storage.canon().await.map(|c| c.block_height as u32).ok();
+                let new_height = node_clone
+                    .expect_storage()
+                    .canon()
+                    .await
+                    .map(|c| c.block_height as u32)
+                    .ok();
 
                 self.node.propagate_block(serialized_block, new_height, local_address);
             }

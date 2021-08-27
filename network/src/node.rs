@@ -69,7 +69,7 @@ pub struct InnerNode {
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync>>,
     /// The node's storage.
-    pub storage: DynStorage,
+    pub storage: Option<DynStorage>,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -118,7 +118,7 @@ impl Node {
 
 impl Node {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config, storage: DynStorage) -> Result<Self, NetworkError> {
+    pub async fn new(config: Config, storage: Option<DynStorage>) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
@@ -143,6 +143,10 @@ impl Node {
         }
 
         Ok(node)
+    }
+
+    pub fn expect_storage(&self) -> &DynStorage {
+        self.storage.as_ref().expect("no storage!")
     }
 
     pub fn set_sync(&mut self, sync: Sync) {
@@ -336,7 +340,10 @@ impl Node {
         }
 
         // The node can already be at some non-zero height.
-        metrics::gauge!(misc::BLOCK_HEIGHT, self.storage.canon().await?.block_height as f64);
+        if let Some(storage) = &self.storage {
+            metrics::gauge!(misc::BLOCK_HEIGHT, storage.canon().await?.block_height as f64);
+        }
+
         Ok(())
     }
 

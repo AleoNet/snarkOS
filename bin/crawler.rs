@@ -25,17 +25,15 @@ use snarkos::{
 };
 use snarkos_network::{config::Config as NodeConfig, Node};
 use snarkos_rpc::start_rpc_server;
-use snarkos_storage::{AsyncStorage, DynStorage, SqliteStorage};
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use tokio::runtime;
 
 ///
 /// Builds a node from configuration parameters.
 ///
-/// 1. Creates a new storage db (unused).
-/// 2. Creates network server.
+/// 1. Creates network server.
 /// 2. Starts rpc server thread.
 /// 3. Starts network server listener.
 ///
@@ -57,31 +55,14 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.p2p.bootnodes.clone(),
         config.node.is_bootnode,
         config.node.is_crawler,
-        // Set sync intervals for peers, blocks and transactions (memory pool).
+        // Set sync intervals for peers,
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
-
-    // Create the storage instance; currently unused but may be useful to store addresses.
-    // TODO: remove?
-    info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let storage: DynStorage = {
-        let mut sqlite_path = path.clone();
-        sqlite_path.push("sqlite.db");
-
-        if config.storage.validate {
-            error!("validator not implemented for sqlite");
-            return Ok(());
-        }
-
-        Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
-    };
-
-    info!("Storage is ready");
 
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let node = Node::new(node_config, storage.clone()).await?;
+    let node = Node::new(node_config, None).await?;
 
     // Initialize metrics framework
     node.initialize_metrics().await?;
@@ -97,7 +78,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
         let rpc_handle = start_rpc_server(
             rpc_address,
-            storage,
+            None,
             node.clone(),
             config.rpc.username,
             config.rpc.password,
