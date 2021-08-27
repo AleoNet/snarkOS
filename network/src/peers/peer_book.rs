@@ -25,7 +25,7 @@ use std::{
 
 use futures::Future;
 use mpmc_map::MpmcMap;
-use rand::prelude::IteratorRandom;
+use rand::{prelude::IteratorRandom, rngs::SmallRng, SeedableRng};
 use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};
@@ -289,7 +289,10 @@ impl PeerBook {
             .collect::<Vec<Peer>>();
         let count_total_higher = peers.len();
 
-        Some((peers.into_iter().choose(&mut rand::thread_rng())?, count_total_higher))
+        Some((
+            peers.into_iter().choose(&mut SmallRng::from_entropy())?,
+            count_total_higher,
+        ))
     }
 
     /// Cancels any expected sync block counts from all peers.
