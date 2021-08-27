@@ -77,7 +77,7 @@ pub struct NodeOutboundStats {
     pub all_failures: u64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeConnectionStats {
     /// The number of all connections the node has accepted.
     pub all_accepted: u64,
@@ -85,6 +85,8 @@ pub struct NodeConnectionStats {
     pub all_initiated: u64,
     /// The number of rejected inbound connection requests.
     pub all_rejected: u64,
+    /// The average connection duration (in seconds).
+    pub average_duration: f64,
     /// Number of currently connecting peers.
     pub connecting_peers: u32,
     /// Number of currently connected peers.

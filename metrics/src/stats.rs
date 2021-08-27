@@ -187,6 +187,8 @@ pub struct ConnectionStats {
     connected_peers: DiscreteGauge,
     /// Number of known disconnected peers.
     disconnected_peers: DiscreteGauge,
+    /// Tracks connection durations (once closed).
+    duration: CircularHistogram,
 }
 
 impl ConnectionStats {
@@ -198,6 +200,7 @@ impl ConnectionStats {
             connecting_peers: DiscreteGauge::new(),
             connected_peers: DiscreteGauge::new(),
             disconnected_peers: DiscreteGauge::new(),
+            duration: CircularHistogram::new(),
         }
     }
 
@@ -206,6 +209,7 @@ impl ConnectionStats {
             all_accepted: self.all_accepted.read(),
             all_initiated: self.all_initiated.read(),
             all_rejected: self.all_rejected.read(),
+            average_duration: self.duration.average(),
             connecting_peers: self.connecting_peers.read() as u32,
             connected_peers: self.connected_peers.read() as u32,
             disconnected_peers: self.disconnected_peers.read() as u32,
@@ -372,6 +376,7 @@ impl Recorder for Stats {
 
     fn record_histogram(&self, key: &Key, value: f64) {
         let metric = match key.name() {
+            connections::DURATION => &self.connections.duration,
             misc::BLOCK_PROCESSING_TIME => &self.misc.block_processing_time,
             internal_rtt::GETPEERS => &self.internal_rtt.getpeers,
             internal_rtt::GETSYNC => &self.internal_rtt.getsync,
