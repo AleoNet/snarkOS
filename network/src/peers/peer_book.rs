@@ -35,7 +35,7 @@ use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHan
 ///
 /// A data structure for storing the history of all peers with this node server.
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PeerBook {
     disconnected_peers: MpmcMap<SocketAddr, Peer>,
     connected_peers: MpmcMap<SocketAddr, PeerHandle>,

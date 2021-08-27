@@ -40,12 +40,15 @@ impl Node {
         debug!("Propagating a block to peers");
 
         let connected_peers = self.connected_peers();
-        let peer_book = self.peer_book.clone();
+        let node = self.clone();
         tokio::spawn(async move {
             let mut futures = Vec::with_capacity(connected_peers.len());
-            for remote_address in connected_peers.iter() {
-                if remote_address != &block_miner {
-                    futures.push(peer_book.send_to(*remote_address, Payload::Block(block_bytes.clone(), height), None));
+            for addr in connected_peers.iter() {
+                if addr != &block_miner {
+                    futures.push(
+                        node.peer_book
+                            .send_to(*addr, Payload::Block(block_bytes.clone(), height), None),
+                    );
                 }
             }
             tokio::time::timeout(Duration::from_secs(1), futures::future::join_all(futures))
