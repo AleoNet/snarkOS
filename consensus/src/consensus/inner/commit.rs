@@ -33,7 +33,14 @@ impl ConsensusInner {
         }
         self.storage.insert_block(block).await?;
 
-        self.try_commit_block(&hash, block).await?;
+        match self.try_commit_block(&hash, block).await {
+            Err(ConsensusError::InvalidBlock(hash)) => {
+                self.storage.delete_block(&hash).await?;
+                return Err(ConsensusError::InvalidBlock(hash));
+            }
+            Ok(_) => {}
+            err => return err,
+        }
 
         self.try_to_fast_forward().await?;
 
