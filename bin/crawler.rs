@@ -23,36 +23,11 @@ use snarkos::{
     display::render_welcome,
     errors::NodeError,
 };
-use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
-use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
+use snarkos_network::{config::Config as NodeConfig, Node};
 use snarkos_rpc::start_rpc_server;
-use snarkos_storage::{
-    export_canon_blocks,
-    key_value::KeyValueStore,
-    AsyncStorage,
-    DynStorage,
-    RocksDb,
-    SerialBlock,
-    SqliteStorage,
-    VMBlock,
-};
+use snarkos_storage::{AsyncStorage, DynStorage, SqliteStorage};
 
-use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
-use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1DPC, Testnet1Transaction},
-        Testnet1Components,
-    },
-    Address,
-    Block,
-    DPCScheme,
-    Network,
-};
-use snarkvm_parameters::{testnet1::GenesisBlock, Genesis, LedgerMerkleTreeParameters, Parameter};
-use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
-
-use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use tokio::runtime;
 use tracing_subscriber::EnvFilter;
@@ -133,7 +108,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config, storage.clone()).await?;
+    let node = Node::new(node_config, storage.clone()).await?;
 
     // Initialize metrics framework
     node.initialize_metrics().await?;
