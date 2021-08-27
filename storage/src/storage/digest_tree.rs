@@ -34,11 +34,7 @@ impl DigestTree {
         if children.is_empty() {
             DigestTree::Leaf(digest)
         } else {
-            DigestTree::Node(
-                digest,
-                children.into_iter().map(|child| DigestTree::Leaf(child)).collect(),
-                2,
-            )
+            DigestTree::Node(digest, children.into_iter().map(DigestTree::Leaf).collect(), 2)
         }
     }
 
