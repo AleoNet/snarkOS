@@ -20,7 +20,7 @@ extern crate tracing;
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
-    display::render_welcome,
+    display::{initialize_logger, print_welcome},
     errors::NodeError,
 };
 use snarkos_network::{config::Config as NodeConfig, Node};
@@ -30,34 +30,6 @@ use snarkos_storage::{AsyncStorage, DynStorage, SqliteStorage};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use tokio::runtime;
-use tracing_subscriber::EnvFilter;
-
-fn initialize_logger(config: &Config) {
-    match config.node.verbose {
-        0 => {}
-        verbosity => {
-            match verbosity {
-                1 => std::env::set_var("RUST_LOG", "info"),
-                2 => std::env::set_var("RUST_LOG", "debug"),
-                3 | 4 => std::env::set_var("RUST_LOG", "trace"),
-                _ => std::env::set_var("RUST_LOG", "info"),
-            };
-
-            // disable undesirable logs
-            let filter = EnvFilter::from_default_env().add_directive("mio=off".parse().unwrap());
-
-            // initialize tracing
-            tracing_subscriber::fmt()
-                .with_env_filter(filter)
-                .with_target(config.node.verbose == 4)
-                .init();
-        }
-    }
-}
-
-fn print_welcome(config: &Config) {
-    println!("{}", render_welcome(config));
-}
 
 ///
 /// Builds a node from configuration parameters.
