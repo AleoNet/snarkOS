@@ -55,6 +55,8 @@ pub struct Peer {
     pub quality: PeerQuality,
     pub is_bootnode: bool,
     #[serde(skip)]
+    pub queued_inbound_message_count: Arc<AtomicUsize>,
+    #[serde(skip)]
     pub queued_outbound_message_count: Arc<AtomicUsize>,
     /// Whether this peer is routable or not.
     ///
@@ -72,6 +74,7 @@ impl Peer {
             status: PeerStatus::Disconnected,
             quality: Default::default(),
             is_bootnode,
+            queued_inbound_message_count: Default::default(),
             queued_outbound_message_count: Default::default(),
 
             // Set to `None` since peer creation only ever happens before a connection to the peer,
@@ -129,6 +132,8 @@ impl Peer {
         let mut reader = network.take_reader();
 
         let (sender, mut read_receiver) = mpsc::channel::<Result<Vec<u8>, NetworkError>>(8);
+        let queued_inbound_message_count = self.queued_inbound_message_count.clone();
+
         tokio::spawn(async move {
             loop {
                 if sender
@@ -137,6 +142,9 @@ impl Peer {
                     .is_err()
                 {
                     break;
+                } else {
+                    queued_inbound_message_count.fetch_add(1, Ordering::SeqCst);
+                    metrics::increment_gauge!(snarkos_metrics::queues::INBOUND, 1.0);
                 }
             }
         });
@@ -157,6 +165,10 @@ impl Peer {
                     if data.is_none() {
                         break;
                     }
+
+                    self.queued_inbound_message_count.fetch_sub(1, Ordering::SeqCst);
+                    metrics::decrement_gauge!(snarkos_metrics::queues::INBOUND, 1.0);
+
                     let data = match data.unwrap() {
                         // decrypt
                         Ok(data) => network.read_payload(&data[..]),
@@ -178,6 +190,8 @@ impl Peer {
             }
         }
 
+        let queued_inbound_message_count = self.queued_inbound_message_count.swap(0, Ordering::SeqCst);
+        metrics::decrement_gauge!(snarkos_metrics::queues::INBOUND, queued_inbound_message_count as f64);
         let queued_outbound_message_count = self.queued_outbound_message_count.swap(0, Ordering::SeqCst);
         metrics::decrement_gauge!(snarkos_metrics::queues::OUTBOUND, queued_outbound_message_count as f64);
 
