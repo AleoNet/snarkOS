@@ -59,7 +59,7 @@ pub struct ConsensusInner {
     pub memory_pool: MemoryPool,
     pub storage: DynStorage,
 }
-
+/*
 struct LedgerData {
     ledger: DynLedger,
     commitments: Vec<Digest>,
@@ -67,7 +67,7 @@ struct LedgerData {
     memos: Vec<Digest>,
     ledger_digests: Vec<Digest>,
 }
-
+*/
 impl ConsensusInner {
     /// scans uncommitted blocks with a known path to the canon chain for forks
     async fn scan_forks(&mut self) -> Result<Vec<(Digest, Digest)>> {
@@ -103,7 +103,7 @@ impl ConsensusInner {
 
         Ok(known_forks)
     }
-
+    /*
     fn fresh_ledger(&self, blocks: Vec<SerialBlock>) -> Result<LedgerData> {
         let mut ledger = self.ledger.clone();
         ledger.clear();
@@ -194,4 +194,5 @@ impl ConsensusInner {
             .await?;
         Ok(())
     }
+    */
 }
