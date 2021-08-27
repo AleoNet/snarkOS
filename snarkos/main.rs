@@ -123,6 +123,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
     let storage: DynStorage = {
+        std::fs::create_dir_all(&path)?;
         let mut sqlite_path = path.clone();
         sqlite_path.push("sqlite.db");
 
