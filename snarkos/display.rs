@@ -66,6 +66,8 @@ pub fn render_welcome(config: &Config) -> String {
     };
     if is_miner {
         output += &format!("Starting a mining node on {}.\n", network).bold().to_string();
+    } else if config.node.is_crawler {
+        output += &format!("Starting a crawler node on {}.\n", network).bold().to_string();
     } else {
         output += &format!("Starting a client node on {}.\n", network).bold().to_string();
     }

@@ -62,7 +62,8 @@ fn print_welcome(config: &Config) {
 ///
 /// Builds a node from configuration parameters.
 ///
-/// 1. Creates network server.
+/// 1. Creates a new storage db (unused).
+/// 2. Creates network server.
 /// 2. Starts rpc server thread.
 /// 3. Starts network server listener.
 ///
@@ -145,7 +146,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::args();
 
-    let config: Config = ConfigCli::parse(&arguments)?;
+    let mut config: Config = ConfigCli::parse(&arguments)?;
+    config.is_crawler(true);
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
 
     let runtime = runtime::Builder::new_multi_thread()

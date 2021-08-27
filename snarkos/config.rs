@@ -228,7 +228,6 @@ impl Config {
             // Flags
             "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
-            "is-crawler" => self.is_crawler(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
             "validate-storage" => self.validate_storage(arguments.is_present(option)),
@@ -294,12 +293,12 @@ impl Config {
         self.node.is_bootnode = argument;
     }
 
-    fn is_miner(&mut self, argument: bool) {
-        self.miner.is_miner = argument;
+    pub fn is_crawler(&mut self, argument: bool) {
+        self.node.is_crawler = argument;
     }
 
-    fn is_crawler(&mut self, argument: bool) {
-        self.node.is_crawler = argument;
+    fn is_miner(&mut self, argument: bool) {
+        self.miner.is_miner = argument;
     }
 
     fn ip(&mut self, argument: Option<&str>) {
@@ -430,7 +429,6 @@ impl CLI for ConfigCli {
         flag::NO_JSONRPC,
         flag::IS_BOOTNODE,
         flag::IS_MINER,
-        flag::IS_CRAWLER,
         flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
         flag::SQLITE,
@@ -467,7 +465,6 @@ impl CLI for ConfigCli {
             "import-canon-blocks",
             "is-bootnode",
             "is-miner",
-            "is-crawler",
             "ip",
             "port",
             "path",
