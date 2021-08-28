@@ -125,9 +125,6 @@ impl ConsensusInner {
                 ConsensusMessage::ScanForks() => {
                     response.send(Box::new(self.scan_forks().await)).ok();
                 }
-                ConsensusMessage::RecommitCanon() => {
-                    response.send(Box::new(self.recommit_canon().await)).ok();
-                }
             }
         }
     }

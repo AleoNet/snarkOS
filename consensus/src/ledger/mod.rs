@@ -22,7 +22,6 @@ use std::{
 };
 
 use anyhow::*;
-use dyn_clone::DynClone;
 use smallvec::SmallVec;
 use snarkos_storage::Digest;
 use snarkvm_algorithms::{
@@ -48,7 +47,7 @@ pub use indexed_digests::IndexedDigests;
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::{FromBytes, ToBytes};
 
-pub trait Ledger: Send + Sync + DynClone {
+pub trait Ledger: Send + Sync {
     fn extend(
         &mut self,
         new_commitments: &[Digest],
@@ -81,12 +80,6 @@ pub trait Ledger: Send + Sync + DynClone {
 }
 
 pub struct DynLedger(pub Box<dyn Ledger>);
-
-impl Clone for DynLedger {
-    fn clone(&self) -> Self {
-        DynLedger(dyn_clone::clone_box(&*self.0))
-    }
-}
 
 impl Deref for DynLedger {
     type Target = dyn Ledger;

@@ -27,19 +27,6 @@ pub struct IndexedMerkleTree<P: MerkleParameters> {
     indexed_digests: IndexedDigests,
 }
 
-impl<P: MerkleParameters> Clone for IndexedMerkleTree<P> {
-    fn clone(&self) -> Self {
-        let tree = self
-            .tree
-            .rebuild::<[u8; 32]>(self.indexed_digests.len(), &[])
-            .expect("failed to clone merkle tree");
-        Self {
-            tree,
-            indexed_digests: self.indexed_digests.clone(),
-        }
-    }
-}
-
 fn to_digest<B: ToBytes>(input: &B) -> Result<Digest> {
     let mut data = vec![];
     input.write_le(&mut data)?;

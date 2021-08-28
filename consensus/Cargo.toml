@@ -82,9 +82,6 @@ version = "1.6"
 [dependencies.lazy_static]
 version = "1.4"
 
-[dependencies.dyn-clone]
-version = "1.0"
-
 [dependencies.futures]
 version = "0.3"
 
