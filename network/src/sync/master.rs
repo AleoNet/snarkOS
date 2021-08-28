@@ -20,7 +20,7 @@ use crate::{Node, Payload, Peer};
 use anyhow::*;
 use futures::{pin_mut, select, FutureExt};
 use hash_hasher::{HashBuildHasher, HashedMap, HashedSet};
-use rand::prelude::SliceRandom;
+use rand::{prelude::SliceRandom, rngs::SmallRng, SeedableRng};
 use snarkos_storage::Digest;
 use snarkvm_algorithms::crh::double_sha256;
 use snarkvm_dpc::{BlockHeader, BlockHeaderHash};
@@ -269,7 +269,7 @@ impl SyncMaster {
             if peers.is_none() {
                 continue;
             }
-            let random_peer = peers.unwrap().choose(&mut rand::thread_rng());
+            let random_peer = peers.unwrap().choose(&mut SmallRng::from_entropy());
             if random_peer.is_none() {
                 continue;
             }

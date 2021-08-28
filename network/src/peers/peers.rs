@@ -20,7 +20,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rand::{prelude::SliceRandom, seq::IteratorRandom};
+use rand::{prelude::SliceRandom, rngs::SmallRng, seq::IteratorRandom, SeedableRng};
 use tokio::task;
 
 use snarkos_metrics::{self as metrics, connections::*};
@@ -119,7 +119,7 @@ impl Node {
             let random_bootnodes = self
                 .config
                 .bootnodes()
-                .choose_multiple(&mut rand::thread_rng(), 2)
+                .choose_multiple(&mut SmallRng::from_entropy(), 2)
                 .copied()
                 .collect::<Vec<_>>();
 
@@ -236,7 +236,7 @@ impl Node {
             if !self.config.is_regular_node() {
                 addr_iter.take(count).collect()
             } else {
-                addr_iter.choose_multiple(&mut rand::thread_rng(), count)
+                addr_iter.choose_multiple(&mut SmallRng::from_entropy(), count)
             }
         };
 
@@ -349,7 +349,7 @@ impl Node {
 
         // Limit set size.
         let peers = peers
-            .choose_multiple(&mut rand::thread_rng(), crate::SHARED_PEER_COUNT)
+            .choose_multiple(&mut SmallRng::from_entropy(), crate::SHARED_PEER_COUNT)
             .copied()
             .collect();
 
