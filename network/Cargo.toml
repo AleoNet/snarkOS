@@ -92,7 +92,7 @@ version = "0.1"
 version = "0.1"
 
 [dependencies.hash_hasher]
-version = "2.0.3"
+version = "2"
 
 [dependencies.itertools]
 version = "0.10.1"
