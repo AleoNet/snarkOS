@@ -390,7 +390,7 @@ mod rpc_tests {
 
         wait_until!(5, !rpc_node.known_network().unwrap().connections().is_empty());
 
-        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"getnetworkgraph\" }}");
+        let request = "{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"getnetworkgraph\" }".to_string();
         let response = rpc.io.handle_request(&request).await.unwrap();
         let value: Value = serde_json::from_str(&response).unwrap();
         let result: NetworkGraph = serde_json::from_value(value["result"].clone()).unwrap();

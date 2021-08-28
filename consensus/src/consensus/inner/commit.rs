@@ -258,7 +258,7 @@ impl ConsensusInner {
             if sub_children.is_empty() {
                 break;
             }
-            sub_children.sort_by(|a, b| b.longest_length().cmp(&a.longest_length()));
+            sub_children.sort_by_key(|child| std::cmp::Reverse(child.longest_length()));
             debug!("Processing the next known descendant.");
             let mut last_error = None;
             for child in sub_children {

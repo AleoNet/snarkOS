@@ -407,7 +407,7 @@ impl SyncStorage for SqliteStorage {
         let canon = self.canon()?;
         match self.get_block_state(hash)? {
             BlockStatus::Committed(_) => {
-                return Err(anyhow!("attempted to recommit block {}", hex::encode(hash)).into());
+                return Err(anyhow!("attempted to recommit block {}", hex::encode(hash)));
             }
             BlockStatus::Unknown => return Err(anyhow!("attempted to commit unknown block")),
             _ => (),
