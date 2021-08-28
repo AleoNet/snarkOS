@@ -156,10 +156,4 @@ impl Consensus {
     pub async fn scan_forks(&self) -> Result<Vec<(Digest, Digest)>> {
         self.send(ConsensusMessage::ScanForks()).await
     }
-
-    /*
-    // Diagnostic function to rebuild the stored ledger components
-    pub async fn recommit_canon(&self) -> Result<()> {
-        self.send(ConsensusMessage::RecommitCanon()).await
-    }*/
 }
