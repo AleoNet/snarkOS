@@ -158,6 +158,12 @@ impl SyncStorage for SqliteStorage {
 
     fn insert_block(&mut self, block: &SerialBlock) -> Result<()> {
         let hash = block.header.hash();
+
+        self.block_children_cache
+            .entry(block.header.previous_block_hash.clone())
+            .or_insert_with(|| HashedSet::with_hasher(HashBuildHasher::default()))
+            .insert(hash.clone());
+
         let mut block_query = self.conn.prepare_cached(
             r"
         INSERT INTO blocks (
