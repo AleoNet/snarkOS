@@ -35,7 +35,6 @@ use tokio::runtime;
 ///
 /// 1. Creates network server.
 /// 2. Starts rpc server thread.
-/// 3. Starts network server listener.
 ///
 async fn start_server(config: Config) -> anyhow::Result<()> {
     initialize_logger(&config);
@@ -45,16 +44,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
-    let mut path = config.node.dir.clone();
-    path.push(&config.node.db);
-
     let node_config = NodeConfig::new(
         desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
-        config.node.is_bootnode,
-        config.node.is_crawler,
+        false, // is_bootnode
+        true,  // is crawler
         // Set sync intervals for peers.
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
@@ -68,6 +64,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     node.initialize_metrics().await?;
 
     // Start listening for incoming connections.
+    // TODO: remove this; a crawler doesn't need to have a listener.
     node.listen().await?;
 
     // Start RPC thread, if the RPC configuration is enabled.
