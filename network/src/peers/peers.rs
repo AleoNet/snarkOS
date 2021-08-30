@@ -286,8 +286,8 @@ impl Node {
         trace!("Broadcasting `Ping` messages");
 
         // Consider peering tests that don't use the sync layer.
-        let current_block_height = if let Some(storage) = &self.storage {
-            storage.canon().await?.block_height as u32
+        let current_block_height = if self.sync().is_some() {
+            self.expect_storage().canon().await?.block_height as u32
         } else {
             0
         };
