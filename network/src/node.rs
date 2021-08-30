@@ -206,16 +206,18 @@ impl Node {
             self.register_task(known_network_task);
         }
 
-        let node_clone = self.clone();
-        let state_tracking_task = task::spawn(async move {
-            loop {
-                sleep(std::time::Duration::from_secs(5)).await;
+        if !self.config.is_crawler() {
+            let node_clone = self.clone();
+            let state_tracking_task = task::spawn(async move {
+                loop {
+                    sleep(std::time::Duration::from_secs(5)).await;
 
-                // Report node's current state.
-                trace!("Node state: {:?}", node_clone.state());
-            }
-        });
-        self.register_task(state_tracking_task);
+                    // Report node's current state.
+                    trace!("Node state: {:?}", node_clone.state());
+                }
+            });
+            self.register_task(state_tracking_task);
+        }
 
         if self.sync().is_some() {
             let node_clone = self.clone();
