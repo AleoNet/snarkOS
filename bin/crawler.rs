@@ -100,10 +100,7 @@ fn main() -> Result<(), NodeError> {
     config.is_crawler(true);
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
 
-    let runtime = runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
-        .build()?;
+    let runtime = runtime::Builder::new_multi_thread().enable_all().build()?;
 
     runtime.block_on(start_server(config))?;
 
