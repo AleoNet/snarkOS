@@ -204,7 +204,7 @@ async fn block_two_node() {
         ..Default::default()
     };
     let node_alice = test_node(setup).await;
-    let alice_address = node_alice.local_address().unwrap();
+    let alice_address = node_alice.local_address();
 
     const NUM_BLOCKS: usize = 100;
 
@@ -323,7 +323,7 @@ async fn transaction_responder_side() {
 #[tokio::test]
 async fn transaction_two_node() {
     let node_alice = test_node(TestSetup::default()).await;
-    let alice_address = node_alice.local_address().unwrap();
+    let alice_address = node_alice.local_address();
 
     // insert transaction into node_alice
     assert!(

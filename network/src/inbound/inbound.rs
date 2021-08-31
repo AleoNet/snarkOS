@@ -28,7 +28,6 @@ impl Node {
         let listener = TcpListener::bind(&self.config.desired_address).await?;
         let own_listener_address = listener.local_addr()?;
 
-        self.set_local_address(own_listener_address);
         info!("Initializing listener for node ({:x})", self.id);
 
         let node_clone = self.clone();

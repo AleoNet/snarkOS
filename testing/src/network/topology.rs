@@ -69,14 +69,14 @@ async fn ring(nodes: &mut Vec<Node>) {
     line(nodes).await;
 
     // Connect the first to the last.
-    let first_addr = nodes.first().unwrap().local_address().unwrap();
+    let first_addr = nodes.first().unwrap().local_address();
     nodes.last().unwrap().connect_to_addresses(&[first_addr]).await;
 }
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
 /// minimum number of connected peers value.
 async fn mesh(nodes: &mut Vec<Node>) {
-    let local_addresses: Vec<SocketAddr> = nodes.iter().map(|node| node.local_address().unwrap()).collect();
+    let local_addresses: Vec<SocketAddr> = nodes.iter().map(|node| node.local_address()).collect();
 
     for node in nodes {
         use rand::seq::SliceRandom;
@@ -94,7 +94,7 @@ async fn mesh(nodes: &mut Vec<Node>) {
 /// Connects the network nodes in a star topology.
 fn star(nodes: &mut Vec<Node>) {
     // Setup the hub.
-    let hub_address = nodes.first().unwrap().local_address().unwrap();
+    let hub_address = nodes.first().unwrap().local_address();
 
     // Start the rest of the nodes with the core node as the bootnode.
     let bootnodes = vec![hub_address];

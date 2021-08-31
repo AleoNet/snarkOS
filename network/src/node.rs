@@ -57,7 +57,7 @@ pub struct InnerNode {
     /// The current state of the node.
     state: StateCode,
     /// The local address of this node.
-    pub local_address: OnceCell<SocketAddr>,
+    pub local_address: SocketAddr,
     /// The pre-configured parameters of this node.
     pub config: Config,
     /// The cache of node's inbound messages.
@@ -122,7 +122,7 @@ impl Node {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
-            local_address: Default::default(),
+            local_address: config.desired_address,
             config,
             storage,
             inbound_cache: Default::default(),
@@ -318,21 +318,13 @@ impl Node {
     }
 
     #[inline]
-    pub fn local_address(&self) -> Option<SocketAddr> {
-        self.local_address.get().copied()
+    pub fn local_address(&self) -> SocketAddr {
+        self.local_address
     }
 
     #[inline]
     pub fn is_shutting_down(&self) -> bool {
         self.shutting_down.load(Ordering::Relaxed)
-    }
-
-    /// Sets the local address of the node to the given value.
-    #[inline]
-    pub fn set_local_address(&self, addr: SocketAddr) {
-        self.local_address
-            .set(addr)
-            .expect("local address was set more than once!");
     }
 
     pub async fn initialize_metrics(&self) -> Result<()> {
@@ -353,11 +345,7 @@ impl Node {
     }
 
     pub fn version(&self) -> Version {
-        Version::new(
-            crate::PROTOCOL_VERSION,
-            self.local_address().map(|x| x.port()).unwrap_or_default(),
-            self.id,
-        )
+        Version::new(crate::PROTOCOL_VERSION, self.local_address().port(), self.id)
     }
 
     pub async fn run_sync(&self) -> Result<()> {

@@ -46,7 +46,7 @@ impl Node {
     ) {
         debug!("Propagating a memory pool transaction to connected peers");
 
-        let local_address = self.local_address().unwrap();
+        let local_address = self.local_address();
 
         for remote_address in self.connected_peers() {
             if remote_address != transaction_sender && remote_address != local_address {

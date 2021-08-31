@@ -208,8 +208,8 @@ async fn binary_star_contact() {
     let bootnode_a = test_node(bootnode_setup.clone()).await;
     let bootnode_b = test_node(bootnode_setup).await;
 
-    let ba = bootnode_a.local_address().unwrap().to_string();
-    let bb = bootnode_b.local_address().unwrap().to_string();
+    let ba = bootnode_a.local_address().to_string();
+    let bb = bootnode_b.local_address().to_string();
 
     // Create the nodes to be used as the leafs in the stars.
     let setup = TestSetup {

@@ -58,7 +58,7 @@ async fn fuzzing_zeroes_pre_handshake() {
         ..Default::default()
     };
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     let mut stream = TcpStream::connect(node_addr).await.unwrap();
     wait_until!(1, node.peer_book.get_active_peer_count() == 1);
@@ -91,7 +91,7 @@ async fn fuzzing_valid_header_pre_handshake() {
         ..Default::default()
     };
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1..(64 * 1024));
@@ -144,7 +144,7 @@ async fn fuzzing_pre_handshake() {
         ..Default::default()
     };
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     for _ in 0..ITERATIONS {
         let random_len: usize = thread_rng().gen_range(1..(64 * 1024));
@@ -195,7 +195,7 @@ async fn fuzzing_corrupted_version_pre_handshake() {
     };
 
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     for i in 0..ITERATIONS {
         let mut stream = TcpStream::connect(node_addr).await.unwrap();
@@ -264,7 +264,7 @@ async fn fuzzing_corrupted_empty_payloads_pre_handshake() {
     };
 
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     for payload in &[Payload::GetMemoryPool, Payload::GetPeers, Payload::Pong] {
         let serialized = Payload::serialize(payload).unwrap();
@@ -329,7 +329,7 @@ async fn fuzzing_corrupted_payloads_with_bodies_pre_handshake() {
     };
 
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     let mut rng = thread_rng();
     let random_len: usize = rng.gen_range(1..(64 * 1024));
@@ -448,7 +448,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     };
 
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     let hashes: Vec<BlockHeaderHash> = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect();
 
@@ -527,7 +527,7 @@ async fn connection_request_spam() {
     };
 
     let node = test_node(node_setup).await;
-    let node_addr = node.local_address().unwrap();
+    let node_addr = node.local_address();
 
     let sockets = Arc::new(Mutex::new(Vec::with_capacity(NUM_ATTEMPTS)));
 

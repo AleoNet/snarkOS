@@ -146,7 +146,7 @@ impl Node {
         debug!("Connecting to {}...", remote_address);
 
         // Local address must be known by now.
-        let own_address = self.local_address().unwrap();
+        let own_address = self.local_address();
 
         // Don't connect if maximum number of connections has been reached.
         if !self.can_connect() {
@@ -178,7 +178,7 @@ impl Node {
     ///
     pub async fn connect_to_addresses(&self, addrs: &[SocketAddr]) {
         // Local address must be known by now.
-        let own_address = self.local_address().unwrap();
+        let own_address = self.local_address();
 
         for node_addr in addrs
             .iter()
@@ -210,7 +210,7 @@ impl Node {
     ///
     async fn connect_to_disconnected_peers(&self, count: usize) {
         // Local address must be known by now.
-        let own_address = self.local_address().unwrap();
+        let own_address = self.local_address();
 
         // If this node is not a bootnode, attempt to satisfy the minimum number of peer connections.
         let random_peers = {
@@ -366,7 +366,7 @@ impl Node {
     /// Add all new/updated addresses to our disconnected.
     /// The connection handler will be responsible for sending out handshake requests to them.
     pub(crate) async fn process_inbound_peers(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
-        let local_address = self.local_address().unwrap(); // the address must be known by now
+        let local_address = self.local_address(); // the address must be known by now
 
         for peer_address in peers.iter().filter(|&peer_addr| *peer_addr != local_address) {
             // Inform the peer book that we found a peer.

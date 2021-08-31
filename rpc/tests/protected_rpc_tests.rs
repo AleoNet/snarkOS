@@ -465,16 +465,14 @@ mod protected_rpc_tests {
         };
         let some_node = test_node(setup).await;
 
-        some_node
-            .connect_to_addresses(&[rpc_node.local_address().unwrap()])
-            .await;
+        some_node.connect_to_addresses(&[rpc_node.local_address()]).await;
 
         wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 1);
 
         let meta = authentication();
         let request = format!(
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"disconnect\", \"params\": [\"{}\"] }}",
-            some_node.local_address().unwrap()
+            some_node.local_address()
         );
         let _response = rpc.handle_request(&request, meta).await.unwrap();
 
@@ -497,8 +495,8 @@ mod protected_rpc_tests {
         let meta = authentication();
         let request = format!(
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"connect\", \"params\": [\"{}\", \"{}\"] }}",
-            some_node1.local_address().unwrap(),
-            some_node2.local_address().unwrap()
+            some_node1.local_address(),
+            some_node2.local_address()
         );
         let _response = rpc.handle_request(&request, meta).await.unwrap();
 
