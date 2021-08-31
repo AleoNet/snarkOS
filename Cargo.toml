@@ -143,6 +143,7 @@ default = [ ]
 prometheus = [ "snarkos-network/prometheus" ]
 compile_capnp_schema = [ "capnpc" ]
 noconfig = [ ]
+cuda = [ "snarkvm-algorithms/cuda" ]
 
 [profile.release]
 opt-level = 3
