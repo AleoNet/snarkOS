@@ -37,7 +37,7 @@ use snarkvm_dpc::{
     TransactionScheme,
 };
 
-mod dummy;
+pub(crate) mod dummy;
 mod merkle;
 pub use merkle::MerkleLedger;
 mod indexed_merkle_tree;
@@ -83,12 +83,6 @@ pub trait Ledger: Send + Sync {
 }
 
 pub struct DynLedger(pub Box<dyn Ledger>);
-
-impl Default for DynLedger {
-    fn default() -> Self {
-        DynLedger(Box::new(dummy::DummyLedger))
-    }
-}
 
 impl Deref for DynLedger {
     type Target = dyn Ledger;

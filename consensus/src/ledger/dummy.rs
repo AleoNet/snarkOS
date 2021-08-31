@@ -19,7 +19,8 @@ use crate::Ledger;
 use anyhow::*;
 use snarkos_storage::Digest;
 
-pub(super) struct DummyLedger;
+/// This object only serves as a temporary replacement for the regular Ledger so that it can be sent to a blocking task.
+pub(crate) struct DummyLedger;
 
 impl Ledger for DummyLedger {
     fn extend(&mut self, _new_cms: &[Digest], _new_sns: &[Digest], _new_memos: &[Digest]) -> Result<Digest> {
