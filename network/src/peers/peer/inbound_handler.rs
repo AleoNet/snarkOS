@@ -254,7 +254,7 @@ impl Peer {
     ) -> Result<(), NetworkError> {
         let result = match payload {
             Ok(payload) => self.inner_dispatch_payload(node, network, time_received, payload).await,
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         };
         match result {
             Ok(()) => (),

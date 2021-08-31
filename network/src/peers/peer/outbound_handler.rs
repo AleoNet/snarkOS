@@ -120,7 +120,7 @@ impl Peer {
                     metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
                     return Ok(PeerResponse::None);
                 }
-                
+
                 let message = Payload::Block(block, Some(height));
 
                 network.write_payload(&message).await.map_err(|e| {
