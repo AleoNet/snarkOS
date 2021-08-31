@@ -187,7 +187,7 @@ mod rpc_tests {
         assert_eq!(result.as_u64().unwrap(), 1u64);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_get_best_block_hash() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
@@ -202,7 +202,7 @@ mod rpc_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_get_block_hash() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
@@ -330,7 +330,7 @@ mod rpc_tests {
         assert!(!peer_info.is_syncing);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_get_block_template() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
