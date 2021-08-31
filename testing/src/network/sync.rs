@@ -19,7 +19,7 @@ use snarkvm_utilities::to_bytes_le;
 use tokio::time::sleep;
 
 use crate::{
-    network::{handshaken_node_and_peer, test_node, ConsensusSetup, TestSetup},
+    network::{handshaken_node_and_peer, handshaken_peer, test_node, ConsensusSetup, TestSetup},
     sync::{BLOCK_1, BLOCK_1_HEADER_HASH, BLOCK_2, BLOCK_2_HEADER_HASH, TRANSACTION_2},
     wait_until,
 };
@@ -172,31 +172,26 @@ async fn block_responder_side() {
     assert_eq!(block, block_struct_1);
 }
 
-#[test]
-#[ignore]
-fn block_propagation() {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_io()
-        .enable_time()
-        .build()
-        .unwrap();
+#[tokio::test(flavor = "multi_thread")]
+async fn block_propagation() {
+    let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
+    let mut peer2 = handshaken_peer(node.local_address().unwrap()).await;
 
-    let setup = TestSetup {
-        consensus_setup: Some(ConsensusSetup {
-            is_miner: true,
-            ..Default::default()
-        }),
-        tokio_handle: Some(rt.handle().clone()),
-        ..Default::default()
-    };
+    let block_1 = BLOCK_1.serialize();
+    let payload = Payload::Block(block_1.clone(), Some(1));
+    peer.write_message(&payload).await;
 
-    rt.block_on(async move {
-        let (_node, mut peer) = handshaken_node_and_peer(setup).await;
+    node.peer_book.broadcast(Payload::Ping(1)).await;
 
-        wait_until!(60, {
-            let payload = peer.read_payload().await.unwrap();
-            matches!(payload, Payload::Block(..))
-        });
+    wait_until!(5, node.storage.canon().await.unwrap().block_height == 1);
+    wait_until!(
+        5,
+        matches!(peer2.read_payload().await.unwrap(), Payload::Block(x, Some(1)) if x == block_1)
+    );
+    wait_until!(5, match peer.read_payload().await.unwrap() {
+        Payload::Block(_, _) => unreachable!(),
+        Payload::Ping(1) => true,
+        _ => false,
     });
 }
 
