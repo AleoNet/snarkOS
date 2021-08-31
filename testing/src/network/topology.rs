@@ -59,7 +59,7 @@ async fn line(nodes: &mut Vec<Node>) {
         };
 
         // Assumes the node has an established address.
-        prev_node = node.local_address();
+        prev_node = Some(node.local_address());
     }
 }
 
