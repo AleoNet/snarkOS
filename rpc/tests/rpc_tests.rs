@@ -367,7 +367,6 @@ mod rpc_tests {
             ..Default::default()
         };
         let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup.clone())).await;
-        rpc_node.listen().await.unwrap();
         rpc_node.start_services().await;
 
         let setup = TestSetup {
