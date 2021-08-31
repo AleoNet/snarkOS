@@ -225,7 +225,7 @@ impl ConsensusInner {
         }
 
         // Check that all the transaction proofs verify
-        self.verify_transactions(block.transactions.iter())
+        self.verify_transactions(block.transactions.clone()).await
     }
 
     pub(super) async fn commit_block(&mut self, hash: &Digest, block: &SerialBlock) -> Result<(), ConsensusError> {
@@ -239,7 +239,7 @@ impl ConsensusInner {
         }
 
         let digest = if self.ledger.requires_async_task(commitments.len(), serial_numbers.len()) {
-            let mut ledger = std::mem::replace(&mut self.ledger, DynLedger(Box::new(DummyLedger)));
+            let mut ledger = std::mem::replace(&mut self.ledger, DynLedger(Arc::new(DummyLedger)));
             let (digest, ledger) = tokio::task::spawn_blocking(move || {
                 let digest = ledger.extend(&commitments[..], &serial_numbers[..], &memos[..]);
 

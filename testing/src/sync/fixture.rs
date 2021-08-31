@@ -61,7 +61,7 @@ impl Fixture {
             Arc::new(Parameters::from(crh))
         };
 
-        DynLedger(Box::new(
+        DynLedger(Arc::new(
             MerkleLedger::new(ledger_parameters, &[], &[], &[], &[]).unwrap(),
         ))
     }

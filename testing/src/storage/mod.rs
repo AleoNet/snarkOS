@@ -43,7 +43,7 @@ pub fn initialize_test_blockchain() -> (DynStorage, DynLedger) {
         Arc::new(Parameters::from(crh))
     };
 
-    let ledger = DynLedger(Box::new(
+    let ledger = DynLedger(Arc::new(
         MerkleLedger::new(ledger_parameters, &[], &[], &[], &[]).unwrap(),
     ));
     let store = Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap()));

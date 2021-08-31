@@ -16,19 +16,20 @@
 
 use snarkos_storage::VMRecord;
 use snarkvm_dpc::testnet1::instantiated::{Testnet1DPC, Testnet1Transaction};
+use tokio::task;
 
 use crate::DeserializedLedger;
 
 use super::*;
 
 impl ConsensusInner {
-    pub(super) fn receive_transaction(&mut self, transaction: Box<SerialTransaction>) -> bool {
+    pub(super) async fn receive_transaction(&mut self, transaction: Box<SerialTransaction>) -> bool {
         if transaction.value_balance.is_negative() {
             error!("Received a transaction that was a coinbase transaction");
             return false;
         }
 
-        match self.verify_transactions(std::iter::once(&*transaction)) {
+        match self.verify_transactions(vec![*transaction.clone()]).await {
             Ok(true) => (),
             Ok(false) => {
                 warn!("Received a transaction that was invalid");
@@ -56,28 +57,32 @@ impl ConsensusInner {
     }
 
     /// Check if the transactions are valid.
-    pub(super) fn verify_transactions<'a>(
+    pub(super) async fn verify_transactions<'a>(
         &self,
-        transactions: impl Iterator<Item = &'a SerialTransaction>,
+        transactions: Vec<SerialTransaction>,
     ) -> Result<bool, ConsensusError> {
-        let mut deserialized = vec![];
-        for transaction in transactions {
-            if !self
-                .public
-                .parameters
-                .authorized_inner_snark_ids
-                .iter()
-                .any(|x| x[..] == transaction.inner_circuit_id[..])
-            {
-                return Ok(false);
-            }
-            deserialized.push(Testnet1Transaction::deserialize(transaction)?);
-        }
+        let consensus = self.public.clone();
+        let ledger = self.ledger.clone();
 
-        Ok(self
-            .public
-            .dpc
-            .verify_transactions(&deserialized[..], &self.ledger.deserialize::<Components>()))
+        task::spawn_blocking(move || {
+            let mut deserialized = vec![];
+            for transaction in transactions {
+                if !consensus
+                    .parameters
+                    .authorized_inner_snark_ids
+                    .iter()
+                    .any(|x| x[..] == transaction.inner_circuit_id[..])
+                {
+                    return Ok(false);
+                }
+                deserialized.push(Testnet1Transaction::deserialize(&transaction)?);
+            }
+
+            Ok(consensus
+                .dpc
+                .verify_transactions(&deserialized[..], &ledger.deserialize::<Components>()))
+        })
+        .await?
     }
 
     /// Generate a transaction by spending old records and specifying new record attributes

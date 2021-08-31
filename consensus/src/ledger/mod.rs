@@ -82,7 +82,8 @@ pub trait Ledger: Send + Sync {
     fn requires_async_task(&self, new_commitments_len: usize, new_serial_numbers_len: usize) -> bool;
 }
 
-pub struct DynLedger(pub Box<dyn Ledger>);
+#[derive(Clone)]
+pub struct DynLedger(pub Arc<dyn Ledger>);
 
 impl Deref for DynLedger {
     type Target = dyn Ledger;
@@ -94,7 +95,7 @@ impl Deref for DynLedger {
 
 impl DerefMut for DynLedger {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.0
+        Arc::get_mut(&mut self.0).unwrap() // this is safe, because the ledger items are processed sequentially
     }
 }
 

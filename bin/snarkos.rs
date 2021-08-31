@@ -201,7 +201,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         let serial_numbers = storage.get_serial_numbers().await?;
         let memos = storage.get_memos().await?;
         info!("Initializing Ledger");
-        let ledger = DynLedger(Box::new(MerkleLedger::new(
+        let ledger = DynLedger(Arc::new(MerkleLedger::new(
             ledger_parameters,
             &ledger_digests[..],
             &commitments[..],
