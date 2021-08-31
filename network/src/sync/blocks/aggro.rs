@@ -36,7 +36,7 @@ pub struct SyncAggro {
 }
 
 struct BlockLocatorHashes {
-    hashes: IndexSet<BlockHeaderHash>,
+    hashes: Vec<BlockHeaderHash>,
     last_update: Instant,
 }
 
@@ -76,7 +76,7 @@ impl SyncAggro {
         self.base.node.register_block_sync_attempt();
 
         let block_locator_hashes = Arc::new(RwLock::new(BlockLocatorHashes {
-            hashes: SyncBase::block_locator_hashes(&self.base.node).await?.into_iter().collect(),
+            hashes: SyncBase::block_locator_hashes(&self.base.node).await?,
             last_update: Instant::now(),
         }));
 
@@ -86,7 +86,7 @@ impl SyncAggro {
             for peer in &sync_nodes {
                 let mut initial_hashes = self.peer_info.entry(peer.address).or_default().pending_block_hashes.clone();
                 if initial_hashes.is_empty() {
-                    initial_hashes = block_locator_hashes.hashes.iter().cloned().collect();
+                    initial_hashes = block_locator_hashes.hashes.clone();
                 }
                 peer_syncs.push((peer.clone(), initial_hashes));
             }
@@ -99,7 +99,7 @@ impl SyncAggro {
             return Ok(());
         }
 
-        let received_hashes = Arc::new(RwLock::new(Cache::default()));
+        let received_hashes = Arc::new(RwLock::new(Cache::<1024, 32>::default()));
 
         let node = self.base.node.clone();
         self.base.receive_messages(15, 3, |msg| {
@@ -120,7 +120,7 @@ impl SyncAggro {
                             match SyncBase::block_locator_hashes(&node).await {
                                 Ok(hashes) => {
                                     let mut target = block_locator_hashes.write().await;
-                                    target.hashes = hashes.into_iter().collect();
+                                    target.hashes = hashes;
                                     target.last_update = Instant::now();
                                 },
                                 Err(e) => warn!("sync failed to fetch block locator hashes: {:?}", e),
@@ -145,13 +145,13 @@ impl SyncAggro {
                             }
                         };
 
-                        let block_locator_hashes: Vec<_> = block_locator_hashes.read().await.hashes.iter().cloned().collect();
-
                         let blocks: IndexSet<_> = {
                             let received_hashes = received_hashes.read().await;
-                            block_locator_hashes
-                                .into_iter()
+                            let hashes = block_locator_hashes.read().await;
+                            hashes.hashes
+                                .iter()
                                 .filter(|x| !received_hashes.contains(&x.0[..]))
+                                .cloned()
                                 .chain(
                                     hashes_trimmed
                                         .into_iter()
@@ -176,7 +176,9 @@ impl SyncAggro {
                 },
                 SyncInbound::Block(peer, block, peer_height) => {
                     let node = node.clone();
+                    let received_hashes = received_hashes.clone();
                     tokio::spawn(async move {
+                        received_hashes.write().await.push(&block[..]);
                         match node
                             .process_received_block(peer, block, peer_height, false)
                             .await {

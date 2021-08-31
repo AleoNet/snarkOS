@@ -14,17 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::block::BlockHeader;
-
 use circular_queue::CircularQueue;
+use snarkvm_dpc::BlockHeader;
 use twox_hash::xxh3::hash64;
 
 #[derive(Debug, Clone)]
-pub struct Cache<const N: usize> {
+pub struct Cache<const N: usize, const S: usize> {
     queue: CircularQueue<u64>,
 }
 
-impl<const N: usize> Default for Cache<N> {
+const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
+
+pub type BlockCache<const N: usize> = Cache<N, BLOCK_HEADER_SIZE>;
+
+impl<const N: usize, const S: usize> Default for Cache<N, S> {
     fn default() -> Self {
         Self {
             queue: CircularQueue::with_capacity(N),
@@ -32,9 +35,9 @@ impl<const N: usize> Default for Cache<N> {
     }
 }
 
-impl<const N: usize> Cache<N> {
+impl<const N: usize, const S: usize> Cache<N, S> {
     fn hash_block(payload: &[u8]) -> u64 {
-        hash64(&payload[..BlockHeader::size()])
+        hash64(&payload[..S.min(payload.len())])
     }
 
     pub fn contains(&self, payload: &[u8]) -> bool {

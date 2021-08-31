@@ -29,7 +29,7 @@ use std::{
 use tokio::sync::mpsc;
 
 use super::PeerQuality;
-use crate::{message::Payload, Cache, NetworkError, Node};
+use crate::{BlockCache, NetworkError, Node, message::Payload};
 
 use super::{network::*, outbound_handler::*};
 
@@ -64,7 +64,7 @@ pub struct Peer {
     pub is_routable: Option<bool>,
 
     #[serde(skip)]
-    pub block_received_cache: Cache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
+    pub block_received_cache: BlockCache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
 }
 
 const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
@@ -83,7 +83,7 @@ impl Peer {
             // Set to `None` since peer creation only ever happens before a connection to the peer,
             // therefore we don't know if its listener is routable or not.
             is_routable: None,
-            block_received_cache: Cache::default(),
+            block_received_cache: BlockCache::default(),
         }
     }
 
