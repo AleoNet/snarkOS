@@ -681,6 +681,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cuda-oxide"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f91b18051e0d9d6772b1367f8f5ab0ef1b5ab0938bed61ce3421ea6b61a403f"
+dependencies = [
+ "num_enum",
+]
+
+[[package]]
 name = "curl"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3008,6 +3017,7 @@ dependencies = [
  "bitvec",
  "blake2",
  "crossbeam-channel 0.5.1",
+ "cuda-oxide",
  "derivative",
  "digest 0.9.0",
  "itertools",
