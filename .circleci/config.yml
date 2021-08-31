@@ -87,7 +87,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: cd consensus && RUST_MIN_STACK=8388608 cargo test
+          command: cd consensus && RUST_MIN_STACK=8388608 cargo test --release
       - clear_environment:
           cache_key: snarkos-consensus-cache
 
@@ -162,7 +162,7 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: cd rpc && RUST_MIN_STACK=8388608 cargo test
+          command: cd rpc && RUST_MIN_STACK=8388608 cargo test --release
       - clear_environment:
           cache_key: snarkos-rpc-cache
 
