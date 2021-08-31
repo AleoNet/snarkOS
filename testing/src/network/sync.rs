@@ -185,10 +185,10 @@ async fn block_propagation() {
 
     wait_until!(5, node.storage.canon().await.unwrap().block_height == 1);
     wait_until!(
-        5,
+        10,
         matches!(peer2.read_payload().await.unwrap(), Payload::Block(x, Some(1)) if x == block_1)
     );
-    wait_until!(5, match peer.read_payload().await.unwrap() {
+    wait_until!(10, match peer.read_payload().await.unwrap() {
         Payload::Block(_, _) => unreachable!(),
         Payload::Ping(1) => true,
         _ => false,
