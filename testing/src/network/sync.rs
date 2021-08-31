@@ -104,7 +104,7 @@ async fn block_initiator_side() {
     wait_until!(
         5,
         matches!(
-            node.expect_storage()
+            node.storage
                 .get_block_state(&block_1_header_hash.0.into())
                 .await
                 .unwrap(),
@@ -114,7 +114,7 @@ async fn block_initiator_side() {
     wait_until!(
         1,
         matches!(
-            node.expect_storage()
+            node.storage
                 .get_block_state(&block_2_header_hash.0.into())
                 .await
                 .unwrap(),
@@ -181,7 +181,7 @@ async fn block_propagation() {
     let payload = Payload::Block(block_1.clone(), Some(1));
     peer.write_message(&payload).await;
 
-    wait_until!(5, node.expect_storage().canon().await.unwrap().block_height == 1);
+    wait_until!(5, node.storage.canon().await.unwrap().block_height == 1);
 
     node.peer_book.broadcast(Payload::Ping(1)).await;
 
@@ -229,7 +229,7 @@ async fn block_two_node() {
     // check blocks present in alice's chain were synced to bob's
     wait_until!(
         30,
-        node_bob.expect_storage().canon().await.unwrap().block_height == NUM_BLOCKS
+        node_bob.storage.canon().await.unwrap().block_height == NUM_BLOCKS
     );
 }
 

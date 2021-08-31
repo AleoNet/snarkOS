@@ -287,7 +287,7 @@ impl Node {
 
         // Consider peering tests that don't use the sync layer.
         let current_block_height = if self.sync().is_some() {
-            self.expect_storage().canon().await?.block_height as u32
+            self.storage.canon().await?.block_height as u32
         } else {
             0
         };
