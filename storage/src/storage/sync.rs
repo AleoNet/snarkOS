@@ -130,7 +130,14 @@ pub trait SyncStorage {
         let mut next_round = vec![];
         loop {
             for path in &round {
-                let children = self.get_block_children(path.last().unwrap())?;
+                let last_hash = path.last().unwrap();
+                let children = if let Some(children) = self.get_cached_block_children(last_hash) {
+                    children.to_vec()
+                } else {
+                    let children = self.get_block_children(last_hash)?;
+                    self.cache_block_children(last_hash.clone(), children.clone());
+                    children
+                };
                 next_round.extend(children.into_iter().map(|x| {
                     let mut path = path.clone();
                     path.push(x);
@@ -165,6 +172,12 @@ pub trait SyncStorage {
         }
         Ok(DigestTree::Node(block_hash.clone(), out_children, longest_tree_len))
     }
+
+    /// Stores the immediate children of `block_hash` in a cache.
+    fn cache_block_children(&mut self, block_hash: Digest, block_children: Vec<Digest>);
+
+    /// Attempts to get the immediate children of `block_hash` from a cache.
+    fn get_cached_block_children(&mut self, block_hash: &Digest) -> Option<Vec<Digest>>;
 
     /// Gets the immediate children of `block_hash`.
     fn get_block_children(&mut self, block_hash: &Digest) -> Result<Vec<Digest>>;

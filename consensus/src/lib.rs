@@ -62,7 +62,7 @@ pub mod ledger;
 pub use ledger::*;
 use snarkvm_dpc::AleoAmount;
 
-pub const OLDEST_FORK_THRESHOLD: usize = 1024;
+pub const OLDEST_FORK_THRESHOLD: usize = u32::MAX as usize;
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> AleoAmount {
