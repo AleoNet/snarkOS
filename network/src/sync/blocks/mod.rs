@@ -14,15 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod blocks;
-pub use blocks::*;
+mod batched;
+pub use batched::*;
+mod interface;
+pub use interface::*;
+mod base;
+pub use base::*;
+mod aggro;
+pub use aggro::*;
 
-pub mod memory_pool;
-pub use memory_pool::*;
+use std::net::SocketAddr;
+use snarkvm_dpc::BlockHeaderHash;
 
-// TODO (howardwu): Move this out of network/sync. It should be on a much higher level.
-pub mod miner;
-pub use miner::*;
-
-pub mod sync;
-pub use sync::*;
+pub enum SyncInbound {
+    BlockHashes(SocketAddr, Vec<BlockHeaderHash>),
+    Block(SocketAddr, Vec<u8>, Option<u32>),
+}

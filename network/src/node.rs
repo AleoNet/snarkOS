@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{master::SyncInbound, sync::master::SyncMaster, *};
+use crate::*;
 use snarkos_metrics::{self as metrics, misc};
 
 use anyhow::*;
@@ -69,7 +69,7 @@ pub struct InnerNode {
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync>>,
     /// The node's storage.
-    pub storage: Option<DynStorage>,
+    pub storage: DynStorage,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -118,7 +118,7 @@ impl Node {
 
 impl Node {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config, storage: Option<DynStorage>) -> Result<Self, NetworkError> {
+    pub async fn new(config: Config, storage: DynStorage) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
@@ -146,10 +146,6 @@ impl Node {
         }
 
         Ok(node)
-    }
-
-    pub fn expect_storage(&self) -> &DynStorage {
-        self.storage.as_ref().expect("no storage!")
     }
 
     pub fn set_sync(&mut self, sync: Sync) {
@@ -348,7 +344,7 @@ impl Node {
         if self.sync().is_some() {
             metrics::gauge!(
                 misc::BLOCK_HEIGHT,
-                self.expect_storage().canon().await?.block_height as f64
+                self.storage.canon().await?.block_height as f64
             );
         }
 
@@ -360,7 +356,7 @@ impl Node {
     }
 
     pub async fn run_sync(&self) -> Result<()> {
-        let (master, sender) = SyncMaster::new(self.clone());
+        let (master, sender) = SyncAggro::new(self.clone());
         *self.master_dispatch.write().await = Some(sender);
         master.run().await
     }

@@ -213,8 +213,8 @@ impl Peer {
                 Ok(PeerResponse::None)
             }
             PeerAction::ExpectingSyncBlocks(amount) => {
-                self.quality.remaining_sync_blocks = amount;
-                self.quality.total_sync_blocks = amount;
+                self.quality.remaining_sync_blocks += amount;
+                self.quality.total_sync_blocks += amount;
                 Ok(PeerResponse::None)
             }
             PeerAction::SoftFail => {

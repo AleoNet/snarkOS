@@ -125,7 +125,7 @@ impl MinerInstance {
                 let serialized_block = block.serialize();
                 let node_clone = self.node.clone();
                 let new_height = node_clone
-                    .expect_storage()
+                    .storage
                     .canon()
                     .await
                     .map(|c| c.block_height as u32)
