@@ -48,7 +48,7 @@ impl Cipher {
             return Err(NetworkError::MessageTooBig(data.len()));
         }
 
-        let mut encrypted_len = 0;
+        let mut encrypted_len = 4; // account for the final message length
         let mut processed_len = 0;
 
         while processed_len < data.len() {
@@ -72,7 +72,7 @@ impl Cipher {
         if encrypted_len > crate::MAX_MESSAGE_SIZE {
             return Err(NetworkError::MessageTooBig(encrypted_len));
         }
-        writer.write_all(&network_len.to_be_bytes()[..]).await?;
+        self.buffer[..4].copy_from_slice(&(network_len - 4).to_be_bytes()[..]);
         writer.write_all(&self.buffer[..encrypted_len]).await?;
         writer.flush().await?;
         Ok(())
