@@ -377,8 +377,8 @@ mod rpc_tests {
         let some_node1 = test_node(setup.clone()).await;
         let some_node2 = test_node(setup).await;
 
-        rpc_node.connect_to_addresses(&[some_node1.local_address()]).await;
-        some_node1.connect_to_addresses(&[some_node2.local_address()]).await;
+        rpc_node.connect_to_addresses(&[some_node1.expect_local_addr()]).await;
+        some_node1.connect_to_addresses(&[some_node2.expect_local_addr()]).await;
 
         wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 1);
         wait_until!(3, some_node1.peer_book.get_connected_peer_count() == 2);
