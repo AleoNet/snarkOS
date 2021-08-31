@@ -174,6 +174,11 @@ async fn block_responder_side() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn block_propagation() {
+    let builder = tracing_subscriber::FmtSubscriber::builder();
+
+    let builder = builder.with_env_filter(tracing_subscriber::EnvFilter::new("TRACE"));
+
+    builder.try_init().unwrap();
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
     let mut peer2 = handshaken_peer(node.local_address().unwrap()).await;
 
@@ -183,16 +188,20 @@ async fn block_propagation() {
 
     node.peer_book.broadcast(Payload::Ping(1)).await;
 
+    tracing::info!("wait 1");
     wait_until!(5, node.storage.canon().await.unwrap().block_height == 1);
+    tracing::info!("wait 2");
     wait_until!(
         10,
         matches!(peer2.read_payload().await.unwrap(), Payload::Block(x, Some(1)) if x == block_1)
     );
+    tracing::info!("wait 3");
     wait_until!(30, match peer.read_payload().await.unwrap() {
         Payload::Block(_, _) => unreachable!(),
         Payload::Ping(1) => true,
         _ => false,
     });
+    tracing::info!("wait 4");
 }
 
 #[tokio::test]
