@@ -70,10 +70,11 @@ impl ConsensusInner {
 
             match message {
                 ConsensusMessage::ReceiveTransaction(transaction) => {
-                    response.send(Box::new(self.receive_transaction(transaction))).ok();
+                    let ret = self.receive_transaction(transaction).await;
+                    response.send(Box::new(ret)).ok();
                 }
                 ConsensusMessage::VerifyTransactions(transactions) => {
-                    let out = match self.verify_transactions(transactions.iter()) {
+                    let out = match self.verify_transactions(transactions).await {
                         Ok(out) => out,
                         Err(e) => {
                             error!(

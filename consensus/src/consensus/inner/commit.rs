@@ -172,7 +172,7 @@ impl ConsensusInner {
 
     /// Check if the block is valid.
     /// Verify transactions and transaction fees.
-    pub(super) async fn verify_block(&self, block: &SerialBlock) -> Result<bool, ConsensusError> {
+    pub(super) async fn verify_block(&mut self, block: &SerialBlock) -> Result<bool, ConsensusError> {
         let canon = self.storage.canon().await?;
         // Verify the block header
         if block.header.previous_block_hash != canon.hash {
@@ -225,7 +225,7 @@ impl ConsensusInner {
         }
 
         // Check that all the transaction proofs verify
-        self.verify_transactions(block.transactions.iter())
+        self.verify_transactions(block.transactions.clone()).await
     }
 
     pub(super) async fn commit_block(&mut self, hash: &Digest, block: &SerialBlock) -> Result<(), ConsensusError> {

@@ -16,19 +16,20 @@
 
 use snarkos_storage::VMRecord;
 use snarkvm_dpc::testnet1::instantiated::{Testnet1DPC, Testnet1Transaction};
+use tokio::task;
 
 use crate::DeserializedLedger;
 
 use super::*;
 
 impl ConsensusInner {
-    pub(super) fn receive_transaction(&mut self, transaction: Box<SerialTransaction>) -> bool {
+    pub(super) async fn receive_transaction(&mut self, transaction: Box<SerialTransaction>) -> bool {
         if transaction.value_balance.is_negative() {
             error!("Received a transaction that was a coinbase transaction");
             return false;
         }
 
-        match self.verify_transactions(std::iter::once(&*transaction)) {
+        match self.verify_transactions(vec![*transaction.clone()]).await {
             Ok(true) => (),
             Ok(false) => {
                 warn!("Received a transaction that was invalid");
@@ -56,28 +57,43 @@ impl ConsensusInner {
     }
 
     /// Check if the transactions are valid.
-    pub(super) fn verify_transactions<'a>(
-        &self,
-        transactions: impl Iterator<Item = &'a SerialTransaction>,
+    pub(super) async fn verify_transactions(
+        &mut self,
+        transactions: Vec<SerialTransaction>,
     ) -> Result<bool, ConsensusError> {
-        let mut deserialized = vec![];
-        for transaction in transactions {
-            if !self
-                .public
-                .parameters
-                .authorized_inner_snark_ids
-                .iter()
-                .any(|x| x[..] == transaction.inner_circuit_id[..])
-            {
-                return Ok(false);
-            }
-            deserialized.push(Testnet1Transaction::deserialize(transaction)?);
-        }
+        let consensus = self.public.clone();
+        let ledger = std::mem::replace(&mut self.ledger, DynLedger::dummy());
 
-        Ok(self
-            .public
-            .dpc
-            .verify_transactions(&deserialized[..], &self.ledger.deserialize::<Components>()))
+        let (ledger, verification_result) = task::spawn_blocking(move || {
+            let mut deserialized = vec![];
+            for transaction in transactions {
+                if !consensus
+                    .parameters
+                    .authorized_inner_snark_ids
+                    .iter()
+                    .any(|x| x[..] == transaction.inner_circuit_id[..])
+                {
+                    return (ledger, Ok(false));
+                }
+                let tx = Testnet1Transaction::deserialize(&transaction);
+                match tx {
+                    Ok(t) => deserialized.push(t),
+                    Err(e) => return (ledger, Err(e)),
+                }
+            }
+
+            let verification_result = consensus
+                .dpc
+                .verify_transactions(&deserialized[..], &ledger.deserialize::<Components>());
+
+            (ledger, Ok(verification_result))
+        })
+        .await
+        .unwrap(); // We won't abort this task, so the only alternative is a panic inside it
+
+        self.ledger = ledger;
+
+        verification_result.map_err(|e| e.into())
     }
 
     /// Generate a transaction by spending old records and specifying new record attributes
