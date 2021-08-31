@@ -57,7 +57,7 @@ pub struct InnerNode {
     /// The current state of the node.
     state: StateCode,
     /// The local address of this node.
-    pub local_address: SocketAddr,
+    pub local_addr: OnceCell<SocketAddr>,
     /// The pre-configured parameters of this node.
     pub config: Config,
     /// The cache of node's inbound messages.
@@ -122,7 +122,7 @@ impl Node {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
-            local_address: config.desired_address,
+            local_addr: Default::default(),
             config,
             storage,
             inbound_cache: Default::default(),
@@ -138,6 +138,9 @@ impl Node {
         }));
 
         if node.config.is_crawler() {
+            // Safe since crawlers don't start the listener service.
+            node.set_local_addr(node.config.desired_address);
+
             // Safe since this can only ever be set here.
             node.known_network.set(KnownNetwork::default()).unwrap();
         }
@@ -317,9 +320,17 @@ impl Node {
         self.threads.append(handle);
     }
 
+    /// Sets the local address of the node to the given value.
     #[inline]
-    pub fn local_address(&self) -> SocketAddr {
-        self.local_address
+    pub fn set_local_addr(&self, addr: SocketAddr) {
+        self.local_addr
+            .set(addr)
+            .expect("local address was set more than once!");
+    }
+
+    #[inline]
+    pub fn expect_local_addr(&self) -> SocketAddr {
+        self.local_addr.get().copied().expect("no address set!")
     }
 
     #[inline]
@@ -345,7 +356,7 @@ impl Node {
     }
 
     pub fn version(&self) -> Version {
-        Version::new(crate::PROTOCOL_VERSION, self.local_address().port(), self.id)
+        Version::new(crate::PROTOCOL_VERSION, self.expect_local_addr().port(), self.id)
     }
 
     pub async fn run_sync(&self) -> Result<()> {

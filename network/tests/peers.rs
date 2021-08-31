@@ -82,7 +82,7 @@ async fn bootnode_peer_propagation() {
 
     // Spin up and connect nodes A and B.
     let node_alice = test_node(setup(true, vec![])).await;
-    let addr_alice = node_alice.local_address();
+    let addr_alice = node_alice.expect_local_addr();
 
     // Connect B to A.
     let node_bob = test_node(setup(false, vec![addr_alice.to_string()])).await;

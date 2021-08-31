@@ -26,7 +26,10 @@ impl Node {
     /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
         let listener = TcpListener::bind(&self.config.desired_address).await?;
+
+        // Update the node's listening address.
         let own_listener_address = listener.local_addr()?;
+        self.set_local_addr(own_listener_address);
 
         info!("Initializing listener for node ({:x})", self.id);
 
