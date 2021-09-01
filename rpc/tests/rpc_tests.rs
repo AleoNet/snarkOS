@@ -130,14 +130,8 @@ mod rpc_tests {
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
     }
 
-    async fn make_request_no_params(rpc: &Rpc, method: String) -> Value {
-        let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method,);
-
-        let response = rpc.io.handle_request(&request).await.unwrap();
-
-        let extracted: Value = serde_json::from_str(&response).unwrap();
-
-        extracted["result"].clone()
+    async fn make_request_no_params(rpc: &Rpc, method: &str) -> Value {
+        make_request_with_params(rpc, method, "[]").await
     }
 
     async fn make_request_with_params(rpc: &Rpc, method: &str, params: &str) -> Value {
@@ -194,9 +188,7 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let method = "getblockcount".to_string();
-
-        let result = make_request_no_params(&rpc, method).await;
+        let result = make_request_no_params(&rpc, "getblockcount").await;
 
         assert_eq!(result.as_u64().unwrap(), 1u64);
     }
@@ -206,9 +198,7 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let method = "getbestblockhash".to_string();
-
-        let result = make_request_no_params(&rpc, method).await;
+        let result = make_request_no_params(&rpc, "getbestblockhash").await;
 
         assert_eq!(
             result.as_str().unwrap(),
@@ -316,9 +306,7 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let method = "getconnectioncount".to_string();
-
-        let result = make_request_no_params(&rpc, method).await;
+        let result = make_request_no_params(&rpc, "getconnectioncount").await;
 
         assert_eq!(result.as_u64().unwrap(), 0u64);
     }
@@ -328,9 +316,7 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let method = "getpeerinfo".to_string();
-
-        let result = make_request_no_params(&rpc, method).await;
+        let result = make_request_no_params(&rpc, "getpeerinfo").await;
 
         let peer_info: PeerInfo = serde_json::from_value(result).unwrap();
 
@@ -344,9 +330,7 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let method = "getnodeinfo".to_string();
-
-        let result = make_request_no_params(&rpc, method).await;
+        let result = make_request_no_params(&rpc, "getnodeinfo").await;
 
         let peer_info: NodeInfo = serde_json::from_value(result).unwrap();
 
@@ -363,9 +347,7 @@ mod rpc_tests {
 
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let method = "getblocktemplate".to_string();
-
-        let result = make_request_no_params(&rpc, method).await;
+        let result = make_request_no_params(&rpc, "getblocktemplate").await;
 
         let template: BlockTemplate = serde_json::from_value(result).unwrap();
 
