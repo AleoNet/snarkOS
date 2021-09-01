@@ -29,7 +29,7 @@ mod consensus_dpc {
     };
     use snarkvm_utilities::{to_bytes_le, ToBytes};
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn base_dpc_multiple_transactions() {
         let program = FIXTURE.program.clone();
         let [_genesis_address, miner_acc, recipient] = FIXTURE.test_accounts.clone();

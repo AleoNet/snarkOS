@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
+use crate::ledger::dummy::DummyLedger;
 use snarkos_metrics as metrics;
 use snarkos_storage::DigestTree;
 use snarkvm_dpc::AleoAmount;
@@ -236,7 +237,23 @@ impl ConsensusInner {
             serial_numbers.extend_from_slice(&transaction.old_serial_numbers[..]);
             memos.push(transaction.memorandum.clone());
         }
-        let digest = self.ledger.extend(&commitments[..], &serial_numbers[..], &memos[..])?;
+
+        let digest = if self.ledger.requires_async_task(commitments.len(), serial_numbers.len()) {
+            let mut ledger = std::mem::replace(&mut self.ledger, DynLedger(Box::new(DummyLedger)));
+            let (digest, ledger) = tokio::task::spawn_blocking(move || {
+                let digest = ledger.extend(&commitments[..], &serial_numbers[..], &memos[..]);
+
+                (digest, ledger)
+            })
+            .await?;
+
+            self.ledger = ledger;
+
+            digest?
+        } else {
+            self.ledger.extend(&commitments[..], &serial_numbers[..], &memos[..])?
+        };
+
         self.storage.commit_block(hash, digest).await?;
         let new_pool = self.memory_pool.cleanse(&self.ledger)?;
         self.memory_pool = new_pool;

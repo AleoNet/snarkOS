@@ -132,4 +132,9 @@ impl<P: MerkleParameters> Ledger for MerkleLedger<P> {
         let calculated_digest = self.commitments.digest();
         self.digest() == calculated_digest
     }
+
+    fn requires_async_task(&self, new_commitments_len: usize, new_serial_numbers_len: usize) -> bool {
+        (self.commitments.len() + new_commitments_len).is_power_of_two()
+            || (self.serial_numbers.len() + new_serial_numbers_len).is_power_of_two()
+    }
 }

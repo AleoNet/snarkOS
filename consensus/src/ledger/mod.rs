@@ -37,6 +37,7 @@ use snarkvm_dpc::{
     TransactionScheme,
 };
 
+pub(crate) mod dummy;
 mod merkle;
 pub use merkle::MerkleLedger;
 mod indexed_merkle_tree;
@@ -77,6 +78,8 @@ pub trait Ledger: Send + Sync {
 
     /// checks if a ledgers state is consistent
     fn validate_ledger(&self) -> bool;
+
+    fn requires_async_task(&self, new_commitments_len: usize, new_serial_numbers_len: usize) -> bool;
 }
 
 pub struct DynLedger(pub Box<dyn Ledger>);
