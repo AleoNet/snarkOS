@@ -19,6 +19,7 @@ use crate::ledger::dummy::DummyLedger;
 use snarkos_metrics as metrics;
 use snarkos_storage::DigestTree;
 use snarkvm_dpc::AleoAmount;
+use tokio::task;
 
 impl ConsensusInner {
     /// Receive a block from an external source and process it based on ledger state.
@@ -211,16 +212,28 @@ impl ConsensusInner {
             return Ok(false);
         }
 
-        let transaction_ids: Vec<[u8; 32]> = block.transactions.iter().map(|x| x.id).collect();
-        let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
-
+        let block_header = block.header.clone();
         let parent_header = self.storage.get_block_header(&canon.hash).await?;
-        if let Err(err) =
-            self.public
-                .parameters
-                .verify_header(&block.header, &parent_header, &merkle_root, &pedersen_merkle_root)
-        {
-            error!("Block header failed to verify: {:?}", err);
+        let transaction_ids: Vec<[u8; 32]> = block.transactions.iter().map(|x| x.id).collect();
+        let consensus = self.public.clone();
+
+        let verification_result = task::spawn_blocking(move || {
+            let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
+
+            if let Err(err) =
+                consensus
+                    .parameters
+                    .verify_header(&block_header, &parent_header, &merkle_root, &pedersen_merkle_root)
+            {
+                error!("Block header failed to verify: {:?}", err);
+                false
+            } else {
+                true
+            }
+        })
+        .await?;
+
+        if !verification_result {
             return Ok(false);
         }
 
