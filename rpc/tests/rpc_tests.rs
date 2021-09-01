@@ -50,8 +50,6 @@ mod rpc_tests {
         );
         node.set_sync(node_consensus);
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // wait for genesis to commit
-
         let rpc_impl = RpcImpl::new(node.storage.clone(), None, node.clone());
 
         let mut io = MetaIoHandler::default();
@@ -142,14 +140,30 @@ mod rpc_tests {
         extracted["result"].clone()
     }
 
+    async fn make_request_with_params(rpc: &Rpc, method: &str, params: &str) -> Value {
+        let request = format!(
+            "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\", \"params\": {} }}",
+            method, params
+        );
+
+        let response = rpc.io.handle_request(&request).await.unwrap();
+
+        let extracted: Value = serde_json::from_str(&response).unwrap();
+
+        extracted["result"].clone()
+    }
+
     #[tokio::test]
     async fn test_rpc_get_block() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let response = rpc.request("getblock", &[hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]);
-
-        let block_response: Value = serde_json::from_str(&response).unwrap();
+        let block_response = make_request_with_params(
+            &rpc,
+            "getblock",
+            &format!("[\"{}\"]", hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())),
+        )
+        .await;
 
         let genesis_block = genesis();
 
@@ -207,10 +221,12 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        assert_eq!(rpc.request("getblockhash", &[0u32]), format![
-            r#""{}""#,
+        let result = make_request_with_params(&rpc, "getblockhash", "[0]").await;
+
+        assert_eq!(
+            result.as_str().unwrap(),
             hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())
-        ]);
+        );
     }
 
     #[tokio::test]
@@ -223,10 +239,12 @@ mod rpc_tests {
         let transaction = &genesis_block.transactions.0[0];
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
 
-        assert_eq!(rpc.request("getrawtransaction", &[transaction_id]), format![
-            r#""{}""#,
-            hex::encode(to_bytes_le![transaction].unwrap())
-        ]);
+        let result = make_request_with_params(&rpc, "getrawtransaction", &format!("[\"{}\"]", transaction_id)).await;
+
+        assert_eq!(
+            result.as_str().unwrap(),
+            hex::encode(to_bytes_le![transaction].unwrap()),
+        );
     }
 
     #[tokio::test]
@@ -237,11 +255,12 @@ mod rpc_tests {
         let genesis_block = genesis();
         let transaction = &genesis_block.transactions.0[0];
 
-        let response = rpc.request("gettransactioninfo", &[hex::encode(
-            transaction.transaction_id().unwrap(),
-        )]);
-
-        let transaction_info: Value = serde_json::from_str(&response).unwrap();
+        let transaction_info = make_request_with_params(
+            &rpc,
+            "gettransactioninfo",
+            &format!("[\"{}\"]", hex::encode(transaction.transaction_id().unwrap())),
+        )
+        .await;
 
         verify_transaction_info(to_bytes_le![transaction].unwrap(), transaction_info);
     }
@@ -251,11 +270,12 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        let response = rpc.request("decoderawtransaction", &[hex::encode(
-            to_bytes_le![&*TRANSACTION_1].unwrap(),
-        )]);
-
-        let transaction_info: Value = serde_json::from_str(&response).unwrap();
+        let transaction_info = make_request_with_params(
+            &rpc,
+            "decoderawtransaction",
+            &format!("[\"{}\"]", hex::encode(to_bytes_le![&*TRANSACTION_1].unwrap())),
+        )
+        .await;
 
         verify_transaction_info(to_bytes_le![&*TRANSACTION_1].unwrap(), transaction_info);
     }
@@ -266,12 +286,14 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        assert_eq!(
-            rpc.request("sendtransaction", &[hex::encode(
-                to_bytes_le![&*TRANSACTION_2].unwrap()
-            )]),
-            format![r#""{}""#, hex::encode(&TRANSACTION_2.id[..])]
-        );
+        let result = make_request_with_params(
+            &rpc,
+            "sendtransaction",
+            &format!("[\"{}\"]", hex::encode(to_bytes_le![&*TRANSACTION_2].unwrap())),
+        )
+        .await;
+
+        assert_eq!(result, hex::encode(&TRANSACTION_2.id[..]),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -279,12 +301,14 @@ mod rpc_tests {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
-        assert_eq!(
-            rpc.request("validaterawtransaction", &[hex::encode(
-                to_bytes_le![&*TRANSACTION_2].unwrap()
-            )]),
-            "true"
-        );
+        let result = make_request_with_params(
+            &rpc,
+            "validaterawtransaction",
+            &format!("[\"{}\"]", hex::encode(to_bytes_le![&*TRANSACTION_2].unwrap())),
+        )
+        .await;
+
+        assert_eq!(result.as_bool(), Some(true));
     }
 
     #[tokio::test]
@@ -333,11 +357,11 @@ mod rpc_tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_get_block_template() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
-
         let canon = consensus.storage.canon().await.unwrap();
         let curr_height = canon.block_height;
         let latest_block_hash = canon.hash;
+
+        let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let method = "getblocktemplate".to_string();
 
