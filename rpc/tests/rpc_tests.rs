@@ -147,7 +147,7 @@ mod rpc_tests {
         extracted["result"].clone()
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_get_block() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
@@ -338,7 +338,7 @@ mod rpc_tests {
         assert!(!peer_info.is_syncing);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_get_block_template() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let canon = consensus.storage.canon().await.unwrap();
