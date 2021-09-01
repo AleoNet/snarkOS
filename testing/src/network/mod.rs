@@ -235,7 +235,7 @@ impl FakeNode {
         let message = match self.network.read_payload(raw) {
             Ok(msg) => {
                 let msg = Payload::deserialize(msg)?;
-                debug!("read a {}", msg);
+                debug!("{}: read a {} {:?}", self.addr, msg, msg);
                 msg
             }
             Err(e) => {
@@ -249,7 +249,7 @@ impl FakeNode {
 
     pub async fn write_message(&mut self, payload: &Payload) {
         self.network.write_payload(payload).await.unwrap();
-        debug!("wrote a message containing a {} to the stream", payload);
+        debug!("{}: wrote a message containing a {} to the stream", self.addr, payload);
     }
 
     pub async fn write_bytes(&mut self, bytes: &[u8]) {
