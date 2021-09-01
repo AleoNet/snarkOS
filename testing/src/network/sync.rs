@@ -186,10 +186,11 @@ async fn block_propagation() {
     let payload = Payload::Block(block_1.clone(), Some(1));
     peer.write_message(&payload).await;
 
-    node.peer_book.broadcast(Payload::Ping(1)).await;
-
     tracing::info!("wait 1");
     wait_until!(5, node.storage.canon().await.unwrap().block_height == 1);
+
+    node.peer_book.broadcast(Payload::Ping(1)).await;
+
     tracing::info!("wait 2");
     wait_until!(
         10,
