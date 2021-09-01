@@ -119,15 +119,16 @@ impl Node {
                         "Failed to deserialize received block from {}: {}",
                         remote_address, error
                     );
-                    return Err(error);
+                    return Err(error).map_err(|e| NetworkError::Other(e.into()));
                 }
             };
 
-            Ok((block, deserialized))
+            let block_struct = <Block<Transaction<Components>> as VMBlock>::serialize(&deserialized)?;
+
+            Ok((block, block_struct))
         })
         .await
         .map_err(|e| NetworkError::Other(e.into()))??;
-        let block_struct = <Block<Transaction<Components>> as VMBlock>::serialize(&block_struct)?;
         let previous_block_hash = block_struct.header.previous_block_hash.clone();
 
         let canon = self.storage.canon().await?;
