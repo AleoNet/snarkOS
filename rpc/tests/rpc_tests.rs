@@ -193,7 +193,7 @@ mod rpc_tests {
         assert_eq!(result.as_u64().unwrap(), 1u64);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_rpc_get_best_block_hash() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
@@ -206,7 +206,7 @@ mod rpc_tests {
         );
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_rpc_get_block_hash() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
@@ -271,7 +271,7 @@ mod rpc_tests {
     }
 
     // multithreaded necessary due to use of non-async jsonrpc & internal use of async
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_rpc_send_raw_transaction() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
@@ -286,7 +286,7 @@ mod rpc_tests {
         assert_eq!(result, hex::encode(&TRANSACTION_2.id[..]),);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_rpc_validate_transaction() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
@@ -338,7 +338,7 @@ mod rpc_tests {
         assert!(!peer_info.is_syncing);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_rpc_get_block_template() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let canon = consensus.storage.canon().await.unwrap();
