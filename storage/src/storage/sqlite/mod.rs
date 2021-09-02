@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::*;
-use hash_hasher::{HashBuildHasher, HashedMap, HashedSet};
 use rusqlite::{
     types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
     Connection,
@@ -30,14 +29,12 @@ mod sync;
 
 pub struct SqliteStorage {
     conn: Connection,
-    block_children_cache: HashedMap<Digest, HashedSet<Digest>>,
 }
 
 impl SqliteStorage {
     pub fn new_ephemeral() -> Result<Self> {
         Ok(Self {
             conn: Connection::open_in_memory()?,
-            block_children_cache: HashedMap::with_hasher(HashBuildHasher::default()),
         })
     }
 
@@ -47,7 +44,6 @@ impl SqliteStorage {
                 path,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
             )?,
-            block_children_cache: HashedMap::with_hasher(HashBuildHasher::default()),
         })
     }
 }

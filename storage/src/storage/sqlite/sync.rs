@@ -16,7 +16,6 @@
 
 use std::convert::TryInto;
 
-use hash_hasher::{HashBuildHasher, HashedSet};
 use rusqlite::{params, OptionalExtension, Row, ToSql};
 use snarkvm_dpc::{AleoAmount, MerkleRootHash, Network, PedersenMerkleRootHash, ProofOfSuccinctWork};
 use tracing::*;
@@ -158,11 +157,6 @@ impl SyncStorage for SqliteStorage {
 
     fn insert_block(&mut self, block: &SerialBlock) -> Result<()> {
         let hash = block.header.hash();
-
-        self.block_children_cache
-            .entry(block.header.previous_block_hash.clone())
-            .or_insert_with(|| HashedSet::with_hasher(HashBuildHasher::default()))
-            .insert(hash.clone());
 
         let mut block_query = self.conn.prepare_cached(
             r"
@@ -488,19 +482,6 @@ impl SyncStorage for SqliteStorage {
             block_height: canon_height as usize,
             hash: hash.ok_or_else(|| anyhow!("missing canon block"))?,
         })
-    }
-
-    fn cache_block_children(&mut self, block_hash: Digest, block_children: Vec<Digest>) {
-        self.block_children_cache
-            .entry(block_hash)
-            .or_insert_with(|| HashedSet::with_hasher(HashBuildHasher::default()))
-            .extend(block_children);
-    }
-
-    fn get_cached_block_children(&mut self, block_hash: &Digest) -> Option<Vec<Digest>> {
-        self.block_children_cache
-            .get(block_hash)
-            .map(|set| set.iter().cloned().collect())
     }
 
     fn get_block_children(&mut self, hash: &Digest) -> Result<Vec<Digest>> {

@@ -131,13 +131,7 @@ pub trait SyncStorage {
         loop {
             for path in &round {
                 let last_hash = path.last().unwrap();
-                let children = if let Some(children) = self.get_cached_block_children(last_hash) {
-                    children.to_vec()
-                } else {
-                    let children = self.get_block_children(last_hash)?;
-                    self.cache_block_children(last_hash.clone(), children.clone());
-                    children
-                };
+                let children = self.get_block_children(last_hash)?;
                 next_round.extend(children.into_iter().map(|x| {
                     let mut path = path.clone();
                     path.push(x);
@@ -201,12 +195,6 @@ pub trait SyncStorage {
 
         Ok(trees.remove(block_hash).expect("missing block hash tree"))
     }
-
-    /// Stores the immediate children of `block_hash` in a cache.
-    fn cache_block_children(&mut self, block_hash: Digest, block_children: Vec<Digest>);
-
-    /// Attempts to get the immediate children of `block_hash` from a cache.
-    fn get_cached_block_children(&mut self, block_hash: &Digest) -> Option<Vec<Digest>>;
 
     /// Gets the immediate children of `block_hash`.
     fn get_block_children(&mut self, block_hash: &Digest) -> Result<Vec<Digest>>;
