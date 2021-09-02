@@ -38,9 +38,7 @@ struct SyncBlock {
 impl SyncBatched {
     pub fn new(node: Node) -> (Self, mpsc::Sender<SyncInbound>) {
         let (base, sender) = SyncBase::new(node);
-        let new = Self {
-            base,
-        };
+        let new = Self { base };
         (new, sender)
     }
 
@@ -66,19 +64,21 @@ impl SyncBatched {
         const TIMEOUT: u64 = 5;
         let mut received_block_hashes = HashMap::new();
 
-        self.base.receive_messages(TIMEOUT, TIMEOUT, |msg| {
-            match msg {
-                SyncInbound::BlockHashes(addr, hashes) => {
-                    received_block_hashes.insert(addr, hashes.into_iter().map(|x| -> Digest { x.0.into() }).collect());
+        self.base
+            .receive_messages(TIMEOUT, TIMEOUT, |msg| {
+                match msg {
+                    SyncInbound::BlockHashes(addr, hashes) => {
+                        received_block_hashes
+                            .insert(addr, hashes.into_iter().map(|x| -> Digest { x.0.into() }).collect());
+                    }
+                    SyncInbound::Block(..) => {
+                        warn!("received sync block prematurely");
+                    }
                 }
-                SyncInbound::Block(..) => {
-                    warn!("received sync block prematurely");
-                }
-            }
-            //todo: fail if peer sends > 1 block hash packet
-            received_block_hashes.len() >= max_message_count
-        })
-        .await;
+                //todo: fail if peer sends > 1 block hash packet
+                received_block_hashes.len() >= max_message_count
+            })
+            .await;
 
         info!(
             "received {} hashes from {} peers in {} seconds",
@@ -97,18 +97,19 @@ impl SyncBatched {
         const TIMEOUT: u64 = 30;
         let mut blocks = vec![];
 
-        self.base.receive_messages(TIMEOUT, 4, |msg| {
-            match msg {
-                SyncInbound::BlockHashes(_, _) => {
-                    // late, ignored
+        self.base
+            .receive_messages(TIMEOUT, 4, |msg| {
+                match msg {
+                    SyncInbound::BlockHashes(_, _) => {
+                        // late, ignored
+                    }
+                    SyncInbound::Block(address, block, height) => {
+                        blocks.push(SyncBlock { address, block, height });
+                    }
                 }
-                SyncInbound::Block(address, block, height) => {
-                    blocks.push(SyncBlock { address, block, height });
-                }
-            }
-            blocks.len() >= block_count
-        })
-        .await;
+                blocks.len() >= block_count
+            })
+            .await;
 
         info!("received {} blocks in {} seconds", blocks.len(), TIMEOUT);
 
@@ -272,7 +273,8 @@ impl SyncBatched {
 
         for (i, hash) in block_order.iter().enumerate() {
             if let Some(block) = blocks_by_hash.remove(hash) {
-                self.base.node
+                self.base
+                    .node
                     .process_received_block(block.address, block.block, block.height, false)
                     .await?;
             } else {

@@ -14,25 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use crate::{Cache, Node, Payload, Peer, SyncBase, SyncInbound};
 use anyhow::*;
 use indexmap::IndexSet;
 use snarkos_storage::Digest;
 use snarkvm_dpc::BlockHeaderHash;
-use tokio::{sync::{RwLock, mpsc}, time::Instant};
-
-#[derive(Default)]
-struct PeerSyncInfo {
-    known_canon_depth: u32,
-    known_latest_hash: Option<BlockHeaderHash>,
-    pending_block_hashes: Vec<BlockHeaderHash>,
-}
+use tokio::{
+    sync::{mpsc, RwLock},
+    time::Instant,
+};
 
 pub struct SyncAggro {
     base: SyncBase,
-    peer_info: BTreeMap<SocketAddr, PeerSyncInfo>,
 }
 
 struct BlockLocatorHashes {
@@ -43,10 +38,7 @@ struct BlockLocatorHashes {
 impl SyncAggro {
     pub fn new(node: Node) -> (Self, mpsc::Sender<SyncInbound>) {
         let (base, sender) = SyncBase::new(node);
-        let new = Self {
-            base,
-            peer_info: BTreeMap::new(),
-        };
+        let new = Self { base };
         (new, sender)
     }
 
@@ -82,15 +74,10 @@ impl SyncAggro {
 
         let peer_syncs = {
             let block_locator_hashes = block_locator_hashes.read().await;
-            let mut peer_syncs = Vec::with_capacity(sync_nodes.len());
-            for peer in &sync_nodes {
-                let mut initial_hashes = self.peer_info.entry(peer.address).or_default().pending_block_hashes.clone();
-                if initial_hashes.is_empty() {
-                    initial_hashes = block_locator_hashes.hashes.clone();
-                }
-                peer_syncs.push((peer.clone(), initial_hashes));
-            }
-            peer_syncs
+            sync_nodes
+                .iter()
+                .map(|peer| (peer.clone(), block_locator_hashes.hashes.clone()))
+                .collect()
         };
 
         let hash_requests_sent = self.send_sync_messages(peer_syncs).await?;
@@ -102,94 +89,102 @@ impl SyncAggro {
         let received_hashes = Arc::new(RwLock::new(Cache::<1024, 32>::default()));
 
         let node = self.base.node.clone();
-        self.base.receive_messages(15, 3, |msg| {
-            metrics::decrement_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
-            match msg {
-                SyncInbound::BlockHashes(peer, hashes) => {
-                    let hashes: Vec<Digest> = hashes.into_iter().map(|x| x.0.into()).collect::<Vec<_>>();
-                    if hashes.is_empty() {
-                        return false;
-                    }
-                    let last_hash = hashes.last().unwrap().clone();
-                    
-                    let node = node.clone();
-                    let block_locator_hashes = block_locator_hashes.clone();
-                    let received_hashes = received_hashes.clone();
-                    tokio::spawn(async move {
-                        if block_locator_hashes.read().await.last_update.elapsed() > Duration::from_secs(10) {
-                            match SyncBase::block_locator_hashes(&node).await {
-                                Ok(hashes) => {
-                                    let mut target = block_locator_hashes.write().await;
-                                    target.hashes = hashes;
-                                    target.last_update = Instant::now();
-                                },
-                                Err(e) => warn!("sync failed to fetch block locator hashes: {:?}", e),
-                            }
+        self.base
+            .receive_messages(15, 3, |msg| {
+                metrics::decrement_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
+                match msg {
+                    SyncInbound::BlockHashes(peer, hashes) => {
+                        debug!("received {} sync hashes from {}", hashes.len(), peer);
+                        let hashes: Vec<Digest> = hashes.into_iter().map(|x| x.0.into()).collect::<Vec<_>>();
+                        if hashes.is_empty() {
+                            return false;
                         }
+                        let last_hash = hashes.last().unwrap().clone();
 
-                        let mut hashes_trimmed = Vec::with_capacity(hashes.len());
-                        {
-                            let received_hashes = received_hashes.read().await;
-                            for hash in hashes {
-                                if !received_hashes.contains(&hash[..]) {
-                                    hashes_trimmed.push(hash);
+                        let node = node.clone();
+                        let block_locator_hashes = block_locator_hashes.clone();
+                        let received_hashes = received_hashes.clone();
+                        tokio::spawn(async move {
+                            if block_locator_hashes.read().await.last_update.elapsed() > Duration::from_secs(10) {
+                                match SyncBase::block_locator_hashes(&node).await {
+                                    Ok(hashes) => {
+                                        let mut target = block_locator_hashes.write().await;
+                                        target.hashes = hashes;
+                                        target.last_update = Instant::now();
+                                    }
+                                    Err(e) => warn!("sync failed to fetch block locator hashes: {:?}", e),
                                 }
                             }
-                        }
 
-                        let early_block_states = match node.storage.get_block_states(&hashes_trimmed[..]).await {
-                            Ok(x) => x,
-                            Err(e) => {
-                                warn!("failed to get block states: {:?}", e);
+                            let mut hashes_trimmed = Vec::with_capacity(hashes.len());
+                            {
+                                let received_hashes = received_hashes.read().await;
+                                for hash in hashes {
+                                    if !received_hashes.contains(&hash[..]) {
+                                        hashes_trimmed.push(hash);
+                                    }
+                                }
+                            }
+
+                            let early_block_states = match node.storage.get_block_states(&hashes_trimmed[..]).await {
+                                Ok(x) => x,
+                                Err(e) => {
+                                    warn!("failed to get block states: {:?}", e);
+                                    return;
+                                }
+                            };
+
+                            let blocks: IndexSet<_> = {
+                                let received_hashes = received_hashes.read().await;
+                                let hashes = block_locator_hashes.read().await;
+                                hashes
+                                    .hashes
+                                    .iter()
+                                    .filter(|x| !received_hashes.contains(&x.0[..]))
+                                    .cloned()
+                                    .chain(
+                                        hashes_trimmed
+                                            .into_iter()
+                                            .zip(early_block_states.iter())
+                                            .filter(|(_, status)| {
+                                                matches!(status, snarkos_storage::BlockStatus::Unknown)
+                                            })
+                                            .map(|(hash, _)| BlockHeaderHash(hash.bytes().unwrap())),
+                                    )
+                                    .collect()
+                            };
+                            if blocks.is_empty() {
                                 return;
                             }
-                        };
+                            debug!("requesting {} sync blocks from {}", blocks.len(), peer);
 
-                        let blocks: IndexSet<_> = {
-                            let received_hashes = received_hashes.read().await;
-                            let hashes = block_locator_hashes.read().await;
-                            hashes.hashes
-                                .iter()
-                                .filter(|x| !received_hashes.contains(&x.0[..]))
-                                .cloned()
-                                .chain(
-                                    hashes_trimmed
-                                        .into_iter()
-                                        .zip(early_block_states.iter())
-                                        .filter(|(_, status)| matches!(status, snarkos_storage::BlockStatus::Unknown))
-                                        .map(|(hash, _)| BlockHeaderHash(hash.bytes().unwrap()))
-                                ).collect()
-                        };
-                        if blocks.is_empty() {
-                            return;
-                        }
-    
-                        if let Some(peer) = node.peer_book.get_peer_handle(peer) {
-                            let request: Vec<BlockHeaderHash> = blocks
-                                .into_iter()
-                                .collect();
-                            peer.expecting_sync_blocks(request.len() as u32).await;
-                            peer.send_payload(Payload::GetBlocks(request), None).await;
-                            peer.send_payload(Payload::GetSync(vec![BlockHeaderHash(last_hash.bytes().unwrap())]), None).await;
-                        }
-                    });
-                },
-                SyncInbound::Block(peer, block, peer_height) => {
-                    let node = node.clone();
-                    let received_hashes = received_hashes.clone();
-                    tokio::spawn(async move {
-                        received_hashes.write().await.push(&block[..]);
-                        match node
-                            .process_received_block(peer, block, peer_height, false)
-                            .await {
+                            if let Some(peer) = node.peer_book.get_peer_handle(peer) {
+                                let request: Vec<BlockHeaderHash> = blocks.into_iter().collect();
+                                peer.expecting_sync_blocks(request.len() as u32).await;
+                                peer.send_payload(Payload::GetBlocks(request), None).await;
+                                peer.send_payload(
+                                    Payload::GetSync(vec![BlockHeaderHash(last_hash.bytes().unwrap())]),
+                                    None,
+                                )
+                                .await;
+                            }
+                        });
+                    }
+                    SyncInbound::Block(peer, block, peer_height) => {
+                        let node = node.clone();
+                        let received_hashes = received_hashes.clone();
+                        tokio::spawn(async move {
+                            received_hashes.write().await.push(&block[..]);
+                            match node.process_received_block(peer, block, peer_height, false).await {
                                 Err(e) => warn!("failed to process received block from {}: {:?}", peer, e),
                                 Ok(()) => (),
                             }
-                    });
-                },
-            }
-            false
-        }).await;
+                        });
+                    }
+                }
+                false
+            })
+            .await;
 
         let sync_addresses = sync_nodes.iter().map(|x| x.address).collect::<Vec<_>>();
 

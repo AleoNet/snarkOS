@@ -29,7 +29,7 @@ use std::{
 use tokio::sync::mpsc;
 
 use super::PeerQuality;
-use crate::{BlockCache, NetworkError, Node, message::Payload};
+use crate::{message::Payload, BlockCache, NetworkError, Node};
 
 use super::{network::*, outbound_handler::*};
 
