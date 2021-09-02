@@ -144,7 +144,7 @@ impl MineContext {
         let (nonce, proof) = match mined {
             Err(PoswError::SnarkError(SNARKError::Terminated)) => {
                 // technically a race condition, but non-critical
-                trace!("terminated miner due to canon block received");
+                debug!("terminated miner due to canon block received");
                 terminator.store(false, Ordering::SeqCst);
                 return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)));
             }
@@ -152,7 +152,7 @@ impl MineContext {
                 if message == "Failed to generate proof - Terminated" =>
             {
                 // todo: remove in snarkvm 0.7.10+
-                trace!("terminated miner due to canon block received");
+                debug!("terminated miner due to canon block received");
                 terminator.store(false, Ordering::SeqCst);
                 return Err(ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)));
             }
