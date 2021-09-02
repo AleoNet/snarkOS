@@ -16,7 +16,7 @@
 
 use std::{net::SocketAddr, time::Duration};
 
-use futures::{FutureExt, pin_mut, select};
+use futures::{pin_mut, select, FutureExt};
 use snarkos_storage::Digest;
 use snarkvm_dpc::BlockHeaderHash;
 use tokio::{sync::mpsc, time::Instant};
@@ -66,10 +66,45 @@ impl SyncBase {
         Ok(interesting_peers)
     }
 
+    pub async fn block_locator_hashes(node: &Node) -> Result<Vec<BlockHeaderHash>> {
+        let forks_of_interest = node.expect_sync().consensus.scan_forks().await?;
+        trace!("sync found {} forks", forks_of_interest.len());
+        let blocks_of_interest: Vec<Digest> = forks_of_interest.into_iter().map(|(_canon, fork)| fork).collect();
+        let mut tips_of_blocks_of_interest: Vec<Digest> = Vec::with_capacity(blocks_of_interest.len());
+        for block in blocks_of_interest {
+            if tips_of_blocks_of_interest.len() > crate::MAX_BLOCK_SYNC_COUNT as usize {
+                debug!("reached limit of blocks of interest in sync block locator hashes");
+                break;
+            }
+            let mut fork_path = node.storage.longest_child_path(&block).await?;
+            if fork_path.len() < 2 {
+                // a minor fork, we probably don't care
+                continue;
+            }
+            tips_of_blocks_of_interest.push(fork_path.pop().unwrap());
+        }
+        let hashes = match node
+            .storage
+            .get_block_locator_hashes(tips_of_blocks_of_interest, snarkos_consensus::OLDEST_FORK_THRESHOLD)
+            .await
+        {
+            Ok(block_locator_hashes) => Ok(block_locator_hashes),
+            Err(e) => {
+                error!("Unable to get block locator hashes from storage: {:?}", e);
+                Err(e)
+            }
+        }?;
+
+        Ok(hashes
+            .into_iter()
+            .map(|x| BlockHeaderHash(x.bytes().unwrap()))
+            .collect::<Vec<_>>())
+    }
+
     /// receives an arbitrary amount of inbound sync messages with a given timeout.
     /// if the passed `handler` callback returns `true`, then the loop is terminated early.
     /// if the sync stream closes, the loop is also terminated early.
-    pub async fn receive_messages<F: FnMut(SyncInbound) -> bool> (
+    pub async fn receive_messages<F: FnMut(SyncInbound) -> bool>(
         &mut self,
         timeout_sec: u64,
         moving_timeout_sec: u64,

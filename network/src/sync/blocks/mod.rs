@@ -23,8 +23,8 @@ pub use base::*;
 mod aggro;
 pub use aggro::*;
 
-use std::net::SocketAddr;
 use snarkvm_dpc::BlockHeaderHash;
+use std::net::SocketAddr;
 
 pub enum SyncInbound {
     BlockHashes(SocketAddr, Vec<BlockHeaderHash>),

@@ -30,7 +30,7 @@ use snarkvm_dpc::{
 use snarkos_consensus::error::ConsensusError;
 use snarkos_metrics as metrics;
 
-use crate::{SyncInbound, message::*, NetworkError, Node, State};
+use crate::{message::*, NetworkError, Node, State, SyncInbound};
 use anyhow::*;
 use tokio::task;
 
