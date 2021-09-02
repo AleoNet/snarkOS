@@ -194,14 +194,6 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         Ok(())
     }
 
-    fn cache_block_children(&mut self, _block_hash: Digest, _block_children: Vec<Digest>) {
-        unimplemented!();
-    }
-
-    fn get_cached_block_children(&mut self, _block_hash: &Digest) -> Option<Vec<Digest>> {
-        unimplemented!();
-    }
-
     fn get_block_children(&mut self, hash: &Digest) -> Result<Vec<Digest>> {
         Ok(self
             .inner()
