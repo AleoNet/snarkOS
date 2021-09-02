@@ -20,7 +20,7 @@ extern crate tracing;
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
-    display::render_welcome,
+    display::{initialize_logger, print_welcome},
     errors::NodeError,
 };
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
@@ -55,34 +55,6 @@ use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 use std::{fs, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use tokio::runtime;
-use tracing_subscriber::EnvFilter;
-
-fn initialize_logger(config: &Config) {
-    match config.node.verbose {
-        0 => {}
-        verbosity => {
-            match verbosity {
-                1 => std::env::set_var("RUST_LOG", "info"),
-                2 => std::env::set_var("RUST_LOG", "debug"),
-                3 | 4 => std::env::set_var("RUST_LOG", "trace"),
-                _ => std::env::set_var("RUST_LOG", "info"),
-            };
-
-            // disable undesirable logs
-            let filter = EnvFilter::from_default_env().add_directive("mio=off".parse().unwrap());
-
-            // initialize tracing
-            tracing_subscriber::fmt()
-                .with_env_filter(filter)
-                .with_target(config.node.verbose == 4)
-                .init();
-        }
-    }
-}
-
-fn print_welcome(config: &Config) {
-    println!("{}", render_welcome(config));
-}
 
 ///
 /// Builds a node from configuration parameters.
@@ -116,8 +88,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
         config.node.is_bootnode,
-        config.node.is_crawler,
-        // Set sync intervals for peers, blocks and transactions (memory pool).
+        false, // is_crawler
+        // Set sync intervals for peers.
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
 
@@ -166,7 +138,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config, storage.clone()).await?;
+    let mut node = Node::new(node_config, Some(storage.clone())).await?;
 
     if let Some(limit) = config.storage.export {
         let mut export_path = path.clone();
@@ -289,7 +261,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         node.set_sync(sync);
     }
 
-    // Initialize metrics framework
+    // Initialize metrics framework.
     node.initialize_metrics().await?;
 
     // Start listening for incoming connections.
@@ -303,7 +275,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
         let rpc_handle = start_rpc_server(
             rpc_address,
-            storage,
+            Some(storage),
             node.clone(),
             config.rpc.username,
             config.rpc.password,

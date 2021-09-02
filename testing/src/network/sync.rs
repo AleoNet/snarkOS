@@ -104,7 +104,7 @@ async fn block_initiator_side() {
     wait_until!(
         5,
         matches!(
-            node.storage
+            node.expect_storage()
                 .get_block_state(&block_1_header_hash.0.into())
                 .await
                 .unwrap(),
@@ -114,7 +114,7 @@ async fn block_initiator_side() {
     wait_until!(
         1,
         matches!(
-            node.storage
+            node.expect_storage()
                 .get_block_state(&block_2_header_hash.0.into())
                 .await
                 .unwrap(),
@@ -175,13 +175,13 @@ async fn block_responder_side() {
 #[tokio::test(flavor = "multi_thread")]
 async fn block_propagation() {
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
-    let mut peer2 = handshaken_peer(node.local_address().unwrap()).await;
+    let mut peer2 = handshaken_peer(node.expect_local_addr()).await;
 
     let block_1 = BLOCK_1.serialize();
     let payload = Payload::Block(block_1.clone(), Some(1));
     peer.write_message(&payload).await;
 
-    wait_until!(5, node.storage.canon().await.unwrap().block_height == 1);
+    wait_until!(5, node.expect_storage().canon().await.unwrap().block_height == 1);
 
     node.peer_book.broadcast(Payload::Ping(1)).await;
 
@@ -204,7 +204,7 @@ async fn block_two_node() {
         ..Default::default()
     };
     let node_alice = test_node(setup).await;
-    let alice_address = node_alice.local_address().unwrap();
+    let alice_address = node_alice.expect_local_addr();
 
     const NUM_BLOCKS: usize = 100;
 
@@ -227,7 +227,10 @@ async fn block_two_node() {
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(30, node_bob.storage.canon().await.unwrap().block_height == NUM_BLOCKS);
+    wait_until!(
+        30,
+        node_bob.expect_storage().canon().await.unwrap().block_height == NUM_BLOCKS
+    );
 }
 
 #[tokio::test]
@@ -320,7 +323,7 @@ async fn transaction_responder_side() {
 #[tokio::test]
 async fn transaction_two_node() {
     let node_alice = test_node(TestSetup::default()).await;
-    let alice_address = node_alice.local_address().unwrap();
+    let alice_address = node_alice.expect_local_addr();
 
     // insert transaction into node_alice
     assert!(

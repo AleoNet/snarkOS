@@ -38,7 +38,7 @@ async fn check_connection_task_cleanup() {
     // Breach the usual ulimit barriers.
     for _ in 0..10_000 {
         // Connect a peer.
-        let peer = handshaken_peer(node.local_address().unwrap()).await;
+        let peer = handshaken_peer(node.expect_local_addr()).await;
         wait_until!(5, node.peer_book.get_active_peer_count() == 1);
 
         // Drop the peer stream.
@@ -59,7 +59,7 @@ async fn check_inactive_conn_cleanup() {
     let node = test_node(setup).await;
 
     // A connection with a peer that will remain inactive.
-    let _peer = handshaken_peer(node.local_address().unwrap()).await;
+    let _peer = handshaken_peer(node.expect_local_addr()).await;
 
     // Wait until the connection is complete.
     wait_until!(1, node.peer_book.get_active_peer_count() == 1);
@@ -106,7 +106,7 @@ async fn check_node_connections_cleanup() {
 
     for i in 0..NUM_CONNS {
         // Connect a peer.
-        let peer = handshaken_peer(node.local_address().unwrap()).await;
+        let peer = handshaken_peer(node.expect_local_addr()).await;
         let addr = peer.addr;
         wait_until!(5, node.peer_book.get_active_peer_count() == 1);
 

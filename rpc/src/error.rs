@@ -55,6 +55,9 @@ pub enum RpcError {
     #[error("The node isn't tracking the network")]
     NoKnownNetwork,
 
+    #[error("The node doesn't have the storage layer running")]
+    NoStorage,
+
     #[error("{}", _0)]
     RecordError(RecordError),
 

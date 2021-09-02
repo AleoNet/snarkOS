@@ -39,7 +39,7 @@ mod rpc_tests {
     async fn initialize_test_rpc(consensus: &Arc<Consensus>, node_setup: Option<TestSetup>) -> (Rpc, Node) {
         let environment = test_config(node_setup.unwrap_or_default());
 
-        let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
+        let mut node = Node::new(environment, Some(consensus.storage.clone())).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
 
         let node_consensus = snarkos_network::Sync::new(
@@ -367,7 +367,6 @@ mod rpc_tests {
             ..Default::default()
         };
         let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup.clone())).await;
-        rpc_node.listen().await.unwrap();
         rpc_node.start_services().await;
 
         let setup = TestSetup {
@@ -377,12 +376,8 @@ mod rpc_tests {
         let some_node1 = test_node(setup.clone()).await;
         let some_node2 = test_node(setup).await;
 
-        rpc_node
-            .connect_to_addresses(&[some_node1.local_address().unwrap()])
-            .await;
-        some_node1
-            .connect_to_addresses(&[some_node2.local_address().unwrap()])
-            .await;
+        rpc_node.connect_to_addresses(&[some_node1.expect_local_addr()]).await;
+        some_node1.connect_to_addresses(&[some_node2.expect_local_addr()]).await;
 
         wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 1);
         wait_until!(3, some_node1.peer_book.get_connected_peer_count() == 2);

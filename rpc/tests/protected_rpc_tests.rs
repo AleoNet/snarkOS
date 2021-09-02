@@ -80,7 +80,7 @@ mod protected_rpc_tests {
         };
 
         let environment = test_config(node_setup.unwrap_or_default());
-        let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
+        let mut node = Node::new(environment, Some(consensus.storage.clone())).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
 
         let node_consensus = snarkos_network::Sync::new(
@@ -92,7 +92,7 @@ mod protected_rpc_tests {
 
         node.set_sync(node_consensus);
 
-        let rpc_impl = RpcImpl::new(consensus.storage.clone(), Some(credentials), node.clone());
+        let rpc_impl = RpcImpl::new(Some(consensus.storage.clone()), Some(credentials), node.clone());
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);
@@ -465,16 +465,14 @@ mod protected_rpc_tests {
         };
         let some_node = test_node(setup).await;
 
-        some_node
-            .connect_to_addresses(&[rpc_node.local_address().unwrap()])
-            .await;
+        some_node.connect_to_addresses(&[rpc_node.expect_local_addr()]).await;
 
         wait_until!(3, rpc_node.peer_book.get_connected_peer_count() == 1);
 
         let meta = authentication();
         let request = format!(
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"disconnect\", \"params\": [\"{}\"] }}",
-            some_node.local_address().unwrap()
+            some_node.expect_local_addr()
         );
         let _response = rpc.handle_request(&request, meta).await.unwrap();
 
@@ -497,8 +495,8 @@ mod protected_rpc_tests {
         let meta = authentication();
         let request = format!(
             "{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"connect\", \"params\": [\"{}\", \"{}\"] }}",
-            some_node1.local_address().unwrap(),
-            some_node2.local_address().unwrap()
+            some_node1.expect_local_addr(),
+            some_node2.expect_local_addr()
         );
         let _response = rpc.handle_request(&request, meta).await.unwrap();
 

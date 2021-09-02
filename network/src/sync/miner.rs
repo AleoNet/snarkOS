@@ -45,7 +45,7 @@ impl MinerInstance {
     /// Calling this function multiple times will spawn additional listeners on separate threads.
     pub fn spawn(self) -> task::JoinHandle<()> {
         task::spawn(async move {
-            let local_address = self.node.local_address().unwrap();
+            let local_addr = self.node.expect_local_addr();
 
             info!("Initializing Aleo miner - Your miner address is {}", self.miner_address);
 
@@ -124,9 +124,14 @@ impl MinerInstance {
 
                 let serialized_block = block.serialize();
                 let node_clone = self.node.clone();
-                let new_height = node_clone.storage.canon().await.map(|c| c.block_height as u32).ok();
+                let new_height = node_clone
+                    .expect_storage()
+                    .canon()
+                    .await
+                    .map(|c| c.block_height as u32)
+                    .ok();
 
-                self.node.propagate_block(serialized_block, new_height, local_address);
+                self.node.propagate_block(serialized_block, new_height, local_addr);
             }
         })
     }

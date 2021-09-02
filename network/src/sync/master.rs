@@ -53,7 +53,7 @@ impl SyncMaster {
     }
 
     async fn find_sync_nodes(&mut self) -> Result<Vec<Peer>> {
-        let our_block_height = self.node.storage.canon().await?.block_height;
+        let our_block_height = self.node.expect_storage().canon().await?.block_height;
         let mut interesting_peers = vec![];
         for mut node in self.node.peer_book.connected_peers_snapshot().await {
             let judge_bad = node.judge_bad();
@@ -89,7 +89,7 @@ impl SyncMaster {
                 debug!("reached limit of blocks of interest in sync block locator hashes");
                 break;
             }
-            let mut fork_path = self.node.storage.longest_child_path(&block).await?;
+            let mut fork_path = self.node.expect_storage().longest_child_path(&block).await?;
             if fork_path.len() < 2 {
                 // a minor fork, we probably don't care
                 continue;
@@ -98,7 +98,7 @@ impl SyncMaster {
         }
         match self
             .node
-            .storage
+            .expect_storage()
             .get_block_locator_hashes(tips_of_blocks_of_interest, snarkos_consensus::OLDEST_FORK_THRESHOLD)
             .await
         {
@@ -342,7 +342,7 @@ impl SyncMaster {
         let early_blocks = Self::order_block_hashes(&blocks[..]);
         let early_blocks_count = early_blocks.len();
 
-        let early_block_states = self.node.storage.get_block_states(&early_blocks[..]).await?;
+        let early_block_states = self.node.expect_storage().get_block_states(&early_blocks[..]).await?;
         let block_order: Vec<_> = early_blocks
             .into_iter()
             .zip(early_block_states.iter())

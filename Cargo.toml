@@ -22,6 +22,7 @@ include = [
 ]
 license = "GPL-3.0"
 edition = "2018"
+default-run = "snarkos"
 
 [workspace]
 members = [
@@ -41,7 +42,11 @@ path = "snarkos/lib.rs"
 
 [[bin]]
 name = "snarkos"
-path = "snarkos/main.rs"
+path = "bin/snarkos.rs"
+
+[[bin]]
+name = "crawler"
+path = "bin/crawler.rs"
 
 [dependencies.snarkvm-algorithms]
 version = "=0.7.9"

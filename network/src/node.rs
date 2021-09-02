@@ -57,7 +57,7 @@ pub struct InnerNode {
     /// The current state of the node.
     state: StateCode,
     /// The local address of this node.
-    pub local_address: OnceCell<SocketAddr>,
+    pub local_addr: OnceCell<SocketAddr>,
     /// The pre-configured parameters of this node.
     pub config: Config,
     /// The cache of node's inbound messages.
@@ -69,7 +69,7 @@ pub struct InnerNode {
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync>>,
     /// The node's storage.
-    pub storage: DynStorage,
+    pub storage: Option<DynStorage>,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -118,11 +118,11 @@ impl Node {
 
 impl Node {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config, storage: DynStorage) -> Result<Self, NetworkError> {
+    pub async fn new(config: Config, storage: Option<DynStorage>) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),
-            local_address: Default::default(),
+            local_addr: Default::default(),
             config,
             storage,
             inbound_cache: Default::default(),
@@ -138,11 +138,18 @@ impl Node {
         }));
 
         if node.config.is_crawler() {
+            // Safe since crawlers don't start the listener service.
+            node.set_local_addr(node.config.desired_address);
+
             // Safe since this can only ever be set here.
             node.known_network.set(KnownNetwork::default()).unwrap();
         }
 
         Ok(node)
+    }
+
+    pub fn expect_storage(&self) -> &DynStorage {
+        self.storage.as_ref().expect("no storage!")
     }
 
     pub fn set_sync(&mut self, sync: Sync) {
@@ -202,16 +209,18 @@ impl Node {
             self.register_task(known_network_task);
         }
 
-        let node_clone = self.clone();
-        let state_tracking_task = task::spawn(async move {
-            loop {
-                sleep(std::time::Duration::from_secs(5)).await;
+        if !self.config.is_crawler() {
+            let node_clone = self.clone();
+            let state_tracking_task = task::spawn(async move {
+                loop {
+                    sleep(std::time::Duration::from_secs(5)).await;
 
-                // Report node's current state.
-                trace!("Node state: {:?}", node_clone.state());
-            }
-        });
-        self.register_task(state_tracking_task);
+                    // Report node's current state.
+                    trace!("Node state: {:?}", node_clone.state());
+                }
+            });
+            self.register_task(state_tracking_task);
+        }
 
         if self.sync().is_some() {
             let node_clone = self.clone();
@@ -311,22 +320,22 @@ impl Node {
         self.threads.append(handle);
     }
 
+    /// Sets the local address of the node to the given value.
     #[inline]
-    pub fn local_address(&self) -> Option<SocketAddr> {
-        self.local_address.get().copied()
+    pub fn set_local_addr(&self, addr: SocketAddr) {
+        self.local_addr
+            .set(addr)
+            .expect("local address was set more than once!");
+    }
+
+    #[inline]
+    pub fn expect_local_addr(&self) -> SocketAddr {
+        self.local_addr.get().copied().expect("no address set!")
     }
 
     #[inline]
     pub fn is_shutting_down(&self) -> bool {
         self.shutting_down.load(Ordering::Relaxed)
-    }
-
-    /// Sets the local address of the node to the given value.
-    #[inline]
-    pub fn set_local_address(&self, addr: SocketAddr) {
-        self.local_address
-            .set(addr)
-            .expect("local address was set more than once!");
     }
 
     pub async fn initialize_metrics(&self) -> Result<()> {
@@ -336,16 +345,18 @@ impl Node {
         }
 
         // The node can already be at some non-zero height.
-        metrics::gauge!(misc::BLOCK_HEIGHT, self.storage.canon().await?.block_height as f64);
+        if self.sync().is_some() {
+            metrics::gauge!(
+                misc::BLOCK_HEIGHT,
+                self.expect_storage().canon().await?.block_height as f64
+            );
+        }
+
         Ok(())
     }
 
     pub fn version(&self) -> Version {
-        Version::new(
-            crate::PROTOCOL_VERSION,
-            self.local_address().map(|x| x.port()).unwrap_or_default(),
-            self.id,
-        )
+        Version::new(crate::PROTOCOL_VERSION, self.expect_local_addr().port(), self.id)
     }
 
     pub async fn run_sync(&self) -> Result<()> {
