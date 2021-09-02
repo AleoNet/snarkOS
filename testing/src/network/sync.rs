@@ -175,13 +175,13 @@ async fn block_responder_side() {
 #[tokio::test(flavor = "multi_thread")]
 async fn block_propagation() {
     let (node, mut peer) = handshaken_node_and_peer(TestSetup::default()).await;
-    let mut peer2 = handshaken_peer(node.local_address().unwrap()).await;
+    let mut peer2 = handshaken_peer(node.expect_local_addr()).await;
 
     let block_1 = BLOCK_1.serialize();
     let payload = Payload::Block(block_1.clone(), Some(1));
     peer.write_message(&payload).await;
 
-    wait_until!(5, node.storage.canon().await.unwrap().block_height == 1);
+    wait_until!(5, node.expect_storage().canon().await.unwrap().block_height == 1);
 
     node.peer_book.broadcast(Payload::Ping(1)).await;
 
