@@ -208,7 +208,7 @@ impl Peer {
                 if self.quality.remaining_sync_blocks > 0 {
                     self.quality.remaining_sync_blocks -= 1;
                 } else {
-                    warn!("received unexpected or late sync block from {}", self.address);
+                    trace!("received unexpected or late sync block from {}", self.address);
                 }
                 Ok(PeerResponse::None)
             }

@@ -91,6 +91,9 @@ impl ConsensusInner {
                     }
                     Err(e) => {
                         match e {
+                            ConsensusError::PreExistingBlock => {
+                                trace!("failed receiving block: {:?}", e);
+                            }
                             ConsensusError::InvalidBlock(e) => {
                                 debug!("failed receiving block: {:?}", e);
                             }
