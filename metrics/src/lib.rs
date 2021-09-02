@@ -15,15 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod metric_types;
-mod names;
-
-pub use names::*;
 
 pub mod snapshots;
 pub mod stats;
 
 /// Re-export metrics macros
 pub use metrics_catalogue::*;
+
+/// Re-export metrics catalogue
+pub use stats::snarkos::*;
 
 pub static STATS: stats::Stats = stats::Stats::new();
 

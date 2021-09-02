@@ -1614,6 +1614,8 @@ dependencies = [
 [[package]]
 name = "metrics-catalogue"
 version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2066ea6d9271a7329eab3504ba5dfd57248d7be34b0ee1dad308fc7cdc13f16f"
 dependencies = [
  "hyper",
  "metrics 0.16.0",

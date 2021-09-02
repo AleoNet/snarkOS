@@ -144,10 +144,13 @@ pub struct ConnectionStats {
     /// The number of rejected inbound connection requests.
     all_rejected: Counter,
     /// Number of currently connecting peers.
+    #[metric("connecting")]
     connecting_peers: DiscreteGauge,
     /// Number of currently connected peers.
+    #[metric("connected")]
     connected_peers: DiscreteGauge,
     /// Number of known disconnected peers.
+    #[metric("disconnected")]
     disconnected_peers: DiscreteGauge,
     /// Tracks connection durations (once closed).
     duration: Histogram<60>,
