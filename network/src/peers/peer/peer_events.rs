@@ -20,7 +20,7 @@ use crate::{Peer, PeerHandle, PeerStatus};
 
 pub enum PeerEventData {
     Connected(PeerHandle),
-    Disconnect(Peer, PeerStatus),
+    Disconnect(Box<Peer>, PeerStatus),
     FailHandshake,
 }
 

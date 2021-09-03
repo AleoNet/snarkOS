@@ -34,7 +34,7 @@ use super::network::PeerIOHandle;
 pub(super) enum PeerAction {
     Disconnect,
     Send(Payload, Option<Instant>),
-    SendBlock(SerialBlock, u32), // block, height
+    SendBlock(Box<SerialBlock>, u32), // block, height
     Get(oneshot::Sender<Peer>),
     QualityJudgement,
     CancelSync,
@@ -73,7 +73,12 @@ impl PeerHandle {
     }
 
     pub async fn send_block(&self, payload: SerialBlock, height: u32) {
-        if self.sender.send(PeerAction::SendBlock(payload, height)).await.is_ok() {
+        if self
+            .sender
+            .send(PeerAction::SendBlock(Box::new(payload), height))
+            .await
+            .is_ok()
+        {
             self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
             metrics::increment_gauge!(OUTBOUND, 1.0);
         }

@@ -73,22 +73,19 @@ version = "0.8"
 [dependencies.thiserror]
 version = "1.0"
 
-[dependencies.mpmc-map]
-version = "0.2"
-
 [dependencies.indexmap]
 version = "1.6"
 
 [dependencies.lazy_static]
 version = "1.4"
 
-[dependencies.futures]
-version = "0.3"
-
 [dependencies.tracing]
 default-features = false
 features = [ "log" ]
 version = "0.1"
+
+[dev-dependencies.futures]
+version = "0.3"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"
