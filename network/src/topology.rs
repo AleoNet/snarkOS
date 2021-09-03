@@ -639,6 +639,7 @@ mod test {
         let addr_d = "44.44.44.44:4000".parse().unwrap();
         let addr_e = "55.55.55.55:5000".parse().unwrap();
         let addr_f = "66.66.66.66:6000".parse().unwrap();
+        let addr_g = "77.77.77.77:7000".parse().unwrap();
 
         let (tx, rx) = mpsc::channel(100);
         let known_network = KnownNetwork {
@@ -648,10 +649,11 @@ mod test {
                 vec![
                     (addr_b, 24),
                     (addr_a, 1),
+                    (addr_g, 77),
                     (addr_d, 26),
-                    (addr_f, 50),
+                    (addr_f, 77),
                     (addr_c, 25),
-                    (addr_e, 50),
+                    (addr_e, 79),
                 ]
                 .into_iter()
                 .collect(),
@@ -659,10 +661,13 @@ mod test {
             connections: Default::default(),
         };
 
-        let potential_forks = known_network.potential_forks();
+        let (potential_tip, potential_forks) = known_network.potential_forks();
+
+        let expected_potential_tip = Some((79, vec![addr_g, addr_f, addr_e]));
         let expected_potential_forks: HashMap<u32, Vec<SocketAddr>> =
             vec![(26, vec![addr_b, addr_c, addr_d])].into_iter().collect();
 
         assert_eq!(potential_forks, expected_potential_forks);
+        assert_eq!(potential_tip, expected_potential_tip);
     }
 }
