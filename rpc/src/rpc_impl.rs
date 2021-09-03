@@ -19,7 +19,6 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
-use futures::Future;
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use serde::{de::DeserializeOwned, Serialize};
 use snarkos_consensus::{get_block_reward, ConsensusParameters};
@@ -35,6 +34,7 @@ use snarkvm_utilities::{
     to_bytes_le,
     CanonicalSerialize,
 };
+use std::future::Future;
 
 use chrono::Utc;
 
