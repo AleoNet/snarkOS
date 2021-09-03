@@ -305,6 +305,8 @@ pub struct NetworkGraph {
     /// lowest.
     pub degree_centrality_delta: f64,
 
+    /// The potential height and members of the canon chain tip.
+    pub potential_tip: Option<PotentialFork>,
     /// The potential forks in the network and their member nodes.
     pub potential_forks: Vec<PotentialFork>,
 

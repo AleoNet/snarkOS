@@ -218,8 +218,8 @@ impl KnownNetwork {
         self.nodes.read().clone()
     }
 
-    /// Returns a map of the potential forks.
-    pub fn potential_forks(&self) -> HashMap<u32, Vec<SocketAddr>> {
+    /// Returns a map of the potential forks (including the tip) and the key to the tip.
+    pub fn potential_forks(&self) -> (Option<(u32, Vec<SocketAddr>)>, HashMap<u32, Vec<SocketAddr>>) {
         use itertools::Itertools;
 
         const HEIGHT_DELTA_TOLERANCE: u32 = 5;
@@ -247,23 +247,30 @@ impl KnownNetwork {
         // Don't forget the first cluster left after the `split_off` operation.
         nodes_grouped.insert(0, nodes);
 
-        // Remove the last cluster since it will contain the nodes even with the chain tip.
-        nodes_grouped.pop();
-
         // Filter out any clusters smaller than three nodes, this minimises the false-positives
-        // as it's reasonable to assume a fork would include more than two members.
+        // as it's reasonable to assume a fork or the tip would include more than two members.
         nodes_grouped.retain(|s| s.len() >= MIN_CLUSTER_SIZE);
 
         let mut potential_forks = HashMap::new();
+        let mut potential_tip_height = 0;
+
         for cluster in nodes_grouped {
             // Safe since no clusters are of length `0`.
             let max_height = cluster.iter().map(|(_, height)| height).max().unwrap();
             let addrs = cluster.iter().map(|(addr, _)| addr).copied().collect();
 
+            // Find the key to the potential canon cluster.
+            if potential_tip_height < *max_height {
+                potential_tip_height = *max_height
+            }
+
             potential_forks.insert(*max_height, addrs);
         }
 
-        potential_forks
+        // Split off the cluster with the highest height, this is our canon tip candidate.
+        let potential_tip = potential_forks.remove_entry(&potential_tip_height);
+
+        (potential_tip, potential_forks)
     }
 }
 
