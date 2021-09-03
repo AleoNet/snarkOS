@@ -31,7 +31,8 @@ pub async fn mine_block(
     transactions: Vec<SerialTransaction>,
     parent_block_header: &SerialBlockHeader,
 ) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
-    let (transactions, coinbase_records) = miner.establish_block(transactions).await?;
+    let canon_height = miner.consensus.storage.canon().await?.block_height as u32;
+    let (transactions, coinbase_records) = miner.establish_block(canon_height + 1, transactions).await?;
 
     let header = miner.find_block(&transactions, parent_block_header, &AtomicBool::new(false))?;
 
