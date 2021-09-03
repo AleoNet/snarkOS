@@ -24,9 +24,6 @@ default-features = false
 [dependencies.snarkvm-parameters]
 version = "=0.7.9"
 
-[dependencies.arc-swap]
-version = "1.2"
-
 [dependencies.snarkvm-utilities]
 version = "=0.7.9"
 default-features = false

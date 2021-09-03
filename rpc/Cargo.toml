@@ -71,12 +71,6 @@ version = "1.0.1"
 [dependencies.jsonrpc-core]
 version = "18"
 
-[dependencies.jsonrpc-core-client]
-version = "18"
-
-[dependencies.jsonrpc-derive]
-version = "18"
-
 [dependencies.snarkos-metrics]
 version = "1.3.14"
 path = "../metrics"

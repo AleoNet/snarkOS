@@ -56,9 +56,6 @@ version = "1"
 [dependencies.capnp]
 version = "0.14"
 
-[dependencies.capnpc]
-version = "0.14"
-
 [dependencies.chrono]
 version = "0.4"
 features = [ "serde" ]
@@ -145,12 +142,6 @@ features = [
 default-features = false
 features = [ "log" ]
 version = "0.1"
-
-[dependencies.tracing-futures]
-version = "0.2"
-
-[dependencies.tracing-subscriber]
-version = "0.2"
 
 [dependencies.arc-swap]
 version = "1.2"

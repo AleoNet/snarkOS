@@ -73,9 +73,6 @@ version = "0.8"
 [dependencies.thiserror]
 version = "1.0"
 
-[dependencies.mpmc-map]
-version = "0.2"
-
 [dependencies.indexmap]
 version = "1.6"
 
