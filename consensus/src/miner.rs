@@ -44,27 +44,17 @@ pub struct MineContext {
     address: Address<Components>,
     /// The sync parameters for the network of this miner.
     pub consensus: Arc<Consensus>,
-    block_height: usize,
-    canon_header: SerialBlockHeader,
 }
 
 impl MineContext {
     pub async fn prepare(address: Address<Components>, consensus: Arc<Consensus>) -> Result<Self, ConsensusError> {
-        let canon = consensus.storage.canon().await?;
-
-        let canon_header = consensus.storage.get_block_header(&canon.hash).await?;
-
-        Ok(Self {
-            address,
-            consensus,
-            block_height: canon.block_height,
-            canon_header,
-        })
+        Ok(Self { address, consensus })
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
-    pub async fn add_coinbase_transaction(
+    async fn add_coinbase_transaction(
         &self,
+        block_number: u32,
         transactions: &mut Vec<SerialTransaction>,
     ) -> Result<Vec<SerialRecord>, ConsensusError> {
         let program_vk_hash = self.consensus.dpc.noop_program.id();
@@ -85,7 +75,7 @@ impl MineContext {
         let response = self
             .consensus
             .create_coinbase_transaction(
-                self.block_height as u32 + 1,
+                block_number,
                 transactions.clone(),
                 program_vk_hash,
                 new_birth_programs,
@@ -105,9 +95,10 @@ impl MineContext {
     #[allow(clippy::type_complexity)]
     pub async fn establish_block(
         &self,
+        block_number: u32,
         mut transactions: Vec<SerialTransaction>,
     ) -> Result<(Vec<SerialTransaction>, Vec<SerialRecord>), ConsensusError> {
-        let coinbase_records = self.add_coinbase_transaction(&mut transactions).await?;
+        let coinbase_records = self.add_coinbase_transaction(block_number, &mut transactions).await?;
 
         // Verify transactions
         // assert!(Testnet1DPC::verify_transactions(
@@ -179,25 +170,32 @@ impl MineContext {
         terminator: Arc<AtomicBool>,
     ) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
         let candidate_transactions = self.consensus.fetch_memory_pool().await;
-        debug!("Miner@{}: creating a block", self.block_height);
 
-        let (transactions, coinbase_records) = self.establish_block(candidate_transactions).await?;
+        let canon = self.consensus.storage.canon().await?;
 
-        debug!("Miner@{}: generated a coinbase transaction", self.block_height);
+        let canon_header = self.consensus.storage.get_block_header(&canon.hash).await?;
+
+        debug!("Miner@{}: creating a block", canon.block_height);
+
+        let (transactions, coinbase_records) = self
+            .establish_block(canon.block_height as u32 + 1, candidate_transactions)
+            .await?;
+
+        debug!("Miner@{}: generated a coinbase transaction", canon.block_height);
 
         for (index, record) in coinbase_records.iter().enumerate() {
             let record_commitment = hex::encode(&to_bytes_le![record.commitment]?);
             debug!(
                 "Miner@{}: Coinbase record {:?} commitment: {:?}",
-                self.block_height, index, record_commitment
+                canon.block_height, index, record_commitment
             );
         }
 
         let ctx = self.clone();
         let txs = transactions.clone();
-        let header = task::spawn_blocking(move || ctx.find_block(&txs, &ctx.canon_header, &terminator)).await??;
+        let header = task::spawn_blocking(move || ctx.find_block(&txs, &canon_header, &terminator)).await??;
 
-        debug!("Miner@{}: found a block", self.block_height);
+        debug!("Miner@{}: found a block", canon.block_height);
 
         let block = SerialBlock { header, transactions };
 

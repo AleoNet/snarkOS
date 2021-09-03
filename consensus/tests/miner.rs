@@ -101,7 +101,11 @@ mod miner {
                 let candidate_transactions = miner.consensus.fetch_memory_pool().await;
                 println!("creating a block");
 
-                let (transactions, _coinbase_records) = miner.establish_block(candidate_transactions).await?;
+                let canon_height = miner.consensus.storage.canon().await?.block_height;
+
+                let (transactions, _coinbase_records) = miner
+                    .establish_block(canon_height as u32 + 1, candidate_transactions)
+                    .await?;
 
                 println!("generated a coinbase transaction");
                 sender_clone.try_send("started").ok().unwrap();

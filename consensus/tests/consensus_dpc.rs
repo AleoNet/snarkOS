@@ -40,8 +40,10 @@ mod consensus_dpc {
             .await
             .unwrap();
 
+        let canon_height = consensus.storage.canon().await?.block_height as u32;
+
         println!("Creating block with coinbase transaction");
-        let (transactions, coinbase_records) = miner.establish_block(vec![]).await.unwrap();
+        let (transactions, coinbase_records) = miner.establish_block(canon_height + 1, vec![]).await.unwrap();
         let previous_block_header = genesis().header.into();
         let header = miner
             .find_block(&transactions, &previous_block_header, &AtomicBool::new(false))
