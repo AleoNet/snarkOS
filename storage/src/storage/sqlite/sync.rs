@@ -484,6 +484,55 @@ impl SyncStorage for SqliteStorage {
         })
     }
 
+    fn longest_child_path(&mut self, block_hash: &Digest) -> Result<Vec<Digest>> {
+        /*
+        alternate total tip (slower due to no temp index)
+        total_tip(parent, remaining) AS (
+            SELECT preferred_tip.sub, preferred_tip.length - 1 FROM preferred_tip
+            UNION ALL
+            SELECT children.sub, total_tip.remaining - 1
+            FROM total_tip
+            INNER JOIN children ON children.parent = total_tip.parent
+            WHERE total_tip.remaining > 0
+        )
+
+        */
+        let mut stmt = self.conn.prepare_cached(
+            r"
+            WITH RECURSIVE
+                children(parent, sub, length) AS (
+                    SELECT ? as hash, NULL, 0 as length
+                    UNION ALL
+                    SELECT blocks.hash, blocks.previous_block_hash, children.length + 1 FROM blocks
+                    INNER JOIN children
+                    WHERE blocks.previous_block_hash = children.parent
+                ),
+                preferred_tip AS (
+                    SELECT parent, sub, length FROM children
+                    WHERE length = (SELECT max(length) as length FROM children)
+                    ORDER BY parent
+                    LIMIT 1
+                ),
+                total_tip(parent, remaining) AS (
+                    SELECT preferred_tip.sub, preferred_tip.length - 1 FROM preferred_tip
+                    UNION ALL
+                    SELECT blocks.previous_block_hash, total_tip.remaining - 1
+                    FROM total_tip
+                    INNER JOIN blocks ON blocks.hash = total_tip.parent
+                    WHERE total_tip.remaining > 0
+                )
+                SELECT sub as hash, 0 as remaining FROM preferred_tip
+                UNION ALL
+                SELECT total_tip.parent, total_tip.remaining as hash FROM total_tip
+                order by remaining;
+        ",
+        )?;
+        let out = stmt
+            .query_map([block_hash], |row| row.get(0))?
+            .collect::<rusqlite::Result<Vec<Digest>>>()?;
+        Ok(out)
+    }
+
     fn get_block_children(&mut self, hash: &Digest) -> Result<Vec<Digest>> {
         let mut stmt = self.conn.prepare_cached(
             r"
