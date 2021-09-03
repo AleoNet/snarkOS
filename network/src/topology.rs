@@ -218,6 +218,7 @@ impl KnownNetwork {
         self.nodes.read().clone()
     }
 
+    #[allow(clippy::type_complexity)]
     /// Returns a map of the potential forks (including the tip) and the key to the tip.
     pub fn potential_forks(&self) -> (Option<(u32, Vec<SocketAddr>)>, HashMap<u32, Vec<SocketAddr>>) {
         use itertools::Itertools;
