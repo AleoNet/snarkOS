@@ -80,7 +80,7 @@ impl Peer {
             event_target
                 .send(PeerEvent {
                     address: peer.address,
-                    data: PeerEventData::Disconnect(peer, PeerStatus::Connected),
+                    data: PeerEventData::Disconnect(Box::new(peer), PeerStatus::Connected),
                 })
                 .await
                 .ok();

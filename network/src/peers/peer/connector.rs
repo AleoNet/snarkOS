@@ -101,7 +101,7 @@ impl Peer {
             event_target
                 .send(PeerEvent {
                     address: self.address,
-                    data: PeerEventData::Disconnect(self, state),
+                    data: PeerEventData::Disconnect(Box::new(self), state),
                 })
                 .await
                 .ok();
