@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use crate::{
     error::ConsensusError,
+    memory_pool::MempoolEntry,
     Consensus,
     ConsensusParameters,
     CreatePartialTransactionRequest,
@@ -41,6 +42,7 @@ use snarkvm_dpc::{
     DPCScheme,
 };
 use snarkvm_posw::txids_to_roots;
+use snarkvm_utilities::has_duplicates;
 use tokio::sync::mpsc;
 
 use snarkos_metrics::misc::*;
@@ -94,5 +96,71 @@ impl ConsensusInner {
         }
 
         Ok(known_forks)
+    }
+
+    /// Adds entry to memory pool if valid in the current ledger.
+    pub(crate) fn insert_into_mempool(
+        &mut self,
+        transaction: SerialTransaction,
+    ) -> Result<Option<Digest>, ConsensusError> {
+        let transaction_id: Digest = transaction.id.into();
+
+        if has_duplicates(&transaction.old_serial_numbers)
+            || has_duplicates(&transaction.new_commitments)
+            || self.memory_pool.transactions.contains_key(&transaction_id)
+        {
+            return Ok(None);
+        }
+
+        for sn in &transaction.old_serial_numbers {
+            if self.ledger.contains_serial(sn) || self.memory_pool.serial_numbers.contains(sn) {
+                return Ok(None);
+            }
+        }
+
+        for cm in &transaction.new_commitments {
+            if self.ledger.contains_commitment(cm) || self.memory_pool.commitments.contains(cm) {
+                return Ok(None);
+            }
+        }
+
+        if self.ledger.contains_memo(&transaction.memorandum)
+            || self.memory_pool.memos.contains(&transaction.memorandum)
+        {
+            return Ok(None);
+        }
+
+        for sn in &transaction.old_serial_numbers {
+            self.memory_pool.serial_numbers.insert(sn.clone());
+        }
+
+        for cm in &transaction.new_commitments {
+            self.memory_pool.commitments.insert(cm.clone());
+        }
+
+        self.memory_pool.memos.insert(transaction.memorandum.clone());
+
+        self.memory_pool
+            .transactions
+            .insert(transaction_id.clone(), MempoolEntry {
+                size_in_bytes: transaction.size(),
+                transaction,
+            });
+
+        Ok(Some(transaction_id))
+    }
+
+    /// Cleanse the memory pool of outdated transactions.
+    pub(crate) fn cleanse_memory_pool(&mut self) -> Result<(), ConsensusError> {
+        let old_mempool = std::mem::take(&mut self.memory_pool);
+
+        for (_, entry) in &old_mempool.transactions {
+            if let Err(e) = self.insert_into_mempool(entry.transaction.clone()) {
+                self.memory_pool = old_mempool;
+                return Err(e);
+            }
+        }
+
+        Ok(())
     }
 }

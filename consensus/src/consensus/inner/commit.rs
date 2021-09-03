@@ -255,9 +255,7 @@ impl ConsensusInner {
         };
 
         self.storage.commit_block(hash, digest).await?;
-        let new_pool = self.memory_pool.cleanse(&self.ledger)?;
-        self.memory_pool = new_pool;
-        Ok(())
+        self.cleanse_memory_pool()
     }
 
     pub(super) async fn try_to_fast_forward(&mut self) -> Result<(), ConsensusError> {
@@ -317,8 +315,6 @@ impl ConsensusInner {
 
         self.ledger
             .rollback(&commitments[..], &serial_numbers[..], &memos[..])?;
-        let new_pool = self.memory_pool.cleanse(&self.ledger)?;
-        self.memory_pool = new_pool;
-        Ok(())
+        self.cleanse_memory_pool()
     }
 }
