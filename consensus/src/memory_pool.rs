@@ -18,17 +18,16 @@
 //!
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
-use crate::{error::ConsensusError, DynLedger};
+use crate::error::ConsensusError;
 use indexmap::{IndexMap, IndexSet};
 use snarkos_storage::{Digest, SerialTransaction};
 use snarkvm_dpc::BlockHeader;
-use snarkvm_utilities::has_duplicates;
 
 /// Stores a transaction and it's size in the memory pool.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct MempoolEntry {
-    size_in_bytes: usize,
-    transaction: SerialTransaction,
+pub(crate) struct MempoolEntry {
+    pub(crate) size_in_bytes: usize,
+    pub(crate) transaction: SerialTransaction,
 }
 
 /// Stores transactions received by the server.
@@ -36,10 +35,10 @@ struct MempoolEntry {
 #[derive(Debug, Default)]
 pub struct MemoryPool {
     /// The mapping of all unconfirmed transaction IDs to their corresponding transaction data.
-    transactions: IndexMap<Digest, MempoolEntry>,
-    commitments: IndexSet<Digest>,
-    serial_numbers: IndexSet<Digest>,
-    memos: IndexSet<Digest>,
+    pub(crate) transactions: IndexMap<Digest, MempoolEntry>,
+    pub(crate) commitments: IndexSet<Digest>,
+    pub(crate) serial_numbers: IndexSet<Digest>,
+    pub(crate) memos: IndexSet<Digest>,
 }
 
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();
@@ -50,66 +49,6 @@ impl MemoryPool {
     #[inline]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Adds entry to memory pool if valid in the current ledger.
-    pub fn insert(
-        &mut self,
-        ledger: &DynLedger,
-        transaction: SerialTransaction,
-    ) -> Result<Option<Digest>, ConsensusError> {
-        let transaction_id: Digest = transaction.id.into();
-
-        if has_duplicates(&transaction.old_serial_numbers)
-            || has_duplicates(&transaction.new_commitments)
-            || self.transactions.contains_key(&transaction_id)
-        {
-            return Ok(None);
-        }
-
-        for sn in &transaction.old_serial_numbers {
-            if ledger.contains_serial(sn) || self.serial_numbers.contains(sn) {
-                return Ok(None);
-            }
-        }
-
-        for cm in &transaction.new_commitments {
-            if ledger.contains_commitment(cm) || self.commitments.contains(cm) {
-                return Ok(None);
-            }
-        }
-
-        if ledger.contains_memo(&transaction.memorandum) || self.memos.contains(&transaction.memorandum) {
-            return Ok(None);
-        }
-
-        for sn in &transaction.old_serial_numbers {
-            self.serial_numbers.insert(sn.clone());
-        }
-
-        for cm in &transaction.new_commitments {
-            self.commitments.insert(cm.clone());
-        }
-
-        self.memos.insert(transaction.memorandum.clone());
-
-        self.transactions.insert(transaction_id.clone(), MempoolEntry {
-            size_in_bytes: transaction.size(),
-            transaction,
-        });
-
-        Ok(Some(transaction_id))
-    }
-
-    /// Cleanse the memory pool of outdated transactions.
-    pub fn cleanse(&self, ledger: &DynLedger) -> Result<MemoryPool, ConsensusError> {
-        let mut new_pool = Self::new();
-
-        for (_, entry) in &self.transactions {
-            new_pool.insert(ledger, entry.transaction.clone())?;
-        }
-
-        Ok(new_pool)
     }
 
     /// Removes transaction from memory pool based on the transaction id.

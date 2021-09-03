@@ -42,7 +42,7 @@ impl ConsensusInner {
                 return false;
             }
         }
-        match self.memory_pool.insert(&self.ledger, *transaction) {
+        match self.insert_into_mempool(*transaction) {
             Ok(Some(digest)) => {
                 debug!("pushed transaction into memory pool: {}", digest);
                 true
