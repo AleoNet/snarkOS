@@ -40,7 +40,7 @@ mod consensus_dpc {
             .await
             .unwrap();
 
-        let canon_height = consensus.storage.canon().await?.block_height as u32;
+        let canon_height = consensus.storage.canon().await.unwrap().block_height as u32;
 
         println!("Creating block with coinbase transaction");
         let (transactions, coinbase_records) = miner.establish_block(canon_height + 1, vec![]).await.unwrap();
@@ -156,7 +156,11 @@ mod consensus_dpc {
         assert!(consensus.verify_transactions(vec![transaction.clone()]).await);
 
         println!("Create a new block with the payment transaction");
-        let (transactions, new_coinbase_records) = miner.establish_block(vec![transaction.clone()]).await.unwrap();
+        let canon_height = consensus.storage.canon().await.unwrap().block_height as u32;
+        let (transactions, new_coinbase_records) = miner
+            .establish_block(canon_height + 1, vec![transaction.clone()])
+            .await
+            .unwrap();
 
         assert!(consensus.verify_transactions(transactions.clone()).await);
 
