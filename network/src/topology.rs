@@ -25,6 +25,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
 // Purges connections that haven't been seen within this time (in hours).
@@ -92,6 +93,13 @@ pub fn nodes_from_connections(connections: &HashSet<Connection>) -> HashSet<Sock
     }
 
     nodes
+}
+
+/// A node cluster (potential forks and tip) in the network, maps height to members.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NodeCluster {
+    pub height: u32,
+    pub members: Vec<SocketAddr>,
 }
 
 /// Message types passed through the `KnownNetwork` channel.
@@ -218,9 +226,8 @@ impl KnownNetwork {
         self.nodes.read().clone()
     }
 
-    #[allow(clippy::type_complexity)]
     /// Returns the canon tip height and members, and a map of the potential forks.
-    pub fn potential_forks(&self) -> (Option<(u32, Vec<SocketAddr>)>, HashMap<u32, Vec<SocketAddr>>) {
+    pub fn potential_forks(&self) -> (Option<NodeCluster>, Vec<NodeCluster>) {
         use itertools::Itertools;
 
         const HEIGHT_DELTA_TOLERANCE: u32 = 5;
@@ -269,7 +276,14 @@ impl KnownNetwork {
         }
 
         // Split off the cluster with the highest height, this is our canon tip candidate.
-        let potential_tip = potential_forks.remove_entry(&potential_tip_height);
+        let potential_tip = potential_forks
+            .remove_entry(&potential_tip_height)
+            .map(|(height, members)| NodeCluster { height, members });
+
+        let potential_forks = potential_forks
+            .into_iter()
+            .map(|(height, members)| NodeCluster { height, members })
+            .collect();
 
         (potential_tip, potential_forks)
     }

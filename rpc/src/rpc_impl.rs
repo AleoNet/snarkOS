@@ -494,12 +494,6 @@ impl RpcFunctions for RpcImpl {
             .collect();
 
         let (potential_tip, potential_forks) = known_network.potential_forks();
-        let potential_tip = potential_tip.map(|(height, members)| PotentialFork { height, members });
-
-        let potential_forks = potential_forks
-            .into_iter()
-            .map(|(height, members)| PotentialFork { height, members })
-            .collect();
 
         let node_count = if network_metrics.node_count == 0 {
             known_network.nodes().len()
