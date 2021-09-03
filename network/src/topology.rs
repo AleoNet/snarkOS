@@ -649,7 +649,7 @@ mod test {
                 vec![
                     (addr_b, 24),
                     (addr_a, 1),
-                    (addr_g, 77),
+                    (addr_g, 75),
                     (addr_d, 26),
                     (addr_f, 77),
                     (addr_c, 25),
