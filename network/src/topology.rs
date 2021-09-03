@@ -219,7 +219,7 @@ impl KnownNetwork {
     }
 
     #[allow(clippy::type_complexity)]
-    /// Returns a map of the potential forks (including the tip) and the key to the tip.
+    /// Returns the canon tip height and members, and a map of the potential forks.
     pub fn potential_forks(&self) -> (Option<(u32, Vec<SocketAddr>)>, HashMap<u32, Vec<SocketAddr>>) {
         use itertools::Itertools;
 
