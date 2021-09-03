@@ -677,9 +677,14 @@ mod test {
 
         let (potential_tip, potential_forks) = known_network.potential_forks();
 
-        let expected_potential_tip = Some((79, vec![addr_g, addr_f, addr_e]));
-        let expected_potential_forks: HashMap<u32, Vec<SocketAddr>> =
-            vec![(26, vec![addr_b, addr_c, addr_d])].into_iter().collect();
+        let expected_potential_tip = Some(NodeCluster {
+            height: 79,
+            members: vec![addr_g, addr_f, addr_e],
+        });
+        let expected_potential_forks = vec![NodeCluster {
+            height: 26,
+            members: vec![addr_b, addr_c, addr_d],
+        }];
 
         assert_eq!(potential_forks, expected_potential_forks);
         assert_eq!(potential_tip, expected_potential_tip);
