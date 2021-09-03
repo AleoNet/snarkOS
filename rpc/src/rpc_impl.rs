@@ -493,11 +493,7 @@ impl RpcFunctions for RpcImpl {
             })
             .collect();
 
-        let potential_forks = known_network
-            .potential_forks()
-            .into_iter()
-            .map(|(height, members)| PotentialFork { height, members })
-            .collect();
+        let (potential_tip, potential_forks) = known_network.potential_forks();
 
         let node_count = if network_metrics.node_count == 0 {
             known_network.nodes().len()
@@ -511,6 +507,7 @@ impl RpcFunctions for RpcImpl {
             density: network_metrics.density,
             algebraic_connectivity: network_metrics.algebraic_connectivity,
             degree_centrality_delta: network_metrics.degree_centrality_delta,
+            potential_tip,
             potential_forks,
             vertices,
             edges,

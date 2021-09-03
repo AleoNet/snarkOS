@@ -21,6 +21,8 @@ use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
+use snarkos_network::NodeCluster;
+
 /// Defines the authentication format for accessing private endpoints on the RPC server
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcCredentials {
@@ -305,20 +307,15 @@ pub struct NetworkGraph {
     /// lowest.
     pub degree_centrality_delta: f64,
 
+    /// The potential height and members of the canon chain tip.
+    pub potential_tip: Option<NodeCluster>,
     /// The potential forks in the network and their member nodes.
-    pub potential_forks: Vec<PotentialFork>,
+    pub potential_forks: Vec<NodeCluster>,
 
     /// Known nodes.
     pub vertices: Vec<Vertice>,
     /// Known connections.
     pub edges: Vec<Edge>,
-}
-
-/// A potential fork in the network, maps height to members.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct PotentialFork {
-    pub height: u32,
-    pub members: Vec<SocketAddr>,
 }
 
 /// Metadata and measurements pertaining to a node in the graph of the known network.

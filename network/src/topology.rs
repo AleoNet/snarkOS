@@ -25,6 +25,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
 // Purges connections that haven't been seen within this time (in hours).
@@ -92,6 +93,13 @@ pub fn nodes_from_connections(connections: &HashSet<Connection>) -> HashSet<Sock
     }
 
     nodes
+}
+
+/// A node cluster (potential forks and tip) in the network, maps height to members.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NodeCluster {
+    pub height: u32,
+    pub members: Vec<SocketAddr>,
 }
 
 /// Message types passed through the `KnownNetwork` channel.
@@ -218,8 +226,8 @@ impl KnownNetwork {
         self.nodes.read().clone()
     }
 
-    /// Returns a map of the potential forks.
-    pub fn potential_forks(&self) -> HashMap<u32, Vec<SocketAddr>> {
+    /// Returns the canon tip height and members, and a map of the potential forks.
+    pub fn potential_forks(&self) -> (Option<NodeCluster>, Vec<NodeCluster>) {
         use itertools::Itertools;
 
         const HEIGHT_DELTA_TOLERANCE: u32 = 5;
@@ -247,23 +255,37 @@ impl KnownNetwork {
         // Don't forget the first cluster left after the `split_off` operation.
         nodes_grouped.insert(0, nodes);
 
-        // Remove the last cluster since it will contain the nodes even with the chain tip.
-        nodes_grouped.pop();
-
         // Filter out any clusters smaller than three nodes, this minimises the false-positives
-        // as it's reasonable to assume a fork would include more than two members.
+        // as it's reasonable to assume a fork or the tip would include more than two members.
         nodes_grouped.retain(|s| s.len() >= MIN_CLUSTER_SIZE);
 
         let mut potential_forks = HashMap::new();
+        let mut potential_tip_height = 0;
+
         for cluster in nodes_grouped {
             // Safe since no clusters are of length `0`.
             let max_height = cluster.iter().map(|(_, height)| height).max().unwrap();
             let addrs = cluster.iter().map(|(addr, _)| addr).copied().collect();
 
+            // Find the key to the potential canon cluster.
+            if potential_tip_height < *max_height {
+                potential_tip_height = *max_height
+            }
+
             potential_forks.insert(*max_height, addrs);
         }
 
-        potential_forks
+        // Split off the cluster with the highest height, this is our canon tip candidate.
+        let potential_tip = potential_forks
+            .remove_entry(&potential_tip_height)
+            .map(|(height, members)| NodeCluster { height, members });
+
+        let potential_forks = potential_forks
+            .into_iter()
+            .map(|(height, members)| NodeCluster { height, members })
+            .collect();
+
+        (potential_tip, potential_forks)
     }
 }
 
@@ -631,6 +653,7 @@ mod test {
         let addr_d = "44.44.44.44:4000".parse().unwrap();
         let addr_e = "55.55.55.55:5000".parse().unwrap();
         let addr_f = "66.66.66.66:6000".parse().unwrap();
+        let addr_g = "77.77.77.77:7000".parse().unwrap();
 
         let (tx, rx) = mpsc::channel(100);
         let known_network = KnownNetwork {
@@ -640,10 +663,11 @@ mod test {
                 vec![
                     (addr_b, 24),
                     (addr_a, 1),
+                    (addr_g, 75),
                     (addr_d, 26),
-                    (addr_f, 50),
+                    (addr_f, 77),
                     (addr_c, 25),
-                    (addr_e, 50),
+                    (addr_e, 79),
                 ]
                 .into_iter()
                 .collect(),
@@ -651,10 +675,18 @@ mod test {
             connections: Default::default(),
         };
 
-        let potential_forks = known_network.potential_forks();
-        let expected_potential_forks: HashMap<u32, Vec<SocketAddr>> =
-            vec![(26, vec![addr_b, addr_c, addr_d])].into_iter().collect();
+        let (potential_tip, potential_forks) = known_network.potential_forks();
+
+        let expected_potential_tip = Some(NodeCluster {
+            height: 79,
+            members: vec![addr_g, addr_f, addr_e],
+        });
+        let expected_potential_forks = vec![NodeCluster {
+            height: 26,
+            members: vec![addr_b, addr_c, addr_d],
+        }];
 
         assert_eq!(potential_forks, expected_potential_forks);
+        assert_eq!(potential_tip, expected_potential_tip);
     }
 }
