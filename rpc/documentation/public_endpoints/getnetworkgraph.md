@@ -13,6 +13,8 @@ None
 | `density`                            | f64        | The density of the known network                                                          |
 | `algebraic_connectivity`             | f64        | The algebraic connectivity, aka the fiedler eigenvalue of the known network               |
 | `degree_centrality_delta`            | f64        | The difference between the largest and the smallest peer count in the network             |
+| `potential_tip`                      | Option     | The crawler's best guess at the canon tip                                                 |
+| `potential_forks`                    | array      | The crawler's best guess at the forks in the network                                      |
 | `edges`                              | array      | The list of connections known by the node                                                 |
 | `vertices`                           | array      | The list of nodes known by the node                                                       |
 | `edges[i].source`                    | SocketAddr | One side of the crawled connection                                                        |
