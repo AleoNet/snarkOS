@@ -84,6 +84,12 @@ pub trait Ledger: Send + Sync {
 
 pub struct DynLedger(pub Box<dyn Ledger>);
 
+impl DynLedger {
+    pub fn dummy() -> Self {
+        Self(Box::new(dummy::DummyLedger))
+    }
+}
+
 impl Deref for DynLedger {
     type Target = dyn Ledger;
 
