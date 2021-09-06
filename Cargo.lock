@@ -2650,6 +2650,7 @@ dependencies = [
  "colored",
  "dirs",
  "hex",
+ "num_cpus",
  "parking_lot",
  "rand 0.8.4",
  "self_update",
