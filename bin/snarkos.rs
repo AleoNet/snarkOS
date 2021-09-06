@@ -316,6 +316,7 @@ fn main() -> Result<(), NodeError> {
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(8 * 1024 * 1024)
+        .max_blocking_threads(std::cmp::max(num_cpus::get().saturating_sub(2), 1)) // don't use 100% of the cores
         .build()?;
 
     runtime.block_on(start_server(config))?;
