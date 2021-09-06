@@ -176,7 +176,7 @@ impl PeerBook {
                 metrics::decrement_gauge!(DISCONNECTED, 1.0);
                 peer
             } else {
-                Peer::new(address, node.config.beacons().contains(&address))
+                Peer::new(address)
             };
             self.pending_connections.fetch_add(1, Ordering::SeqCst);
             peer.connect(node, self.peer_events.clone());
@@ -245,7 +245,7 @@ impl PeerBook {
     ///
     /// Adds the given address to the disconnected peers in this `PeerBook`.
     ///
-    pub async fn add_peer(&self, address: SocketAddr, is_beacon: bool) {
+    pub async fn add_peer(&self, address: SocketAddr) {
         if self.connected_peers.contains_key(&address) || self.disconnected_peers.contains_key(&address) {
             return;
         }
@@ -253,7 +253,7 @@ impl PeerBook {
         // Add the given address to the map of disconnected peers.
         if self
             .disconnected_peers
-            .insert(address, Peer::new(address, is_beacon))
+            .insert(address, Peer::new(address))
             .await
             .is_none()
         {

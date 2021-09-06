@@ -53,7 +53,6 @@ pub struct Peer {
     #[serde(skip)]
     pub status: PeerStatus,
     pub quality: PeerQuality,
-    pub is_beacon: bool,
     #[serde(skip)]
     pub queued_inbound_message_count: Arc<AtomicUsize>,
     #[serde(skip)]
@@ -71,12 +70,11 @@ const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
 const FAILURE_THRESHOLD: usize = 5;
 
 impl Peer {
-    pub fn new(address: SocketAddr, is_beacon: bool) -> Self {
+    pub fn new(address: SocketAddr) -> Self {
         Self {
             address,
             status: PeerStatus::Disconnected,
             quality: Default::default(),
-            is_beacon,
             queued_inbound_message_count: Default::default(),
             queued_outbound_message_count: Default::default(),
 
@@ -113,18 +111,6 @@ impl Peer {
                 .collect();
         }
         self.quality.failures.len()
-    }
-
-    pub fn handshake_timeout(&self) -> Duration {
-        if self.is_beacon {
-            Duration::from_secs(crate::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64)
-        } else {
-            Self::peer_handshake_timeout()
-        }
-    }
-
-    pub fn peer_handshake_timeout() -> Duration {
-        Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64)
     }
 
     pub(super) async fn run(

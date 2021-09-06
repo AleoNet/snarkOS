@@ -372,9 +372,7 @@ impl Node {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            self.peer_book
-                .add_peer(*peer_address, self.config.beacons().contains(peer_address))
-                .await;
+            self.peer_book.add_peer(*peer_address).await;
         }
 
         if let Some(known_network) = self.known_network() {

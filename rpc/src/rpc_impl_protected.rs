@@ -276,7 +276,7 @@ impl RpcImpl {
             .map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
 
         for addr in &addresses {
-            self.node.peer_book.add_peer(*addr, false).await;
+            self.node.peer_book.add_peer(*addr).await;
         }
         self.node.connect_to_addresses(&addresses).await;
 
@@ -697,7 +697,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let node = self.node.clone();
         tokio::spawn(async move {
             for addr in &addresses {
-                node.peer_book.add_peer(*addr, false).await;
+                node.peer_book.add_peer(*addr).await;
             }
             node.connect_to_addresses(&addresses).await
         });
