@@ -322,7 +322,8 @@ pub struct NetworkGraph {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Vertice {
     pub addr: SocketAddr,
-    pub is_bootnode: bool,
+    pub is_beacon: bool,
+    pub is_sync_provider: bool,
 
     // Centrality measurements for the node.
     pub degree_centrality: u16,

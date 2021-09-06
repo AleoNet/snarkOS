@@ -42,8 +42,10 @@ pub struct Config {
     minimum_number_of_connected_peers: u16,
     /// The maximum number of peers permitted to maintain connections with.
     maximum_number_of_connected_peers: u16,
-    /// The default bootnodes of the network.
-    pub bootnodes: ArcSwap<Vec<SocketAddr>>,
+    /// The default peer discovery nodes of the network.
+    pub beacons: ArcSwap<Vec<SocketAddr>>,
+    /// The default sync provider nodes of the network.
+    sync_providers: ArcSwap<Vec<SocketAddr>>,
     /// The interval between each peer sync.
     peer_sync_interval: Duration,
 }
@@ -57,14 +59,14 @@ impl Config {
         desired_address: SocketAddr,
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
-        bootnodes_addresses: Vec<String>,
+        beacon_addresses: Vec<String>,
         peer_sync_interval: Duration,
     ) -> Result<Self, NetworkError> {
         // Convert the given bootnodes into socket addresses.
-        let mut bootnodes = Vec::with_capacity(bootnodes_addresses.len());
-        for bootnode_address in bootnodes_addresses.iter() {
-            if let Ok(bootnode) = bootnode_address.parse::<SocketAddr>() {
-                bootnodes.push(bootnode);
+        let mut beacons = Vec::with_capacity(beacon_addresses.len());
+        for beacon_address in beacon_addresses.iter() {
+            if let Ok(beacon) = beacon_address.parse::<SocketAddr>() {
+                beacons.push(beacon);
             }
         }
 
@@ -74,15 +76,22 @@ impl Config {
             desired_address,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
-            bootnodes: ArcSwap::new(Arc::new(bootnodes)),
+            beacons: ArcSwap::new(Arc::new(beacons)),
+            sync_providers: ArcSwap::new(Arc::new(Vec::new())),
             peer_sync_interval,
         })
     }
 
-    /// Returns the default bootnodes of the network.
+    /// Returns the default peer discovery nodes of the network.
     #[inline]
-    pub fn bootnodes(&self) -> Arc<Vec<SocketAddr>> {
-        self.bootnodes.load_full()
+    pub fn beacons(&self) -> Arc<Vec<SocketAddr>> {
+        self.beacons.load_full()
+    }
+
+    /// Returns the default sync provider nodes of the network.
+    #[inline]
+    pub fn sync_providers(&self) -> Arc<Vec<SocketAddr>> {
+        self.sync_providers.load_full()
     }
 
     /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.

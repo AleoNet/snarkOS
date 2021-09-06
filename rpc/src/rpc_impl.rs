@@ -482,7 +482,8 @@ impl RpcFunctions for RpcImpl {
             .iter()
             .map(|(addr, node_centrality)| Vertice {
                 addr: *addr,
-                is_bootnode: self.node.config.bootnodes().contains(addr),
+                is_beacon: self.node.config.beacons().contains(addr),
+                is_sync_provider: self.node.config.sync_providers().contains(addr),
                 degree_centrality: node_centrality.degree_centrality,
                 eigenvector_centrality: node_centrality.eigenvector_centrality,
                 fiedler_value: node_centrality.fiedler_value,

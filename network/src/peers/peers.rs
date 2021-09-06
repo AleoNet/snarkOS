@@ -71,7 +71,7 @@ impl Node {
             let number_to_connect = crawling_capacity.saturating_sub(active_peer_count - number_to_disconnect);
 
             (number_to_disconnect, number_to_connect)
-        } else if self.config.is_bootnode() {
+        } else if self.config.is_bootnode() || self.config.is_beacon() {
             // Bootnodes disconnect down to 80% of their max to leave capacity open for new
             // connections.
             const BOOTNODE_CAPACITY_PERCENTAGE: f64 = 0.8;
@@ -115,10 +115,10 @@ impl Node {
 
         // Attempt to connect to a few random bootnodes if the node has no active
         // connections or if it's a bootnode itself.
-        if self.peer_book.get_active_peer_count() == 0 || self.config.is_bootnode() {
+        if self.peer_book.get_active_peer_count() == 0 || self.config.is_bootnode() || self.config.is_beacon() {
             let random_bootnodes = self
                 .config
-                .bootnodes()
+                .beacons()
                 .choose_multiple(&mut SmallRng::from_entropy(), 2)
                 .copied()
                 .collect::<Vec<_>>();
@@ -223,8 +223,8 @@ impl Node {
             let mut candidates = self.peer_book.disconnected_peers_snapshot();
 
             // Bootnodes are connected to in a dedicated method.
-            let bootnodes = self.config.bootnodes();
-            candidates.retain(|peer| peer.address != own_address && !bootnodes.contains(&peer.address));
+            let beacons = self.config.beacons();
+            candidates.retain(|peer| peer.address != own_address && !beacons.contains(&peer.address));
 
             if !self.config.is_regular_node() {
                 // Bootnodes and crawlers prefer peers they haven't dialed in a while.
@@ -317,7 +317,7 @@ impl Node {
         let connected_peers = self.peer_book.connected_peers_snapshot().await;
 
         let basic_filter =
-            |peer: &Peer| peer.address != remote_address && !self.config.bootnodes().contains(&peer.address);
+            |peer: &Peer| peer.address != remote_address && !self.config.beacons().contains(&peer.address);
         let strict_filter = |peer: &Peer| basic_filter(peer) && peer.is_routable.unwrap_or(false);
 
         // Strictly filter the connected peers by only including the routable addresses.
@@ -329,7 +329,7 @@ impl Node {
 
         // Bootnodes apply less strict filtering rules if the set is empty by falling back on
         // connected peers that may or may not be routable...
-        let peers = if self.config.is_bootnode() && strictly_filtered_peers.is_empty() {
+        let peers = if (self.config.is_bootnode() || self.config.is_beacon()) && strictly_filtered_peers.is_empty() {
             let filtered_peers: Vec<SocketAddr> = connected_peers
                 .iter()
                 .filter(|peer| basic_filter(peer))
@@ -373,7 +373,7 @@ impl Node {
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
             self.peer_book
-                .add_peer(*peer_address, self.config.bootnodes().contains(peer_address))
+                .add_peer(*peer_address, self.config.beacons().contains(peer_address))
                 .await;
         }
 
