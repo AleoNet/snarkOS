@@ -24,10 +24,17 @@ use std::{
     {self},
 };
 
+pub enum NodeType {
+    Client, // Sometimes referred to as a "regular" node.
+    Crawler,
+    Bootnode, // Soon to be "SyncProvider".
+}
+
 /// A core data structure containing the pre-configured parameters for the node.
 pub struct Config {
     /// The desired numeric ID of the node.
     pub node_id: Option<u64>,
+    pub node_type: NodeType,
     /// The pre-configured desired address of this node.
     pub desired_address: SocketAddr,
     /// The minimum number of peers required to maintain connections with.
@@ -36,11 +43,6 @@ pub struct Config {
     maximum_number_of_connected_peers: u16,
     /// The default bootnodes of the network.
     pub bootnodes: ArcSwap<Vec<SocketAddr>>,
-    /// If `true`, initializes this node as a bootnode and forgoes connecting
-    /// to the default bootnodes or saved peers in the peer book.
-    is_bootnode: bool,
-    /// If `true`, initializes this node as a crawler.
-    is_crawler: bool,
     /// The interval between each peer sync.
     peer_sync_interval: Duration,
 }
@@ -50,12 +52,11 @@ impl Config {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         node_id: Option<u64>,
+        node_type: NodeType,
         desired_address: SocketAddr,
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
         bootnodes_addresses: Vec<String>,
-        is_bootnode: bool,
-        is_crawler: bool,
         peer_sync_interval: Duration,
     ) -> Result<Self, NetworkError> {
         // Convert the given bootnodes into socket addresses.
@@ -68,12 +69,11 @@ impl Config {
 
         Ok(Self {
             node_id,
+            node_type,
             desired_address,
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
             bootnodes: ArcSwap::new(Arc::new(bootnodes)),
-            is_bootnode,
-            is_crawler,
             peer_sync_interval,
         })
     }
@@ -87,19 +87,19 @@ impl Config {
     /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.
     #[inline]
     pub fn is_bootnode(&self) -> bool {
-        self.is_bootnode
+        matches!(self.node_type, NodeType::Bootnode)
     }
 
     /// Returns `true` if this node is a crawler. Otherwise, returns `false`.
     #[inline]
     pub fn is_crawler(&self) -> bool {
-        self.is_crawler
+        matches!(self.node_type, NodeType::Crawler)
     }
 
     /// Returns `true` if this node is a plain node. Otherwise, returns `false`.
     #[inline]
     pub fn is_regular_node(&self) -> bool {
-        !(self.is_bootnode() || self.is_crawler())
+        matches!(self.node_type, NodeType::Bootnode | NodeType::Crawler)
     }
 
     /// Returns the minimum number of peers this node maintains a connection with.

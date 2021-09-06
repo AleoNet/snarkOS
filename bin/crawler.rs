@@ -23,7 +23,7 @@ use snarkos::{
     display::{initialize_logger, print_welcome},
     errors::NodeError,
 };
-use snarkos_network::{config::Config as NodeConfig, Node};
+use snarkos_network::{config::Config as NodeConfig, Node, NodeType};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::{AsyncStorage, SqliteStorage};
 
@@ -47,12 +47,11 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     let node_config = NodeConfig::new(
         None,
+        NodeType::Crawler,
         desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
-        false, // is_bootnode
-        true,  // is crawler
         // Set sync intervals for peers.
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
