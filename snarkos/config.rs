@@ -26,10 +26,15 @@ use dirs::home_dir;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
-/// Bootnodes maintained by Aleo.
+/// Peer discovery nodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
-pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &[&str] = &[
+pub const MAINNET_BEACONS: &[&str] = &[]; // "192.168.0.1:4130"
+// FIXME: setup peer discovery node addresses.
+pub const TESTNET_BEACONS: &[&str] = &[];
+
+pub const MAINNET_SYNC_PROVIDERS: &[&str] = &[];
+// TODO: these are the current "bootnodes".
+pub const TESTNET_SYNC_PROVIDERS: &[&str] = &[
     "50.18.83.123:4131",
     "50.18.246.201:4131",
     "159.89.152.247:4131",
@@ -88,7 +93,9 @@ pub struct Miner {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
-    pub bootnodes: Vec<String>,
+    pub beacons: Vec<String>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub sync_providers: Vec<String>,
     #[serde(alias = "mempool_interval")]
     pub mempool_sync_interval: u8,
     pub block_sync_interval: u16,
@@ -141,7 +148,11 @@ impl Default for Config {
                 password: Some("Password".into()),
             },
             p2p: P2P {
-                bootnodes: TESTNET_BOOTNODES
+                beacons: TESTNET_BEACONS
+                    .iter()
+                    .map(|node| (*node).to_string())
+                    .collect::<Vec<String>>(),
+                sync_providers: TESTNET_SYNC_PROVIDERS
                     .iter()
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
@@ -210,12 +221,13 @@ impl Config {
         // Parse the contents into the `Config` struct
         let mut config: Config = toml::from_str(&toml_string)?;
 
-        let bootnodes = match config.aleo.network_id {
-            0 => MAINNET_BOOTNODES,
-            _ => TESTNET_BOOTNODES,
+        let (beacons, sync_providers) = match config.aleo.network_id {
+            0 => (MAINNET_BEACONS, MAINNET_SYNC_PROVIDERS),
+            _ => (TESTNET_BEACONS, TESTNET_SYNC_PROVIDERS),
         };
 
-        config.p2p.bootnodes = bootnodes
+        config.p2p.beacons = beacons.iter().map(|node| (*node).to_string()).collect::<Vec<String>>();
+        config.p2p.sync_providers = sync_providers
             .iter()
             .map(|node| (*node).to_string())
             .collect::<Vec<String>>();
@@ -260,19 +272,31 @@ impl Config {
                 0 => {
                     self.node.db = "snarkos_mainnet".into();
                     self.node.port = 4130;
-                    self.p2p.bootnodes = MAINNET_BOOTNODES
+                    self.p2p.beacons = MAINNET_BEACONS
                         .iter()
                         .map(|node| (*node).to_string())
                         .collect::<Vec<String>>();
+
+                    self.p2p.sync_providers = MAINNET_SYNC_PROVIDERS
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+
                     self.aleo.network_id = network_id;
                 }
                 _ => {
                     self.node.db = format!("snarkos_testnet{}", network_id);
                     self.node.port = 4130 + (network_id as u16);
-                    self.p2p.bootnodes = TESTNET_BOOTNODES
+                    self.p2p.beacons = TESTNET_BEACONS
                         .iter()
                         .map(|node| (*node).to_string())
                         .collect::<Vec<String>>();
+
+                    self.p2p.sync_providers = TESTNET_SYNC_PROVIDERS
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+
                     self.aleo.network_id = network_id;
                 }
             }
@@ -320,10 +344,10 @@ impl Config {
     }
 
     fn connect(&mut self, argument: Option<&str>) {
-        if let Some(bootnodes) = argument {
-            let sanitize_bootnodes = bootnodes.replace(&['[', ']', ' '][..], "");
-            let bootnodes: Vec<String> = sanitize_bootnodes.split(',').map(|s| s.to_string()).collect();
-            self.p2p.bootnodes = bootnodes;
+        if let Some(addrs) = argument {
+            let sanitized_addrs = addrs.replace(&['[', ']', ' '][..], "");
+            let addrs: Vec<String> = sanitized_addrs.split(',').map(|s| s.to_string()).collect();
+            self.p2p.beacons = addrs;
         }
     }
 

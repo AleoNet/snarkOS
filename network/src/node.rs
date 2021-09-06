@@ -244,7 +244,7 @@ impl Node {
             #[cfg(not(feature = "test"))]
             sleep(Duration::from_secs(5)).await;
 
-            let bootnodes = self.config.bootnodes();
+            let sync_providers = self.config.sync_providers();
             let node_clone = self.clone();
             let mempool_sync_interval = node_clone.expect_sync().mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
@@ -265,17 +265,17 @@ impl Node {
                         //  all of our connected peers anyways.
 
                         // The order of preference for the sync node is as follows:
-                        //   1. Iterate (in declared order) through the bootnodes:
-                        //      a. Check if this node is connected to the specified bootnode in the peer book.
-                        //      b. Select the specified bootnode as the sync node if this node is connected to it.
-                        //   2. If this node is not connected to any bootnode,
+                        //   1. Iterate (in declared order) through the sync_providers:
+                        //      a. Check if this node is connected to the specified sync provider in the peer book.
+                        //      b. Select the specified sync provider as the sync node if this node is connected to it.
+                        //   2. If this node is not connected to any sync provider,
                         //      then select the last seen peer as the sync node.
 
                         // Step 1.
                         let mut sync_node = None;
-                        for bootnode in bootnodes.iter() {
-                            if node_clone.peer_book.is_connected(*bootnode) {
-                                sync_node = Some(*bootnode);
+                        for sync_provider in sync_providers.iter() {
+                            if node_clone.peer_book.is_connected(*sync_provider) {
+                                sync_node = Some(*sync_provider);
                                 break;
                             }
                         }

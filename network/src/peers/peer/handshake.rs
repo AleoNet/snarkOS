@@ -185,8 +185,8 @@ impl Peer {
             }
         };
 
-        match self.is_bootnode {
-            true => info!("Connected to bootnode {}", self.address),
+        match self.is_beacon {
+            true => info!("Connected to peer discovery node {}", self.address),
             false => info!("Connected to peer {}", self.address),
         };
 
