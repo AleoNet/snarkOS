@@ -96,6 +96,9 @@ version = "3.0.2"
 [dependencies.hex]
 version = "0.4.1"
 
+[dependencies.num_cpus]
+version = "1"
+
 [dependencies.parking_lot]
 version = "0.11.1"
 
