@@ -48,6 +48,10 @@ path = "bin/snarkos.rs"
 name = "crawler"
 path = "bin/crawler.rs"
 
+[[bin]]
+name = "beacon"
+path = "bin/beacon.rs"
+
 [dependencies.snarkvm-algorithms]
 version = "=0.7.9"
 default-features = false
