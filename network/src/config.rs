@@ -27,6 +27,7 @@ use std::{
 pub enum NodeType {
     Client, // Sometimes referred to as a "regular" node.
     Crawler,
+    Beacon,   // Used for peer discovery.
     Bootnode, // Soon to be "SyncProvider".
 }
 
@@ -100,6 +101,12 @@ impl Config {
     #[inline]
     pub fn is_regular_node(&self) -> bool {
         matches!(self.node_type, NodeType::Bootnode | NodeType::Crawler)
+    }
+
+    /// Returns `true` if this node is a peer discovery node. Otherwise, returns `false`.
+    #[inline]
+    pub fn is_beacon(&self) -> bool {
+        matches!(self.node_type, NodeType::Beacon)
     }
 
     /// Returns the minimum number of peers this node maintains a connection with.
