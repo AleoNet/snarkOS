@@ -24,7 +24,7 @@ use snarkos::{
     errors::NodeError,
 };
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
-use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
+use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, NodeType, Sync};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::{
     export_canon_blocks,
@@ -82,14 +82,19 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         fs::create_dir(&path)?;
     }
 
+    let node_type = if config.node.is_bootnode {
+        NodeType::Bootnode
+    } else {
+        NodeType::Client
+    };
+
     let node_config = NodeConfig::new(
         None,
+        node_type,
         desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.bootnodes.clone(),
-        config.node.is_bootnode,
-        false, // is_crawler
         // Set sync intervals for peers.
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
