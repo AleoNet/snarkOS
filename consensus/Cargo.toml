@@ -38,6 +38,9 @@ version = "0.17"
 [dependencies.snarkvm-parameters]
 version = "=0.7.9"
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.tokio]
 version = "1"
 

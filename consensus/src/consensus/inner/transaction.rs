@@ -16,7 +16,7 @@
 
 use snarkos_storage::VMRecord;
 use snarkvm_dpc::testnet1::instantiated::{Testnet1DPC, Testnet1Transaction};
-use tokio::task;
+use tokio::sync::oneshot;
 
 use crate::DeserializedLedger;
 
@@ -64,7 +64,8 @@ impl ConsensusInner {
         let consensus = self.public.clone();
         let ledger = std::mem::replace(&mut self.ledger, DynLedger::dummy());
 
-        let (ledger, verification_result) = task::spawn_blocking(move || {
+        let (tx, rx) = oneshot::channel();
+        rayon::spawn(move || {
             let mut deserialized = vec![];
             for transaction in transactions {
                 if !consensus
@@ -73,12 +74,16 @@ impl ConsensusInner {
                     .iter()
                     .any(|x| x[..] == transaction.inner_circuit_id[..])
                 {
-                    return (ledger, Ok(false));
+                    let _ = tx.send((ledger, Ok(false)));
+                    return;
                 }
-                let tx = Testnet1Transaction::deserialize(&transaction);
-                match tx {
+                let transaction = Testnet1Transaction::deserialize(&transaction);
+                match transaction {
                     Ok(t) => deserialized.push(t),
-                    Err(e) => return (ledger, Err(e)),
+                    Err(e) => {
+                        let _ = tx.send((ledger, Err(e)));
+                        return;
+                    }
                 }
             }
 
@@ -86,10 +91,10 @@ impl ConsensusInner {
                 .dpc
                 .verify_transactions(&deserialized[..], &ledger.deserialize::<Components>());
 
-            (ledger, Ok(verification_result))
-        })
-        .await
-        .unwrap(); // We won't abort this task, so the only alternative is a panic inside it
+            let _ = tx.send((ledger, Ok(verification_result)));
+        });
+
+        let (ledger, verification_result) = rx.await.unwrap();
 
         self.ledger = ledger;
 

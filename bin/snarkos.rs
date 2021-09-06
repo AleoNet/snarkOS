@@ -135,6 +135,8 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     info!("Storage is ready");
 
+    rayon::ThreadPoolBuilder::new().build_global().unwrap();
+
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.

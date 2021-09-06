@@ -32,7 +32,7 @@ use snarkos_metrics as metrics;
 
 use crate::{master::SyncInbound, message::*, NetworkError, Node, State};
 use anyhow::*;
-use tokio::task;
+use tokio::sync::oneshot;
 
 impl Node {
     /// Broadcast block to connected peers
@@ -111,7 +111,8 @@ impl Node {
     ) -> Result<(), NetworkError> {
         let now = Instant::now();
 
-        let (block, block_struct) = task::spawn_blocking(move || {
+        let (tx, rx) = oneshot::channel();
+        rayon::spawn(move || {
             let deserialized = match Block::<Transaction<Components>>::deserialize(&block) {
                 Ok(block) => block,
                 Err(error) => {
@@ -119,16 +120,24 @@ impl Node {
                         "Failed to deserialize received block from {}: {}",
                         remote_address, error
                     );
-                    return Err(error).map_err(|e| NetworkError::Other(e.into()));
+                    tx.send(Err(error).map_err(|e| NetworkError::Other(e.into()))).unwrap();
+                    return;
                 }
             };
 
-            let block_struct = <Block<Transaction<Components>> as VMBlock>::serialize(&deserialized)?;
+            let block_struct = match <Block<Transaction<Components>> as VMBlock>::serialize(&deserialized) {
+                Ok(bs) => bs,
+                Err(e) => {
+                    tx.send(Err(e.into())).unwrap();
+                    return;
+                }
+            };
 
-            Ok((block, block_struct))
-        })
-        .await
-        .map_err(|e| NetworkError::Other(e.into()))??;
+            tx.send(Ok((block, block_struct))).unwrap();
+        });
+
+        let (block, block_struct) = rx.await.map_err(|e| NetworkError::Other(e.into()))??;
+
         let previous_block_hash = block_struct.header.previous_block_hash.clone();
 
         let canon = self.expect_storage().canon().await?;
