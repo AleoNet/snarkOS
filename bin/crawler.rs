@@ -25,8 +25,9 @@ use snarkos::{
 };
 use snarkos_network::{config::Config as NodeConfig, Node};
 use snarkos_rpc::start_rpc_server;
+use snarkos_storage::{AsyncStorage, SqliteStorage};
 
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use tokio::runtime;
 
@@ -58,7 +59,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (RPC) needs to use it.
-    let node = Node::new(node_config, None).await?;
+
+    let storage = Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap()));
+
+    let node = Node::new(node_config, storage.clone()).await?;
 
     // Initialize metrics framework.
     node.initialize_metrics().await?;
@@ -71,7 +75,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
         let rpc_handle = start_rpc_server(
             rpc_address,
-            None,
+            storage,
             node.clone(),
             config.rpc.username,
             config.rpc.password,

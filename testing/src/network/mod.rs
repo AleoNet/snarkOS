@@ -185,15 +185,13 @@ pub async fn test_node(setup: TestSetup) -> Node {
     let node = match setup.consensus_setup {
         None => Node::new(
             config,
-            Some(Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap()))),
+            Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap())),
         )
         .await
         .unwrap(),
         Some(consensus_setup) => {
             let consensus = test_consensus(consensus_setup).await;
-            let mut node = Node::new(config, Some(consensus.consensus.storage.clone()))
-                .await
-                .unwrap();
+            let mut node = Node::new(config, consensus.consensus.storage.clone()).await.unwrap();
 
             node.set_sync(consensus);
             node

@@ -621,7 +621,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns the number of record commitments that are stored on the full node.
     async fn get_record_commitment_count(&self) -> Result<usize, RpcError> {
-        let storage = &self.storage()?;
+        let storage = &self.storage;
         let record_commitments = storage.get_record_commitments(None).await?;
 
         Ok(record_commitments.len())
@@ -629,7 +629,7 @@ impl ProtectedRpcFunctions for RpcImpl {
 
     /// Returns a list of record commitments that are stored on the full node.
     async fn get_record_commitments(&self) -> Result<Vec<String>, RpcError> {
-        let record_commitments = self.storage()?.get_record_commitments(Some(100)).await?;
+        let record_commitments = self.storage.get_record_commitments(Some(100)).await?;
         let record_commitment_strings: Vec<String> = record_commitments.iter().map(hex::encode).collect();
 
         Ok(record_commitment_strings)
@@ -638,7 +638,7 @@ impl ProtectedRpcFunctions for RpcImpl {
     /// Returns the hex encoded bytes of a record from its record commitment
     async fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError> {
         let decoded = hex::decode(record_commitment)?;
-        match self.storage()?.get_record(decoded[..].into()).await? {
+        match self.storage.get_record(decoded[..].into()).await? {
             Some(record) => Ok(hex::encode(to_bytes_le![record]?)),
             None => Ok("Record not found".to_string()),
         }

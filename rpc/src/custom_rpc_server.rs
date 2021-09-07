@@ -60,7 +60,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 15] = [
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
     rpc_addr: SocketAddr,
-    storage: Option<DynStorage>,
+    storage: DynStorage,
     node_server: Node,
     username: Option<String>,
     password: Option<String>,

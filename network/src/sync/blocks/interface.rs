@@ -131,7 +131,7 @@ impl Node {
         .map_err(|e| NetworkError::Other(e.into()))??;
         let previous_block_hash = block_struct.header.previous_block_hash.clone();
 
-        let canon = self.expect_storage().canon().await?;
+        let canon = self.storage.canon().await?;
 
         info!(
             "Got a block from {} ({}) with hash {}... (current head {})",
@@ -175,8 +175,8 @@ impl Node {
             .map(|x| -> Digest { x.0.into() })
             .enumerate()
         {
-            let block = self.expect_storage().get_block(&hash).await?;
-            let height = match self.expect_storage().get_block_state(&block.header.hash()).await? {
+            let block = self.storage.get_block(&hash).await?;
+            let height = match self.storage.get_block_state(&block.header.hash()).await? {
                 BlockStatus::Committed(h) => Some(h as u32),
                 _ => None,
             };
@@ -211,7 +211,7 @@ impl Node {
         let block_locator_hashes = block_locator_hashes.into_iter().map(|x| x.0.into()).collect::<Vec<_>>();
 
         let sync_hashes = self
-            .expect_storage()
+            .storage
             .find_sync_blocks(&block_locator_hashes[..], crate::MAX_BLOCK_SYNC_COUNT as usize)
             .await?
             .into_iter()
