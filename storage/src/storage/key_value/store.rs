@@ -722,4 +722,9 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         }
         out
     }
+
+    #[cfg(feature = "test")]
+    fn reset(&mut self) -> Result<()> {
+        unimplemented!();
+    }
 }

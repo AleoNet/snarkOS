@@ -207,6 +207,9 @@ pub trait Storage: Send + Sync {
     /// Removes the given key and its corresponding value from the given column.
     #[cfg(feature = "test")]
     async fn delete_item(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
+
+    #[cfg(feature = "test")]
+    async fn reset(&self) -> Result<()>;
 }
 
 /// A wrapper over storage implementations

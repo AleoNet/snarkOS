@@ -884,4 +884,12 @@ impl SyncStorage for SqliteStorage {
         }
         out
     }
+
+    #[cfg(feature = "test")]
+    fn reset(&mut self) -> Result<()> {
+        let new_storage = SqliteStorage::new_ephemeral()?;
+        *self = new_storage;
+        self.init()?;
+        Ok(())
+    }
 }
