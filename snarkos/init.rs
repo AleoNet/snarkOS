@@ -247,7 +247,7 @@ pub async fn init_node(config: &Config, storage: Option<DynStorage>) -> anyhow::
     Ok(node)
 }
 
-pub async fn init_rpc(config: &Config, node: Node, storage: Option<DynStorage>) -> anyhow::Result<()> {
+pub fn init_rpc(config: &Config, node: Node, storage: Option<DynStorage>) -> anyhow::Result<()> {
     let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
         .parse()
         .expect("Invalid RPC server address!");
