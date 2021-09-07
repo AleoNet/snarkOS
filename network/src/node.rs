@@ -342,10 +342,7 @@ impl Node {
 
         // The node can already be at some non-zero height.
         if self.sync().is_some() {
-            metrics::gauge!(
-                misc::BLOCK_HEIGHT,
-                self.storage.canon().await?.block_height as f64
-            );
+            metrics::gauge!(misc::BLOCK_HEIGHT, self.storage.canon().await?.block_height as f64);
         }
 
         Ok(())
