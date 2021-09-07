@@ -115,7 +115,7 @@ impl Node {
 
         // Attempt to connect to a few random bootnodes if the node has no active
         // connections or if it's a bootnode itself.
-        if self.peer_book.get_active_peer_count() == 0 || self.config.is_sync_provider() || self.config.is_beacon() {
+        if (!self.config.is_sync_provider() && self.peer_book.get_active_peer_count() == 0) || self.config.is_beacon() {
             let random_beacons = self
                 .config
                 .beacons()
@@ -352,10 +352,19 @@ impl Node {
         };
 
         // Limit set size.
-        let peers = peers
+        let mut peers: Vec<SocketAddr> = peers
             .choose_multiple(&mut SmallRng::from_entropy(), crate::SHARED_PEER_COUNT)
             .copied()
             .collect();
+
+        // Make sure to include a sync provider in the addresses if this node is a peer discovery
+        // node. In future, sync provider addresses wouldn't be provided if their capacity is
+        // maxed out.
+        if self.config.is_beacon() {
+            if let Some(random_sync_provider) = self.config.sync_providers().choose(&mut SmallRng::from_entropy()) {
+                peers.push(*random_sync_provider);
+            }
+        }
 
         self.peer_book
             .send_to(remote_address, Payload::Peers(peers), time_received)

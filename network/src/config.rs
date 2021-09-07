@@ -62,15 +62,20 @@ impl Config {
         minimum_number_of_connected_peers: u16,
         maximum_number_of_connected_peers: u16,
         beacon_addresses: Vec<String>,
+        sync_provider_addresses: Vec<String>,
         peer_sync_interval: Duration,
     ) -> Result<Self, NetworkError> {
         // Convert the given bootnodes into socket addresses.
-        let mut beacons = Vec::with_capacity(beacon_addresses.len());
-        for beacon_address in beacon_addresses.iter() {
-            if let Ok(beacon) = beacon_address.parse::<SocketAddr>() {
-                beacons.push(beacon);
-            }
-        }
+
+        let beacons: Vec<SocketAddr> = beacon_addresses
+            .into_iter()
+            .flat_map(|addr| addr.parse().ok())
+            .collect();
+
+        let sync_providers: Vec<SocketAddr> = sync_provider_addresses
+            .into_iter()
+            .filter_map(|addr| addr.parse().ok())
+            .collect();
 
         Ok(Self {
             node_id,
@@ -79,7 +84,7 @@ impl Config {
             minimum_number_of_connected_peers,
             maximum_number_of_connected_peers,
             beacons: ArcSwap::new(Arc::new(beacons)),
-            sync_providers: ArcSwap::new(Arc::new(Vec::new())),
+            sync_providers: ArcSwap::new(Arc::new(sync_providers)),
             peer_sync_interval,
         })
     }
