@@ -127,6 +127,108 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>>
     Ok(Some(storage))
 }
 
+pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<Sync> {
+    let memory_pool = MemoryPool::new(); // from_storage(&storage).await?;
+
+    debug!("Loading Aleo parameters...");
+    let dpc = <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::load(!config.miner.is_miner)?;
+    info!("Loaded Aleo parameters");
+
+    // Fetch the set of valid inner circuit IDs.
+    let inner_snark_vk: <<Components as Testnet1Components>::InnerSNARK as SNARK>::VerifyingKey =
+        dpc.inner_snark_parameters.1.clone().into();
+    let inner_snark_id = dpc
+        .system_parameters
+        .inner_circuit_id_crh
+        .hash(&to_bytes_le![inner_snark_vk]?)?;
+
+    let authorized_inner_snark_ids = vec![to_bytes_le![inner_snark_id]?];
+
+    // Set the initial sync parameters.
+    let consensus_params = ConsensusParameters {
+        max_block_size: 1_000_000_000usize,
+        max_nonce: u32::max_value(),
+        target_block_time: 10i64,
+        network_id: Network::from_id(config.aleo.network_id),
+        verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
+        authorized_inner_snark_ids,
+    };
+
+    let ledger_parameters = {
+        type Parameters = <Components as Testnet1Components>::MerkleParameters;
+        let parameters: <<Parameters as MerkleParameters>::H as CRH>::Parameters =
+            FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes()?[..])?;
+        let crh = <Parameters as MerkleParameters>::H::from(parameters);
+        Arc::new(Parameters::from(crh))
+    };
+    info!("Loading Ledger");
+    let ledger_digests = storage.get_ledger_digests().await?;
+    let commitments = storage.get_commitments().await?;
+    let serial_numbers = storage.get_serial_numbers().await?;
+    let memos = storage.get_memos().await?;
+    info!("Initializing Ledger");
+    let ledger = DynLedger(Box::new(MerkleLedger::new(
+        ledger_parameters,
+        &ledger_digests[..],
+        &commitments[..],
+        &serial_numbers[..],
+        &memos[..],
+    )?));
+
+    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
+    let genesis_block: SerialBlock = <Block<Testnet1Transaction> as VMBlock>::serialize(&genesis_block)?;
+
+    let consensus = Consensus::new(
+        consensus_params,
+        Arc::new(dpc),
+        genesis_block,
+        ledger,
+        storage.clone(),
+        memory_pool,
+    );
+    info!("Loaded Ledger");
+
+    if config.storage.scan_for_forks {
+        storage
+        .scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32)
+        .await?;
+    }
+
+    if let Some(import_path) = &config.storage.import {
+        info!("Importing canon blocks from {}", import_path.display());
+
+        let now = std::time::Instant::now();
+        let mut blocks = std::io::Cursor::new(std::fs::read(import_path)?);
+
+        let mut processed = 0usize;
+        let mut imported = 0usize;
+        while let Ok(block) = Block::<Testnet1Transaction>::read_le(&mut blocks) {
+            let block = <Block<Testnet1Transaction> as VMBlock>::serialize(&block)?;
+            // Skip possible duplicate blocks etc.
+            if consensus.receive_block(block).await {
+                imported += 1;
+            }
+            processed += 1;
+        }
+
+        info!(
+            "Processed {} canon blocks ({} imported) in {}ms",
+            processed,
+            imported,
+            now.elapsed().as_millis()
+        );
+    }
+
+    let sync = Sync::new(
+        consensus,
+        config.miner.is_miner,
+        Duration::from_secs(config.p2p.block_sync_interval.into()),
+        Duration::from_secs(config.p2p.mempool_sync_interval.into()),
+    );
+
+    Ok(sync)
+}
+
 pub async fn init_node(config: &Config, storage: Option<DynStorage>) -> anyhow::Result<Node> {
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
@@ -147,4 +249,33 @@ pub async fn init_node(config: &Config, storage: Option<DynStorage>) -> anyhow::
     Ok(node)
 }
 
-// pub async fn init_sync(config: &Config)
+pub async fn init_rpc(config: &Config, node: Node, storage: Option<DynStorage>) -> anyhow::Result<()> {
+    let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
+        .parse()
+        .expect("Invalid RPC server address!");
+
+    let rpc_handle = start_rpc_server(
+        rpc_address,
+        storage,
+        node.clone(),
+        config.rpc.username.clone(),
+        config.rpc.password.clone(),
+    );
+    node.register_task(rpc_handle);
+
+    info!("Listening for RPC requests on port {}", config.rpc.port);
+
+    Ok(())
+}
+
+pub fn init_miner(config: &Config, node: Node) {
+    match Address::<Components>::from_str(&config.miner.miner_address) {
+        Ok(miner_address) => {
+            let handle = MinerInstance::new(miner_address, node.clone()).spawn();
+            node.register_task(handle);
+        }
+        Err(_) => info!(
+            "Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI."
+        ),
+    }
+}
