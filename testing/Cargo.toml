@@ -80,6 +80,7 @@ version = "1.8"
 
 [dependencies.rand]
 version = "0.8"
+features = [ "small_rng" ]
 
 [dependencies.rand_chacha]
 version = "0.3"

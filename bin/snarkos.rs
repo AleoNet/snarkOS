@@ -83,6 +83,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     let node_config = NodeConfig::new(
+        None,
         desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,

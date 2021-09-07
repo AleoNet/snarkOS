@@ -482,15 +482,16 @@ mod protected_rpc_tests {
     #[tokio::test]
     async fn test_rpc_connect() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
-        let setup = TestSetup {
+        let setup = || TestSetup {
             consensus_setup: None,
             ..Default::default()
         };
-        let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup.clone())).await;
+
+        let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup())).await;
         rpc_node.listen().await.unwrap();
 
-        let some_node1 = test_node(setup.clone()).await;
-        let some_node2 = test_node(setup).await;
+        let some_node1 = test_node(setup()).await;
+        let some_node2 = test_node(setup()).await;
 
         let meta = authentication();
         let request = format!(

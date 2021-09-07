@@ -375,12 +375,12 @@ mod rpc_tests {
         let (rpc, rpc_node) = initialize_test_rpc(&consensus, Some(setup.clone())).await;
         rpc_node.start_services().await;
 
-        let setup = TestSetup {
+        let setup = || TestSetup {
             consensus_setup: None,
             ..Default::default()
         };
-        let some_node1 = test_node(setup.clone()).await;
-        let some_node2 = test_node(setup).await;
+        let some_node1 = test_node(setup()).await;
+        let some_node2 = test_node(setup()).await;
 
         rpc_node.connect_to_addresses(&[some_node1.expect_local_addr()]).await;
         some_node1.connect_to_addresses(&[some_node2.expect_local_addr()]).await;

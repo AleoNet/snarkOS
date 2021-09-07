@@ -28,6 +28,8 @@ use snarkos_network::{errors::*, *};
 use snarkos_storage::{AsyncStorage, SqliteStorage};
 
 use std::{net::SocketAddr, sync::Arc, time::Duration};
+
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::{tcp::OwnedReadHalf, TcpListener, TcpStream},
@@ -138,7 +140,7 @@ impl TestSetup {
 impl Default for TestSetup {
     fn default() -> Self {
         Self {
-            node_id: u64::MAX,
+            node_id: SmallRng::from_entropy().gen(),
             socket_address: "127.0.0.1:0".parse().unwrap(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
@@ -166,6 +168,7 @@ pub async fn test_consensus(setup: ConsensusSetup) -> snarkos_network::Sync {
 /// Returns a `Config` struct based on the given `TestSetup`.
 pub fn test_config(setup: TestSetup) -> Config {
     Config::new(
+        Some(setup.node_id),
         setup.socket_address,
         setup.min_peers,
         setup.max_peers,
