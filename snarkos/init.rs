@@ -233,6 +233,7 @@ pub async fn init_node(config: &Config, storage: Option<DynStorage>) -> anyhow::
         config.p2p.min_peers,
         config.p2p.max_peers,
         config.p2p.beacons.clone(),
+        config.p2p.sync_providers.clone(),
         // Set sync intervals for peers.
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
