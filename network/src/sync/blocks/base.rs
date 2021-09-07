@@ -24,6 +24,7 @@ use tokio::{sync::mpsc, time::Instant};
 use crate::{Node, Peer, SyncInbound};
 use anyhow::*;
 
+/// Base sync helpers
 pub struct SyncBase {
     pub node: Node,
     pub incoming: mpsc::Receiver<SyncInbound>,
