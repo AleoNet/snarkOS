@@ -103,6 +103,7 @@ pub struct TestSetup {
     pub is_bootnode: bool,
     pub is_crawler: bool,
     pub bootnodes: Vec<String>,
+    pub network_enabled: bool,
 }
 
 impl TestSetup {
@@ -117,6 +118,7 @@ impl TestSetup {
         is_bootnode: bool,
         is_crawler: bool,
         bootnodes: Vec<String>,
+        network_enabled: bool,
     ) -> Self {
         Self {
             node_id,
@@ -128,6 +130,7 @@ impl TestSetup {
             is_bootnode,
             is_crawler,
             bootnodes,
+            network_enabled,
         }
     }
 }
@@ -144,6 +147,7 @@ impl Default for TestSetup {
             is_bootnode: false,
             is_crawler: false,
             bootnodes: vec![],
+            network_enabled: true,
         }
     }
 }
@@ -195,8 +199,10 @@ pub async fn test_node(setup: TestSetup) -> Node {
         }
     };
 
-    node.listen().await.unwrap();
-    node.start_services().await;
+    if setup.network_enabled {
+        node.listen().await.unwrap();
+        node.start_services().await;
+    }
 
     if is_miner {
         let miner_address = FIXTURE.test_accounts[0].address.clone();
