@@ -95,12 +95,6 @@ fn render_welcome(config: &Config) -> String {
         i => format!("testnet{}", i),
     };
 
-    //     if is_miner {
-    //         output += &format!("Starting a mining node on {}.\n", network).bold().to_string();
-    //     } else {
-    //         output += &format!("Starting a client node on {}.\n", network).bold().to_string();
-    //     }
-
     match config.node.kind {
         NodeType::Client if is_miner => {
             output += &format!("Starting a mining node on {}.\n", network).bold().to_string();

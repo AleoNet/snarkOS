@@ -19,7 +19,7 @@ use snarkos::{
     config::{Config, ConfigCli},
     display::{initialize_logger, print_welcome},
     errors::NodeError,
-    init::{init_miner, init_node, init_rpc, init_storage, init_sync},
+    init::{init_node, init_rpc, init_storage, init_sync},
 };
 use snarkos_network::NodeType;
 
@@ -68,12 +68,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start the network services
     node.start_services().await;
-
-    // Start the miner task if mining configuration is enabled.
-    if config.miner.is_miner {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        init_miner(&config, node);
-    }
 
     std::future::pending::<()>().await;
 
