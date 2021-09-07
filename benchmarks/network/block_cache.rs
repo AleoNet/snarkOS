@@ -24,7 +24,7 @@ fn block_cache_perf(c: &mut Criterion) {
     const MIN_BLOCK_SIZE: usize = 1024; // 1KiB
     const MAX_BLOCK_SIZE: usize = 1024 * 1024; // 1MiB
 
-    let mut cache = Cache::<8192>::default();
+    let mut cache = BlockCache::<8192>::default();
 
     let seed: u64 = thread_rng().gen();
     let mut rng = XorShiftRng::seed_from_u64(seed);
