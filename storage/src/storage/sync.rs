@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use anyhow::*;
 use tracing::{debug, trace};
@@ -156,21 +156,68 @@ pub trait SyncStorage {
 
     /// Gets a tree structure representing all the descendents of [`block_hash`]
     fn get_block_digest_tree(&mut self, block_hash: &Digest) -> Result<DigestTree> {
-        let children = self.get_block_children(block_hash)?;
-        if children.is_empty() {
+        let mut nodes: HashMap<Digest, Vec<Digest>> = HashMap::new();
+        let mut stack = vec![block_hash.clone()];
+        while let Some(hash) = stack.pop() {
+            let children = self.get_block_children(&hash)?;
+            stack.extend_from_slice(&children[..]);
+            if !children.is_empty() {
+                nodes.insert(hash, children);
+            }
+        }
+        if nodes.is_empty() {
             return Ok(DigestTree::Leaf(block_hash.clone()));
         }
-        let mut out_children = Vec::with_capacity(children.len());
-        let mut longest_tree_len = 0usize;
-        for child in children {
-            let subtree = self.get_block_digest_tree(&child)?;
-            let len = subtree.longest_length() + 1;
-            if len > longest_tree_len {
-                longest_tree_len = len;
+        let mut node_entries: HashSet<Digest> = nodes.keys().cloned().collect();
+
+        let mut trees: HashMap<Digest, DigestTree> = HashMap::new();
+        loop {
+            if nodes.is_empty() {
+                break;
             }
-            out_children.push(subtree);
+            nodes.retain(|hash, children| {
+                let mut new_children = vec![];
+                let mut longest_tree_len = 0usize;
+                for child in children {
+                    if node_entries.contains(child) {
+                        return true;
+                    }
+                    if let Some(tree) = trees.remove(child) {
+                        let len = tree.longest_length() + 1;
+                        if len > longest_tree_len {
+                            longest_tree_len = len;
+                        }
+                        new_children.push(tree);
+                    } else {
+                        new_children.push(DigestTree::Leaf(child.clone()));
+                    }
+                }
+                trees.insert(
+                    hash.clone(),
+                    DigestTree::Node(hash.clone(), new_children, longest_tree_len),
+                );
+                node_entries.remove(hash);
+                false
+            });
         }
-        Ok(DigestTree::Node(block_hash.clone(), out_children, longest_tree_len))
+        assert_eq!(nodes.len(), 0);
+        assert_eq!(trees.len(), 1);
+
+        Ok(trees.remove(block_hash).expect("missing block hash tree"))
+
+        // let mut out = DigestTree::Node(block_hash.clone(), vec![], 0);
+
+        // let mut out_children = Vec::with_capacity(children.len());
+        // let mut longest_tree_len = 0usize;
+        // for child in children {
+        //     let subtree = self.get_block_digest_tree(&child)?;
+        //     let len = subtree.longest_length() + 1;
+        //     if len > longest_tree_len {
+        //         longest_tree_len = len;
+        //     }
+        //     out_children.push(subtree);
+        // }
+        // Ok(DigestTree::Node(block_hash.clone(), out_children, longest_tree_len))
     }
 
     /// Stores the immediate children of `block_hash` in a cache.
