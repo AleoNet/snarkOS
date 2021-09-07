@@ -95,7 +95,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
-        init_rpc(&config, node.clone(), Some(storage));
+        init_rpc(&config, node.clone(), Some(storage))?;
     }
 
     // Start the network services
