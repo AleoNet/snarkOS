@@ -408,7 +408,7 @@ impl RpcFunctions for RpcImpl {
     async fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
         Ok(NodeInfo {
             listening_addr: self.node.config.desired_address,
-            is_bootnode: self.node.config.is_bootnode(),
+            node_type: self.node.config.node_type,
             is_miner: self.sync_handler()?.is_miner,
             is_syncing: self.node.is_syncing_blocks(),
             launched: self.node.launched,

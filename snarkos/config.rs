@@ -21,6 +21,8 @@ use crate::{
     update::UpdateCLI,
 };
 
+use snarkos_network::NodeType;
+
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
@@ -75,10 +77,9 @@ pub struct JsonRPC {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {
+    pub kind: NodeType,
     pub dir: PathBuf,
     pub db: String,
-    pub is_bootnode: bool,
-    pub is_crawler: bool,
     pub ip: String,
     pub port: u16,
     pub verbose: u8,
@@ -127,10 +128,9 @@ impl Default for Config {
         Self {
             aleo: Aleo { network_id: 1 },
             node: Node {
+                kind: NodeType::Client,
                 dir: Self::snarkos_dir(),
                 db: "snarkos_testnet1".into(),
-                is_bootnode: false,
-                is_crawler: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
                 verbose: 2,
@@ -238,7 +238,6 @@ impl Config {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Flags
-            "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
@@ -311,14 +310,6 @@ impl Config {
         if let Some(path) = argument {
             self.storage.import = Some(path.to_owned().into());
         }
-    }
-
-    fn is_bootnode(&mut self, argument: bool) {
-        self.node.is_bootnode = argument;
-    }
-
-    pub fn is_crawler(&mut self, argument: bool) {
-        self.node.is_crawler = argument;
     }
 
     fn is_miner(&mut self, argument: bool) {
@@ -428,12 +419,13 @@ impl Config {
             return Err(CliError::SyncIntervalInvalid);
         }
 
-        if self.node.is_bootnode && self.miner.is_miner {
-            return Err(CliError::MinerBootstrapper);
-        }
-
-        if self.node.is_bootnode && self.node.is_crawler {
-            return Err(CliError::CrawlerBootstrapper);
+        if self.miner.is_miner {
+            match self.node.kind {
+                NodeType::Client => {}
+                NodeType::Crawler => return Err(CliError::MinerCrawler),
+                NodeType::Beacon => return Err(CliError::MinerBeacon),
+                NodeType::SyncProvider => return Err(CliError::MinerSyncProvider),
+            }
         }
 
         // TODO (howardwu): Check the memory pool interval.

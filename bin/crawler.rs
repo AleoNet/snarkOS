@@ -97,7 +97,7 @@ fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::args();
 
     let mut config: Config = ConfigCli::parse(&arguments)?;
-    config.is_crawler(true);
+    config.node.kind = NodeType::Crawler;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
 
     let runtime = runtime::Builder::new_multi_thread().enable_all().build()?;

@@ -52,6 +52,10 @@ path = "bin/crawler.rs"
 name = "beacon"
 path = "bin/beacon.rs"
 
+[[bin]]
+name = "sync_provider"
+path = "bin/sync_provider.rs"
+
 [dependencies.snarkvm-algorithms]
 version = "=0.7.9"
 default-features = false

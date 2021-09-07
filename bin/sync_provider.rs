@@ -83,8 +83,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     }
 
     let node_config = NodeConfig::new(
-        None,
-        NodeType::Client,
+        NodeType::SyncProvider,
         desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
@@ -138,7 +137,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config, storage.clone()).await?;
+    let mut node = Node::new(node_config, Some(storage.clone())).await?;
 
     if let Some(limit) = config.storage.export {
         let mut export_path = path.clone();
@@ -275,7 +274,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
         let rpc_handle = start_rpc_server(
             rpc_address,
-            storage,
+            Some(storage),
             node.clone(),
             config.rpc.username,
             config.rpc.password,
@@ -311,13 +310,12 @@ fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::args();
 
     let mut config: Config = ConfigCli::parse(&arguments)?;
-    config.node.kind = NodeType::Client;
+    config.node.kind = NodeType::SyncProvider;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
 
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(8 * 1024 * 1024)
-        .max_blocking_threads(std::cmp::max(num_cpus::get().saturating_sub(2), 1)) // don't use 100% of the cores
         .build()?;
 
     runtime.block_on(start_server(config))?;
