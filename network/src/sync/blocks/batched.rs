@@ -25,6 +25,7 @@ use snarkvm_algorithms::crh::double_sha256;
 use snarkvm_dpc::{BlockHeader, BlockHeaderHash};
 use tokio::sync::mpsc;
 
+/// Efficient but slow and fork-prone sync method that operates in distributed batches.
 pub struct SyncBatched {
     base: SyncBase,
 }

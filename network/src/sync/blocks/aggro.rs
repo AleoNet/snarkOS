@@ -26,6 +26,7 @@ use tokio::{
     time::Instant,
 };
 
+/// Aggressive, continuous sync process that pulls peers entire canon trees.
 pub struct SyncAggro {
     base: SyncBase,
 }
