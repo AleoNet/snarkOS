@@ -25,19 +25,6 @@ pub enum DigestTree {
 }
 
 impl DigestTree {
-    pub fn with_children(self, children: Vec<Digest>) -> Self {
-        let digest = match self {
-            DigestTree::Leaf(digest) => digest,
-            _ => panic!("cannot add children to non-leaf node"),
-        };
-
-        if children.is_empty() {
-            DigestTree::Leaf(digest)
-        } else {
-            DigestTree::Node(digest, children.into_iter().map(DigestTree::Leaf).collect(), 2)
-        }
-    }
-
     pub fn root(&self) -> &Digest {
         match self {
             DigestTree::Leaf(root) => root,
