@@ -80,7 +80,7 @@ mod protected_rpc_tests {
         };
 
         let environment = test_config(node_setup.unwrap_or_default());
-        let mut node = Node::new(environment, Some(consensus.storage.clone())).await.unwrap();
+        let mut node = Node::new(environment, consensus.storage.clone()).await.unwrap();
         let consensus_setup = ConsensusSetup::default();
 
         let node_consensus = snarkos_network::Sync::new(
