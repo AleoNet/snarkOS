@@ -31,7 +31,6 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::{tcp::OwnedReadHalf, TcpListener, TcpStream},
-    runtime,
 };
 use tracing::*;
 
@@ -104,7 +103,6 @@ pub struct TestSetup {
     pub is_bootnode: bool,
     pub is_crawler: bool,
     pub bootnodes: Vec<String>,
-    pub tokio_handle: Option<runtime::Handle>,
 }
 
 impl TestSetup {
@@ -119,7 +117,6 @@ impl TestSetup {
         is_bootnode: bool,
         is_crawler: bool,
         bootnodes: Vec<String>,
-        tokio_handle: Option<runtime::Handle>,
     ) -> Self {
         Self {
             node_id,
@@ -131,7 +128,6 @@ impl TestSetup {
             is_bootnode,
             is_crawler,
             bootnodes,
-            tokio_handle,
         }
     }
 }
@@ -148,7 +144,6 @@ impl Default for TestSetup {
             is_bootnode: false,
             is_crawler: false,
             bootnodes: vec![],
-            tokio_handle: None,
         }
     }
 }
