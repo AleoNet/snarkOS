@@ -14,14 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    cli::CLI,
-    config::{Config, ConfigCli},
-    display::{initialize_logger, print_welcome},
-    errors::NodeError,
-};
+use crate::config::Config;
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
-use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, NodeType, Sync};
+use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
 use snarkos_storage::{
     export_canon_blocks,
@@ -49,9 +44,7 @@ use snarkvm_parameters::{testnet1::GenesisBlock, Genesis, LedgerMerkleTreeParame
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
-use std::{fs, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
-
-use tokio::runtime;
+use std::{fs, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>> {
     let mut path = config.node.dir.clone();

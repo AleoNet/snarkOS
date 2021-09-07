@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate tracing;
-
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
@@ -24,11 +21,8 @@ use snarkos::{
     errors::NodeError,
     init::{init_node, init_rpc},
 };
-use snarkos_network::{config::Config as NodeConfig, Node, NodeType};
-use snarkos_rpc::start_rpc_server;
 use snarkos_storage::{AsyncStorage, SqliteStorage};
-
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use snarkos_network::NodeType;
 
 use tokio::runtime;
 

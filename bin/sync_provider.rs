@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate tracing;
-
 use snarkos::{
     cli::CLI,
     config::{Config, ConfigCli},
@@ -24,36 +21,7 @@ use snarkos::{
     errors::NodeError,
     init::{init_miner, init_node, init_rpc, init_storage, init_sync},
 };
-use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
-use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, NodeType, Sync};
-use snarkos_rpc::start_rpc_server;
-use snarkos_storage::{
-    export_canon_blocks,
-    key_value::KeyValueStore,
-    AsyncStorage,
-    DynStorage,
-    RocksDb,
-    SerialBlock,
-    SqliteStorage,
-    VMBlock,
-};
-
-use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
-use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1DPC, Testnet1Transaction},
-        Testnet1Components,
-    },
-    Address,
-    Block,
-    DPCScheme,
-    Network,
-};
-use snarkvm_parameters::{testnet1::GenesisBlock, Genesis, LedgerMerkleTreeParameters, Parameter};
-use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
-
-use std::{fs, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+use snarkos_network::NodeType;
 
 use tokio::runtime;
 
