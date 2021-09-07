@@ -126,6 +126,19 @@ impl ConsensusInner {
                 ConsensusMessage::ScanForks() => {
                     response.send(Box::new(self.scan_forks().await)).ok();
                 }
+                #[cfg(feature = "test")]
+                ConsensusMessage::Reset() => {
+                    response
+                        .send(Box::new(
+                            async {
+                                self.ledger.clear();
+                                self.storage.reset().await?;
+                                self.init().await
+                            }
+                            .await,
+                        ))
+                        .ok();
+                }
             }
         }
     }

@@ -75,6 +75,8 @@ enum Message {
     StoreItem(KeyValueColumn, Vec<u8>, Vec<u8>),
     #[cfg(feature = "test")]
     DeleteItem(KeyValueColumn, Vec<u8>),
+    #[cfg(feature = "test")]
+    Reset(),
 }
 
 impl fmt::Display for Message {
@@ -135,6 +137,8 @@ impl fmt::Display for Message {
             Message::StoreItem(col, key, value) => write!(f, "StoreItem({:?}, {:?}, {:?})", col, key, value),
             #[cfg(feature = "test")]
             Message::DeleteItem(col, key) => write!(f, "DeleteItem({:?}, {:?})", col, key),
+            #[cfg(feature = "test")]
+            Message::Reset() => write!(f, "Reset()"),
         }
     }
 }
@@ -199,6 +203,8 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::StoreItem(col, key, value) => Box::new(self.wrap(move |f| f.store_item(col, key, value))),
             #[cfg(feature = "test")]
             Message::DeleteItem(col, key) => Box::new(self.wrap(move |f| f.delete_item(col, key))),
+            #[cfg(feature = "test")]
+            Message::Reset() => Box::new(self.inner.reset()),
         }
     }
 
@@ -382,5 +388,10 @@ impl Storage for AsyncStorage {
     #[cfg(feature = "test")]
     async fn delete_item(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()> {
         self.send(Message::DeleteItem(col, key)).await
+    }
+
+    #[cfg(feature = "test")]
+    async fn reset(&self) -> Result<()> {
+        self.send(Message::Reset()).await
     }
 }

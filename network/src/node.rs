@@ -120,7 +120,7 @@ impl Node {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config, storage: Option<DynStorage>) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
-            id: thread_rng().gen(),
+            id: config.node_id.unwrap_or_else(|| thread_rng().gen()),
             state: Default::default(),
             local_addr: Default::default(),
             config,

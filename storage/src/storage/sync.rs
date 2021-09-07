@@ -359,4 +359,8 @@ pub trait SyncStorage {
     /// Removes the given key and its corresponding value from the given column.
     #[cfg(feature = "test")]
     fn delete_item(&mut self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
+
+    /// Fully resets the storage.
+    #[cfg(feature = "test")]
+    fn reset(&mut self) -> Result<()>;
 }

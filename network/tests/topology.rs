@@ -28,11 +28,11 @@ const N: usize = 25;
 const MIN_PEERS: u16 = 5;
 const MAX_PEERS: u16 = 30;
 
-async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
+async fn test_nodes<F: Fn() -> TestSetup>(n: usize, setup: F) -> Vec<Node> {
     let mut nodes = Vec::with_capacity(n);
 
     for _ in 0..n {
-        nodes.push(test_node(setup.clone()).await);
+        nodes.push(test_node(setup()).await);
 
         // Nodes are started with a slight delay to avoid having peering intervals in phase (this
         // is the hypothetical worst case scenario).
@@ -44,7 +44,7 @@ async fn test_nodes(n: usize, setup: TestSetup) -> Vec<Node> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn spawn_nodes_in_a_line() {
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         ..Default::default()
@@ -64,7 +64,7 @@ async fn spawn_nodes_in_a_line() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn spawn_nodes_in_a_ring() {
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         ..Default::default()
@@ -79,7 +79,7 @@ async fn spawn_nodes_in_a_ring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn spawn_nodes_in_a_star() {
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         ..Default::default()
@@ -93,7 +93,7 @@ async fn spawn_nodes_in_a_star() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn spawn_nodes_in_a_mesh() {
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 5,
         min_peers: MIN_PEERS,
@@ -122,7 +122,7 @@ async fn spawn_nodes_in_a_mesh() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn line_converges_to_mesh() {
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         min_peers: MIN_PEERS,
@@ -142,7 +142,7 @@ async fn line_converges_to_mesh() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ring_converges_to_mesh() {
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         min_peers: MIN_PEERS,
@@ -162,7 +162,7 @@ async fn ring_converges_to_mesh() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn star_converges_to_mesh() {
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         min_peers: MIN_PEERS,
@@ -173,7 +173,7 @@ async fn star_converges_to_mesh() {
     // A bootnode will be necessary at the center of the star for peers to get propagated.
     let hub_setup = TestSetup {
         is_bootnode: true,
-        ..setup.clone()
+        ..setup()
     };
 
     // Create the regular nodes.
@@ -198,28 +198,28 @@ async fn binary_star_contact() {
     // their bootnodes.
 
     // Setup the bootnodes for each star topology.
-    let bootnode_setup = TestSetup {
+    let bootnode_setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         is_bootnode: true,
         ..Default::default()
     };
 
-    let bootnode_a = test_node(bootnode_setup.clone()).await;
-    let bootnode_b = test_node(bootnode_setup).await;
+    let bootnode_a = test_node(bootnode_setup()).await;
+    let bootnode_b = test_node(bootnode_setup()).await;
 
     let ba = bootnode_a.expect_local_addr().to_string();
     let bb = bootnode_b.expect_local_addr().to_string();
 
     // Create the nodes to be used as the leafs in the stars.
-    let setup = TestSetup {
+    let setup = || TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         min_peers: MIN_PEERS,
         max_peers: MAX_PEERS,
         ..Default::default()
     };
-    let mut star_a_nodes = test_nodes(N - 1, setup.clone()).await;
+    let mut star_a_nodes = test_nodes(N - 1, setup).await;
     let mut star_b_nodes = test_nodes(N - 1, setup).await;
 
     // Insert the bootnodes at the begining of the node lists.

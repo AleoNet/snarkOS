@@ -17,6 +17,10 @@ include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[features]
+default = []
+test = []
+
 [dependencies.snarkvm-algorithms]
 version = "=0.7.9"
 

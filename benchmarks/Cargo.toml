@@ -28,6 +28,11 @@ path = "network/block_cache.rs"
 harness = false
 
 [[bench]]
+name = "block_processing"
+path = "network/block_processing.rs"
+harness = false
+
+[[bench]]
 name = "messaging"
 path = "network/messaging.rs"
 harness = false
@@ -73,6 +78,10 @@ version = "1.3.14"
 path = "../network"
 version = "1.3.14"
 
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "1.3.14"
+
 [dependencies.snarkos-testing]
 path = "../testing"
 version = "1.3.14"
@@ -85,6 +94,12 @@ version = "2"
 
 [dependencies.digest]
 version = "0.7"
+
+[dependencies.futures]
+version = "0.3"
+
+[dependencies.num_cpus]
+version = "1"
 
 [dependencies.rand]
 version = "0.8"

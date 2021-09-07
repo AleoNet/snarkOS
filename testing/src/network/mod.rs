@@ -28,10 +28,11 @@ use snarkos_network::{errors::*, *};
 use snarkos_storage::{AsyncStorage, SqliteStorage};
 
 use std::{net::SocketAddr, sync::Arc, time::Duration};
+
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::{tcp::OwnedReadHalf, TcpListener, TcpStream},
-    runtime,
 };
 use tracing::*;
 
@@ -104,7 +105,7 @@ pub struct TestSetup {
     pub is_bootnode: bool,
     pub is_crawler: bool,
     pub bootnodes: Vec<String>,
-    pub tokio_handle: Option<runtime::Handle>,
+    pub network_enabled: bool,
 }
 
 impl TestSetup {
@@ -119,7 +120,7 @@ impl TestSetup {
         is_bootnode: bool,
         is_crawler: bool,
         bootnodes: Vec<String>,
-        tokio_handle: Option<runtime::Handle>,
+        network_enabled: bool,
     ) -> Self {
         Self {
             node_id,
@@ -131,7 +132,7 @@ impl TestSetup {
             is_bootnode,
             is_crawler,
             bootnodes,
-            tokio_handle,
+            network_enabled,
         }
     }
 }
@@ -139,7 +140,7 @@ impl TestSetup {
 impl Default for TestSetup {
     fn default() -> Self {
         Self {
-            node_id: u64::MAX,
+            node_id: SmallRng::from_entropy().gen(),
             socket_address: "127.0.0.1:0".parse().unwrap(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
@@ -148,7 +149,7 @@ impl Default for TestSetup {
             is_bootnode: false,
             is_crawler: false,
             bootnodes: vec![],
-            tokio_handle: None,
+            network_enabled: true,
         }
     }
 }
@@ -167,6 +168,7 @@ pub async fn test_consensus(setup: ConsensusSetup) -> snarkos_network::Sync {
 /// Returns a `Config` struct based on the given `TestSetup`.
 pub fn test_config(setup: TestSetup) -> Config {
     Config::new(
+        Some(setup.node_id),
         setup.socket_address,
         setup.min_peers,
         setup.max_peers,
@@ -200,8 +202,10 @@ pub async fn test_node(setup: TestSetup) -> Node {
         }
     };
 
-    node.listen().await.unwrap();
-    node.start_services().await;
+    if setup.network_enabled {
+        node.listen().await.unwrap();
+        node.start_services().await;
+    }
 
     if is_miner {
         let miner_address = FIXTURE.test_accounts[0].address.clone();

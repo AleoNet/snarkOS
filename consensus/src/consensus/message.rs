@@ -47,6 +47,8 @@ pub(super) enum ConsensusMessage {
     ForceDecommit(Vec<u8>),
     FastForward(),
     ScanForks(),
+    #[cfg(feature = "test")]
+    Reset(),
 }
 
 pub(super) type ConsensusMessageWrapped = (ConsensusMessage, oneshot::Sender<Box<dyn Any + Send + Sync>>);
