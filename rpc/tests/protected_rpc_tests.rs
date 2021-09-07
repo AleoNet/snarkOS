@@ -92,7 +92,7 @@ mod protected_rpc_tests {
 
         node.set_sync(node_consensus);
 
-        let rpc_impl = RpcImpl::new(Some(consensus.storage.clone()), Some(credentials), node.clone());
+        let rpc_impl = RpcImpl::new(consensus.storage.clone(), Some(credentials), node.clone());
         let mut io = jsonrpc_core::MetaIoHandler::default();
 
         rpc_impl.add_protected(&mut io);

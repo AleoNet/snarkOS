@@ -57,7 +57,7 @@ impl Deref for RpcImpl {
 
 pub struct RpcInner {
     /// Blockchain database storage.
-    pub(crate) storage: Option<DynStorage>,
+    pub(crate) storage: DynStorage,
 
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
@@ -68,16 +68,12 @@ pub struct RpcInner {
 
 impl RpcImpl {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(storage: Option<DynStorage>, credentials: Option<RpcCredentials>, node: Node) -> Self {
+    pub fn new(storage: DynStorage, credentials: Option<RpcCredentials>, node: Node) -> Self {
         Self(Arc::new(RpcInner {
             storage,
             credentials,
             node,
         }))
-    }
-
-    pub fn storage(&self) -> Result<&DynStorage, RpcError> {
-        self.storage.as_ref().ok_or(RpcError::NoStorage)
     }
 
     pub fn sync_handler(&self) -> Result<&Arc<Sync>, RpcError> {
@@ -226,20 +222,20 @@ impl RpcFunctions for RpcImpl {
         }
 
         let block_header_hash: Digest = block_hash[..].into();
-        let height = match self.storage()?.get_block_state(&block_header_hash).await? {
+        let height = match self.storage.get_block_state(&block_header_hash).await? {
             BlockStatus::Committed(block_num) => Some(block_num),
             BlockStatus::Uncommitted => None,
             BlockStatus::Unknown => return Err(RpcError::InvalidBlockHash(block_hash_string)),
         };
 
-        let canon = self.storage()?.canon().await?;
+        let canon = self.storage.canon().await?;
 
         let confirmations = match height {
             Some(block_height) => canon.block_height - block_height,
             None => 0,
         };
 
-        let block = self.storage()?.get_block(&block_header_hash).await?;
+        let block = self.storage.get_block(&block_header_hash).await?;
         let mut transactions = Vec::with_capacity(block.transactions.len());
 
         for transaction in block.transactions.iter() {
@@ -264,20 +260,20 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the number of blocks in the canonical chain, including the genesis.
     async fn get_block_count(&self) -> Result<u32, RpcError> {
-        let canon = self.storage()?.canon().await?;
+        let canon = self.storage.canon().await?;
         Ok(canon.block_height as u32 + 1)
     }
 
     /// Returns the block hash of the head of the canonical chain.
     async fn get_best_block_hash(&self) -> Result<String, RpcError> {
-        let canon = self.storage()?.canon().await?;
+        let canon = self.storage.canon().await?;
 
         Ok(hex::encode(&canon.hash.0))
     }
 
     /// Returns the block hash of the index specified if it exists in the canonical chain.
     async fn get_block_hash(&self, block_height: u32) -> Result<String, RpcError> {
-        let block_hash = self.storage()?.get_block_hash(block_height).await?;
+        let block_hash = self.storage.get_block_hash(block_height).await?;
 
         Ok(block_hash
             .map(|x| hex::encode(&x))
@@ -287,7 +283,7 @@ impl RpcFunctions for RpcImpl {
     /// Returns the hex encoded bytes of a transaction from its transaction id.
     async fn get_raw_transaction(&self, transaction_id: String) -> Result<String, RpcError> {
         let transaction_id = hex::decode(transaction_id)?;
-        let transaction = self.storage()?.get_transaction(transaction_id[..].into()).await?;
+        let transaction = self.storage.get_transaction(transaction_id[..].into()).await?;
 
         Ok(hex::encode(&to_bytes_le![&transaction]?))
     }
@@ -332,8 +328,8 @@ impl RpcFunctions for RpcImpl {
 
         let transaction_id = transaction.transaction_id()?;
 
-        let block_number = match self.storage()?.get_transaction_location(transaction_id.into()).await? {
-            Some(block_location) => match self.storage()?.get_block_state(&block_location.block_hash).await? {
+        let block_number = match self.storage.get_transaction_location(transaction_id.into()).await? {
+            Some(block_location) => match self.storage.get_block_state(&block_location.block_hash).await? {
                 BlockStatus::Committed(n) => Some(n as u32),
                 _ => None,
             },
@@ -431,9 +427,9 @@ impl RpcFunctions for RpcImpl {
 
     /// Returns the current mempool and sync information known by this node.
     async fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
-        let canon = self.storage()?.canon().await?;
+        let canon = self.storage.canon().await?;
 
-        let block = self.storage()?.get_block_header(&canon.hash).await?;
+        let block = self.storage.get_block_header(&canon.hash).await?;
 
         let time = Utc::now().timestamp();
 
