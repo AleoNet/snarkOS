@@ -68,7 +68,7 @@ impl ConsensusInner {
         let canon_hashes = self
             .storage
             .get_block_hashes(
-                Some(crate::OLDEST_FORK_THRESHOLD as u32 + 1),
+                Some(crate::OLDEST_FORK_THRESHOLD as u32),
                 BlockFilter::CanonOnly(BlockOrder::Descending),
             )
             .await?;
