@@ -22,6 +22,7 @@ use snarkos::{
     config::{Config, ConfigCli},
     display::{initialize_logger, print_welcome},
     errors::NodeError,
+    init::init_storage,
 };
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, NodeType, Sync};
@@ -72,19 +73,21 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     print_welcome(&config);
 
+    let (path, storage) = match init_storage(&config).await? {
+        Some(storage) => storage,
+        None => return Ok(()), // Return if no storage was returned (usually in case of validation).
+    };
+
+    // Construct the node instance. Note this does not start the network services.
+    // This is done early on, so that the local address can be discovered
+    // before any other object (miner, RPC) needs to use it.
+
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
-    let mut path = config.node.dir.clone();
-    path.push(&config.node.db);
-
-    if !path.exists() {
-        fs::create_dir(&path)?;
-    }
-
     let node_config = NodeConfig::new(
         None,
-        NodeType::Client,
+        config.node.kind,
         desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
@@ -93,51 +96,6 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
     )?;
 
-    info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let storage: DynStorage = {
-        let mut sqlite_path = path.clone();
-        sqlite_path.push("sqlite.db");
-
-        if config.storage.validate {
-            error!("validator not implemented for sqlite");
-            return Ok(());
-        }
-
-        Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
-    };
-
-    if storage.canon().await?.block_height == 0 {
-        let mut rocks_identity_path = path.clone();
-        rocks_identity_path.push("IDENTITY");
-        if rocks_identity_path.exists() {
-            info!("Empty sqlite DB with existing rocksdb found, migrating...");
-            let rocks_storage = RocksDb::open(&path)?;
-            let rocks_storage: DynStorage = Arc::new(AsyncStorage::new(KeyValueStore::new(rocks_storage)));
-
-            snarkos_storage::migrate(&rocks_storage, &storage).await?;
-        }
-    }
-
-    if let Some(max_head) = config.storage.max_head {
-        let canon_next = storage.get_block_hash(max_head + 1).await?;
-        if let Some(canon_next) = canon_next {
-            storage.decommit_blocks(&canon_next).await?;
-        }
-    }
-
-    if config.storage.trim {
-        let now = std::time::Instant::now();
-        // There shouldn't be issues after validation, but if there are, ignore them.
-        let _ = snarkos_storage::trim(storage.clone()).await;
-        info!("Storage trimmed in {}ms", now.elapsed().as_millis());
-        return Ok(());
-    }
-
-    info!("Storage is ready");
-
-    // Construct the node instance. Note this does not start the network services.
-    // This is done early on, so that the local address can be discovered
-    // before any other object (miner, RPC) needs to use it.
     let mut node = Node::new(node_config, storage.clone()).await?;
 
     if let Some(limit) = config.storage.export {

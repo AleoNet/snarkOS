@@ -17,9 +17,13 @@
 #[macro_use]
 extern crate thiserror;
 
+#[macro_use]
+extern crate tracing;
+
 pub mod cli;
 pub mod config;
 pub mod display;
 pub mod errors;
+pub mod init;
 pub mod parameters;
 pub mod update;
