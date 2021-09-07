@@ -22,6 +22,7 @@ use snarkos::{
     config::{Config, ConfigCli},
     display::{initialize_logger, print_welcome},
     errors::NodeError,
+    init::{init_node, init_rpc},
 };
 use snarkos_network::{config::Config as NodeConfig, Node, NodeType};
 use snarkos_rpc::start_rpc_server;
@@ -42,23 +43,10 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     print_welcome(&config);
 
-    let address = format!("{}:{}", config.node.ip, config.node.port);
-    let desired_address = address.parse::<SocketAddr>()?;
-
-    let node_config = NodeConfig::new(
-        config.node.kind,
-        desired_address,
-        config.p2p.min_peers,
-        config.p2p.max_peers,
-        config.p2p.beacons.clone(),
-        // Set sync intervals for peers.
-        Duration::from_secs(config.p2p.peer_sync_interval.into()),
-    )?;
-
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (RPC) needs to use it.
-    let node = Node::new(node_config, None).await?;
+    let node = init_node(&config, None).await?;
 
     // Initialize metrics framework.
     node.initialize_metrics().await?;
@@ -68,20 +56,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
-        let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
-            .parse()
-            .expect("Invalid RPC server address!");
-
-        let rpc_handle = start_rpc_server(
-            rpc_address,
-            None,
-            node.clone(),
-            config.rpc.username,
-            config.rpc.password,
-        );
-        node.register_task(rpc_handle);
-
-        info!("Listening for RPC requests on port {}", config.rpc.port);
+        let rpc_handle = init_rpc(&config, node.clone(), None);
     }
 
     // Start the network services.
