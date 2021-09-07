@@ -156,4 +156,10 @@ impl Consensus {
     pub async fn scan_forks(&self) -> Result<Vec<(Digest, Digest)>> {
         self.send(ConsensusMessage::ScanForks()).await
     }
+
+    /// Fully reset the ledger and the storage
+    #[cfg(feature = "test")]
+    pub async fn reset(&self) -> Result<()> {
+        self.send(ConsensusMessage::Reset()).await
+    }
 }
