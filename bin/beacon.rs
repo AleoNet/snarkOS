@@ -46,7 +46,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     let desired_address = address.parse::<SocketAddr>()?;
 
     let node_config = NodeConfig::new(
-        NodeType::Beacon,
+        config.node.kind,
         desired_address,
         config.p2p.min_peers,
         config.p2p.max_peers,
