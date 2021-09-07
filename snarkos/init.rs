@@ -53,7 +53,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc, time::Dur
 
 use tokio::runtime;
 
-pub async fn init_storage(config: &Config) -> anyhow::Result<Option<(PathBuf, DynStorage)>> {
+pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>> {
     let mut path = config.node.dir.clone();
     path.push(&config.node.db);
 
@@ -104,5 +104,47 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<(PathBuf, Dy
 
     info!("Storage is ready");
 
-    Ok(Some((path, storage)))
+    if let Some(limit) = config.storage.export {
+        let mut export_path = path.clone();
+        export_path.push("canon_blocks");
+
+        let limit = if limit == 0 { None } else { Some(limit) };
+
+        let now = std::time::Instant::now();
+        match export_canon_blocks(storage.clone(), limit, &export_path).await {
+            Ok(num_exported) => {
+                info!(
+                    "{} canon blocks exported to {} in {}ms",
+                    num_exported,
+                    export_path.display(),
+                    now.elapsed().as_millis()
+                );
+            }
+            Err(e) => error!("Couldn't export canon blocks to {}: {}", export_path.display(), e),
+        }
+    }
+
+    Ok(Some(storage))
 }
+
+pub async fn init_node(config: &Config, storage: Option<DynStorage>) -> anyhow::Result<Node> {
+    let address = format!("{}:{}", config.node.ip, config.node.port);
+    let desired_address = address.parse::<SocketAddr>()?;
+
+    let node_config = NodeConfig::new(
+        None,
+        config.node.kind,
+        desired_address,
+        config.p2p.min_peers,
+        config.p2p.max_peers,
+        config.p2p.beacons.clone(),
+        // Set sync intervals for peers.
+        Duration::from_secs(config.p2p.peer_sync_interval.into()),
+    )?;
+
+    let node = Node::new(node_config, storage).await?;
+
+    Ok(node)
+}
+
+// pub async fn init_sync(config: &Config)
