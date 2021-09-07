@@ -227,10 +227,7 @@ async fn block_two_node() {
     let node_bob = test_node(setup).await;
 
     // check blocks present in alice's chain were synced to bob's
-    wait_until!(
-        30,
-        node_bob.storage.canon().await.unwrap().block_height == NUM_BLOCKS
-    );
+    wait_until!(30, node_bob.storage.canon().await.unwrap().block_height == NUM_BLOCKS);
 }
 
 #[tokio::test]
