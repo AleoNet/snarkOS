@@ -17,6 +17,7 @@
 use crate::NetworkError;
 
 use arc_swap::ArcSwap;
+use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     sync::Arc,
@@ -24,11 +25,12 @@ use std::{
     {self},
 };
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NodeType {
     Client, // Sometimes referred to as a "regular" node.
     Crawler,
-    Beacon,   // Used for peer discovery.
-    Bootnode, // Soon to be "SyncProvider".
+    Beacon, // Used for peer discovery.
+    SyncProvider,
 }
 
 /// A core data structure containing the pre-configured parameters for the node.
@@ -96,8 +98,8 @@ impl Config {
 
     /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.
     #[inline]
-    pub fn is_bootnode(&self) -> bool {
-        matches!(self.node_type, NodeType::Bootnode)
+    pub fn is_sync_provider(&self) -> bool {
+        matches!(self.node_type, NodeType::SyncProvider)
     }
 
     /// Returns `true` if this node is a crawler. Otherwise, returns `false`.
@@ -108,8 +110,8 @@ impl Config {
 
     /// Returns `true` if this node is a plain node. Otherwise, returns `false`.
     #[inline]
-    pub fn is_regular_node(&self) -> bool {
-        matches!(self.node_type, NodeType::Bootnode | NodeType::Crawler)
+    pub fn is_client(&self) -> bool {
+        matches!(self.node_type, NodeType::Client)
     }
 
     /// Returns `true` if this node is a peer discovery node. Otherwise, returns `false`.

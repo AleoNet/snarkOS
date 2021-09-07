@@ -71,7 +71,7 @@ impl Node {
             let number_to_connect = crawling_capacity.saturating_sub(active_peer_count - number_to_disconnect);
 
             (number_to_disconnect, number_to_connect)
-        } else if self.config.is_bootnode() || self.config.is_beacon() {
+        } else if self.config.is_sync_provider() || self.config.is_beacon() {
             // Bootnodes disconnect down to 80% of their max to leave capacity open for new
             // connections.
             const BOOTNODE_CAPACITY_PERCENTAGE: f64 = 0.8;
@@ -96,7 +96,7 @@ impl Node {
         if number_to_disconnect != 0 {
             let mut current_peers = self.peer_book.connected_peers_snapshot().await;
 
-            if !self.config.is_regular_node() {
+            if !self.config.is_client() {
                 // Bootnodes and crawlers will disconnect from their oldest peers...
                 current_peers.sort_unstable_by_key(|peer| cmp::Reverse(peer.quality.last_connected));
             } else {
@@ -115,15 +115,15 @@ impl Node {
 
         // Attempt to connect to a few random bootnodes if the node has no active
         // connections or if it's a bootnode itself.
-        if self.peer_book.get_active_peer_count() == 0 || self.config.is_bootnode() || self.config.is_beacon() {
-            let random_bootnodes = self
+        if self.peer_book.get_active_peer_count() == 0 || self.config.is_sync_provider() || self.config.is_beacon() {
+            let random_beacons = self
                 .config
                 .beacons()
                 .choose_multiple(&mut SmallRng::from_entropy(), 2)
                 .copied()
                 .collect::<Vec<_>>();
 
-            self.connect_to_addresses(&random_bootnodes).await;
+            self.connect_to_addresses(&random_beacons).await;
         }
 
         if number_to_connect != 0 {
@@ -226,14 +226,14 @@ impl Node {
             let beacons = self.config.beacons();
             candidates.retain(|peer| peer.address != own_address && !beacons.contains(&peer.address));
 
-            if !self.config.is_regular_node() {
+            if !self.config.is_client() {
                 // Bootnodes and crawlers prefer peers they haven't dialed in a while.
                 candidates.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
 
             let addr_iter = candidates.iter().map(|peer| peer.address);
 
-            if !self.config.is_regular_node() {
+            if !self.config.is_client() {
                 addr_iter.take(count).collect()
             } else {
                 addr_iter.choose_multiple(&mut SmallRng::from_entropy(), count)
@@ -265,7 +265,7 @@ impl Node {
     async fn broadcast_getpeers_requests(&self) {
         // If the node is not a bootnode or a crawler, check if the request for peers is needed
         // based on the number of active connections.
-        if self.config.is_regular_node() {
+        if self.config.is_client() {
             // Fetch the number of connected and connecting peers.
             let number_of_peers = self.peer_book.get_active_peer_count() as usize;
 
@@ -329,7 +329,7 @@ impl Node {
 
         // Bootnodes apply less strict filtering rules if the set is empty by falling back on
         // connected peers that may or may not be routable...
-        let peers = if (self.config.is_bootnode() || self.config.is_beacon()) && strictly_filtered_peers.is_empty() {
+        let peers = if self.config.is_beacon() && strictly_filtered_peers.is_empty() {
             let filtered_peers: Vec<SocketAddr> = connected_peers
                 .iter()
                 .filter(|peer| basic_filter(peer))

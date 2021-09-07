@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::Config;
+use snarkos_network::NodeType;
 use snarkvm_dpc::{testnet1::instantiated::Components, Address};
 
 use colored::*;
@@ -93,12 +94,31 @@ fn render_welcome(config: &Config) -> String {
         0 => "mainnet".to_string(),
         i => format!("testnet{}", i),
     };
-    if is_miner {
-        output += &format!("Starting a mining node on {}.\n", network).bold().to_string();
-    } else if config.node.is_crawler {
-        output += &format!("Starting a crawler node on {}.\n", network).bold().to_string();
-    } else {
-        output += &format!("Starting a client node on {}.\n", network).bold().to_string();
+
+    //     if is_miner {
+    //         output += &format!("Starting a mining node on {}.\n", network).bold().to_string();
+    //     } else {
+    //         output += &format!("Starting a client node on {}.\n", network).bold().to_string();
+    //     }
+
+    match config.node.kind {
+        NodeType::Client if is_miner => {
+            output += &format!("Starting a mining node on {}.\n", network).bold().to_string();
+        }
+        NodeType::Client => {
+            output += &format!("Starting a client node on {}.\n", network).bold().to_string();
+        }
+        NodeType::Crawler => output += &format!("Starting a crawler node on {}.\n", network).bold().to_string(),
+        NodeType::Beacon => {
+            output += &format!("Starting a peer discovery node on {}.\n", network)
+                .bold()
+                .to_string()
+        }
+        NodeType::SyncProvider => {
+            output += &format!("Starting a sync provider node on {}.\n", network)
+                .bold()
+                .to_string()
+        }
     }
 
     output
