@@ -22,7 +22,7 @@ use snarkos::{
     config::{Config, ConfigCli},
     display::{initialize_logger, print_welcome},
     errors::NodeError,
-    init::init_storage,
+    init::{init_node, init_storage},
 };
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, NodeType, Sync};
@@ -73,7 +73,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     print_welcome(&config);
 
-    let (path, storage) = match init_storage(&config).await? {
+    let storage = match init_storage(&config).await? {
         Some(storage) => storage,
         None => return Ok(()), // Return if no storage was returned (usually in case of validation).
     };
@@ -81,42 +81,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-
-    let address = format!("{}:{}", config.node.ip, config.node.port);
-    let desired_address = address.parse::<SocketAddr>()?;
-
-    let node_config = NodeConfig::new(
-        None,
-        config.node.kind,
-        desired_address,
-        config.p2p.min_peers,
-        config.p2p.max_peers,
-        config.p2p.beacons.clone(),
-        // Set sync intervals for peers.
-        Duration::from_secs(config.p2p.peer_sync_interval.into()),
-    )?;
-
-    let mut node = Node::new(node_config, storage.clone()).await?;
-
-    if let Some(limit) = config.storage.export {
-        let mut export_path = path.clone();
-        export_path.push("canon_blocks");
-
-        let limit = if limit == 0 { None } else { Some(limit) };
-
-        let now = std::time::Instant::now();
-        match export_canon_blocks(storage.clone(), limit, &export_path).await {
-            Ok(num_exported) => {
-                info!(
-                    "{} canon blocks exported to {} in {}ms",
-                    num_exported,
-                    export_path.display(),
-                    now.elapsed().as_millis()
-                );
-            }
-            Err(e) => error!("Couldn't export canon blocks to {}: {}", export_path.display(), e),
-        }
-    }
+    let mut node = init_node(&config, storage.clone()).await?;
 
     // Enable the sync layer.
     {
