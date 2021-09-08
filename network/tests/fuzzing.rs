@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::{MessageHeader, Payload, Version};
+use snarkos_network::{MessageHeader, NodeType, Payload, Version};
+use snarkvm_dpc::BlockHeaderHash;
 
 use rand::{distributions::Standard, thread_rng, Rng};
 use snarkos_storage::Digest;
@@ -53,8 +54,8 @@ fn corrupt_bytes(serialized: &[u8]) -> Vec<u8> {
 #[tokio::test]
 async fn fuzzing_zeroes_pre_handshake() {
     let node_setup = TestSetup {
+        node_type: NodeType::Beacon, // same rules for establishing connections and reading messages as a regular node, but lighter
         consensus_setup: None,
-        is_bootnode: true, // same rules for establishing connections and reading messages as a regular node, but lighter
         ..Default::default()
     };
     let node = test_node(node_setup).await;
@@ -70,8 +71,8 @@ async fn fuzzing_zeroes_pre_handshake() {
 #[tokio::test]
 async fn fuzzing_zeroes_post_handshake() {
     let node_setup = TestSetup {
+        node_type: NodeType::Beacon, // same rules for establishing connections and reading messages as a regular node, but lighter
         consensus_setup: None,
-        is_bootnode: true,
         ..Default::default()
     };
     let (node, mut fake_node) = handshaken_node_and_peer(node_setup).await;
@@ -86,8 +87,8 @@ async fn fuzzing_valid_header_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
     let node_setup = TestSetup {
+        node_type: NodeType::Beacon, // same rules for establishing connections and reading messages as a regular node, but lighter
         consensus_setup: None,
-        is_bootnode: true,
         ..Default::default()
     };
     let node = test_node(node_setup).await;
@@ -139,8 +140,8 @@ async fn fuzzing_pre_handshake() {
     // tracing_subscriber::fmt::init();
 
     let node_setup = TestSetup {
+        node_type: NodeType::Beacon, // same rules for establishing connections and reading messages as a regular node, but lighter
         consensus_setup: None,
-        is_bootnode: true,
         ..Default::default()
     };
     let node = test_node(node_setup).await;
@@ -543,7 +544,7 @@ async fn connection_request_spam() {
     wait_until!(3, node.peer_book.get_active_peer_count() >= max_peers as u32);
 
     wait_until!(
-        snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 * 2,
+        snarkos_network::HANDSHAKE_TIMEOUT_SECS as u64 * 2,
         node.peer_book.get_active_peer_count() == 0
     );
 }

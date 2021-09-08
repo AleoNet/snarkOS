@@ -44,7 +44,7 @@ pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
         Topology::Line => line(nodes).await,
         Topology::Ring => ring(nodes).await,
         Topology::Mesh => mesh(nodes).await,
-        Topology::Star => star(nodes),
+        Topology::Star => star(nodes).await,
     }
 }
 
@@ -92,13 +92,12 @@ async fn mesh(nodes: &mut Vec<Node>) {
 }
 
 /// Connects the network nodes in a star topology.
-fn star(nodes: &mut Vec<Node>) {
+async fn star(nodes: &mut Vec<Node>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().expect_local_addr();
 
-    // Start the rest of the nodes with the core node as the bootnode.
-    let bootnodes = vec![hub_address];
+    // Start the rest of the nodes with the core node at the center.
     for node in nodes.iter_mut().skip(1) {
-        node.config.bootnodes.store(Arc::new(bootnodes.clone()));
+        node.connect_to_addresses(&[hub_address]).await;
     }
 }

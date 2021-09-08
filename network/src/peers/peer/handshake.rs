@@ -168,7 +168,7 @@ impl Peer {
         let (mut reader, mut writer) = stream.into_split();
 
         let result = tokio::time::timeout(
-            Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
+            Duration::from_secs(crate::HANDSHAKE_TIMEOUT_SECS as u64),
             initiator_handshake(self.address, &our_version, &mut writer, &mut reader),
         )
         .await;
@@ -202,7 +202,7 @@ impl Peer {
         let (mut reader, mut writer) = stream.into_split();
 
         let result = tokio::time::timeout(
-            Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64),
+            Duration::from_secs(crate::HANDSHAKE_TIMEOUT_SECS as u64),
             responder_handshake(address, &our_version, &mut writer, &mut reader),
         )
         .await;

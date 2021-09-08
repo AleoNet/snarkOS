@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_network::{topology::calculate_density, Node};
+use snarkos_network::{topology::calculate_density, Node, NodeType};
 use snarkos_testing::{
     network::{
         test_node,
@@ -208,7 +208,7 @@ async fn star_converges_to_mesh() {
 
     // A bootnode will be necessary at the center of the star for peers to get propagated.
     let hub_setup = TestSetup {
-        is_bootnode: true,
+        node_type: NodeType::Beacon,
         ..setup()
     };
 
@@ -234,18 +234,18 @@ async fn binary_star_contact() {
     // their bootnodes.
 
     // Setup the bootnodes for each star topology.
-    let bootnode_setup = || TestSetup {
+    let beacon_setup = || TestSetup {
+        node_type: NodeType::Beacon,
         consensus_setup: None,
         peer_sync_interval: 1,
-        is_bootnode: true,
         ..Default::default()
     };
 
-    let bootnode_a = test_node(bootnode_setup()).await;
-    let bootnode_b = test_node(bootnode_setup()).await;
+    let beacon_a = test_node(beacon_setup()).await;
+    let beacon_b = test_node(beacon_setup()).await;
 
-    let ba = bootnode_a.expect_local_addr().to_string();
-    let bb = bootnode_b.expect_local_addr().to_string();
+    let ba = beacon_a.expect_local_addr().to_string();
+    let bb = beacon_b.expect_local_addr().to_string();
 
     // Create the nodes to be used as the leafs in the stars.
     let setup = || TestSetup {
@@ -258,9 +258,9 @@ async fn binary_star_contact() {
     let mut star_a_nodes = test_nodes(N - 1, setup).await;
     let mut star_b_nodes = test_nodes(N - 1, setup).await;
 
-    // Insert the bootnodes at the begining of the node lists.
-    star_a_nodes.insert(0, bootnode_a);
-    star_b_nodes.insert(0, bootnode_b);
+    // Insert the beacons at the begining of the node lists.
+    star_a_nodes.insert(0, beacon_a);
+    star_b_nodes.insert(0, beacon_b);
 
     // Create the star topologies.
     connect_nodes(&mut star_a_nodes, Topology::Star).await;
@@ -272,14 +272,14 @@ async fn binary_star_contact() {
     let mut nodes = star_a_nodes;
 
     // Single node to connect to a subset of N and K.
-    let bootnodes = vec![ba, bb];
+    let beacons = vec![ba, bb];
 
     let solo_setup = TestSetup {
         consensus_setup: None,
         peer_sync_interval: 1,
         min_peers: MIN_PEERS,
         max_peers: MAX_PEERS,
-        bootnodes,
+        beacons,
         ..Default::default()
     };
     let solo = test_node(solo_setup).await;

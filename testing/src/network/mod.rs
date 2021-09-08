@@ -96,42 +96,42 @@ impl Default for ConsensusSetup {
 
 #[derive(Clone)]
 pub struct TestSetup {
+    pub node_type: NodeType,
     pub node_id: u64,
     pub socket_address: SocketAddr,
     pub consensus_setup: Option<ConsensusSetup>,
     pub peer_sync_interval: u64,
     pub min_peers: u16,
     pub max_peers: u16,
-    pub is_bootnode: bool,
-    pub is_crawler: bool,
-    pub bootnodes: Vec<String>,
+    pub beacons: Vec<String>,
+    pub sync_providers: Vec<String>,
     pub network_enabled: bool,
 }
 
 impl TestSetup {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        node_type: NodeType,
         node_id: u64,
         socket_address: SocketAddr,
         consensus_setup: Option<ConsensusSetup>,
         peer_sync_interval: u64,
         min_peers: u16,
         max_peers: u16,
-        is_bootnode: bool,
-        is_crawler: bool,
-        bootnodes: Vec<String>,
+        beacons: Vec<String>,
+        sync_providers: Vec<String>,
         network_enabled: bool,
     ) -> Self {
         Self {
+            node_type,
             node_id,
             socket_address,
             consensus_setup,
             peer_sync_interval,
             min_peers,
             max_peers,
-            is_bootnode,
-            is_crawler,
-            bootnodes,
+            beacons,
+            sync_providers,
             network_enabled,
         }
     }
@@ -141,14 +141,15 @@ impl Default for TestSetup {
     fn default() -> Self {
         Self {
             node_id: SmallRng::from_entropy().gen(),
+            node_type: NodeType::Client,
+            node_id: u64::MAX,
             socket_address: "127.0.0.1:0".parse().unwrap(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
             min_peers: 1,
             max_peers: 100,
-            is_bootnode: false,
-            is_crawler: false,
-            bootnodes: vec![],
+            beacons: vec![],
+            sync_providers: vec![],
             network_enabled: true,
         }
     }
@@ -169,12 +170,12 @@ pub async fn test_consensus(setup: ConsensusSetup) -> snarkos_network::Sync {
 pub fn test_config(setup: TestSetup) -> Config {
     Config::new(
         Some(setup.node_id),
+        setup.node_type,
         setup.socket_address,
         setup.min_peers,
         setup.max_peers,
-        setup.bootnodes,
-        setup.is_bootnode,
-        setup.is_crawler,
+        setup.beacons,
+        setup.sync_providers,
         Duration::from_secs(setup.peer_sync_interval),
     )
     .unwrap()
