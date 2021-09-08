@@ -443,8 +443,6 @@ impl CLI for ConfigCli {
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[
         flag::NO_JSONRPC,
-        flag::IS_BOOTNODE,
-        flag::IS_MINER,
         flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
         flag::SQLITE,
