@@ -142,7 +142,6 @@ impl Default for TestSetup {
         Self {
             node_id: SmallRng::from_entropy().gen(),
             node_type: NodeType::Client,
-            node_id: u64::MAX,
             socket_address: "127.0.0.1:0".parse().unwrap(),
             consensus_setup: Some(Default::default()),
             peer_sync_interval: 600,
