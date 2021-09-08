@@ -18,7 +18,7 @@
 mod rpc_tests {
     use jsonrpc_core::{MetaIoHandler, Params, RemoteProcedure, RpcMethod};
     use snarkos_consensus::{get_block_reward, Consensus};
-    use snarkos_network::Node;
+    use snarkos_network::{Node, NodeType};
     use snarkos_rpc::*;
     use snarkos_testing::{
         network::{test_config, test_node, ConsensusSetup, TestSetup},
@@ -366,7 +366,7 @@ mod rpc_tests {
     async fn test_rpc_getnetworkgraph() {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let setup = TestSetup {
-            is_crawler: true,
+            node_type: NodeType::Crawler,
             peer_sync_interval: 1,
             min_peers: 2,
             consensus_setup: None,

@@ -65,7 +65,7 @@ pub const NOISE_TAG_LEN: usize = 16;
 
 /// The maximum amount of time in which a handshake with a regular node can conclude before dropping the
 /// connection; it should be no greater than the `peer_sync_interval`.
-pub const HANDSHAKE_PEER_TIMEOUT_SECS: u8 = 5;
+pub const HANDSHAKE_TIMEOUT_SECS: u8 = 5;
 /// The amount of time after which a peer will be considered inactive an disconnected from if they have
 /// not sent any messages in the meantime.
 pub const MAX_PEER_INACTIVITY_SECS: u8 = 30;
