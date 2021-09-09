@@ -16,7 +16,7 @@
 
 use anyhow::*;
 use chrono::Utc;
-use futures::{select, FutureExt};
+use futures::{select_biased, FutureExt};
 use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
@@ -154,7 +154,7 @@ impl Peer {
         });
 
         loop {
-            select! {
+            select_biased! {
                 message = receiver.recv().fuse() => {
                     if message.is_none() {
                         break;

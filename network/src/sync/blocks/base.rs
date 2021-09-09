@@ -16,7 +16,7 @@
 
 use std::{net::SocketAddr, time::Duration};
 
-use futures::{pin_mut, select, FutureExt};
+use futures::{pin_mut, select_biased, FutureExt};
 use snarkos_storage::Digest;
 use snarkvm_dpc::BlockHeaderHash;
 use tokio::{sync::mpsc, time::Instant};
@@ -116,7 +116,10 @@ impl SyncBase {
         loop {
             let timeout = tokio::time::sleep_until(end.min(moving_end)).fuse();
             pin_mut!(timeout);
-            select! {
+            select_biased! {
+                _ = timeout => {
+                    break;
+                }
                 msg = self.incoming.recv().fuse() => {
                     if msg.is_none() {
                         break;
@@ -127,9 +130,6 @@ impl SyncBase {
                     }
                     moving_end += Duration::from_secs(moving_timeout_sec);
                 },
-                _ = timeout => {
-                    break;
-                }
             }
         }
     }
