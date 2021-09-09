@@ -396,6 +396,12 @@ pub trait SyncStorage {
     /// Similar to `Storage::get_canon_blocks`, gets hashes of all blocks subject to `filter` and `limit` in filter-defined order. A maintenance function, not intended for general use.
     fn get_block_hashes(&mut self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>>;
 
+    fn store_peers(&mut self, peers: Vec<Peer>) -> Result<()>;
+
+    fn lookup_peers(&mut self, addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>>;
+
+    fn fetch_peers(&mut self) -> Result<Vec<Peer>>;
+
     /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
     fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError>;
 

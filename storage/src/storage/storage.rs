@@ -15,21 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::*;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
-use crate::{
-    Digest,
-    DigestTree,
-    FixMode,
-    SerialBlock,
-    SerialBlockHeader,
-    SerialRecord,
-    SerialTransaction,
-    TransactionLocation,
-    ValidatorError,
-};
+use crate::{Digest, DigestTree, FixMode, Peer, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, TransactionLocation, ValidatorError};
 
 /// Current state of a block in storage
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -199,6 +189,15 @@ pub trait Storage: Send + Sync {
 
     /// Similar to `Storage::get_canon_blocks`, gets hashes of all blocks subject to `filter` and `limit` in filter-defined order. A maintenance function, not intended for general use.
     async fn get_block_hashes(&self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>>;
+
+    /// Stores or updates a collection of [`Peer`]s
+    async fn store_peers(&self, peers: Vec<Peer>) -> Result<()>;
+
+    /// Looks up a series of [`Peer`]s based on socket address.
+    async fn lookup_peers(&self, addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>>;
+
+    /// Looks up all known [`Peer`]s.
+    async fn fetch_peers(&self) -> Result<Vec<Peer>>;
 
     /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
     async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError>;

@@ -57,6 +57,22 @@ impl Peer {
         }
     }
 
+    pub fn serialize(&self) -> snarkos_storage::Peer {
+        snarkos_storage::Peer {
+            address: self.address,
+            block_height: self.quality.block_height,
+            first_seen: self.quality.first_seen,
+            last_seen: self.quality.last_seen,
+            last_connected: self.quality.last_connected,
+            blocks_synced_to: self.quality.blocks_synced_to,
+            blocks_synced_from: self.quality.blocks_synced_from,
+            blocks_received_from: self.quality.blocks_received_from,
+            blocks_sent_to: self.quality.blocks_sent_to,
+            connection_attempt_count: self.quality.connection_attempt_count,
+            connection_success_count: self.quality.connected_count,
+        }
+    }
+
     pub fn judge_bad(&mut self) -> bool {
         let f = self.failures();
         // self.quality.rtt_ms > 1500 ||

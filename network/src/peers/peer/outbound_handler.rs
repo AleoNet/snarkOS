@@ -16,7 +16,6 @@
 
 use std::time::Instant;
 
-use snarkos_storage::SerialBlock;
 use tokio::sync::oneshot;
 
 use snarkos_metrics::{self as metrics, wrapped_mpsc};
@@ -28,7 +27,6 @@ use super::network::PeerIOHandle;
 pub(super) enum PeerAction {
     Disconnect,
     Send(Payload, Option<Instant>),
-    SendBlock(Box<SerialBlock>, u32), // block, height
     Get(oneshot::Sender<Peer>),
     QualityJudgement,
     CancelSync,
@@ -62,13 +60,6 @@ impl PeerHandle {
         self.sender.send(PeerAction::Send(payload, time_received)).await.ok();
     }
 
-    pub async fn send_block(&self, payload: SerialBlock, height: u32) {
-        self.sender
-            .send(PeerAction::SendBlock(Box::new(payload), height))
-            .await
-            .ok();
-    }
-
     pub async fn cancel_sync(&self) {
         self.sender.send(PeerAction::CancelSync).await.ok();
     }
@@ -99,6 +90,7 @@ impl Peer {
     ) -> Result<PeerResponse, NetworkError> {
         match message {
             PeerAction::Disconnect => Ok(PeerResponse::Disconnect),
+<<<<<<< HEAD
             PeerAction::SendBlock(block, height) => {
                 // check if they sent us the block recently
                 let block = block.serialize();
@@ -120,10 +112,25 @@ impl Peer {
                 debug!("Sent a '{}' message to {}", &message, self.address);
                 Ok(PeerResponse::None)
             }
+=======
+>>>>>>> 6883736b... wip
             PeerAction::Send(message, time_received) => {
-                if matches!(message, Payload::Ping(_)) {
-                    self.quality.expecting_pong = true;
-                    self.quality.last_ping_sent = Some(Instant::now());
+                match &message {
+                    Payload::Ping(_) => {
+                        self.quality.expecting_pong = true;
+                        self.quality.last_ping_sent = Some(Instant::now());    
+                    },
+                    Payload::Block(block, _) => {
+                        if self.block_received_cache.contains(&block[..]) {
+                            metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
+                            return Ok(PeerResponse::None);
+                        }
+                        self.quality.blocks_sent_to += 1;
+                    },
+                    Payload::SyncBlock(..) => {
+                        self.quality.blocks_synced_to += 1;
+                    },
+                    _ => (),
                 }
 
                 network.write_payload(&message).await.map_err(|e| {

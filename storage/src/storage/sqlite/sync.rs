@@ -47,7 +47,7 @@ fn read_static_blob<const S: usize>(row: &Row, index: usize) -> rusqlite::Result
 
 impl SqliteStorage {
     /// Counter used for tracking migrations, incremented on each schema change, and checked in [`migrate`] function below to update schema.
-    const SCHEMA_INDEX: u32 = 2;
+    const SCHEMA_INDEX: u32 = 3;
 
     fn migrate(&self, from: u32) -> Result<()> {
         if from == 0 {
@@ -119,6 +119,30 @@ impl SqliteStorage {
             );
             CREATE INDEX record_owner_lookup ON miner_records(owner);
             CREATE INDEX record_commitment_lookup ON miner_records(commitment);
+            ",
+            )?;
+        }
+
+        if from <= 2 {
+            self.conn.execute_batch(
+                r"
+            CREATE INDEX blocks_time_lookup ON blocks(time);
+            CREATE TABLE IF NOT EXISTS peers(
+                id INTEGER PRIMARY KEY,
+                address TEXT NOT NULL,
+                block_height INTEGER NOT NULL,
+                first_seen INTEGER,
+                last_seen INTEGER,
+                last_connected INTEGER,
+                blocks_synced_to INTEGER NOT NULL,
+                blocks_synced_from INTEGER NOT NULL,
+                blocks_received_from INTEGER NOT NULL,
+                blocks_sent_to INTEGER NOT NULL,
+                connection_attempt_count INTEGER NOT NULL,
+                connection_success_count INTEGER NOT NULL
+            );
+            CREATE UNIQUE INDEX peer_address_lookup ON peers(address);
+            CREATE INDEX peer_last_seen_lookup ON peers(last_seen);
             ",
             )?;
         }
@@ -966,6 +990,145 @@ impl SyncStorage for SqliteStorage {
             }
         };
         Ok(hashes)
+    }
+
+    fn store_peers(&mut self, peers: Vec<Peer>) -> Result<()> {
+        let mut stmt = self.conn.prepare_cached(
+            "
+            INSERT INTO peers (
+                address,
+                block_height,
+                first_seen,
+                last_seen,
+                last_connected,
+                blocks_synced_to,
+                blocks_synced_from,
+                blocks_received_from,
+                blocks_sent_to,
+                connection_attempt_count,
+                connection_success_count
+            )
+            VALUES (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?
+            )
+            ON CONFLICT(address)
+            DO UPDATE SET
+                block_height = excluded.block_height,
+                first_seen = excluded.first_seen,
+                last_seen = excluded.last_seen,
+                last_connected = excluded.last_connected,
+                blocks_synced_to = excluded.blocks_synced_to,
+                blocks_synced_from = excluded.blocks_synced_from,
+                blocks_received_from = excluded.blocks_received_from,
+                blocks_sent_to = excluded.blocks_sent_to,
+                connection_attempt_count = excluded.connection_attempt_count,
+                connection_success_count = excluded.connection_success_count
+        ",
+        )?;
+
+        for peer in peers {
+            stmt.execute(params![
+                peer.address.to_string(),
+                peer.block_height,
+                peer.first_seen.map(|x| x.naive_utc().timestamp()),
+                peer.last_seen.map(|x| x.naive_utc().timestamp()),
+                peer.last_connected.map(|x| x.naive_utc().timestamp()),
+                peer.blocks_synced_to,
+                peer.blocks_synced_from,
+                peer.blocks_received_from,
+                peer.blocks_sent_to,
+                peer.connection_attempt_count,
+                peer.connection_success_count,
+            ])?;
+        }
+        Ok(())
+    }
+
+    fn lookup_peers(&mut self, addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>> {
+        let mut out = vec![];
+        let mut stmt = self.conn.prepare_cached(
+            "
+            SELECT
+                block_height,
+                first_seen,
+                last_seen,
+                last_connected,
+                blocks_synced_to,
+                blocks_synced_from,
+                blocks_received_from,
+                blocks_sent_to,
+                connection_attempt_count,
+                connection_success_count
+            FROM peers
+            WHERE address = ?
+        ",
+        )?;
+        // todo: this is O(n) queries, but this isn't large-size input and convenient
+        for address in addresses {
+            let peer = stmt.query_row([address.to_string()], |row| {
+                Ok(Peer {
+                    address,
+                    block_height: row.get(0)?,
+                    first_seen: row.get::<_, Option<i64>>(1)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                    last_seen: row.get::<_, Option<i64>>(2)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                    last_connected: row.get::<_, Option<i64>>(3)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                    blocks_synced_to: row.get(4)?,
+                    blocks_synced_from: row.get(5)?,
+                    blocks_received_from: row.get(6)?,
+                    blocks_sent_to: row.get(7)?,
+                    connection_attempt_count: row.get(8)?,
+                    connection_success_count: row.get(9)?,
+                })
+            }).optional()?;
+            out.push(peer);
+        }
+        Ok(out)
+    }
+
+    fn fetch_peers(&mut self) -> Result<Vec<Peer>> {
+        let mut stmt = self.conn.prepare_cached(
+            "
+            SELECT
+                address,
+                block_height,
+                first_seen,
+                last_seen,
+                last_connected,
+                blocks_synced_to,
+                blocks_synced_from,
+                blocks_received_from,
+                blocks_sent_to,
+                connection_attempt_count,
+                connection_success_count
+            FROM peers
+        ",
+        )?;
+
+        let query = stmt.query_map([], |row| Ok(Peer {
+            address: row.get::<_, String>(0)?.parse().map_err(|_| rusqlite::Error::InvalidQuery)?,
+            block_height: row.get(1)?,
+            first_seen: row.get::<_, Option<i64>>(2)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+            last_seen: row.get::<_, Option<i64>>(3)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+            last_connected: row.get::<_, Option<i64>>(4)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+            blocks_synced_to: row.get(5)?,
+            blocks_synced_from: row.get(6)?,
+            blocks_received_from: row.get(7)?,
+            blocks_sent_to: row.get(8)?,
+            connection_attempt_count: row.get(9)?,
+            connection_success_count: row.get(10)?,
+        }))?;
+
+        Ok(query.collect::<Result<Vec<_>, rusqlite::Error>>()?)
     }
 
     fn validate(&mut self, _limit: Option<u32>, _fix_mode: FixMode) -> Vec<ValidatorError> {

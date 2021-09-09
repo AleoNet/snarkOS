@@ -65,6 +65,7 @@ impl Peer {
             }
             Payload::Block(block, height) => {
                 metrics::increment_counter!(inbound::BLOCKS);
+                self.quality.blocks_received_from += 1;
 
                 if node.sync().is_some() {
                     let node = node.clone();
@@ -97,6 +98,7 @@ impl Peer {
             }
             Payload::SyncBlock(block, height) => {
                 metrics::increment_counter!(inbound::SYNCBLOCKS);
+                self.quality.blocks_synced_from += 1;
 
                 if node.sync().is_some() {
                     let node = node.clone();

@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryInto,
-};
+use std::{collections::{HashMap, HashSet}, convert::TryInto, net::SocketAddr};
 
 use anyhow::*;
 use snarkvm_dpc::{
@@ -28,25 +25,7 @@ use snarkvm_dpc::{
 use snarkvm_utilities::{has_duplicates, FromBytes, ToBytes};
 use tracing::debug;
 
-use crate::{
-    key_value::{KeyValueColumn, KEY_CURR_CM_INDEX, KEY_CURR_MEMO_INDEX, KEY_CURR_SN_INDEX},
-    BlockFilter,
-    BlockOrder,
-    BlockStatus,
-    CanonData,
-    Digest,
-    FixMode,
-    KeyValueStorage,
-    SerialBlock,
-    SerialBlockHeader,
-    SerialRecord,
-    SerialTransaction,
-    SyncStorage,
-    TransactionLocation,
-    VMRecord,
-    Validator,
-    ValidatorError,
-};
+use crate::{BlockFilter, BlockOrder, BlockStatus, CanonData, Digest, FixMode, KeyValueStorage, Peer, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, SyncStorage, TransactionLocation, VMRecord, Validator, ValidatorError, key_value::{KeyValueColumn, KEY_CURR_CM_INDEX, KEY_CURR_MEMO_INDEX, KEY_CURR_SN_INDEX}};
 
 use super::KEY_BEST_BLOCK_NUMBER;
 
@@ -656,6 +635,19 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
             .collect::<Vec<(Digest, u32)>>();
         keys.sort_by(|(_, a), (_, b)| a.cmp(b));
         Ok(keys.into_iter().map(|(digest, _)| digest).collect())
+    }
+
+
+    fn store_peers(&mut self, _peers: Vec<Peer>) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn lookup_peers(&mut self, _addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>> {
+        unimplemented!()
+    }
+
+    fn fetch_peers(&mut self) -> Result<Vec<Peer>> {
+        unimplemented!()
     }
 
     fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {

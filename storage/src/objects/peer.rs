@@ -14,23 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod block;
-pub use block::*;
+use std::net::SocketAddr;
 
-pub mod block_header;
-pub use block_header::*;
+use chrono::{DateTime, Utc};
+use serde::{Serialize, Deserialize};
 
-pub mod record;
-pub use record::*;
 
-pub mod transaction_location;
-pub use transaction_location::*;
-
-pub mod transaction;
-pub use transaction::*;
-
-pub mod address;
-pub use address::*;
-
-pub mod peer;
-pub use peer::*;
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Peer {
+    pub address: SocketAddr,
+    pub block_height: u32,
+    pub first_seen: Option<DateTime<Utc>>,
+    pub last_seen: Option<DateTime<Utc>>,
+    pub last_connected: Option<DateTime<Utc>>,
+    pub blocks_synced_to: u32,
+    pub blocks_synced_from: u32,
+    pub blocks_received_from: u32,
+    pub blocks_sent_to: u32,
+    pub connection_attempt_count: u64,
+    pub connection_success_count: u64,
+}

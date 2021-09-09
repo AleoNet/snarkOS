@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{any::Any, fmt};
+use std::{any::Any, fmt, net::SocketAddr};
 
 use anyhow::*;
 use metrics::wrapped_mpsc;
@@ -24,23 +24,7 @@ use tracing::log::trace;
 
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
-use crate::{
-    BlockFilter,
-    BlockStatus,
-    CanonData,
-    Digest,
-    DigestTree,
-    FixMode,
-    ForkDescription,
-    SerialBlock,
-    SerialBlockHeader,
-    SerialRecord,
-    SerialTransaction,
-    Storage,
-    SyncStorage,
-    TransactionLocation,
-    ValidatorError,
-};
+use crate::{BlockFilter, BlockStatus, CanonData, Digest, DigestTree, FixMode, ForkDescription, Peer, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, Storage, SyncStorage, TransactionLocation, ValidatorError};
 
 enum Message {
     InsertBlock(SerialBlock),
@@ -72,6 +56,9 @@ enum Message {
     ResetLedger(Vec<Digest>, Vec<Digest>, Vec<Digest>, Vec<Digest>),
     GetCanonBlocks(Option<u32>),
     GetBlockHashes(Option<u32>, BlockFilter),
+    StorePeers(Vec<Peer>),
+    LookupPeers(Vec<SocketAddr>),
+    FetchPeers(),
     Validate(Option<u32>, FixMode),
     #[cfg(feature = "test")]
     StoreItem(KeyValueColumn, Vec<u8>, Vec<u8>),
@@ -135,6 +122,9 @@ impl fmt::Display for Message {
             Message::ResetLedger(_, _, _, _) => write!(f, "ResetLedger(..)"),
             Message::GetCanonBlocks(limit) => write!(f, "GetCanonBlocks({:?})", limit),
             Message::GetBlockHashes(limit, filter) => write!(f, "GetBlockHashes({:?}, {:?})", limit, filter),
+            Message::StorePeers(peers) => write!(f, "StorePeers({:?})", peers),
+            Message::LookupPeers(addresses) => write!(f, "LookupPeers({:?})", addresses),
+            Message::FetchPeers() => write!(f, "FetchPeers()"),
             Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
             #[cfg(feature = "test")]
             Message::StoreItem(col, key, value) => write!(f, "StoreItem({:?}, {:?}, {:?})", col, key, value),
@@ -202,6 +192,9 @@ impl<S: SyncStorage + 'static> Agent<S> {
             }
             Message::GetCanonBlocks(limit) => Box::new(self.inner.get_canon_blocks(limit)),
             Message::GetBlockHashes(limit, filter) => Box::new(self.inner.get_block_hashes(limit, filter)),
+            Message::StorePeers(peers) => Box::new(self.inner.store_peers(peers)),
+            Message::LookupPeers(addresses) => Box::new(self.inner.lookup_peers(addresses)),
+            Message::FetchPeers() => Box::new(self.inner.fetch_peers()),
             Message::Validate(limit, fix_mode) => Box::new(self.inner.validate(limit, fix_mode)),
             #[cfg(feature = "test")]
             Message::StoreItem(col, key, value) => Box::new(self.wrap(move |f| f.store_item(col, key, value))),
@@ -380,6 +373,18 @@ impl Storage for AsyncStorage {
 
     async fn get_block_hashes(&self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>> {
         self.send(Message::GetBlockHashes(limit, filter)).await
+    }
+
+    async fn store_peers(&self, peers: Vec<Peer>) -> Result<()> {
+        self.send(Message::StorePeers(peers)).await
+    }
+
+    async fn lookup_peers(&self, addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>> {
+        self.send(Message::LookupPeers(addresses)).await
+    }
+
+    async fn fetch_peers(&self) -> Result<Vec<Peer>> {
+        self.send(Message::FetchPeers()).await
     }
 
     async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {
