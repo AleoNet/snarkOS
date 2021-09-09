@@ -1,4 +1,4 @@
-Returns the network graph crawled by this node (if it is a bootnode).
+Returns the network graph crawled by this node (if it is a crawler).
 
 ### Arguments
 
@@ -20,7 +20,8 @@ None
 | `edges[i].source`                    | SocketAddr | One side of the crawled connection                                                        |
 | `edges[i].target`                    | SocketAddr | The other side of the crawled connection                                                  |
 | `vertices[i].addr`                   | SocketAddr | The recorded address of the crawled node                                                  |
-| `vertices[i].is_bootnode`            | bool       | Indicates whether the node is a bootnode                                                  |
+| `vertices[i].is_beacon`              | bool       | Indicates whether the node is a beacon                                                    |
+| `vertices[i].is_sync_provider`       | bool       | Indicates whether the node is a sync provider                                             |
 | `vertices[i].degree_centrality`      | u16        | The node's degree centrality, aka its connection count                                    |
 | `vertices[i].eigenvector_centrality` | f64        | The node's eigenvector centrality, indicates its relative importance in the network       |
 | `vertices[i].fiedler_value`          | f64        | The node's fiedler value, can be used to partition the network graph                      |

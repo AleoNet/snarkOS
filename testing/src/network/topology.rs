@@ -31,8 +31,7 @@ pub enum Topology {
 
 /// Connects the nodes in a given `Topology`.
 ///
-/// This function assumes the nodes have an established address but don't have their services
-/// started yet, as it uses the bootnodes to establish the connections between nodes.
+/// This function assumes the nodes have an established address.
 ///
 /// When connecting in a `Star`, the first node in the `nodes` will be used as the hub.
 pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
@@ -52,7 +51,7 @@ pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
 async fn line(nodes: &mut Vec<Node>) {
     let mut prev_node: Option<SocketAddr> = None;
 
-    // Start each node with the previous as a bootnode.
+    // Connect each node with the previous.
     for node in nodes {
         if let Some(addr) = prev_node {
             node.connect_to_addresses(&[addr]).await;

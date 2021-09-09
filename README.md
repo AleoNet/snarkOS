@@ -196,7 +196,6 @@ USAGE:
 
 FLAGS:
     -h, --help           Prints help information
-        --is-bootnode    Run the node as a bootnode (IP is hard coded in the protocol)
         --is-miner       Start mining blocks from this node
         --no-jsonrpc     Run the node without running the json rpc server
 

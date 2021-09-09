@@ -206,7 +206,7 @@ async fn star_converges_to_mesh() {
         ..Default::default()
     };
 
-    // A bootnode will be necessary at the center of the star for peers to get propagated.
+    // A beacon node will be necessary at the center of the star for peers to get propagated.
     let hub_setup = TestSetup {
         node_type: NodeType::Beacon,
         ..setup()
@@ -215,7 +215,7 @@ async fn star_converges_to_mesh() {
     // Create the regular nodes.
     let mut nodes = test_nodes(N - 1, setup).await;
 
-    // Insert the bootnode at the head of the list.
+    // Insert the beacon at the head of the list.
     nodes.insert(0, test_node(hub_setup).await);
 
     connect_nodes(&mut nodes, Topology::Star).await;
@@ -231,9 +231,9 @@ async fn star_converges_to_mesh() {
 #[tokio::test(flavor = "multi_thread")]
 async fn binary_star_contact() {
     // Two initally separate star topologies subsequently connected by a single node connecting to
-    // their bootnodes.
+    // the peer discovery nodes at their center.
 
-    // Setup the bootnodes for each star topology.
+    // Setup the beacons for each star topology.
     let beacon_setup = || TestSetup {
         node_type: NodeType::Beacon,
         consensus_setup: None,

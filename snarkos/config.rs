@@ -443,6 +443,7 @@ impl CLI for ConfigCli {
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[
         flag::NO_JSONRPC,
+        flag::IS_MINER,
         flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
         flag::SQLITE,
@@ -477,7 +478,6 @@ impl CLI for ConfigCli {
             "no-jsonrpc",
             "export-canon-blocks",
             "import-canon-blocks",
-            "is-bootnode",
             "is-miner",
             "ip",
             "port",

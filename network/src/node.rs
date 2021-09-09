@@ -265,7 +265,7 @@ impl Node {
                         //  all of our connected peers anyways.
 
                         // The order of preference for the sync node is as follows:
-                        //   1. Iterate (in declared order) through the sync_providers:
+                        //   1. Iterate (in declared order) through the sync providers:
                         //      a. Check if this node is connected to the specified sync provider in the peer book.
                         //      b. Select the specified sync provider as the sync node if this node is connected to it.
                         //   2. If this node is not connected to any sync provider,

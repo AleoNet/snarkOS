@@ -113,8 +113,8 @@ impl Node {
             }
         }
 
-        // Attempt to connect to a few random bootnodes if the node has no active
-        // connections or if it's a bootnode itself.
+        // Attempt to connect to a few random peer provider nodes if the node has no active
+        // connections or if it's a beacon itself.
         if (!self.config.is_sync_provider() && self.peer_book.get_active_peer_count() == 0) || self.config.is_beacon() {
             let random_beacons = self
                 .config
@@ -212,7 +212,6 @@ impl Node {
         // Local address must be known by now.
         let own_address = self.expect_local_addr();
 
-        // If this node is not a bootnode, attempt to satisfy the minimum number of peer connections.
         let random_peers = {
             trace!(
                 "Connecting to {} disconnected peers",
@@ -222,7 +221,7 @@ impl Node {
             // Obtain the collection of disconnected peers.
             let mut candidates = self.peer_book.disconnected_peers_snapshot();
 
-            // Bootnodes are connected to in a dedicated method.
+            // Peer discovery nodes are connected to in a dedicated method, so we exclude them here.
             let beacons = self.config.beacons();
             candidates.retain(|peer| peer.address != own_address && !beacons.contains(&peer.address));
 
@@ -263,7 +262,7 @@ impl Node {
 
     /// Broadcasts a `GetPeers` message to all connected peers to request for more peers.
     async fn broadcast_getpeers_requests(&self) {
-        // If the node is not a bootnode or a crawler, check if the request for peers is needed
+        // If the node is a client node, check if the request for peers is needed
         // based on the number of active connections.
         if self.config.is_client() {
             // Fetch the number of connected and connecting peers.
@@ -327,7 +326,7 @@ impl Node {
             .map(|peer| peer.address)
             .collect();
 
-        // Bootnodes apply less strict filtering rules if the set is empty by falling back on
+        // Beacons apply less strict filtering rules if the set is empty by falling back on
         // connected peers that may or may not be routable...
         let peers = if self.config.is_beacon() && strictly_filtered_peers.is_empty() {
             let filtered_peers: Vec<SocketAddr> = connected_peers

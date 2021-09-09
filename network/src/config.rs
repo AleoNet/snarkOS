@@ -65,8 +65,7 @@ impl Config {
         sync_provider_addresses: Vec<String>,
         peer_sync_interval: Duration,
     ) -> Result<Self, NetworkError> {
-        // Convert the given bootnodes into socket addresses.
-
+        // Convert the given seeded nodes into socket addresses.
         let beacons: Vec<SocketAddr> = beacon_addresses
             .into_iter()
             .flat_map(|addr| addr.parse().ok())
@@ -101,7 +100,7 @@ impl Config {
         self.sync_providers.load_full()
     }
 
-    /// Returns `true` if this node is a bootnode. Otherwise, returns `false`.
+    /// Returns `true` if this node is a sync provider node. Otherwise, returns `false`.
     #[inline]
     pub fn is_sync_provider(&self) -> bool {
         matches!(self.node_type, NodeType::SyncProvider)
@@ -113,7 +112,7 @@ impl Config {
         matches!(self.node_type, NodeType::Crawler)
     }
 
-    /// Returns `true` if this node is a plain node. Otherwise, returns `false`.
+    /// Returns `true` if this node is a plain client node. Otherwise, returns `false`.
     #[inline]
     pub fn is_client(&self) -> bool {
         matches!(self.node_type, NodeType::Client)
