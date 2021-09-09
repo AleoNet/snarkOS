@@ -16,7 +16,7 @@
 
 use snarkos_network::Node;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 pub enum Topology {
     /// Each node - except the last one - connects to the next one in a linear fashion.
