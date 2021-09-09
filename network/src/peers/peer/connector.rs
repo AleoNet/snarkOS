@@ -19,8 +19,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{select, FutureExt};
-use tokio::{net::TcpStream, sync::mpsc};
+use tokio::{net::TcpStream, sync::mpsc, time::timeout};
 
 use snarkos_metrics::{self as metrics, connections::*};
 
@@ -113,15 +112,17 @@ impl Peer {
         metrics::increment_gauge!(CONNECTING, 1.0);
         let _x = defer::defer(|| metrics::decrement_gauge!(CONNECTING, 1.0));
 
-        let tcp_stream;
-        select! {
-            stream = TcpStream::connect(self.address).fuse() => {
-                tcp_stream = stream?;
-            },
-            _ = tokio::time::sleep(Duration::from_secs(CONNECTION_TIMEOUT_SECS)).fuse() => {
-                return Err(NetworkError::Io(IoError::new(ErrorKind::TimedOut, "connection timed out")));
-            },
+        match timeout(
+            Duration::from_secs(CONNECTION_TIMEOUT_SECS),
+            TcpStream::connect(self.address),
+        )
+        .await
+        {
+            Ok(stream) => self.inner_handshake_initiator(stream?, our_version).await,
+            Err(_) => Err(NetworkError::Io(IoError::new(
+                ErrorKind::TimedOut,
+                "connection timed out",
+            ))),
         }
-        self.inner_handshake_initiator(tcp_stream, our_version).await
     }
 }
