@@ -20,7 +20,7 @@ use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};
 
-use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus, Version};
+use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, Version};
 
 use super::{network::PeerIOHandle, PeerAction};
 
@@ -80,7 +80,7 @@ impl Peer {
             event_target
                 .send(PeerEvent {
                     address: peer.address,
-                    data: PeerEventData::Disconnect(Box::new(peer), PeerStatus::Connected),
+                    data: PeerEventData::Disconnect(Box::new(peer)),
                 })
                 .await
                 .ok();

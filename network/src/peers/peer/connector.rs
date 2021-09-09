@@ -37,6 +37,14 @@ impl Peer {
             self.set_connecting();
             match self.inner_connect(node.version()).await {
                 Err(e) => {
+                    event_target
+                        .send(PeerEvent {
+                            address: self.address,
+                            data: PeerEventData::FailHandshake,
+                        })
+                        .await
+                        .ok();
+
                     self.fail();
                     if !e.is_trivial() {
                         error!(
@@ -96,12 +104,11 @@ impl Peer {
                     metrics::decrement_gauge!(CONNECTED, 1.0);
                 }
             }
-            let state = self.status;
             self.set_disconnected();
             event_target
                 .send(PeerEvent {
                     address: self.address,
-                    data: PeerEventData::Disconnect(Box::new(self), state),
+                    data: PeerEventData::Disconnect(Box::new(self)),
                 })
                 .await
                 .ok();
