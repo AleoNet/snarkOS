@@ -159,6 +159,6 @@ pub async fn create_test_consensus() -> Arc<snarkos_consensus::Consensus> {
         FIXTURE_VK.storage(),
         MemoryPool::new(),
     );
-    tokio::time::sleep(tokio::time::Duration::from_millis(25)).await; // plenty of time to let consensus setup genesis block
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await; // plenty of time to let consensus setup genesis block
     consensus
 }
