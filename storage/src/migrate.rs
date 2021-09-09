@@ -19,7 +19,10 @@ use anyhow::*;
 
 pub async fn migrate(from: &DynStorage, to: &DynStorage) -> Result<()> {
     let blocks = from.get_canon_blocks(None).await?;
-    let ledger_digests = from.get_ledger_digests().await?;
+    let mut ledger_digests = from.get_ledger_digests().await?;
+    if ledger_digests.len() == blocks.len() + 1 {
+        ledger_digests.remove(0); // pre-genesis ledger digest
+    }
     if blocks.len() != ledger_digests.len() {
         return Err(anyhow!(
             "canon, ledger digest lengths differed for migration -- corrupt DB?"
