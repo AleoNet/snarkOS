@@ -46,6 +46,10 @@ use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::{fs, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
+pub fn init_ephemeral_storage() -> anyhow::Result<DynStorage> {
+    Ok(Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral()?)))
+}
+
 pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>> {
     let mut path = config.node.dir.clone();
     path.push(&config.node.db);
@@ -222,7 +226,7 @@ pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<S
     Ok(sync)
 }
 
-pub async fn init_node(config: &Config, storage: Option<DynStorage>) -> anyhow::Result<Node> {
+pub async fn init_node(config: &Config, storage: DynStorage) -> anyhow::Result<Node> {
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
@@ -243,7 +247,7 @@ pub async fn init_node(config: &Config, storage: Option<DynStorage>) -> anyhow::
     Ok(node)
 }
 
-pub fn init_rpc(config: &Config, node: Node, storage: Option<DynStorage>) -> anyhow::Result<()> {
+pub fn init_rpc(config: &Config, node: Node, storage: DynStorage) -> anyhow::Result<()> {
     let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
         .parse()
         .expect("Invalid RPC server address!");
