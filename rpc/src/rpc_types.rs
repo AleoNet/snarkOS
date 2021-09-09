@@ -128,7 +128,7 @@ pub struct NodeInfo {
     /// The configured listening address of the node.
     pub listening_addr: SocketAddr,
 
-    /// Flag indicating if the node is a bootnode
+    /// Flag indicating if the node's type.
     pub node_type: NodeType,
 
     /// Flag indicating if the node is operating as a miner

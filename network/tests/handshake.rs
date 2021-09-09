@@ -257,7 +257,7 @@ async fn handshake_timeout_initiator_side() {
     };
     let node = test_node(setup).await;
 
-    // the node should start connecting to all the configured bootnodes
+    // the node should start connecting to all the configured beacons.
     wait_until!(3, node.peer_book.get_active_peer_count() != 0);
 
     // but since they won't reply, it should drop them after the handshake deadline
