@@ -2787,6 +2787,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "twox-hash",
 ]
 

@@ -158,5 +158,8 @@ version = "0.2"
 [dev-dependencies.snarkos-testing]
 path = "../testing"
 
+[dev-dependencies.tracing-subscriber]
+version = "0.2"
+
 [dev-dependencies.peak_alloc]
 version = "0.1.0"

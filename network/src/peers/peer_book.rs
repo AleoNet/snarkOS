@@ -30,7 +30,7 @@ use tokio::{net::TcpStream, sync::mpsc};
 
 use snarkos_metrics::{self as metrics, connections::*};
 
-use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle, PeerStatus};
+use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle};
 
 ///
 /// A data structure for storing the history of all peers with this node server.
@@ -64,7 +64,7 @@ impl PeerBookRef {
                         old_peer.disconnect().await;
                     }
                 }
-                PeerEventData::Disconnect(peer, status) => {
+                PeerEventData::Disconnect(peer) => {
                     self.connected_peers.remove(peer.address).await;
 
                     let queued_inbound_message_count = peer.queued_inbound_message_count.swap(0, Ordering::SeqCst);
@@ -74,9 +74,6 @@ impl PeerBookRef {
 
                     if self.disconnected_peers.insert(peer.address, *peer).await.is_none() {
                         metrics::increment_gauge!(DISCONNECTED, 1.0);
-                    }
-                    if status == PeerStatus::Connecting {
-                        self.pending_connections.fetch_sub(1, Ordering::SeqCst);
                     }
                 }
                 PeerEventData::FailHandshake => {

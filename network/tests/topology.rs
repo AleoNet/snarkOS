@@ -43,6 +43,42 @@ async fn test_nodes<F: Fn() -> TestSetup>(n: usize, setup: F) -> Vec<Node> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn reconnect_nodes() {
+    // tracing_subscriber::fmt::init();
+    let setup = || TestSetup {
+        consensus_setup: None,
+        peer_sync_interval: 999999,
+        max_peers: N as u16 * 4,
+        ..Default::default()
+    };
+    let nodes = test_nodes(N, setup).await;
+    let addresses = nodes.iter().map(|x| x.expect_local_addr()).collect::<Vec<_>>();
+
+    for _ in 0..(4 * N) {
+        for (i, node) in nodes.iter().enumerate() {
+            node.connect_to_addresses(&addresses[i + 1..]).await;
+        }
+        wait_until!(5, {
+            nodes
+                .iter()
+                .all(|node| node.peer_book.get_connected_peer_count() == N as u32 - 1)
+        });
+        for node in &nodes {
+            assert_eq!(node.peer_book.pending_connections(), 0);
+        }
+
+        for node in &nodes {
+            for address in &addresses {
+                node.disconnect_from_peer(*address).await;
+            }
+        }
+        wait_until!(5, {
+            nodes.iter().all(|node| node.peer_book.get_active_peer_count() == 0)
+        });
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn spawn_nodes_in_a_line() {
     let setup = || TestSetup {
         consensus_setup: None,

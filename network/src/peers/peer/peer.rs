@@ -32,26 +32,10 @@ use super::PeerQuality;
 use crate::{message::Payload, BlockCache, NetworkError, Node};
 
 use super::{network::*, outbound_handler::*};
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-pub enum PeerStatus {
-    Connected,
-    Connecting,
-    Disconnected,
-}
-
-impl Default for PeerStatus {
-    fn default() -> Self {
-        PeerStatus::Disconnected
-    }
-}
-
 /// A data structure containing information about a peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Peer {
     pub address: SocketAddr,
-    #[serde(skip)]
-    pub status: PeerStatus,
     pub quality: PeerQuality,
     pub is_bootnode: bool,
     #[serde(skip)]
@@ -74,7 +58,6 @@ impl Peer {
     pub fn new(address: SocketAddr, is_bootnode: bool) -> Self {
         Self {
             address,
-            status: PeerStatus::Disconnected,
             quality: Default::default(),
             is_bootnode,
             queued_inbound_message_count: Default::default(),
@@ -204,17 +187,14 @@ impl Peer {
 
     pub(super) fn set_connected(&mut self) {
         self.quality.connected();
-        self.status = PeerStatus::Connected;
     }
 
     pub(super) fn set_connecting(&mut self) {
         self.quality.see();
-        self.status = PeerStatus::Connecting;
     }
 
     pub(super) fn set_disconnected(&mut self) {
         self.quality.disconnected();
-        self.status = PeerStatus::Disconnected;
     }
 
     pub(super) fn set_routable(&mut self, is_routable: bool) {
