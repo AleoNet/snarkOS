@@ -43,7 +43,7 @@ impl Peer {
                         })
                         .await
                         .ok();
-
+metrics::increment_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
                     self.fail();
                     if !e.is_trivial() {
                         error!(
