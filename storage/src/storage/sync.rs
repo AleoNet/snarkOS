@@ -160,8 +160,8 @@ pub trait SyncStorage {
         let mut stack = vec![block_hash.clone()];
         while let Some(hash) = stack.pop() {
             let children = self.get_block_children(&hash)?;
-            stack.extend_from_slice(&children[..]);
             if !children.is_empty() {
+                stack.extend_from_slice(&children[..]);
                 nodes.insert(hash, children);
             }
         }
@@ -171,10 +171,7 @@ pub trait SyncStorage {
         let mut node_entries: HashSet<Digest> = nodes.keys().cloned().collect();
 
         let mut trees: HashMap<Digest, DigestTree> = HashMap::new();
-        loop {
-            if nodes.is_empty() {
-                break;
-            }
+        while !nodes.is_empty() {
             nodes.retain(|hash, children| {
                 let mut new_children = vec![];
                 let mut longest_tree_len = 0usize;
@@ -200,24 +197,9 @@ pub trait SyncStorage {
                 false
             });
         }
-        assert_eq!(nodes.len(), 0);
         assert_eq!(trees.len(), 1);
 
         Ok(trees.remove(block_hash).expect("missing block hash tree"))
-
-        // let mut out = DigestTree::Node(block_hash.clone(), vec![], 0);
-
-        // let mut out_children = Vec::with_capacity(children.len());
-        // let mut longest_tree_len = 0usize;
-        // for child in children {
-        //     let subtree = self.get_block_digest_tree(&child)?;
-        //     let len = subtree.longest_length() + 1;
-        //     if len > longest_tree_len {
-        //         longest_tree_len = len;
-        //     }
-        //     out_children.push(subtree);
-        // }
-        // Ok(DigestTree::Node(block_hash.clone(), out_children, longest_tree_len))
     }
 
     /// Stores the immediate children of `block_hash` in a cache.
