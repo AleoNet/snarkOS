@@ -40,6 +40,13 @@ pub struct PeerQuality {
     pub first_seen: Option<DateTime<Utc>>,
     pub last_connected: Option<DateTime<Utc>>,
     pub last_disconnected: Option<DateTime<Utc>>,
+
+    pub blocks_synced_to: u32,
+    pub blocks_synced_from: u32,
+    pub blocks_received_from: u32,
+    pub blocks_sent_to: u32,
+    /// The number of times we have attempted to connect to this peer.
+    pub connection_attempt_count: u64,
     /// The number of times we have connected to this peer.
     pub connected_count: u64,
     pub disconnected_count: u64,
