@@ -50,7 +50,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = init_node(&config, Some(storage.clone())).await?;
+    let mut node = init_node(&config, storage.clone()).await?;
 
     // Enable the sync layer.
     node.set_sync(sync);
@@ -63,7 +63,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
-        init_rpc(&config, node.clone(), Some(storage))?;
+        init_rpc(&config, node.clone(), storage)?;
     }
 
     // Start the network services

@@ -19,7 +19,7 @@ use snarkos::{
     config::{Config, ConfigCli},
     display::{initialize_logger, print_welcome},
     errors::NodeError,
-    init::{init_node, init_rpc},
+    init::{init_ephemeral_storage, init_node, init_rpc},
 };
 use snarkos_network::NodeType;
 
@@ -37,10 +37,12 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     print_welcome(&config);
 
+    let storage = init_ephemeral_storage()?;
+
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (RPC) needs to use it.
-    let node = init_node(&config, None).await?;
+    let node = init_node(&config, storage.clone()).await?;
 
     // Initialize metrics framework.
     node.initialize_metrics().await?;
@@ -50,7 +52,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
-        init_rpc(&config, node.clone(), None)?;
+        init_rpc(&config, node.clone(), storage)?;
     }
 
     // Start the network services.
