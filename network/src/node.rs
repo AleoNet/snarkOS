@@ -137,7 +137,7 @@ impl Node {
             terminator: Arc::new(AtomicBool::new(false)),
         }));
 
-        if node.config.is_of_type(NodeType::Crawler) {
+        if node.is_of_type(NodeType::Crawler) {
             // Safe since crawlers don't start the listener service.
             node.set_local_addr(node.config.desired_address);
 
@@ -146,6 +146,10 @@ impl Node {
         }
 
         Ok(node)
+    }
+
+    pub fn is_of_type(&self, t: NodeType) -> bool {
+        self.config.node_type == t
     }
 
     pub fn set_sync(&mut self, sync: Sync) {
@@ -205,7 +209,7 @@ impl Node {
             self.register_task(known_network_task);
         }
 
-        if !self.config.is_of_type(NodeType::Crawler) {
+        if !self.is_of_type(NodeType::Crawler) {
             let node_clone = self.clone();
             let state_tracking_task = task::spawn(async move {
                 loop {

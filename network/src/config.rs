@@ -106,10 +106,6 @@ impl Config {
         self.sync_providers.load_full()
     }
 
-    pub fn is_of_type(&self, t: NodeType) -> bool {
-        self.node_type == t
-    }
-
     /// Returns the minimum number of peers this node maintains a connection with.
     #[inline]
     pub fn minimum_number_of_connected_peers(&self) -> u16 {

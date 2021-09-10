@@ -60,7 +60,7 @@ impl Node {
 
         // Calculate the peer counts to disconnect and connect based on the node type and current
         // peer counts.
-        let (number_to_disconnect, number_to_connect) = if self.config.is_of_type(NodeType::Crawler) {
+        let (number_to_disconnect, number_to_connect) = if self.is_of_type(NodeType::Crawler) {
             // Crawlers disconnect down to the min peer count, this to free up room for
             // the next crawled peers...
             let number_to_disconnect = active_peer_count.saturating_sub(min_peers);
@@ -71,7 +71,7 @@ impl Node {
             let number_to_connect = crawling_capacity.saturating_sub(active_peer_count - number_to_disconnect);
 
             (number_to_disconnect, number_to_connect)
-        } else if self.config.is_of_type(NodeType::SyncProvider) || self.config.is_of_type(NodeType::Beacon) {
+        } else if self.is_of_type(NodeType::SyncProvider) || self.is_of_type(NodeType::Beacon) {
             // Beacons and sync providers disconnect down to 80% of their max to leave capacity open for new
             // connections.
             const CAPACITY_PERCENTAGE: f64 = 0.8;
@@ -96,7 +96,7 @@ impl Node {
         if number_to_disconnect != 0 {
             let mut current_peers = self.peer_book.connected_peers_snapshot().await;
 
-            if !self.config.is_of_type(NodeType::Client) {
+            if !self.is_of_type(NodeType::Client) {
                 // Beacons, sync providers and crawlers will disconnect from their oldest peers...
                 current_peers.sort_unstable_by_key(|peer| cmp::Reverse(peer.quality.last_connected));
             } else {
@@ -115,8 +115,8 @@ impl Node {
 
         // Attempt to connect to a few random beacons if the node has no active
         // connections or if it's a beacon itself.
-        if (!self.config.is_of_type(NodeType::SyncProvider) && self.peer_book.get_active_peer_count() == 0)
-            || self.config.is_of_type(NodeType::Beacon)
+        if (!self.is_of_type(NodeType::SyncProvider) && self.peer_book.get_active_peer_count() == 0)
+            || self.is_of_type(NodeType::Beacon)
         {
             let random_beacons = self
                 .config
@@ -227,14 +227,14 @@ impl Node {
             let beacons = self.config.beacons();
             candidates.retain(|peer| peer.address != own_address && !beacons.contains(&peer.address));
 
-            if !self.config.is_of_type(NodeType::Client) {
+            if !self.is_of_type(NodeType::Client) {
                 // Beacons, sync providers and crawlers prefer peers they haven't dialed in a while.
                 candidates.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
 
             let addr_iter = candidates.iter().map(|peer| peer.address);
 
-            if !self.config.is_of_type(NodeType::Client) {
+            if !self.is_of_type(NodeType::Client) {
                 addr_iter.take(count).collect()
             } else {
                 addr_iter.choose_multiple(&mut SmallRng::from_entropy(), count)
@@ -266,7 +266,7 @@ impl Node {
     async fn broadcast_getpeers_requests(&self) {
         // If the node is a client node, check if the request for peers is needed
         // based on the number of active connections.
-        if self.config.is_of_type(NodeType::Client) {
+        if self.is_of_type(NodeType::Client) {
             // Fetch the number of connected and connecting peers.
             let number_of_peers = self.peer_book.get_active_peer_count() as usize;
 
@@ -330,7 +330,7 @@ impl Node {
 
         // Beacons apply less strict filtering rules if the set is empty by falling back on
         // connected peers that may or may not be routable...
-        let peers = if self.config.is_of_type(NodeType::Beacon) && strictly_filtered_peers.is_empty() {
+        let peers = if self.is_of_type(NodeType::Beacon) && strictly_filtered_peers.is_empty() {
             let filtered_peers: Vec<SocketAddr> = connected_peers
                 .iter()
                 .filter(|peer| basic_filter(peer))
@@ -360,10 +360,12 @@ impl Node {
 
         // Make sure to include a sync provider in the addresses if this node is a beacon. In
         // future, sync provider addresses wouldn't be provided if their capacity is maxed out.
-        if self.config.is_of_type(NodeType::Beacon) {
+        if self.is_of_type(NodeType::Beacon) {
             if let Some(random_sync_provider) = self.config.sync_providers().choose(&mut SmallRng::from_entropy()) {
                 // Replace to maintain the size of the list.
-                peers[0] = *random_sync_provider;
+                if let Some(first) = peers.first_mut() {
+                    *first = *random_sync_provider;
+                }
             }
         }
 
