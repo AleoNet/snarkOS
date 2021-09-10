@@ -137,7 +137,7 @@ impl Node {
             terminator: Arc::new(AtomicBool::new(false)),
         }));
 
-        if node.config.is_crawler() {
+        if node.config.is_of_type(NodeType::Crawler) {
             // Safe since crawlers don't start the listener service.
             node.set_local_addr(node.config.desired_address);
 
@@ -205,7 +205,7 @@ impl Node {
             self.register_task(known_network_task);
         }
 
-        if !self.config.is_crawler() {
+        if !self.config.is_of_type(NodeType::Crawler) {
             let node_clone = self.clone();
             let state_tracking_task = task::spawn(async move {
                 loop {
