@@ -195,7 +195,7 @@ async fn star_converges_to_mesh() {
 #[tokio::test(flavor = "multi_thread")]
 async fn binary_star_contact() {
     // Two initally separate star topologies subsequently connected by a single node connecting to
-    // the peer discovery nodes at their center.
+    // the beacons at their center.
 
     // Setup the beacons for each star topology.
     let beacon_setup = || TestSetup {
