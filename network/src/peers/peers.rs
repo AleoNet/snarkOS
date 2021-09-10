@@ -358,12 +358,12 @@ impl Node {
             .copied()
             .collect();
 
-        // Make sure to include a sync provider in the addresses if this node is a peer discovery
-        // node. In future, sync provider addresses wouldn't be provided if their capacity is
-        // maxed out.
+        // Make sure to include a sync provider in the addresses if this node is a beacon. In
+        // future, sync provider addresses wouldn't be provided if their capacity is maxed out.
         if self.config.is_of_type(NodeType::Beacon) {
             if let Some(random_sync_provider) = self.config.sync_providers().choose(&mut SmallRng::from_entropy()) {
-                peers.push(*random_sync_provider);
+                // Replace to maintain the size of the list.
+                peers[0] = *random_sync_provider;
             }
         }
 
