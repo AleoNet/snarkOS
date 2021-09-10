@@ -27,9 +27,15 @@ use std::{
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NodeType {
-    Client, // Sometimes referred to as a "regular" node.
+    /// The default "regular" node.
+    Client,
+    /// Crawls the network to track the known network.
     Crawler,
-    Beacon, // Used for peer discovery.
+    /// Used for peer discovery, they are the entry point into the network.
+    Beacon,
+    /// Used for initial sync after joining the network.
+    ///
+    /// Sync provider addresses are shared by the beacons.
     SyncProvider,
 }
 
@@ -68,7 +74,7 @@ impl Config {
         // Convert the given seeded nodes into socket addresses.
         let beacons: Vec<SocketAddr> = beacon_addresses
             .into_iter()
-            .flat_map(|addr| addr.parse().ok())
+            .filter_map(|addr| addr.parse().ok())
             .collect();
 
         let sync_providers: Vec<SocketAddr> = sync_provider_addresses
@@ -100,28 +106,8 @@ impl Config {
         self.sync_providers.load_full()
     }
 
-    /// Returns `true` if this node is a sync provider node. Otherwise, returns `false`.
-    #[inline]
-    pub fn is_sync_provider(&self) -> bool {
-        matches!(self.node_type, NodeType::SyncProvider)
-    }
-
-    /// Returns `true` if this node is a crawler. Otherwise, returns `false`.
-    #[inline]
-    pub fn is_crawler(&self) -> bool {
-        matches!(self.node_type, NodeType::Crawler)
-    }
-
-    /// Returns `true` if this node is a plain client node. Otherwise, returns `false`.
-    #[inline]
-    pub fn is_client(&self) -> bool {
-        matches!(self.node_type, NodeType::Client)
-    }
-
-    /// Returns `true` if this node is a peer discovery node. Otherwise, returns `false`.
-    #[inline]
-    pub fn is_beacon(&self) -> bool {
-        matches!(self.node_type, NodeType::Beacon)
+    pub fn is_of_type(&self, t: NodeType) -> bool {
+        self.node_type == t
     }
 
     /// Returns the minimum number of peers this node maintains a connection with.
