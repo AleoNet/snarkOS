@@ -210,6 +210,7 @@ OPTIONS:
         --network <network-id>                   Specify the network id (default = 1) of the node
     -d, --path <path>                            Specify the node's storage path
     -p, --port <port>                            Specify the port the node is run on
+        --host <host>                            Specify the host with the port the node is run on
         --rpc-password <rpc-password>            Specify a password for rpc authentication
         --rpc-port <rpc-port>                    Specify the port the json rpc server is run on
         --rpc-username <rpc-username>            Specify a username for rpc authentication

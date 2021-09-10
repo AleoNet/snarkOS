@@ -25,6 +25,7 @@ use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
+use std::net::{ToSocketAddrs, SocketAddr::V4};
 
 /// Bootnodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
@@ -219,6 +220,7 @@ impl Config {
             "export-canon-blocks" => self.export_canon_blocks(clap::value_t!(arguments.value_of(*option), u32).ok()),
             "import-canon-blocks" => self.import_canon_blocks(arguments.value_of(option)),
             "ip" => self.ip(arguments.value_of(option)),
+            "host" => self.host(arguments.value_of(option)),
             "miner-address" => self.miner_address(arguments.value_of(option)),
             "mempool-interval" => self.mempool_interval(clap::value_t!(arguments.value_of(*option), u8).ok()),
             "max-peers" => self.max_peers(clap::value_t!(arguments.value_of(*option), u16).ok()),
@@ -295,6 +297,18 @@ impl Config {
         }
     }
 
+    fn host(&mut self, argument: Option<&str>) {
+        if let Some(host) = argument {
+            let mut address_iter = host.to_socket_addrs().unwrap();
+            if let V4(socket_address)  = address_iter.next().unwrap() {
+                let mut ip_and_port: Vec<String> = socket_address.to_string().split(':')
+                    .map(|s| s.to_string()).collect();
+                self.node.port = ip_and_port.pop().unwrap().parse::<u16>().unwrap();
+                self.node.ip = ip_and_port.pop().unwrap();
+            }
+        }
+    }
+
     fn path(&mut self, argument: Option<&str>) {
         if let Some(path) = argument {
             self.node.db = path.into();
@@ -304,7 +318,14 @@ impl Config {
     fn connect(&mut self, argument: Option<&str>) {
         if let Some(bootnodes) = argument {
             let sanitize_bootnodes = bootnodes.replace(&['[', ']', ' '][..], "");
-            let bootnodes: Vec<String> = sanitize_bootnodes.split(',').map(|s| s.to_string()).collect();
+            let bootnodes: Vec<String> = sanitize_bootnodes.split(',')
+                .map(|sa| sa.to_socket_addrs()
+                    .unwrap()
+                    .filter(|f| f.is_ipv4())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>())
+                .flatten()
+                .collect::<Vec<String>>();
             self.p2p.bootnodes = bootnodes;
         }
     }
@@ -420,6 +441,7 @@ impl CLI for ConfigCli {
         option::IP,
         option::PORT,
         option::PATH,
+        option::HOST,
         option::CONNECT,
         option::EXPORT_CANON_BLOCKS,
         option::IMPORT_CANON_BLOCKS,
@@ -449,6 +471,7 @@ impl CLI for ConfigCli {
             "is-crawler",
             "ip",
             "port",
+            "host",
             "path",
             "connect",
             "miner-address",

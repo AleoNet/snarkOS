@@ -37,6 +37,13 @@ pub const PORT: OptionType = (
     &[],
 );
 
+pub const HOST: OptionType = (
+    "[host] --host=[host] 'Specify the host with the port the node is run on'",
+    &[],
+    &[],
+    &[],
+);
+
 pub const CONNECT: OptionType = (
     "[connect] --connect=[ip] 'Specify one or more node ip addresses to connect to on startup'",
     &[],
