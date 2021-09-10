@@ -31,7 +31,7 @@ pub enum CliError {
     #[error("A crawler node can't also be a miner")]
     MinerCrawler,
 
-    #[error("The peer discovery node can't also be a miner")]
+    #[error("The beacon node can't also be a miner")]
     MinerBeacon,
 
     #[error("The sync provider node can't also be a miner")]

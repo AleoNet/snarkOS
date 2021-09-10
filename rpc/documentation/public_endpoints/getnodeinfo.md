@@ -8,7 +8,7 @@ None
 
 |     Parameter    |     Type      |                  Description                  |
 |:----------------:|:-------------:|:---------------------------------------------:|
-| `node_type`      | NodeType      | Flag indicating if the node type              |
+| `node_type`      | NodeType      | Flag indicating the node type                 |
 | `is_miner`       | bool          | Flag indicating if the node is a miner        |
 | `is_syncing`     | bool          | Flag indicating if the node currently syncing |
 | `launched`       | timestamp     | The timestamp of when the node was launched   |

@@ -100,7 +100,7 @@ async fn beacon_peer_propagation() {
             && node_charlie.peer_book.get_active_peer_count() == 2
     };
 
-    // Make sure B and C connect => becon propagates peers (without `is_routable` check in this
+    // Make sure B and C connect => beacon propagates peers (without `is_routable` check in this
     // case).
     wait_until!(5, triangle_is_formed());
 }

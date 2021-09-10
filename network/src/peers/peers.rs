@@ -72,21 +72,21 @@ impl Node {
 
             (number_to_disconnect, number_to_connect)
         } else if self.config.is_of_type(NodeType::SyncProvider) || self.config.is_of_type(NodeType::Beacon) {
-            // Bootnodes disconnect down to 80% of their max to leave capacity open for new
+            // Beacons and sync providers disconnect down to 80% of their max to leave capacity open for new
             // connections.
-            const BOOTNODE_CAPACITY_PERCENTAGE: f64 = 0.8;
-            let bootnode_capacity = (BOOTNODE_CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
+            const CAPACITY_PERCENTAGE: f64 = 0.8;
+            let capacity = (CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
 
             (
-                // Bootnodes disconnect down to 80% of their max to leave capacity open for new
+                // Beacons and sync providers disconnect down to 80% of their max to leave capacity open for new
                 // connections...
-                active_peer_count.saturating_sub(bootnode_capacity),
+                active_peer_count.saturating_sub(capacity),
                 // ...and don't connect to any peers on their own once above `0` peers.
                 0,
             )
         } else {
             (
-                // Non-bootnodes disconnect if above the max peer count...
+                // Other nodes disconnect if above the max peer count...
                 active_peer_count.saturating_sub(max_peers),
                 // ...and connect if below the min peer count.
                 min_peers.saturating_sub(active_peer_count),
@@ -97,7 +97,7 @@ impl Node {
             let mut current_peers = self.peer_book.connected_peers_snapshot().await;
 
             if !self.config.is_of_type(NodeType::Client) {
-                // Bootnodes and crawlers will disconnect from their oldest peers...
+                // Beacons, sync providers and crawlers will disconnect from their oldest peers...
                 current_peers.sort_unstable_by_key(|peer| cmp::Reverse(peer.quality.last_connected));
             } else {
                 // ...while regular nodes from the ones most recently connected to.
@@ -113,7 +113,7 @@ impl Node {
             }
         }
 
-        // Attempt to connect to a few random peer provider nodes if the node has no active
+        // Attempt to connect to a few random beacons if the node has no active
         // connections or if it's a beacon itself.
         if (!self.config.is_of_type(NodeType::SyncProvider) && self.peer_book.get_active_peer_count() == 0)
             || self.config.is_of_type(NodeType::Beacon)
@@ -223,12 +223,12 @@ impl Node {
             // Obtain the collection of disconnected peers.
             let mut candidates = self.peer_book.disconnected_peers_snapshot();
 
-            // Peer discovery nodes are connected to in a dedicated method, so we exclude them here.
+            // Beacons are connected to in a dedicated method, so we exclude them here.
             let beacons = self.config.beacons();
             candidates.retain(|peer| peer.address != own_address && !beacons.contains(&peer.address));
 
             if !self.config.is_of_type(NodeType::Client) {
-                // Bootnodes and crawlers prefer peers they haven't dialed in a while.
+                // Beacons, sync providers and crawlers prefer peers they haven't dialed in a while.
                 candidates.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
 

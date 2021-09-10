@@ -11,7 +11,7 @@ snarkOS downloads, verifies, and stores the history of valid blocks and transact
 ## Peer Discovery
 
 When a node joins the network for the first time, it needs to populate a list of active peers in the network.
-In order to bootstrap peer discovery, snarkOS includes a set of optional specialised beacon nodes. Once connected, these provide an initial set of peers which includes the address of a sync provider. The sync provider will supply the node with an initial sync of the chainstate.
+In order to bootstrap peer discovery, snarkOS includes a set of optional specialised "beacon" nodes. Once connected, these provide an initial set of peers which includes the address of a sync provider. The sync provider will supply the node with an initial sync of the chainstate.
 To allow users flexibility, snarkOS provides allows users to configure the initial set of nodes in the configuration file,
 or as a input via a command-line flag.
 
@@ -20,7 +20,7 @@ This processes starts by asking peers for more connected nodes in the network wi
 followed by attempts to establish a connection with each newly discovered peer.
 
 Upon success, snarkOS will store the new peer address to allow it to connect directly with this peer in the future,
-without needing to use peer discovery nodes to startup in the future.
+without needing to use beacons to startup in the future.
 
 ## Connecting to Peers
 
