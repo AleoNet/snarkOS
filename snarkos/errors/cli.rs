@@ -28,14 +28,8 @@ pub enum CliError {
     #[error("TomlDeError: {0}")]
     TomlDeError(#[from] toml::de::Error),
 
-    #[error("A crawler node can't also be a miner")]
-    MinerCrawler,
-
-    #[error("The beacon node can't also be a miner")]
-    MinerBeacon,
-
-    #[error("The sync provider node can't also be a miner")]
-    MinerSyncProvider,
+    #[error("Only client nodes can run with mining enabled")]
+    CantMine,
 
     #[error("The minimum or maximum value for peer count is invalid")]
     PeerCountInvalid,
