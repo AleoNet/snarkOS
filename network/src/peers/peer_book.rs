@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    future::Future,
     net::SocketAddr,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -23,7 +24,6 @@ use std::{
     time::Instant,
 };
 
-use futures::Future;
 use mpmc_map::MpmcMap;
 use rand::{prelude::IteratorRandom, rngs::SmallRng, SeedableRng};
 use tokio::{net::TcpStream, sync::mpsc};

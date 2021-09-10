@@ -16,7 +16,6 @@
 
 use anyhow::*;
 use chrono::Utc;
-use futures::{select_biased, FutureExt};
 use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
@@ -137,8 +136,10 @@ impl Peer {
         });
 
         loop {
-            select_biased! {
-                message = receiver.recv().fuse() => {
+            tokio::select! {
+                biased;
+
+                message = receiver.recv() => {
                     if message.is_none() {
                         break;
                     }
@@ -148,7 +149,7 @@ impl Peer {
                         PeerResponse::None => (),
                     }
                 },
-                data = read_receiver.recv().fuse() => {
+                data = read_receiver.recv() => {
                     if data.is_none() {
                         break;
                     }
