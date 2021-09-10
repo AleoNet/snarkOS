@@ -422,9 +422,7 @@ impl Config {
         if self.miner.is_miner {
             match self.node.kind {
                 NodeType::Client => {}
-                NodeType::Crawler => return Err(CliError::MinerCrawler),
-                NodeType::Beacon => return Err(CliError::MinerBeacon),
-                NodeType::SyncProvider => return Err(CliError::MinerSyncProvider),
+                NodeType::Crawler | NodeType::Beacon | NodeType::SyncProvider => return Err(CliError::CantMine),
             }
         }
 
