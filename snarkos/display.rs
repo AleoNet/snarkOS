@@ -103,11 +103,7 @@ fn render_welcome(config: &Config) -> String {
             output += &format!("Starting a client node on {}.\n", network).bold().to_string();
         }
         NodeType::Crawler => output += &format!("Starting a crawler node on {}.\n", network).bold().to_string(),
-        NodeType::Beacon => {
-            output += &format!("Starting a beacon node on {}.\n", network)
-                .bold()
-                .to_string()
-        }
+        NodeType::Beacon => output += &format!("Starting a beacon node on {}.\n", network).bold().to_string(),
         NodeType::SyncProvider => {
             output += &format!("Starting a sync provider node on {}.\n", network)
                 .bold()
