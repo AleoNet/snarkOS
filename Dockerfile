@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:18.04 AS builder
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
@@ -42,8 +42,31 @@ RUN set -eux ; \
     rm -rf /var/lib/apt/lists/*;
 
 WORKDIR /usr/src/snarkOS
+
 COPY . .
 
 RUN cargo build --release
 
-CMD ["./target/release/snarkos"]
+FROM ubuntu:18.04
+
+SHELL ["/bin/bash", "-c"]
+
+VOLUME ["/aleo/data"]
+
+RUN set -ex && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o DPkg::Options::=--force-confold && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /aleo/{bin,data} && \
+    mkdir -p /aleo/data/params/{git,registry} && \
+    mkdir -p /usr/local/cargo/git/checkouts/snarkvm-f1160780ffe17de8/ef32edc/parameters/src/ && \
+    mkdir -p /usr/local/cargo/registry/src/github.com-1ecc6299db9ec823/snarkvm-parameters-0.7.9/src/ && \
+    ln -s /aleo/data/params/git /usr/local/cargo/git/checkouts/snarkvm-f1160780ffe17de8/ef32edc/parameters/src/testnet1 && \
+    ln -s /aleo/data/params/registry /usr/local/cargo/registry/src/github.com-1ecc6299db9ec823/snarkvm-parameters-0.7.9/src/testnet1
+
+COPY --from=builder /usr/src/snarkOS/target/release/snarkos /aleo/bin/
+
+CMD ["bash", "-c", "/aleo/bin/snarkos -d /aleo/data"]
