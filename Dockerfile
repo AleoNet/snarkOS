@@ -49,17 +49,23 @@ RUN cargo build --release
 
 FROM ubuntu:18.04
 
+SHELL ["/bin/bash", "-c"]
+
+VOLUME ["/aleo/data"]
+
 RUN set -ex && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o DPkg::Options::=--force-confold && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /aleo/{bin,data} && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /aleo/{bin,data} && \
+    mkdir -p /aleo/data/params/{git,registry} && \
     mkdir -p /usr/local/cargo/git/checkouts/snarkvm-f1160780ffe17de8/ef32edc/parameters/src/ && \
-    ln -s /aleo/data/params /usr/local/cargo/git/checkouts/snarkvm-f1160780ffe17de8/ef32edc/parameters/src/testnet1
+    mkdir -p /usr/local/cargo/registry/src/github.com-1ecc6299db9ec823/snarkvm-parameters-0.7.9/src/ && \
+    ln -s /aleo/data/params/git /usr/local/cargo/git/checkouts/snarkvm-f1160780ffe17de8/ef32edc/parameters/src/testnet1 && \
+    ln -s /aleo/data/params/registry /usr/local/cargo/registry/src/github.com-1ecc6299db9ec823/snarkvm-parameters-0.7.9/src/testnet1
 
 COPY --from=builder /usr/src/snarkOS/target/release/snarkos /aleo/bin/
 
