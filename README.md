@@ -15,6 +15,7 @@
     * [Option 1 - Download snarkOS](#option-1---download-snarkos)
     * [Option 2 - Install from Crates.io](#option-2---install-from-cratesio)
     * [Option 3 - Build from Source Code](#option-3---build-from-source-code)
+    * [Option 4 - Build from Source Code and run on a Docker container](#option-4---build-from-source-code-and-run-ib-a-Docker-container)
 * [3. Usage Guide](#3-usage-guide)
     * [3.1 Connecting to the Aleo Network](#31-connecting-to-the-aleo-network)
     * [3.2 Command Line Interface](#32-command-line-interface)
@@ -40,11 +41,11 @@ enables applications to verify and store state in a publicly verifiable manner.
 
 [mac_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/mac-pass-sm.png
 [mac_badge]: https://img.shields.io/badge/download-testnet1_for_mac-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[0].name&style=for-the-badge
-[mac_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.12/aleo-testnet1-v1.3.12-x86_64-apple-darwin.zip
+[mac_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.14/aleo-testnet1-v1.3.14-x86_64-apple-darwin.zip
 
 [linux_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/linux-pass-sm.png
 [linux_badge]: https://img.shields.io/badge/download-testnet1_for_linux-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[1].name&style=for-the-badge
-[linux_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.12/aleo-testnet1-v1.3.12-x86_64-unknown-linux-gnu.zip
+[linux_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.14/aleo-testnet1-v1.3.14-x86_64-unknown-linux-gnu.zip
 
 [windows_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/windows-pass-sm.png
 [windows_badge]: https://img.shields.io/badge/download-coming_soon-orange?style=for-the-badge
@@ -144,27 +145,31 @@ To start a snarkOS client node, run:
 snarkos
 ```
 
-<!--
-### 2.2c Build with Docker
+### Option 4 - Build from Source Code and run on a Docker container
+
+
+Start by cloning this repository:
+```bash
+git clone https://github.com/AleoHQ/snarkOS --depth 1
+```
+
+Then install Docker and build the container:
 
 #### Docker build
 ```bash
-docker build -t snarkos:latest .
-```
-or
-```bash
-docker-compose build
+docker build --rm -t aleohq/snarkos:latest .
 ```
 
 #### Docker run
 ``` bash
-docker run -d -p 14131:14131 --name snarkos snarkos
+docker run -d -p 4131:4131 --name snarkos aleohq/snarkos:latest
 ```
-or
+
+#### Devnet (local) 
+
 ```bash
-docker-compose up
+docker-compose -p snarkos up -d
 ```
--->
 
 ## 3. Usage Guide
 
@@ -180,8 +185,7 @@ To start a mining node, run:
 snarkos --is-miner --miner-address {ALEO_ADDRESS}
 ```
 
-To run a node with custom settings, refer to the full list of options and flags available
-in the CLI.
+To run a node with custom settings, refer to the full list of options and flags available in the CLI.
 
 ### 3.2 Command Line Interface
 

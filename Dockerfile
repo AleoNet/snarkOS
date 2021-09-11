@@ -69,4 +69,4 @@ RUN set -ex && \
 
 COPY --from=builder /usr/src/snarkOS/target/release/snarkos /aleo/bin/
 
-CMD ["/aleo/bin/snarkos -d /aleo/data"]
+CMD ["bash", "-c", "/aleo/bin/snarkos -d /aleo/data"]
