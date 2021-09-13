@@ -135,25 +135,12 @@ impl SyncAggro {
                                 }
                             };
 
-                            let blocks: IndexSet<_> = {
-                                let received_hashes = received_hashes.read().await;
-                                let hashes = block_locator_hashes.read().await;
-                                hashes
-                                    .hashes
-                                    .iter()
-                                    .filter(|x| !received_hashes.contains(&x.0[..]))
-                                    .cloned()
-                                    .chain(
-                                        hashes_trimmed
-                                            .into_iter()
-                                            .zip(early_block_states.iter())
-                                            .filter(|(_, status)| {
-                                                matches!(status, snarkos_storage::BlockStatus::Unknown)
-                                            })
-                                            .map(|(hash, _)| BlockHeaderHash(hash.bytes().unwrap())),
-                                    )
-                                    .collect()
-                            };
+                            let blocks: Vec<_> = hashes_trimmed
+                                .into_iter()
+                                .zip(early_block_states.iter())
+                                .filter(|(_, status)| matches!(status, snarkos_storage::BlockStatus::Unknown))
+                                .map(|(hash, _)| BlockHeaderHash(hash.bytes().unwrap()))
+                                .collect();
                             if blocks.is_empty() {
                                 return;
                             }
