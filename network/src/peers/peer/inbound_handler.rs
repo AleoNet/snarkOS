@@ -175,10 +175,8 @@ impl Peer {
                     if sync.is_empty() {
                         // An empty `Sync` is unexpected, as `GetSync` requests are only
                         // sent to peers that declare a greater block height.
-                        warn!("{} doesn't have sync blocks to share", source);
-                        if let Some(peer) = node.peer_book.get_peer_handle(source) {
-                            peer.fail().await;
-                        }
+                        // They can happen due to aggro sync ignoring canon during sync for better fork resolution
+                        trace!("{} doesn't have sync blocks to share", source);
                     } else {
                         trace!("Received {} sync block hashes from {}", sync.len(), source);
                         let node = node.clone();
