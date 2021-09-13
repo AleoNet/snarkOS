@@ -175,11 +175,11 @@ impl Node {
             .map(|x| -> Digest { x.0.into() })
             .enumerate()
         {
-            let block = self.storage.get_block(&hash).await?;
-            let height = match self.storage.get_block_state(&block.header.hash()).await? {
+            let height = match self.storage.get_block_state(&hash).await? {
                 BlockStatus::Committed(h) => Some(h as u32),
                 _ => None,
             };
+            let block = self.storage.get_block(&hash).await?;
 
             // Only stop the clock on internal RTT for the last block in the response.
             let time_received = if i == crate::MAX_BLOCK_SYNC_COUNT as usize - 1 {
