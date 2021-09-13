@@ -219,6 +219,11 @@ impl Node {
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| anyhow!("invalid block header size in locator hash"))?;
 
+        if sync_hashes.is_empty() {
+            trace!("warning: no sync hashes found");
+            return Ok(());
+        }
+
         // send a `Sync` message to the connected peer.
         self.peer_book
             .send_to(remote_address, Payload::Sync(sync_hashes), time_received)
