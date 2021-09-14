@@ -46,7 +46,6 @@ pub(super) enum ConsensusMessage {
     CreatePartialTransaction(CreatePartialTransactionRequest),
     ForceDecommit(Vec<u8>),
     FastForward(),
-    ScanForks(),
     #[cfg(feature = "test")]
     Reset(),
 }

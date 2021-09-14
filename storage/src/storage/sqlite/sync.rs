@@ -599,6 +599,32 @@ impl SyncStorage for SqliteStorage {
         Ok(out)
     }
 
+    fn scan_forks(&mut self, scan_depth: u32) -> Result<Vec<(Digest, Digest)>> {
+        let mut stmt = self.conn.prepare_cached(
+            r"
+            WITH RECURSIVE
+                children(parent, sub, length) AS (
+                    SELECT NULL, (select hash from blocks where canon_height = (select max(canon_height) from blocks)), 0
+                    UNION ALL
+                    SELECT blocks.hash, blocks.previous_block_hash, children.length + 1 FROM blocks
+                    INNER JOIN children
+                    WHERE blocks.hash = children.sub AND blocks.canon_height IS NOT NULL AND length <= ?
+                )
+                SELECT b.previous_block_hash, b.hash FROM children
+                INNER JOIN blocks b ON b.previous_block_hash = children.sub AND b.hash != children.parent
+                WHERE children.length > 0
+                GROUP BY children.parent
+                HAVING count(b.id) >= 1
+                ORDER BY length;
+        ",
+        )?;
+
+        let out = stmt
+            .query_map([scan_depth], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<(Digest, Digest)>>>()?;
+        Ok(out)
+    }
+
     fn get_transaction_location(&mut self, transaction_id: &Digest) -> Result<Option<TransactionLocation>> {
         self.conn
             .query_row(

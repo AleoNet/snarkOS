@@ -32,24 +32,6 @@ impl ConsensusInner {
             self.commit_block(&hash, &block).await?;
         }
 
-        // scan for forks
-        // let forks = self.scan_forks().await?;
-        // for (canon, fork_child) in forks {
-        //     let canon_height = match self.storage.get_block_state(&canon).await? {
-        //         BlockStatus::Committed(n) => n,
-        //         _ => continue,
-        //     };
-        //     let fork_blocks = self.storage.longest_child_path(&fork_child).await?;
-        //     debug!(
-        //         "fork detected @ {}/{} -- starts at {}, goes for {} blocks, ending at {}",
-        //         canon_height,
-        //         canon,
-        //         fork_child,
-        //         fork_blocks.len(),
-        //         fork_blocks.last().unwrap()
-        //     );
-        // }
-
         if let Err(e) = self.try_to_fast_forward().await {
             match e {
                 ConsensusError::InvalidBlock(e) => debug!("invalid block in initial fast-forward: {}", e),
@@ -125,9 +107,6 @@ impl ConsensusInner {
                 ConsensusMessage::FastForward() => {
                     let out = self.try_to_fast_forward().await;
                     response.send(Box::new(out)).ok();
-                }
-                ConsensusMessage::ScanForks() => {
-                    response.send(Box::new(self.scan_forks().await)).ok();
                 }
                 #[cfg(feature = "test")]
                 ConsensusMessage::Reset() => {

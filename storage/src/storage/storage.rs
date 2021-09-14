@@ -139,6 +139,9 @@ pub trait Storage: Send + Sync {
         oldest_fork_threshold: usize,
     ) -> Result<Vec<Digest>>;
 
+    /// scans uncommitted blocks with a known path to the canon chain for forks
+    async fn scan_forks(&self, scan_depth: u32) -> Result<Vec<(Digest, Digest)>>;
+
     /// Find hashes to provide for a syncing node given `block_locator_hashes`.
     async fn find_sync_blocks(&self, block_locator_hashes: &[Digest], block_count: usize) -> Result<Vec<Digest>>;
 

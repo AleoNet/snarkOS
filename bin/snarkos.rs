@@ -224,7 +224,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
         info!("Loaded Ledger");
 
         if config.storage.scan_for_forks {
-            consensus.scan_forks().await?;
+            storage
+                .scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32)
+                .await?;
         }
 
         if let Some(import_path) = config.storage.import {
