@@ -19,17 +19,10 @@ use anyhow::*;
 
 pub async fn migrate(from: &DynStorage, to: &DynStorage) -> Result<()> {
     let blocks = from.get_canon_blocks(None).await?;
-    let ledger_digests = from.get_ledger_digests().await?;
-    if blocks.len() != ledger_digests.len() {
-        return Err(anyhow!(
-            "canon, ledger digest lengths differed for migration -- corrupt DB?"
-        ));
-    }
 
     // transfer blocks
-    for (block, digest) in blocks.into_iter().zip(ledger_digests.into_iter()) {
+    for block in blocks {
         to.insert_block(&block).await?;
-        to.commit_block(&block.header.hash(), digest).await?;
     }
 
     // transfer miner records
