@@ -27,8 +27,6 @@ use crate::{
 };
 use anyhow::*;
 use snarkos_storage::{
-    BlockFilter,
-    BlockOrder,
     BlockStatus,
     Digest,
     DynStorage,
@@ -63,41 +61,6 @@ pub struct ConsensusInner {
 }
 
 impl ConsensusInner {
-    /// scans uncommitted blocks with a known path to the canon chain for forks
-    async fn scan_forks(&mut self) -> Result<Vec<(Digest, Digest)>> {
-        let canon_hashes = self
-            .storage
-            .get_block_hashes(
-                Some(crate::OLDEST_FORK_THRESHOLD as u32),
-                BlockFilter::CanonOnly(BlockOrder::Descending),
-            )
-            .await?;
-
-        if canon_hashes.len() < 2 {
-            // windows will panic if len < 2
-            return Ok(vec![]);
-        }
-
-        let mut known_forks = vec![];
-
-        for canon_hashes in canon_hashes.windows(2) {
-            // windows will ignore last block (furthest down), so we pull one extra above
-            let target_hash = &canon_hashes[1];
-            let ignore_child_hash = &canon_hashes[0];
-            let children = self.storage.get_block_children(target_hash).await?;
-            if children.len() == 1 && &children[0] == ignore_child_hash {
-                continue;
-            }
-            for child in children {
-                if &child != ignore_child_hash {
-                    known_forks.push((target_hash.clone(), child));
-                }
-            }
-        }
-
-        Ok(known_forks)
-    }
-
     /// Adds entry to memory pool if valid in the current ledger.
     pub(crate) fn insert_into_mempool(
         &mut self,

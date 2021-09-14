@@ -23,6 +23,7 @@ use tracing::{debug, trace};
 use crate::key_value::KeyValueColumn;
 use crate::{
     BlockFilter,
+    BlockOrder,
     BlockStatus,
     CanonData,
     Digest,
@@ -290,6 +291,35 @@ pub trait SyncStorage {
         block_locator_hashes.push(hash);
 
         Ok(block_locator_hashes)
+    }
+
+    /// scans uncommitted blocks with a known path to the canon chain for forks
+    fn scan_forks(&mut self, scan_depth: u32) -> Result<Vec<(Digest, Digest)>> {
+        let canon_hashes = self.get_block_hashes(Some(scan_depth), BlockFilter::CanonOnly(BlockOrder::Descending))?;
+
+        if canon_hashes.len() < 2 {
+            // windows will panic if len < 2
+            return Ok(vec![]);
+        }
+
+        let mut known_forks = vec![];
+
+        for canon_hashes in canon_hashes.windows(2) {
+            // windows will ignore last block (furthest down), so we pull one extra above
+            let target_hash = &canon_hashes[1];
+            let ignore_child_hash = &canon_hashes[0];
+            let children = self.get_block_children(target_hash)?;
+            if children.len() == 1 && &children[0] == ignore_child_hash {
+                continue;
+            }
+            for child in children {
+                if &child != ignore_child_hash {
+                    known_forks.push((target_hash.clone(), child));
+                }
+            }
+        }
+
+        Ok(known_forks)
     }
 
     /// Find hashes to provide for a syncing node given `block_locator_hashes`.

@@ -57,6 +57,7 @@ enum Message {
     GetBlockDigestTree(Digest),
     GetBlockChildren(Digest),
     GetBlockLocatorHashes(Vec<Digest>, usize), // points of interest, oldest_fork_threshold
+    ScanForks(u32),
     FindSyncBlocks(Vec<Digest>, usize),
     GetTransactionLocation(Digest),
     GetTransaction(Digest),
@@ -107,6 +108,7 @@ impl fmt::Display for Message {
                 "GetBlockLocatorHashes({:?}, {})",
                 canon_depth_limit, oldest_fork_threshold
             ),
+            Message::ScanForks(depth) => write!(f, "ScanForks({})", depth),
             Message::FindSyncBlocks(hashes, max_block_count) => {
                 write!(f, "FindSyncBlocks(")?;
                 for hash in hashes {
@@ -181,6 +183,7 @@ impl<S: SyncStorage + 'static> Agent<S> {
                 self.inner
                     .get_block_locator_hashes(points_of_interest, oldest_fork_threshold),
             ),
+            Message::ScanForks(depth) => Box::new(self.inner.scan_forks(depth)),
             Message::FindSyncBlocks(hashes, block_count) => Box::new(self.inner.find_sync_blocks(hashes, block_count)),
             Message::GetTransactionLocation(transaction_id) => {
                 Box::new(self.inner.get_transaction_location(&transaction_id))
@@ -314,6 +317,10 @@ impl Storage for AsyncStorage {
             oldest_fork_threshold,
         ))
         .await
+    }
+
+    async fn scan_forks(&self, scan_depth: u32) -> Result<Vec<(Digest, Digest)>> {
+        self.send(Message::ScanForks(scan_depth)).await
     }
 
     async fn find_sync_blocks(&self, block_locator_hashes: &[Digest], block_count: usize) -> Result<Vec<Digest>> {
