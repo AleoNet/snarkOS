@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_payloads_with_hashes() {
-        let hashes = (0u8..10).map(|i| Digest::from(vec![i; 32])).collect::<Vec<_>>();
+        let hashes = (0u8..10).map(|i| Digest::from([i; 32])).collect::<Vec<_>>();
 
         for payload in &[
             Payload::GetBlocks(hashes.clone()),
