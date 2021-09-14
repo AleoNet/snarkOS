@@ -628,7 +628,7 @@ async fn validate_block_transactions(
                         warn!(
                             "Can't get the block number for tx {}! The block locator entry for hash {} is missing",
                             hex::encode(tx.id),
-                            BlockHeaderHash(tx_location.block_hash.bytes::<32>().unwrap())
+                            tx_location.block_hash
                         );
 
                         if [FixMode::Testnet1TxLocations, FixMode::Everything].contains(&fix_mode) {

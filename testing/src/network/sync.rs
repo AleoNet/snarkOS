@@ -26,7 +26,7 @@ use crate::{
 
 use snarkos_network::message::*;
 
-use snarkvm_dpc::{block_header_hash::BlockHeaderHash, testnet1::instantiated::Testnet1Transaction, Block};
+use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
 #[cfg(test)]
 use snarkvm_utilities::ToBytes;
 
@@ -73,8 +73,8 @@ async fn block_initiator_side() {
         matches!(payload, Payload::GetSync(..))
     });
 
-    let block_1_header_hash = BlockHeaderHash::new(BLOCK_1_HEADER_HASH.to_vec());
-    let block_2_header_hash = BlockHeaderHash::new(BLOCK_2_HEADER_HASH.to_vec());
+    let block_1_header_hash = BLOCK_1_HEADER_HASH.clone();
+    let block_2_header_hash = BLOCK_2_HEADER_HASH.clone();
 
     let block_header_hashes = vec![block_1_header_hash.clone(), block_2_header_hash.clone()];
 

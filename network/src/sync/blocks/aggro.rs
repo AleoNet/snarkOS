@@ -19,7 +19,6 @@ use std::{sync::Arc, time::Duration};
 use crate::{Cache, Node, Payload, Peer, SyncBase, SyncInbound};
 use anyhow::*;
 use snarkos_storage::Digest;
-use snarkvm_dpc::BlockHeaderHash;
 use tokio::{
     sync::{mpsc, RwLock},
     time::Instant,
@@ -31,7 +30,7 @@ pub struct SyncAggro {
 }
 
 struct BlockLocatorHashes {
-    hashes: Vec<BlockHeaderHash>,
+    hashes: Vec<Digest>,
     last_update: Instant,
 }
 
@@ -42,7 +41,7 @@ impl SyncAggro {
         (new, sender)
     }
 
-    async fn send_sync_messages(&mut self, nodes: Vec<(Peer, Vec<BlockHeaderHash>)>) -> Result<usize> {
+    async fn send_sync_messages(&mut self, nodes: Vec<(Peer, Vec<Digest>)>) -> Result<usize> {
         info!("requested block information from {} peers", nodes.len());
         let mut future_set = vec![];
 
@@ -138,7 +137,7 @@ impl SyncAggro {
                                 .into_iter()
                                 .zip(early_block_states.iter())
                                 .filter(|(_, status)| matches!(status, snarkos_storage::BlockStatus::Unknown))
-                                .map(|(hash, _)| BlockHeaderHash(hash.bytes().unwrap()))
+                                .map(|(hash, _)| hash)
                                 .collect();
                             if blocks.is_empty() {
                                 return;
@@ -146,14 +145,9 @@ impl SyncAggro {
                             debug!("requesting {} sync blocks from {}", blocks.len(), peer);
 
                             if let Some(peer) = node.peer_book.get_peer_handle(peer) {
-                                let request: Vec<BlockHeaderHash> = blocks.into_iter().collect();
-                                peer.expecting_sync_blocks(request.len() as u32).await;
-                                peer.send_payload(Payload::GetBlocks(request), None).await;
-                                peer.send_payload(
-                                    Payload::GetSync(vec![BlockHeaderHash(last_hash.bytes().unwrap())]),
-                                    None,
-                                )
-                                .await;
+                                peer.expecting_sync_blocks(blocks.len() as u32).await;
+                                peer.send_payload(Payload::GetBlocks(blocks), None).await;
+                                peer.send_payload(Payload::GetSync(vec![last_hash]), None).await;
                             }
                         });
                     }

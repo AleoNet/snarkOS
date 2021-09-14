@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::BlockHeaderHash;
-
 use std::{fmt, net::SocketAddr};
+
+use snarkos_storage::Digest;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {
@@ -64,13 +64,13 @@ pub enum Payload {
     #[doc = include_str!("../../documentation/network_messages/block.md")]
     Block(Vec<u8>, Option<u32>),
     #[doc = include_str!("../../documentation/network_messages/get_blocks.md")]
-    GetBlocks(Vec<BlockHeaderHash>),
+    GetBlocks(Vec<Digest>),
     #[doc = include_str!("../../documentation/network_messages/get_memory_pool.md")]
     GetMemoryPool,
     #[doc = include_str!("../../documentation/network_messages/get_peers.md")]
     GetPeers,
     #[doc = include_str!("../../documentation/network_messages/get_sync.md")]
-    GetSync(Vec<BlockHeaderHash>),
+    GetSync(Vec<Digest>),
     #[doc = include_str!("../../documentation/network_messages/memory_pool.md")]
     MemoryPool(Vec<Vec<u8>>),
     #[doc = include_str!("../../documentation/network_messages/peers.md")]
@@ -80,7 +80,7 @@ pub enum Payload {
     #[doc = include_str!("../../documentation/network_messages/pong.md")]
     Pong,
     #[doc = include_str!("../../documentation/network_messages/sync.md")]
-    Sync(Vec<BlockHeaderHash>),
+    Sync(Vec<Digest>),
     #[doc = include_str!("../../documentation/network_messages/sync_block.md")]
     SyncBlock(Vec<u8>, Option<u32>),
     #[doc = include_str!("../../documentation/network_messages/transaction.md")]

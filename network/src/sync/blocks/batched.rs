@@ -22,7 +22,7 @@ use hash_hasher::{HashBuildHasher, HashedMap, HashedSet};
 use rand::{prelude::SliceRandom, rngs::SmallRng, SeedableRng};
 use snarkos_storage::Digest;
 use snarkvm_algorithms::crh::double_sha256;
-use snarkvm_dpc::{BlockHeader, BlockHeaderHash};
+use snarkvm_dpc::BlockHeader;
 use tokio::sync::mpsc;
 
 /// Efficient but slow and fork-prone sync method that operates in distributed batches.
@@ -189,10 +189,6 @@ impl SyncBatched {
         for (addr, request) in peer_block_requests {
             if let Some(peer) = self.base.node.peer_book.get_peer_handle(addr) {
                 sent += request.len();
-                let request: Vec<BlockHeaderHash> = request
-                    .into_iter()
-                    .map(|x| BlockHeaderHash(x.bytes::<32>().unwrap()))
-                    .collect();
                 future_set.push(async move {
                     peer.expecting_sync_blocks(request.len() as u32).await;
                     peer.send_payload(Payload::GetBlocks(request), None).await;

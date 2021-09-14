@@ -15,12 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::{message::*, Node, Version};
+use snarkos_storage::Digest;
 use snarkos_testing::{
     network::{test_node, write_message_to_stream, TestSetup},
     wait_until,
 };
-
-use snarkvm_dpc::block_header_hash::BlockHeaderHash;
 
 use std::time::Duration;
 
@@ -185,13 +184,13 @@ async fn reject_non_version_messages_before_handshake() {
 
     // GetBlock
     let mut peer_stream = TcpStream::connect(node.expect_local_addr()).await.unwrap();
-    let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
+    let block_hash = Digest::from([0u8; 32]);
     write_message_to_stream(Payload::GetBlocks(vec![block_hash]), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
     // GetSync
     let mut peer_stream = TcpStream::connect(node.expect_local_addr()).await.unwrap();
-    let block_hash = BlockHeaderHash::new([0u8; 32].to_vec());
+    let block_hash = Digest::from([0u8; 32]);
     write_message_to_stream(Payload::GetSync(vec![block_hash]), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 
@@ -223,7 +222,7 @@ async fn reject_non_version_messages_before_handshake() {
 
     // Sync
     let mut peer_stream = TcpStream::connect(node.expect_local_addr()).await.unwrap();
-    let block_hash = BlockHeaderHash::new(vec![0u8; 32]);
+    let block_hash = Digest::from([0u8; 32]);
     write_message_to_stream(Payload::Sync(vec![block_hash]), &mut peer_stream).await;
     assert_node_rejected_message(&node, &mut peer_stream).await;
 

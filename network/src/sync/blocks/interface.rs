@@ -24,7 +24,6 @@ use snarkos_storage::{BlockStatus, Digest, VMBlock};
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, Transaction},
     Block,
-    BlockHeaderHash,
 };
 
 use snarkos_consensus::error::ConsensusError;
@@ -166,7 +165,7 @@ impl Node {
     pub(crate) async fn received_get_blocks(
         &self,
         remote_address: SocketAddr,
-        header_hashes: Vec<BlockHeaderHash>,
+        header_hashes: Vec<Digest>,
         time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
         for (i, hash) in header_hashes
@@ -205,7 +204,7 @@ impl Node {
     pub(crate) async fn received_get_sync(
         &self,
         remote_address: SocketAddr,
-        block_locator_hashes: Vec<BlockHeaderHash>,
+        block_locator_hashes: Vec<Digest>,
         time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
         let block_locator_hashes = block_locator_hashes.into_iter().map(|x| x.0.into()).collect::<Vec<_>>();
@@ -213,11 +212,7 @@ impl Node {
         let sync_hashes = self
             .storage
             .find_sync_blocks(&block_locator_hashes[..], crate::MAX_BLOCK_SYNC_COUNT as usize)
-            .await?
-            .into_iter()
-            .map(|x| x.bytes::<32>().map(BlockHeaderHash))
-            .collect::<Option<Vec<_>>>()
-            .ok_or_else(|| anyhow!("invalid block header size in locator hash"))?;
+            .await?;
 
         // send a `Sync` message to the connected peer.
         self.peer_book
@@ -228,7 +223,7 @@ impl Node {
     }
 
     /// A peer has sent us their chain state.
-    pub(crate) async fn received_sync(&self, remote_address: SocketAddr, block_hashes: Vec<BlockHeaderHash>) {
+    pub(crate) async fn received_sync(&self, remote_address: SocketAddr, block_hashes: Vec<Digest>) {
         let sender = self.master_dispatch.read().await;
         if let Some(sender) = &*sender {
             sender
