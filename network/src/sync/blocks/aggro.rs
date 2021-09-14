@@ -92,7 +92,6 @@ impl SyncAggro {
         let node = self.base.node.clone();
         self.base
             .receive_messages(15, 3, |msg| {
-                metrics::decrement_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
                 match msg {
                     SyncInbound::BlockHashes(peer, hashes) => {
                         debug!("received {} sync hashes from {}", hashes.len(), peer);
