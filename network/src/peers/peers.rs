@@ -365,9 +365,7 @@ impl Node {
 
         // Beacons apply less strict filtering rules if the set is empty by falling back on
         // connected peers that may or may not be routable...
-        let peers = if (self.is_of_type(NodeType::SyncProvider) || self.is_of_type(NodeType::Beacon))
-            && strictly_filtered_peers.is_empty()
-        {
+        let peers = if self.is_of_type(NodeType::Beacon) && strictly_filtered_peers.is_empty() {
             let filtered_peers: Vec<SocketAddr> = connected_peers
                 .iter()
                 .filter(|peer| basic_filter(peer))
