@@ -32,11 +32,8 @@ use std::{fs, path::PathBuf};
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BEACONS: &[&str] = &[]; // "192.168.0.1:4130"
 // FIXME: setup peer discovery node addresses.
-pub const TESTNET_BEACONS: &[&str] = &[];
-
-pub const MAINNET_SYNC_PROVIDERS: &[&str] = &[];
-// TODO: these are the current "bootnodes".
-pub const TESTNET_SYNC_PROVIDERS: &[&str] = &[
+// Setting the old bootnodes as beacons ensures backwards compaibility during the transition.
+pub const TESTNET_BEACONS: &[&str] = &[
     "50.18.83.123:4131",
     "50.18.246.201:4131",
     "159.89.152.247:4131",
@@ -49,6 +46,9 @@ pub const TESTNET_SYNC_PROVIDERS: &[&str] = &[
     "206.189.80.245:4131",
     "178.128.18.3:4131",
 ];
+
+pub const MAINNET_SYNC_PROVIDERS: &[&str] = &[];
+pub const TESTNET_SYNC_PROVIDERS: &[&str] = &[];
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
