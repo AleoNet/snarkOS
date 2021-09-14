@@ -18,7 +18,6 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{Cache, Node, Payload, Peer, SyncBase, SyncInbound};
 use anyhow::*;
-use indexmap::IndexSet;
 use snarkos_storage::Digest;
 use snarkvm_dpc::BlockHeaderHash;
 use tokio::{

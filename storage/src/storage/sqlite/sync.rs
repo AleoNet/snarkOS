@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::convert::TryInto;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+};
 
 use rusqlite::{params, OptionalExtension, Row, ToSql};
 use snarkvm_dpc::{AleoAmount, MerkleRootHash, Network, PedersenMerkleRootHash, ProofOfSuccinctWork};
@@ -26,6 +29,7 @@ use crate::{
     BlockFilter,
     BlockOrder,
     CanonData,
+    DigestTree,
     FixMode,
     SerialRecord,
     SerialTransaction,
@@ -517,6 +521,68 @@ impl SyncStorage for SqliteStorage {
             .query_map([block_hash], |row| row.get(0))?
             .collect::<rusqlite::Result<Vec<Digest>>>()?;
         Ok(out)
+    }
+
+    fn get_block_digest_tree(&mut self, block_hash: &Digest) -> Result<DigestTree> {
+        let mut nodes: HashMap<Digest, Vec<Digest>> = HashMap::new();
+        let mut stmt = self.conn.prepare_cached(
+            r"
+            WITH RECURSIVE
+                children(parent, sub, length) AS (
+                    SELECT ?, NULL, 0 as length
+                    UNION ALL
+                    SELECT blocks.hash, blocks.previous_block_hash, children.length + 1 FROM blocks
+                    INNER JOIN children
+                    WHERE blocks.previous_block_hash = children.parent
+                )
+                SELECT * FROM children
+                WHERE length > 0
+                ORDER BY length;
+        ",
+        )?;
+        let out = stmt
+            .query_map([block_hash], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<(Digest, Digest)>>>()?;
+        for (hash, parent_hash) in out {
+            nodes.entry(parent_hash).or_insert_with(Vec::new).push(hash);
+        }
+
+        // only our base case
+        if nodes.is_empty() {
+            return Ok(DigestTree::Leaf(block_hash.clone()));
+        }
+        let mut node_entries: HashSet<Digest> = nodes.keys().cloned().collect();
+
+        let mut trees: HashMap<Digest, DigestTree> = HashMap::new();
+        while !nodes.is_empty() {
+            nodes.retain(|hash, children| {
+                let mut new_children = vec![];
+                let mut longest_tree_len = 0usize;
+                for child in children {
+                    if node_entries.contains(child) {
+                        return true;
+                    }
+                    if let Some(tree) = trees.remove(child) {
+                        let len = tree.longest_length() + 1;
+                        if len > longest_tree_len {
+                            longest_tree_len = len;
+                        }
+                        new_children.push(tree);
+                    } else {
+                        new_children.push(DigestTree::Leaf(child.clone()));
+                    }
+                }
+                trees.insert(
+                    hash.clone(),
+                    DigestTree::Node(hash.clone(), new_children, longest_tree_len),
+                );
+                node_entries.remove(hash);
+                false
+            });
+        }
+        assert_eq!(trees.len(), 1);
+
+        Ok(trees.remove(block_hash).expect("missing block hash tree"))
     }
 
     fn get_block_children(&mut self, hash: &Digest) -> Result<Vec<Digest>> {
