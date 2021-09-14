@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_dpc::BlockHeaderHash;
+use snarkos_storage::Digest;
 
 use crate::message::{Payload, Version};
 use payload_capnp::{
@@ -215,14 +215,14 @@ fn deserialize_block(block: block::Reader<'_>, is_sync: bool) -> capnp::Result<P
     Ok(payload)
 }
 
-fn deserialize_block_hashes(hashes: BlockHashes<'_>) -> capnp::Result<Vec<BlockHeaderHash>> {
+fn deserialize_block_hashes(hashes: BlockHashes<'_>) -> capnp::Result<Vec<Digest>> {
     let mut vec = Vec::with_capacity(hashes.len() as usize);
 
     for hash in hashes.iter() {
         let bytes = hash.get_hash()?;
         let mut block_hash = [0u8; 32];
         block_hash.copy_from_slice(bytes);
-        vec.push(BlockHeaderHash(block_hash));
+        vec.push(block_hash.into());
     }
 
     Ok(vec)
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_payloads_with_hashes() {
-        let hashes = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect::<Vec<_>>();
+        let hashes = (0u8..10).map(|i| Digest::from(vec![i; 32])).collect::<Vec<_>>();
 
         for payload in &[
             Payload::GetBlocks(hashes.clone()),

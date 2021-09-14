@@ -15,9 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::{MessageHeader, Payload, Version};
-use snarkvm_dpc::BlockHeaderHash;
 
 use rand::{distributions::Standard, thread_rng, Rng};
+use snarkos_storage::Digest;
 use snarkos_testing::{
     network::{handshaken_node_and_peer, spawn_2_fake_nodes, test_node, TestSetup},
     wait_until,
@@ -450,7 +450,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_pre_handshake() {
     let node = test_node(node_setup).await;
     let node_addr = node.expect_local_addr();
 
-    let hashes: Vec<BlockHeaderHash> = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect();
+    let hashes: Vec<Digest> = (0u8..10).map(|i| Digest::from([i; 32])).collect();
 
     for payload in &[
         Payload::GetBlocks(hashes.clone()),
@@ -491,7 +491,7 @@ async fn fuzzing_corrupted_payloads_with_hashes_post_handshake() {
         }
     });
 
-    let hashes: Vec<BlockHeaderHash> = (0u8..10).map(|i| BlockHeaderHash::new(vec![i; 32])).collect();
+    let hashes: Vec<Digest> = (0u8..10).map(|i| Digest::from([i; 32])).collect();
 
     for payload in &[
         Payload::GetBlocks(hashes.clone()),

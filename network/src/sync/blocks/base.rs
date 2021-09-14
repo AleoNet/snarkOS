@@ -17,7 +17,6 @@
 use std::{net::SocketAddr, time::Duration};
 
 use snarkos_storage::Digest;
-use snarkvm_dpc::BlockHeaderHash;
 use tokio::sync::mpsc;
 
 use crate::{Node, Peer, SyncInbound};
@@ -66,11 +65,8 @@ impl SyncBase {
         Ok(interesting_peers)
     }
 
-    pub async fn block_locator_hashes(node: &Node) -> Result<Vec<BlockHeaderHash>> {
-        let forks_of_interest = node
-            .storage
-            .scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32)
-            .await?;
+    pub async fn block_locator_hashes(node: &Node) -> Result<Vec<Digest>> {
+        let forks_of_interest = node.storage.scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32).await?;
         trace!("sync found {} forks", forks_of_interest.len());
         let blocks_of_interest: Vec<Digest> = forks_of_interest.into_iter().map(|(_canon, fork)| fork).collect();
         let mut tips_of_blocks_of_interest: Vec<Digest> = Vec::with_capacity(blocks_of_interest.len());
@@ -98,10 +94,7 @@ impl SyncBase {
             }
         }?;
 
-        Ok(hashes
-            .into_iter()
-            .map(|x| BlockHeaderHash(x.bytes().unwrap()))
-            .collect::<Vec<_>>())
+        Ok(hashes)
     }
 
     /// receives an arbitrary amount of inbound sync messages with a given timeout.

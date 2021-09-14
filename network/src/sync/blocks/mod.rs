@@ -22,11 +22,11 @@ mod base;
 pub use base::*;
 mod aggro;
 pub use aggro::*;
+use snarkos_storage::Digest;
 
-use snarkvm_dpc::BlockHeaderHash;
 use std::net::SocketAddr;
 
 pub enum SyncInbound {
-    BlockHashes(SocketAddr, Vec<BlockHeaderHash>),
+    BlockHashes(SocketAddr, Vec<Digest>),
     Block(SocketAddr, Vec<u8>, Option<u32>),
 }
