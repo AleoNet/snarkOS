@@ -115,9 +115,8 @@ impl Node {
 
         // Attempt to connect to a few random beacons if the node has no active
         // connections or if it's a beacon itself.
-        if self.peer_book.get_active_peer_count() == 0
+        if (!self.is_of_type(NodeType::SyncProvider) && self.peer_book.get_active_peer_count() == 0)
             || self.is_of_type(NodeType::Beacon)
-            || self.is_of_type(NodeType::SyncProvider)
         {
             let random_beacons = self
                 .config
@@ -331,9 +330,7 @@ impl Node {
 
         // Beacons apply less strict filtering rules if the set is empty by falling back on
         // connected peers that may or may not be routable...
-        let peers = if (self.is_of_type(NodeType::SyncProvider) || self.is_of_type(NodeType::Beacon))
-            && strictly_filtered_peers.is_empty()
-        {
+        let peers = if self.is_of_type(NodeType::Beacon) && strictly_filtered_peers.is_empty() {
             let filtered_peers: Vec<SocketAddr> = connected_peers
                 .iter()
                 .filter(|peer| basic_filter(peer))
