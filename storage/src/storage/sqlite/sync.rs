@@ -156,6 +156,10 @@ impl SyncStorage for SqliteStorage {
         if current_index < Self::SCHEMA_INDEX {
             self.migrate(current_index)?;
         }
+        self.conn.execute(
+            r"PRAGMA OPTIMIZE;",
+            [],
+        )?;
         Ok(())
     }
 
