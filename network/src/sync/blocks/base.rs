@@ -66,7 +66,10 @@ impl SyncBase {
     }
 
     pub async fn block_locator_hashes(node: &Node) -> Result<Vec<Digest>> {
-        let forks_of_interest = node.storage.scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32).await?;
+        let forks_of_interest = node
+            .storage
+            .scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32)
+            .await?;
         trace!("sync found {} forks", forks_of_interest.len());
         let blocks_of_interest: Vec<Digest> = forks_of_interest.into_iter().map(|(_canon, fork)| fork).collect();
         let mut tips_of_blocks_of_interest: Vec<Digest> = Vec::with_capacity(blocks_of_interest.len());
