@@ -43,7 +43,7 @@ features = [ "derive" ]
 
 [dependencies.tokio]
 version = "1"
-features = [ "macros", "rt-multi-thread" ]
+features = [ "macros", "rt-multi-thread", "sync" ]
 
 [dev-dependencies.snarkvm-derives]
 version = "=0.7.9"
