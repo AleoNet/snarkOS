@@ -41,7 +41,6 @@ use snarkvm_dpc::{
 };
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::has_duplicates;
-use tokio::sync::mpsc;
 
 use snarkos_metrics::misc::*;
 

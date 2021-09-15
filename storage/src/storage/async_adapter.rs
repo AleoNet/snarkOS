@@ -17,8 +17,9 @@
 use std::{any::Any, fmt};
 
 use anyhow::*;
+use metrics::wrapped_mpsc;
 use snarkos_metrics::{self as metrics, queues};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use tracing::log::trace;
 
 #[cfg(feature = "test")]
@@ -211,10 +212,9 @@ impl<S: SyncStorage + 'static> Agent<S> {
         }
     }
 
-    fn agent(mut self, mut receiver: mpsc::Receiver<MessageWrapper>) {
+    fn agent(mut self, mut receiver: wrapped_mpsc::Receiver<MessageWrapper>) {
         self.inner.init().expect("failed to initialize sync storage");
         while let Some((message, response)) = receiver.blocking_recv() {
-            metrics::decrement_gauge!(queues::STORAGE, 1.0);
             let out = self.handle_message(message);
             response.send(out).ok();
         }
@@ -224,12 +224,12 @@ impl<S: SyncStorage + 'static> Agent<S> {
 type MessageWrapper = (Message, oneshot::Sender<Box<dyn Any + Send + Sync>>);
 
 pub struct AsyncStorage {
-    sender: mpsc::Sender<MessageWrapper>,
+    sender: wrapped_mpsc::Sender<MessageWrapper>,
 }
 
 impl AsyncStorage {
     pub fn new<S: SyncStorage + Send + 'static>(inner: S) -> AsyncStorage {
-        let (sender, receiver) = mpsc::channel(256);
+        let (sender, receiver) = wrapped_mpsc::channel(queues::STORAGE, 256);
         std::thread::spawn(move || Agent::new(inner).agent(receiver));
         Self { sender }
     }
@@ -237,7 +237,6 @@ impl AsyncStorage {
     #[allow(clippy::ok_expect)]
     async fn send<T: Send + Sync + 'static>(&self, message: Message) -> T {
         let (sender, receiver) = oneshot::channel();
-        metrics::increment_gauge!(queues::STORAGE, 1.0);
         self.sender.send((message, sender)).await.ok();
         *receiver
             .await

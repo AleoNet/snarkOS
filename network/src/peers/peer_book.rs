@@ -26,9 +26,9 @@ use std::{
 
 use mpmc_map::MpmcMap;
 use rand::{prelude::IteratorRandom, rngs::SmallRng, SeedableRng};
-use tokio::{net::TcpStream, sync::mpsc};
+use tokio::net::TcpStream;
 
-use snarkos_metrics::{self as metrics, connections::*};
+use snarkos_metrics::{self as metrics, connections::*, wrapped_mpsc};
 
 use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHandle};
 
@@ -40,7 +40,7 @@ pub struct PeerBook {
     disconnected_peers: MpmcMap<SocketAddr, Peer>,
     connected_peers: MpmcMap<SocketAddr, PeerHandle>,
     pending_connections: Arc<AtomicU32>,
-    peer_events: mpsc::Sender<PeerEvent>,
+    peer_events: wrapped_mpsc::Sender<PeerEvent>,
 }
 
 // to avoid circular reference to peer_events
@@ -52,10 +52,8 @@ struct PeerBookRef {
 
 impl PeerBookRef {
     // gets terminated when sender is dropped from PeerBook
-    async fn handle_peer_events(self, mut receiver: mpsc::Receiver<PeerEvent>) {
+    async fn handle_peer_events(self, mut receiver: wrapped_mpsc::Receiver<PeerEvent>) {
         while let Some(event) = receiver.recv().await {
-            metrics::decrement_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
-
             match event.data {
                 PeerEventData::Connected(handle) => {
                     self.pending_connections.fetch_sub(1, Ordering::SeqCst);
@@ -66,11 +64,6 @@ impl PeerBookRef {
                 }
                 PeerEventData::Disconnect(peer) => {
                     self.connected_peers.remove(peer.address).await;
-
-                    let queued_inbound_message_count = peer.queued_inbound_message_count.swap(0, Ordering::SeqCst);
-                    metrics::decrement_gauge!(snarkos_metrics::queues::INBOUND, queued_inbound_message_count as f64);
-                    let queued_outbound_message_count = peer.queued_outbound_message_count.swap(0, Ordering::SeqCst);
-                    metrics::decrement_gauge!(snarkos_metrics::queues::OUTBOUND, queued_outbound_message_count as f64);
 
                     if self.disconnected_peers.insert(peer.address, *peer).await.is_none() {
                         metrics::increment_gauge!(DISCONNECTED, 1.0);
@@ -86,7 +79,7 @@ impl PeerBookRef {
 
 impl PeerBook {
     pub fn spawn() -> Self {
-        let (sender, receiver) = mpsc::channel(256);
+        let (sender, receiver) = wrapped_mpsc::channel(snarkos_metrics::queues::PEER_EVENTS, 256);
         let peers = PeerBook {
             disconnected_peers: Default::default(),
             connected_peers: Default::default(),

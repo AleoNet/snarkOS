@@ -19,9 +19,9 @@ use std::{
     time::Duration,
 };
 
-use tokio::{net::TcpStream, sync::mpsc, time::timeout};
+use tokio::{net::TcpStream, time::timeout};
 
-use snarkos_metrics::{self as metrics, connections::*};
+use snarkos_metrics::{self as metrics, connections::*, wrapped_mpsc};
 
 use crate::{NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandle, Version};
 
@@ -30,8 +30,8 @@ use super::{network::PeerIOHandle, PeerAction};
 const CONNECTION_TIMEOUT_SECS: u64 = 3;
 
 impl Peer {
-    pub fn connect(mut self, node: Node, event_target: mpsc::Sender<PeerEvent>) {
-        let (sender, receiver) = mpsc::channel::<PeerAction>(64);
+    pub fn connect(mut self, node: Node, event_target: wrapped_mpsc::Sender<PeerEvent>) {
+        let (sender, receiver) = wrapped_mpsc::channel::<PeerAction>(snarkos_metrics::queues::PEER_EVENTS, 64);
         tokio::spawn(async move {
             self.set_connecting();
             match self.inner_connect(node.version()).await {
@@ -43,7 +43,6 @@ impl Peer {
                         })
                         .await
                         .ok();
-                    metrics::increment_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
                     self.fail();
                     if !e.is_trivial() {
                         error!(
@@ -77,14 +76,10 @@ impl Peer {
                     event_target
                         .send(PeerEvent {
                             address: self.address,
-                            data: PeerEventData::Connected(PeerHandle {
-                                sender: sender.clone(),
-                                queued_outbound_message_count: self.queued_outbound_message_count.clone(),
-                            }),
+                            data: PeerEventData::Connected(PeerHandle { sender: sender.clone() }),
                         })
                         .await
                         .ok();
-                    metrics::increment_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
 
                     if let Err(e) = self.run(node, network, receiver).await {
                         if !e.is_trivial() {
@@ -111,7 +106,6 @@ impl Peer {
                 })
                 .await
                 .ok();
-            metrics::increment_gauge!(snarkos_metrics::queues::PEER_EVENTS, 1.0);
         });
     }
 

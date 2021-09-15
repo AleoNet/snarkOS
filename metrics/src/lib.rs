@@ -22,6 +22,9 @@ pub use names::*;
 pub mod snapshots;
 pub mod stats;
 
+pub mod wrapped_mpsc;
+pub use wrapped_mpsc::*;
+
 /// Re-export metrics macros
 pub use metrics::*;
 

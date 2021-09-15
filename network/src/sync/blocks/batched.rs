@@ -20,10 +20,10 @@ use crate::{Node, Payload, Peer, SyncBase, SyncInbound};
 use anyhow::*;
 use hash_hasher::{HashBuildHasher, HashedMap, HashedSet};
 use rand::{prelude::SliceRandom, rngs::SmallRng, SeedableRng};
+use snarkos_metrics::wrapped_mpsc;
 use snarkos_storage::Digest;
 use snarkvm_algorithms::crh::double_sha256;
 use snarkvm_dpc::BlockHeader;
-use tokio::sync::mpsc;
 
 /// Efficient but slow and fork-prone sync method that operates in distributed batches.
 pub struct SyncBatched {
@@ -37,7 +37,7 @@ struct SyncBlock {
 }
 
 impl SyncBatched {
-    pub fn new(node: Node) -> (Self, mpsc::Sender<SyncInbound>) {
+    pub fn new(node: Node) -> (Self, wrapped_mpsc::Sender<SyncInbound>) {
         let (base, sender) = SyncBase::new(node);
         let new = Self { base };
         (new, sender)
@@ -286,11 +286,5 @@ impl SyncBatched {
         }
 
         Ok(())
-    }
-}
-
-impl Drop for SyncBatched {
-    fn drop(&mut self) {
-        metrics::gauge!(snarkos_metrics::queues::SYNC_ITEMS, 0.0);
     }
 }
