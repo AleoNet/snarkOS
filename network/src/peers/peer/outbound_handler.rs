@@ -14,18 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    time::Instant,
-};
+use std::time::Instant;
 
 use snarkos_storage::SerialBlock;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 
-use snarkos_metrics::{self as metrics, queues::*};
+use snarkos_metrics::{self as metrics, wrapped_mpsc};
 
 use crate::{NetworkError, Payload, Peer};
 
@@ -45,8 +39,7 @@ pub(super) enum PeerAction {
 
 #[derive(Clone, Debug)]
 pub struct PeerHandle {
-    pub(super) sender: mpsc::Sender<PeerAction>,
-    pub queued_outbound_message_count: Arc<AtomicUsize>,
+    pub(super) sender: wrapped_mpsc::Sender<PeerAction>,
 }
 
 impl PeerHandle {
@@ -66,22 +59,14 @@ impl PeerHandle {
     }
 
     pub async fn send_payload(&self, payload: Payload, time_received: Option<Instant>) {
-        if self.sender.send(PeerAction::Send(payload, time_received)).await.is_ok() {
-            self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
-            metrics::increment_gauge!(OUTBOUND, 1.0);
-        }
+        self.sender.send(PeerAction::Send(payload, time_received)).await.ok();
     }
 
     pub async fn send_block(&self, payload: SerialBlock, height: u32) {
-        if self
-            .sender
+        self.sender
             .send(PeerAction::SendBlock(Box::new(payload), height))
             .await
-            .is_ok()
-        {
-            self.queued_outbound_message_count.fetch_add(1, Ordering::SeqCst);
-            metrics::increment_gauge!(OUTBOUND, 1.0);
-        }
+            .ok();
     }
 
     pub async fn cancel_sync(&self) {
@@ -118,9 +103,6 @@ impl Peer {
                 // check if they sent us the block recently
                 let block = block.serialize();
 
-                self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
-                metrics::decrement_gauge!(OUTBOUND, 1.0);
-
                 if self.block_received_cache.contains(&block[..]) {
                     metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
                     return Ok(PeerResponse::None);
@@ -143,9 +125,6 @@ impl Peer {
                     self.quality.expecting_pong = true;
                     self.quality.last_ping_sent = Some(Instant::now());
                 }
-
-                self.queued_outbound_message_count.fetch_sub(1, Ordering::SeqCst);
-                metrics::decrement_gauge!(OUTBOUND, 1.0);
 
                 network.write_payload(&message).await.map_err(|e| {
                     metrics::increment_counter!(metrics::outbound::ALL_FAILURES);

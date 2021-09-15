@@ -16,8 +16,8 @@
 
 use std::{net::SocketAddr, time::Duration};
 
+use snarkos_metrics::wrapped_mpsc;
 use snarkos_storage::Digest;
-use tokio::sync::mpsc;
 
 use crate::{Node, Peer, SyncInbound};
 use anyhow::*;
@@ -25,12 +25,12 @@ use anyhow::*;
 /// Base sync helpers
 pub struct SyncBase {
     pub node: Node,
-    pub incoming: mpsc::Receiver<SyncInbound>,
+    pub incoming: wrapped_mpsc::Receiver<SyncInbound>,
 }
 
 impl SyncBase {
-    pub fn new(node: Node) -> (Self, mpsc::Sender<SyncInbound>) {
-        let (sender, receiver) = mpsc::channel(256);
+    pub fn new(node: Node) -> (Self, wrapped_mpsc::Sender<SyncInbound>) {
+        let (sender, receiver) = wrapped_mpsc::channel(snarkos_metrics::queues::SYNC_ITEMS, 256);
         let new = Self {
             node,
             incoming: receiver,
@@ -124,7 +124,6 @@ impl SyncBase {
                     if msg.is_none() {
                         break;
                     }
-                    metrics::decrement_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
                     if handler(msg.unwrap()) {
                         break;
                     }

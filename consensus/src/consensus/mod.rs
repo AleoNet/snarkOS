@@ -17,6 +17,7 @@
 use std::{convert::TryInto, sync::Arc};
 
 use rand::{thread_rng, Rng};
+use snarkos_metrics::wrapped_mpsc;
 use snarkos_storage::{Address, Digest, DynStorage, SerialBlock, SerialRecord, SerialTransaction, VMRecord};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
@@ -32,7 +33,7 @@ use snarkvm_dpc::{
     ProgramScheme,
 };
 use snarkvm_utilities::{to_bytes_le, ToBytes};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 
 use crate::{error::ConsensusError, ConsensusParameters, DynLedger, MemoryPool};
 
@@ -50,7 +51,7 @@ pub struct Consensus {
     pub dpc: Arc<Testnet1DPC>,
     pub storage: DynStorage,
     genesis_block: SerialBlock,
-    sender: mpsc::Sender<ConsensusMessageWrapped>,
+    sender: wrapped_mpsc::Sender<ConsensusMessageWrapped>,
 }
 
 impl Consensus {
@@ -63,7 +64,7 @@ impl Consensus {
         storage: DynStorage,
         memory_pool: MemoryPool,
     ) -> Arc<Self> {
-        let (sender, receiver) = mpsc::channel(256);
+        let (sender, receiver) = wrapped_mpsc::channel(snarkos_metrics::queues::CONSENSUS, 256);
         let created = Arc::new(Self {
             parameters,
             dpc,
@@ -91,7 +92,6 @@ impl Consensus {
     async fn send<T: Send + Sync + 'static>(&self, message: ConsensusMessage) -> T {
         let (sender, receiver) = oneshot::channel();
         self.sender.send((message, sender)).await.ok();
-        metrics::increment_gauge!(snarkos_metrics::queues::CONSENSUS, 1.0);
         *receiver
             .await
             .ok()
