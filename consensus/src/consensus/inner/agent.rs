@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_metrics::wrapped_mpsc;
+
 use crate::consensus::ConsensusMessageWrapped;
 
 use super::*;
@@ -42,14 +44,12 @@ impl ConsensusInner {
         Ok(())
     }
 
-    pub(in crate::consensus) async fn agent(mut self, mut receiver: mpsc::Receiver<ConsensusMessageWrapped>) {
+    pub(in crate::consensus) async fn agent(mut self, mut receiver: wrapped_mpsc::Receiver<ConsensusMessageWrapped>) {
         self.init()
             .await
             .expect("failed to initialize ledger & storage with genesis block");
 
         while let Some((message, response)) = receiver.recv().await {
-            metrics::decrement_gauge!(snarkos_metrics::queues::CONSENSUS, 1.0);
-
             match message {
                 ConsensusMessage::ReceiveTransaction(transaction) => {
                     let ret = self.receive_transaction(transaction).await;

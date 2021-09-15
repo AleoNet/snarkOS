@@ -18,11 +18,9 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{Cache, Node, Payload, Peer, SyncBase, SyncInbound};
 use anyhow::*;
+use snarkos_metrics::wrapped_mpsc;
 use snarkos_storage::Digest;
-use tokio::{
-    sync::{mpsc, RwLock},
-    time::Instant,
-};
+use tokio::{sync::RwLock, time::Instant};
 
 /// Aggressive, continuous sync process that pulls peers entire canon trees.
 pub struct SyncAggro {
@@ -35,7 +33,7 @@ struct BlockLocatorHashes {
 }
 
 impl SyncAggro {
-    pub fn new(node: Node) -> (Self, mpsc::Sender<SyncInbound>) {
+    pub fn new(node: Node) -> (Self, wrapped_mpsc::Sender<SyncInbound>) {
         let (base, sender) = SyncBase::new(node);
         let new = Self { base };
         (new, sender)
@@ -90,7 +88,6 @@ impl SyncAggro {
         let node = self.base.node.clone();
         self.base
             .receive_messages(15, 3, |msg| {
-                metrics::decrement_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
                 match msg {
                     SyncInbound::BlockHashes(peer, hashes) => {
                         debug!("received {} sync hashes from {}", hashes.len(), peer);
@@ -172,11 +169,5 @@ impl SyncAggro {
         self.base.cancel_outstanding_syncs(&sync_addresses[..]).await;
 
         Ok(())
-    }
-}
-
-impl Drop for SyncAggro {
-    fn drop(&mut self) {
-        metrics::gauge!(snarkos_metrics::queues::SYNC_ITEMS, 0.0);
     }
 }

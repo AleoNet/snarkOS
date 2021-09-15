@@ -95,7 +95,6 @@ impl Node {
                     .send(SyncInbound::Block(remote_address, block, height))
                     .await
                     .ok();
-                metrics::increment_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
             }
         }
         Ok(())
@@ -230,7 +229,6 @@ impl Node {
                 .send(SyncInbound::BlockHashes(remote_address, block_hashes))
                 .await
                 .ok();
-            metrics::increment_gauge!(snarkos_metrics::queues::SYNC_ITEMS, 1.0);
         }
     }
 }

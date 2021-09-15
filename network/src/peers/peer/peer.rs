@@ -17,15 +17,11 @@
 use anyhow::*;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use snarkos_metrics::wrapped_mpsc;
 use std::{
     net::SocketAddr,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc;
 
 use super::PeerQuality;
 use crate::{message::Payload, BlockCache, NetworkError, Node};
@@ -37,10 +33,6 @@ pub struct Peer {
     pub address: SocketAddr,
     pub quality: PeerQuality,
     pub is_bootnode: bool,
-    #[serde(skip)]
-    pub queued_inbound_message_count: Arc<AtomicUsize>,
-    #[serde(skip)]
-    pub queued_outbound_message_count: Arc<AtomicUsize>,
     /// Whether this peer is routable or not.
     ///
     /// `None` indicates the node has never attempted a connection with this peer.
@@ -59,8 +51,6 @@ impl Peer {
             address,
             quality: Default::default(),
             is_bootnode,
-            queued_inbound_message_count: Default::default(),
-            queued_outbound_message_count: Default::default(),
 
             // Set to `None` since peer creation only ever happens before a connection to the peer,
             // therefore we don't know if its listener is routable or not.
@@ -113,12 +103,12 @@ impl Peer {
         &mut self,
         node: Node,
         mut network: PeerIOHandle,
-        mut receiver: mpsc::Receiver<PeerAction>,
+        mut receiver: wrapped_mpsc::Receiver<PeerAction>,
     ) -> Result<(), NetworkError> {
         let mut reader = network.take_reader();
 
-        let (sender, mut read_receiver) = mpsc::channel::<Result<Vec<u8>, NetworkError>>(8);
-        let queued_inbound_message_count = self.queued_inbound_message_count.clone();
+        let (sender, mut read_receiver) =
+            wrapped_mpsc::channel::<Result<Vec<u8>, NetworkError>>(snarkos_metrics::queues::INBOUND, 8);
 
         tokio::spawn(async move {
             loop {
@@ -128,9 +118,6 @@ impl Peer {
                     .is_err()
                 {
                     break;
-                } else {
-                    queued_inbound_message_count.fetch_add(1, Ordering::SeqCst);
-                    metrics::increment_gauge!(snarkos_metrics::queues::INBOUND, 1.0);
                 }
             }
         });
@@ -154,9 +141,6 @@ impl Peer {
                         break;
                     }
 
-                    self.queued_inbound_message_count.fetch_sub(1, Ordering::SeqCst);
-                    metrics::decrement_gauge!(snarkos_metrics::queues::INBOUND, 1.0);
-
                     let data = match data.unwrap() {
                         // decrypt
                         Ok(data) => network.read_payload(&data[..]),
@@ -177,11 +161,6 @@ impl Peer {
                 },
             }
         }
-
-        let queued_inbound_message_count = self.queued_inbound_message_count.swap(0, Ordering::SeqCst);
-        metrics::decrement_gauge!(snarkos_metrics::queues::INBOUND, queued_inbound_message_count as f64);
-        let queued_outbound_message_count = self.queued_outbound_message_count.swap(0, Ordering::SeqCst);
-        metrics::decrement_gauge!(snarkos_metrics::queues::OUTBOUND, queued_outbound_message_count as f64);
 
         Ok(())
     }

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkos_metrics::{self as metrics, misc};
+use snarkos_metrics::{self as metrics, misc, wrapped_mpsc};
 
 use anyhow::*;
 use chrono::{DateTime, Utc};
@@ -34,7 +34,7 @@ use std::{
     thread,
 };
 use tokio::{
-    sync::{mpsc, Mutex, RwLock},
+    sync::{Mutex, RwLock},
     task,
     time::sleep,
 };
@@ -78,7 +78,7 @@ pub struct InnerNode {
     threads: DropJoin<thread::JoinHandle<()>>,
     /// An indicator of whether the node is shutting down.
     shutting_down: AtomicBool,
-    pub(crate) master_dispatch: RwLock<Option<mpsc::Sender<SyncInbound>>>,
+    pub(crate) master_dispatch: RwLock<Option<wrapped_mpsc::Sender<SyncInbound>>>,
     pub terminator: Arc<AtomicBool>,
 }
 
