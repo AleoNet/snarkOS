@@ -104,20 +104,14 @@ async fn block_initiator_side() {
     wait_until!(
         5,
         matches!(
-            node.storage
-                .get_block_state(&block_1_header_hash.0.into())
-                .await
-                .unwrap(),
+            node.storage.get_block_state(&block_1_header_hash).await.unwrap(),
             BlockStatus::Committed(_)
         )
     );
     wait_until!(
         1,
         matches!(
-            node.storage
-                .get_block_state(&block_2_header_hash.0.into())
-                .await
-                .unwrap(),
+            node.storage.get_block_state(&block_2_header_hash).await.unwrap(),
             BlockStatus::Committed(_)
         )
     );
@@ -151,9 +145,8 @@ async fn block_responder_side() {
     };
 
     let block_header_hash = sync.get(1).unwrap();
-    let block_header_hash_digest: Digest = block_header_hash.0.into();
     // check it matches the block inserted into the node's ledger
-    assert_eq!(block_header_hash_digest, block_struct_1.header.hash());
+    assert_eq!(block_header_hash, &block_struct_1.header.hash());
 
     // request the block from the node
     let get_block = Payload::GetBlocks(vec![block_header_hash.clone()]);
