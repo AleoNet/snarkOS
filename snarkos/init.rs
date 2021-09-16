@@ -187,8 +187,8 @@ pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<S
 
     if config.storage.scan_for_forks {
         storage
-        .scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32)
-        .await?;
+            .scan_forks(snarkos_consensus::OLDEST_FORK_THRESHOLD as u32)
+            .await?;
     }
 
     if let Some(import_path) = &config.storage.import {
