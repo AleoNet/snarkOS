@@ -47,12 +47,28 @@ pub struct PeerQuality {
     pub blocks_sent_to: u32,
     /// The number of times we have attempted to connect to this peer.
     pub connection_attempt_count: u64,
+    /// The number of failed connection attempts since the last connection success
+    pub connection_transient_fail_count: u64,
     /// The number of times we have connected to this peer.
     pub connected_count: u64,
     pub disconnected_count: u64,
 }
 
 impl PeerQuality {
+    pub fn sync_from_storage(&mut self, peer: &snarkos_storage::Peer) {
+        self.block_height = peer.block_height;
+        self.last_seen = peer.last_seen;
+        self.first_seen = peer.first_seen;
+        self.last_connected = peer.last_connected;
+        self.blocks_synced_to = peer.blocks_synced_to;
+        self.blocks_synced_from = peer.blocks_synced_from;
+        self.blocks_received_from = peer.blocks_received_from;
+        self.blocks_sent_to = peer.blocks_sent_to;
+        self.connection_attempt_count = peer.connection_attempt_count;
+        self.connection_transient_fail_count = peer.connection_transient_fail_count;
+        self.connected_count = peer.connection_success_count;
+    }
+
     pub fn is_inactive(&self, now: DateTime<Utc>) -> bool {
         let last_seen = self.last_seen;
         if let Some(last_seen) = last_seen {
@@ -73,8 +89,17 @@ impl PeerQuality {
 
     pub fn connected(&mut self) {
         self.see();
+        self.connection_transient_fail_count = 0;
         self.last_connected = Some(chrono::Utc::now());
         self.connected_count += 1;
+    }
+
+    pub fn connecting(&mut self) {
+        self.connection_attempt_count += 1;
+    }
+
+    pub fn connect_failed(&mut self) {
+        self.connection_transient_fail_count += 1;
     }
 
     pub fn disconnected(&mut self) {

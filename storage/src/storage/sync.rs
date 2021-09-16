@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    net::SocketAddr,
+};
 
 use anyhow::*;
 use tracing::{debug, trace};
@@ -31,6 +34,7 @@ use crate::{
     FixMode,
     ForkDescription,
     ForkPath,
+    Peer,
     SerialBlock,
     SerialBlockHeader,
     SerialRecord,

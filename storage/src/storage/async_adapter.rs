@@ -24,7 +24,24 @@ use tracing::log::trace;
 
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
-use crate::{BlockFilter, BlockStatus, CanonData, Digest, DigestTree, FixMode, ForkDescription, Peer, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, Storage, SyncStorage, TransactionLocation, ValidatorError};
+use crate::{
+    BlockFilter,
+    BlockStatus,
+    CanonData,
+    Digest,
+    DigestTree,
+    FixMode,
+    ForkDescription,
+    Peer,
+    SerialBlock,
+    SerialBlockHeader,
+    SerialRecord,
+    SerialTransaction,
+    Storage,
+    SyncStorage,
+    TransactionLocation,
+    ValidatorError,
+};
 
 enum Message {
     InsertBlock(SerialBlock),

@@ -17,8 +17,10 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::TryInto,
+    net::SocketAddr,
 };
 
+use chrono::{DateTime, NaiveDateTime, Utc};
 use rusqlite::{params, OptionalExtension, Row, ToSql};
 use snarkvm_dpc::{AleoAmount, MerkleRootHash, Network, PedersenMerkleRootHash, ProofOfSuccinctWork};
 use tracing::*;
@@ -31,6 +33,7 @@ use crate::{
     CanonData,
     DigestTree,
     FixMode,
+    Peer,
     SerialRecord,
     SerialTransaction,
     SyncStorage,
@@ -139,7 +142,8 @@ impl SqliteStorage {
                 blocks_received_from INTEGER NOT NULL,
                 blocks_sent_to INTEGER NOT NULL,
                 connection_attempt_count INTEGER NOT NULL,
-                connection_success_count INTEGER NOT NULL
+                connection_success_count INTEGER NOT NULL,
+                connection_transient_fail_count INTEGER NOT NULL
             );
             CREATE UNIQUE INDEX peer_address_lookup ON peers(address);
             CREATE INDEX peer_last_seen_lookup ON peers(last_seen);
@@ -1006,9 +1010,11 @@ impl SyncStorage for SqliteStorage {
                 blocks_received_from,
                 blocks_sent_to,
                 connection_attempt_count,
-                connection_success_count
+                connection_success_count,
+                connection_transient_fail_count
             )
             VALUES (
+                ?,
                 ?,
                 ?,
                 ?,
@@ -1032,7 +1038,8 @@ impl SyncStorage for SqliteStorage {
                 blocks_received_from = excluded.blocks_received_from,
                 blocks_sent_to = excluded.blocks_sent_to,
                 connection_attempt_count = excluded.connection_attempt_count,
-                connection_success_count = excluded.connection_success_count
+                connection_success_count = excluded.connection_success_count,
+                connection_transient_fail_count = excluded.connection_transient_fail_count
         ",
         )?;
 
@@ -1049,6 +1056,7 @@ impl SyncStorage for SqliteStorage {
                 peer.blocks_sent_to,
                 peer.connection_attempt_count,
                 peer.connection_success_count,
+                peer.connection_transient_fail_count,
             ])?;
         }
         Ok(())
@@ -1068,28 +1076,38 @@ impl SyncStorage for SqliteStorage {
                 blocks_received_from,
                 blocks_sent_to,
                 connection_attempt_count,
-                connection_success_count
+                connection_success_count,
+                connection_transient_fail_count
             FROM peers
             WHERE address = ?
         ",
         )?;
         // todo: this is O(n) queries, but this isn't large-size input and convenient
         for address in addresses {
-            let peer = stmt.query_row([address.to_string()], |row| {
-                Ok(Peer {
-                    address,
-                    block_height: row.get(0)?,
-                    first_seen: row.get::<_, Option<i64>>(1)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
-                    last_seen: row.get::<_, Option<i64>>(2)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
-                    last_connected: row.get::<_, Option<i64>>(3)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
-                    blocks_synced_to: row.get(4)?,
-                    blocks_synced_from: row.get(5)?,
-                    blocks_received_from: row.get(6)?,
-                    blocks_sent_to: row.get(7)?,
-                    connection_attempt_count: row.get(8)?,
-                    connection_success_count: row.get(9)?,
+            let peer = stmt
+                .query_row([address.to_string()], |row| {
+                    Ok(Peer {
+                        address,
+                        block_height: row.get(0)?,
+                        first_seen: row
+                            .get::<_, Option<i64>>(1)?
+                            .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                        last_seen: row
+                            .get::<_, Option<i64>>(2)?
+                            .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                        last_connected: row
+                            .get::<_, Option<i64>>(3)?
+                            .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                        blocks_synced_to: row.get(4)?,
+                        blocks_synced_from: row.get(5)?,
+                        blocks_received_from: row.get(6)?,
+                        blocks_sent_to: row.get(7)?,
+                        connection_attempt_count: row.get(8)?,
+                        connection_success_count: row.get(9)?,
+                        connection_transient_fail_count: row.get(10)?,
+                    })
                 })
-            }).optional()?;
+                .optional()?;
             out.push(peer);
         }
         Ok(out)
@@ -1109,24 +1127,37 @@ impl SyncStorage for SqliteStorage {
                 blocks_received_from,
                 blocks_sent_to,
                 connection_attempt_count,
-                connection_success_count
+                connection_success_count,
+                connection_transient_fail_count
             FROM peers
         ",
         )?;
 
-        let query = stmt.query_map([], |row| Ok(Peer {
-            address: row.get::<_, String>(0)?.parse().map_err(|_| rusqlite::Error::InvalidQuery)?,
-            block_height: row.get(1)?,
-            first_seen: row.get::<_, Option<i64>>(2)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
-            last_seen: row.get::<_, Option<i64>>(3)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
-            last_connected: row.get::<_, Option<i64>>(4)?.map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
-            blocks_synced_to: row.get(5)?,
-            blocks_synced_from: row.get(6)?,
-            blocks_received_from: row.get(7)?,
-            blocks_sent_to: row.get(8)?,
-            connection_attempt_count: row.get(9)?,
-            connection_success_count: row.get(10)?,
-        }))?;
+        let query = stmt.query_map([], |row| {
+            Ok(Peer {
+                address: row
+                    .get::<_, String>(0)?
+                    .parse()
+                    .map_err(|_| rusqlite::Error::InvalidQuery)?,
+                block_height: row.get(1)?,
+                first_seen: row
+                    .get::<_, Option<i64>>(2)?
+                    .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                last_seen: row
+                    .get::<_, Option<i64>>(3)?
+                    .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                last_connected: row
+                    .get::<_, Option<i64>>(4)?
+                    .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                blocks_synced_to: row.get(5)?,
+                blocks_synced_from: row.get(6)?,
+                blocks_received_from: row.get(7)?,
+                blocks_sent_to: row.get(8)?,
+                connection_attempt_count: row.get(9)?,
+                connection_success_count: row.get(10)?,
+                connection_transient_fail_count: row.get(11)?,
+            })
+        })?;
 
         Ok(query.collect::<Result<Vec<_>, rusqlite::Error>>()?)
     }

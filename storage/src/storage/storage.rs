@@ -19,7 +19,18 @@ use std::{net::SocketAddr, sync::Arc};
 
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
-use crate::{Digest, DigestTree, FixMode, Peer, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction, TransactionLocation, ValidatorError};
+use crate::{
+    Digest,
+    DigestTree,
+    FixMode,
+    Peer,
+    SerialBlock,
+    SerialBlockHeader,
+    SerialRecord,
+    SerialTransaction,
+    TransactionLocation,
+    ValidatorError,
+};
 
 /// Current state of a block in storage
 #[derive(Debug, Clone, Copy, PartialEq)]

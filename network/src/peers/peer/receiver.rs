@@ -33,7 +33,7 @@ impl Peer {
     ) {
         let (sender, receiver) = wrapped_mpsc::channel::<PeerAction>(metrics::queues::OUTBOUND, 64);
         tokio::spawn(async move {
-            let (mut peer, network) = match Peer::inner_receive(remote_address, stream, node.version()).await {
+            let (peer, network) = match Peer::inner_receive(remote_address, stream, node.version()).await {
                 Err(e) => {
                     error!(
                         "failed to receive incoming connection from peer '{}': '{:?}'",
@@ -50,6 +50,8 @@ impl Peer {
                 }
                 Ok(x) => x,
             };
+
+            let mut peer = node.peer_book.fetch_received_peer_data(peer.address).await;
 
             peer.set_connected();
             metrics::increment_gauge!(CONNECTED, 1.0);

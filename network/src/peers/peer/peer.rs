@@ -32,10 +32,6 @@ use super::{network::*, outbound_handler::*};
 pub struct Peer {
     pub address: SocketAddr,
     pub quality: PeerQuality,
-    /// Whether this peer is routable or not.
-    ///
-    /// `None` indicates the node has never attempted a connection with this peer.
-    pub is_routable: Option<bool>,
 
     #[serde(skip)]
     pub block_received_cache: BlockCache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
@@ -45,14 +41,15 @@ const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
 const FAILURE_THRESHOLD: usize = 5;
 
 impl Peer {
-    pub fn new(address: SocketAddr) -> Self {
+    pub fn new(address: SocketAddr, data: Option<&snarkos_storage::Peer>) -> Self {
+        let mut quality: PeerQuality = Default::default();
+        if let Some(data) = data {
+            quality.sync_from_storage(data);
+        }
         Self {
             address,
-            quality: Default::default(),
+            quality,
 
-            // Set to `None` since peer creation only ever happens before a connection to the peer,
-            // therefore we don't know if its listener is routable or not.
-            is_routable: None,
             block_received_cache: BlockCache::default(),
         }
     }
@@ -70,6 +67,7 @@ impl Peer {
             blocks_sent_to: self.quality.blocks_sent_to,
             connection_attempt_count: self.quality.connection_attempt_count,
             connection_success_count: self.quality.connected_count,
+            connection_transient_fail_count: self.quality.connection_transient_fail_count,
         }
     }
 
@@ -173,13 +171,10 @@ impl Peer {
 
     pub(super) fn set_connecting(&mut self) {
         self.quality.see();
+        self.quality.connecting();
     }
 
     pub(super) fn set_disconnected(&mut self) {
         self.quality.disconnected();
-    }
-
-    pub(super) fn set_routable(&mut self, is_routable: bool) {
-        self.is_routable = Some(is_routable)
     }
 }
