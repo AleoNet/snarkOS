@@ -53,35 +53,22 @@ impl<T: Send> fmt::Debug for Sender<T> {
 impl<T: Send> Sender<T> {
     fn increment(&self) {
         metrics::increment_gauge!(self.metrics_tracker, 1.0);
-        self.tracker.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    fn maybe_decrement(&self, is_err: bool) {
-        if is_err {
-            metrics::decrement_gauge!(self.metrics_tracker, 1.0);
-            self.tracker.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-        }
+        self.tracker.fetch_add(1, Ordering::SeqCst);
     }
 
     pub async fn send(&self, value: T) -> Result<(), SendError<T>> {
         self.increment();
-        let out = self.inner.send(value).await;
-        self.maybe_decrement(out.is_err());
-        out
+        self.inner.send(value).await
     }
 
     pub fn try_send(&self, message: T) -> Result<(), TrySendError<T>> {
         self.increment();
-        let out = self.inner.try_send(message);
-        self.maybe_decrement(out.is_err());
-        out
+        self.inner.try_send(message)
     }
 
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
         self.increment();
-        let out = self.inner.blocking_send(value);
-        self.maybe_decrement(out.is_err());
-        out
+        self.inner.blocking_send(value)
     }
 }
 
@@ -94,10 +81,10 @@ pub struct Receiver<T: Send> {
 }
 
 impl<T: Send> Receiver<T> {
-    fn maybe_decrement(&self, is_err: bool) {
-        if is_err {
+    fn maybe_decrement(&self, is_ok: bool) {
+        if is_ok {
             metrics::decrement_gauge!(self.metrics_tracker, 1.0);
-            self.tracker.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            self.tracker.fetch_sub(1, Ordering::SeqCst);
         }
     }
 
@@ -134,6 +121,7 @@ pub fn channel<T: Send>(metrics_tracker: &'static str, buffer: usize) -> (Sender
 
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
-        metrics::decrement_gauge!(self.metrics_tracker, self.tracker.load(Ordering::SeqCst) as f64);
+        let count = self.tracker.swap(0, Ordering::SeqCst) as f64;
+        metrics::decrement_gauge!(self.metrics_tracker, count);
     }
 }
