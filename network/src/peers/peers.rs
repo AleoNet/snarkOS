@@ -143,6 +143,11 @@ impl Node {
                 error!("failed to broadcast pings: {:?}", e);
             }
         }
+
+        let peers = self.peer_book.serialize().await;
+        if let Err(e) = self.storage.store_peers(peers).await {
+            error!("failed to store peers to database: {:?}", e);
+        }
     }
 
     async fn initiate_connection(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
@@ -168,7 +173,11 @@ impl Node {
 
         metrics::increment_counter!(ALL_INITIATED);
 
-        self.peer_book.get_or_connect(self.clone(), remote_address).await?;
+        let stored_peer = self.storage.lookup_peers(vec![remote_address]).await?.remove(0);
+
+        self.peer_book
+            .get_or_connect(self.clone(), remote_address, stored_peer.as_ref())
+            .await?;
 
         Ok(())
     }
@@ -218,7 +227,7 @@ impl Node {
         let random_peers = {
             trace!(
                 "Connecting to {} disconnected peers",
-                cmp::min(count, self.peer_book.disconnected_peers().len())
+                cmp::min(count, self.peer_book.get_disconnected_peer_count() as usize)
             );
 
             // Obtain the collection of disconnected peers.
@@ -319,8 +328,12 @@ impl Node {
         let connected_peers = self.peer_book.connected_peers_snapshot().await;
 
         let basic_filter =
-            |peer: &Peer| peer.address != remote_address && !self.config.beacons().contains(&peer.address);
-        let strict_filter = |peer: &Peer| basic_filter(peer) && peer.is_routable.unwrap_or(false);
+            |peer: &Peer| peer.address != remote_address && !self.config.bootnodes().contains(&peer.address);
+        let strict_filter = |peer: &Peer| {
+            basic_filter(peer)
+                && peer.quality.connection_transient_fail_count == 0
+                && peer.quality.connection_attempt_count > 0
+        };
 
         // Strictly filter the connected peers by only including the routable addresses.
         let strictly_filtered_peers: Vec<SocketAddr> = connected_peers
@@ -387,7 +400,7 @@ impl Node {
             // Inform the peer book that we found a peer.
             // The peer book will determine if we have seen the peer before,
             // and include the peer if it is new.
-            self.peer_book.add_peer(*peer_address).await;
+            self.peer_book.add_peer(*peer_address, None).await;
         }
 
         if let Some(known_network) = self.known_network() {

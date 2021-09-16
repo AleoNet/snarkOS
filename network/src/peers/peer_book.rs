@@ -25,7 +25,7 @@ use std::{
 };
 
 use mpmc_map::MpmcMap;
-use rand::{prelude::IteratorRandom, rngs::SmallRng, SeedableRng};
+use snarkos_storage::DynStorage;
 use tokio::net::TcpStream;
 
 use snarkos_metrics::{self as metrics, connections::*, wrapped_mpsc};
@@ -35,7 +35,6 @@ use crate::{NetworkError, Node, Payload, Peer, PeerEvent, PeerEventData, PeerHan
 ///
 /// A data structure for storing the history of all peers with this node server.
 ///
-#[derive(Debug)]
 pub struct PeerBook {
     disconnected_peers: MpmcMap<SocketAddr, Peer>,
     connected_peers: MpmcMap<SocketAddr, PeerHandle>,
@@ -48,12 +47,14 @@ struct PeerBookRef {
     disconnected_peers: MpmcMap<SocketAddr, Peer>,
     connected_peers: MpmcMap<SocketAddr, PeerHandle>,
     pending_connections: Arc<AtomicU32>,
+    storage: DynStorage,
 }
 
 impl PeerBookRef {
     // gets terminated when sender is dropped from PeerBook
     async fn handle_peer_events(self, mut receiver: wrapped_mpsc::Receiver<PeerEvent>) {
         while let Some(event) = receiver.recv().await {
+            trace!("received peer event: {:?}", event);
             match event.data {
                 PeerEventData::Connected(handle) => {
                     self.pending_connections.fetch_sub(1, Ordering::SeqCst);
@@ -64,6 +65,10 @@ impl PeerBookRef {
                 }
                 PeerEventData::Disconnect(peer) => {
                     self.connected_peers.remove(peer.address).await;
+
+                    if let Err(e) = self.storage.store_peers(vec![peer.serialize()]).await {
+                        error!("failed to store disconnected peer: {:?}", e);
+                    }
 
                     if self.disconnected_peers.insert(peer.address, *peer).await.is_none() {
                         metrics::increment_gauge!(DISCONNECTED, 1.0);
@@ -78,7 +83,7 @@ impl PeerBookRef {
 }
 
 impl PeerBook {
-    pub fn spawn() -> Self {
+    pub fn spawn(storage: DynStorage) -> Self {
         let (sender, receiver) = wrapped_mpsc::channel(snarkos_metrics::queues::PEER_EVENTS, 256);
         let peers = PeerBook {
             disconnected_peers: Default::default(),
@@ -88,6 +93,7 @@ impl PeerBook {
         };
         tokio::spawn(
             PeerBookRef {
+                storage,
                 disconnected_peers: peers.disconnected_peers.clone(),
                 connected_peers: peers.connected_peers.clone(),
                 pending_connections: peers.pending_connections.clone(),
@@ -110,36 +116,20 @@ impl PeerBook {
         self.connected_peers.inner().keys().copied().collect()
     }
 
-    pub fn disconnected_peers(&self) -> Vec<SocketAddr> {
-        self.disconnected_peers.inner().keys().copied().collect()
-    }
-
     pub fn get_connected_peer_count(&self) -> u32 {
         self.connected_peers.len() as u32
-    }
-
-    pub fn get_active_peer_count(&self) -> u32 {
-        self.get_connected_peer_count() + self.pending_connections()
     }
 
     pub fn get_disconnected_peer_count(&self) -> u32 {
         self.disconnected_peers.len() as u32
     }
 
+    pub fn get_active_peer_count(&self) -> u32 {
+        self.get_connected_peer_count() + self.pending_connections()
+    }
+
     pub fn get_peer_handle(&self, address: SocketAddr) -> Option<PeerHandle> {
         self.connected_peers.get(&address)
-    }
-
-    pub async fn get_active_peer(&self, address: SocketAddr) -> Option<Peer> {
-        self.get_peer_handle(address)?.load().await
-    }
-
-    pub fn get_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
-        self.disconnected_peers.get(&address)
-    }
-
-    async fn take_disconnected_peer(&self, address: SocketAddr) -> Option<Peer> {
-        self.disconnected_peers.remove(address).await
     }
 
     pub fn pending_connections(&self) -> u32 {
@@ -152,21 +142,38 @@ impl PeerBook {
         Ok(())
     }
 
-    pub async fn get_or_connect(&self, node: Node, address: SocketAddr) -> Result<Option<PeerHandle>, NetworkError> {
+    pub async fn fetch_received_peer_data(&self, address: SocketAddr) -> Peer {
+        if let Some(peer) = self.disconnected_peers.remove(address).await {
+            metrics::decrement_gauge!(DISCONNECTED, 1.0);
+            peer
+        } else {
+            Peer::new(address, None)
+        }
+    }
+
+    pub async fn get_or_connect(
+        &self,
+        node: Node,
+        address: SocketAddr,
+        data: Option<&snarkos_storage::Peer>,
+    ) -> Result<Option<PeerHandle>, NetworkError> {
         if let Some(active_handler) = self.connected_peers.get(&address) {
             Ok(Some(active_handler))
         } else {
-            if let Some(mut peer) = self.get_disconnected_peer(address) {
+            if let Some(mut peer) = self.disconnected_peers.get(&address) {
                 if peer.judge_bad_offline() {
                     // dont reconnect to bad peers
                     return Ok(None);
                 }
             }
-            let peer = if let Some(peer) = self.take_disconnected_peer(address).await {
+            let peer = if let Some(mut peer) = self.disconnected_peers.remove(address).await {
                 metrics::decrement_gauge!(DISCONNECTED, 1.0);
+                if let Some(data) = data {
+                    peer.quality.sync_from_storage(data);
+                }
                 peer
             } else {
-                Peer::new(address)
+                Peer::new(address, data)
             };
             self.pending_connections.fetch_add(1, Ordering::SeqCst);
             peer.connect(node, self.peer_events.clone());
@@ -202,6 +209,19 @@ impl PeerBook {
         .await;
     }
 
+    pub async fn serialize(&self) -> Vec<snarkos_storage::Peer> {
+        self.map_each_peer(move |peer| async move { peer.load().await.map(|x| x.serialize()) })
+            .await
+    }
+
+    pub async fn serialize_disconnected(&self) -> Vec<snarkos_storage::Peer> {
+        self.disconnected_peers
+            .inner()
+            .values()
+            .map(|x| x.serialize())
+            .collect()
+    }
+
     pub async fn broadcast(&self, payload: Payload) {
         self.for_each_peer(move |peer| {
             let payload = payload.clone();
@@ -235,7 +255,7 @@ impl PeerBook {
     ///
     /// Adds the given address to the disconnected peers in this `PeerBook`.
     ///
-    pub async fn add_peer(&self, address: SocketAddr) {
+    pub async fn add_peer(&self, address: SocketAddr, data: Option<&snarkos_storage::Peer>) {
         if self.connected_peers.contains_key(&address) || self.disconnected_peers.contains_key(&address) {
             return;
         }
@@ -243,7 +263,7 @@ impl PeerBook {
         // Add the given address to the map of disconnected peers.
         if self
             .disconnected_peers
-            .insert(address, Peer::new(address))
+            .insert(address, Peer::new(address, data))
             .await
             .is_none()
         {
@@ -269,29 +289,5 @@ impl PeerBook {
             .into_iter()
             .max_by(|a, b| a.quality.last_seen.cmp(&b.quality.last_seen))
             .map(|x| x.address)
-    }
-
-    /// returns (peer, count_total_higher)
-    pub async fn random_higher_peer(&self, block_height: u32) -> Option<(Peer, usize)> {
-        let peers = self
-            .connected_peers_snapshot()
-            .await
-            .into_iter()
-            .filter(|x| x.quality.block_height > block_height)
-            .collect::<Vec<Peer>>();
-        let count_total_higher = peers.len();
-
-        Some((
-            peers.into_iter().choose(&mut SmallRng::from_entropy())?,
-            count_total_higher,
-        ))
-    }
-
-    /// Cancels any expected sync block counts from all peers.
-    pub async fn cancel_any_unfinished_syncing(&self) {
-        self.for_each_peer(move |peer| async move {
-            peer.cancel_sync().await;
-        })
-        .await;
     }
 }

@@ -124,9 +124,9 @@ impl Node {
             state: Default::default(),
             local_addr: Default::default(),
             config,
-            storage,
+            storage: storage.clone(),
             inbound_cache: Default::default(),
-            peer_book: PeerBook::spawn(),
+            peer_book: PeerBook::spawn(storage),
             sync: Default::default(),
             known_network: Default::default(),
             launched: Utc::now(),
@@ -183,6 +183,22 @@ impl Node {
     pub async fn start_services(&self) {
         let node_clone: Node = self.clone();
         let peer_sync_interval = self.config.peer_sync_interval();
+        match self.storage.fetch_peers().await {
+            Err(e) => {
+                error!("failed to fetch peers from storage: {:?}", e);
+            }
+            Ok(peers) => {
+                for peer in peers {
+                    self.peer_book
+                        .add_peer(
+                            peer.address,
+                            self.config.bootnodes.load().contains(&peer.address),
+                            Some(&peer),
+                        )
+                        .await;
+                }
+            }
+        }
         let peering_task = task::spawn(async move {
             loop {
                 info!("Updating peers");

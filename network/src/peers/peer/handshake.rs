@@ -221,7 +221,7 @@ impl Peer {
 
         let mut peer_address = address;
         peer_address.set_port(data.version.listening_port);
-        let peer = Peer::new(peer_address);
+        let peer = Peer::new(peer_address, None);
 
         info!("Connected to peer {}", peer_address);
 

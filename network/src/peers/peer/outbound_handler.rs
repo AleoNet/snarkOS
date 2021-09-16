@@ -90,46 +90,22 @@ impl Peer {
     ) -> Result<PeerResponse, NetworkError> {
         match message {
             PeerAction::Disconnect => Ok(PeerResponse::Disconnect),
-<<<<<<< HEAD
-            PeerAction::SendBlock(block, height) => {
-                // check if they sent us the block recently
-                let block = block.serialize();
-
-                if self.block_received_cache.contains(&block[..]) {
-                    metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
-                    return Ok(PeerResponse::None);
-                }
-
-                let message = Payload::Block(block, Some(height));
-
-                network.write_payload(&message).await.map_err(|e| {
-                    metrics::increment_counter!(metrics::outbound::ALL_FAILURES);
-                    e
-                })?;
-
-                metrics::increment_counter!(metrics::outbound::ALL_SUCCESSES);
-
-                debug!("Sent a '{}' message to {}", &message, self.address);
-                Ok(PeerResponse::None)
-            }
-=======
->>>>>>> 6883736b... wip
             PeerAction::Send(message, time_received) => {
                 match &message {
                     Payload::Ping(_) => {
                         self.quality.expecting_pong = true;
-                        self.quality.last_ping_sent = Some(Instant::now());    
-                    },
+                        self.quality.last_ping_sent = Some(Instant::now());
+                    }
                     Payload::Block(block, _) => {
                         if self.block_received_cache.contains(&block[..]) {
                             metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
                             return Ok(PeerResponse::None);
                         }
                         self.quality.blocks_sent_to += 1;
-                    },
+                    }
                     Payload::SyncBlock(..) => {
                         self.quality.blocks_synced_to += 1;
-                    },
+                    }
                     _ => (),
                 }
 
