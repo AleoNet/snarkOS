@@ -32,10 +32,6 @@ use super::{network::*, outbound_handler::*};
 pub struct Peer {
     pub address: SocketAddr,
     pub quality: PeerQuality,
-    #[serde(skip)]
-    pub queued_inbound_message_count: Arc<AtomicUsize>,
-    #[serde(skip)]
-    pub queued_outbound_message_count: Arc<AtomicUsize>,
     /// Whether this peer is routable or not.
     ///
     /// `None` indicates the node has never attempted a connection with this peer.
@@ -53,8 +49,6 @@ impl Peer {
         Self {
             address,
             quality: Default::default(),
-            queued_inbound_message_count: Default::default(),
-            queued_outbound_message_count: Default::default(),
 
             // Set to `None` since peer creation only ever happens before a connection to the peer,
             // therefore we don't know if its listener is routable or not.
