@@ -281,7 +281,9 @@ impl ConsensusInner {
             canon.block_height
         );
         loop {
-            let mut sub_children = children.children().to_vec();
+            let mut sub_children = children.take_children();
+            // rust doesn't believe we will always set children before the next loop
+            children = DigestTree::Leaf(Digest::from([0u8; 32]));
             if sub_children.is_empty() {
                 break;
             }
