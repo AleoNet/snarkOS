@@ -13,7 +13,7 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
-include = [ "Cargo.toml", "src", "README.md", "LICENSE.md" ]
+include = [ "Cargo.toml", "src", "README.md", "LICENSE.md", "documentation/" ]
 license = "GPL-3.0"
 edition = "2018"
 
