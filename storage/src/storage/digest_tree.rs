@@ -16,7 +16,8 @@
 
 use crate::Digest;
 
-#[derive(Clone, Debug)]
+// do not implement clone: this structure can be too deep, resulting in stack overflow
+#[derive(Debug)]
 pub enum DigestTree {
     // digest of leaf node
     Leaf(Digest),
@@ -64,6 +65,13 @@ impl DigestTree {
         match self {
             DigestTree::Leaf(_) => &[],
             DigestTree::Node(_, children, _) => &children[..],
+        }
+    }
+
+    pub fn take_children(self) -> Vec<DigestTree> {
+        match self {
+            DigestTree::Leaf(_) => vec![],
+            DigestTree::Node(_, children, _) => children,
         }
     }
 }
