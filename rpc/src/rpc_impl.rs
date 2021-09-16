@@ -408,7 +408,7 @@ impl RpcFunctions for RpcImpl {
     async fn get_node_info(&self) -> Result<NodeInfo, RpcError> {
         Ok(NodeInfo {
             listening_addr: self.node.config.desired_address,
-            is_bootnode: self.node.config.is_bootnode(),
+            node_type: self.node.config.node_type,
             is_miner: self.sync_handler()?.is_miner,
             is_syncing: self.node.is_syncing_blocks(),
             launched: self.node.launched,
@@ -482,7 +482,8 @@ impl RpcFunctions for RpcImpl {
             .iter()
             .map(|(addr, node_centrality)| Vertice {
                 addr: *addr,
-                is_bootnode: self.node.config.bootnodes().contains(addr),
+                is_beacon: self.node.config.beacons().contains(addr),
+                is_sync_provider: self.node.config.sync_providers().contains(addr),
                 degree_centrality: node_centrality.degree_centrality,
                 eigenvector_centrality: node_centrality.eigenvector_centrality,
                 fiedler_value: node_centrality.fiedler_value,

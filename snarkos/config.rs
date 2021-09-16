@@ -21,15 +21,19 @@ use crate::{
     update::UpdateCLI,
 };
 
+use snarkos_network::NodeType;
+
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
-/// Bootnodes maintained by Aleo.
+/// Peer discovery nodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
-pub const MAINNET_BOOTNODES: &[&str] = &[]; // "192.168.0.1:4130"
-pub const TESTNET_BOOTNODES: &[&str] = &[
+pub const MAINNET_BEACONS: &[&str] = &[]; // "192.168.0.1:4130"
+// FIXME: setup peer discovery node addresses.
+// Setting the old bootnodes as beacons ensures backwards compaibility during the transition.
+pub const TESTNET_BEACONS: &[&str] = &[
     "50.18.83.123:4131",
     "50.18.246.201:4131",
     "159.89.152.247:4131",
@@ -42,6 +46,9 @@ pub const TESTNET_BOOTNODES: &[&str] = &[
     "206.189.80.245:4131",
     "178.128.18.3:4131",
 ];
+
+pub const MAINNET_SYNC_PROVIDERS: &[&str] = &[];
+pub const TESTNET_SYNC_PROVIDERS: &[&str] = &[];
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -70,10 +77,9 @@ pub struct JsonRPC {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {
+    pub kind: NodeType,
     pub dir: PathBuf,
     pub db: String,
-    pub is_bootnode: bool,
-    pub is_crawler: bool,
     pub ip: String,
     pub port: u16,
     pub verbose: u8,
@@ -88,7 +94,9 @@ pub struct Miner {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct P2P {
     #[serde(skip_serializing, skip_deserializing)]
-    pub bootnodes: Vec<String>,
+    pub beacons: Vec<String>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub sync_providers: Vec<String>,
     #[serde(alias = "mempool_interval")]
     pub mempool_sync_interval: u8,
     pub block_sync_interval: u16,
@@ -120,10 +128,9 @@ impl Default for Config {
         Self {
             aleo: Aleo { network_id: 1 },
             node: Node {
+                kind: NodeType::Client,
                 dir: Self::snarkos_dir(),
                 db: "snarkos_testnet1".into(),
-                is_bootnode: false,
-                is_crawler: false,
                 ip: "0.0.0.0".into(),
                 port: 4131,
                 verbose: 2,
@@ -141,7 +148,11 @@ impl Default for Config {
                 password: Some("Password".into()),
             },
             p2p: P2P {
-                bootnodes: TESTNET_BOOTNODES
+                beacons: TESTNET_BEACONS
+                    .iter()
+                    .map(|node| (*node).to_string())
+                    .collect::<Vec<String>>(),
+                sync_providers: TESTNET_SYNC_PROVIDERS
                     .iter()
                     .map(|node| (*node).to_string())
                     .collect::<Vec<String>>(),
@@ -210,12 +221,13 @@ impl Config {
         // Parse the contents into the `Config` struct
         let mut config: Config = toml::from_str(&toml_string)?;
 
-        let bootnodes = match config.aleo.network_id {
-            0 => MAINNET_BOOTNODES,
-            _ => TESTNET_BOOTNODES,
+        let (beacons, sync_providers) = match config.aleo.network_id {
+            0 => (MAINNET_BEACONS, MAINNET_SYNC_PROVIDERS),
+            _ => (TESTNET_BEACONS, TESTNET_SYNC_PROVIDERS),
         };
 
-        config.p2p.bootnodes = bootnodes
+        config.p2p.beacons = beacons.iter().map(|node| (*node).to_string()).collect::<Vec<String>>();
+        config.p2p.sync_providers = sync_providers
             .iter()
             .map(|node| (*node).to_string())
             .collect::<Vec<String>>();
@@ -226,7 +238,6 @@ impl Config {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Flags
-            "is-bootnode" => self.is_bootnode(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
@@ -260,19 +271,31 @@ impl Config {
                 0 => {
                     self.node.db = "snarkos_mainnet".into();
                     self.node.port = 4130;
-                    self.p2p.bootnodes = MAINNET_BOOTNODES
+                    self.p2p.beacons = MAINNET_BEACONS
                         .iter()
                         .map(|node| (*node).to_string())
                         .collect::<Vec<String>>();
+
+                    self.p2p.sync_providers = MAINNET_SYNC_PROVIDERS
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+
                     self.aleo.network_id = network_id;
                 }
                 _ => {
                     self.node.db = format!("snarkos_testnet{}", network_id);
                     self.node.port = 4130 + (network_id as u16);
-                    self.p2p.bootnodes = TESTNET_BOOTNODES
+                    self.p2p.beacons = TESTNET_BEACONS
                         .iter()
                         .map(|node| (*node).to_string())
                         .collect::<Vec<String>>();
+
+                    self.p2p.sync_providers = TESTNET_SYNC_PROVIDERS
+                        .iter()
+                        .map(|node| (*node).to_string())
+                        .collect::<Vec<String>>();
+
                     self.aleo.network_id = network_id;
                 }
             }
@@ -287,14 +310,6 @@ impl Config {
         if let Some(path) = argument {
             self.storage.import = Some(path.to_owned().into());
         }
-    }
-
-    fn is_bootnode(&mut self, argument: bool) {
-        self.node.is_bootnode = argument;
-    }
-
-    pub fn is_crawler(&mut self, argument: bool) {
-        self.node.is_crawler = argument;
     }
 
     fn is_miner(&mut self, argument: bool) {
@@ -320,10 +335,10 @@ impl Config {
     }
 
     fn connect(&mut self, argument: Option<&str>) {
-        if let Some(bootnodes) = argument {
-            let sanitize_bootnodes = bootnodes.replace(&['[', ']', ' '][..], "");
-            let bootnodes: Vec<String> = sanitize_bootnodes.split(',').map(|s| s.to_string()).collect();
-            self.p2p.bootnodes = bootnodes;
+        if let Some(addrs) = argument {
+            let sanitized_addrs = addrs.replace(&['[', ']', ' '][..], "");
+            let addrs: Vec<String> = sanitized_addrs.split(',').map(|s| s.to_string()).collect();
+            self.p2p.beacons = addrs;
         }
     }
 
@@ -404,12 +419,11 @@ impl Config {
             return Err(CliError::SyncIntervalInvalid);
         }
 
-        if self.node.is_bootnode && self.miner.is_miner {
-            return Err(CliError::MinerBootstrapper);
-        }
-
-        if self.node.is_bootnode && self.node.is_crawler {
-            return Err(CliError::CrawlerBootstrapper);
+        if self.miner.is_miner {
+            match self.node.kind {
+                NodeType::Client => {}
+                NodeType::Crawler | NodeType::Beacon | NodeType::SyncProvider => return Err(CliError::CantMine),
+            }
         }
 
         // TODO (howardwu): Check the memory pool interval.
@@ -427,7 +441,6 @@ impl CLI for ConfigCli {
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[
         flag::NO_JSONRPC,
-        flag::IS_BOOTNODE,
         flag::IS_MINER,
         flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
@@ -463,7 +476,6 @@ impl CLI for ConfigCli {
             "no-jsonrpc",
             "export-canon-blocks",
             "import-canon-blocks",
-            "is-bootnode",
             "is-miner",
             "ip",
             "port",

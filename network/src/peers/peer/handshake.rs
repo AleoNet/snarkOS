@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use snow::TransportState;
 use tokio::{
@@ -168,7 +168,7 @@ impl Peer {
         let (mut reader, mut writer) = stream.into_split();
 
         let result = tokio::time::timeout(
-            self.handshake_timeout(),
+            Duration::from_secs(crate::HANDSHAKE_TIMEOUT_SECS as u64),
             initiator_handshake(self.address, &our_version, &mut writer, &mut reader),
         )
         .await;
@@ -185,10 +185,7 @@ impl Peer {
             }
         };
 
-        match self.is_bootnode {
-            true => info!("Connected to bootnode {}", self.address),
-            false => info!("Connected to peer {}", self.address),
-        };
+        info!("Connected to peer {}", self.address);
 
         Ok(PeerIOHandle {
             reader: Some(reader),
@@ -205,7 +202,7 @@ impl Peer {
         let (mut reader, mut writer) = stream.into_split();
 
         let result = tokio::time::timeout(
-            Peer::peer_handshake_timeout(),
+            Duration::from_secs(crate::HANDSHAKE_TIMEOUT_SECS as u64),
             responder_handshake(address, &our_version, &mut writer, &mut reader),
         )
         .await;
@@ -224,7 +221,7 @@ impl Peer {
 
         let mut peer_address = address;
         peer_address.set_port(data.version.listening_port);
-        let peer = Peer::new(peer_address, false);
+        let peer = Peer::new(peer_address);
 
         info!("Connected to peer {}", peer_address);
 

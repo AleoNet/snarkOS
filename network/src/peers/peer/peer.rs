@@ -32,7 +32,6 @@ use super::{network::*, outbound_handler::*};
 pub struct Peer {
     pub address: SocketAddr,
     pub quality: PeerQuality,
-    pub is_bootnode: bool,
     /// Whether this peer is routable or not.
     ///
     /// `None` indicates the node has never attempted a connection with this peer.
@@ -46,11 +45,10 @@ const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
 const FAILURE_THRESHOLD: usize = 5;
 
 impl Peer {
-    pub fn new(address: SocketAddr, is_bootnode: bool) -> Self {
+    pub fn new(address: SocketAddr) -> Self {
         Self {
             address,
             quality: Default::default(),
-            is_bootnode,
 
             // Set to `None` since peer creation only ever happens before a connection to the peer,
             // therefore we don't know if its listener is routable or not.
@@ -85,18 +83,6 @@ impl Peer {
                 .collect();
         }
         self.quality.failures.len()
-    }
-
-    pub fn handshake_timeout(&self) -> Duration {
-        if self.is_bootnode {
-            Duration::from_secs(crate::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64)
-        } else {
-            Self::peer_handshake_timeout()
-        }
-    }
-
-    pub fn peer_handshake_timeout() -> Duration {
-        Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64)
     }
 
     pub(super) async fn run(

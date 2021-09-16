@@ -21,7 +21,7 @@ use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
-use snarkos_network::NodeCluster;
+use snarkos_network::{NodeCluster, NodeType};
 
 /// Defines the authentication format for accessing private endpoints on the RPC server
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -128,8 +128,8 @@ pub struct NodeInfo {
     /// The configured listening address of the node.
     pub listening_addr: SocketAddr,
 
-    /// Flag indicating if the node is a bootnode
-    pub is_bootnode: bool,
+    /// Flag indicating if the node's type.
+    pub node_type: NodeType,
 
     /// Flag indicating if the node is operating as a miner
     pub is_miner: bool,
@@ -322,7 +322,8 @@ pub struct NetworkGraph {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Vertice {
     pub addr: SocketAddr,
-    pub is_bootnode: bool,
+    pub is_beacon: bool,
+    pub is_sync_provider: bool,
 
     // Centrality measurements for the node.
     pub degree_centrality: u16,

@@ -90,15 +90,14 @@ async fn handshake_initiator_side() {
     let peer_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let peer_address = peer_listener.local_addr().unwrap();
 
-    // start node with the peer as a bootnode; that way it will get connected to
     // note: using the smallest allowed interval for peer sync
     let setup = TestSetup {
         consensus_setup: None,
-        bootnodes: vec![peer_address.to_string()],
         peer_sync_interval: 1,
         ..Default::default()
     };
     let node = test_node(setup).await;
+    node.connect_to_addresses(&[peer_address]).await;
 
     // accept the node's connection on peer side
     let (mut peer_stream, _node_address) = peer_listener.accept().await.unwrap();
@@ -235,18 +234,18 @@ async fn reject_non_version_messages_before_handshake() {
 
 #[tokio::test]
 async fn handshake_timeout_initiator_side() {
-    const NUM_BOOTSTRAPPERS: usize = 5;
+    const NUM_BEACONS: usize = 5;
 
-    // set up bootnodes that won't perform a valid handshake
-    let mut failing_bootnodes = Vec::with_capacity(NUM_BOOTSTRAPPERS);
-    for _ in 0..NUM_BOOTSTRAPPERS {
-        failing_bootnodes.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    // set up beacons that won't perform a valid handshake
+    let mut failing_beacons = Vec::with_capacity(NUM_BEACONS);
+    for _ in 0..NUM_BEACONS {
+        failing_beacons.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
     }
 
     // start the node
     let setup = TestSetup {
         consensus_setup: None,
-        bootnodes: failing_bootnodes
+        beacons: failing_beacons
             .iter()
             .map(|l| {
                 let addr = l.local_addr().unwrap();
@@ -257,12 +256,12 @@ async fn handshake_timeout_initiator_side() {
     };
     let node = test_node(setup).await;
 
-    // the node should start connecting to all the configured bootnodes
+    // the node should start connecting to all the configured beacons.
     wait_until!(3, node.peer_book.get_active_peer_count() != 0);
 
     // but since they won't reply, it should drop them after the handshake deadline
     wait_until!(
-        snarkos_network::HANDSHAKE_BOOTNODE_TIMEOUT_SECS as u64 + 1,
+        snarkos_network::HANDSHAKE_TIMEOUT_SECS as u64 + 1,
         node.peer_book.get_active_peer_count() == 0
     );
 }
@@ -285,7 +284,7 @@ async fn handshake_timeout_responder_side() {
 
     // but since it won't conclude the handshake, it should be dropped after the handshake deadline
     wait_until!(
-        snarkos_network::HANDSHAKE_PEER_TIMEOUT_SECS as u64 + 1,
+        snarkos_network::HANDSHAKE_TIMEOUT_SECS as u64 + 1,
         node.peer_book.get_active_peer_count() == 0
     );
 }

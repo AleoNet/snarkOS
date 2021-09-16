@@ -137,7 +137,7 @@ impl Node {
             terminator: Arc::new(AtomicBool::new(false)),
         }));
 
-        if node.config.is_crawler() {
+        if node.is_of_type(NodeType::Crawler) {
             // Safe since crawlers don't start the listener service.
             node.set_local_addr(node.config.desired_address);
 
@@ -146,6 +146,10 @@ impl Node {
         }
 
         Ok(node)
+    }
+
+    pub fn is_of_type(&self, t: NodeType) -> bool {
+        self.config.node_type == t
     }
 
     pub fn set_sync(&mut self, sync: Sync) {
@@ -205,7 +209,7 @@ impl Node {
             self.register_task(known_network_task);
         }
 
-        if !self.config.is_crawler() {
+        if !self.is_of_type(NodeType::Crawler) {
             let node_clone = self.clone();
             let state_tracking_task = task::spawn(async move {
                 loop {
@@ -244,7 +248,9 @@ impl Node {
             #[cfg(not(feature = "test"))]
             sleep(Duration::from_secs(5)).await;
 
-            let bootnodes = self.config.bootnodes();
+            // FIXME: sync providers are set as beacons in the configuration during the rollout.
+            // let sync_providers = self.config.sync_providers();
+            let sync_providers = self.config.beacons();
             let node_clone = self.clone();
             let mempool_sync_interval = node_clone.expect_sync().mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
@@ -265,17 +271,17 @@ impl Node {
                         //  all of our connected peers anyways.
 
                         // The order of preference for the sync node is as follows:
-                        //   1. Iterate (in declared order) through the bootnodes:
-                        //      a. Check if this node is connected to the specified bootnode in the peer book.
-                        //      b. Select the specified bootnode as the sync node if this node is connected to it.
-                        //   2. If this node is not connected to any bootnode,
+                        //   1. Iterate (in declared order) through the sync providers:
+                        //      a. Check if this node is connected to the specified sync provider in the peer book.
+                        //      b. Select the specified sync provider as the sync node if this node is connected to it.
+                        //   2. If this node is not connected to any sync provider,
                         //      then select the last seen peer as the sync node.
 
                         // Step 1.
                         let mut sync_node = None;
-                        for bootnode in bootnodes.iter() {
-                            if node_clone.peer_book.is_connected(*bootnode) {
-                                sync_node = Some(*bootnode);
+                        for sync_provider in sync_providers.iter() {
+                            if node_clone.peer_book.is_connected(*sync_provider) {
+                                sync_node = Some(*sync_provider);
                                 break;
                             }
                         }

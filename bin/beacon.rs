@@ -30,6 +30,7 @@ use tokio::runtime;
 ///
 /// 1. Creates network server.
 /// 2. Starts rpc server thread.
+/// 3. Starts the network listener.
 ///
 async fn start_server(config: Config) -> anyhow::Result<()> {
     initialize_logger(&config);
@@ -45,6 +46,9 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Initialize metrics framework.
     node.initialize_metrics().await?;
+
+    // Start listening for incoming connections.
+    node.listen().await?;
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
@@ -63,7 +67,7 @@ fn main() -> Result<(), NodeError> {
     let arguments = ConfigCli::args();
 
     let mut config: Config = ConfigCli::parse(&arguments)?;
-    config.node.kind = NodeType::Crawler;
+    config.node.kind = NodeType::Beacon;
     config.check().map_err(|e| NodeError::Message(e.to_string()))?;
 
     let runtime = runtime::Builder::new_multi_thread().enable_all().build()?;

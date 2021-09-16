@@ -28,11 +28,8 @@ pub enum CliError {
     #[error("TomlDeError: {0}")]
     TomlDeError(#[from] toml::de::Error),
 
-    #[error("The node can't be a bootstrapper and a miner at the same time")]
-    MinerBootstrapper,
-
-    #[error("The node can't be a bootstrapper and a crawler at the same time")]
-    CrawlerBootstrapper,
+    #[error("Only client nodes can run with mining enabled")]
+    CantMine,
 
     #[error("The minimum or maximum value for peer count is invalid")]
     PeerCountInvalid,

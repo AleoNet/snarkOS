@@ -214,10 +214,10 @@ async fn block_two_node() {
             ..Default::default()
         }),
         peer_sync_interval: 5,
-        bootnodes: vec![alice_address.to_string()],
         ..Default::default()
     };
     let node_bob = test_node(setup).await;
+    node_bob.connect_to_addresses(&[alice_address]).await;
 
     // check blocks present in alice's chain were synced to bob's
     wait_until!(30, node_bob.storage.canon().await.unwrap().block_height == NUM_BLOCKS);
@@ -330,10 +330,10 @@ async fn transaction_two_node() {
             ..Default::default()
         }),
         peer_sync_interval: 1,
-        bootnodes: vec![alice_address.to_string()],
         ..Default::default()
     };
     let node_bob = test_node(setup).await;
+    node_bob.connect_to_addresses(&[alice_address]).await;
 
     // check transaction is present in bob's memory pool
     wait_until!(

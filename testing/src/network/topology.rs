@@ -16,7 +16,7 @@
 
 use snarkos_network::Node;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 pub enum Topology {
     /// Each node - except the last one - connects to the next one in a linear fashion.
@@ -31,8 +31,7 @@ pub enum Topology {
 
 /// Connects the nodes in a given `Topology`.
 ///
-/// This function assumes the nodes have an established address but don't have their services
-/// started yet, as it uses the bootnodes to establish the connections between nodes.
+/// This function assumes the nodes have an established address.
 ///
 /// When connecting in a `Star`, the first node in the `nodes` will be used as the hub.
 pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
@@ -44,7 +43,7 @@ pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
         Topology::Line => line(nodes).await,
         Topology::Ring => ring(nodes).await,
         Topology::Mesh => mesh(nodes).await,
-        Topology::Star => star(nodes),
+        Topology::Star => star(nodes).await,
     }
 }
 
@@ -52,7 +51,7 @@ pub async fn connect_nodes(nodes: &mut Vec<Node>, topology: Topology) {
 async fn line(nodes: &mut Vec<Node>) {
     let mut prev_node: Option<SocketAddr> = None;
 
-    // Start each node with the previous as a bootnode.
+    // Connect each node with the previous.
     for node in nodes {
         if let Some(addr) = prev_node {
             node.connect_to_addresses(&[addr]).await;
@@ -92,13 +91,12 @@ async fn mesh(nodes: &mut Vec<Node>) {
 }
 
 /// Connects the network nodes in a star topology.
-fn star(nodes: &mut Vec<Node>) {
+async fn star(nodes: &mut Vec<Node>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().expect_local_addr();
 
-    // Start the rest of the nodes with the core node as the bootnode.
-    let bootnodes = vec![hub_address];
+    // Start the rest of the nodes with the core node at the center.
     for node in nodes.iter_mut().skip(1) {
-        node.config.bootnodes.store(Arc::new(bootnodes.clone()));
+        node.connect_to_addresses(&[hub_address]).await;
     }
 }
