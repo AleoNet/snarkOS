@@ -147,7 +147,7 @@ features = [ "log" ]
 version = "0.1"
 
 [dependencies.arc-swap]
-version = "1.2"
+version = "1.4"
 
 [dependencies.atomic-instant]
 version = "0.1"
