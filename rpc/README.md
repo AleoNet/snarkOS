@@ -197,7 +197,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconne
 ```
 
 ## getnetworkgraph
-Returns the network graph crawled by this node (if it is a bootnode).
+Returns the network graph crawled by this node (if it is a crawler).
 
 ### Arguments
 
@@ -219,7 +219,8 @@ None
 | `edges[i].source`                    | SocketAddr | One side of the crawled connection                                                        |
 | `edges[i].target`                    | SocketAddr | The other side of the crawled connection                                                  |
 | `vertices[i].addr`                   | SocketAddr | The recorded address of the crawled node                                                  |
-| `vertices[i].is_bootnode`            | bool       | Indicates whether the node is a bootnode                                                  |
+| `vertices[i].is_beacon`              | bool       | Indicates whether the node is a beacon                                                    |
+| `vertices[i].is_sync_provider`       | bool       | Indicates whether the node is a sync provider                                             |
 | `vertices[i].degree_centrality`      | u16        | The node's degree centrality, aka its connection count                                    |
 | `vertices[i].eigenvector_centrality` | f64        | The node's eigenvector centrality, indicates its relative importance in the network       |
 | `vertices[i].fiedler_value`          | f64        | The node's fiedler value, can be used to partition the network graph                      |
@@ -241,7 +242,7 @@ None
 
 |     Parameter    |     Type      |                  Description                  |
 |:----------------:|:-------------:|:---------------------------------------------:|
-| `is_bootnode`    | bool          | Flag indicating if the node is a bootnode     |
+| `node_type`      | NodeType      | Flag indicating the node type                 |
 | `is_miner`       | bool          | Flag indicating if the node is a miner        |
 | `is_syncing`     | bool          | Flag indicating if the node currently syncing |
 | `launched`       | timestamp     | The timestamp of when the node was launched   |
