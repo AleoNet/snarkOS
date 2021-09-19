@@ -18,7 +18,8 @@ include = [
   "snarkos",
   "README.md",
   "LICENSE.md",
-  "build.rs"
+  "build.rs",
+  "bin/"
 ]
 license = "GPL-3.0"
 edition = "2018"
