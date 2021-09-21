@@ -74,6 +74,7 @@ pub mod misc {
     pub const ORPHAN_BLOCKS: &str = "snarkos_misc_orphan_blocks_total";
     pub const RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";
     pub const BLOCK_PROCESSING_TIME: &str = "snarkos_misc_block_processing_time";
+    pub const BLOCK_COMMIT_TIME: &str = "snarkos_misc_block_commit_time";
 }
 
 pub mod internal_rtt {
