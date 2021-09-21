@@ -21,7 +21,7 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 6,
+  "id": 1,
   "links": [],
   "panels": [
     {
@@ -182,7 +182,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.1.2",
+      "pluginVersion": "8.1.3",
       "targets": [
         {
           "exemplar": true,
@@ -919,8 +919,16 @@
           "exemplar": true,
           "expr": "rate(snarkos_misc_block_processing_time_sum[$__rate_interval])/rate(snarkos_misc_block_processing_time_count[$__rate_interval])",
           "interval": "",
-          "legendFormat": "time",
+          "legendFormat": "total processing time",
           "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_misc_block_commit_time_sum[$__rate_interval])/rate(snarkos_misc_block_commit_time_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "verification and commit",
+          "refId": "B"
         }
       ],
       "title": "average block processing time",
@@ -1200,12 +1208,12 @@
     "list": []
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "snarkOS node",
   "uid": "nuiNXZV7k",
-  "version": 7
+  "version": 4
 }
