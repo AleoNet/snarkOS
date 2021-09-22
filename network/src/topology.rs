@@ -233,7 +233,7 @@ impl KnownNetwork {
         const HEIGHT_DELTA_TOLERANCE: u32 = 5;
         const MIN_CLUSTER_SIZE: usize = 3;
 
-        let mut nodes: Vec<(SocketAddr, u32)> = self.nodes().into_iter().collect();
+        let mut nodes: Vec<(SocketAddr, u32)> = self.nodes().into_iter().filter(|(_, height)| *height != 0).collect();
         nodes.sort_unstable_by_key(|&(_, height)| height);
 
         // Find the indices at which to split the heights.
