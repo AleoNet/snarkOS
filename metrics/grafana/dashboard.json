@@ -919,7 +919,7 @@
           "exemplar": true,
           "expr": "rate(snarkos_misc_block_processing_time_sum[$__rate_interval])/rate(snarkos_misc_block_processing_time_count[$__rate_interval])",
           "interval": "",
-          "legendFormat": "total processing time",
+          "legendFormat": "total for inbound block",
           "refId": "A"
         },
         {
@@ -931,7 +931,7 @@
           "refId": "B"
         }
       ],
-      "title": "average block processing time",
+      "title": "average block processing times",
       "type": "timeseries"
     },
     {
@@ -1208,12 +1208,12 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "snarkOS node",
   "uid": "nuiNXZV7k",
-  "version": 4
+  "version": 6
 }
