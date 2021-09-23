@@ -52,6 +52,7 @@ impl Peer {
             };
 
             peer.set_connected();
+            metrics::increment_gauge!(CONNECTED, 1.0);
             event_target
                 .send(PeerEvent {
                     address: peer.address,
