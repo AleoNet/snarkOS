@@ -33,18 +33,9 @@ struct StorageTrimSummary {
 pub async fn trim(storage: DynStorage) -> Result<()> {
     info!("Checking for obsolete objects in the storage...");
 
-    let non_canon_hashes = storage.get_block_hashes(None, crate::BlockFilter::NonCanonOnly).await?;
+    storage.trim().await?;
 
-    info!("found {} obsolete blocks, removing...", non_canon_hashes.len());
-
-    for hash in &non_canon_hashes {
-        storage.delete_block(hash).await?;
-    }
-
-    info!(
-        "The storage was trimmed successfully ({} items removed)!",
-        non_canon_hashes.len()
-    );
+    info!("The storage was trimmed successfully!");
 
     Ok(())
 }

@@ -223,6 +223,9 @@ pub trait Storage: Send + Sync {
 
     #[cfg(feature = "test")]
     async fn reset(&self) -> Result<()>;
+
+    /// Removes non-canon blocks and transactions from the storage.
+    async fn trim(&self) -> Result<()>;
 }
 
 /// A wrapper over storage implementations

@@ -83,6 +83,7 @@ enum Message {
     DeleteItem(KeyValueColumn, Vec<u8>),
     #[cfg(feature = "test")]
     Reset(),
+    Trim(),
 }
 
 impl fmt::Display for Message {
@@ -149,6 +150,7 @@ impl fmt::Display for Message {
             Message::DeleteItem(col, key) => write!(f, "DeleteItem({:?}, {:?})", col, key),
             #[cfg(feature = "test")]
             Message::Reset() => write!(f, "Reset()"),
+            Message::Trim() => write!(f, "Trim()"),
         }
     }
 }
@@ -219,6 +221,7 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::DeleteItem(col, key) => Box::new(self.wrap(move |f| f.delete_item(col, key))),
             #[cfg(feature = "test")]
             Message::Reset() => Box::new(self.inner.reset()),
+            Message::Trim() => Box::new(self.inner.trim()),
         }
     }
 
@@ -421,5 +424,9 @@ impl Storage for AsyncStorage {
     #[cfg(feature = "test")]
     async fn reset(&self) -> Result<()> {
         self.send(Message::Reset()).await
+    }
+
+    async fn trim(&self) -> Result<()> {
+        self.send(Message::Trim()).await
     }
 }

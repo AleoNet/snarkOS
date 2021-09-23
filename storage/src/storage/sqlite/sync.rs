@@ -1195,4 +1195,30 @@ impl SyncStorage for SqliteStorage {
         self.init()?;
         Ok(())
     }
+
+    fn trim(&mut self) -> Result<()> {
+        // Remove transactions belonging to non-canon blocks.
+        self.conn.execute(
+            r"
+            DELETE FROM transactions
+            WHERE id IN (
+                SELECT transactions.id
+                FROM transactions
+                INNER JOIN transaction_blocks on transaction_blocks.transaction_id = transactions.id
+                INNER JOIN blocks on blocks.id = transaction_blocks.block_id
+                WHERE blocks.canon_height IS NULL
+            )
+        ",
+            [],
+        )?;
+
+        // Remove non-canon blocks.
+        self.conn
+            .execute(r"DELETE FROM blocks WHERE blocks.canon_height IS NULL", [])?;
+
+        // Compact the storage file.
+        self.conn.execute("VACUUM", [])?;
+
+        Ok(())
+    }
 }

@@ -409,4 +409,7 @@ pub trait SyncStorage {
     /// Fully resets the storage.
     #[cfg(feature = "test")]
     fn reset(&mut self) -> Result<()>;
+
+    /// Removes non-canon blocks and transactions from the storage.
+    fn trim(&mut self) -> Result<()>;
 }
