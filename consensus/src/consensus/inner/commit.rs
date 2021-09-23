@@ -28,7 +28,7 @@ impl ConsensusInner {
         match self.storage.get_block_state(&hash).await? {
             BlockStatus::Unknown => (),
             BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
-                metrics::increment_counter!(DUPLICATE_BLOCKS);
+                metrics::increment_counter!(metrics::blocks::DUPLICATE_BLOCKS);
                 return Err(ConsensusError::PreExistingBlock);
             }
         }
@@ -54,7 +54,7 @@ impl ConsensusInner {
         match self.storage.get_block_state(&block.header.previous_block_hash).await? {
             BlockStatus::Committed(n) if n == canon.block_height => {
                 debug!("Processing a block that is on canon chain. Height {} -> {}", n, n + 1);
-                metrics::gauge!(BLOCK_HEIGHT, n as f64 + 1.0);
+                metrics::gauge!(metrics::blocks::HEIGHT, n as f64 + 1.0);
                 // Process the block now.
             }
             BlockStatus::Unknown => {
@@ -102,7 +102,7 @@ impl ConsensusInner {
 
                             {
                                 let canon = self.storage.canon().await?;
-                                metrics::gauge!(BLOCK_HEIGHT, canon.block_height as f64);
+                                metrics::gauge!(metrics::blocks::HEIGHT, canon.block_height as f64);
                             }
 
                             for block_hash in fork_path.path {
@@ -169,7 +169,7 @@ impl ConsensusInner {
             self.memory_pool.remove(&transaction.id.into())?;
         }
 
-        metrics::histogram!(BLOCK_COMMIT_TIME, now.elapsed());
+        metrics::histogram!(metrics::blocks::COMMIT_TIME, now.elapsed());
 
         Ok(())
     }

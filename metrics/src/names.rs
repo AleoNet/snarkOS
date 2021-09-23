@@ -67,14 +67,17 @@ pub mod queues {
 }
 
 pub mod misc {
-    pub const BLOCK_HEIGHT: &str = "snarkos_misc_block_height_total";
-    pub const BLOCKS_MINED: &str = "snarkos_misc_blocks_mined_total";
-    pub const DUPLICATE_BLOCKS: &str = "snarkos_misc_duplicate_blocks_total";
-    pub const DUPLICATE_SYNC_BLOCKS: &str = "snarkos_misc_duplicate_sync_blocks_total";
-    pub const ORPHAN_BLOCKS: &str = "snarkos_misc_orphan_blocks_total";
     pub const RPC_REQUESTS: &str = "snarkos_misc_rpc_requests_total";
-    pub const BLOCK_PROCESSING_TIME: &str = "snarkos_misc_block_processing_time";
-    pub const BLOCK_COMMIT_TIME: &str = "snarkos_misc_block_commit_time";
+}
+
+pub mod blocks {
+    pub const HEIGHT: &str = "snarkos_blocks_height_total";
+    pub const MINED: &str = "snarkos_blocks_mined_total";
+    pub const DUPLICATE_BLOCKS: &str = "snarkos_blocks_duplicate_blocks_total";
+    pub const DUPLICATE_SYNC_BLOCKS: &str = "snarkos_blocks_duplicate_sync_blocks_total";
+    pub const ORPHANS: &str = "snarkos_blocks_orphan_total";
+    pub const INBOUND_PROCESSING_TIME: &str = "snarkos_blocks_inbound_processing_time";
+    pub const COMMIT_TIME: &str = "snarkos_blocks_commit_time";
 }
 
 pub mod internal_rtt {

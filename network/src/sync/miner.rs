@@ -118,7 +118,7 @@ impl MinerInstance {
                     self.node.set_state(State::Idle);
                 }
 
-                metrics::increment_counter!(BLOCKS_MINED);
+                metrics::increment_counter!(metrics::blocks::MINED);
 
                 info!("Mined a new block: {:?}", hex::encode(block.header.hash().0));
 

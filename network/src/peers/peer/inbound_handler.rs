@@ -76,7 +76,7 @@ impl Peer {
                         {
                             let mut inbound_cache = node.inbound_cache.lock().await;
                             if inbound_cache.contains(&block[..]) {
-                                metrics::increment_counter!(misc::DUPLICATE_BLOCKS);
+                                metrics::increment_counter!(metrics::blocks::DUPLICATE_BLOCKS);
                                 return;
                             } else {
                                 inbound_cache.push(&block[..]);
