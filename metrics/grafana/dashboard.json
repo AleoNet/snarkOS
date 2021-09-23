@@ -204,7 +204,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_duplicate_blocks_total",
+          "expr": "snarkos_duplicates_total",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate Blocks",
@@ -212,7 +212,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_duplicate_sync_blocks_total",
+          "expr": "snarkos_duplicates_sync_total",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate SyncBlocks",
@@ -1215,5 +1215,5 @@
   "timezone": "",
   "title": "snarkOS node",
   "uid": "nuiNXZV7k",
-  "version": 7
+  "version": 8
 }
