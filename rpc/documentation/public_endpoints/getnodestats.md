@@ -8,6 +8,12 @@ None
 
 | Parameter                        | Type | Description                                                                  |
 | :------------------------------: | :--: | :--------------------------------------------------------------------------: |
+| `blocks.height`                  | u32  | The current block height of the node                                         |
+| `blocks.mined`                   | u32  | The number of blocks the node has mined                                      |
+| `blocks.inbound_processing_time` | f64  | The average processing time of an inbound block in seconds                   |
+| `blocks.commit_time`             | f64  | The block verification and commit time in seconds                            |
+| `blocks.duplicates`              | u64  | The number of duplicate blocks received                                      |
+| `blocks.duplicates_sync`         | u64  | The number of duplicate sync blocks received                                 |
 | `connections.all_accepted`       | u64  | The number of connection requests the node has received                      |
 | `connections.all_initiated`      | u64  | The number of connection requests the node has made                          |
 | `connections.all_rejected`       | u64  | The number of connection requests the node has rejected                      |
@@ -40,12 +46,6 @@ None
 | `internal_rtt.getsync`           | f64  | The average internal RTT for GetSync messages in seconds                     |
 | `internal_rtt.getblocks`         | f64  | The average internal RTT for GetBlocks messages in seconds                   |
 | `internal_rtt.getmemorypool`     | f64  | The average internal RTT for GetMemoryPool messages in seconds               |
-| `misc.block_height`              | u32  | The current block height of the node                                         |
-| `misc.blocks_mined`              | u32  | The number of blocks the node has mined                                      |
-| `misc.block_processing_time`     | f64  | The average processing time of an inbound block in seconds                   |
-| `misc.block_commit_time`         | f64  | The block verification and commit time in seconds                            |
-| `misc.duplicate_blocks`          | u64  | The number of duplicate blocks received                                      |
-| `misc.duplicate_sync_blocks`     | u64  | The number of duplicate sync blocks received                                 |
 | `outbound.all_successes`         | u64  | The number of successfully sent messages                                     |
 | `outbound.all_failures`          | u64  | The number of failures to send messages                                      |
 | `queues.consensus`               | u64  | The number of queued consensus requests                                      |
