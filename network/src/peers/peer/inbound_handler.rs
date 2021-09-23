@@ -17,7 +17,6 @@
 use snarkos_metrics::{
     self as metrics,
     inbound::{self, *},
-    misc,
     outbound,
 };
 use tokio::task;
