@@ -444,7 +444,6 @@ impl CLI for ConfigCli {
         flag::IS_MINER,
         flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
-        flag::SQLITE,
     ];
     const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
