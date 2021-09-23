@@ -332,9 +332,9 @@ pub struct BlockStats {
     /// The verification and commit time for a block.
     commit_time: CircularHistogram,
     /// The number of duplicate blocks received.
-    duplicate_blocks: Counter,
+    duplicates: Counter,
     /// The number of duplicate sync blocks received.
-    duplicate_sync_blocks: Counter,
+    duplicates_sync: Counter,
     /// The number of orphan blocks received.
     orphans: Counter,
 }
@@ -346,8 +346,8 @@ impl BlockStats {
             mined: Counter::new(),
             inbound_processing_time: CircularHistogram::new(),
             commit_time: CircularHistogram::new(),
-            duplicate_blocks: Counter::new(),
-            duplicate_sync_blocks: Counter::new(),
+            duplicates: Counter::new(),
+            duplicates_sync: Counter::new(),
             orphans: Counter::new(),
         }
     }
@@ -358,8 +358,8 @@ impl BlockStats {
             mined: self.mined.read(),
             inbound_processing_time: self.inbound_processing_time.average(),
             commit_time: self.commit_time.average(),
-            duplicate_blocks: self.duplicate_blocks.read(),
-            duplicate_sync_blocks: self.duplicate_sync_blocks.read(),
+            duplicates: self.duplicates.read(),
+            duplicates_sync: self.duplicates_sync.read(),
             orphans: self.orphans.read(),
         }
     }
@@ -454,8 +454,8 @@ impl Recorder for Stats {
             misc::RPC_REQUESTS => &self.misc.rpc_requests,
             // blocks
             blocks::MINED => &self.blocks.mined,
-            blocks::DUPLICATE_BLOCKS => &self.blocks.duplicate_blocks,
-            blocks::DUPLICATE_SYNC_BLOCKS => &self.blocks.duplicate_sync_blocks,
+            blocks::DUPLICATES => &self.blocks.duplicates,
+            blocks::DUPLICATES_SYNC => &self.blocks.duplicates_sync,
             blocks::ORPHANS => &self.blocks.orphans,
             _ => {
                 return;

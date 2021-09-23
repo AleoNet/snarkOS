@@ -28,7 +28,7 @@ impl ConsensusInner {
         match self.storage.get_block_state(&hash).await? {
             BlockStatus::Unknown => (),
             BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
-                metrics::increment_counter!(metrics::blocks::DUPLICATE_BLOCKS);
+                metrics::increment_counter!(metrics::blocks::DUPLICATES);
                 return Err(ConsensusError::PreExistingBlock);
             }
         }

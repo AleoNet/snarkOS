@@ -146,9 +146,9 @@ pub struct NodeBlockStats {
     /// The average block verification and commit time (in seconds).
     pub commit_time: f64,
     /// The number of duplicate blocks received.
-    pub duplicate_blocks: u64,
+    pub duplicates: u64,
     /// The number of duplicate sync blocks received.
-    pub duplicate_sync_blocks: u64,
+    pub duplicates_sync: u64,
     /// The number of orphan blocks received.
     pub orphans: u64,
 }
