@@ -302,8 +302,10 @@ pub struct MiscStats {
     block_height: DiscreteGauge,
     /// The number of mined blocks.
     blocks_mined: Counter,
-    /// The processing time for a block.
+    /// The processing time for an inbound block.
     block_processing_time: CircularHistogram,
+    /// The verification and commit time for a block.
+    block_commit_time: CircularHistogram,
     /// The number of duplicate blocks received.
     duplicate_blocks: Counter,
     /// The number of duplicate sync blocks received.
@@ -320,6 +322,7 @@ impl MiscStats {
             block_height: DiscreteGauge::new(),
             blocks_mined: Counter::new(),
             block_processing_time: CircularHistogram::new(),
+            block_commit_time: CircularHistogram::new(),
             duplicate_blocks: Counter::new(),
             duplicate_sync_blocks: Counter::new(),
             orphan_blocks: Counter::new(),
@@ -332,6 +335,7 @@ impl MiscStats {
             block_height: self.block_height.read(),
             blocks_mined: self.blocks_mined.read(),
             block_processing_time: self.block_processing_time.average(),
+            block_commit_time: self.block_commit_time.average(),
             duplicate_blocks: self.duplicate_blocks.read(),
             duplicate_sync_blocks: self.duplicate_sync_blocks.read(),
             orphan_blocks: self.orphan_blocks.read(),
@@ -381,6 +385,7 @@ impl Recorder for Stats {
         let metric = match key.name() {
             connections::DURATION => &self.connections.duration,
             misc::BLOCK_PROCESSING_TIME => &self.misc.block_processing_time,
+            misc::BLOCK_COMMIT_TIME => &self.misc.block_commit_time,
             internal_rtt::GETPEERS => &self.internal_rtt.getpeers,
             internal_rtt::GETSYNC => &self.internal_rtt.getsync,
             internal_rtt::GETBLOCKS => &self.internal_rtt.getblocks,

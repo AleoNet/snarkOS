@@ -148,6 +148,8 @@ impl ConsensusInner {
         hash: &Digest,
         block: &SerialBlock,
     ) -> Result<(), ConsensusError> {
+        let now = std::time::Instant::now();
+
         match self.storage.get_block_state(hash).await? {
             BlockStatus::Committed(_) => return Ok(()),
             BlockStatus::Unknown => return Err(ConsensusError::InvalidBlock(hash.clone())),
@@ -166,6 +168,8 @@ impl ConsensusInner {
         for transaction in block.transactions.iter() {
             self.memory_pool.remove(&transaction.id.into())?;
         }
+
+        metrics::histogram!(BLOCK_COMMIT_TIME, now.elapsed());
 
         Ok(())
     }

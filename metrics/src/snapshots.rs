@@ -133,8 +133,10 @@ pub struct NodeMiscStats {
     pub block_height: u64,
     /// The number of blocks the node has mined.
     pub blocks_mined: u64,
-    /// The average block processing time (in seconds).
+    /// The average inbound block processing time (in seconds).
     pub block_processing_time: f64,
+    /// The average block verification and commit time (in seconds).
+    pub block_commit_time: f64,
     /// The number of duplicate blocks received.
     pub duplicate_blocks: u64,
     /// The number of duplicate sync blocks received.
