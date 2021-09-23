@@ -409,7 +409,7 @@ impl RpcFunctions for RpcImpl {
         Ok(NodeInfo {
             listening_addr: self.node.config.desired_address,
             node_type: self.node.config.node_type,
-            is_miner: self.sync_handler()?.is_miner,
+            is_miner: self.sync_handler().map(|sync| sync.is_miner).unwrap_or(false),
             is_syncing: self.node.is_syncing_blocks(),
             launched: self.node.launched,
             version: env!("CARGO_PKG_VERSION").into(),
