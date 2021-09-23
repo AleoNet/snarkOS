@@ -18,16 +18,7 @@ use crate::config::Config;
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
-use snarkos_storage::{
-    export_canon_blocks,
-    key_value::KeyValueStore,
-    AsyncStorage,
-    DynStorage,
-    RocksDb,
-    SerialBlock,
-    SqliteStorage,
-    VMBlock,
-};
+use snarkos_storage::{export_canon_blocks, AsyncStorage, DynStorage, SerialBlock, SqliteStorage, VMBlock};
 
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
 use snarkvm_dpc::{
@@ -63,26 +54,8 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>>
         let mut sqlite_path = path.clone();
         sqlite_path.push("sqlite.db");
 
-        if config.storage.validate {
-            error!("validator not implemented for sqlite");
-            // FIXME: this should probably be an error, perhaps handled at the CLI level.
-            return Ok(None);
-        }
-
         Arc::new(AsyncStorage::new(SqliteStorage::new(&sqlite_path)?))
     };
-
-    if storage.canon().await?.block_height == 0 {
-        let mut rocks_identity_path = path.clone();
-        rocks_identity_path.push("IDENTITY");
-        if rocks_identity_path.exists() {
-            info!("Empty sqlite DB with existing rocksdb found, migrating...");
-            let rocks_storage = RocksDb::open(&path)?;
-            let rocks_storage: DynStorage = Arc::new(AsyncStorage::new(KeyValueStore::new(rocks_storage)));
-
-            snarkos_storage::migrate(&rocks_storage, &storage).await?;
-        }
-    }
 
     if let Some(max_head) = config.storage.max_head {
         let canon_next = storage.get_block_hash(max_head + 1).await?;
@@ -93,7 +66,7 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>>
 
     if config.storage.trim {
         let now = std::time::Instant::now();
-        // There shouldn't be issues after validation, but if there are, ignore them.
+        // Any unlikely trim-specific issues are non-critical.
         let _ = snarkos_storage::trim(storage.clone()).await;
         info!("Storage trimmed in {}ms", now.elapsed().as_millis());
         return Ok(None);

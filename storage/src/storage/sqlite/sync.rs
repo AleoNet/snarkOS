@@ -22,20 +22,7 @@ use rusqlite::{params, OptionalExtension, Row, ToSql};
 use snarkvm_dpc::{AleoAmount, MerkleRootHash, Network, PedersenMerkleRootHash, ProofOfSuccinctWork};
 use tracing::*;
 
-#[cfg(feature = "test")]
-use crate::key_value::KeyValueColumn;
-use crate::{
-    BlockFilter,
-    BlockOrder,
-    CanonData,
-    DigestTree,
-    FixMode,
-    Peer,
-    SerialRecord,
-    SerialTransaction,
-    SyncStorage,
-    ValidatorError,
-};
+use crate::{BlockFilter, BlockOrder, CanonData, DigestTree, Peer, SerialRecord, SerialTransaction, SyncStorage};
 
 use super::*;
 
@@ -1270,21 +1257,6 @@ impl SyncStorage for SqliteStorage {
         })?;
 
         Ok(query.collect::<Result<Vec<_>, rusqlite::Error>>()?)
-    }
-
-    fn validate(&mut self, _limit: Option<u32>, _fix_mode: FixMode) -> Vec<ValidatorError> {
-        warn!("called validator on sqlite, which is a NOP");
-        vec![]
-    }
-
-    #[cfg(feature = "test")]
-    fn store_item(&mut self, _col: KeyValueColumn, _key: Vec<u8>, _value: Vec<u8>) -> Result<()> {
-        unimplemented!()
-    }
-
-    #[cfg(feature = "test")]
-    fn delete_item(&mut self, _col: KeyValueColumn, _key: Vec<u8>) -> Result<()> {
-        unimplemented!()
     }
 
     fn transact<T, F: FnOnce(&mut Self) -> Result<T>>(&mut self, func: F) -> Result<T> {

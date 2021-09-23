@@ -119,8 +119,6 @@ pub struct Storage {
     pub export: Option<u32>,
     /// If set, contains the path to the file contained canon blocks exported using the `--export-canon-blocks` option.
     pub import: Option<PathBuf>,
-    /// If `true`, checks the node's storage for inconsistencies and attempts to fix any encountered issues.
-    pub validate: bool,
     /// If `true`, deletes any superfluous (non-canon) items from the node's storage. Note: it can temporarily increase
     /// the size of the database files, but they will become smaller after a while, when the database has run its
     /// automated maintenance.
@@ -174,7 +172,6 @@ impl Default for Config {
                 export: None,
                 import: None,
                 trim: false,
-                validate: false,
                 scan_for_forks: false,
                 max_head: None,
             },
@@ -249,7 +246,6 @@ impl Config {
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
-            "validate-storage" => self.validate_storage(arguments.is_present(option)),
             // Options
             "connect" => self.connect(arguments.value_of(option)),
             "export-canon-blocks" => self.export_canon_blocks(clap::value_t!(arguments.value_of(*option), u32).ok()),
@@ -406,10 +402,6 @@ impl Config {
         self.storage.trim = argument;
     }
 
-    fn validate_storage(&mut self, argument: bool) {
-        self.storage.validate = argument;
-    }
-
     fn verbose(&mut self, argument: Option<u8>) {
         if let Some(verbose) = argument {
             self.node.verbose = verbose
@@ -447,12 +439,7 @@ impl CLI for ConfigCli {
     type Config = Config;
 
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
-    const FLAGS: &'static [FlagType] = &[
-        flag::NO_JSONRPC,
-        flag::IS_MINER,
-        flag::TRIM_STORAGE,
-        flag::VALIDATE_STORAGE,
-    ];
+    const FLAGS: &'static [FlagType] = &[flag::NO_JSONRPC, flag::IS_MINER, flag::TRIM_STORAGE];
     const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
         option::IP,
@@ -497,7 +484,6 @@ impl CLI for ConfigCli {
             "rpc-username",
             "rpc-password",
             "trim-storage",
-            "validate-storage",
             "verbose",
             "max-head",
         ]);

@@ -21,15 +21,12 @@ use snarkos_metrics::{queues, wrapped_mpsc};
 use tokio::sync::oneshot;
 use tracing::log::trace;
 
-#[cfg(feature = "test")]
-use crate::key_value::KeyValueColumn;
 use crate::{
     BlockFilter,
     BlockStatus,
     CanonData,
     Digest,
     DigestTree,
-    FixMode,
     ForkDescription,
     Peer,
     SerialBlock,
@@ -39,7 +36,6 @@ use crate::{
     Storage,
     SyncStorage,
     TransactionLocation,
-    ValidatorError,
 };
 
 enum Message {
@@ -77,11 +73,6 @@ enum Message {
     StorePeers(Vec<Peer>),
     LookupPeers(Vec<SocketAddr>),
     FetchPeers(),
-    Validate(Option<u32>, FixMode),
-    #[cfg(feature = "test")]
-    StoreItem(KeyValueColumn, Vec<u8>, Vec<u8>),
-    #[cfg(feature = "test")]
-    DeleteItem(KeyValueColumn, Vec<u8>),
     #[cfg(feature = "test")]
     Reset(),
     Trim(),
@@ -146,11 +137,6 @@ impl fmt::Display for Message {
             Message::StorePeers(peers) => write!(f, "StorePeers({:?})", peers),
             Message::LookupPeers(addresses) => write!(f, "LookupPeers({:?})", addresses),
             Message::FetchPeers() => write!(f, "FetchPeers()"),
-            Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
-            #[cfg(feature = "test")]
-            Message::StoreItem(col, key, value) => write!(f, "StoreItem({:?}, {:?}, {:?})", col, key, value),
-            #[cfg(feature = "test")]
-            Message::DeleteItem(col, key) => write!(f, "DeleteItem({:?}, {:?})", col, key),
             #[cfg(feature = "test")]
             Message::Reset() => write!(f, "Reset()"),
             Message::Trim() => write!(f, "Trim()"),
@@ -219,11 +205,6 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::StorePeers(peers) => Box::new(self.inner.store_peers(peers)),
             Message::LookupPeers(addresses) => Box::new(self.inner.lookup_peers(addresses)),
             Message::FetchPeers() => Box::new(self.inner.fetch_peers()),
-            Message::Validate(limit, fix_mode) => Box::new(self.inner.validate(limit, fix_mode)),
-            #[cfg(feature = "test")]
-            Message::StoreItem(col, key, value) => Box::new(self.wrap(move |f| f.store_item(col, key, value))),
-            #[cfg(feature = "test")]
-            Message::DeleteItem(col, key) => Box::new(self.wrap(move |f| f.delete_item(col, key))),
             #[cfg(feature = "test")]
             Message::Reset() => Box::new(self.inner.reset()),
             Message::Trim() => Box::new(self.inner.trim()),
@@ -418,20 +399,6 @@ impl Storage for AsyncStorage {
 
     async fn fetch_peers(&self) -> Result<Vec<Peer>> {
         self.send(Message::FetchPeers()).await
-    }
-
-    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {
-        self.send(Message::Validate(limit, fix_mode)).await
-    }
-
-    #[cfg(feature = "test")]
-    async fn store_item(&self, col: KeyValueColumn, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        self.send(Message::StoreItem(col, key, value)).await
-    }
-
-    #[cfg(feature = "test")]
-    async fn delete_item(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()> {
-        self.send(Message::DeleteItem(col, key)).await
     }
 
     #[cfg(feature = "test")]

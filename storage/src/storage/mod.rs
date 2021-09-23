@@ -14,12 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod mem;
-pub use mem::*;
-#[cfg(feature = "rocksdb_storage")]
-mod rocks;
-#[cfg(feature = "rocksdb_storage")]
-pub use rocks::*;
 #[allow(clippy::module_inception)]
 pub mod storage;
 pub use storage::*;
@@ -29,9 +23,6 @@ pub mod async_adapter;
 pub use async_adapter::*;
 pub mod digest_tree;
 pub use digest_tree::*;
-
-pub mod key_value;
-pub use key_value::KeyValueStorage;
 
 #[cfg(feature = "sqlite_storage")]
 pub mod sqlite;

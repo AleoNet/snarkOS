@@ -20,10 +20,6 @@ pub mod exporter;
 #[cfg(test)]
 pub mod trim;
 
-// #[cfg(test)]
-// pub mod validator;
-
-// pub use snarkos_storage::validator::FixMode;
 use snarkos_consensus::{DynLedger, MerkleLedger};
 use snarkos_storage::{AsyncStorage, DynStorage, SqliteStorage};
 use snarkvm_algorithms::{MerkleParameters, CRH};

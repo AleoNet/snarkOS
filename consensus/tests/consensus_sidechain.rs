@@ -16,7 +16,6 @@
 
 mod consensus_sidechain {
     use snarkos_consensus::OLDEST_FORK_THRESHOLD;
-    use snarkos_storage::validator::FixMode;
     use snarkos_testing::sync::*;
 
     use rand::{seq::IteratorRandom, thread_rng, Rng};
@@ -271,9 +270,6 @@ mod consensus_sidechain {
             .await
             .unwrap();
         assert!(consensus2_sync_blocks.is_empty());
-
-        // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 
     #[tokio::test]
@@ -347,9 +343,6 @@ mod consensus_sidechain {
             .await
             .unwrap(); // no common blocks
         assert!(consensus2_sync_blocks.is_empty());
-
-        // Verify the integrity of the block storage for the first instance.
-        assert!(consensus1.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 
     #[tokio::test]
@@ -395,8 +388,6 @@ mod consensus_sidechain {
             .await
             .unwrap();
         assert!(sync_blocks.is_empty());
-
-        assert!(consensus2.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 
     #[tokio::test]
@@ -419,8 +410,5 @@ mod consensus_sidechain {
         consensus.fast_forward().await.unwrap();
 
         assert_eq!(consensus.storage.canon().await.unwrap().block_height, 20);
-
-        // Verify the integrity of the block storage.
-        assert!(consensus.storage.validate(None, FixMode::Nothing).await.is_empty());
     }
 }

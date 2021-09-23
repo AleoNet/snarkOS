@@ -31,9 +31,6 @@ pub use objects::*;
 pub mod digest;
 pub use digest::*;
 
-pub mod validator;
-pub use validator::*;
-
 pub mod migrate;
 pub use migrate::*;
 

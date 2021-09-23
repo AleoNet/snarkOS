@@ -17,19 +17,15 @@
 use anyhow::*;
 use std::{net::SocketAddr, sync::Arc};
 
-#[cfg(feature = "test")]
-use crate::key_value::KeyValueColumn;
 use crate::{
     Digest,
     DigestTree,
-    FixMode,
     Peer,
     SerialBlock,
     SerialBlockHeader,
     SerialRecord,
     SerialTransaction,
     TransactionLocation,
-    ValidatorError,
 };
 
 /// Current state of a block in storage
@@ -215,17 +211,6 @@ pub trait Storage: Send + Sync {
 
     /// Looks up all known [`Peer`]s.
     async fn fetch_peers(&self) -> Result<Vec<Peer>>;
-
-    /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
-    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError>;
-
-    /// Stores the given key+value pair in the given column.
-    #[cfg(feature = "test")]
-    async fn store_item(&self, col: KeyValueColumn, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
-
-    /// Removes the given key and its corresponding value from the given column.
-    #[cfg(feature = "test")]
-    async fn delete_item(&self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
 
     #[cfg(feature = "test")]
     async fn reset(&self) -> Result<()>;

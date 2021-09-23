@@ -99,7 +99,4 @@ async fn trim_side_chain_blocks() {
 
     // Ensure that children of the genesis block were cleaned up.
     //todo: assert_eq!(consensus.ledger.get_child_block_hashes(&genesis_hash).unwrap().len(), 1);
-
-    // Validate the post-trim storage.
-    // todo: assert!(consensus.ledger.validate(None, FixMode::Nothing).await);
 }

@@ -20,8 +20,6 @@ use anyhow::*;
 use hash_hasher::{HashedMap, HashedSet};
 use tracing::{debug, trace};
 
-#[cfg(feature = "test")]
-use crate::key_value::KeyValueColumn;
 use crate::{
     BlockFilter,
     BlockOrder,
@@ -29,7 +27,6 @@ use crate::{
     CanonData,
     Digest,
     DigestTree,
-    FixMode,
     ForkDescription,
     ForkPath,
     Peer,
@@ -38,7 +35,6 @@ use crate::{
     SerialRecord,
     SerialTransaction,
     TransactionLocation,
-    ValidatorError,
 };
 
 /// An application level storage interface
@@ -397,17 +393,6 @@ pub trait SyncStorage {
     fn lookup_peers(&mut self, addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>>;
 
     fn fetch_peers(&mut self) -> Result<Vec<Peer>>;
-
-    /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
-    fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError>;
-
-    /// Stores the given key+value pair in the given column.
-    #[cfg(feature = "test")]
-    fn store_item(&mut self, col: KeyValueColumn, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
-
-    /// Removes the given key and its corresponding value from the given column.
-    #[cfg(feature = "test")]
-    fn delete_item(&mut self, col: KeyValueColumn, key: Vec<u8>) -> Result<()>;
 
     /// Fully resets the storage.
     #[cfg(feature = "test")]
