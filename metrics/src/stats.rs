@@ -302,7 +302,7 @@ pub struct MiscStats {
     block_height: DiscreteGauge,
     /// The number of mined blocks.
     blocks_mined: Counter,
-    /// The processing time for a block.
+    /// The processing time for an inbound block.
     block_processing_time: CircularHistogram,
     /// The verification and commit time for a block.
     block_commit_time: CircularHistogram,
