@@ -46,6 +46,7 @@ None
 | `internal_rtt.getsync`           | f64  | The average internal RTT for GetSync messages in seconds                     |
 | `internal_rtt.getblocks`         | f64  | The average internal RTT for GetBlocks messages in seconds                   |
 | `internal_rtt.getmemorypool`     | f64  | The average internal RTT for GetMemoryPool messages in seconds               |
+| `misc.rpc_requests`              | f64  | The number of RPC requests received by the node                              |
 | `outbound.all_successes`         | u64  | The number of successfully sent messages                                     |
 | `outbound.all_failures`          | u64  | The number of failures to send messages                                      |
 | `queues.consensus`               | u64  | The number of queued consensus requests                                      |
