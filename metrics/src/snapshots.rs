@@ -31,6 +31,8 @@ pub struct NodeStats {
     pub queues: NodeQueueStats,
     /// Miscellaneous stats related to the node.
     pub misc: NodeMiscStats,
+    /// The node's block-related stats.
+    pub blocks: NodeBlockStats,
     /// The node's internal RTT from message received to response sent.
     pub internal_rtt: NodeInternalRttStats,
 }
@@ -129,22 +131,26 @@ pub struct NodeQueueStats {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeMiscStats {
-    /// The current block height of the node.
-    pub block_height: u64,
-    /// The number of blocks the node has mined.
-    pub blocks_mined: u64,
-    /// The average inbound block processing time (in seconds).
-    pub block_processing_time: f64,
-    /// The average block verification and commit time (in seconds).
-    pub block_commit_time: f64,
-    /// The number of duplicate blocks received.
-    pub duplicate_blocks: u64,
-    /// The number of duplicate sync blocks received.
-    pub duplicate_sync_blocks: u64,
-    /// The number of orphan blocks received.
-    pub orphan_blocks: u64,
     /// The number of RPC requests received.
     pub rpc_requests: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NodeBlockStats {
+    /// The current block height of the node.
+    pub height: u64,
+    /// The number of blocks the node has mined.
+    pub mined: u64,
+    /// The average inbound block processing time (in seconds).
+    pub inbound_processing_time: f64,
+    /// The average block verification and commit time (in seconds).
+    pub commit_time: f64,
+    /// The number of duplicate blocks received.
+    pub duplicates: u64,
+    /// The number of duplicate sync blocks received.
+    pub duplicates_sync: u64,
+    /// The number of orphan blocks received.
+    pub orphans: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -186,7 +186,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "snarkos_misc_block_height_total",
+          "expr": "snarkos_blocks_height_total",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -196,7 +196,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_blocks_mined_total",
+          "expr": "snarkos_blocks_mined_total",
           "instant": false,
           "interval": "",
           "legendFormat": "mined blocks",
@@ -204,7 +204,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_duplicate_blocks_total",
+          "expr": "snarkos_duplicates_total",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate Blocks",
@@ -212,7 +212,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_duplicate_sync_blocks_total",
+          "expr": "snarkos_duplicates_sync_total",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate SyncBlocks",
@@ -228,7 +228,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_misc_orphan_blocks_total",
+          "expr": "snarkos_blocks_orphan_total",
           "hide": false,
           "interval": "",
           "legendFormat": "Orphan blocks",
@@ -917,14 +917,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(snarkos_misc_block_processing_time_sum[$__rate_interval])/rate(snarkos_misc_block_processing_time_count[$__rate_interval])",
+          "expr": "rate(snarkos_blocks_inbound_processing_time_sum[$__rate_interval])/rate(snarkos_blocks_inbound_processing_time_count[$__rate_interval])",
           "interval": "",
           "legendFormat": "total for inbound block",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "rate(snarkos_misc_block_commit_time_sum[$__rate_interval])/rate(snarkos_misc_block_commit_time_count[$__rate_interval])",
+          "expr": "rate(snarkos_blocks_commit_time_sum[$__rate_interval])/rate(snarkos_blocks_commit_time_count[$__rate_interval])",
           "hide": false,
           "interval": "",
           "legendFormat": "verification and commit",
@@ -1215,5 +1215,5 @@
   "timezone": "",
   "title": "snarkOS node",
   "uid": "nuiNXZV7k",
-  "version": 6
+  "version": 8
 }

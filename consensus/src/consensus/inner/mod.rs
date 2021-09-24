@@ -42,8 +42,6 @@ use snarkvm_dpc::{
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::has_duplicates;
 
-use snarkos_metrics::misc::*;
-
 use rand::thread_rng;
 
 use super::message::{ConsensusMessage, CreateTransactionRequest, TransactionResponse};

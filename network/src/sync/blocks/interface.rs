@@ -155,7 +155,7 @@ impl Node {
             self.propagate_block(block, height, remote_address);
         }
 
-        metrics::histogram!(metrics::misc::BLOCK_PROCESSING_TIME, now.elapsed());
+        metrics::histogram!(metrics::blocks::INBOUND_PROCESSING_TIME, now.elapsed());
 
         Ok(())
     }

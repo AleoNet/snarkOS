@@ -20,6 +20,7 @@ use crate::{
     metric_types::{CircularHistogram, Counter, DiscreteGauge},
     names::*,
     snapshots::{
+        NodeBlockStats,
         NodeConnectionStats,
         NodeHandshakeStats,
         NodeInboundStats,
@@ -46,6 +47,8 @@ pub struct Stats {
     queues: QueueStats,
     /// Miscellaneous stats related to the node.
     misc: MiscStats,
+    /// The node's block-related stats.
+    blocks: BlockStats,
     /// The node's internal RTT from message received to response sent (in seconds).
     internal_rtt: InternalRtt,
 }
@@ -59,6 +62,7 @@ impl Stats {
             handshakes: HandshakeStats::new(),
             queues: QueueStats::new(),
             misc: MiscStats::new(),
+            blocks: BlockStats::new(),
             internal_rtt: InternalRtt::new(),
         }
     }
@@ -71,6 +75,7 @@ impl Stats {
             handshakes: self.handshakes.snapshot(),
             queues: self.queues.snapshot(),
             misc: self.misc.snapshot(),
+            blocks: self.blocks.snapshot(),
             internal_rtt: self.internal_rtt.snapshot(),
         }
     }
@@ -299,19 +304,6 @@ impl QueueStats {
 }
 
 pub struct MiscStats {
-    block_height: DiscreteGauge,
-    /// The number of mined blocks.
-    blocks_mined: Counter,
-    /// The processing time for an inbound block.
-    block_processing_time: CircularHistogram,
-    /// The verification and commit time for a block.
-    block_commit_time: CircularHistogram,
-    /// The number of duplicate blocks received.
-    duplicate_blocks: Counter,
-    /// The number of duplicate sync blocks received.
-    duplicate_sync_blocks: Counter,
-    /// The number of orphan blocks received.
-    orphan_blocks: Counter,
     /// The number of RPC requests received.
     rpc_requests: Counter,
 }
@@ -319,27 +311,56 @@ pub struct MiscStats {
 impl MiscStats {
     const fn new() -> Self {
         Self {
-            block_height: DiscreteGauge::new(),
-            blocks_mined: Counter::new(),
-            block_processing_time: CircularHistogram::new(),
-            block_commit_time: CircularHistogram::new(),
-            duplicate_blocks: Counter::new(),
-            duplicate_sync_blocks: Counter::new(),
-            orphan_blocks: Counter::new(),
             rpc_requests: Counter::new(),
         }
     }
 
     pub fn snapshot(&self) -> NodeMiscStats {
         NodeMiscStats {
-            block_height: self.block_height.read(),
-            blocks_mined: self.blocks_mined.read(),
-            block_processing_time: self.block_processing_time.average(),
-            block_commit_time: self.block_commit_time.average(),
-            duplicate_blocks: self.duplicate_blocks.read(),
-            duplicate_sync_blocks: self.duplicate_sync_blocks.read(),
-            orphan_blocks: self.orphan_blocks.read(),
             rpc_requests: self.rpc_requests.read(),
+        }
+    }
+}
+
+pub struct BlockStats {
+    /// The block height of the node's canon chain.
+    height: DiscreteGauge,
+    /// The number of mined blocks.
+    mined: Counter,
+    /// The processing time for an inbound block.
+    inbound_processing_time: CircularHistogram,
+    /// The verification and commit time for a block.
+    commit_time: CircularHistogram,
+    /// The number of duplicate blocks received.
+    duplicates: Counter,
+    /// The number of duplicate sync blocks received.
+    duplicates_sync: Counter,
+    /// The number of orphan blocks received.
+    orphans: Counter,
+}
+
+impl BlockStats {
+    const fn new() -> Self {
+        BlockStats {
+            height: DiscreteGauge::new(),
+            mined: Counter::new(),
+            inbound_processing_time: CircularHistogram::new(),
+            commit_time: CircularHistogram::new(),
+            duplicates: Counter::new(),
+            duplicates_sync: Counter::new(),
+            orphans: Counter::new(),
+        }
+    }
+
+    pub fn snapshot(&self) -> NodeBlockStats {
+        NodeBlockStats {
+            height: self.height.read(),
+            mined: self.mined.read(),
+            inbound_processing_time: self.inbound_processing_time.average(),
+            commit_time: self.commit_time.average(),
+            duplicates: self.duplicates.read(),
+            duplicates_sync: self.duplicates_sync.read(),
+            orphans: self.orphans.read(),
         }
     }
 }
@@ -384,8 +405,8 @@ impl Recorder for Stats {
     fn record_histogram(&self, key: &Key, value: f64) {
         let metric = match key.name() {
             connections::DURATION => &self.connections.duration,
-            misc::BLOCK_PROCESSING_TIME => &self.misc.block_processing_time,
-            misc::BLOCK_COMMIT_TIME => &self.misc.block_commit_time,
+            blocks::INBOUND_PROCESSING_TIME => &self.blocks.inbound_processing_time,
+            blocks::COMMIT_TIME => &self.blocks.commit_time,
             internal_rtt::GETPEERS => &self.internal_rtt.getpeers,
             internal_rtt::GETSYNC => &self.internal_rtt.getsync,
             internal_rtt::GETBLOCKS => &self.internal_rtt.getblocks,
@@ -430,11 +451,12 @@ impl Recorder for Stats {
             handshakes::TIMEOUTS_INIT => &self.handshakes.timeouts_init,
             handshakes::TIMEOUTS_RESP => &self.handshakes.timeouts_resp,
             // misc
-            misc::BLOCKS_MINED => &self.misc.blocks_mined,
-            misc::DUPLICATE_BLOCKS => &self.misc.duplicate_blocks,
-            misc::DUPLICATE_SYNC_BLOCKS => &self.misc.duplicate_sync_blocks,
-            misc::ORPHAN_BLOCKS => &self.misc.orphan_blocks,
             misc::RPC_REQUESTS => &self.misc.rpc_requests,
+            // blocks
+            blocks::MINED => &self.blocks.mined,
+            blocks::DUPLICATES => &self.blocks.duplicates,
+            blocks::DUPLICATES_SYNC => &self.blocks.duplicates_sync,
+            blocks::ORPHANS => &self.blocks.orphans,
             _ => {
                 return;
             }
@@ -449,8 +471,8 @@ impl Recorder for Stats {
             queues::OUTBOUND => &self.queues.outbound,
             queues::PEER_EVENTS => &self.queues.peer_events,
             queues::STORAGE => &self.queues.storage,
-            // misc
-            misc::BLOCK_HEIGHT => &self.misc.block_height,
+            // blocks
+            blocks::HEIGHT => &self.blocks.height,
             // connections
             connections::CONNECTING => &self.connections.connecting_peers,
             connections::CONNECTED => &self.connections.connected_peers,

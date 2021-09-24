@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::*;
-use snarkos_metrics::{self as metrics, misc, wrapped_mpsc};
+use snarkos_metrics::{self as metrics, wrapped_mpsc};
 
 use anyhow::*;
 use chrono::{DateTime, Utc};
@@ -348,7 +348,7 @@ impl Node {
 
         // The node can already be at some non-zero height.
         if self.sync().is_some() {
-            metrics::gauge!(misc::BLOCK_HEIGHT, self.storage.canon().await?.block_height as f64);
+            metrics::gauge!(metrics::blocks::HEIGHT, self.storage.canon().await?.block_height as f64);
         }
 
         Ok(())
