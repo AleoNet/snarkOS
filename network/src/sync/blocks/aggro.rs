@@ -14,22 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use crate::{Cache, Node, Payload, Peer, SyncBase, SyncInbound};
 use anyhow::*;
 use snarkos_metrics::wrapped_mpsc;
 use snarkos_storage::Digest;
-use tokio::{sync::RwLock, time::Instant};
+use tokio::sync::RwLock;
 
 /// Aggressive, continuous sync process that pulls peers entire canon trees.
 pub struct SyncAggro {
     base: SyncBase,
-}
-
-struct BlockLocatorHashes {
-    hashes: Vec<Digest>,
-    last_update: Instant,
 }
 
 impl SyncAggro {
@@ -64,16 +59,12 @@ impl SyncAggro {
 
         self.base.node.register_block_sync_attempt();
 
-        let block_locator_hashes = Arc::new(RwLock::new(BlockLocatorHashes {
-            hashes: SyncBase::block_locator_hashes(&self.base.node).await?,
-            last_update: Instant::now(),
-        }));
+        let block_locator_hashes = SyncBase::block_locator_hashes(&self.base.node).await?;
 
         let peer_syncs = {
-            let block_locator_hashes = block_locator_hashes.read().await;
             sync_nodes
                 .iter()
-                .map(|peer| (peer.clone(), block_locator_hashes.hashes.clone()))
+                .map(|peer| (peer.clone(), block_locator_hashes.clone()))
                 .collect()
         };
 
@@ -87,7 +78,7 @@ impl SyncAggro {
 
         let node = self.base.node.clone();
         self.base
-            .receive_messages(15, 3, |msg| {
+            .receive_messages(60, 3, |msg| {
                 match msg {
                     SyncInbound::BlockHashes(peer, hashes) => {
                         debug!("received {} sync hashes from {}", hashes.len(), peer);
@@ -98,20 +89,8 @@ impl SyncAggro {
                         let last_hash = hashes.last().unwrap().clone();
 
                         let node = node.clone();
-                        let block_locator_hashes = block_locator_hashes.clone();
                         let received_hashes = received_hashes.clone();
                         tokio::spawn(async move {
-                            if block_locator_hashes.read().await.last_update.elapsed() > Duration::from_secs(10) {
-                                match SyncBase::block_locator_hashes(&node).await {
-                                    Ok(hashes) => {
-                                        let mut target = block_locator_hashes.write().await;
-                                        target.hashes = hashes;
-                                        target.last_update = Instant::now();
-                                    }
-                                    Err(e) => warn!("sync failed to fetch block locator hashes: {:?}", e),
-                                }
-                            }
-
                             let mut hashes_trimmed = Vec::with_capacity(hashes.len());
                             {
                                 let received_hashes = received_hashes.read().await;
@@ -136,15 +115,15 @@ impl SyncAggro {
                                 .filter(|(_, status)| matches!(status, snarkos_storage::BlockStatus::Unknown))
                                 .map(|(hash, _)| hash)
                                 .collect();
-                            if blocks.is_empty() {
-                                return;
-                            }
                             debug!("requesting {} sync blocks from {}", blocks.len(), peer);
 
                             if let Some(peer) = node.peer_book.get_peer_handle(peer) {
                                 peer.expecting_sync_blocks(blocks.len() as u32).await;
-                                peer.send_payload(Payload::GetBlocks(blocks), None).await;
                                 peer.send_payload(Payload::GetSync(vec![last_hash]), None).await;
+                                if blocks.is_empty() {
+                                    return;
+                                }
+                                peer.send_payload(Payload::GetBlocks(blocks), None).await;
                             }
                         });
                     }

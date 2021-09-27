@@ -246,40 +246,16 @@ pub trait SyncStorage {
         }
 
         // Calculate the average distance between block hashes based on the desired number of locator hashes.
-        let mut proportional_step =
+        let proportional_step =
             (hash_index.min(oldest_fork_threshold as u32) / num_locator_hashes).min(crate::NUM_LOCATOR_HASHES - 1);
 
         // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
         // lower or close to the proportional step distance.
-        let num_quadratic_steps = (proportional_step as f32).log2() as u32;
+        let num_quadratic_steps = ((hash_index as f32).log2() - (proportional_step as f32).log2()) as u32;
 
         // The remaining hashes should have a proportional index distance between them.
         let num_proportional_steps = num_locator_hashes - num_quadratic_steps;
 
-        // Obtain a few hashes increasing the distance quadratically.
-        let mut quadratic_step = 2; // the size of the first quadratic step
-        for _ in 0..num_quadratic_steps {
-            let hash = self.get_block_hash_guarded(hash_index)?;
-            trace!("block locator hash -- quadratic: block# {}: {}", hash_index, hash);
-            block_locator_hashes.push(hash);
-            hash_index = hash_index.saturating_sub(quadratic_step);
-            quadratic_step *= 2;
-        }
-
-        // Update the size of the proportional step so that the hashes of the remaining blocks have the same distance
-        // between one another.
-        proportional_step =
-            (hash_index.min(oldest_fork_threshold as u32) / num_locator_hashes).min(crate::NUM_LOCATOR_HASHES - 1);
-
-        // Tweak: in order to avoid "jumping" by too many indices with the last step,
-        // increase the value of each step by 1 if the last step is too large. This
-        // can result in the final number of locator hashes being a bit lower, but
-        // it's preferable to having a large gap between values.
-        if hash_index - proportional_step * num_proportional_steps > 2 * proportional_step {
-            proportional_step += 1;
-        }
-
-        // Obtain the rest of hashes with a proportional distance between them.
         for _ in 0..num_proportional_steps {
             let hash = self.get_block_hash_guarded(hash_index)?;
             trace!("block locator hash -- proportional: block# {}: {}", hash_index, hash);
@@ -288,6 +264,19 @@ pub trait SyncStorage {
                 return Ok(block_locator_hashes);
             }
             hash_index = hash_index.saturating_sub(proportional_step);
+        }
+
+        // Obtain a few hashes increasing the distance quadratically.
+        let mut quadratic_step = proportional_step * 2; // the size of the first quadratic step
+        for _ in 0..num_quadratic_steps {
+            if hash_index == 0 {
+                break;
+            }
+            let hash = self.get_block_hash_guarded(hash_index)?;
+            trace!("block locator hash -- quadratic: block# {}: {}", hash_index, hash);
+            block_locator_hashes.push(hash);
+            hash_index = hash_index.saturating_sub(quadratic_step);
+            quadratic_step *= 2;
         }
 
         let hash = self.get_block_hash_guarded(0)?;
