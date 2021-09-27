@@ -244,8 +244,6 @@ impl Node {
                 candidates.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
 
-            // let addr_iter = candidates.into_iter(); // .iter().map(|peer| peer.address);
-
             if !self.is_of_type(NodeType::Client) {
                 candidates.into_iter().take(count).collect()
             } else {
