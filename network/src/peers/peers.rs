@@ -327,8 +327,7 @@ impl Node {
 
         let connected_peers = self.peer_book.connected_peers_snapshot().await;
 
-        let basic_filter =
-            |peer: &Peer| peer.address != remote_address && !self.config.bootnodes().contains(&peer.address);
+        let basic_filter = |peer: &Peer| peer.address != remote_address;
         let strict_filter = |peer: &Peer| {
             basic_filter(peer)
                 && peer.quality.connection_transient_fail_count == 0
