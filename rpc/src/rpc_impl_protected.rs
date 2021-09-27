@@ -697,11 +697,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let node = self.node.clone();
         tokio::spawn(async move {
             for addr in &addresses {
-<<<<<<< HEAD
-                node.peer_book.add_peer(*addr).await;
-=======
-                node.peer_book.add_peer(*addr, false, None).await;
->>>>>>> 95fc2684... wip
+                node.peer_book.add_peer(*addr, None).await;
             }
             node.connect_to_addresses(&addresses).await
         });
