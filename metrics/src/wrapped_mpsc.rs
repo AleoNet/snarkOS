@@ -62,8 +62,9 @@ impl<T: Send> Sender<T> {
     }
 
     pub fn try_send(&self, message: T) -> Result<(), TrySendError<T>> {
+        self.inner.try_send(message)?;
         self.increment();
-        self.inner.try_send(message)
+        Ok(())
     }
 
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
