@@ -189,13 +189,7 @@ impl Node {
             }
             Ok(peers) => {
                 for peer in peers {
-                    self.peer_book
-                        .add_peer(
-                            peer.address,
-                            self.config.bootnodes.load().contains(&peer.address),
-                            Some(&peer),
-                        )
-                        .await;
+                    self.peer_book.add_peer(peer.address, Some(&peer)).await;
                 }
             }
         }
