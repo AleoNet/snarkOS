@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_storage::{BlockStatus, Digest, VMBlock};
+use snarkos_storage::{BlockStatus, VMBlock};
 use snarkvm_utilities::to_bytes_le;
 use tokio::time::sleep;
 

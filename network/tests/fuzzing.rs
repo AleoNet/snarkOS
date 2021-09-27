@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_network::{MessageHeader, NodeType, Payload, Version};
-use snarkvm_dpc::BlockHeaderHash;
 
 use rand::{distributions::Standard, thread_rng, Rng};
 use snarkos_storage::Digest;
