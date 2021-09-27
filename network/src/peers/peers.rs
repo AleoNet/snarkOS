@@ -269,7 +269,6 @@ impl Node {
         .iter()
         .map(|peer| peer.address)
         .collect();
-        info!("peer heights: {:?}", random_peers);
 
         for remote_address in random_peers {
             let node = self.clone();
