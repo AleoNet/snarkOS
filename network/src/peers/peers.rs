@@ -20,12 +20,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+use itertools::Itertools;
 use rand::{prelude::SliceRandom, rngs::SmallRng, seq::IteratorRandom, SeedableRng};
 use tokio::task;
 
 use snarkos_metrics::{self as metrics, connections::*};
 
-use crate::{message::*, KnownNetworkMessage, NetworkError, Node, NodeType};
+use crate::{message::*, KnownNetworkMessage, NetworkError, Node, NodeType, Peer};
 use anyhow::*;
 
 impl Node {
@@ -224,7 +225,8 @@ impl Node {
         // Local address must be known by now.
         let own_address = self.expect_local_addr();
 
-        let random_peers = {
+        // If this node is not a bootnode, attempt to satisfy the minimum number of peer connections.
+        let random_peers: Vec<SocketAddr> = {
             trace!(
                 "Connecting to {} disconnected peers",
                 cmp::min(count, self.peer_book.get_disconnected_peer_count() as usize)
@@ -242,14 +244,32 @@ impl Node {
                 candidates.sort_unstable_by_key(|peer| peer.quality.last_connected);
             }
 
-            let addr_iter = candidates.iter().map(|peer| peer.address);
+            // let addr_iter = candidates.into_iter(); // .iter().map(|peer| peer.address);
 
             if !self.is_of_type(NodeType::Client) {
-                addr_iter.take(count).collect()
+                candidates.into_iter().take(count).collect()
             } else {
-                addr_iter.choose_multiple(&mut SmallRng::from_entropy(), count)
+                let random_count = count / 2;
+                let random_picks: Vec<Peer> = candidates
+                    .iter()
+                    .choose_multiple(&mut SmallRng::from_entropy(), random_count)
+                    .into_iter()
+                    .cloned()
+                    .collect();
+                candidates.sort_unstable_by(|x, y| y.quality.block_height.cmp(&x.quality.block_height));
+
+                candidates.truncate(count - random_count);
+                candidates
+                    .into_iter()
+                    .chain(random_picks.into_iter())
+                    .unique_by(|x| x.address)
+                    .collect::<Vec<Peer>>()
             }
-        };
+        }
+        .iter()
+        .map(|peer| peer.address)
+        .collect();
+        info!("peer heights: {:?}", random_peers);
 
         for remote_address in random_peers {
             let node = self.clone();
@@ -322,8 +342,6 @@ impl Node {
 
     pub(crate) async fn send_peers(&self, remote_address: SocketAddr, time_received: Option<Instant>) {
         // Broadcast the sanitized list of connected peers back to the requesting peer.
-
-        use crate::Peer;
 
         let connected_peers = self.peer_book.connected_peers_snapshot().await;
 

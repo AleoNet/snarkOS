@@ -16,7 +16,7 @@
 
 use std::{fmt, io, ops::Deref};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use snarkvm_utilities::{ToBytes, Write};
 
@@ -42,6 +42,16 @@ impl fmt::Debug for Digest {
 impl Serialize for Digest {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Digest {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = String::deserialize(deserializer)?;
+
+        Ok(Self(InnerType::from(
+            hex::decode(&name).map_err(|e| serde::de::Error::custom(e))?,
+        )))
     }
 }
 
