@@ -244,6 +244,9 @@ impl Node {
                             if let Err(e) = node_clone.run_sync().await {
                                 error!("failed sync process: {:?}", e);
                             }
+                            if let Err(e) = node_clone.expect_sync().consensus.fast_forward().await {
+                                error!("failed to initiate fast forward for sync: {:?}", e);
+                            };
                             node_clone.finished_syncing_blocks();
                         }
                     }

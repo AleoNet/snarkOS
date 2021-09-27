@@ -18,7 +18,7 @@ use std::{convert::TryInto, sync::Arc};
 
 use rand::{thread_rng, Rng};
 use snarkos_metrics::wrapped_mpsc;
-use snarkos_storage::{Address, Digest, DynStorage, SerialBlock, SerialRecord, SerialTransaction, VMRecord};
+use snarkos_storage::{Address, BlockStatus, Digest, DynStorage, SerialBlock, SerialRecord, SerialTransaction, VMRecord};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
@@ -56,7 +56,7 @@ pub struct Consensus {
 
 impl Consensus {
     /// Creates a new consensus instance with the given parameters, genesis, ledger, storage, and memory pool.
-    pub fn new(
+    pub async fn new(
         parameters: ConsensusParameters,
         dpc: Arc<Testnet1DPC>,
         genesis_block: SerialBlock,
@@ -84,6 +84,15 @@ impl Consensus {
             .agent(receiver)
             .await;
         });
+
+
+        if let Err(e) = created.fast_forward().await {
+            match e {
+                ConsensusError::InvalidBlock(e) => debug!("invalid block in initial fast-forward: {}", e),
+                e => warn!("failed to perform initial fast-forward: {:?}", e),
+            }
+        };
+        info!("fastforwarding complete");
 
         created
     }
@@ -117,6 +126,19 @@ impl Consensus {
         self.send(ConsensusMessage::ReceiveBlock(Box::new(block))).await
     }
 
+    pub async fn shallow_receive_block(&self, block: SerialBlock) -> Result<()> {
+        let hash = block.header.hash();
+        match self.storage.get_block_state(&hash).await? {
+            BlockStatus::Unknown => (),
+            BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
+                metrics::increment_counter!(snarkos_metrics::blocks::DUPLICATES);
+                return Err(ConsensusError::PreExistingBlock.into());
+            }
+        }
+        self.storage.insert_block(&block).await?;
+        Ok(())
+    }
+
     /// Fetches a snapshot of the memory pool
     pub async fn fetch_memory_pool(&self) -> Vec<SerialTransaction> {
         self.send(ConsensusMessage::FetchMemoryPool(self.parameters.max_block_size))
@@ -146,7 +168,7 @@ impl Consensus {
         self.send(ConsensusMessage::ForceDecommit(hash.0.to_vec())).await
     }
 
-    /// Initiate a fast forward operation
+    /// Run a fast forward operation
     /// Used for testing/rectifying use of `force_decommit`
     pub async fn fast_forward(&self) -> Result<(), ConsensusError> {
         self.send(ConsensusMessage::FastForward()).await
