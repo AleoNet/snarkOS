@@ -214,7 +214,7 @@ impl PeerBook {
             .await
     }
 
-    pub async fn serialize_disconnected(&self) -> Vec<snarkos_storage::Peer> {
+    pub fn serialize_disconnected(&self) -> Vec<snarkos_storage::Peer> {
         self.disconnected_peers
             .inner()
             .values()
