@@ -134,7 +134,13 @@ impl<P: MerkleParameters> Ledger for MerkleLedger<P> {
     }
 
     fn requires_async_task(&self, new_commitments_len: usize, new_serial_numbers_len: usize) -> bool {
-        (self.commitments.len() + new_commitments_len).is_power_of_two()
-            || (self.serial_numbers.len() + new_serial_numbers_len).is_power_of_two()
+        jumps_power_of_two(self.commitments.len(), new_commitments_len) || 
+        jumps_power_of_two(self.serial_numbers.len(), new_serial_numbers_len)
     }
+}
+
+fn jumps_power_of_two(start: usize, adding: usize) -> bool {
+    let prior_commitments_depth = (start as f64).log2() as usize;
+    let new_commitments_depth = ((start + adding) as f64).log2() as usize;
+    prior_commitments_depth != new_commitments_depth
 }
