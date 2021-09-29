@@ -79,6 +79,19 @@ impl Stats {
             internal_rtt: self.internal_rtt.snapshot(),
         }
     }
+
+    // TODO: conditional compilation?
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.inbound.clear();
+        self.outbound.clear();
+        self.connections.clear();
+        self.handshakes.clear();
+        self.queues.clear();
+        self.misc.clear();
+        self.blocks.clear();
+        self.internal_rtt.clear();
+    }
 }
 
 pub struct InboundStats {
@@ -154,6 +167,25 @@ impl InboundStats {
             unknown: self.unknown.read(),
         }
     }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.all_successes.clear();
+        self.all_failures.clear();
+        self.blocks.clear();
+        self.getblocks.clear();
+        self.getmemorypool.clear();
+        self.getpeers.clear();
+        self.getsync.clear();
+        self.memorypool.clear();
+        self.peers.clear();
+        self.pings.clear();
+        self.pongs.clear();
+        self.syncs.clear();
+        self.syncblocks.clear();
+        self.transactions.clear();
+        self.unknown.clear();
+    }
 }
 
 pub struct OutboundStats {
@@ -178,7 +210,15 @@ impl OutboundStats {
         NodeOutboundStats {
             all_successes: self.all_successes.read(),
             all_failures: self.all_failures.read(),
+            // FIXME: add missing metric?
         }
+    }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.all_successes.clear();
+        self.all_failures.clear();
+        self.all_cache_hits.clear();
     }
 }
 
@@ -223,6 +263,17 @@ impl ConnectionStats {
             disconnected_peers: self.disconnected_peers.read() as u32,
         }
     }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.all_accepted.clear();
+        self.all_initiated.clear();
+        self.all_rejected.clear();
+        self.duration.clear();
+        self.connecting_peers.clear();
+        self.connected_peers.clear();
+        self.disconnected_peers.clear();
+    }
 }
 
 pub struct HandshakeStats {
@@ -261,6 +312,16 @@ impl HandshakeStats {
             timeouts_init: self.timeouts_init.read(),
             timeouts_resp: self.timeouts_resp.read(),
         }
+    }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.successes_init.clear();
+        self.successes_resp.clear();
+        self.failures_init.clear();
+        self.failures_resp.clear();
+        self.timeouts_init.clear();
+        self.timeouts_resp.clear();
     }
 }
 
@@ -301,6 +362,16 @@ impl QueueStats {
             sync_items: self.sync_items.read(),
         }
     }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.consensus.clear();
+        self.inbound.clear();
+        self.outbound.clear();
+        self.peer_events.clear();
+        self.storage.clear();
+        self.sync_items.clear();
+    }
 }
 
 pub struct MiscStats {
@@ -319,6 +390,11 @@ impl MiscStats {
         NodeMiscStats {
             rpc_requests: self.rpc_requests.read(),
         }
+    }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.rpc_requests.clear();
     }
 }
 
@@ -363,6 +439,17 @@ impl BlockStats {
             orphans: self.orphans.read(),
         }
     }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.height.clear();
+        self.mined.clear();
+        self.inbound_processing_time.clear();
+        self.commit_time.clear();
+        self.duplicates.clear();
+        self.duplicates_sync.clear();
+        self.orphans.clear();
+    }
 }
 
 /// Each histogram holds the last `QUEUE_CAPACITY` (see `metric_types` mod) measurements for internal RTT for the indicated message
@@ -391,6 +478,14 @@ impl InternalRtt {
             getblocks: self.getblocks.average(),
             getmemorypool: self.getmemorypool.average(),
         }
+    }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.getpeers.clear();
+        self.getsync.clear();
+        self.getblocks.clear();
+        self.getmemorypool.clear();
     }
 }
 
