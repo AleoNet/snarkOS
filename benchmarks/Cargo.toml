@@ -108,7 +108,7 @@ version = "0.8"
 version = "1"
 
 [dependencies.smallvec]
-version = "1.6"
+version = "1.7"
 
 [dependencies.criterion]
 version = "0.3.4"
