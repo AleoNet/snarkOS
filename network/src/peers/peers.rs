@@ -246,6 +246,7 @@ impl Node {
             if !self.is_of_type(NodeType::Client) {
                 candidates.into_iter().take(count).collect()
             } else {
+                // Floored if count is odd.
                 let random_count = count / 2;
                 let random_picks: Vec<Peer> = candidates
                     .iter()
