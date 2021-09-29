@@ -23,3 +23,4 @@ pub mod mining;
 pub mod network;
 pub mod storage;
 pub mod sync;
+pub mod metrics;
