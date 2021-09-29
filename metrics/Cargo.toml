@@ -20,6 +20,7 @@ edition = "2018"
 [features]
 std = [ ]
 prometheus = [ "metrics-exporter-prometheus" ]
+test = [ ]
 
 [dependencies.circular-queue]
 version = "0.2"
