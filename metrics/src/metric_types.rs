@@ -169,10 +169,11 @@ impl CircularHistogram {
             .get_or_init(|| RwLock::new(CircularQueue::with_capacity(QUEUE_CAPACITY)))
             .read();
 
-        // FIXME: early return if queue is empty.
+        if queue_r.is_empty() {
+            return 0.0;
+        }
 
         let sum: f64 = queue_r.iter().copied().sum();
-
         sum / queue_r.len() as f64
     }
 
