@@ -69,7 +69,7 @@ features = [ "serde" ]
 version = "0.4.2"
 
 [dependencies.smallvec]
-version = "1.6"
+version = "1.7"
 
 [dependencies.rand]
 version = "0.8"

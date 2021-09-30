@@ -53,7 +53,7 @@ version = "2.2.0"
 version = "0.9"
 
 [dependencies.smallvec]
-version = "1.6"
+version = "1.7"
 features = [ "write" ]
 
 [dependencies.anyhow]
