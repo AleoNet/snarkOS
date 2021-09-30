@@ -89,6 +89,7 @@ impl Consensus {
                 ledger,
                 storage,
                 memory_pool,
+                recommit_taint: None,
             }
             .agent(receiver)
             .await;

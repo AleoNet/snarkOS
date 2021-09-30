@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     convert::TryInto,
     net::SocketAddr,
 };
@@ -470,6 +470,23 @@ impl SyncStorage for SqliteStorage {
         self.get_block_state(hash)
     }
 
+    fn recommit_block(&mut self, hash: &Digest) -> Result<BlockStatus> {
+        let canon = self.canon()?;
+        match self.get_block_state(hash)? {
+            BlockStatus::Committed(_) => {
+                return Err(anyhow!("attempted to recommit block {}", hex::encode(hash)));
+            }
+            BlockStatus::Unknown => return Err(anyhow!("attempted to commit unknown block")),
+            _ => (),
+        }
+        let next_canon_height = if canon.is_empty() { 0 } else { canon.block_height + 1 };
+        self.conn.execute(
+            r"UPDATE blocks SET canon_height = ? WHERE hash = ? AND canon_ledger_digest IS NOT NULL",
+            params![next_canon_height, hash],
+        )?;
+        self.get_block_state(hash)
+    }
+
     fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<SerialBlock>> {
         self.optimize()?;
 
@@ -495,7 +512,7 @@ impl SyncStorage for SqliteStorage {
             debug!("Decommitting block {} ({})", last_hash, block_number);
 
             self.conn.execute(
-                r"UPDATE blocks SET canon_height = NULL, canon_ledger_digest = NULL WHERE hash = ?",
+                r"UPDATE blocks SET canon_height = NULL WHERE hash = ?",
                 [&last_hash],
             )?;
 
@@ -579,7 +596,6 @@ impl SyncStorage for SqliteStorage {
     fn get_block_digest_tree(&mut self, block_hash: &Digest) -> Result<DigestTree> {
         self.optimize()?;
 
-        let mut nodes: HashMap<Digest, Vec<Digest>> = HashMap::new();
         let mut stmt = self.conn.prepare_cached(
             r"
             WITH RECURSIVE
@@ -596,48 +612,40 @@ impl SyncStorage for SqliteStorage {
         ",
         )?;
         let out = stmt
-            .query_map([block_hash], |row| Ok((row.get(0)?, row.get(1)?)))?
-            .collect::<rusqlite::Result<Vec<(Digest, Digest)>>>()?;
-        for (hash, parent_hash) in out {
-            nodes.entry(parent_hash).or_insert_with(Vec::new).push(hash);
+            .query_map([block_hash], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .collect::<rusqlite::Result<Vec<(Digest, Digest, u32)>>>()?;
+
+        let mut past_leaves = HashMap::<Digest, Vec<DigestTree>>::new();
+        let mut pending_leaves = HashMap::<Digest, Vec<DigestTree>>::new();
+        let mut current_tree_depth = None::<u32>;
+        for (hash, parent_hash, tree_depth) in out.into_iter().rev() {
+
+            if current_tree_depth.is_none() {
+                current_tree_depth = Some(tree_depth);
+            } else if Some(tree_depth) != current_tree_depth {
+                current_tree_depth = Some(tree_depth);
+
+                past_leaves.clear();
+                std::mem::swap(&mut past_leaves, &mut pending_leaves);
+            }
+            // pending_leaves.entry(parent_hash).and_modify(|inner| inner.push_child(hash)).or_insert_with(|| DigestTree::Leaf(hash));
+            let waiting_children = past_leaves.remove(&hash).unwrap_or_default();
+            let node = if !waiting_children.is_empty() {
+                let max_dist = waiting_children.iter().map(|x| x.longest_length()).max().unwrap_or(0);
+                DigestTree::Node(hash, waiting_children, max_dist)
+            } else {
+                DigestTree::Leaf(hash)
+            };
+            pending_leaves.entry(parent_hash).or_insert_with(Vec::new).push(node);
         }
 
-        // only our base case
-        if nodes.is_empty() {
-            return Ok(DigestTree::Leaf(block_hash.clone()));
-        }
-        let mut node_entries: HashSet<Digest> = nodes.keys().cloned().collect();
+        if let Some(children) = pending_leaves.remove(block_hash) {
+            let max_dist = children.iter().map(|x| x.longest_length()).max().unwrap_or(0);
 
-        let mut trees: HashMap<Digest, DigestTree> = HashMap::new();
-        while !nodes.is_empty() {
-            nodes.retain(|hash, children| {
-                let mut new_children = vec![];
-                let mut longest_tree_len = 0usize;
-                for child in children {
-                    if node_entries.contains(child) {
-                        return true;
-                    }
-                    if let Some(tree) = trees.remove(child) {
-                        let len = tree.longest_length() + 1;
-                        if len > longest_tree_len {
-                            longest_tree_len = len;
-                        }
-                        new_children.push(tree);
-                    } else {
-                        new_children.push(DigestTree::Leaf(child.clone()));
-                    }
-                }
-                trees.insert(
-                    hash.clone(),
-                    DigestTree::Node(hash.clone(), new_children, longest_tree_len),
-                );
-                node_entries.remove(hash);
-                false
-            });
+            Ok(DigestTree::Node(block_hash.clone(), children, max_dist))
+        } else {
+            Ok(DigestTree::Leaf(block_hash.clone()))
         }
-        assert_eq!(trees.len(), 1);
-
-        Ok(trees.remove(block_hash).expect("missing block hash tree"))
     }
 
     fn get_block_children(&mut self, hash: &Digest) -> Result<Vec<Digest>> {
@@ -852,7 +860,7 @@ impl SyncStorage for SqliteStorage {
         Ok(())
     }
 
-    fn get_commitments(&mut self) -> Result<Vec<Digest>> {
+    fn get_commitments(&mut self, block_start: u32) -> Result<Vec<Digest>> {
         self.optimize()?;
 
         let mut stmt = self.conn.prepare_cached(
@@ -863,12 +871,12 @@ impl SyncStorage for SqliteStorage {
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
         INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
-        WHERE blocks.canon_height IS NOT NULL
+        WHERE blocks.canon_height IS NOT NULL AND blocks.canon_height >= ?
         ORDER BY blocks.canon_height ASC, transaction_blocks.block_order ASC
         ",
         )?;
         let digests = stmt
-            .query_map([], |row| Ok([row.get(0)?, row.get(1)?]))?
+            .query_map([block_start], |row| Ok([row.get(0)?, row.get(1)?]))?
             .collect::<rusqlite::Result<Vec<[Digest; 2]>>>()?
             .into_iter()
             .flatten()
@@ -876,7 +884,7 @@ impl SyncStorage for SqliteStorage {
         Ok(digests)
     }
 
-    fn get_serial_numbers(&mut self) -> Result<Vec<Digest>> {
+    fn get_serial_numbers(&mut self, block_start: u32) -> Result<Vec<Digest>> {
         self.optimize()?;
 
         let mut stmt = self.conn.prepare_cached(
@@ -887,12 +895,12 @@ impl SyncStorage for SqliteStorage {
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
         INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
-        WHERE blocks.canon_height IS NOT NULL
+        WHERE blocks.canon_height IS NOT NULL AND blocks.canon_height >= ?
         ORDER BY blocks.canon_height ASC, transaction_blocks.block_order ASC
         ",
         )?;
         let digests = stmt
-            .query_map([], |row| Ok([row.get(0)?, row.get(1)?]))?
+            .query_map([block_start], |row| Ok([row.get(0)?, row.get(1)?]))?
             .collect::<rusqlite::Result<Vec<[Digest; 2]>>>()?
             .into_iter()
             .flatten()
@@ -900,7 +908,7 @@ impl SyncStorage for SqliteStorage {
         Ok(digests)
     }
 
-    fn get_memos(&mut self) -> Result<Vec<Digest>> {
+    fn get_memos(&mut self, block_start: u32) -> Result<Vec<Digest>> {
         self.optimize()?;
 
         let mut stmt = self.conn.prepare_cached(
@@ -910,17 +918,17 @@ impl SyncStorage for SqliteStorage {
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
         INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
-        WHERE blocks.canon_height IS NOT NULL
+        WHERE blocks.canon_height IS NOT NULL AND blocks.canon_height >= ?
         ORDER BY blocks.canon_height ASC, transaction_blocks.block_order ASC
         ",
         )?;
         let digests = stmt
-            .query_map([], |row| row.get(0))?
+            .query_map([block_start], |row| row.get(0))?
             .collect::<rusqlite::Result<Vec<Digest>>>()?;
         Ok(digests)
     }
 
-    fn get_ledger_digests(&mut self) -> Result<Vec<Digest>> {
+    fn get_ledger_digests(&mut self, block_start: u32) -> Result<Vec<Digest>> {
         self.optimize()?;
 
         let mut stmt = self.conn.prepare_cached(
@@ -928,12 +936,12 @@ impl SyncStorage for SqliteStorage {
         SELECT
         blocks.canon_ledger_digest
         FROM blocks
-        WHERE blocks.canon_height IS NOT NULL
+        WHERE blocks.canon_height IS NOT NULL AND blocks.canon_height >= ?
         ORDER BY blocks.canon_height ASC
         ",
         )?;
         let digests = stmt
-            .query_map([], |row| row.get(0))?
+            .query_map([block_start], |row| row.get(0))?
             .collect::<rusqlite::Result<Vec<Digest>>>()?;
         Ok(digests)
     }

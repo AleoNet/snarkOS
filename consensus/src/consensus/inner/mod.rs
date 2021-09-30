@@ -55,6 +55,7 @@ pub struct ConsensusInner {
     pub ledger: DynLedger,
     pub memory_pool: MemoryPool,
     pub storage: DynStorage,
+    pub recommit_taint: Option<u32>, // height of first recommitted block
 }
 
 impl ConsensusInner {
@@ -71,6 +72,8 @@ impl ConsensusInner {
         {
             return Ok(None);
         }
+
+        //todo: partial ledger fix
 
         for sn in &transaction.old_serial_numbers {
             if self.ledger.contains_serial(sn) || self.memory_pool.serial_numbers.contains(sn) {

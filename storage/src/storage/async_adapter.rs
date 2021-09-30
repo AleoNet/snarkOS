@@ -53,6 +53,7 @@ enum Message {
     GetBlock(Digest),
     GetForkPath(Digest, usize),
     CommitBlock(Digest, Digest),
+    RecommitBlock(Digest),
     DecommitBlocks(Digest),
     Canon(),
     LongestChildPath(Digest),
@@ -66,10 +67,10 @@ enum Message {
     GetRecordCommitments(Option<usize>),
     GetRecord(Digest),
     StoreRecords(Vec<SerialRecord>),
-    GetCommitments(),
-    GetSerialNumbers(),
-    GetMemos(),
-    GetLedgerDigests(),
+    GetCommitments(u32),
+    GetSerialNumbers(u32),
+    GetMemos(u32),
+    GetLedgerDigests(u32),
     ResetLedger(Vec<Digest>, Vec<Digest>, Vec<Digest>, Vec<Digest>),
     GetCanonBlocks(Option<u32>),
     GetBlockHashes(Option<u32>, BlockFilter),
@@ -104,6 +105,7 @@ impl fmt::Display for Message {
             Message::GetBlock(hash) => write!(f, "GetBlock({})", hash),
             Message::GetForkPath(hash, size) => write!(f, "GetForkPath({}, {})", hash, size),
             Message::CommitBlock(hash, ledger_digest) => write!(f, "CommitBlock({}, {})", hash, ledger_digest),
+            Message::RecommitBlock(hash) => write!(f, "RecommitBlock({})", hash),
             Message::DecommitBlocks(hash) => write!(f, "DecommitBlocks({})", hash),
             Message::Canon() => write!(f, "Canon()"),
             Message::LongestChildPath(hash) => write!(f, "LongestChildPath({})", hash),
@@ -133,10 +135,10 @@ impl fmt::Display for Message {
                 }
                 write!(f, ")")
             }
-            Message::GetCommitments() => write!(f, "GetCommitments()"),
-            Message::GetSerialNumbers() => write!(f, "GetSerialNumbers()"),
-            Message::GetMemos() => write!(f, "GetMemos()"),
-            Message::GetLedgerDigests() => write!(f, "GetLedgerDigests()"),
+            Message::GetCommitments(block_start) => write!(f, "GetCommitments({})", block_start),
+            Message::GetSerialNumbers(block_start) => write!(f, "GetSerialNumbers({})", block_start),
+            Message::GetMemos(block_start) => write!(f, "GetMemos({})", block_start),
+            Message::GetLedgerDigests(block_start) => write!(f, "GetLedgerDigests({})", block_start),
             Message::ResetLedger(_, _, _, _) => write!(f, "ResetLedger(..)"),
             Message::GetCanonBlocks(limit) => write!(f, "GetCanonBlocks({:?})", limit),
             Message::GetBlockHashes(limit, filter) => write!(f, "GetBlockHashes({:?}, {:?})", limit, filter),
@@ -184,6 +186,9 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::CommitBlock(block_hash, ledger_digest) => {
                 Box::new(self.wrap(move |f| f.commit_block(&block_hash, &ledger_digest)))
             }
+            Message::RecommitBlock(block_hash) => {
+                Box::new(self.wrap(move |f| f.recommit_block(&block_hash)))
+            }
             Message::DecommitBlocks(hash) => Box::new(self.wrap(move |f| f.decommit_blocks(&hash))),
             Message::Canon() => Box::new(self.inner.canon()),
             Message::GetBlockChildren(hash) => Box::new(self.inner.get_block_children(&hash)),
@@ -202,10 +207,10 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::GetRecordCommitments(limit) => Box::new(self.inner.get_record_commitments(limit)),
             Message::GetRecord(commitment) => Box::new(self.inner.get_record(&commitment)),
             Message::StoreRecords(records) => Box::new(self.wrap(move |f| f.store_records(&records[..]))),
-            Message::GetCommitments() => Box::new(self.inner.get_commitments()),
-            Message::GetSerialNumbers() => Box::new(self.inner.get_serial_numbers()),
-            Message::GetMemos() => Box::new(self.inner.get_memos()),
-            Message::GetLedgerDigests() => Box::new(self.inner.get_ledger_digests()),
+            Message::GetCommitments(block_start) => Box::new(self.inner.get_commitments(block_start)),
+            Message::GetSerialNumbers(block_start) => Box::new(self.inner.get_serial_numbers(block_start)),
+            Message::GetMemos(block_start) => Box::new(self.inner.get_memos(block_start)),
+            Message::GetLedgerDigests(block_start) => Box::new(self.inner.get_ledger_digests(block_start)),
             Message::ResetLedger(commitments, serial_numbers, memos, digests) => {
                 Box::new(self.wrap(move |f| f.reset_ledger(commitments, serial_numbers, memos, digests)))
             }
@@ -299,6 +304,12 @@ impl Storage for AsyncStorage {
         self.send(Message::CommitBlock(hash.clone(), digest)).await
     }
 
+
+    /// Attempts to recommit a block into canon if it has a ledger digest.
+    async fn recommit_block(&self, hash: &Digest) -> Result<BlockStatus> {
+        self.send(Message::RecommitBlock(hash.clone())).await
+    }
+
     async fn decommit_blocks(&self, hash: &Digest) -> Result<Vec<SerialBlock>> {
         self.send(Message::DecommitBlocks(hash.clone())).await
     }
@@ -360,20 +371,20 @@ impl Storage for AsyncStorage {
         self.send(Message::StoreRecords(records.to_vec())).await
     }
 
-    async fn get_commitments(&self) -> Result<Vec<Digest>> {
-        self.send(Message::GetCommitments()).await
+    async fn get_commitments(&self, block_start: u32) -> Result<Vec<Digest>> {
+        self.send(Message::GetCommitments(block_start)).await
     }
 
-    async fn get_serial_numbers(&self) -> Result<Vec<Digest>> {
-        self.send(Message::GetSerialNumbers()).await
+    async fn get_serial_numbers(&self, block_start: u32) -> Result<Vec<Digest>> {
+        self.send(Message::GetSerialNumbers(block_start)).await
     }
 
-    async fn get_memos(&self) -> Result<Vec<Digest>> {
-        self.send(Message::GetMemos()).await
+    async fn get_memos(&self, block_start: u32) -> Result<Vec<Digest>> {
+        self.send(Message::GetMemos(block_start)).await
     }
 
-    async fn get_ledger_digests(&self) -> Result<Vec<Digest>> {
-        self.send(Message::GetLedgerDigests()).await
+    async fn get_ledger_digests(&self, block_start: u32) -> Result<Vec<Digest>> {
+        self.send(Message::GetLedgerDigests(block_start)).await
     }
 
     async fn reset_ledger(

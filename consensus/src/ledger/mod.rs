@@ -56,6 +56,12 @@ pub trait Ledger: Send + Sync {
         new_memos: &[Digest],
     ) -> Result<Digest>;
 
+    /// Pushes raw ledger digests into the ledger -- used when committing multiple blocks at a time
+    fn push_interim_digests(
+        &mut self,
+        new_ledger_digests: &[Digest],
+    ) -> Result<()>;
+
     fn rollback(&mut self, commitments: &[Digest], serial_numbers: &[Digest], memos: &[Digest]) -> Result<()>;
 
     fn clear(&mut self);

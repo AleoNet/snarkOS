@@ -118,6 +118,9 @@ pub trait Storage: Send + Sync {
     /// Commits a block into canon.
     async fn commit_block(&self, hash: &Digest, digest: Digest) -> Result<BlockStatus>;
 
+    /// Attempts to recommit a block into canon if it has a ledger digest.
+    async fn recommit_block(&self, hash: &Digest) -> Result<BlockStatus>;
+
     /// Decommits a block and all descendent blocks, returning them in ascending order
     async fn decommit_blocks(&self, hash: &Digest) -> Result<Vec<SerialBlock>>;
 
@@ -175,16 +178,16 @@ pub trait Storage: Send + Sync {
     async fn store_records(&self, records: &[SerialRecord]) -> Result<()>;
 
     /// Gets all known commitments for canon chain in block-number ascending order
-    async fn get_commitments(&self) -> Result<Vec<Digest>>;
+    async fn get_commitments(&self, block_start: u32) -> Result<Vec<Digest>>;
 
     /// Gets all known serial numbers for canon chain in block-number ascending order
-    async fn get_serial_numbers(&self) -> Result<Vec<Digest>>;
+    async fn get_serial_numbers(&self, block_start: u32) -> Result<Vec<Digest>>;
 
     /// Gets all known memos for canon chain in block-number ascending order
-    async fn get_memos(&self) -> Result<Vec<Digest>>;
+    async fn get_memos(&self, block_start: u32) -> Result<Vec<Digest>>;
 
     /// Gets all known ledger digests for canon chain in block-number ascending order
-    async fn get_ledger_digests(&self) -> Result<Vec<Digest>>;
+    async fn get_ledger_digests(&self, block_start: u32) -> Result<Vec<Digest>>;
 
     /// Resets stored ledger state. A maintenance function, not intended for general use.
     async fn reset_ledger(

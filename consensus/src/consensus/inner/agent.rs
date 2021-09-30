@@ -86,11 +86,11 @@ impl ConsensusInner {
                     response.send(Box::new(out)).ok();
                 }
                 ConsensusMessage::CreateTransaction(request) => {
-                    let out = self.create_transaction(*request);
+                    let out = self.create_transaction(*request).await;
                     response.send(Box::new(out)).ok();
                 }
                 ConsensusMessage::CreatePartialTransaction(request) => {
-                    let out = self.create_partial_transaction(request);
+                    let out = self.create_partial_transaction(request).await;
                     response.send(Box::new(out)).ok();
                 }
                 ConsensusMessage::ForceDecommit(hash) => {
