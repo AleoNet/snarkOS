@@ -185,7 +185,7 @@ impl SyncStorage for SqliteStorage {
             self.migrate(current_index)?;
         }
         self.conn.execute(r"PRAGMA OPTIMIZE;", [])?;
-        self.conn.execute(r"PRAGMA journal_mode=WAL;", [])?;
+        self.conn.query_row(r"PRAGMA journal_mode=WAL;", [], |_| Ok(()))?;
         Ok(())
     }
 
