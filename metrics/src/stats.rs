@@ -80,7 +80,6 @@ impl Stats {
         }
     }
 
-    // TODO: conditional compilation?
     #[cfg(feature = "test")]
     pub fn clear(&self) {
         self.inbound.clear();
