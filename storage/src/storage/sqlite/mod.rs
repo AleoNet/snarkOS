@@ -21,7 +21,10 @@ use rusqlite::{
     OpenFlags,
     ToSql,
 };
-use std::path::Path;
+use std::{
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use crate::{BlockStatus, Digest, SerialBlock, SerialBlockHeader, TransactionLocation};
 
@@ -29,12 +32,14 @@ mod sync;
 
 pub struct SqliteStorage {
     conn: Connection,
+    last_optimize: Instant,
 }
 
 impl SqliteStorage {
     pub fn new_ephemeral() -> Result<Self> {
         Ok(Self {
             conn: Connection::open_in_memory()?,
+            last_optimize: Instant::now(),
         })
     }
 
@@ -44,7 +49,17 @@ impl SqliteStorage {
                 path,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
             )?,
+            last_optimize: Instant::now(),
         })
+    }
+
+    pub fn optimize(&mut self) -> Result<()> {
+        if self.last_optimize.elapsed() < Duration::from_secs(60 * 15) {
+            return Ok(());
+        }
+        self.conn.execute(r"PRAGMA OPTIMIZE;", [])?;
+        self.last_optimize = Instant::now();
+        Ok(())
     }
 }
 
