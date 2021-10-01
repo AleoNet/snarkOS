@@ -83,12 +83,15 @@ async fn block_initiator_side() {
     let sync = Payload::Sync(block_header_hashes);
     peer.write_message(&sync).await;
 
+    assert!(matches!(peer.read_payload().await.unwrap(), Payload::GetSync(_)));
+
     // make sure both GetBlock messages are received
     let payload = peer.read_payload().await.unwrap();
+
     let block_hashes = if let Payload::GetBlocks(block_hashes) = payload {
         block_hashes
     } else {
-        unreachable!();
+        panic!("unexpected payload in test: {:?}", payload);
     };
 
     assert!(block_hashes.contains(&block_1_header_hash) && block_hashes.contains(&block_2_header_hash));
