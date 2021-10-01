@@ -118,6 +118,9 @@ pub trait Storage: Send + Sync {
     /// Commits a block into canon.
     async fn commit_block(&self, hash: &Digest, digest: Digest) -> Result<BlockStatus>;
 
+    /// Attempts to recommit a block and its longest descendent chains blocks into canon, until there are no more ledger digests.
+    async fn recommit_blockchain(&self, hash: &Digest) -> Result<()>;
+
     /// Attempts to recommit a block into canon if it has a ledger digest.
     async fn recommit_block(&self, hash: &Digest) -> Result<BlockStatus>;
 

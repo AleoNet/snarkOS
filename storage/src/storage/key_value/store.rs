@@ -449,6 +449,10 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         unimplemented!()
     }
 
+    fn recommit_blockchain(&mut self, _root_hash: &Digest) -> Result<()> {
+        unimplemented!()
+    }
+
     fn commit_block(&mut self, block_hash: &Digest, ledger_digest: &Digest) -> Result<BlockStatus> {
         let canon = self.canon()?;
         let block = self.get_block(block_hash)?;

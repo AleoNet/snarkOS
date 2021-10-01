@@ -65,10 +65,7 @@ impl<P: MerkleParameters> Ledger for MerkleLedger<P> {
         Ok(new_digest)
     }
 
-    fn push_interim_digests(
-        &mut self,
-        new_ledger_digests: &[Digest],
-    ) -> Result<()> {
+    fn push_interim_digests(&mut self, new_ledger_digests: &[Digest]) -> Result<()> {
         self.ledger_digests.extend(new_ledger_digests.iter().cloned());
         Ok(())
     }

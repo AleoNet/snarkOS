@@ -27,10 +27,7 @@ impl Ledger for DummyLedger {
         unimplemented!()
     }
 
-    fn push_interim_digests(
-        &mut self,
-        _new_ledger_digests: &[Digest],
-    ) -> Result<()> {
+    fn push_interim_digests(&mut self, _new_ledger_digests: &[Digest]) -> Result<()> {
         unimplemented!()
     }
 

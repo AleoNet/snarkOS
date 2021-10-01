@@ -120,6 +120,8 @@ pub trait SyncStorage {
     /// Commits a block into canon.
     fn commit_block(&mut self, hash: &Digest, digest: &Digest) -> Result<BlockStatus>;
 
+    fn recommit_blockchain(&mut self, root_hash: &Digest) -> Result<()>;
+
     /// Attempts to recommit a block into canon if it has a ledger digest.
     fn recommit_block(&mut self, hash: &Digest) -> Result<BlockStatus>;
 

@@ -470,6 +470,51 @@ impl SyncStorage for SqliteStorage {
         self.get_block_state(hash)
     }
 
+    fn recommit_blockchain(&mut self, root_hash: &Digest) -> Result<()> {
+        let canon = self.canon()?;
+        match self.get_block_state(root_hash)? {
+            BlockStatus::Committed(_) => {
+                return Err(anyhow!("attempted to recommit block {}", hex::encode(root_hash)));
+            }
+            BlockStatus::Unknown => return Err(anyhow!("attempted to commit unknown block")),
+            _ => (),
+        }
+        let next_canon_height = if canon.is_empty() { 0 } else { canon.block_height + 1 };
+        self.conn.execute(
+            r"
+            WITH RECURSIVE
+                children(parent, sub, length) AS (
+                    SELECT ?, NULL, 0 as length
+                    UNION ALL
+                    SELECT blocks.hash, blocks.previous_block_hash, children.length + 1 FROM blocks
+                    INNER JOIN children
+                    WHERE blocks.previous_block_hash = children.parent
+                ),
+                preferred_tip AS (
+                    SELECT parent, sub, length FROM children
+                    WHERE length = (SELECT max(length) FROM children)
+                    ORDER BY parent
+                    LIMIT 1
+                ),
+                total_tip(parent, remaining, digest) AS (
+                    SELECT preferred_tip.parent, preferred_tip.length, NULL FROM preferred_tip
+                    UNION ALL
+                    SELECT blocks.previous_block_hash, total_tip.remaining - 1, blocks.canon_ledger_digest
+                    FROM total_tip
+                    INNER JOIN blocks ON blocks.hash = total_tip.parent
+                )
+                UPDATE blocks SET
+                    canon_height = total_tip.remaining + ?
+                FROM total_tip
+                WHERE
+                    total_tip.parent = blocks.hash
+                    AND total_tip.digest IS NOT NULL;
+            ",
+            params![root_hash, next_canon_height],
+        )?;
+        Ok(())
+    }
+
     fn recommit_block(&mut self, hash: &Digest) -> Result<BlockStatus> {
         let canon = self.canon()?;
         match self.get_block_state(hash)? {
@@ -511,10 +556,8 @@ impl SyncStorage for SqliteStorage {
 
             debug!("Decommitting block {} ({})", last_hash, block_number);
 
-            self.conn.execute(
-                r"UPDATE blocks SET canon_height = NULL WHERE hash = ?",
-                [&last_hash],
-            )?;
+            self.conn
+                .execute(r"UPDATE blocks SET canon_height = NULL WHERE hash = ?", [&last_hash])?;
 
             let new_last_hash = block.header.previous_block_hash.clone();
             decommitted.push(block);
@@ -619,7 +662,6 @@ impl SyncStorage for SqliteStorage {
         let mut pending_leaves = HashMap::<Digest, Vec<DigestTree>>::new();
         let mut current_tree_depth = None::<u32>;
         for (hash, parent_hash, tree_depth) in out.into_iter().rev() {
-
             if current_tree_depth.is_none() {
                 current_tree_depth = Some(tree_depth);
             } else if Some(tree_depth) != current_tree_depth {

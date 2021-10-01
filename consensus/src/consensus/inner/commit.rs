@@ -86,14 +86,14 @@ impl ConsensusInner {
                                     BlockStatus::Unknown => {
                                         return Err(anyhow!("failed to find parent block of fork").into());
                                     }
-                                    BlockStatus::Committed(n) => n,
+                                    BlockStatus::Committed(n) => n as u32,
                                     BlockStatus::Uncommitted => {
                                         return Err(anyhow!("proposed parent block of fork is non-canon").into());
                                     }
                                 };
 
                             // Remove existing canon chain descendents, if any.
-                            match self.storage.get_block_hash(canon_branch_number as u32 + 1).await? {
+                            match self.storage.get_block_hash(canon_branch_number + 1).await? {
                                 None => (),
                                 Some(hash) => {
                                     self.decommit_ledger_block(&hash).await?;
@@ -105,11 +105,18 @@ impl ConsensusInner {
                                 metrics::gauge!(metrics::blocks::HEIGHT, canon.block_height as f64);
                             }
 
-                            for block_hash in fork_path.path {
-                                if &block_hash == hash {
-                                    self.verify_and_commit_block(hash, block).await?
+                            self.storage.recommit_blockchain(&fork_path.path[0]).await?;
+                            let committed_blocks =
+                                self.storage.canon().await?.block_height as u32 - canon_branch_number;
+                            if committed_blocks > 0 && self.recommit_taint.is_none() {
+                                self.recommit_taint = Some(canon_branch_number);
+                            }
+
+                            for block_hash in &fork_path.path[committed_blocks as usize..] {
+                                if block_hash == hash {
+                                    self.verify_and_commit_block(hash, block).await?;
                                 } else {
-                                    let new_block = self.storage.get_block(&block_hash).await?;
+                                    let new_block = self.storage.get_block(block_hash).await?;
                                     self.verify_and_commit_block(&new_block.header.hash(), &new_block)
                                         .await?;
                                 }
@@ -244,7 +251,12 @@ impl ConsensusInner {
         self.verify_transactions(block.transactions.clone()).await
     }
 
-    async fn resolve_recommit_taint(&mut self, commitments: &mut Vec<Digest>, serial_numbers: &mut Vec<Digest>, memos: &mut Vec<Digest>) -> Result<Vec<Digest>, ConsensusError> {
+    async fn resolve_recommit_taint(
+        &mut self,
+        commitments: &mut Vec<Digest>,
+        serial_numbers: &mut Vec<Digest>,
+        memos: &mut Vec<Digest>,
+    ) -> Result<Vec<Digest>, ConsensusError> {
         let mut ledger_digests = vec![];
 
         if let Some(taint_source) = self.recommit_taint.take() {
@@ -260,7 +272,9 @@ impl ConsensusInner {
         let mut commitments = vec![];
         let mut serial_numbers = vec![];
         let mut memos = vec![];
-        let resolved_digests = self.resolve_recommit_taint(&mut commitments, &mut serial_numbers, &mut memos).await?;
+        let resolved_digests = self
+            .resolve_recommit_taint(&mut commitments, &mut serial_numbers, &mut memos)
+            .await?;
         if resolved_digests.is_empty() {
             return Ok(());
         }
@@ -269,29 +283,38 @@ impl ConsensusInner {
         Ok(())
     }
 
-    async fn extend_ledger(&mut self, commitments: Vec<Digest>, serial_numbers: Vec<Digest>, memos: Vec<Digest>) -> Result<Digest, ConsensusError> {
-        Ok(if self.ledger.requires_async_task(commitments.len(), serial_numbers.len()) {
-            let mut ledger = std::mem::replace(&mut self.ledger, DynLedger(Box::new(DummyLedger)));
-            let (digest, ledger) = tokio::task::spawn_blocking(move || {
-                let digest = ledger.extend(&commitments[..], &serial_numbers[..], &memos[..]);
+    async fn extend_ledger(
+        &mut self,
+        commitments: Vec<Digest>,
+        serial_numbers: Vec<Digest>,
+        memos: Vec<Digest>,
+    ) -> Result<Digest, ConsensusError> {
+        Ok(
+            if self.ledger.requires_async_task(commitments.len(), serial_numbers.len()) {
+                let mut ledger = std::mem::replace(&mut self.ledger, DynLedger(Box::new(DummyLedger)));
+                let (digest, ledger) = tokio::task::spawn_blocking(move || {
+                    let digest = ledger.extend(&commitments[..], &serial_numbers[..], &memos[..]);
 
-                (digest, ledger)
-            })
-            .await?;
+                    (digest, ledger)
+                })
+                .await?;
 
-            self.ledger = ledger;
+                self.ledger = ledger;
 
-            digest?
-        } else {
-            self.ledger.extend(&commitments[..], &serial_numbers[..], &memos[..])?
-        })
+                digest?
+            } else {
+                self.ledger.extend(&commitments[..], &serial_numbers[..], &memos[..])?
+            },
+        )
     }
 
     async fn inner_commit_block(&mut self, block: &SerialBlock) -> Result<Digest, ConsensusError> {
         let mut commitments = vec![];
         let mut serial_numbers = vec![];
         let mut memos = vec![];
-        let resolved_digests = self.resolve_recommit_taint(&mut commitments, &mut serial_numbers, &mut memos).await?;
+        let resolved_digests = self
+            .resolve_recommit_taint(&mut commitments, &mut serial_numbers, &mut memos)
+            .await?;
         for transaction in block.transactions.iter() {
             commitments.extend_from_slice(&transaction.new_commitments[..]);
             serial_numbers.extend_from_slice(&transaction.old_serial_numbers[..]);
@@ -315,7 +338,7 @@ impl ConsensusInner {
     pub(super) async fn recommit_block(&mut self, hash: &Digest) -> Result<BlockStatus, ConsensusError> {
         let initial_state = self.storage.get_block_state(hash).await?;
         if initial_state != BlockStatus::Uncommitted {
-            return Ok(initial_state); 
+            return Ok(initial_state);
         }
         let out = self.storage.recommit_block(hash).await?;
         if let BlockStatus::Committed(n) = out {
@@ -384,7 +407,7 @@ impl ConsensusInner {
             }
         }
         self.push_recommit_taint().await?;
-        
+
         self.ledger
             .rollback(&commitments[..], &serial_numbers[..], &memos[..])?;
         self.cleanse_memory_pool()

@@ -54,6 +54,7 @@ enum Message {
     GetForkPath(Digest, usize),
     CommitBlock(Digest, Digest),
     RecommitBlock(Digest),
+    RecommitBlockchain(Digest),
     DecommitBlocks(Digest),
     Canon(),
     LongestChildPath(Digest),
@@ -106,6 +107,7 @@ impl fmt::Display for Message {
             Message::GetForkPath(hash, size) => write!(f, "GetForkPath({}, {})", hash, size),
             Message::CommitBlock(hash, ledger_digest) => write!(f, "CommitBlock({}, {})", hash, ledger_digest),
             Message::RecommitBlock(hash) => write!(f, "RecommitBlock({})", hash),
+            Message::RecommitBlockchain(hash) => write!(f, "RecommitBlockchain({})", hash),
             Message::DecommitBlocks(hash) => write!(f, "DecommitBlocks({})", hash),
             Message::Canon() => write!(f, "Canon()"),
             Message::LongestChildPath(hash) => write!(f, "LongestChildPath({})", hash),
@@ -186,9 +188,8 @@ impl<S: SyncStorage + 'static> Agent<S> {
             Message::CommitBlock(block_hash, ledger_digest) => {
                 Box::new(self.wrap(move |f| f.commit_block(&block_hash, &ledger_digest)))
             }
-            Message::RecommitBlock(block_hash) => {
-                Box::new(self.wrap(move |f| f.recommit_block(&block_hash)))
-            }
+            Message::RecommitBlock(block_hash) => Box::new(self.wrap(move |f| f.recommit_block(&block_hash))),
+            Message::RecommitBlockchain(block_hash) => Box::new(self.wrap(move |f| f.recommit_blockchain(&block_hash))),
             Message::DecommitBlocks(hash) => Box::new(self.wrap(move |f| f.decommit_blocks(&hash))),
             Message::Canon() => Box::new(self.inner.canon()),
             Message::GetBlockChildren(hash) => Box::new(self.inner.get_block_children(&hash)),
@@ -304,8 +305,10 @@ impl Storage for AsyncStorage {
         self.send(Message::CommitBlock(hash.clone(), digest)).await
     }
 
+    async fn recommit_blockchain(&self, hash: &Digest) -> Result<()> {
+        self.send(Message::RecommitBlockchain(hash.clone())).await
+    }
 
-    /// Attempts to recommit a block into canon if it has a ledger digest.
     async fn recommit_block(&self, hash: &Digest) -> Result<BlockStatus> {
         self.send(Message::RecommitBlock(hash.clone())).await
     }
