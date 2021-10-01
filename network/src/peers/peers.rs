@@ -225,7 +225,6 @@ impl Node {
         // Local address must be known by now.
         let own_address = self.expect_local_addr();
 
-        // If this node is not a bootnode, attempt to satisfy the minimum number of peer connections.
         let random_peers: Vec<SocketAddr> = {
             trace!(
                 "Connecting to {} disconnected peers",
@@ -247,6 +246,7 @@ impl Node {
             if !self.is_of_type(NodeType::Client) {
                 candidates.into_iter().take(count).collect()
             } else {
+                // Floored if count is odd.
                 let random_count = count / 2;
                 let random_picks: Vec<Peer> = candidates
                     .iter()
