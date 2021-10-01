@@ -185,10 +185,12 @@ impl SyncStorage for SqliteStorage {
             self.migrate(current_index)?;
         }
         self.conn.execute(r"PRAGMA OPTIMIZE;", [])?;
+        self.conn.execute(r"PRAGMA journal_mode=WAL;", [])?;
         Ok(())
     }
 
     fn insert_block(&mut self, block: &SerialBlock) -> Result<()> {
+        self.optimize()?;
         let hash = block.header.hash();
 
         let mut block_query = self.conn.prepare_cached(
@@ -314,6 +316,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn delete_block(&mut self, hash: &Digest) -> Result<()> {
+        self.optimize()?;
+
         self.conn.execute(
             r"
             DELETE FROM blocks WHERE hash = ?
@@ -324,6 +328,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_hash(&mut self, block_num: u32) -> Result<Option<Digest>> {
+        self.optimize()?;
+
         Ok(self
             .conn
             .query_row::<Vec<u8>, _, _>(r"SELECT hash FROM blocks WHERE canon_height = ?", [block_num], |row| {
@@ -334,6 +340,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_header(&mut self, hash: &Digest) -> Result<SerialBlockHeader> {
+        self.optimize()?;
+
         self.conn
             .query_row(
                 r"
@@ -363,6 +371,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_state(&mut self, hash: &Digest) -> Result<BlockStatus> {
+        self.optimize()?;
+
         let output: Option<Option<usize>> = self
             .conn
             .query_row(r"SELECT canon_height FROM blocks WHERE hash = ?", [hash], |row| {
@@ -378,6 +388,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_states(&mut self, hashes: &[Digest]) -> Result<Vec<BlockStatus>> {
+        self.optimize()?;
+
         // intentional N+1 query since rusqlite doesn't support WHERE ... IN here and it doesn't matter at the moment
         let mut out = Vec::with_capacity(hashes.len());
         for hash in hashes {
@@ -388,6 +400,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block(&mut self, hash: &Digest) -> Result<SerialBlock> {
+        self.optimize()?;
+
         let header = self.get_block_header(hash)?;
         let mut stmt = self.conn.prepare_cached(
             "SELECT
@@ -438,6 +452,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn commit_block(&mut self, hash: &Digest, ledger_digest: &Digest) -> Result<BlockStatus> {
+        self.optimize()?;
+
         let canon = self.canon()?;
         match self.get_block_state(hash)? {
             BlockStatus::Committed(_) => {
@@ -455,6 +471,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<SerialBlock>> {
+        self.optimize()?;
+
         match self.get_block_state(hash)? {
             BlockStatus::Committed(_) => (),
             _ => return Err(anyhow!("attempted to decommit uncommitted block")),
@@ -493,6 +511,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn canon_height(&mut self) -> Result<u32> {
+        self.optimize()?;
+
         self.conn
             .query_row(r"SELECT coalesce(max(canon_height), 0) FROM blocks", [], |row| {
                 row.get(0)
@@ -501,6 +521,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn canon(&mut self) -> Result<CanonData> {
+        self.optimize()?;
+
         let canon_height = self.canon_height()?;
 
         let hash = self.get_block_hash(canon_height)?;
@@ -518,6 +540,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn longest_child_path(&mut self, block_hash: &Digest) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
             WITH RECURSIVE
@@ -553,6 +577,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_digest_tree(&mut self, block_hash: &Digest) -> Result<DigestTree> {
+        self.optimize()?;
+
         let mut nodes: HashMap<Digest, Vec<Digest>> = HashMap::new();
         let mut stmt = self.conn.prepare_cached(
             r"
@@ -615,6 +641,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_children(&mut self, hash: &Digest) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
             SELECT blocks.hash FROM blocks
@@ -629,6 +657,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn scan_forks(&mut self, scan_depth: u32) -> Result<Vec<(Digest, Digest)>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
             WITH RECURSIVE
@@ -655,6 +685,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_transaction_location(&mut self, transaction_id: &Digest) -> Result<Option<TransactionLocation>> {
+        self.optimize()?;
+
         self.conn
             .query_row(
                 r"
@@ -679,6 +711,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_transaction(&mut self, transaction_id: &Digest) -> Result<SerialTransaction> {
+        self.optimize()?;
+
         self.conn
             .query_row(
                 r"
@@ -726,6 +760,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_record_commitments(&mut self, limit: Option<usize>) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
         SELECT commitment
@@ -781,6 +817,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn store_records(&mut self, records: &[SerialRecord]) -> Result<()> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
         INSERT INTO miner_records (
@@ -815,6 +853,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_commitments(&mut self) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
         SELECT
@@ -837,6 +877,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_serial_numbers(&mut self) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
         SELECT
@@ -859,6 +901,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_memos(&mut self) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
         SELECT
@@ -877,6 +921,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_ledger_digests(&mut self) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             r"
         SELECT
@@ -903,6 +949,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<SerialBlock>> {
+        self.optimize()?;
+
         let digests = self.get_block_hashes(limit, BlockFilter::CanonOnly(BlockOrder::Unordered))?;
         // this is intentionally N+1 query since this is not a critical performance function and its easy
         let mut blocks = Vec::with_capacity(digests.len());
@@ -914,6 +962,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn get_block_hashes(&mut self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>> {
+        self.optimize()?;
+
         let limit = limit.unwrap_or(u32::MAX);
         let hashes = match filter {
             BlockFilter::CanonOnly(BlockOrder::Unordered) => {
@@ -997,6 +1047,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn store_peers(&mut self, peers: Vec<Peer>) -> Result<()> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             "
             INSERT INTO peers (
@@ -1063,6 +1115,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn lookup_peers(&mut self, addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>> {
+        self.optimize()?;
+
         let mut out = vec![];
         let mut stmt = self.conn.prepare_cached(
             "
@@ -1114,6 +1168,8 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn fetch_peers(&mut self) -> Result<Vec<Peer>> {
+        self.optimize()?;
+
         let mut stmt = self.conn.prepare_cached(
             "
             SELECT
