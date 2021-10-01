@@ -158,20 +158,14 @@ impl ConsensusInner {
             BlockStatus::Uncommitted => (),
         }
 
-        let start = Instant::now();
-
         // 1. Verify that the block valid
         if !self.verify_block(block).await? {
             return Err(ConsensusError::InvalidBlock(hash.clone()));
         }
-
-        info!("verify took {} ms", start.elapsed().as_millis());
         let start = Instant::now();
 
         // 2. Insert/canonize block
         self.commit_block(hash, block).await?;
-
-        info!("commit took {} ms", start.elapsed().as_millis());
 
         // 3. Remove transactions from the mempool
         for transaction in block.transactions.iter() {

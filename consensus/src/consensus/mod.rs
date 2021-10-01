@@ -18,7 +18,16 @@ use std::{convert::TryInto, sync::Arc};
 
 use rand::{thread_rng, Rng};
 use snarkos_metrics::wrapped_mpsc;
-use snarkos_storage::{Address, BlockStatus, Digest, DynStorage, SerialBlock, SerialRecord, SerialTransaction, VMRecord};
+use snarkos_storage::{
+    Address,
+    BlockStatus,
+    Digest,
+    DynStorage,
+    SerialBlock,
+    SerialRecord,
+    SerialTransaction,
+    VMRecord,
+};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
@@ -84,7 +93,6 @@ impl Consensus {
             .agent(receiver)
             .await;
         });
-
 
         if let Err(e) = created.fast_forward().await {
             match e {

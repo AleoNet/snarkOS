@@ -150,7 +150,7 @@ impl Node {
                 if previous_block_hash == canon.hash && self.state() == State::Mining {
                     self.terminator.store(true, Ordering::SeqCst);
                 }
-    
+
                 // This is a non-sync Block, send it to our peers.
                 self.propagate_block(block, height, remote_address);
             }
