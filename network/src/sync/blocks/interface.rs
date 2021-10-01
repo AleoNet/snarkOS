@@ -160,8 +160,6 @@ impl Node {
             }
         }
 
-        // Verify the block and insert it into the storage.
-
         metrics::histogram!(metrics::blocks::INBOUND_PROCESSING_TIME, now.elapsed());
 
         Ok(())

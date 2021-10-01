@@ -162,7 +162,6 @@ impl ConsensusInner {
         if !self.verify_block(block).await? {
             return Err(ConsensusError::InvalidBlock(hash.clone()));
         }
-        let start = Instant::now();
 
         // 2. Insert/canonize block
         self.commit_block(hash, block).await?;
