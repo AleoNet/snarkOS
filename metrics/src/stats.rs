@@ -209,7 +209,7 @@ impl OutboundStats {
         NodeOutboundStats {
             all_successes: self.all_successes.read(),
             all_failures: self.all_failures.read(),
-            // FIXME: add missing metric?
+            all_cache_hits: self.all_cache_hits.read(),
         }
     }
 
