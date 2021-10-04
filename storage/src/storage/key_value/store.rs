@@ -733,4 +733,8 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
     fn reset(&mut self) -> Result<()> {
         unimplemented!();
     }
+
+    fn trim(&mut self) -> Result<()> {
+        unimplemented!();
+    }
 }

@@ -50,7 +50,7 @@ impl<'de> Deserialize<'de> for Digest {
         let name = String::deserialize(deserializer)?;
 
         Ok(Self(InnerType::from(
-            hex::decode(&name).map_err(|e| serde::de::Error::custom(e))?,
+            hex::decode(&name).map_err(serde::de::Error::custom)?,
         )))
     }
 }

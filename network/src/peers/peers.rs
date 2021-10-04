@@ -248,18 +248,17 @@ impl Node {
             } else {
                 // Floored if count is odd.
                 let random_count = count / 2;
-                let random_picks: Vec<Peer> = candidates
-                    .iter()
-                    .choose_multiple(&mut SmallRng::from_entropy(), random_count)
+                let random_picks = candidates
+                    .clone()
                     .into_iter()
-                    .cloned()
-                    .collect();
+                    .choose_multiple(&mut SmallRng::from_entropy(), random_count)
+                    .into_iter();
                 candidates.sort_unstable_by(|x, y| y.quality.block_height.cmp(&x.quality.block_height));
 
                 candidates.truncate(count - random_count);
                 candidates
                     .into_iter()
-                    .chain(random_picks.into_iter())
+                    .chain(random_picks)
                     .unique_by(|x| x.address)
                     .collect::<Vec<Peer>>()
             }
