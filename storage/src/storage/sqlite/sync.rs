@@ -1204,9 +1204,9 @@ impl SyncStorage for SqliteStorage {
             WHERE id IN (
                 SELECT transactions.id
                 FROM transactions
-                INNER JOIN transaction_blocks on transaction_blocks.transaction_id = transactions.id
-                INNER JOIN blocks on blocks.id = transaction_blocks.block_id
-                WHERE blocks.canon_height IS NULL
+                LEFT JOIN transaction_blocks on transaction_blocks.transaction_id = transactions.id
+                LEFT JOIN blocks on blocks.id = transaction_blocks.block_id
+                WHERE transaction_blocks.transaction_id IS NULL OR blocks.canon_height IS NULL
             )
         ",
             [],
