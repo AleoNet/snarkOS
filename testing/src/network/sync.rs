@@ -105,7 +105,7 @@ async fn block_initiator_side() {
 
     // check the blocks have been added to the node's chain
     wait_until!(
-        5,
+        65,
         matches!(
             node.storage.get_block_state(&block_1_header_hash).await.unwrap(),
             BlockStatus::Committed(_)
