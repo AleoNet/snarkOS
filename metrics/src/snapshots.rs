@@ -77,6 +77,8 @@ pub struct NodeOutboundStats {
     pub all_successes: u64,
     /// The number of messages that failed to be sent to peers.
     pub all_failures: u64,
+    /// The number of messages that were going to be sent to a peer, but was blocked at the last minute by a cache.
+    pub all_cache_hits: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

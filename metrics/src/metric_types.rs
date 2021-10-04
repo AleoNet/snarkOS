@@ -37,6 +37,11 @@ impl Counter {
     pub fn read(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.0.store(0, Ordering::Relaxed);
+    }
 }
 
 /// Mimics a [`metrics-core`] arbitrarily increasing & decreasing [`Gauge`]
@@ -70,6 +75,11 @@ impl DiscreteGauge {
     #[inline]
     pub fn read(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
+    }
+
+    #[cfg(feature = "test")]
+    pub fn clear(&self) {
+        self.0.store(0, Ordering::Relaxed);
     }
 }
 
@@ -159,8 +169,19 @@ impl CircularHistogram {
             .get_or_init(|| RwLock::new(CircularQueue::with_capacity(QUEUE_CAPACITY)))
             .read();
 
-        let sum: f64 = queue_r.iter().copied().sum();
+        if queue_r.is_empty() {
+            return 0.0;
+        }
 
+        let sum: f64 = queue_r.iter().copied().sum();
         sum / queue_r.len() as f64
+    }
+
+    #[cfg(feature = "test")]
+    pub(crate) fn clear(&self) {
+        // Reset the queue only if it has previously been initialised.
+        if let Some(queue) = self.0.get() {
+            *queue.write() = CircularQueue::with_capacity(QUEUE_CAPACITY);
+        }
     }
 }

@@ -18,6 +18,8 @@
 #![forbid(unsafe_code)]
 
 pub mod dpc;
+#[cfg(test)]
+pub mod metrics;
 pub mod mining;
 #[cfg(feature = "network")]
 pub mod network;
