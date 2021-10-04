@@ -192,7 +192,10 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: cd testing && RUST_MIN_STACK=8388608 cargo test --release -- --nocapture --skip metrics && RUST_MIN_STACK=8388608 cargo test --release metrics -- --test-threads 1
+          command: |
+            cd testing
+            RUST_MIN_STACK=8388608 cargo test --release -- --nocapture --skip metrics
+            cargo test --release metrics -- --test-threads 1
       - clear_environment:
           cache_key: snarkos-testing-cache
 
