@@ -41,8 +41,13 @@ async fn connect_and_disconnect_responder_side() {
     let metrics = NODE_STATS.snapshot();
 
     assert_eq!(metrics.connections.all_accepted, 1);
-    assert_eq!(metrics.connections.connected_peers, 1);
+    assert_eq!(metrics.connections.all_initiated, 0);
     assert_eq!(metrics.handshakes.successes_resp, 1);
+    assert_eq!(metrics.handshakes.successes_init, 0);
+
+    assert_eq!(metrics.connections.connected_peers, 1);
+    assert_eq!(metrics.connections.connecting_peers, 0);
+    assert_eq!(metrics.connections.disconnected_peers, 0);
 
     // Break the connection by dropping the peer.
     drop(peer);
@@ -115,9 +120,14 @@ async fn connect_and_disconnect_initiator_side() {
     // ...the metrics should reflect this.
     let metrics = NODE_STATS.snapshot();
 
+    assert_eq!(metrics.connections.all_accepted, 0);
     assert_eq!(metrics.connections.all_initiated, 1);
-    assert_eq!(metrics.connections.connected_peers, 1);
+    assert_eq!(metrics.handshakes.successes_resp, 0);
     assert_eq!(metrics.handshakes.successes_init, 1);
+
+    assert_eq!(metrics.connections.connected_peers, 1);
+    assert_eq!(metrics.connections.connecting_peers, 0);
+    assert_eq!(metrics.connections.disconnected_peers, 0);
 
     // Break the connection by dropping the peer.
     drop(peer);
