@@ -154,10 +154,8 @@ impl Node {
                 // This is a non-sync Block, send it to our peers.
                 self.propagate_block(block, height, remote_address);
             }
-        } else {
-            if let Err(e) = self.expect_sync().consensus.shallow_receive_block(block_struct).await {
-                debug!("failed receiving sync block: {:?}", e);
-            }
+        } else if let Err(e) = self.expect_sync().consensus.shallow_receive_block(block_struct).await {
+            debug!("failed receiving sync block: {:?}", e);
         }
 
         metrics::histogram!(metrics::blocks::INBOUND_PROCESSING_TIME, now.elapsed());

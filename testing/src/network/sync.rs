@@ -104,6 +104,7 @@ async fn block_initiator_side() {
     peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
+    // can take a while since sync runs in 60 second rounds before committing anything.
     wait_until!(
         65,
         matches!(
