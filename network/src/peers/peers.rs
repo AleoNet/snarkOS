@@ -21,7 +21,7 @@ use std::{
 };
 
 use itertools::Itertools;
-use rand::{prelude::SliceRandom, rngs::SmallRng, seq::IteratorRandom, SeedableRng};
+use rand::{prelude::SliceRandom, rngs::SmallRng, SeedableRng};
 use tokio::task;
 
 use snarkos_metrics::{self as metrics, connections::*};
@@ -248,11 +248,11 @@ impl Node {
             } else {
                 // Floored if count is odd.
                 let random_count = count / 2;
-                let random_picks = candidates
-                    .clone()
-                    .into_iter()
+                let random_picks: Vec<Peer> = candidates
                     .choose_multiple(&mut SmallRng::from_entropy(), random_count)
-                    .into_iter();
+                    .cloned()
+                    .collect();
+
                 candidates.sort_unstable_by(|x, y| y.quality.block_height.cmp(&x.quality.block_height));
 
                 candidates.truncate(count - random_count);
