@@ -107,12 +107,12 @@ impl ConsensusInner {
 
                             self.storage.recommit_blockchain(&fork_path.path[0]).await?;
                             let committed_blocks =
-                                self.storage.canon().await?.block_height as u32 - canon_branch_number;
+                                self.storage.canon().await?.block_height - canon_branch_number as usize;
                             if committed_blocks > 0 && self.recommit_taint.is_none() {
                                 self.recommit_taint = Some(canon_branch_number);
                             }
 
-                            for block_hash in &fork_path.path[committed_blocks as usize..] {
+                            for block_hash in &fork_path.path[committed_blocks.min(fork_path.path.len())..] {
                                 if block_hash == hash {
                                     self.verify_and_commit_block(hash, block).await?;
                                 } else {

@@ -666,7 +666,6 @@ impl SyncStorage for SqliteStorage {
                 past_leaves.clear();
                 std::mem::swap(&mut past_leaves, &mut pending_leaves);
             }
-            // pending_leaves.entry(parent_hash).and_modify(|inner| inner.push_child(hash)).or_insert_with(|| DigestTree::Leaf(hash));
             let waiting_children = past_leaves.remove(&hash).unwrap_or_default();
             let node = if !waiting_children.is_empty() {
                 let max_dist = waiting_children.iter().map(|x| x.longest_length()).max().unwrap_or(0);

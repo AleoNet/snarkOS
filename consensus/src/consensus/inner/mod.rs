@@ -73,8 +73,6 @@ impl ConsensusInner {
             return Ok(None);
         }
 
-        //todo: partial ledger fix
-
         for sn in &transaction.old_serial_numbers {
             if self.ledger.contains_serial(sn) || self.memory_pool.serial_numbers.contains(sn) {
                 return Ok(None);
