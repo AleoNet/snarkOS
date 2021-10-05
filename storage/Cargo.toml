@@ -29,6 +29,9 @@ version = "0.25"
 optional = true
 features = [ "bundled" ]
 
+[dependencies.metrics]
+version = "0.17"
+
 [dependencies.snarkvm-algorithms]
 version = "=0.7.9"
 

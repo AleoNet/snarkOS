@@ -135,14 +135,6 @@ impl Consensus {
     }
 
     pub async fn shallow_receive_block(&self, block: SerialBlock) -> Result<()> {
-        let hash = block.header.hash();
-        match self.storage.get_block_state(&hash).await? {
-            BlockStatus::Unknown => (),
-            BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
-                metrics::increment_counter!(snarkos_metrics::blocks::DUPLICATES);
-                return Err(ConsensusError::PreExistingBlock.into());
-            }
-        }
         self.storage.insert_block(&block).await?;
         Ok(())
     }

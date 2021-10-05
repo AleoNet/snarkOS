@@ -24,16 +24,9 @@ use tokio::task;
 impl ConsensusInner {
     /// Receive a block from an external source and process it based on ledger state.
     pub(super) async fn receive_block(&mut self, block: &SerialBlock) -> Result<(), ConsensusError> {
-        let hash = block.header.hash();
-        match self.storage.get_block_state(&hash).await? {
-            BlockStatus::Unknown => (),
-            BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
-                metrics::increment_counter!(metrics::blocks::DUPLICATES);
-                return Err(ConsensusError::PreExistingBlock);
-            }
-        }
         self.storage.insert_block(block).await?;
 
+        let hash = block.header.hash();
         match self.try_commit_block(&hash, block).await {
             Err(ConsensusError::InvalidBlock(hash)) => {
                 self.storage.delete_block(&hash).await?;
