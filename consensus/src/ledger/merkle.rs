@@ -140,7 +140,7 @@ impl<P: MerkleParameters> Ledger for MerkleLedger<P> {
 }
 
 fn jumps_power_of_two(start: usize, adding: usize) -> bool {
-    let prior_commitments_depth = (start as f64).log2() as usize;
-    let new_commitments_depth = ((start + adding) as f64).log2() as usize;
-    prior_commitments_depth != new_commitments_depth
+    let prior_depth = (start as f64).log2() as usize;
+    let new_depth = ((start + adding) as f64).log2() as usize;
+    prior_depth != new_depth
 }
