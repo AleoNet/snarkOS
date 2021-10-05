@@ -67,14 +67,11 @@ impl ConsensusInner {
                     }
                     Err(e) => {
                         match e {
-                            ConsensusError::PreExistingBlock => {
-                                trace!("failed receiving block: {:?}", e);
-                            }
                             ConsensusError::InvalidBlock(e) => {
                                 debug!("failed receiving block: {:?}", e);
                             }
                             e => {
-                                warn!("failed receiving block: {:?}", e);
+                                debug!("failed receiving block: {:?}", e);
                             }
                         }
                         response.send(Box::new(false)).ok();

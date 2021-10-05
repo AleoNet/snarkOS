@@ -2888,6 +2888,7 @@ dependencies = [
  "hash_hasher",
  "hex",
  "indexmap",
+ "metrics",
  "num_enum",
  "parking_lot",
  "rand 0.8.4",

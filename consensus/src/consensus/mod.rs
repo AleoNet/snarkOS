@@ -18,16 +18,7 @@ use std::{convert::TryInto, sync::Arc};
 
 use rand::{thread_rng, Rng};
 use snarkos_metrics::wrapped_mpsc;
-use snarkos_storage::{
-    Address,
-    BlockStatus,
-    Digest,
-    DynStorage,
-    SerialBlock,
-    SerialRecord,
-    SerialTransaction,
-    VMRecord,
-};
+use snarkos_storage::{Address, Digest, DynStorage, SerialBlock, SerialRecord, SerialTransaction, VMRecord};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::{
@@ -135,14 +126,6 @@ impl Consensus {
     }
 
     pub async fn shallow_receive_block(&self, block: SerialBlock) -> Result<()> {
-        let hash = block.header.hash();
-        match self.storage.get_block_state(&hash).await? {
-            BlockStatus::Unknown => (),
-            BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
-                metrics::increment_counter!(snarkos_metrics::blocks::DUPLICATES);
-                return Err(ConsensusError::PreExistingBlock.into());
-            }
-        }
         self.storage.insert_block(&block).await?;
         Ok(())
     }

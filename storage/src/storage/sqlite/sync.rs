@@ -193,6 +193,14 @@ impl SyncStorage for SqliteStorage {
         self.optimize()?;
         let hash = block.header.hash();
 
+        match self.get_block_state(&hash)? {
+            BlockStatus::Unknown => (),
+            BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
+                metrics::increment_counter!(snarkos_metrics::blocks::DUPLICATES);
+                return Err(anyhow!("duplicate block insertion"));
+            }
+        }
+
         let mut block_query = self.conn.prepare_cached(
             r"
         INSERT INTO blocks (

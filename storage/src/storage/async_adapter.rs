@@ -17,8 +17,7 @@
 use std::{any::Any, fmt, net::SocketAddr};
 
 use anyhow::*;
-use metrics::wrapped_mpsc;
-use snarkos_metrics::{self as metrics, queues};
+use snarkos_metrics::{queues, wrapped_mpsc};
 use tokio::sync::oneshot;
 use tracing::log::trace;
 
