@@ -143,16 +143,19 @@ impl Node {
             canon.block_height,
         );
 
-        // Verify the block and insert it into the storage.
-        let block_validity = self.expect_sync().consensus.receive_block(block_struct).await;
+        if is_non_sync {
+            let block_validity = self.expect_sync().consensus.receive_block(block_struct).await;
 
-        if block_validity && is_non_sync {
-            if previous_block_hash == canon.hash && self.state() == State::Mining {
-                self.terminator.store(true, Ordering::SeqCst);
+            if block_validity {
+                if previous_block_hash == canon.hash && self.state() == State::Mining {
+                    self.terminator.store(true, Ordering::SeqCst);
+                }
+
+                // This is a non-sync Block, send it to our peers.
+                self.propagate_block(block, height, remote_address);
             }
-
-            // This is a non-sync Block, send it to our peers.
-            self.propagate_block(block, height, remote_address);
+        } else if let Err(e) = self.expect_sync().consensus.shallow_receive_block(block_struct).await {
+            debug!("failed receiving sync block: {:?}", e);
         }
 
         metrics::histogram!(metrics::blocks::INBOUND_PROCESSING_TIME, now.elapsed());
