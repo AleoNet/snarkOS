@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::Instant;
 
 use super::*;
 use crate::ledger::dummy::DummyLedger;
