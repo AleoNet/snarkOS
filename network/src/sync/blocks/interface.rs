@@ -167,20 +167,24 @@ impl Node {
     pub(crate) async fn received_get_blocks(
         &self,
         remote_address: SocketAddr,
-        header_hashes: Vec<Digest>,
+        mut header_hashes: Vec<Digest>,
         time_received: Option<Instant>,
     ) -> Result<(), NetworkError> {
-        for (i, hash) in header_hashes
-            .into_iter()
-            .take(crate::MAX_BLOCK_SYNC_COUNT as usize)
-            .map(|x| -> Digest { x.0.into() })
-            .enumerate()
-        {
+        header_hashes.truncate(crate::MAX_BLOCK_SYNC_COUNT as usize);
+
+        let mut blocks = Vec::with_capacity(header_hashes.len());
+        for hash in &header_hashes {
+            let block = self.storage.get_block(hash).await?;
+            blocks.push(block);
+        }
+        let blocks: Vec<_> =
+            task::spawn_blocking(move || blocks.into_iter().map(|block| block.serialize()).collect()).await?;
+
+        for (i, (block, hash)) in blocks.into_iter().zip(header_hashes.into_iter()).enumerate() {
             let height = match self.storage.get_block_state(&hash).await? {
                 BlockStatus::Committed(h) => Some(h as u32),
                 _ => None,
             };
-            let block = self.storage.get_block(&hash).await?;
 
             // Only stop the clock on internal RTT for the last block in the response.
             let time_received = if i == crate::MAX_BLOCK_SYNC_COUNT as usize - 1 {
@@ -191,11 +195,7 @@ impl Node {
 
             // Send a `SyncBlock` message to the connected peer.
             self.peer_book
-                .send_to(
-                    remote_address,
-                    Payload::SyncBlock(block.serialize(), height),
-                    time_received,
-                )
+                .send_to(remote_address, Payload::SyncBlock(block, height), time_received)
                 .await;
         }
 

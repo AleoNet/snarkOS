@@ -41,6 +41,7 @@ pub enum NetworkError {
     PeerIsDisconnected,
     SelfConnectAttempt,
     SenderError(tokio::sync::mpsc::error::SendError<Message>),
+    TaskPanicked(tokio::task::JoinError),
     TooManyConnections,
     OutboundChannelMissing,
     ReceiverFailedToParse,
@@ -134,6 +135,12 @@ impl From<std::io::Error> for NetworkError {
 impl From<tokio::sync::mpsc::error::SendError<Message>> for NetworkError {
     fn from(error: tokio::sync::mpsc::error::SendError<Message>) -> Self {
         NetworkError::SenderError(error)
+    }
+}
+
+impl From<tokio::task::JoinError> for NetworkError {
+    fn from(error: tokio::task::JoinError) -> Self {
+        NetworkError::TaskPanicked(error)
     }
 }
 
