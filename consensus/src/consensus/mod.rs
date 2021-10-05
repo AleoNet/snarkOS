@@ -20,7 +20,6 @@ use rand::{thread_rng, Rng};
 use snarkos_metrics::wrapped_mpsc;
 use snarkos_storage::{
     Address,
-    BlockStatus,
     Digest,
     DynStorage,
     SerialBlock,
