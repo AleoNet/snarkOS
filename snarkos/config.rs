@@ -410,7 +410,7 @@ impl Config {
 
     pub fn check(&self) -> Result<(), CliError> {
         // Check that the minimum and maximum number of peers is valid.
-        if self.p2p.min_peers == 0 || self.p2p.max_peers == 0 {
+        if self.p2p.min_peers == 0 || self.p2p.max_peers == 0 || self.p2p.min_peers > self.p2p.max_peers {
             return Err(CliError::PeerCountInvalid);
         }
 
