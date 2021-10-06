@@ -84,11 +84,12 @@ impl Node {
                 0,
             )
         } else {
+            const REFRESH_COUNT: u32 = 2;
             (
                 // Other nodes disconnect if above the max peer count...
-                active_peer_count.saturating_sub(max_peers),
+                active_peer_count.saturating_sub(max_peers) + REFRESH_COUNT,
                 // ...and connect if below the min peer count.
-                min_peers.saturating_sub(active_peer_count),
+                min_peers.saturating_sub(active_peer_count) + REFRESH_COUNT,
             )
         };
 
