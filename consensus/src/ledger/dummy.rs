@@ -27,6 +27,10 @@ impl Ledger for DummyLedger {
         unimplemented!()
     }
 
+    fn push_interim_digests(&mut self, _new_ledger_digests: &[Digest]) -> Result<()> {
+        unimplemented!()
+    }
+
     fn rollback(&mut self, _commitments: &[Digest], _serial_numbers: &[Digest], _memos: &[Digest]) -> Result<()> {
         unimplemented!()
     }

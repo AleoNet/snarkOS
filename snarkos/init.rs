@@ -159,10 +159,10 @@ pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<S
         Arc::new(Parameters::from(crh))
     };
     info!("Loading Ledger");
-    let ledger_digests = storage.get_ledger_digests().await?;
-    let commitments = storage.get_commitments().await?;
-    let serial_numbers = storage.get_serial_numbers().await?;
-    let memos = storage.get_memos().await?;
+    let ledger_digests = storage.get_ledger_digests(0).await?;
+    let commitments = storage.get_commitments(0).await?;
+    let serial_numbers = storage.get_serial_numbers(0).await?;
+    let memos = storage.get_memos(0).await?;
     info!("Initializing Ledger");
     let ledger = DynLedger(Box::new(MerkleLedger::new(
         ledger_parameters,

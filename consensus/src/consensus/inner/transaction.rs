@@ -62,6 +62,8 @@ impl ConsensusInner {
         transactions: Vec<SerialTransaction>,
     ) -> Result<bool, ConsensusError> {
         let consensus = self.public.clone();
+        self.push_recommit_taint().await?;
+
         let ledger = std::mem::replace(&mut self.ledger, DynLedger::dummy());
 
         let (ledger, verification_result) = task::spawn_blocking(move || {
@@ -97,10 +99,12 @@ impl ConsensusInner {
     }
 
     /// Generate a transaction by spending old records and specifying new record attributes
-    pub(super) fn create_transaction(
-        &self,
+    pub(super) async fn create_transaction(
+        &mut self,
         request: CreateTransactionRequest,
     ) -> Result<TransactionResponse, ConsensusError> {
+        self.push_recommit_taint().await?;
+
         let mut rng = thread_rng();
         // Offline execution to generate a DPC transaction
         let old_private_keys: Vec<_> = request.old_account_private_keys.into_iter().map(|x| x.into()).collect();
@@ -143,10 +147,12 @@ impl ConsensusInner {
     }
 
     /// Generate a transaction by spending old records and specifying new record attributes
-    pub(super) fn create_partial_transaction(
-        &self,
+    pub(super) async fn create_partial_transaction(
+        &mut self,
         request: CreatePartialTransactionRequest,
     ) -> Result<TransactionResponse, ConsensusError> {
+        self.push_recommit_taint().await?;
+
         let mut rng = thread_rng();
         // Offline execution to generate a DPC transaction
         let transaction_kernel: Box<TransactionKernel<Components>> = request

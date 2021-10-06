@@ -445,6 +445,14 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         Ok(hashes)
     }
 
+    fn recommit_block(&mut self, _block_hash: &Digest) -> Result<BlockStatus> {
+        unimplemented!()
+    }
+
+    fn recommit_blockchain(&mut self, _root_hash: &Digest) -> Result<()> {
+        unimplemented!()
+    }
+
     fn commit_block(&mut self, block_hash: &Digest, ledger_digest: &Digest) -> Result<BlockStatus> {
         let canon = self.canon()?;
         let block = self.get_block(block_hash)?;
@@ -648,7 +656,10 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         Ok(())
     }
 
-    fn get_ledger_digests(&mut self) -> Result<Vec<Digest>> {
+    fn get_ledger_digests(&mut self, block_start: u32) -> Result<Vec<Digest>> {
+        if block_start != 0 {
+            unimplemented!();
+        }
         let mut keys = self
             .inner()
             .get_column(KeyValueColumn::DigestIndex)?
@@ -706,15 +717,24 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         }
     }
 
-    fn get_commitments(&mut self) -> Result<Vec<Digest>> {
+    fn get_commitments(&mut self, block_start: u32) -> Result<Vec<Digest>> {
+        if block_start != 0 {
+            unimplemented!();
+        }
         self.get_digest_keys(KeyValueColumn::Commitment)
     }
 
-    fn get_serial_numbers(&mut self) -> Result<Vec<Digest>> {
+    fn get_serial_numbers(&mut self, block_start: u32) -> Result<Vec<Digest>> {
+        if block_start != 0 {
+            unimplemented!();
+        }
         self.get_digest_keys(KeyValueColumn::SerialNumber)
     }
 
-    fn get_memos(&mut self) -> Result<Vec<Digest>> {
+    fn get_memos(&mut self, block_start: u32) -> Result<Vec<Digest>> {
+        if block_start != 0 {
+            unimplemented!();
+        }
         self.get_digest_keys(KeyValueColumn::Memo)
     }
 
