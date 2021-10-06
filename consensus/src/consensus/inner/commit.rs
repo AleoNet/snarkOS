@@ -58,7 +58,7 @@ impl ConsensusInner {
             _ => {
                 let fork_path = self
                     .storage
-                    .get_fork_path(&block.header.previous_block_hash, crate::OLDEST_FORK_THRESHOLD)
+                    .get_fork_path(hash, crate::OLDEST_FORK_THRESHOLD)
                     .await?;
                 match fork_path {
                     ForkDescription::Path(fork_path) => {
