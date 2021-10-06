@@ -56,10 +56,7 @@ impl ConsensusInner {
                 return Ok(());
             }
             _ => {
-                let fork_path = self
-                    .storage
-                    .get_fork_path(hash, crate::OLDEST_FORK_THRESHOLD)
-                    .await?;
+                let fork_path = self.storage.get_fork_path(hash, crate::OLDEST_FORK_THRESHOLD).await?;
                 match fork_path {
                     ForkDescription::Path(fork_path) => {
                         let new_block_number = fork_path.base_index + fork_path.path.len() as u32;
