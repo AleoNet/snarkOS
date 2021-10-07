@@ -149,7 +149,7 @@ mod consensus_sidechain {
 
         new_block_height = consensus.storage.canon().await.unwrap().block_height;
 
-        assert_eq!(old_block_height, new_block_height);
+        assert_eq!(old_block_height + 1, new_block_height);
 
         // 4. Receive valid canon block 1 and accept the previous irrelevant block 2
 
@@ -159,7 +159,7 @@ mod consensus_sidechain {
 
         new_block_height = consensus.storage.canon().await.unwrap().block_height;
 
-        assert_eq!(old_block_height + 1, new_block_height);
+        assert_eq!(old_block_height, new_block_height);
     }
 
     #[tokio::test]
