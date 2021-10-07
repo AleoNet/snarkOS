@@ -42,8 +42,7 @@ use std::{ops::Deref, sync::Arc};
 
 type JsonRPCError = jsonrpc_core::Error;
 
-/// Implements JSON-RPC HTTP endpoint functions for a node.
-/// The constructor is given Arc::clone() copies of all needed node components.
+/// Implements RPC HTTP endpoint functions for a node.
 #[derive(Clone)]
 pub struct RpcImpl(Arc<RpcInner>);
 
@@ -55,6 +54,7 @@ impl Deref for RpcImpl {
     }
 }
 
+#[doc(hidden)]
 pub struct RpcInner {
     /// Blockchain database storage.
     pub(crate) storage: DynStorage,
@@ -76,22 +76,27 @@ impl RpcImpl {
         }))
     }
 
+    /// Returns a reference to the node's sync handler.
     pub fn sync_handler(&self) -> Result<&Arc<Sync>, RpcError> {
         self.node.sync().ok_or(RpcError::NoConsensus)
     }
 
+    /// Returns a reference to the node's consensus parameters.
     pub fn consensus_parameters(&self) -> Result<&ConsensusParameters, RpcError> {
         Ok(&self.sync_handler()?.consensus.parameters)
     }
 
+    /// Returns a reference to the node's DPC object.
     pub fn dpc(&self) -> Result<&Testnet1DPC, RpcError> {
         Ok(&self.sync_handler()?.consensus.dpc)
     }
 
+    /// Returns a reference to the node's `KnownNetwork` object.
     pub fn known_network(&self) -> Result<&KnownNetwork, RpcError> {
         self.node.known_network().ok_or(RpcError::NoKnownNetwork)
     }
 
+    /// A helper function used to pass a single value to the RPC handler.
     pub async fn map_rpc_singlet<
         A: DeserializeOwned,
         O: Serialize,
@@ -121,6 +126,7 @@ impl RpcImpl {
         }
     }
 
+    /// A helper function used to pass calls to the RPC handler.
     pub async fn map_rpc<O: Serialize, Fut: Future<Output = Result<O, RpcError>>, F: Fn(Self) -> Fut>(
         self,
         callee: F,

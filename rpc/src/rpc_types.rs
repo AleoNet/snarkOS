@@ -143,10 +143,10 @@ pub struct NodeInfo {
     /// The version of the client binary.
     pub version: String,
 
-    // The minimum desired number of connected peers.
+    /// The minimum desired number of connected peers.
     pub min_peers: u16,
 
-    // The maximum allowed number of connected peers.
+    /// The maximum allowed number of connected peers.
     pub max_peers: u16,
 }
 
@@ -321,19 +321,26 @@ pub struct NetworkGraph {
 /// Metadata and measurements pertaining to a node in the graph of the known network.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Vertice {
+    /// The address of the node in the graph.
     pub addr: SocketAddr,
+    /// Indicates whether the related node acts as a beacon.
     pub is_beacon: bool,
+    /// Indicates whether the related node acts as a sync provider.
     pub is_sync_provider: bool,
 
-    // Centrality measurements for the node.
+    /// The degree of network centrality applicable to the node.
     pub degree_centrality: u16,
+    /// The node's eigenvector centrality value in the network.
     pub eigenvector_centrality: f64,
+    /// The node's Fiedler value in the network.
     pub fiedler_value: f64,
 }
 
 /// A connection in the graph of the known network.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Edge {
+    /// The source of a graph's edge.
     pub source: SocketAddr,
+    /// The destination of a graph's edge.
     pub target: SocketAddr,
 }
