@@ -84,7 +84,7 @@ impl Node {
                 0,
             )
         } else {
-            const REFRESH_RATE: u32 = 1;
+            const REFRESH_COUNT: u32 = 1;
 
             // Other nodes disconnect if above the max peer count...
             let mut number_to_disconnect = active_peer_count.saturating_sub(max_peers);
@@ -92,9 +92,9 @@ impl Node {
             let mut number_to_connect = min_peers.saturating_sub(active_peer_count);
 
             // If within normal operating values, refresh a few peers to avoid clustering.
-            if number_to_disconnect == 0 && number_to_connect == 0 && REFRESH_RATE < min_peers {
-                number_to_disconnect = REFRESH_RATE;
-                number_to_connect = REFRESH_RATE;
+            if number_to_disconnect == 0 && number_to_connect == 0 && REFRESH_COUNT < min_peers {
+                number_to_disconnect = REFRESH_COUNT;
+                number_to_connect = REFRESH_COUNT;
             }
 
             (number_to_disconnect, number_to_connect)
