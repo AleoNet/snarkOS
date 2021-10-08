@@ -56,9 +56,20 @@ impl<T: Send> Sender<T> {
         self.tracker.fetch_add(1, Ordering::SeqCst);
     }
 
+    fn maybe_decrement(&self) {
+        if self.tracker.load(Ordering::SeqCst) != 0 {
+            metrics::decrement_gauge!(self.metrics_tracker, 1.0);
+            self.tracker.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+
     pub async fn send(&self, value: T) -> Result<(), SendError<T>> {
         self.increment();
-        self.inner.send(value).await
+        let ret = self.inner.send(value).await;
+        if ret.is_err() {
+            self.maybe_decrement();
+        }
+        ret
     }
 
     pub fn try_send(&self, message: T) -> Result<(), TrySendError<T>> {
@@ -69,7 +80,11 @@ impl<T: Send> Sender<T> {
 
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
         self.increment();
-        self.inner.blocking_send(value)
+        let ret = self.inner.blocking_send(value);
+        if ret.is_err() {
+            self.maybe_decrement();
+        }
+        ret
     }
 }
 
