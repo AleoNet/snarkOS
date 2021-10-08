@@ -561,10 +561,12 @@ impl Recorder for Stats {
     fn update_gauge(&self, key: &Key, value: GaugeValue) {
         let metric = match key.name() {
             // queues
+            queues::CONSENSUS => &self.queues.consensus,
             queues::INBOUND => &self.queues.inbound,
             queues::OUTBOUND => &self.queues.outbound,
             queues::PEER_EVENTS => &self.queues.peer_events,
             queues::STORAGE => &self.queues.storage,
+            queues::SYNC_ITEMS => &self.queues.sync_items,
             // blocks
             blocks::HEIGHT => &self.blocks.height,
             // connections
