@@ -137,7 +137,9 @@ pub fn channel<T: Send>(metrics_tracker: &'static str, buffer: usize) -> (Sender
 
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
-        let count = self.tracker.swap(0, Ordering::SeqCst) as f64;
-        metrics::decrement_gauge!(self.metrics_tracker, count);
+        let count = self.tracker.swap(0, Ordering::SeqCst);
+        if count != 0 {
+            metrics::decrement_gauge!(self.metrics_tracker, count as f64);
+        }
     }
 }
