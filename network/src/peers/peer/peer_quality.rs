@@ -22,9 +22,6 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncState {
-    /// The latest broadcast block height of this peer.
-    pub block_height: u32,
-
     /// number of requested sync blocks
     pub total_sync_blocks: u32,
     /// The number of remaining blocks to sync with.
@@ -42,7 +39,6 @@ pub struct SyncState {
 
 impl SyncState {
     pub fn sync_from_storage(&mut self, data: &snarkos_storage::Peer) {
-        self.block_height = data.block_height;
         self.blocks_synced_to = data.blocks_synced_to;
         self.blocks_synced_from = data.blocks_synced_from;
         self.blocks_received_from = data.blocks_received_from;

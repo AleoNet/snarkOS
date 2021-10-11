@@ -30,10 +30,16 @@ use super::{network::*, outbound_handler::*};
 /// A data structure containing information about a peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Peer {
+    /// The address of the node's listener socket.
     pub address: SocketAddr,
+    /// The latest broadcast block height of the peer.
+    pub block_height: u32,
+    /// Quantifies the node's connection quality with the peer.
     pub quality: PeerQuality,
+    /// Tracks the node's sync state with the peer.
     pub sync_state: SyncState,
 
+    /// The cache of received blocks from the peer.
     #[serde(skip)]
     pub block_received_cache: BlockCache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
 }
@@ -43,16 +49,19 @@ const FAILURE_THRESHOLD: usize = 5;
 
 impl Peer {
     pub fn new(address: SocketAddr, data: Option<&snarkos_storage::Peer>) -> Self {
+        let mut block_height = Default::default();
         let mut quality: PeerQuality = Default::default();
         let mut sync_state: SyncState = Default::default();
 
         if let Some(data) = data {
+            block_height = data.block_height;
             quality.sync_from_storage(data);
             sync_state.sync_from_storage(data);
         }
 
         Self {
             address,
+            block_height,
             quality,
             sync_state,
 
@@ -63,7 +72,7 @@ impl Peer {
     pub fn serialize(&self) -> snarkos_storage::Peer {
         snarkos_storage::Peer {
             address: self.address,
-            block_height: self.sync_state.block_height,
+            block_height: self.block_height,
             first_seen: self.quality.first_seen,
             last_seen: self.quality.last_seen,
             last_connected: self.quality.last_connected,

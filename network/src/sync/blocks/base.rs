@@ -43,16 +43,16 @@ impl SyncBase {
         let mut interesting_peers = vec![];
         for mut node in self.node.peer_book.connected_peers_snapshot().await {
             let judge_bad = node.judge_bad();
-            if !judge_bad && node.sync_state.block_height as usize > our_block_height + 1 {
+            if !judge_bad && node.block_height as usize > our_block_height + 1 {
                 interesting_peers.push(node);
             }
         }
-        interesting_peers.sort_by(|x, y| y.sync_state.block_height.cmp(&x.sync_state.block_height));
+        interesting_peers.sort_by(|x, y| y.block_height.cmp(&x.block_height));
 
         // trim nodes close to us if any are > 10 blocks ahead
         if let Some(i) = interesting_peers
             .iter()
-            .position(|x| x.sync_state.block_height as usize <= our_block_height + 10)
+            .position(|x| x.block_height as usize <= our_block_height + 10)
         {
             interesting_peers.truncate(i + 1);
         }
