@@ -23,7 +23,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use super::PeerQuality;
+use super::{PeerQuality, SyncState};
 use crate::{message::Payload, BlockCache, NetworkError, Node};
 
 use super::{network::*, outbound_handler::*};
@@ -32,6 +32,7 @@ use super::{network::*, outbound_handler::*};
 pub struct Peer {
     pub address: SocketAddr,
     pub quality: PeerQuality,
+    pub sync_state: SyncState,
 
     #[serde(skip)]
     pub block_received_cache: BlockCache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
@@ -43,12 +44,17 @@ const FAILURE_THRESHOLD: usize = 5;
 impl Peer {
     pub fn new(address: SocketAddr, data: Option<&snarkos_storage::Peer>) -> Self {
         let mut quality: PeerQuality = Default::default();
+        let mut sync_state: SyncState = Default::default();
+
         if let Some(data) = data {
             quality.sync_from_storage(data);
+            sync_state.sync_from_storage(data);
         }
+
         Self {
             address,
             quality,
+            sync_state,
 
             block_received_cache: BlockCache::default(),
         }
@@ -57,14 +63,14 @@ impl Peer {
     pub fn serialize(&self) -> snarkos_storage::Peer {
         snarkos_storage::Peer {
             address: self.address,
-            block_height: self.quality.sync_state.block_height,
+            block_height: self.sync_state.block_height,
             first_seen: self.quality.first_seen,
             last_seen: self.quality.last_seen,
             last_connected: self.quality.last_connected,
-            blocks_synced_to: self.quality.sync_state.blocks_synced_to,
-            blocks_synced_from: self.quality.sync_state.blocks_synced_from,
-            blocks_received_from: self.quality.sync_state.blocks_received_from,
-            blocks_sent_to: self.quality.sync_state.blocks_sent_to,
+            blocks_synced_to: self.sync_state.blocks_synced_to,
+            blocks_synced_from: self.sync_state.blocks_synced_from,
+            blocks_received_from: self.sync_state.blocks_received_from,
+            blocks_sent_to: self.sync_state.blocks_sent_to,
             connection_attempt_count: self.quality.connection_attempt_count,
             connection_success_count: self.quality.connected_count,
             connection_transient_fail_count: self.quality.connection_transient_fail_count,
@@ -175,6 +181,7 @@ impl Peer {
     }
 
     pub(super) fn set_disconnected(&mut self) {
+        self.sync_state.reset();
         self.quality.disconnected();
     }
 }

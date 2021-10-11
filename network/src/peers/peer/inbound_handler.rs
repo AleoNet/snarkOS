@@ -65,7 +65,7 @@ impl Peer {
             }
             Payload::Block(block, height) => {
                 metrics::increment_counter!(inbound::BLOCKS);
-                self.quality.sync_state.blocks_received_from += 1;
+                self.sync_state.blocks_received_from += 1;
 
                 if node.sync().is_some() {
                     let node = node.clone();
@@ -98,7 +98,7 @@ impl Peer {
             }
             Payload::SyncBlock(block, height) => {
                 metrics::increment_counter!(inbound::SYNCBLOCKS);
-                self.quality.sync_state.blocks_synced_from += 1;
+                self.sync_state.blocks_synced_from += 1;
 
                 if node.sync().is_some() {
                     let node = node.clone();
@@ -206,7 +206,7 @@ impl Peer {
             Payload::Ping(block_height) => {
                 network.write_payload(&Payload::Pong).await?;
                 debug!("Sent a '{}' message to {}", Payload::Pong, self.address);
-                self.quality.sync_state.block_height = block_height;
+                self.sync_state.block_height = block_height;
                 metrics::increment_counter!(PINGS);
 
                 // Pongs are sent without going through the outbound handler,

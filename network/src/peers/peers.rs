@@ -253,7 +253,7 @@ impl Node {
                     .cloned()
                     .collect();
 
-                candidates.sort_unstable_by(|x, y| y.quality.sync_state.block_height.cmp(&x.quality.sync_state.block_height));
+                candidates.sort_unstable_by(|x, y| y.sync_state.block_height.cmp(&x.sync_state.block_height));
 
                 candidates.truncate(count - random_count);
                 candidates

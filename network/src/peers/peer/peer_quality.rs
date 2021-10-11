@@ -40,6 +40,21 @@ pub struct SyncState {
     pub blocks_sent_to: u32,
 }
 
+impl SyncState {
+    pub fn sync_from_storage(&mut self, data: &snarkos_storage::Peer) {
+        self.block_height = data.block_height;
+        self.blocks_synced_to = data.blocks_synced_to;
+        self.blocks_synced_from = data.blocks_synced_from;
+        self.blocks_received_from = data.blocks_received_from;
+        self.blocks_sent_to = data.blocks_sent_to;
+    }
+
+    pub fn reset(&mut self) {
+        self.remaining_sync_blocks = 0;
+        self.total_sync_blocks = 0;
+    }
+}
+
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PeerQuality {
     /// The number of failures associated with the peer; grounds for dismissal.
@@ -74,8 +89,6 @@ pub struct PeerQuality {
 
     /// The number of messages received from this peer.
     pub num_messages_received: u64,
-
-    pub sync_state: SyncState,
 }
 
 impl PeerQuality {
@@ -87,12 +100,6 @@ impl PeerQuality {
         self.connection_attempt_count = peer.connection_attempt_count;
         self.connection_transient_fail_count = peer.connection_transient_fail_count;
         self.connected_count = peer.connection_success_count;
-
-        self.sync_state.block_height = peer.block_height;
-        self.sync_state.blocks_synced_to = peer.blocks_synced_to;
-        self.sync_state.blocks_synced_from = peer.blocks_synced_from;
-        self.sync_state.blocks_received_from = peer.blocks_received_from;
-        self.sync_state.blocks_sent_to = peer.blocks_sent_to;
     }
 
     pub fn is_inactive(&self, now: DateTime<Utc>) -> bool {
@@ -135,8 +142,6 @@ impl PeerQuality {
         self.last_disconnected = Some(disconnect_timestamp);
         self.disconnected_count += 1;
         self.expecting_pong = false;
-        self.sync_state.remaining_sync_blocks = 0;
-        self.sync_state.total_sync_blocks = 0;
 
         if let Some(last_connected) = self.last_connected {
             if let Ok(elapsed) = disconnect_timestamp.signed_duration_since(last_connected).to_std() {
