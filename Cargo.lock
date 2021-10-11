@@ -2864,6 +2864,7 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-metrics",
  "snarkos-network",
+ "snarkos-rpc-types",
  "snarkos-storage",
  "snarkos-testing",
  "snarkvm-algorithms",
@@ -2872,6 +2873,15 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "snarkos-rpc-types"
+version = "1.3.16"
+dependencies = [
+ "chrono",
+ "serde",
+ "snarkos-network",
 ]
 
 [[package]]
