@@ -46,8 +46,12 @@ impl SyncState {
     }
 
     pub fn reset(&mut self) {
-        self.remaining_sync_blocks = 0;
-        self.total_sync_blocks = 0;
+        self.set(0);
+    }
+
+    pub fn set(&mut self, amount: u32) {
+        self.remaining_sync_blocks = amount;
+        self.total_sync_blocks = amount;
     }
 }
 

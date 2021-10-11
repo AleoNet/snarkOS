@@ -224,22 +224,26 @@ impl Peer {
     }
 
     pub fn cancel_sync(&mut self) {
-        if self.sync_state.remaining_sync_blocks > self.sync_state.total_sync_blocks / 2 {
-            warn!(
-                "Was expecting {} more sync blocks from {}",
-                self.sync_state.remaining_sync_blocks, self.address,
-            );
-            self.sync_state.remaining_sync_blocks = 0;
-            self.sync_state.total_sync_blocks = 0;
-            self.fail();
-        } else if self.sync_state.remaining_sync_blocks > 0 {
-            trace!(
-                "Was expecting {} more sync blocks from {}",
-                self.sync_state.remaining_sync_blocks,
-                self.address,
-            );
-            self.sync_state.remaining_sync_blocks = 0;
-            self.sync_state.total_sync_blocks = 0;
+        // TODO: the negative case shouldn't be necessary here, kept just in case while the decrement is still
+        // unchecked.
+        if self.sync_state.remaining_sync_blocks <= 0 {
+            return;
         }
+
+        let message = format!(
+            "Was expecting {} more sync blocks from {}",
+            self.sync_state.remaining_sync_blocks, self.address
+        );
+
+        // Unfortunately the tracing crate doesn't support dynamic log levels, so the `else`
+        // statement is necessary here.
+        if self.sync_state.remaining_sync_blocks > self.sync_state.total_sync_blocks / 2 {
+            warn!("{}", message);
+            self.fail();
+        } else {
+            trace!("{}", message);
+        }
+
+        self.sync_state.reset();
     }
 }
