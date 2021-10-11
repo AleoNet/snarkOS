@@ -238,7 +238,7 @@ pub async fn init_node(config: &Config, storage: DynStorage) -> anyhow::Result<N
 
     let gateway = igd::search_gateway(gateway_search_opts)
         .map_err(|e| {
-            error!(
+            warn!(
                 "Can't obtain the node's gateway details: {}; perhaps it's not UPnP-enabled?",
                 e
             )
