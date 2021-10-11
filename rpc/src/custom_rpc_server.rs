@@ -58,6 +58,8 @@ const METHODS_EXPECTING_PARAMS: [&str; 15] = [
 ];
 
 #[allow(clippy::too_many_arguments)]
+/// Starts a local RPC HTTP server at `rpc_port` in a dedicated `tokio` task.
+/// RPC failures do not affect the rest of the node.
 pub fn start_rpc_server(
     rpc_addr: SocketAddr,
     storage: DynStorage,

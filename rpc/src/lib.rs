@@ -18,7 +18,7 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 // Documentation
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 #![doc = include_str!("../documentation/concepts/rpc_server.md")]
 
 #[macro_use]
@@ -28,6 +28,7 @@ pub mod custom_rpc_server;
 #[doc(inline)]
 pub use custom_rpc_server::*;
 
+#[allow(missing_docs)]
 pub mod error;
 
 pub mod rpc_impl;
