@@ -221,18 +221,7 @@ impl Peer {
                 }
             }
             Payload::Pong => {
-                if self.quality.expecting_pong {
-                    let rtt = self
-                        .quality
-                        .last_ping_sent
-                        .map(|x| x.elapsed().as_millis() as u64)
-                        .unwrap_or(u64::MAX);
-                    trace!("RTT for {} is {}ms", source, rtt);
-                    self.quality.expecting_pong = false;
-                    self.quality.rtt_ms = rtt;
-                } else {
-                    self.fail();
-                }
+                self.stop_rtt_measurement();
                 metrics::increment_counter!(PONGS);
             }
             Payload::Unknown => {

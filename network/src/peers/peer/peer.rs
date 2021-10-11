@@ -184,4 +184,23 @@ impl Peer {
         self.sync_state.reset();
         self.quality.disconnected();
     }
+
+    pub fn stop_rtt_measurement(&mut self) {
+        if !self.quality.expecting_pong {
+            self.fail();
+
+            return;
+        }
+
+        let rtt = self
+            .quality
+            .last_ping_sent
+            .map(|x| x.elapsed().as_millis() as u64)
+            .unwrap_or(u64::MAX);
+
+        trace!("RTT for {} is {}ms", self.address, rtt);
+
+        self.quality.expecting_pong = false;
+        self.quality.rtt_ms = rtt;
+    }
 }
