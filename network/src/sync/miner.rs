@@ -23,8 +23,10 @@ use snarkvm_dpc::{testnet1::instantiated::*, Address};
 use tokio::{task, time::sleep};
 use tracing::*;
 
-use snarkos_consensus::MineContext;
+use snarkos_consensus::{error::ConsensusError, MineContext};
 use snarkos_metrics::{self as metrics};
+use snarkvm_algorithms::SNARKError;
+use snarkvm_posw::error::PoswError;
 
 use crate::{Node, State};
 
@@ -93,6 +95,11 @@ impl MinerInstance {
                         // meantime; don't change to `Idle` if the current status isn't still `Mining`.
                         if self.node.state() == State::Mining {
                             self.node.set_state(State::Idle);
+                        }
+
+                        // Miner termination shouldn't count as a failure, as it's expected to occur regularly.
+                        if let ConsensusError::PoswError(PoswError::SnarkError(SNARKError::Terminated)) = error {
+                            continue;
                         }
 
                         warn!(
