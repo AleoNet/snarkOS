@@ -21,52 +21,78 @@ use std::time::Instant;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PeerQuality {
+pub struct SyncState {
+    /// The latest broadcast block height of this peer.
     pub block_height: u32,
-    pub last_seen: Option<DateTime<Utc>>,
-    #[serde(skip)]
-    pub expecting_pong: bool,
-    #[serde(skip)]
-    pub last_ping_sent: Option<Instant>,
-    /// The time it took to send a `Ping` to the peer and for it to respond with a `Pong`.
-    pub rtt_ms: u64,
-    /// The number of failures associated with the peer; grounds for dismissal.
-    pub failures: Vec<DateTime<Utc>>,
+
     /// number of requested sync blocks
     pub total_sync_blocks: u32,
     /// The number of remaining blocks to sync with.
     pub remaining_sync_blocks: u32,
-    pub num_messages_received: u64,
+
+    /// The number of sync blocks sent to this peer.
+    pub blocks_synced_to: u32,
+    /// The number of sync blocks received from this peer.
+    pub blocks_synced_from: u32,
+    /// The number of blocks received from this peer.
+    pub blocks_received_from: u32,
+    /// The number of blocks sent to this peer.
+    pub blocks_sent_to: u32,
+}
+
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PeerQuality {
+    /// The number of failures associated with the peer; grounds for dismissal.
+    pub failures: Vec<DateTime<Utc>>,
+
+    /// The last time the node interacted with this peer.
+    pub last_seen: Option<DateTime<Utc>>,
+    /// The first time the node interacted with this peer.
     pub first_seen: Option<DateTime<Utc>>,
+    /// The last time the node was connected to this peer.
     pub last_connected: Option<DateTime<Utc>>,
+    /// The last time the node was disconnected from this peer.
     pub last_disconnected: Option<DateTime<Utc>>,
 
-    pub blocks_synced_to: u32,
-    pub blocks_synced_from: u32,
-    pub blocks_received_from: u32,
-    pub blocks_sent_to: u32,
     /// The number of times we have attempted to connect to this peer.
     pub connection_attempt_count: u64,
     /// The number of failed connection attempts since the last connection success
     pub connection_transient_fail_count: u64,
     /// The number of times we have connected to this peer.
     pub connected_count: u64,
+    /// The number of times we have disconnected from this peer.
     pub disconnected_count: u64,
+
+    /// Set to `true` if this node has sent a `Ping` and is expecting a `Pong` in return.
+    #[serde(skip)]
+    pub expecting_pong: bool,
+    /// The timestamp of the last sent `Ping` to this peer.
+    #[serde(skip)]
+    pub last_ping_sent: Option<Instant>,
+    /// The time it took to send a `Ping` to the peer and for it to respond with a `Pong`.
+    pub rtt_ms: u64,
+
+    /// The number of messages received from this peer.
+    pub num_messages_received: u64,
+
+    pub sync_state: SyncState,
 }
 
 impl PeerQuality {
     pub fn sync_from_storage(&mut self, peer: &snarkos_storage::Peer) {
-        self.block_height = peer.block_height;
         self.last_seen = peer.last_seen;
         self.first_seen = peer.first_seen;
         self.last_connected = peer.last_connected;
-        self.blocks_synced_to = peer.blocks_synced_to;
-        self.blocks_synced_from = peer.blocks_synced_from;
-        self.blocks_received_from = peer.blocks_received_from;
-        self.blocks_sent_to = peer.blocks_sent_to;
+
         self.connection_attempt_count = peer.connection_attempt_count;
         self.connection_transient_fail_count = peer.connection_transient_fail_count;
         self.connected_count = peer.connection_success_count;
+
+        self.sync_state.block_height = peer.block_height;
+        self.sync_state.blocks_synced_to = peer.blocks_synced_to;
+        self.sync_state.blocks_synced_from = peer.blocks_synced_from;
+        self.sync_state.blocks_received_from = peer.blocks_received_from;
+        self.sync_state.blocks_sent_to = peer.blocks_sent_to;
     }
 
     pub fn is_inactive(&self, now: DateTime<Utc>) -> bool {
@@ -109,8 +135,8 @@ impl PeerQuality {
         self.last_disconnected = Some(disconnect_timestamp);
         self.disconnected_count += 1;
         self.expecting_pong = false;
-        self.remaining_sync_blocks = 0;
-        self.total_sync_blocks = 0;
+        self.sync_state.remaining_sync_blocks = 0;
+        self.sync_state.total_sync_blocks = 0;
 
         if let Some(last_connected) = self.last_connected {
             if let Ok(elapsed) = disconnect_timestamp.signed_duration_since(last_connected).to_std() {
