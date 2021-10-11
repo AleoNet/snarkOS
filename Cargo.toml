@@ -34,6 +34,7 @@ members = [
   "parameters",
   "profiler",
   "rpc",
+  "rpc-types",
   "storage",
   "testing"
 ]

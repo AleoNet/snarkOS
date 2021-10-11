@@ -35,6 +35,10 @@ version = "1.3.16"
 path = "../network"
 version = "1.3.16"
 
+[dependencies.snarkos-rpc-types]
+path = "../rpc-types"
+version = "1.3.16"
+
 [dependencies.snarkos-storage]
 path = "../storage"
 version = "1.3.16"

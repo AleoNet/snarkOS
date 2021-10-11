@@ -19,6 +19,7 @@ mod protected_rpc_tests {
     use snarkos_consensus::Consensus;
     use snarkos_network::Node;
     use snarkos_rpc::*;
+    use snarkos_rpc_types::*;
     use snarkos_storage::VMTransaction;
     use snarkos_testing::{
         network::{test_config, test_node, ConsensusSetup, TestSetup},

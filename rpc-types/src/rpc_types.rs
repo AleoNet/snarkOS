@@ -17,7 +17,6 @@
 //! Structures for RPC endpoint requests and responses.
 
 use chrono::{DateTime, Utc};
-use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -31,15 +30,6 @@ pub struct RpcCredentials {
     /// The password in the credential
     pub password: String,
 }
-
-/// RPC metadata for encoding authentication
-#[derive(Default, Clone)]
-pub struct Meta {
-    /// An optional authentication string for protected RPC functions
-    pub auth: Option<String>,
-}
-
-impl Metadata for Meta {}
 
 /// Returned value for the `getblock` rpc call
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

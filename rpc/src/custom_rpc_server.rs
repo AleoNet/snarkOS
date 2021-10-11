@@ -16,13 +16,10 @@
 
 //! Logic for instantiating the RPC server.
 
-use crate::{
-    rpc_trait::RpcFunctions,
-    rpc_types::{Meta, RpcCredentials},
-    RpcImpl,
-};
+use crate::{rpc_trait::RpcFunctions, Meta, RpcImpl};
 use snarkos_metrics::{self as metrics, misc};
 use snarkos_network::Node;
+use snarkos_rpc_types::RpcCredentials;
 use snarkos_storage::DynStorage;
 
 use hyper::{

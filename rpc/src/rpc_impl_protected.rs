@@ -21,11 +21,12 @@
 use crate::{
     error::RpcError,
     rpc_trait::ProtectedRpcFunctions,
-    rpc_types::*,
     transaction_kernel_builder::TransactionKernelBuilder,
+    Meta,
     RpcImpl,
 };
 use snarkos_consensus::{CreatePartialTransactionRequest, CreateTransactionRequest};
+use snarkos_rpc_types::*;
 use snarkos_storage::VMRecord;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{

@@ -20,6 +20,7 @@ mod rpc_tests {
     use snarkos_consensus::{get_block_reward, Consensus};
     use snarkos_network::{Node, NodeType};
     use snarkos_rpc::*;
+    use snarkos_rpc_types::*;
     use snarkos_testing::{
         network::{test_config, test_node, ConsensusSetup, TestSetup},
         sync::*,

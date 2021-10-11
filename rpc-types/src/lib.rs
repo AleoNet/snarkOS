@@ -17,44 +17,7 @@
 // Compilation
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
-// Documentation
-#![warn(missing_docs)]
-#![doc = include_str!("../documentation/concepts/rpc_server.md")]
 
-#[macro_use]
-extern crate thiserror;
-
-pub mod custom_rpc_server;
+pub mod rpc_types;
 #[doc(inline)]
-pub use custom_rpc_server::*;
-
-#[allow(missing_docs)]
-pub mod error;
-
-pub mod rpc_impl;
-#[doc(inline)]
-pub use rpc_impl::*;
-
-pub mod rpc_impl_protected;
-#[doc(inline)]
-pub use rpc_impl_protected::*;
-/*
-pub mod rpc_server;
-#[doc(inline)]
-pub use rpc_server::*;
-*/
-pub mod rpc_trait;
-#[doc(inline)]
-pub use rpc_trait::*;
-
-pub(crate) mod empty_ledger;
-pub(crate) mod transaction_kernel_builder;
-
-/// RPC metadata for encoding authentication
-#[derive(Default, Clone)]
-pub struct Meta {
-    /// An optional authentication string for protected RPC functions
-    pub auth: Option<String>,
-}
-
-impl jsonrpc_core::Metadata for Meta {}
+pub use rpc_types::*;

@@ -16,8 +16,9 @@
 
 //! Definition of the public and private RPC endpoints.
 
-use crate::{error::RpcError, rpc_types::*};
+use crate::error::RpcError;
 use snarkos_metrics::snapshots::NodeStats;
+use snarkos_rpc_types::*;
 
 use std::net::SocketAddr;
 

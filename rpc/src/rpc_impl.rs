@@ -18,12 +18,13 @@
 //!
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
-use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
+use crate::{error::RpcError, rpc_trait::RpcFunctions, Meta};
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use serde::{de::DeserializeOwned, Serialize};
 use snarkos_consensus::{get_block_reward, ConsensusParameters};
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
+use snarkos_rpc_types::*;
 use snarkos_storage::{BlockStatus, Digest, DynStorage, VMTransaction};
 use snarkvm_dpc::{
     testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
