@@ -176,6 +176,7 @@ pub fn test_config(setup: TestSetup) -> Config {
         setup.beacons,
         setup.sync_providers,
         Duration::from_secs(setup.peer_sync_interval),
+        None,
     )
     .unwrap()
 }

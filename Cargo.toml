@@ -105,6 +105,9 @@ version = "4.0"
 [dependencies.hex]
 version = "0.4.1"
 
+[dependencies.igd]
+version = "0.12"
+
 [dependencies.num_cpus]
 version = "1"
 

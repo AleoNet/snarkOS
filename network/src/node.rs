@@ -22,6 +22,8 @@ use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use rand::{thread_rng, Rng};
 use snarkos_storage::DynStorage;
+#[cfg(not(feature = "test"))]
+use std::time::Duration;
 use std::{
     net::{Ipv4Addr, SocketAddr},
     ops::Deref,
@@ -30,7 +32,6 @@ use std::{
         Arc,
     },
     thread,
-    time::Duration,
 };
 use tokio::{
     sync::{Mutex, RwLock},
@@ -120,10 +121,17 @@ impl Node {
 impl Node {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config, storage: DynStorage) -> Result<Self, NetworkError> {
+        let external_addr = config.gateway.as_ref().and_then(|gateway| {
+            gateway
+                .get_external_ip()
+                .map_err(|e| error!("Can't obtain external node address: {}", e))
+                .ok()
+        });
+
         let node = Self(Arc::new(InnerNode {
             id: config.node_id.unwrap_or_else(|| thread_rng().gen()),
             state: Default::default(),
-            external_addr: obtain_external_addr(),
+            external_addr,
             local_addr: Default::default(),
             config,
             storage: storage.clone(),
@@ -378,24 +386,4 @@ impl Node {
         *self.master_dispatch.write().await = Some(sender);
         master.run().await
     }
-}
-
-fn obtain_external_addr() -> Option<Ipv4Addr> {
-    let opts = igd::SearchOptions {
-        timeout: Some(Duration::from_secs(1)),
-        ..Default::default()
-    };
-
-    match igd::search_gateway(opts) {
-        Err(err) => error!("Can't obtain external node address: {}", err),
-        Ok(gateway) => match gateway.get_external_ip() {
-            Err(err) => error!("Can't obtain external node address: {}", err),
-            Ok(ext_addr) => {
-                info!("External node address: {}", ext_addr);
-                return Some(ext_addr);
-            }
-        },
-    }
-
-    None
 }

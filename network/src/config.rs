@@ -17,6 +17,7 @@
 use crate::NetworkError;
 
 use arc_swap::ArcSwap;
+use igd::Gateway;
 use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
@@ -56,6 +57,8 @@ pub struct Config {
     sync_providers: ArcSwap<Vec<SocketAddr>>,
     /// The interval between each peer sync.
     peer_sync_interval: Duration,
+    /// Details of the node's network gateway, if it's UPnP-enabled.
+    pub gateway: Option<Gateway>,
 }
 
 impl Config {
@@ -70,6 +73,7 @@ impl Config {
         beacon_addresses: Vec<String>,
         sync_provider_addresses: Vec<String>,
         peer_sync_interval: Duration,
+        gateway: Option<Gateway>,
     ) -> Result<Self, NetworkError> {
         // Convert the given seeded nodes into socket addresses.
         let beacons: Vec<SocketAddr> = beacon_addresses
@@ -91,6 +95,7 @@ impl Config {
             beacons: ArcSwap::new(Arc::new(beacons)),
             sync_providers: ArcSwap::new(Arc::new(sync_providers)),
             peer_sync_interval,
+            gateway,
         })
     }
 

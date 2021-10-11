@@ -231,6 +231,20 @@ pub async fn init_node(config: &Config, storage: DynStorage) -> anyhow::Result<N
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
+    let gateway_search_opts = igd::SearchOptions {
+        timeout: Some(Duration::from_secs(1)),
+        ..Default::default()
+    };
+
+    let gateway = igd::search_gateway(gateway_search_opts)
+        .map_err(|e| {
+            error!(
+                "Can't obtain the node's gateway details: {}; perhaps it's not UPnP-enabled?",
+                e
+            )
+        })
+        .ok();
+
     let node_config = NodeConfig::new(
         None,
         config.node.kind,
@@ -241,6 +255,7 @@ pub async fn init_node(config: &Config, storage: DynStorage) -> anyhow::Result<N
         config.p2p.sync_providers.clone(),
         // Set sync intervals for peers.
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
+        gateway,
     )?;
 
     let node = Node::new(node_config, storage).await?;
