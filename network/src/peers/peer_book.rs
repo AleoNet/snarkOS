@@ -21,12 +21,12 @@ use std::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use mpmc_map::MpmcMap;
 use snarkos_storage::DynStorage;
-use tokio::net::TcpStream;
+use tokio::{net::TcpStream, time::timeout};
 
 use snarkos_metrics::{self as metrics, connections::*, wrapped_mpsc};
 
@@ -241,7 +241,16 @@ impl PeerBook {
     }
 
     pub async fn connected_peers_snapshot(&self) -> Vec<Peer> {
-        self.map_each_peer(|peer| async move { peer.load().await }).await
+        let mut futures = Vec::with_capacity(self.connected_peers.len());
+        for (_, peer) in self.connected_peers.inner().iter() {
+            let peer = peer.clone();
+            futures.push(async move { timeout(Duration::from_millis(5), peer.load()).await });
+        }
+        futures::future::join_all(futures)
+            .await
+            .into_iter()
+            .filter_map(|peer| peer.ok().flatten())
+            .collect()
     }
 
     pub fn disconnected_peers_snapshot(&self) -> Vec<Peer> {
