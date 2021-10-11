@@ -222,4 +222,24 @@ impl Peer {
         self.quality.see();
         self.quality.num_messages_received += 1;
     }
+
+    pub fn cancel_sync(&mut self) {
+        if self.sync_state.remaining_sync_blocks > self.sync_state.total_sync_blocks / 2 {
+            warn!(
+                "Was expecting {} more sync blocks from {}",
+                self.sync_state.remaining_sync_blocks, self.address,
+            );
+            self.sync_state.remaining_sync_blocks = 0;
+            self.sync_state.total_sync_blocks = 0;
+            self.fail();
+        } else if self.sync_state.remaining_sync_blocks > 0 {
+            trace!(
+                "Was expecting {} more sync blocks from {}",
+                self.sync_state.remaining_sync_blocks,
+                self.address,
+            );
+            self.sync_state.remaining_sync_blocks = 0;
+            self.sync_state.total_sync_blocks = 0;
+        }
+    }
 }

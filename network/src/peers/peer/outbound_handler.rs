@@ -143,23 +143,7 @@ impl Peer {
                 }
             }
             PeerAction::CancelSync => {
-                if self.sync_state.remaining_sync_blocks > self.sync_state.total_sync_blocks / 2 {
-                    warn!(
-                        "Was expecting {} more sync blocks from {}",
-                        self.sync_state.remaining_sync_blocks, self.address,
-                    );
-                    self.sync_state.remaining_sync_blocks = 0;
-                    self.sync_state.total_sync_blocks = 0;
-                    self.fail();
-                } else if self.sync_state.remaining_sync_blocks > 0 {
-                    trace!(
-                        "Was expecting {} more sync blocks from {}",
-                        self.sync_state.remaining_sync_blocks,
-                        self.address,
-                    );
-                    self.sync_state.remaining_sync_blocks = 0;
-                    self.sync_state.total_sync_blocks = 0;
-                }
+                self.cancel_sync();
                 Ok(PeerResponse::None)
                 //todo: should we notify the peer we are no longer expecting anything from them?
             }
