@@ -26,17 +26,19 @@ use crate::{errors::NetworkError, Node};
 impl Node {
     /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
-        if let Some(ref gateway) = self.config.gateway {
-            if let SocketAddr::V4(internal_addr) = self.config.desired_address {
-                let external_port = internal_addr.port();
+        if self.config.auto_port_forwarding {
+            if let Some(ref gateway) = self.config.gateway {
+                if let SocketAddr::V4(internal_addr) = self.config.desired_address {
+                    let external_port = internal_addr.port();
 
-                match gateway.add_port(PortMappingProtocol::TCP, external_port, internal_addr, 0, "snarkOS") {
-                    Err(AddPortError::PortInUse) => warn!("Port {} is already forwarded", external_port),
-                    Err(e) => error!(
-                        "Can't map external port {} to address {}: {}",
-                        external_port, internal_addr, e
-                    ),
-                    Ok(_) => info!("Enabled port forwarding via UPnP"),
+                    match gateway.add_port(PortMappingProtocol::TCP, external_port, internal_addr, 0, "snarkOS") {
+                        Err(AddPortError::PortInUse) => warn!("Port {} is already forwarded", external_port),
+                        Err(e) => error!(
+                            "Can't map external port {} to address {}: {}",
+                            external_port, internal_addr, e
+                        ),
+                        Ok(_) => info!("Enabled port forwarding via UPnP"),
+                    }
                 }
             }
         }

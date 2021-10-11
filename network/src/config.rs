@@ -59,6 +59,8 @@ pub struct Config {
     peer_sync_interval: Duration,
     /// Details of the node's network gateway, if it's UPnP-enabled.
     pub gateway: Option<Gateway>,
+    /// Indicates whether the node should attempt to automatically forward its listening port.
+    pub auto_port_forwarding: bool,
 }
 
 impl Config {
@@ -74,6 +76,7 @@ impl Config {
         sync_provider_addresses: Vec<String>,
         peer_sync_interval: Duration,
         gateway: Option<Gateway>,
+        auto_port_forwarding: bool,
     ) -> Result<Self, NetworkError> {
         // Convert the given seeded nodes into socket addresses.
         let beacons: Vec<SocketAddr> = beacon_addresses
@@ -96,6 +99,7 @@ impl Config {
             sync_providers: ArcSwap::new(Arc::new(sync_providers)),
             peer_sync_interval,
             gateway,
+            auto_port_forwarding,
         })
     }
 

@@ -82,6 +82,7 @@ pub struct Node {
     pub db: String,
     pub ip: String,
     pub port: u16,
+    pub auto_port_forwarding: bool,
     pub verbose: u8,
 }
 
@@ -133,6 +134,7 @@ impl Default for Config {
                 db: "snarkos_testnet1".into(),
                 ip: "0.0.0.0".into(),
                 port: 4131,
+                auto_port_forwarding: false,
                 verbose: 2,
             },
             miner: Miner {
@@ -238,6 +240,7 @@ impl Config {
     fn parse(&mut self, arguments: &ArgMatches, options: &[&str]) {
         options.iter().for_each(|option| match *option {
             // Flags
+            "auto-port-forwarding" => self.auto_port_forwarding(arguments.is_present(option)),
             "is-miner" => self.is_miner(arguments.is_present(option)),
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
@@ -310,6 +313,10 @@ impl Config {
         if let Some(path) = argument {
             self.storage.import = Some(path.to_owned().into());
         }
+    }
+
+    fn auto_port_forwarding(&mut self, argument: bool) {
+        self.node.auto_port_forwarding = argument;
     }
 
     fn is_miner(&mut self, argument: bool) {
@@ -440,6 +447,7 @@ impl CLI for ConfigCli {
 
     const ABOUT: AboutType = "Run an Aleo node (include -h for more options)";
     const FLAGS: &'static [FlagType] = &[
+        flag::AUTO_PORT_FORWARDING,
         flag::NO_JSONRPC,
         flag::IS_MINER,
         flag::TRIM_STORAGE,
@@ -471,6 +479,7 @@ impl CLI for ConfigCli {
     fn parse(arguments: &ArgMatches) -> Result<Self::Config, CliError> {
         let mut config = Config::read_config()?;
         config.parse(arguments, &[
+            "auto-port-forwarding",
             "network",
             "no-jsonrpc",
             "export-canon-blocks",

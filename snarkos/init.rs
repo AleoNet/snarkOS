@@ -256,6 +256,7 @@ pub async fn init_node(config: &Config, storage: DynStorage) -> anyhow::Result<N
         // Set sync intervals for peers.
         Duration::from_secs(config.p2p.peer_sync_interval.into()),
         gateway,
+        config.node.auto_port_forwarding,
     )?;
 
     let node = Node::new(node_config, storage).await?;

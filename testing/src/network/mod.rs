@@ -177,6 +177,7 @@ pub fn test_config(setup: TestSetup) -> Config {
         setup.sync_providers,
         Duration::from_secs(setup.peer_sync_interval),
         None,
+        false,
     )
     .unwrap()
 }
