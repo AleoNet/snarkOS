@@ -92,10 +92,7 @@ impl Peer {
             PeerAction::Disconnect => Ok(PeerResponse::Disconnect),
             PeerAction::Send(message, time_received) => {
                 match &message {
-                    Payload::Ping(_) => {
-                        self.quality.expecting_pong = true;
-                        self.quality.last_ping_sent = Some(Instant::now());
-                    }
+                    Payload::Ping(_) => self.start_rtt_measurement(),
                     Payload::Block(block, _) => {
                         if self.block_received_cache.contains(&block[..]) {
                             metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
