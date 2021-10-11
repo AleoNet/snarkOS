@@ -35,8 +35,7 @@ impl Peer {
         time_received: Option<Instant>,
         payload: Payload,
     ) -> Result<(), NetworkError> {
-        self.quality.see();
-        self.quality.num_messages_received += 1;
+        self.register_received_message();
         metrics::increment_counter!(inbound::ALL_SUCCESSES);
 
         let source = self.address;

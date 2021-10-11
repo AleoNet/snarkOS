@@ -208,4 +208,9 @@ impl Peer {
         self.quality.expecting_pong = false;
         self.quality.rtt_ms = rtt;
     }
+
+    pub fn register_received_message(&mut self) {
+        self.quality.see();
+        self.quality.num_messages_received += 1;
+    }
 }
