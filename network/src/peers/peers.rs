@@ -79,8 +79,6 @@ impl Node {
             let capacity = (CAPACITY_PERCENTAGE * max_peers as f64).floor() as u32;
 
             (
-                // Beacons and sync providers disconnect down to 80% of their max to leave capacity open for new
-                // connections...
                 active_peer_count.saturating_sub(capacity),
                 // ...and don't connect to any peers on their own once above `0` peers.
                 0,
@@ -116,10 +114,7 @@ impl Node {
 
         // Attempt to connect to a few random beacons if the node has no active
         // connections or if it's a beacon itself.
-        if self.peer_book.get_active_peer_count() == 0
-            || self.is_of_type(NodeType::Beacon)
-            || self.is_of_type(NodeType::SyncProvider)
-        {
+        if self.peer_book.get_active_peer_count() == 0 || self.is_of_type(NodeType::Beacon) {
             let random_beacons = self
                 .config
                 .beacons()
@@ -128,6 +123,19 @@ impl Node {
                 .collect::<Vec<_>>();
 
             self.connect_to_addresses(&random_beacons).await;
+        }
+
+        // Connect to a few random sync providers if the node is itself a sync provider, this will
+        // help to keep chain state in sync.
+        if self.is_of_type(NodeType::SyncProvider) {
+            let random_sync_providers = self
+                .config
+                .sync_providers()
+                .choose_multiple(&mut SmallRng::from_entropy(), 2)
+                .copied()
+                .collect::<Vec<_>>();
+
+            self.connect_to_addresses(&random_sync_providers).await;
         }
 
         if number_to_connect != 0 {
