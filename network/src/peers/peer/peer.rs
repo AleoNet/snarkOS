@@ -224,15 +224,17 @@ impl Peer {
     }
 
     pub fn register_received_sync_block(&mut self) {
-        // Covers the negative case just as a precaution.
-        if self.sync_state.remaining_sync_blocks <= 0 {
+        let remaining_sync_blocks = self.sync_state.remaining_sync_blocks;
+
+        // No need to cover the negative case since we saturate the decrement.
+        if remaining_sync_blocks == 0 {
             trace!("received unexpected or late sync block from {}", self.address);
 
             return;
         }
 
         // Decrement if > 0.
-        self.sync_state.remaining_sync_blocks -= 1;
+        self.sync_state.remaining_sync_blocks = remaining_sync_blocks.saturating_sub(1);
     }
 
     pub fn increment_sync_expectations(&mut self, amount: u32) {
@@ -241,8 +243,8 @@ impl Peer {
     }
 
     pub fn cancel_sync(&mut self) {
-        // Covers the negative case just as a precaution.
-        if self.sync_state.remaining_sync_blocks <= 0 {
+        // No need to cover the negative case since we saturate the decrement.
+        if self.sync_state.remaining_sync_blocks == 0 {
             return;
         }
 
