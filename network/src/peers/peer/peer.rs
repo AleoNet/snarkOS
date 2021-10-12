@@ -223,9 +223,25 @@ impl Peer {
         self.quality.num_messages_received += 1;
     }
 
+    pub fn register_received_sync_block(&mut self) {
+        // Covers the negative case just as a precaution.
+        if self.sync_state.remaining_sync_blocks <= 0 {
+            trace!("received unexpected or late sync block from {}", self.address);
+
+            return;
+        }
+
+        // Decrement if > 0.
+        self.sync_state.remaining_sync_blocks -= 1;
+    }
+
+    pub fn increment_sync_expectations(&mut self, amount: u32) {
+        self.sync_state.remaining_sync_blocks += amount;
+        self.sync_state.total_sync_blocks += amount;
+    }
+
     pub fn cancel_sync(&mut self) {
-        // TODO: the negative case shouldn't be necessary here, kept just in case while the decrement is still
-        // unchecked.
+        // Covers the negative case just as a precaution.
         if self.sync_state.remaining_sync_blocks <= 0 {
             return;
         }
