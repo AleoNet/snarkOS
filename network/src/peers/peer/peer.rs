@@ -194,12 +194,12 @@ impl Peer {
         self.quality.disconnected();
     }
 
-    pub fn start_rtt_measurement(&mut self) {
+    pub fn start_ping_measurement(&mut self) {
         self.quality.expecting_pong = true;
         self.quality.last_ping_sent = Some(Instant::now());
     }
 
-    pub fn stop_rtt_measurement(&mut self) {
+    pub fn stop_ping_measurement(&mut self) {
         if !self.quality.expecting_pong {
             self.fail();
 

@@ -220,7 +220,7 @@ impl Peer {
                 }
             }
             Payload::Pong => {
-                self.stop_rtt_measurement();
+                self.stop_ping_measurement();
                 metrics::increment_counter!(PONGS);
             }
             Payload::Unknown => {
