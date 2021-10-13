@@ -52,6 +52,7 @@ impl ConsensusInner {
             }
             BlockStatus::Unknown => {
                 debug!("Processing a block that is an unknown orphan");
+                metrics::increment_counter!(metrics::blocks::ORPHANS);
                 // Don't process the block.
                 return Ok(());
             }
@@ -118,6 +119,7 @@ impl ConsensusInner {
                     }
                     ForkDescription::Orphan => {
                         debug!("Processing a block that is on unknown orphan chain");
+                        metrics::increment_counter!(metrics::blocks::ORPHANS);
                         // Don't process the block.
                         return Ok(());
                     }
