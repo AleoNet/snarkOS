@@ -14,12 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    net::SocketAddr,
-};
+use std::{collections::VecDeque, net::SocketAddr};
 
 use anyhow::*;
+use hash_hasher::{HashedMap, HashedSet};
 use tracing::{debug, trace};
 
 #[cfg(feature = "test")]
@@ -160,7 +158,7 @@ pub trait SyncStorage {
 
     /// Gets a tree structure representing all the descendents of [`block_hash`]
     fn get_block_digest_tree(&mut self, block_hash: &Digest) -> Result<DigestTree> {
-        let mut nodes: HashMap<Digest, Vec<Digest>> = HashMap::new();
+        let mut nodes: HashedMap<Digest, Vec<Digest>> = Default::default();
         let mut stack = vec![block_hash.clone()];
         while let Some(hash) = stack.pop() {
             let children = self.get_block_children(&hash)?;
@@ -172,9 +170,9 @@ pub trait SyncStorage {
         if nodes.is_empty() {
             return Ok(DigestTree::Leaf(block_hash.clone()));
         }
-        let mut node_entries: HashSet<Digest> = nodes.keys().cloned().collect();
+        let mut node_entries: HashedSet<Digest> = nodes.keys().cloned().collect();
 
-        let mut trees: HashMap<Digest, DigestTree> = HashMap::new();
+        let mut trees: HashedMap<Digest, DigestTree> = Default::default();
         while !nodes.is_empty() {
             nodes.retain(|hash, children| {
                 let mut new_children = vec![];
