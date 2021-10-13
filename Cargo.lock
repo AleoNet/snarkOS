@@ -361,7 +361,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
- "time",
+ "time 0.1.43",
  "winapi",
 ]
 
@@ -2731,7 +2731,6 @@ name = "snarkos-consensus"
 version = "1.3.16"
 dependencies = [
  "anyhow",
- "chrono",
  "criterion",
  "futures 0.3.17",
  "hex",
@@ -2753,6 +2752,7 @@ dependencies = [
  "snarkvm-posw",
  "snarkvm-utilities",
  "thiserror",
+ "time 0.3.3",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2783,7 +2783,6 @@ dependencies = [
  "bincode",
  "byteorder",
  "capnp",
- "chrono",
  "circular-queue",
  "defer",
  "derivative",
@@ -2811,6 +2810,7 @@ dependencies = [
  "snarkvm-utilities",
  "snow",
  "thiserror",
+ "time 0.3.3",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2821,7 +2821,6 @@ dependencies = [
 name = "snarkos-parameters"
 version = "1.3.16"
 dependencies = [
- "chrono",
  "curl",
  "hex",
  "rand 0.8.4",
@@ -2834,6 +2833,7 @@ dependencies = [
  "snarkvm-parameters",
  "snarkvm-posw",
  "snarkvm-utilities",
+ "time 0.3.3",
 ]
 
 [[package]]
@@ -2850,7 +2850,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "chrono",
  "derivative",
  "hex",
  "hyper",
@@ -2871,6 +2870,7 @@ dependencies = [
  "snarkvm-dpc",
  "snarkvm-utilities",
  "thiserror",
+ "time 0.3.3",
  "tokio",
  "tracing",
 ]
@@ -2883,7 +2883,6 @@ dependencies = [
  "async-trait",
  "bincode",
  "blake2",
- "chrono",
  "derivative",
  "futures 0.3.17",
  "hash_hasher",
@@ -2904,6 +2903,7 @@ dependencies = [
  "snarkvm-dpc",
  "snarkvm-utilities",
  "thiserror",
+ "time 0.3.3",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -3344,6 +3344,17 @@ checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "time"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cde1cf55178e0293453ba2cca0d5f8392a922e52aa958aee9c28ed02becc6d03"
+dependencies = [
+ "itoa",
+ "libc",
+ "serde",
 ]
 
 [[package]]
@@ -3828,5 +3839,5 @@ dependencies = [
  "crc32fast",
  "flate2",
  "thiserror",
- "time",
+ "time 0.1.43",
 ]
