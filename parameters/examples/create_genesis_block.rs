@@ -29,12 +29,12 @@ use snarkvm_dpc::{
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
 
-use chrono::Utc;
 use std::{
     fs::File,
     io::{Result as IoResult, Write},
     path::{Path, PathBuf},
 };
+use time::OffsetDateTime;
 
 pub fn generate<C: Testnet1Components>() -> Result<Vec<u8>, TransactionError> {
     // Add transactions to block
@@ -46,7 +46,7 @@ pub fn generate<C: Testnet1Components>() -> Result<Vec<u8>, TransactionError> {
     let genesis_header = BlockHeader {
         previous_block_hash: BlockHeaderHash([0u8; 32]),
         merkle_root_hash: MerkleRootHash([0u8; 32]),
-        time: Utc::now().timestamp(),
+        time: OffsetDateTime::now_utc().unix_timestamp(),
         difficulty_target: 0x07FF_FFFF_FFFF_FFFF_u64,
         nonce: 0,
         pedersen_merkle_root_hash: PedersenMerkleRootHash([0u8; 32]),

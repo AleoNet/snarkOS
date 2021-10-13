@@ -16,10 +16,10 @@
 
 //! Structures for RPC endpoint requests and responses.
 
-use chrono::{DateTime, Utc};
 use jsonrpc_core::Metadata;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use time::OffsetDateTime;
 
 use snarkos_network::{NodeCluster, NodeType};
 
@@ -138,7 +138,7 @@ pub struct NodeInfo {
     pub is_syncing: bool,
 
     /// The timestamp of when the node was launched.
-    pub launched: DateTime<Utc>,
+    pub launched: OffsetDateTime,
 
     /// The version of the client binary.
     pub version: String,

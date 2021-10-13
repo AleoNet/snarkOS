@@ -61,9 +61,8 @@ default-features = false
 [dependencies.anyhow]
 version = "1.0.40"
 
-[dependencies.chrono]
-version = "0.4"
-features = [ "serde" ]
+[dependencies.time]
+version = "0.3"
 
 [dependencies.hex]
 version = "0.4.2"

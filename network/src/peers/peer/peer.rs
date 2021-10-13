@@ -15,12 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::*;
-use chrono::Utc;
 use snarkos_metrics::wrapped_mpsc;
-use std::{
-    net::SocketAddr,
-    time::{Duration, Instant},
-};
+use std::{net::SocketAddr, time::Instant};
+use time::OffsetDateTime;
 
 use super::{PeerQuality, SyncState};
 use crate::{message::Payload, BlockCache, NetworkError, Node};
@@ -42,7 +39,7 @@ pub struct Peer {
     pub block_received_cache: BlockCache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
 }
 
-const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
+const FAILURE_EXPIRY_MINS: i64 = 15;
 const FAILURE_THRESHOLD: usize = 5;
 
 impl Peer {
@@ -87,7 +84,7 @@ impl Peer {
     pub fn judge_bad(&mut self) -> bool {
         let f = self.failures();
         // self.quality.rtt_ms > 1500 ||
-        f >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
+        f >= FAILURE_THRESHOLD || self.quality.is_inactive(OffsetDateTime::now_utc())
     }
 
     pub fn judge_bad_offline(&mut self) -> bool {
@@ -95,17 +92,17 @@ impl Peer {
     }
 
     pub fn fail(&mut self) {
-        self.quality.failures.push(Utc::now());
+        self.quality.failures.push(OffsetDateTime::now_utc());
     }
 
     pub fn failures(&mut self) -> usize {
-        let now = Utc::now();
+        let now = OffsetDateTime::now_utc();
         if self.quality.failures.len() >= FAILURE_THRESHOLD {
             self.quality.failures = self
                 .quality
                 .failures
                 .iter()
-                .filter(|x| now.signed_duration_since(**x) < chrono::Duration::from_std(FAILURE_EXPIRY_TIME).unwrap())
+                .filter(|x| now - **x < time::Duration::minutes(FAILURE_EXPIRY_MINS))
                 .copied()
                 .collect();
         }

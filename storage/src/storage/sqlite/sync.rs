@@ -16,10 +16,10 @@
 
 use std::{convert::TryInto, net::SocketAddr};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
 use hash_hasher::HashedMap;
 use rusqlite::{params, OptionalExtension, Row, ToSql};
 use snarkvm_dpc::{AleoAmount, MerkleRootHash, Network, PedersenMerkleRootHash, ProofOfSuccinctWork};
+use time::OffsetDateTime;
 use tracing::*;
 
 #[cfg(feature = "test")]
@@ -1153,9 +1153,9 @@ impl SyncStorage for SqliteStorage {
             stmt.execute(params![
                 peer.address.to_string(),
                 peer.block_height,
-                peer.first_seen.map(|x| x.naive_utc().timestamp()),
-                peer.last_seen.map(|x| x.naive_utc().timestamp()),
-                peer.last_connected.map(|x| x.naive_utc().timestamp()),
+                peer.first_seen.map(|x| x.unix_timestamp()),
+                peer.last_seen.map(|x| x.unix_timestamp()),
+                peer.last_connected.map(|x| x.unix_timestamp()),
                 peer.blocks_synced_to,
                 peer.blocks_synced_from,
                 peer.blocks_received_from,
@@ -1199,13 +1199,16 @@ impl SyncStorage for SqliteStorage {
                         block_height: row.get(0)?,
                         first_seen: row
                             .get::<_, Option<i64>>(1)?
-                            .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                            .map(|x| OffsetDateTime::from_unix_timestamp(x).ok())
+                            .flatten(),
                         last_seen: row
                             .get::<_, Option<i64>>(2)?
-                            .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                            .map(|x| OffsetDateTime::from_unix_timestamp(x).ok())
+                            .flatten(),
                         last_connected: row
                             .get::<_, Option<i64>>(3)?
-                            .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                            .map(|x| OffsetDateTime::from_unix_timestamp(x).ok())
+                            .flatten(),
                         blocks_synced_to: row.get(4)?,
                         blocks_synced_from: row.get(5)?,
                         blocks_received_from: row.get(6)?,
@@ -1252,13 +1255,16 @@ impl SyncStorage for SqliteStorage {
                 block_height: row.get(1)?,
                 first_seen: row
                     .get::<_, Option<i64>>(2)?
-                    .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                    .map(|x| OffsetDateTime::from_unix_timestamp(x).ok())
+                    .flatten(),
                 last_seen: row
                     .get::<_, Option<i64>>(3)?
-                    .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                    .map(|x| OffsetDateTime::from_unix_timestamp(x).ok())
+                    .flatten(),
                 last_connected: row
                     .get::<_, Option<i64>>(4)?
-                    .map(|x| DateTime::from_utc(NaiveDateTime::from_timestamp(x, 0), Utc)),
+                    .map(|x| OffsetDateTime::from_unix_timestamp(x).ok())
+                    .flatten(),
                 blocks_synced_to: row.get(5)?,
                 blocks_synced_from: row.get(6)?,
                 blocks_received_from: row.get(7)?,

@@ -31,8 +31,8 @@ use snarkvm_dpc::{
 use snarkvm_posw::{Marlin, PoswMarlin};
 use snarkvm_utilities::FromBytes;
 
-use chrono::Utc;
 use rand::{CryptoRng, Rng};
+use time::OffsetDateTime;
 
 pub const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -80,7 +80,7 @@ impl ConsensusParameters {
     ) -> Result<(), ConsensusError> {
         let hash_result = header.to_difficulty_hash();
 
-        let now = Utc::now().timestamp();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         let future_timelimit: i64 = now + TWO_HOURS_UNIX;
         let expected_difficulty = self.get_block_difficulty(parent_header, header.time);
         let parent_hash = parent_header.hash();
@@ -239,7 +239,7 @@ mod tests {
 
         // far in the future block
         let mut h2_err = h2.clone();
-        h2_err.time = Utc::now().timestamp() + 7201;
+        h2_err.time = OffsetDateTime::now_utc().unix_timestamp() + 7201;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();
@@ -267,7 +267,7 @@ mod tests {
 
         // expected difficulty did not match the difficulty target
         let mut h2_err = h2;
-        h2_err.difficulty_target = consensus.get_block_difficulty(&h1, Utc::now().timestamp()) + 1;
+        h2_err.difficulty_target = consensus.get_block_difficulty(&h1, OffsetDateTime::now_utc().unix_timestamp()) + 1;
         consensus
             .verify_header(&h2_err, &h1, &merkle_root_hash, &pedersen_merkle_root)
             .unwrap_err();

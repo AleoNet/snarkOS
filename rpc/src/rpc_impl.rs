@@ -36,7 +36,7 @@ use snarkvm_utilities::{
 };
 use std::future::Future;
 
-use chrono::Utc;
+use time::OffsetDateTime;
 
 use std::{ops::Deref, sync::Arc};
 
@@ -437,7 +437,7 @@ impl RpcFunctions for RpcImpl {
 
         let block = self.storage.get_block_header(&canon.hash).await?;
 
-        let time = Utc::now().timestamp();
+        let time = OffsetDateTime::now_utc().unix_timestamp();
 
         let full_transactions = self.node.expect_sync().consensus.fetch_memory_pool().await;
 

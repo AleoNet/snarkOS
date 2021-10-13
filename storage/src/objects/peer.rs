@@ -16,16 +16,16 @@
 
 use std::net::SocketAddr;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Peer {
     pub address: SocketAddr,
     pub block_height: u32,
-    pub first_seen: Option<DateTime<Utc>>,
-    pub last_seen: Option<DateTime<Utc>>,
-    pub last_connected: Option<DateTime<Utc>>,
+    pub first_seen: Option<OffsetDateTime>,
+    pub last_seen: Option<OffsetDateTime>,
+    pub last_connected: Option<OffsetDateTime>,
     pub blocks_synced_to: u32,
     pub blocks_synced_from: u32,
     pub blocks_received_from: u32,

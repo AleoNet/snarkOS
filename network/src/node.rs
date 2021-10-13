@@ -18,7 +18,6 @@ use crate::*;
 use snarkos_metrics::{self as metrics, wrapped_mpsc};
 
 use anyhow::*;
-use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use rand::{thread_rng, Rng};
 use snarkos_storage::DynStorage;
@@ -33,6 +32,7 @@ use std::{
     },
     thread,
 };
+use time::OffsetDateTime;
 use tokio::{
     sync::{Mutex, RwLock},
     task,
@@ -71,7 +71,7 @@ pub struct InnerNode {
     /// The node's storage.
     pub storage: DynStorage,
     /// The node's start-up timestamp.
-    pub launched: DateTime<Utc>,
+    pub launched: OffsetDateTime,
     /// The tasks spawned by the node.
     tasks: DropJoin<task::JoinHandle<()>>,
     /// The threads spawned by the node.
@@ -129,7 +129,7 @@ impl Node {
             peer_book: PeerBook::spawn(storage),
             sync: Default::default(),
             known_network: Default::default(),
-            launched: Utc::now(),
+            launched: OffsetDateTime::now_utc(),
             tasks: Default::default(),
             threads: Default::default(),
             shutting_down: Default::default(),

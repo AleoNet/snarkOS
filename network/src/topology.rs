@@ -22,10 +22,10 @@ use std::{
     ops::Sub,
 };
 
-use chrono::{DateTime, Utc};
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
 // Purges connections that haven't been seen within this time (in hours).
@@ -43,7 +43,7 @@ pub struct Connection {
     pub target: SocketAddr,
     /// The last time this peer was seen by the crawler (used determine which connections are
     /// likely stale).
-    last_seen: DateTime<Utc>,
+    last_seen: OffsetDateTime,
 }
 
 impl PartialEq for Connection {
@@ -78,7 +78,7 @@ impl Connection {
         Connection {
             source,
             target,
-            last_seen: Utc::now(),
+            last_seen: OffsetDateTime::now_utc(),
         }
     }
 }
@@ -173,7 +173,7 @@ impl KnownNetwork {
             .difference(&new_connections)
             .filter(|conn| {
                 (conn.source == source || conn.target == source)
-                    && (Utc::now() - conn.last_seen).num_hours() > STALE_CONNECTION_CUTOFF_TIME_HRS
+                    && (OffsetDateTime::now_utc() - conn.last_seen).whole_hours() > STALE_CONNECTION_CUTOFF_TIME_HRS
             })
             .copied()
             .collect();
@@ -538,7 +538,7 @@ fn sorted_eigenvalue_vector_pairs(matrix: DMatrix<f64>, ascending: bool) -> Vec<
 #[cfg(test)]
 mod test {
     use super::*;
-    use chrono::Duration;
+    use time::Duration;
 
     #[test]
     fn connections_partial_eq() {
@@ -557,8 +557,8 @@ mod test {
         let addr_d = "44.44.44.44:4000".parse().unwrap();
         let addr_e = "55.55.55.55:5000".parse().unwrap();
 
-        let old_but_valid_timestamp = Utc::now() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS - 1);
-        let stale_timestamp = Utc::now() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS + 1);
+        let old_but_valid_timestamp = OffsetDateTime::now_utc() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS - 1);
+        let stale_timestamp = OffsetDateTime::now_utc() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS + 1);
 
         // Seed the known network with the older connections.
         let old_but_valid_connection = Connection {

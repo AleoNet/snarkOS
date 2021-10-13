@@ -21,12 +21,12 @@ use snarkvm_dpc::{testnet1::instantiated::*, Address, BlockHeader, BlockHeaderHa
 use snarkvm_posw::{error::PoswError, txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
-use chrono::Utc;
 use rand::thread_rng;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use time::OffsetDateTime;
 use tokio::task;
 
 lazy_static::lazy_static! {
@@ -121,7 +121,7 @@ impl MineContext {
         let txids = transactions.iter().map(|x| x.id).collect::<Vec<_>>();
         let (merkle_root_hash, pedersen_merkle_root_hash, subroots) = txids_to_roots(&txids);
 
-        let time = Utc::now().timestamp();
+        let time = OffsetDateTime::now_utc().unix_timestamp();
         let difficulty_target = self.consensus.parameters.get_block_difficulty(parent_header, time);
 
         // TODO: Switch this to use a user-provided RNG

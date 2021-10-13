@@ -18,7 +18,7 @@ use snarkos_metrics as metrics;
 
 use std::time::Instant;
 
-use chrono::{DateTime, Utc};
+use time::OffsetDateTime;
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncState {
@@ -54,16 +54,16 @@ impl SyncState {
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PeerQuality {
     /// The number of failures associated with the peer; grounds for dismissal.
-    pub failures: Vec<DateTime<Utc>>,
+    pub failures: Vec<OffsetDateTime>,
 
     /// The last time the node interacted with this peer.
-    pub last_seen: Option<DateTime<Utc>>,
+    pub last_seen: Option<OffsetDateTime>,
     /// The first time the node interacted with this peer.
-    pub first_seen: Option<DateTime<Utc>>,
+    pub first_seen: Option<OffsetDateTime>,
     /// The last time the node was connected to this peer.
-    pub last_connected: Option<DateTime<Utc>>,
+    pub last_connected: Option<OffsetDateTime>,
     /// The last time the node was disconnected from this peer.
-    pub last_disconnected: Option<DateTime<Utc>>,
+    pub last_disconnected: Option<OffsetDateTime>,
 
     /// The number of times we have attempted to connect to this peer.
     pub connection_attempt_count: u64,
@@ -98,10 +98,10 @@ impl PeerQuality {
         self.connected_count = peer.connection_success_count;
     }
 
-    pub fn is_inactive(&self, now: DateTime<Utc>) -> bool {
+    pub fn is_inactive(&self, now: OffsetDateTime) -> bool {
         let last_seen = self.last_seen;
         if let Some(last_seen) = last_seen {
-            now - last_seen > chrono::Duration::seconds(crate::MAX_PEER_INACTIVITY_SECS.into())
+            now - last_seen > time::Duration::seconds(crate::MAX_PEER_INACTIVITY_SECS.into())
         } else {
             // in the peer book, but never been connected to before
             false
@@ -109,7 +109,7 @@ impl PeerQuality {
     }
 
     pub fn see(&mut self) {
-        let now = chrono::Utc::now();
+        let now = OffsetDateTime::now_utc();
         if self.first_seen.is_none() {
             self.first_seen = Some(now);
         }
@@ -119,7 +119,7 @@ impl PeerQuality {
     pub fn connected(&mut self) {
         self.see();
         self.connection_transient_fail_count = 0;
-        self.last_connected = Some(chrono::Utc::now());
+        self.last_connected = Some(OffsetDateTime::now_utc());
         self.connected_count += 1;
     }
 
@@ -132,7 +132,7 @@ impl PeerQuality {
     }
 
     pub fn disconnected(&mut self) {
-        let disconnect_timestamp = chrono::Utc::now();
+        let disconnect_timestamp = OffsetDateTime::now_utc();
 
         self.see();
         self.last_disconnected = Some(disconnect_timestamp);
@@ -140,9 +140,10 @@ impl PeerQuality {
         self.expecting_pong = false;
 
         if let Some(last_connected) = self.last_connected {
-            if let Ok(elapsed) = disconnect_timestamp.signed_duration_since(last_connected).to_std() {
-                metrics::histogram!(metrics::connections::DURATION, elapsed);
-            }
+            metrics::histogram!(
+                metrics::connections::DURATION,
+                (disconnect_timestamp - last_connected).whole_seconds() as f64
+            );
         }
     }
 }
