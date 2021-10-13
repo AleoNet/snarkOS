@@ -16,7 +16,6 @@
 
 use anyhow::*;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 use snarkos_metrics::wrapped_mpsc;
 use std::{
     net::SocketAddr,
@@ -28,7 +27,7 @@ use crate::{message::Payload, BlockCache, NetworkError, Node};
 
 use super::{network::*, outbound_handler::*};
 /// A data structure containing information about a peer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Peer {
     /// The address of the node's listener socket.
     pub address: SocketAddr,
@@ -40,7 +39,6 @@ pub struct Peer {
     pub sync_state: SyncState,
 
     /// The cache of received blocks from the peer.
-    #[serde(skip)]
     pub block_received_cache: BlockCache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
 }
 
