@@ -49,7 +49,7 @@ const FAILURE_THRESHOLD: usize = 5;
 
 impl Peer {
     pub fn new(address: SocketAddr, data: Option<&snarkos_storage::Peer>) -> Self {
-        let mut block_height = Default::default();
+        let mut block_height = 0;
         let mut quality: PeerQuality = Default::default();
         let mut sync_state: SyncState = Default::default();
 
