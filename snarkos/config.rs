@@ -31,24 +31,32 @@ use std::{fs, path::PathBuf};
 /// Peer discovery nodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
 pub const MAINNET_BEACONS: &[&str] = &[]; // "192.168.0.1:4130"
-// FIXME: setup peer discovery node addresses.
-// Setting the old bootnodes as beacons ensures backwards compaibility during the transition.
 pub const TESTNET_BEACONS: &[&str] = &[
-    "50.18.83.123:4131",
-    "50.18.246.201:4131",
-    "159.89.152.247:4131",
-    "128.199.7.1:4131",
-    "128.199.15.82:4131",
-    "46.101.144.133:4131",
-    "46.101.147.96:4131",
-    "167.71.79.152:4131",
-    "167.99.69.230:4131",
-    "206.189.80.245:4131",
-    "178.128.18.3:4131",
+    "164.90.244.192",
+    "165.227.251.158",
+    "159.203.49.11",
+    "67.207.71.112",
+    "138.68.122.60",
+    "164.90.241.245",
+    "139.59.48.164",
+    "188.166.196.149",
+    "34.84.79.188",
+    "54.153.131.7",
 ];
 
 pub const MAINNET_SYNC_PROVIDERS: &[&str] = &[];
-pub const TESTNET_SYNC_PROVIDERS: &[&str] = &[];
+pub const TESTNET_SYNC_PROVIDERS: &[&str] = &[
+    "178.128.128.92",
+    "143.244.213.137",
+    "159.203.55.128",
+    "159.65.211.80",
+    "64.225.80.138",
+    "138.68.127.67",
+    "139.59.52.218",
+    "188.166.205.27",
+    "34.64.246.68",
+    "54.253.223.255",
+];
 
 /// Represents all configuration options for a node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
