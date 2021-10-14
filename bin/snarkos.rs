@@ -90,8 +90,14 @@ fn main() -> Result<(), NodeError> {
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(8 * 1024 * 1024)
-        .max_blocking_threads(std::cmp::max(num_cpus::get().saturating_sub(2), 1)) // don't use 100% of the cores
+        .max_blocking_threads(num_cpus::get().saturating_sub(2).max(1)) // don't use 100% of the cores
         .build()?;
+
+    // don't use 100% of the cores for mining
+    rayon::ThreadPoolBuilder::new()
+        .num_threads((num_cpus::get() / 2).max(1))
+        .build_global()
+        .unwrap();
 
     runtime.block_on(start_server(config))?;
 
