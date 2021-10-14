@@ -35,8 +35,7 @@ impl Peer {
         time_received: Option<Instant>,
         payload: Payload,
     ) -> Result<(), NetworkError> {
-        self.quality.see();
-        self.quality.num_messages_received += 1;
+        self.register_received_message();
         metrics::increment_counter!(inbound::ALL_SUCCESSES);
 
         let source = self.address;
@@ -65,7 +64,7 @@ impl Peer {
             }
             Payload::Block(block, height) => {
                 metrics::increment_counter!(inbound::BLOCKS);
-                self.quality.blocks_received_from += 1;
+                self.sync_state.blocks_received_from += 1;
 
                 if node.sync().is_some() {
                     let node = node.clone();
@@ -98,7 +97,7 @@ impl Peer {
             }
             Payload::SyncBlock(block, height) => {
                 metrics::increment_counter!(inbound::SYNCBLOCKS);
-                self.quality.blocks_synced_from += 1;
+                self.sync_state.blocks_synced_from += 1;
 
                 if node.sync().is_some() {
                     let node = node.clone();
@@ -206,7 +205,7 @@ impl Peer {
             Payload::Ping(block_height) => {
                 network.write_payload(&Payload::Pong).await?;
                 debug!("Sent a '{}' message to {}", Payload::Pong, self.address);
-                self.quality.block_height = block_height;
+                self.block_height = block_height;
                 metrics::increment_counter!(PINGS);
 
                 // Pongs are sent without going through the outbound handler,
@@ -221,18 +220,7 @@ impl Peer {
                 }
             }
             Payload::Pong => {
-                if self.quality.expecting_pong {
-                    let rtt = self
-                        .quality
-                        .last_ping_sent
-                        .map(|x| x.elapsed().as_millis() as u64)
-                        .unwrap_or(u64::MAX);
-                    trace!("RTT for {} is {}ms", source, rtt);
-                    self.quality.expecting_pong = false;
-                    self.quality.rtt_ms = rtt;
-                } else {
-                    self.fail();
-                }
+                self.stop_ping_measurement();
                 metrics::increment_counter!(PONGS);
             }
             Payload::Unknown => {

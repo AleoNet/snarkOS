@@ -92,19 +92,16 @@ impl Peer {
             PeerAction::Disconnect => Ok(PeerResponse::Disconnect),
             PeerAction::Send(message, time_received) => {
                 match &message {
-                    Payload::Ping(_) => {
-                        self.quality.expecting_pong = true;
-                        self.quality.last_ping_sent = Some(Instant::now());
-                    }
+                    Payload::Ping(_) => self.start_ping_measurement(),
                     Payload::Block(block, _) => {
                         if self.block_received_cache.contains(&block[..]) {
                             metrics::increment_counter!(metrics::outbound::ALL_CACHE_HITS);
                             return Ok(PeerResponse::None);
                         }
-                        self.quality.blocks_sent_to += 1;
+                        self.sync_state.blocks_sent_to += 1;
                     }
                     Payload::SyncBlock(..) => {
-                        self.quality.blocks_synced_to += 1;
+                        self.sync_state.blocks_synced_to += 1;
                     }
                     _ => (),
                 }
@@ -146,37 +143,16 @@ impl Peer {
                 }
             }
             PeerAction::CancelSync => {
-                if self.quality.remaining_sync_blocks > self.quality.total_sync_blocks / 2 {
-                    warn!(
-                        "Was expecting {} more sync blocks from {}",
-                        self.quality.remaining_sync_blocks, self.address,
-                    );
-                    self.quality.remaining_sync_blocks = 0;
-                    self.quality.total_sync_blocks = 0;
-                    self.fail();
-                } else if self.quality.remaining_sync_blocks > 0 {
-                    trace!(
-                        "Was expecting {} more sync blocks from {}",
-                        self.quality.remaining_sync_blocks,
-                        self.address,
-                    );
-                    self.quality.remaining_sync_blocks = 0;
-                    self.quality.total_sync_blocks = 0;
-                }
+                self.cancel_sync();
                 Ok(PeerResponse::None)
                 //todo: should we notify the peer we are no longer expecting anything from them?
             }
             PeerAction::GotSyncBlock => {
-                if self.quality.remaining_sync_blocks > 0 {
-                    self.quality.remaining_sync_blocks -= 1;
-                } else {
-                    trace!("received unexpected or late sync block from {}", self.address);
-                }
+                self.register_received_sync_block();
                 Ok(PeerResponse::None)
             }
             PeerAction::ExpectingSyncBlocks(amount) => {
-                self.quality.remaining_sync_blocks += amount;
-                self.quality.total_sync_blocks += amount;
+                self.increment_sync_expectations(amount);
                 Ok(PeerResponse::None)
             }
             PeerAction::SoftFail => {
