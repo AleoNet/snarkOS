@@ -2678,6 +2678,7 @@ dependencies = [
  "num_cpus",
  "parking_lot",
  "rand 0.8.4",
+ "rayon",
  "self_update",
  "serde",
  "snarkos-consensus",
