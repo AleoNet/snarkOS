@@ -261,9 +261,7 @@ impl Node {
             #[cfg(not(feature = "test"))]
             sleep(Duration::from_secs(5)).await;
 
-            // FIXME: sync providers are set as beacons in the configuration during the rollout.
-            // let sync_providers = self.config.sync_providers();
-            let sync_providers = self.config.beacons();
+            let sync_providers = self.config.sync_providers();
             let node_clone = self.clone();
             let mempool_sync_interval = node_clone.expect_sync().mempool_sync_interval();
             let sync_mempool_task = task::spawn(async move {
