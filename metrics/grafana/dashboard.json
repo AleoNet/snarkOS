@@ -21,7 +21,7 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 7,
   "links": [],
   "panels": [
     {
@@ -182,7 +182,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.1.3",
+      "pluginVersion": "8.1.6",
       "targets": [
         {
           "exemplar": true,
@@ -204,7 +204,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_duplicates_total",
+          "expr": "snarkos_blocks_duplicates_total",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate Blocks",
@@ -212,7 +212,7 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_duplicates_sync_total",
+          "expr": "snarkos_blocks_duplicates_sync_total",
           "hide": false,
           "interval": "",
           "legendFormat": "duplicate SyncBlocks",
@@ -1215,5 +1215,5 @@
   "timezone": "",
   "title": "snarkOS node",
   "uid": "nuiNXZV7k",
-  "version": 8
+  "version": 2
 }
