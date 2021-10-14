@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, convert::TryInto, net::SocketAddr};
+use std::{convert::TryInto, net::SocketAddr};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
+use hash_hasher::HashedMap;
 use rusqlite::{params, OptionalExtension, Row, ToSql};
 use snarkvm_dpc::{AleoAmount, MerkleRootHash, Network, PedersenMerkleRootHash, ProofOfSuccinctWork};
 use tracing::*;
@@ -662,8 +663,8 @@ impl SyncStorage for SqliteStorage {
             .query_map([block_hash], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
             .collect::<rusqlite::Result<Vec<(Digest, Digest, u32)>>>()?;
 
-        let mut past_leaves = HashMap::<Digest, Vec<DigestTree>>::new();
-        let mut pending_leaves = HashMap::<Digest, Vec<DigestTree>>::new();
+        let mut past_leaves = HashedMap::<Digest, Vec<DigestTree>>::default();
+        let mut pending_leaves = HashedMap::<Digest, Vec<DigestTree>>::default();
         let mut current_tree_depth = None::<u32>;
         for (hash, parent_hash, tree_depth) in out.into_iter().rev() {
             if current_tree_depth.is_none() {
