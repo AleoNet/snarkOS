@@ -63,7 +63,7 @@ impl<N: Network> SqliteStorage<N> {
             CREATE TABLE IF NOT EXISTS transactions(
                 id INTEGER PRIMARY KEY,
                 transaction_id BLOB UNIQUE NOT NULL,
-                network INTEGER NOT NULL,
+                network_id INTEGER NOT NULL,
                 ledger_digest BLOB NOT NULL,
                 serial_number_0 BLOB NOT NULL,
                 serial_number_1 BLOB NOT NULL,
@@ -227,7 +227,7 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             r"
             INSERT OR IGNORE INTO transactions (
                 transaction_id,
-                network,
+                network_id,
                 ledger_digest,
                 serial_number_0,
                 serial_number_1,
@@ -278,8 +278,8 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 transaction.ledger_digest,
                 &transaction.serial_numbers[0],
                 &transaction.serial_numbers[1],
-                &transaction.new_commitments[0],
-                &transaction.new_commitments[1],
+                &transaction.commitments[0],
+                &transaction.commitments[1],
                 transaction.value_balance.0,
                 &transaction.new_records[0],
                 &transaction.new_records[1],
@@ -383,7 +383,7 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
         let mut stmt = self.conn.prepare_cached(
             "SELECT
             transactions.transaction_id,
-            network,
+            network_id,
             ledger_digest,
             serial_number_0,
             serial_number_1,
@@ -407,7 +407,7 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 network: Network::from_id(row.get(1)?),
                 ledger_digest: row.get(2)?,
                 serial_numbers: vec![row.get(3)?, row.get(4)?],
-                new_commitments: vec![row.get(5)?, row.get(6)?],
+                commitments: vec![row.get(5)?, row.get(6)?],
                 value_balance: AleoAmount(row.get(7)?),
                 transaction_proof: row.get(8)?,
                 memorandum: row.get(9)?,
@@ -736,7 +736,7 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 r"
         SELECT
             transactions.transaction_id,
-            network,
+            network_id,
             ledger_digest,
             serial_number_0,
             serial_number_1,
@@ -755,10 +755,10 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 |row| {
                     Ok(Transaction {
                         id: read_static_blob(row, 0)?,
-                        network: Network::from_id(row.get(1)?),
+                        network_id: Network::from_id(row.get(1)?),
                         ledger_digest: row.get(2)?,
                         serial_numbers: vec![row.get(3)?, row.get(4)?],
-                        new_commitments: vec![row.get(5)?, row.get(6)?],
+                        commitments: vec![row.get(5)?, row.get(6)?],
                         value_balance: AleoAmount(row.get(7)?),
                         transaction_proof: row.get(8)?,
                         memorandum: row.get(9)?,
