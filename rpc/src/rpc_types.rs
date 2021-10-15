@@ -179,11 +179,8 @@ pub struct RecordInfo {
     /// Record payload
     pub payload: RPCRecordPayload,
 
-    /// Record birth program id
-    pub birth_program_id: String,
-
-    /// Record death program id
-    pub death_program_id: String,
+    /// Record program ID
+    pub program_id: String,
 
     /// Record serial number nonce
     pub serial_number_nonce: String,
@@ -216,7 +213,7 @@ pub struct TransactionInfo {
     pub size: usize,
 
     /// Transaction inputs
-    pub old_serial_numbers: Vec<String>,
+    pub serial_numbers: Vec<String>,
 
     /// Transaction outputs
     pub new_commitments: Vec<String>,
@@ -232,12 +229,6 @@ pub struct TransactionInfo {
 
     /// Transaction (outer snark) proof
     pub transaction_proof: String,
-
-    /// Program verification key commitment
-    pub program_commitment: String,
-
-    /// Local data root
-    pub local_data_root: String,
 
     /// Transaction value balance
     pub value_balance: i64,

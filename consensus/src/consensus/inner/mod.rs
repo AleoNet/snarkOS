@@ -53,14 +53,14 @@ impl ConsensusInner {
     ) -> Result<Option<Digest>, ConsensusError> {
         let transaction_id: Digest = transaction.id.into();
 
-        if has_duplicates(&transaction.old_serial_numbers)
+        if has_duplicates(&transaction.serial_numbers)
             || has_duplicates(&transaction.new_commitments)
             || self.memory_pool.transactions.contains_key(&transaction_id)
         {
             return Ok(None);
         }
 
-        for sn in &transaction.old_serial_numbers {
+        for sn in &transaction.serial_numbers {
             if self.ledger.contains_serial(sn) || self.memory_pool.serial_numbers.contains(sn) {
                 return Ok(None);
             }
@@ -78,7 +78,7 @@ impl ConsensusInner {
             return Ok(None);
         }
 
-        for sn in &transaction.old_serial_numbers {
+        for sn in &transaction.serial_numbers {
             self.memory_pool.serial_numbers.insert(sn.clone());
         }
 

@@ -18,14 +18,7 @@ use crate::config::Config;
 use snarkos_consensus::{Consensus, ConsensusParameters, DeserializedLedger, DynLedger, MemoryPool, MerkleLedger};
 use snarkos_network::{config::Config as NodeConfig, MinerInstance, Node, Sync};
 use snarkos_rpc::start_rpc_server;
-use snarkos_storage::{
-    export_canon_blocks,
-    key_value::KeyValueStore,
-    AsyncStorage,
-    DynStorage,
-    RocksDb,
-    SqliteStorage,
-};
+use snarkos_storage::{export_canon_blocks, AsyncStorage, DynStorage, RocksDb, SqliteStorage};
 
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
 use snarkvm_dpc::{
@@ -73,13 +66,13 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage<N
     if storage.canon().await?.block_height == 0 {
         let mut rocks_identity_path = path.clone();
         rocks_identity_path.push("IDENTITY");
-        if rocks_identity_path.exists() {
-            info!("Empty sqlite DB with existing rocksdb found, migrating...");
-            let rocks_storage = RocksDb::open(&path)?;
-            let rocks_storage: DynStorage<N> = Arc::new(AsyncStorage::new(KeyValueStore::new(rocks_storage)));
-
-            snarkos_storage::migrate(&rocks_storage, &storage).await?;
-        }
+        // if rocks_identity_path.exists() {
+        //     info!("Empty sqlite DB with existing rocksdb found, migrating...");
+        //     let rocks_storage = RocksDb::open(&path)?;
+        //     let rocks_storage: DynStorage<N> = Arc::new(AsyncStorage::new(KeyValueStore::new(rocks_storage)));
+        //
+        //     snarkos_storage::migrate(&rocks_storage, &storage).await?;
+        // }
     }
 
     if let Some(max_head) = config.storage.max_head {

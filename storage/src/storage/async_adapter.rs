@@ -41,7 +41,7 @@ enum Message<N: Network> {
     DeleteBlock(Digest),
     GetBlockHash(u32),
     GetBlockHeader(Digest),
-    GetBlockState(Digest),
+    GetBlockState(N::BlockHash),
     GetBlockStates(Vec<Digest>),
     GetBlock(Digest),
     GetForkPath(Digest, usize),
@@ -83,7 +83,7 @@ enum Message<N: Network> {
 impl<N: Network> fmt::Display for Message<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Message::InsertBlock(block) => write!(f, "InsertBlock({})", block.header.hash()),
+            Message::InsertBlock(block) => write!(f, "InsertBlock({})", block.block_hash()),
             Message::DeleteBlock(block) => write!(f, "DeleteBlock({})", block),
             Message::GetBlockHash(block_number) => write!(f, "GetBlockHash({})", block_number),
             Message::GetBlockHeader(hash) => write!(f, "GetBlockHeader({})", hash),
@@ -125,7 +125,7 @@ impl<N: Network> fmt::Display for Message<N> {
             Message::StoreRecords(records) => {
                 write!(f, "StoreRecords(")?;
                 for record in records {
-                    write!(f, "{}, ", record.commitment)?;
+                    write!(f, "{}, ", record.commitment())?;
                 }
                 write!(f, ")")
             }
@@ -215,7 +215,6 @@ impl<N: Network, S: SyncStorage<N> + 'static> Agent<N, S> {
             Message::StorePeers(peers) => Box::new(self.inner.store_peers(peers)),
             Message::LookupPeers(addresses) => Box::new(self.inner.lookup_peers(addresses)),
             Message::FetchPeers() => Box::new(self.inner.fetch_peers()),
-            Message::Validate(limit, fix_mode) => Box::new(self.inner.validate(limit, fix_mode)),
             #[cfg(feature = "test")]
             Message::StoreItem(col, key, value) => Box::new(self.wrap(move |f| f.store_item(col, key, value))),
             #[cfg(feature = "test")]
@@ -279,8 +278,8 @@ impl<N: Network> Storage<N> for AsyncStorage<N> {
         self.send(Message::GetBlockHeader(hash.clone())).await
     }
 
-    async fn get_block_state(&self, hash: &Digest) -> Result<BlockStatus> {
-        self.send(Message::GetBlockState(hash.clone())).await
+    async fn get_block_state(&self, block_hash: N::BlockHash) -> Result<BlockStatus> {
+        self.send(Message::GetBlockState(block_hash)).await
     }
 
     async fn get_block_states(&self, hashes: &[Digest]) -> Result<Vec<BlockStatus>> {

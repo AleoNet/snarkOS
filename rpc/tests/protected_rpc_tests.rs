@@ -209,10 +209,9 @@ mod protected_rpc_tests {
 
         let record_info = record_info["result"].clone();
 
-        let owner: Address<N> = record.owner.clone().into();
-        let owner = owner.to_string();
-        let is_dummy = record.is_dummy;
-        let value = record.value.0;
+        let owner = record.owner().to_string();
+        let is_dummy = record.is_dummy();
+        let value = record.value().0;
         let birth_program_id = hex::encode(&record.birth_program_id);
         let death_program_id = hex::encode(&record.death_program_id);
         let serial_number_nonce = hex::encode(&record.serial_number_nonce);

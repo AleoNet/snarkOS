@@ -26,7 +26,7 @@ impl ConsensusInner {
     pub(super) async fn receive_block(&mut self, block: &Block<N>) -> Result<(), ConsensusError> {
         self.storage.insert_block(block).await?;
 
-        let hash = block.header.hash();
+        let hash = block.block_hash();
         match self.try_commit_block(&hash, block).await {
             Err(ConsensusError::InvalidBlock(hash)) => {
                 self.storage.delete_block(&hash).await?;
@@ -44,7 +44,7 @@ impl ConsensusInner {
     pub(super) async fn try_commit_block(&mut self, hash: &Digest, block: &Block<N>) -> Result<(), ConsensusError> {
         let canon = self.storage.canon().await?;
 
-        match self.storage.get_block_state(&block.header.previous_block_hash).await? {
+        match self.storage.get_block_state(&block.previous_block_hash()).await? {
             BlockStatus::Committed(n) if n == canon.block_height => {
                 debug!("Processing a block that is on canon chain. Height {} -> {}", n, n + 1);
                 metrics::gauge!(metrics::blocks::HEIGHT, n as f64 + 1.0);
@@ -108,7 +108,7 @@ impl ConsensusInner {
                                     self.verify_and_commit_block(hash, block).await?;
                                 } else {
                                     let new_block = self.storage.get_block(block_hash).await?;
-                                    self.verify_and_commit_block(&new_block.header.hash(), &new_block)
+                                    self.verify_and_commit_block(&new_block.block_hash(), &new_block)
                                         .await?;
                                 }
                             }
@@ -164,7 +164,7 @@ impl ConsensusInner {
         self.commit_block(hash, block).await?;
 
         // 3. Remove transactions from the mempool
-        for transaction in block.transactions.iter() {
+        for transaction in block.transactions().iter() {
             self.memory_pool.remove(&transaction.id.into())?;
         }
 
@@ -178,7 +178,7 @@ impl ConsensusInner {
     pub(super) async fn verify_block(&mut self, block: &Block<N>) -> Result<bool, ConsensusError> {
         let canon = self.storage.canon().await?;
         // Verify the block header
-        if block.header.previous_block_hash != canon.hash {
+        if block.previous_block_hash() != canon.hash {
             return Err(anyhow!("attempted to commit a block that wasn't a direct child of tip of canon").into());
         }
 
@@ -186,7 +186,7 @@ impl ConsensusInner {
         let mut coinbase_transaction_count: i32 = 0;
         let mut total_value_balance = AleoAmount::ZERO;
 
-        for transaction in block.transactions.iter() {
+        for transaction in block.transactions().iter() {
             let value_balance = transaction.value_balance;
 
             if value_balance.is_negative() {
@@ -214,9 +214,9 @@ impl ConsensusInner {
             return Ok(false);
         }
 
-        let block_header = block.header.clone();
+        let block_header = block.header().clone();
         let parent_header = self.storage.get_block_header(&canon.hash).await?;
-        let transaction_ids: Vec<[u8; 32]> = block.transactions.iter().map(|x| x.id).collect();
+        let transaction_ids: Vec<[u8; 32]> = block.transactions().iter().map(|x| x.id).collect();
         let consensus = self.public.clone();
 
         let verification_result = task::spawn_blocking(move || {
@@ -240,7 +240,7 @@ impl ConsensusInner {
         }
 
         // Check that all the transaction proofs verify
-        self.verify_transactions(block.transactions.clone()).await
+        self.verify_transactions(block.transactions().clone()).await
     }
 
     async fn resolve_recommit_taint(
@@ -307,9 +307,9 @@ impl ConsensusInner {
         let resolved_digests = self
             .resolve_recommit_taint(&mut commitments, &mut serial_numbers, &mut memos)
             .await?;
-        for transaction in block.transactions.iter() {
+        for transaction in block.transactions().iter() {
             commitments.extend_from_slice(&transaction.new_commitments[..]);
-            serial_numbers.extend_from_slice(&transaction.old_serial_numbers[..]);
+            serial_numbers.extend_from_slice(&transaction.serial_numbers[..]);
             memos.push(transaction.memorandum.clone());
         }
 
@@ -391,10 +391,10 @@ impl ConsensusInner {
         let mut memos = vec![];
         debug!("decommited {} blocks", decommited_blocks.len());
         for block in decommited_blocks.into_iter().rev() {
-            debug!("ledger: rolling back block {}", block.header.hash());
-            for transaction in block.transactions.iter() {
+            debug!("ledger: rolling back block {}", block.block_hash());
+            for transaction in block.transactions().iter() {
                 commitments.extend_from_slice(&transaction.new_commitments[..]);
-                serial_numbers.extend_from_slice(&transaction.old_serial_numbers[..]);
+                serial_numbers.extend_from_slice(&transaction.serial_numbers[..]);
                 memos.push(transaction.memorandum.clone());
             }
         }

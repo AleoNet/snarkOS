@@ -30,7 +30,7 @@ async fn trim_side_chain_blocks() {
     let blocks1 = TestBlocks::load(Some(5), "test_blocks_100_1").0;
     let mut block_hashes1 = HashSet::new();
     for block in &blocks1 {
-        let hash = block.header.hash();
+        let hash = block.block_hash();
         block_hashes1.insert(hash);
 
         assert!(consensus.receive_block(block.clone()).await);
@@ -45,7 +45,7 @@ async fn trim_side_chain_blocks() {
     let blocks2 = TestBlocks::load(Some(10), "test_blocks_100_2").0;
     let mut block_hashes2 = HashSet::new();
     for block in blocks2 {
-        let hash = block.header.hash();
+        let hash = block.block_hash();
         block_hashes2.insert(hash);
 
         assert!(consensus.receive_block(block).await);
@@ -59,7 +59,7 @@ async fn trim_side_chain_blocks() {
     // Ensure that the obsolete objects are in place.
     for block in &blocks1 {
         // Check the header.
-        let hash = block.header.hash();
+        let hash = block.block_hash();
         assert_eq!(
             consensus.storage.get_block_state(&hash).await.unwrap(),
             BlockStatus::Uncommitted
@@ -75,7 +75,7 @@ async fn trim_side_chain_blocks() {
     // Ensure that the obsolete objects were trimmed.
     for block in blocks1 {
         // Check the header.
-        let hash = block.header.hash();
+        let hash = block.block_hash();
         assert_eq!(
             consensus.storage.get_block_state(&hash).await.unwrap(),
             BlockStatus::Unknown
@@ -85,7 +85,7 @@ async fn trim_side_chain_blocks() {
         assert!(consensus.storage.get_block(&hash).await.is_err());
 
         // Check tx locations.
-        for tx in &block.transactions {
+        for tx in &block.transactions() {
             // A transaction from the first set of blocks could still be applicable...
             let tx_location = match consensus.storage.get_transaction_location(tx.id.into()).await.unwrap() {
                 Some(location) => location,

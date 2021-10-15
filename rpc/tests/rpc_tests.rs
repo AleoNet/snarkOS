@@ -80,8 +80,8 @@ mod rpc_tests {
 
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
         let transaction_size = transaction_bytes.len();
-        let old_serial_numbers: Vec<Value> = transaction
-            .old_serial_numbers()
+        let serial_numbers: Vec<Value> = transaction
+            .serial_numbers()
             .iter()
             .map(|sn| {
                 let mut serial_number: Vec<u8> = vec![];
@@ -95,12 +95,10 @@ mod rpc_tests {
             .map(|cm| Value::String(hex::encode(to_bytes_le![cm].unwrap())))
             .collect();
         let memo = hex::encode(transaction.memorandum());
-        let network_id = transaction.network.id();
+        let network_id = transaction.network_id();
 
         let digest = hex::encode(to_bytes_le![transaction.ledger_digest].unwrap());
         let transaction_proof = hex::encode(to_bytes_le![transaction.transaction_proof].unwrap());
-        let program_commitment = hex::encode(to_bytes_le![transaction.program_commitment()].unwrap());
-        let local_data_root = hex::encode(to_bytes_le![transaction.local_data_root].unwrap());
         let value_balance = transaction.value_balance;
         let signatures: Vec<Value> = transaction
             .signatures
@@ -116,15 +114,13 @@ mod rpc_tests {
 
         assert_eq!(transaction_id, transaction_info["txid"]);
         assert_eq!(transaction_size, transaction_info["size"]);
-        assert_eq!(Value::Array(old_serial_numbers), transaction_info["old_serial_numbers"]);
+        assert_eq!(Value::Array(serial_numbers), transaction_info["serial_numbers"]);
         assert_eq!(Value::Array(new_commitments), transaction_info["new_commitments"]);
         assert_eq!(memo, transaction_info["memo"]);
 
         assert_eq!(network_id, transaction_info["network_id"]);
         assert_eq!(digest, transaction_info["digest"]);
         assert_eq!(transaction_proof, transaction_info["transaction_proof"]);
-        assert_eq!(program_commitment, transaction_info["program_commitment"]);
-        assert_eq!(local_data_root, transaction_info["local_data_root"]);
         assert_eq!(value_balance.0, transaction_info["value_balance"]);
         assert_eq!(Value::Array(signatures), transaction_info["signatures"]);
         assert_eq!(Value::Array(encrypted_records), transaction_info["encrypted_records"]);
@@ -161,26 +157,26 @@ mod rpc_tests {
 
         let genesis_block = genesis();
 
-        assert_eq!(hex::encode(genesis_block.header.get_hash().0), block_response["hash"]);
+        assert_eq!(hex::encode(genesis_block.header().get_hash().0), block_response["hash"]);
         assert_eq!(
-            genesis_block.header.merkle_root_hash.to_string(),
+            genesis_block.header().merkle_root_hash.to_string(),
             block_response["merkle_root"]
         );
         assert_eq!(
-            genesis_block.header.previous_block_hash.to_string(),
+            genesis_block.previous_block_hash().to_string(),
             block_response["previous_block_hash"]
         );
         assert_eq!(
-            genesis_block.header.pedersen_merkle_root_hash.to_string(),
+            genesis_block.header().pedersen_merkle_root_hash.to_string(),
             block_response["pedersen_merkle_root_hash"]
         );
-        assert_eq!(genesis_block.header.proof.to_string(), block_response["proof"]);
-        assert_eq!(genesis_block.header.time, block_response["time"]);
+        assert_eq!(genesis_block.header().proof.to_string(), block_response["proof"]);
+        assert_eq!(genesis_block.header().time, block_response["time"]);
         assert_eq!(
-            genesis_block.header.difficulty_target,
+            genesis_block.header().difficulty_target,
             block_response["difficulty_target"]
         );
-        assert_eq!(genesis_block.header.nonce, block_response["nonce"]);
+        assert_eq!(genesis_block.header().nonce, block_response["nonce"]);
     }
 
     #[tokio::test]
@@ -226,7 +222,7 @@ mod rpc_tests {
 
         let genesis_block = genesis();
 
-        let transaction = &genesis_block.transactions.0[0];
+        let transaction = &genesis_block.transactions().0[0];
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
 
         let result = make_request_with_params(&rpc, "getrawtransaction", &format!("[\"{}\"]", transaction_id)).await;
@@ -243,7 +239,7 @@ mod rpc_tests {
         let (rpc, _rpc_node) = initialize_test_rpc(&consensus, None).await;
 
         let genesis_block = genesis();
-        let transaction = &genesis_block.transactions.0[0];
+        let transaction = &genesis_block.transactions().0[0];
 
         let transaction_info = make_request_with_params(
             &rpc,

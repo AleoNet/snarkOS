@@ -74,7 +74,7 @@ impl MineContext {
             if self.consensus.parameters.network_id != transaction.network {
                 return Err(ConsensusError::ConflictingNetworkId(
                     self.consensus.parameters.network_id.id(),
-                    transaction.network.id(),
+                    transaction.network_id(),
                 ));
             }
         }

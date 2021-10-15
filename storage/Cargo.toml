@@ -33,17 +33,20 @@ features = [ "bundled" ]
 version = "0.17"
 
 [dependencies.snarkvm-algorithms]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "999ae6d"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#rev = "999ae6d"
+path = "../../snarkVM/algorithms"
 #version = "=0.7.9"
 
 [dependencies.snarkvm-dpc]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "999ae6d"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#rev = "999ae6d"
+path = "../../snarkVM/dpc"
 
 [dependencies.snarkvm-utilities]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "999ae6d"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#rev = "999ae6d"
+path = "../../snarkVM/utilities"
 
 [dependencies.snarkos-metrics]
 path = "../metrics"
@@ -125,8 +128,9 @@ version = "0.1"
 path = "../consensus"
 
 [dev-dependencies.snarkvm-curves]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "999ae6d"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#rev = "999ae6d"
+path = "../../snarkVM/curves"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.2"

@@ -127,7 +127,7 @@ impl MinerInstance {
 
                 metrics::increment_counter!(metrics::blocks::MINED);
 
-                info!("Mined a new block: {:?}", hex::encode(block.header.hash().0));
+                info!("Mined a new block: {:?}", hex::encode(block.block_hash().0));
 
                 let serialized_block = block.serialize();
                 let node_clone = self.node.clone();

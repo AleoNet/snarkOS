@@ -669,8 +669,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let payload = RPCRecordPayload {
             payload: hex::encode(to_bytes_le![record.payload()]?),
         };
-        let birth_program_id = hex::encode(record.birth_program_id());
-        let death_program_id = hex::encode(record.death_program_id());
+        let program_id = hex::encode(record.program_id());
         let serial_number_nonce = hex::encode(to_bytes_le![record.serial_number_nonce()]?);
         let commitment = hex::encode(to_bytes_le![record.commitment()]?);
         let commitment_randomness = hex::encode(to_bytes_le![record.commitment_randomness()]?);
@@ -680,8 +679,7 @@ impl ProtectedRpcFunctions for RpcImpl {
             is_dummy: record.is_dummy(),
             value: record.value(),
             payload,
-            birth_program_id,
-            death_program_id,
+            program_id,
             serial_number_nonce,
             commitment,
             commitment_randomness,

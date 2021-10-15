@@ -27,7 +27,7 @@ impl ConsensusInner {
         // no blocks present/genesis situation
         if canon.is_empty() {
             // no blocks
-            let hash = self.public.genesis_block.header.hash();
+            let hash = self.public.genesis_block.block_hash();
             let block = self.public.genesis_block.clone();
             self.storage.insert_block(&block).await?;
 

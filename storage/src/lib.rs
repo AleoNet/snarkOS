@@ -28,9 +28,6 @@ pub use errors::*;
 pub mod exporter;
 pub use exporter::*;
 
-pub mod migrate;
-pub use migrate::*;
-
 pub mod objects;
 pub use objects::*;
 

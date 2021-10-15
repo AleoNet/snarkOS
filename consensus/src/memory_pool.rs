@@ -60,7 +60,7 @@ impl MemoryPool {
                         panic!("missing commitment from memory pool during removal");
                     }
                 }
-                for serial in &entry.transaction.old_serial_numbers {
+                for serial in &entry.transaction.serial_numbers {
                     if !self.serial_numbers.remove(serial) {
                         panic!("missing serial from memory pool during removal");
                     }

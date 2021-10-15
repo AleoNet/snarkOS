@@ -244,9 +244,9 @@ impl RpcFunctions for RpcImpl {
         };
 
         let block = self.storage.get_block(&block_header_hash).await?;
-        let mut transactions = Vec::with_capacity(block.transactions.len());
+        let mut transactions = Vec::with_capacity(block.transactions().len());
 
-        for transaction in block.transactions.iter() {
+        for transaction in block.transactions().iter() {
             transactions.push(hex::encode(&transaction.id));
         }
 
@@ -255,13 +255,13 @@ impl RpcFunctions for RpcImpl {
             height: height.map(|x| x as u32),
             confirmations: confirmations as u32,
             size: block.serialize().len(), // todo: we should not do this
-            previous_block_hash: block.header.previous_block_hash.to_string(),
-            merkle_root: block.header.merkle_root_hash.to_string(),
-            pedersen_merkle_root_hash: block.header.pedersen_merkle_root_hash.to_string(),
-            proof: block.header.proof.to_string(),
-            time: block.header.time,
-            difficulty_target: block.header.difficulty_target,
-            nonce: block.header.nonce,
+            previous_block_hash: block.previous_block_hash().to_string(),
+            merkle_root: block.header().merkle_root_hash.to_string(),
+            pedersen_merkle_root_hash: block.header().pedersen_merkle_root_hash.to_string(),
+            proof: block.header().proof.to_string(),
+            time: block.header().time,
+            difficulty_target: block.header().difficulty_target,
+            nonce: block.header().nonce,
             transactions,
         })
     }
@@ -307,12 +307,12 @@ impl RpcFunctions for RpcImpl {
         let transaction_bytes = hex::decode(transaction_bytes)?;
         let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
 
-        let mut old_serial_numbers = Vec::with_capacity(transaction.old_serial_numbers().len());
+        let mut serial_numbers = Vec::with_capacity(transaction.serial_numbers().len());
 
-        for sn in transaction.old_serial_numbers() {
+        for sn in transaction.serial_numbers() {
             let mut serial_number: Vec<u8> = vec![];
             CanonicalSerialize::serialize(sn, &mut serial_number).unwrap();
-            old_serial_numbers.push(hex::encode(serial_number));
+            serial_numbers.push(hex::encode(serial_number));
         }
 
         let mut new_commitments = Vec::with_capacity(transaction.new_commitments().len());
@@ -349,14 +349,12 @@ impl RpcFunctions for RpcImpl {
         Ok(TransactionInfo {
             txid: hex::encode(&transaction_id),
             size: transaction_bytes.len(),
-            old_serial_numbers,
+            serial_numbers,
             new_commitments,
             memo,
-            network_id: transaction.network.id(),
+            network_id: transaction.network_id(),
             digest: hex::encode(to_bytes_le![transaction.ledger_digest]?),
             transaction_proof: hex::encode(to_bytes_le![transaction.transaction_proof]?),
-            program_commitment: hex::encode(to_bytes_le![transaction.program_commitment]?),
-            local_data_root: hex::encode(to_bytes_le![transaction.local_data_root]?),
             value_balance: transaction.value_balance.0,
             signatures,
             encrypted_records,

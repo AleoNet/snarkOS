@@ -68,8 +68,6 @@ impl<N: Network> SqliteStorage<N> {
                 old_serial_number2 BLOB NOT NULL,
                 new_commitment1 BLOB NOT NULL,
                 new_commitment2 BLOB NOT NULL,
-                program_commitment BLOB NOT NULL,
-                local_data_root BLOB NOT NULL,
                 value_balance INTEGER NOT NULL,
                 signature1 BLOB NOT NULL,
                 signature2 BLOB NOT NULL,
@@ -97,14 +95,12 @@ impl<N: Network> SqliteStorage<N> {
             CREATE TABLE IF NOT EXISTS miner_records(
                 id INTEGER PRIMARY KEY,
                 owner TEXT NOT NULL,
-                is_dummy INTEGER NOT NULL,
                 value INTEGER NOT NULL,
                 payload BLOB NOT NULL,
-                birth_program_id BLOB NOT NULL,
-                death_program_id BLOB NOT NULL,
+                program_id BLOB NOT NULL,
                 serial_number_nonce BLOB NOT NULL,
-                commitment BLOB NOT NULL,
-                commitment_randomness BLOB NOT NULL
+                commitment_randomness BLOB NOT NULL,
+                commitment BLOB NOT NULL
             );
             CREATE INDEX record_owner_lookup ON miner_records(owner);
             CREATE INDEX record_commitment_lookup ON miner_records(commitment);
@@ -177,9 +173,9 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
 
     fn insert_block(&mut self, block: &Block<N>) -> Result<()> {
         self.optimize()?;
-        let hash = block.header.hash();
+        let block_hash = block.block_hash();
 
-        match self.get_block_state(&hash)? {
+        match self.get_block_state(&block_hash)? {
             BlockStatus::Unknown => (),
             BlockStatus::Committed(_) | BlockStatus::Uncommitted => {
                 metrics::increment_counter!(snarkos_metrics::blocks::DUPLICATES);
@@ -213,20 +209,20 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
         ",
         )?;
         block_query.execute::<&[&dyn ToSql]>(&[
-            &hash,
-            &block.header.previous_block_hash,
-            &block.header.previous_block_hash,
-            &&block.header.merkle_root_hash.0[..],
-            &&block.header.pedersen_merkle_root_hash.0[..],
-            &&block.header.proof.0[..],
-            &block.header.time,
-            &block.header.difficulty_target,
-            &block.header.nonce,
+            &block_hash,
+            &block.previous_block_hash(),
+            &block.previous_block_hash(),
+            &&block.header().merkle_root_hash.0[..],
+            &&block.header().pedersen_merkle_root_hash.0[..],
+            &&block.header().proof().unwrap().to_bytes_le()?[..],
+            &block.timestamp(),
+            &block.difficulty_target(),
+            &block.nonce(),
         ])?;
         let block_id = self.conn.last_insert_rowid();
         self.conn.execute(
             "UPDATE blocks SET previous_block_id = ? WHERE previous_block_hash = ?",
-            params![block_id, hash],
+            params![block_id, block_hash],
         )?;
         let mut transaction_query = self.conn.prepare_cached(
             r"
@@ -238,8 +234,6 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 old_serial_number2,
                 new_commitment1,
                 new_commitment2,
-                program_commitment,
-                local_data_root,
                 value_balance,
                 signature1,
                 signature2,
@@ -250,8 +244,6 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 inner_circuit_id
             )
             VALUES (
-                ?,
-                ?,
                 ?,
                 ?,
                 ?,
@@ -284,17 +276,15 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             )
         ",
         )?;
-        for (i, transaction) in block.transactions.iter().enumerate() {
+        for (i, transaction) in block.transactions().iter().enumerate() {
             transaction_query.execute(params![
                 &transaction.id[..],
-                transaction.network.id(),
+                transaction.network_id(),
                 transaction.ledger_digest,
-                &transaction.old_serial_numbers[0],
-                &transaction.old_serial_numbers[1],
+                &transaction.serial_numbers[0],
+                &transaction.serial_numbers[1],
                 &transaction.new_commitments[0],
                 &transaction.new_commitments[1],
-                transaction.program_commitment,
-                transaction.local_data_root,
                 transaction.value_balance.0,
                 &transaction.signatures[0],
                 &transaction.signatures[1],
@@ -406,8 +396,6 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             old_serial_number2,
             new_commitment1,
             new_commitment2,
-            program_commitment,
-            local_data_root,
             value_balance,
             signature1,
             signature2,
@@ -427,16 +415,14 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 id: read_static_blob(row, 0)?,
                 network: Network::from_id(row.get(1)?),
                 ledger_digest: row.get(2)?,
-                old_serial_numbers: vec![row.get(3)?, row.get(4)?],
+                serial_numbers: vec![row.get(3)?, row.get(4)?],
                 new_commitments: vec![row.get(5)?, row.get(6)?],
-                program_commitment: row.get(7)?,
-                local_data_root: row.get(8)?,
-                value_balance: AleoAmount(row.get(9)?),
-                signatures: vec![row.get(10)?, row.get(11)?],
-                new_records: vec![row.get(12)?, row.get(13)?],
-                transaction_proof: row.get(14)?,
-                memorandum: row.get(15)?,
-                inner_circuit_id: row.get(16)?,
+                value_balance: AleoAmount(row.get(7)?),
+                signatures: vec![row.get(8)?, row.get(9)?],
+                new_records: vec![row.get(10)?, row.get(11)?],
+                transaction_proof: row.get(12)?,
+                memorandum: row.get(13)?,
+                inner_circuit_id: row.get(14)?,
             })
         })?;
         Ok(Block {
@@ -553,7 +539,7 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             self.conn
                 .execute(r"UPDATE blocks SET canon_height = NULL WHERE hash = ?", [&last_hash])?;
 
-            let new_last_hash = block.header.previous_block_hash.clone();
+            let new_last_hash = block.previous_block_hash();
             decommitted.push(block);
             if &last_hash == hash {
                 break;
@@ -767,8 +753,6 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             old_serial_number2,
             new_commitment1,
             new_commitment2,
-            program_commitment,
-            local_data_root,
             value_balance,
             signature1,
             signature2,
@@ -786,16 +770,14 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                         id: read_static_blob(row, 0)?,
                         network: Network::from_id(row.get(1)?),
                         ledger_digest: row.get(2)?,
-                        old_serial_numbers: vec![row.get(3)?, row.get(4)?],
+                        serial_numbers: vec![row.get(3)?, row.get(4)?],
                         new_commitments: vec![row.get(5)?, row.get(6)?],
-                        program_commitment: row.get(7)?,
-                        local_data_root: row.get(8)?,
-                        value_balance: AleoAmount(row.get(9)?),
-                        signatures: vec![row.get(10)?, row.get(11)?],
-                        new_records: vec![row.get(12)?, row.get(13)?],
-                        transaction_proof: row.get(14)?,
-                        memorandum: row.get(15)?,
-                        inner_circuit_id: row.get(16)?,
+                        value_balance: AleoAmount(row.get(7)?),
+                        signatures: vec![row.get(8)?, row.get(9)?],
+                        new_records: vec![row.get(10)?, row.get(11)?],
+                        transaction_proof: row.get(12)?,
+                        memorandum: row.get(13)?,
+                        inner_circuit_id: row.get(14)?,
                     })
                 },
             )
@@ -824,14 +806,12 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 r"
         SELECT
             owner,
-            is_dummy,
             value,
             payload,
-            birth_program_id,
-            death_program_id,
+            program_id,
             serial_number_nonce,
-            commitment,
-            commitment_randomness
+            commitment_randomness,
+            commitment
         FROM miner_records
         WHERE commitment = ?
         ",
@@ -842,15 +822,12 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                             .get::<_, String>(0)?
                             .parse()
                             .map_err(|_| rusqlite::Error::InvalidQuery)?,
-                        is_dummy: row.get(1)?,
-                        value: AleoAmount(row.get(2)?),
-                        payload: row.get(3)?,
-                        birth_program_id: row.get(4)?,
-                        death_program_id: row.get(5)?,
-                        serial_number_nonce: row.get(6)?,
-                        commitment: row.get(7)?,
-                        commitment_randomness: row.get(8)?,
-                        serial_number_nonce_randomness: None,
+                        value: AleoAmount(row.get(1)?),
+                        payload: row.get(2)?,
+                        program_id: row.get(3)?,
+                        serial_number_nonce: row.get(4)?,
+                        commitment_randomness: row.get(5)?,
+                        commitment: row.get(6)?,
                         position: None,
                     })
                 },
@@ -866,30 +843,26 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             r"
         INSERT INTO miner_records (
             owner,
-            is_dummy,
             value,
             payload,
-            birth_program_id,
-            death_program_id,
+            program_id,
             serial_number_nonce,
-            commitment,
-            commitment_randomness
+            commitment_randomness,
+            commitment
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?
         )
         ",
         )?;
         for record in records {
             stmt.execute(params![
-                record.owner.to_string(),
-                record.is_dummy,
-                record.value.0,
-                &record.payload,
-                &record.birth_program_id,
-                &record.death_program_id,
-                &record.serial_number_nonce,
-                &record.commitment,
-                &record.commitment_randomness,
+                record.owner().to_string(),
+                record.value().0,
+                &record.payload(),
+                &record.program_id(),
+                &record.serial_number_nonce(),
+                &record.commitment_randomness(),
+                &record.commitment(),
             ])?;
         }
         Ok(())

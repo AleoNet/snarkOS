@@ -153,7 +153,7 @@ pub trait Storage<N: Network>: Send + Sync {
             .await?
             .ok_or_else(|| anyhow!("transaction not found"))?;
         let block = self.get_block(&location.block_hash).await?;
-        if let Some(transaction) = block.transactions.get(location.index as usize) {
+        if let Some(transaction) = block.transactions().get(location.index as usize) {
             Ok(transaction.clone())
         } else {
             Err(anyhow!("missing transaction in block"))

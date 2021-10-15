@@ -75,12 +75,12 @@ pub trait SyncStorage<N: Network> {
     /// Finds a fork path from any applicable canon node within `oldest_fork_threshold` to `hash`.
     fn get_fork_path(&mut self, hash: &Digest, oldest_fork_threshold: usize) -> Result<ForkDescription> {
         let mut side_chain_path = VecDeque::new();
-        let header = self.get_block_header(hash)?;
+        let block = self.get_block(hash)?;
         let canon_height = self.canon_height()?;
-        let mut parent_hash = header.previous_block_hash;
+        let mut previous_block_hash = block.previous_block_hash();
         for _ in 0..=oldest_fork_threshold {
             // check if the part is part of the canon chain
-            match self.get_block_state(&parent_hash)? {
+            match self.get_block_state(&previous_block_hash)? {
                 // This is a canon parent
                 BlockStatus::Committed(block_num) => {
                     // Add the children from the latest block
@@ -99,8 +99,8 @@ pub trait SyncStorage<N: Network> {
                 }
                 // Add to the side_chain_path
                 BlockStatus::Uncommitted => {
-                    side_chain_path.push_front(parent_hash.clone());
-                    parent_hash = self.get_block_header(&parent_hash)?.previous_block_hash;
+                    side_chain_path.push_front(previous_block_hash);
+                    previous_block_hash = self.get_block(&previous_block_hash)?.previous_block_hash();
                 }
                 BlockStatus::Unknown => {
                     return Ok(ForkDescription::Orphan);

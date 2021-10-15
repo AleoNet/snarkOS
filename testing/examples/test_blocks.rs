@@ -61,7 +61,7 @@ async fn mine_blocks(n: u32) -> Result<TestBlocks, ConsensusError> {
         .await?;
 
         txs.push(response.transaction);
-        last_block_header = block.header.clone();
+        last_block_header = block.header().clone();
         blocks.push(block);
     }
 
