@@ -62,10 +62,6 @@ version = "1.3.16"
 optional = true
 features = [ "test" ]
 
-[dependencies.snarkos-parameters]
-path = "../parameters"
-version = "1.3.16"
-
 [dependencies.snarkos-storage]
 path = "../storage"
 version = "1.3.16"

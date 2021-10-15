@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_parameters::GenesisBlock;
 use snarkos_storage::Digest;
-use snarkvm_dpc::{testnet1::instantiated::*, Block, Record, Transaction};
+use snarkvm_dpc::{testnet1::instantiated::*, Block, Network, Record, Transaction};
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 
@@ -48,8 +47,8 @@ pub static ALTERNATIVE_BLOCK_2: Lazy<Block<N>> = Lazy::new(|| Block {
     transactions: DATA.block_2.transactions.clone(),
 });
 
-pub fn genesis() -> Block<Testnet1Transaction> {
-    FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap()
+pub fn genesis<N: Network>() -> Block<Testnet1Transaction> {
+    N::genesis_block().clone()
 }
 
 pub struct TestData {
