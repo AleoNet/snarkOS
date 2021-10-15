@@ -78,8 +78,7 @@ impl ConsensusInner {
                     }
                 },
                 ConsensusMessage::FetchMemoryPool(size) => {
-                    let out: Vec<SerialTransaction> =
-                        self.memory_pool.get_candidates(size).into_iter().cloned().collect();
+                    let out: Vec<Transaction<N>> = self.memory_pool.get_candidates(size).into_iter().cloned().collect();
                     response.send(Box::new(out)).ok();
                 }
                 ConsensusMessage::CreateTransaction(request) => {

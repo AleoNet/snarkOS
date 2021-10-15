@@ -47,7 +47,7 @@ pub fn setup_or_load_parameters<R: Rng + CryptoRng>(
     (ledger_merkle_tree_parameters, dpc)
 }
 
-pub fn generate_test_accounts<R: Rng + CryptoRng>(dpc: &Testnet1DPC, rng: &mut R) -> [Account<Components>; 3] {
+pub fn generate_test_accounts<R: Rng + CryptoRng>(dpc: &Testnet1DPC, rng: &mut R) -> [Account<N>; 3] {
     // TODO (howardwu): Remove DPCScheme<MerkleTreeLedger<S>> usage after decoupling ledger.
     let genesis_account =
         <Testnet1DPC as DPCScheme<DeserializedLedger<'_, Components>>>::create_account(dpc, rng).unwrap();

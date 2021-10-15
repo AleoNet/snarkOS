@@ -14,13 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{any::Any, fmt, net::SocketAddr};
-
-use anyhow::*;
-use snarkos_metrics::{queues, wrapped_mpsc};
-use tokio::sync::oneshot;
-use tracing::log::trace;
-
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
 use crate::{
@@ -29,21 +22,22 @@ use crate::{
     CanonData,
     Digest,
     DigestTree,
-    FixMode,
     ForkDescription,
     Peer,
-    SerialBlock,
-    SerialBlockHeader,
-    SerialRecord,
-    SerialTransaction,
     Storage,
     SyncStorage,
     TransactionLocation,
-    ValidatorError,
 };
+use snarkos_metrics::{queues, wrapped_mpsc};
+use snarkvm_dpc::{Block, BlockHeader, Network, Record, Transaction};
 
-enum Message {
-    InsertBlock(SerialBlock),
+use anyhow::*;
+use std::{any::Any, fmt, marker::PhantomData, net::SocketAddr};
+use tokio::sync::oneshot;
+use tracing::log::trace;
+
+enum Message<N: Network> {
+    InsertBlock(Block<N>),
     DeleteBlock(Digest),
     GetBlockHash(u32),
     GetBlockHeader(Digest),
@@ -66,7 +60,7 @@ enum Message {
     GetTransaction(Digest),
     GetRecordCommitments(Option<usize>),
     GetRecord(Digest),
-    StoreRecords(Vec<SerialRecord>),
+    StoreRecords(Vec<Record<N>>),
     GetCommitments(u32),
     GetSerialNumbers(u32),
     GetMemos(u32),
@@ -77,7 +71,6 @@ enum Message {
     StorePeers(Vec<Peer>),
     LookupPeers(Vec<SocketAddr>),
     FetchPeers(),
-    Validate(Option<u32>, FixMode),
     #[cfg(feature = "test")]
     StoreItem(KeyValueColumn, Vec<u8>, Vec<u8>),
     #[cfg(feature = "test")]
@@ -87,7 +80,7 @@ enum Message {
     Trim(),
 }
 
-impl fmt::Display for Message {
+impl<N: Network> fmt::Display for Message<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Message::InsertBlock(block) => write!(f, "InsertBlock({})", block.header.hash()),
@@ -146,7 +139,6 @@ impl fmt::Display for Message {
             Message::StorePeers(peers) => write!(f, "StorePeers({:?})", peers),
             Message::LookupPeers(addresses) => write!(f, "LookupPeers({:?})", addresses),
             Message::FetchPeers() => write!(f, "FetchPeers()"),
-            Message::Validate(limit, fix_mode) => write!(f, "Validate({:?}, {:?})", limit, fix_mode),
             #[cfg(feature = "test")]
             Message::StoreItem(col, key, value) => write!(f, "StoreItem({:?}, {:?}, {:?})", col, key, value),
             #[cfg(feature = "test")]
@@ -158,20 +150,24 @@ impl fmt::Display for Message {
     }
 }
 
-pub(super) struct Agent<S: SyncStorage + 'static> {
+pub(super) struct Agent<N: Network, S: SyncStorage<N> + 'static> {
     inner: S,
+    _network: PhantomData<N>,
 }
 
-impl<S: SyncStorage + 'static> Agent<S> {
+impl<N: Network, S: SyncStorage<N> + 'static> Agent<N, S> {
     pub(super) fn new(inner: S) -> Self {
-        Agent { inner }
+        Agent {
+            inner,
+            _network: PhantomData,
+        }
     }
 
     fn wrap<T, F: FnOnce(&mut S) -> Result<T>>(&mut self, func: F) -> Result<T> {
         self.inner.transact(func)
     }
 
-    fn handle_message(&mut self, message: Message) -> Box<dyn Any + Send + Sync> {
+    fn handle_message(&mut self, message: Message<N>) -> Box<dyn Any + Send + Sync> {
         trace!("received storage request: {}", message);
         match message {
             Message::InsertBlock(block) => Box::new(self.wrap(move |f| f.insert_block(&block))),
@@ -230,7 +226,7 @@ impl<S: SyncStorage + 'static> Agent<S> {
         }
     }
 
-    fn agent(mut self, mut receiver: wrapped_mpsc::Receiver<MessageWrapper>) {
+    fn agent(mut self, mut receiver: wrapped_mpsc::Receiver<MessageWrapper<N>>) {
         self.inner.init().expect("failed to initialize sync storage");
         while let Some((message, response)) = receiver.blocking_recv() {
             let out = self.handle_message(message);
@@ -239,21 +235,21 @@ impl<S: SyncStorage + 'static> Agent<S> {
     }
 }
 
-type MessageWrapper = (Message, oneshot::Sender<Box<dyn Any + Send + Sync>>);
+type MessageWrapper<N> = (Message<N>, oneshot::Sender<Box<dyn Any + Send + Sync>>);
 
-pub struct AsyncStorage {
-    sender: wrapped_mpsc::Sender<MessageWrapper>,
+pub struct AsyncStorage<N: Network> {
+    sender: wrapped_mpsc::Sender<MessageWrapper<N>>,
 }
 
-impl AsyncStorage {
-    pub fn new<S: SyncStorage + Send + 'static>(inner: S) -> AsyncStorage {
+impl<N: Network> AsyncStorage<N> {
+    pub fn new<S: SyncStorage<N> + Send + 'static>(inner: S) -> AsyncStorage<N> {
         let (sender, receiver) = wrapped_mpsc::channel(queues::STORAGE, 256);
         std::thread::spawn(move || Agent::new(inner).agent(receiver));
         Self { sender }
     }
 
     #[allow(clippy::ok_expect)]
-    async fn send<T: Send + Sync + 'static>(&self, message: Message) -> T {
+    async fn send<T: Send + Sync + 'static>(&self, message: Message<N>) -> T {
         let (sender, receiver) = oneshot::channel();
         self.sender.send((message, sender)).await.ok();
         *receiver
@@ -266,8 +262,8 @@ impl AsyncStorage {
 }
 
 #[async_trait::async_trait]
-impl Storage for AsyncStorage {
-    async fn insert_block(&self, block: &SerialBlock) -> Result<()> {
+impl<N: Network> Storage<N> for AsyncStorage<N> {
+    async fn insert_block(&self, block: &Block<N>) -> Result<()> {
         self.send(Message::InsertBlock(block.clone())).await
     }
 
@@ -279,7 +275,7 @@ impl Storage for AsyncStorage {
         self.send(Message::GetBlockHash(block_num)).await
     }
 
-    async fn get_block_header(&self, hash: &Digest) -> Result<SerialBlockHeader> {
+    async fn get_block_header(&self, hash: &Digest) -> Result<BlockHeader<N>> {
         self.send(Message::GetBlockHeader(hash.clone())).await
     }
 
@@ -291,7 +287,7 @@ impl Storage for AsyncStorage {
         self.send(Message::GetBlockStates(hashes.to_vec())).await
     }
 
-    async fn get_block(&self, hash: &Digest) -> Result<SerialBlock> {
+    async fn get_block(&self, hash: &Digest) -> Result<Block<N>> {
         self.send(Message::GetBlock(hash.clone())).await
     }
 
@@ -312,7 +308,7 @@ impl Storage for AsyncStorage {
         self.send(Message::RecommitBlock(hash.clone())).await
     }
 
-    async fn decommit_blocks(&self, hash: &Digest) -> Result<Vec<SerialBlock>> {
+    async fn decommit_blocks(&self, hash: &Digest) -> Result<Vec<Block<N>>> {
         self.send(Message::DecommitBlocks(hash.clone())).await
     }
 
@@ -357,7 +353,7 @@ impl Storage for AsyncStorage {
         self.send(Message::GetTransactionLocation(transaction_id)).await
     }
 
-    async fn get_transaction(&self, transaction_id: Digest) -> Result<SerialTransaction> {
+    async fn get_transaction(&self, transaction_id: Digest) -> Result<Transaction<N>> {
         self.send(Message::GetTransaction(transaction_id)).await
     }
 
@@ -365,11 +361,11 @@ impl Storage for AsyncStorage {
         self.send(Message::GetRecordCommitments(limit)).await
     }
 
-    async fn get_record(&self, commitment: Digest) -> Result<Option<SerialRecord>> {
+    async fn get_record(&self, commitment: Digest) -> Result<Option<Record<N>>> {
         self.send(Message::GetRecord(commitment)).await
     }
 
-    async fn store_records(&self, records: &[SerialRecord]) -> Result<()> {
+    async fn store_records(&self, records: &[Record<N>]) -> Result<()> {
         self.send(Message::StoreRecords(records.to_vec())).await
     }
 
@@ -400,7 +396,7 @@ impl Storage for AsyncStorage {
             .await
     }
 
-    async fn get_canon_blocks(&self, limit: Option<u32>) -> Result<Vec<SerialBlock>> {
+    async fn get_canon_blocks(&self, limit: Option<u32>) -> Result<Vec<Block<N>>> {
         self.send(Message::GetCanonBlocks(limit)).await
     }
 
@@ -418,10 +414,6 @@ impl Storage for AsyncStorage {
 
     async fn fetch_peers(&self) -> Result<Vec<Peer>> {
         self.send(Message::FetchPeers()).await
-    }
-
-    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {
-        self.send(Message::Validate(limit, fix_mode)).await
     }
 
     #[cfg(feature = "test")]

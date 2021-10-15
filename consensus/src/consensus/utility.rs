@@ -26,7 +26,7 @@ impl Consensus {
     pub async fn create_coinbase_transaction(
         &self,
         block_num: u32,
-        transactions: Vec<SerialTransaction>,
+        transactions: Vec<Transaction<N>>,
         program_vk_hash: Vec<u8>,
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
@@ -48,7 +48,7 @@ impl Consensus {
             }
 
             // Generate a new account that owns the dummy input records
-            let new_account = Account::<Components>::new(
+            let new_account = Account::<N>::new(
                 &consensus.dpc.system_parameters.account_signature,
                 &consensus.dpc.system_parameters.account_commitment,
                 &consensus.dpc.system_parameters.account_encryption,
@@ -57,11 +57,11 @@ impl Consensus {
             .unwrap();
 
             // Generate dummy input records having as address the genesis address.
-            let old_account_private_keys = vec![new_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
-            let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+            let old_account_private_keys = vec![new_account.private_key.clone(); N::NUM_INPUT_RECORDS];
+            let mut old_records = Vec::with_capacity(N::NUM_INPUT_RECORDS);
             let mut joint_serial_numbers = vec![];
 
-            for old_account_private_key in old_account_private_keys.iter().take(Components::NUM_INPUT_RECORDS) {
+            for old_account_private_key in old_account_private_keys.iter().take(N::NUM_INPUT_RECORDS) {
                 let sn_nonce_input: [u8; 4] = rng.gen();
 
                 let old_sn_nonce = <Components as DPCComponents>::SerialNumberNonceCRH::hash(
@@ -91,17 +91,12 @@ impl Consensus {
                 old_records.push(old_record.serialize()?);
             }
 
-            let new_is_dummy_flags = [vec![false], vec![true; Components::NUM_OUTPUT_RECORDS - 1]].concat();
-            let new_values = [vec![total_value_balance.0 as u64], vec![
-                0;
-                Components::NUM_OUTPUT_RECORDS
-                    - 1
-            ]]
-            .concat();
-            let new_payloads = vec![Payload::default(); Components::NUM_OUTPUT_RECORDS];
+            let new_is_dummy_flags = [vec![false], vec![true; N::NUM_OUTPUT_RECORDS - 1]].concat();
+            let new_values = [vec![total_value_balance.0 as u64], vec![0; N::NUM_OUTPUT_RECORDS - 1]].concat();
+            let new_payloads = vec![Payload::default(); N::NUM_OUTPUT_RECORDS];
 
             let mut new_records = vec![];
-            for j in 0..Components::NUM_OUTPUT_RECORDS {
+            for j in 0..N::NUM_OUTPUT_RECORDS {
                 new_records.push(
                     DPCRecord::new_full(
                         &consensus.dpc.system_parameters.serial_number_nonce,
@@ -137,14 +132,14 @@ impl Consensus {
 
     pub fn calculate_joint_serial_numbers(
         &self,
-        records: &[SerialRecord],
+        records: &[Record<N>],
         private_keys: &[PrivateKey],
     ) -> Result<Vec<u8>> {
         assert!(records.len() == private_keys.len());
         let mut joint_serial_numbers = vec![];
 
         for (record, key) in records.iter().zip(private_keys.iter()) {
-            let (sn, _) = <DPCRecord<Components> as VMRecord>::deserialize(record)?
+            let (sn, _) = <DPCRecord<N> as VMRecord>::deserialize(record)?
                 .to_serial_number(&self.dpc.system_parameters.account_signature, key.into_ref())?;
             joint_serial_numbers.extend_from_slice(&to_bytes_le![sn]?);
         }
@@ -158,7 +153,7 @@ impl Consensus {
         new_record_owner: Address,
         value: AleoAmount,
         payload: Payload,
-    ) -> Result<SerialRecord> {
+    ) -> Result<Record<N>> {
         DPCRecord::new_full(
             &self.dpc.system_parameters.serial_number_nonce,
             &self.dpc.system_parameters.record_commitment,

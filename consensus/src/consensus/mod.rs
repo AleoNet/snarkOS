@@ -14,30 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{convert::TryInto, sync::Arc};
-
-use rand::{thread_rng, Rng};
+use crate::{error::ConsensusError, ConsensusParameters, DynLedger, MemoryPool};
 use snarkos_metrics::wrapped_mpsc;
-use snarkos_storage::{Address, Digest, DynStorage, SerialBlock, SerialRecord, SerialTransaction, VMRecord};
+use snarkos_storage::{Address, Digest, DynStorage};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Testnet1DPC},
-        payload::Payload,
-        Record as DPCRecord,
-    },
+    testnet1::instantiated::{Components, Testnet1DPC},
     Account,
-    AccountScheme,
     AleoAmount,
-    DPCComponents,
+    Block,
+    Payload,
     ProgramScheme,
+    Record,
+    Transaction,
 };
 use snarkvm_utilities::{to_bytes_le, ToBytes};
-use tokio::sync::oneshot;
-
-use crate::{error::ConsensusError, ConsensusParameters, DynLedger, MemoryPool};
 
 use anyhow::*;
+use rand::{thread_rng, Rng};
+use std::{convert::TryInto, sync::Arc};
+use tokio::sync::oneshot;
 
 mod inner;
 pub use inner::ConsensusInner;
@@ -49,8 +45,8 @@ mod utility;
 pub struct Consensus {
     pub parameters: ConsensusParameters,
     pub dpc: Arc<Testnet1DPC>,
-    pub storage: DynStorage,
-    genesis_block: SerialBlock,
+    pub storage: DynStorage<N>,
+    genesis_block: Block<N>,
     sender: wrapped_mpsc::Sender<ConsensusMessageWrapped>,
 }
 
@@ -59,9 +55,9 @@ impl Consensus {
     pub async fn new(
         parameters: ConsensusParameters,
         dpc: Arc<Testnet1DPC>,
-        genesis_block: SerialBlock,
+        genesis_block: Block<N>,
         ledger: DynLedger,
-        storage: DynStorage,
+        storage: DynStorage<N>,
         memory_pool: MemoryPool,
     ) -> Arc<Self> {
         let (sender, receiver) = wrapped_mpsc::channel(snarkos_metrics::queues::CONSENSUS, 256);
@@ -110,29 +106,29 @@ impl Consensus {
     }
 
     /// Receives a live transaction (into the memory pool)
-    pub async fn receive_transaction(&self, transaction: SerialTransaction) -> bool {
+    pub async fn receive_transaction(&self, transaction: Transaction<N>) -> bool {
         self.send(ConsensusMessage::ReceiveTransaction(Box::new(transaction)))
             .await
     }
 
     /// Verify a set of transactions
     /// Used for tests and RPC
-    pub async fn verify_transactions(&self, transactions: Vec<SerialTransaction>) -> bool {
+    pub async fn verify_transactions(&self, transactions: Vec<Transaction<N>>) -> bool {
         self.send(ConsensusMessage::VerifyTransactions(transactions)).await
     }
 
     /// Receives any block into consensus
-    pub async fn receive_block(&self, block: SerialBlock) -> bool {
+    pub async fn receive_block(&self, block: Block<N>) -> bool {
         self.send(ConsensusMessage::ReceiveBlock(Box::new(block))).await
     }
 
-    pub async fn shallow_receive_block(&self, block: SerialBlock) -> Result<()> {
+    pub async fn shallow_receive_block(&self, block: Block<N>) -> Result<()> {
         self.storage.insert_block(&block).await?;
         Ok(())
     }
 
     /// Fetches a snapshot of the memory pool
-    pub async fn fetch_memory_pool(&self) -> Vec<SerialTransaction> {
+    pub async fn fetch_memory_pool(&self) -> Vec<Transaction<N>> {
         self.send(ConsensusMessage::FetchMemoryPool(self.parameters.max_block_size))
             .await
     }

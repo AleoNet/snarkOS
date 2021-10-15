@@ -17,26 +17,29 @@
 use std::sync::atomic::AtomicBool;
 
 use snarkos_consensus::{error::ConsensusError, Consensus, CreateTransactionRequest, MineContext, TransactionResponse};
-use snarkos_storage::{PrivateKey, SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
+use snarkos_storage::PrivateKey;
 use snarkvm_dpc::{
     testnet1::{instantiated::*, record::payload::Payload as RecordPayload},
     Account,
     Address,
     AleoAmount,
+    Block,
     DPCComponents,
+    Record,
+    Transaction,
 };
 
 pub async fn mine_block(
     miner: &MineContext,
-    transactions: Vec<SerialTransaction>,
-    parent_block_header: &SerialBlockHeader,
-) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
+    transactions: Vec<Transaction<N>>,
+    parent_block_header: &BlockHeader<N>,
+) -> Result<(Block<N>, Vec<Record<N>>), ConsensusError> {
     let canon_height = miner.consensus.storage.canon().await?.block_height as u32;
     let (transactions, coinbase_records) = miner.establish_block(canon_height + 1, transactions).await?;
 
     let header = miner.find_block(&transactions, parent_block_header, &AtomicBool::new(false))?;
 
-    let block = SerialBlock { header, transactions };
+    let block = Block { header, transactions };
 
     let old_block_height = miner.consensus.storage.canon().await?.block_height;
 
@@ -54,9 +57,9 @@ pub async fn mine_block(
 #[allow(clippy::too_many_arguments)]
 pub async fn send(
     consensus: &Consensus,
-    from: &Account<Components>,
-    inputs: Vec<SerialRecord>,
-    receiver: &Address<Components>,
+    from: &Account<N>,
+    inputs: Vec<Record<N>>,
+    receiver: &Address<N>,
     amount: i64,
     memo: [u8; 32],
 ) -> Result<TransactionResponse, ConsensusError> {
@@ -70,14 +73,14 @@ pub async fn send(
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
 
-    let from: Vec<PrivateKey> = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS]
+    let from: Vec<PrivateKey> = vec![from.private_key.clone(); N::NUM_INPUT_RECORDS]
         .into_iter()
         .map(Into::into)
         .collect();
 
     let joint_serial_numbers = consensus.calculate_joint_serial_numbers(&inputs[..], &from[..])?;
     let mut new_records = vec![];
-    for j in 0..Components::NUM_OUTPUT_RECORDS as u8 {
+    for j in 0..N::NUM_OUTPUT_RECORDS as u8 {
         new_records.push(consensus.make_dummy_record(
             &joint_serial_numbers[..],
             j,

@@ -15,11 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::sync::{create_test_consensus, TestBlocks};
-use rand::{thread_rng, Rng};
-use snarkos_storage::VMBlock;
 use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
 use snarkvm_utilities::FromBytes;
 
+use rand::{thread_rng, Rng};
 use std::{env, fs, io};
 
 pub fn random_storage_path() -> String {
@@ -48,7 +47,7 @@ async fn import_export_blocks() {
 
     for test_block in test_blocks {
         let imported_block: Block<Testnet1Transaction> = FromBytes::read_le(&mut imported_blocks).unwrap();
-        let imported_block = <Block<_> as VMBlock>::serialize(&imported_block).unwrap();
+        let imported_block = <Block<_>>::serialize(&imported_block).unwrap();
         assert_eq!(imported_block, test_block);
     }
 

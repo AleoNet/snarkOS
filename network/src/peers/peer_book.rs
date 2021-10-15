@@ -47,7 +47,7 @@ struct PeerBookRef {
     disconnected_peers: MpmcMap<SocketAddr, Peer>,
     connected_peers: MpmcMap<SocketAddr, PeerHandle>,
     pending_connections: Arc<AtomicU32>,
-    storage: DynStorage,
+    storage: DynStorage<N>,
 }
 
 impl PeerBookRef {
@@ -83,7 +83,7 @@ impl PeerBookRef {
 }
 
 impl PeerBook {
-    pub fn spawn(storage: DynStorage) -> Self {
+    pub fn spawn(storage: DynStorage<N>) -> Self {
         let (sender, receiver) = wrapped_mpsc::channel(snarkos_metrics::queues::PEER_EVENTS, 256);
         let peers = PeerBook {
             disconnected_peers: Default::default(),

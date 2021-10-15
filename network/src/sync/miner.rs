@@ -32,13 +32,13 @@ use crate::{Node, State};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance {
-    miner_address: Address<Components>,
+    miner_address: Address<N>,
     node: Node,
 }
 
 impl MinerInstance {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(miner_address: Address<Components>, node: Node) -> Self {
+    pub fn new(miner_address: Address<N>, node: Node) -> Self {
         Self { miner_address, node }
     }
 

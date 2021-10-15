@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::DynStorage;
+use snarkvm_dpc::Network;
 
 use anyhow::*;
 use tracing::*;
@@ -30,7 +31,7 @@ struct StorageTrimSummary {
 /// Removes obsolete objects from the database; can be used for cleanup purposes, but it can also provide
 /// some insight into the features of the chain, e.g. the number of blocks and transactions that were
 /// ultimately not accepted into the canonical chain.
-pub async fn trim(storage: DynStorage) -> Result<()> {
+pub async fn trim<N: Network>(storage: DynStorage<N>) -> Result<()> {
     info!("Checking for obsolete objects in the storage...");
 
     storage.trim().await?;

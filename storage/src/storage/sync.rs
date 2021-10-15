@@ -14,14 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, net::SocketAddr};
-
-use anyhow::*;
-use hash_hasher::{HashedMap, HashedSet};
-use tracing::{debug, trace};
-
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
+
 use crate::{
     BlockFilter,
     BlockOrder,
@@ -29,21 +24,21 @@ use crate::{
     CanonData,
     Digest,
     DigestTree,
-    FixMode,
     ForkDescription,
     ForkPath,
     Peer,
-    SerialBlock,
-    SerialBlockHeader,
-    SerialRecord,
-    SerialTransaction,
     TransactionLocation,
-    ValidatorError,
 };
+use snarkvm_dpc::{Block, BlockHeader, Network, Record, Transaction};
+
+use anyhow::*;
+use hash_hasher::{HashedMap, HashedSet};
+use std::{collections::VecDeque, net::SocketAddr};
+use tracing::{debug, trace};
 
 /// An application level storage interface
 /// Synchronous version of [`crate::Storage`]
-pub trait SyncStorage {
+pub trait SyncStorage<N: Network> {
     /// Initialization function that will be called before any other functions
     fn init(&mut self) -> Result<()>;
 
@@ -51,7 +46,7 @@ pub trait SyncStorage {
     fn transact<T, F: FnOnce(&mut Self) -> Result<T>>(&mut self, func: F) -> Result<T>;
 
     /// Inserts a block into storage, not committing it.
-    fn insert_block(&mut self, block: &SerialBlock) -> Result<()>;
+    fn insert_block(&mut self, block: &Block<N>) -> Result<()>;
 
     /// Deletes a block from storage, including any associated data. Must not be called on a committed block.
     fn delete_block(&mut self, hash: &Digest) -> Result<()>;
@@ -66,7 +61,7 @@ pub trait SyncStorage {
     }
 
     /// Gets a block header for a given hash
-    fn get_block_header(&mut self, hash: &Digest) -> Result<SerialBlockHeader>;
+    fn get_block_header(&mut self, hash: &Digest) -> Result<BlockHeader<N>>;
 
     /// Gets a block status for a given hash
     fn get_block_state(&mut self, hash: &Digest) -> Result<BlockStatus>;
@@ -75,7 +70,7 @@ pub trait SyncStorage {
     fn get_block_states(&mut self, hashes: &[Digest]) -> Result<Vec<BlockStatus>>;
 
     /// Gets a block header and transaction blob for a given hash.
-    fn get_block(&mut self, hash: &Digest) -> Result<SerialBlock>;
+    fn get_block(&mut self, hash: &Digest) -> Result<Block<N>>;
 
     /// Finds a fork path from any applicable canon node within `oldest_fork_threshold` to `hash`.
     fn get_fork_path(&mut self, hash: &Digest, oldest_fork_threshold: usize) -> Result<ForkDescription> {
@@ -124,7 +119,7 @@ pub trait SyncStorage {
     fn recommit_block(&mut self, hash: &Digest) -> Result<BlockStatus>;
 
     /// Decommits a block and all descendent blocks, returning them in ascending order
-    fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<SerialBlock>>;
+    fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<Block<N>>>;
 
     /// Gets the current canon height of storage
     fn canon_height(&mut self) -> Result<u32>;
@@ -352,7 +347,7 @@ pub trait SyncStorage {
     fn get_transaction_location(&mut self, transaction_id: &Digest) -> Result<Option<TransactionLocation>>;
 
     /// Gets a transaction from a transaction id
-    fn get_transaction(&mut self, transaction_id: &Digest) -> Result<SerialTransaction>;
+    fn get_transaction(&mut self, transaction_id: &Digest) -> Result<Transaction<N>>;
 
     // miner convenience record management functions
 
@@ -360,10 +355,10 @@ pub trait SyncStorage {
     fn get_record_commitments(&mut self, limit: Option<usize>) -> Result<Vec<Digest>>;
 
     /// Gets a record blob given a commitment.
-    fn get_record(&mut self, commitment: &Digest) -> Result<Option<SerialRecord>>;
+    fn get_record(&mut self, commitment: &Digest) -> Result<Option<Record<N>>>;
 
     /// Stores a series of new record blobs and their commitments.
-    fn store_records(&mut self, records: &[SerialRecord]) -> Result<()>;
+    fn store_records(&mut self, records: &[Record<N>]) -> Result<()>;
 
     /// Gets all known commitments for canon chain in block-number ascending order
     fn get_commitments(&mut self, block_start: u32) -> Result<Vec<Digest>>;
@@ -387,7 +382,7 @@ pub trait SyncStorage {
     ) -> Result<()>;
 
     /// Gets a dump of all stored canon blocks, in block-number ascending order. A maintenance function, not intended for general use.
-    fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<SerialBlock>>;
+    fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<Block<N>>>;
 
     /// Similar to `Storage::get_canon_blocks`, gets hashes of all blocks subject to `filter` and `limit` in filter-defined order. A maintenance function, not intended for general use.
     fn get_block_hashes(&mut self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>>;
@@ -397,9 +392,6 @@ pub trait SyncStorage {
     fn lookup_peers(&mut self, addresses: Vec<SocketAddr>) -> Result<Vec<Option<Peer>>>;
 
     fn fetch_peers(&mut self) -> Result<Vec<Peer>>;
-
-    /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
-    fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError>;
 
     /// Stores the given key+value pair in the given column.
     #[cfg(feature = "test")]

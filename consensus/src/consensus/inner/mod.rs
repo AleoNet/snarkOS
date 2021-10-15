@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
+use super::message::{ConsensusMessage, CreateTransactionRequest, TransactionResponse};
 use crate::{
     error::ConsensusError,
     memory_pool::MempoolEntry,
@@ -25,26 +24,14 @@ use crate::{
     DynLedger,
     MemoryPool,
 };
-use anyhow::*;
-use snarkos_storage::{
-    BlockStatus,
-    Digest,
-    DynStorage,
-    ForkDescription,
-    SerialBlock,
-    SerialTransaction,
-    VMTransaction,
-};
-use snarkvm_dpc::{
-    testnet1::{instantiated::Components, Record as DPCRecord, TransactionKernel},
-    DPCScheme,
-};
+use snarkos_storage::{BlockStatus, Digest, DynStorage, ForkDescription};
+use snarkvm_dpc::{testnet1::instantiated::Components, Record};
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::has_duplicates;
 
+use anyhow::*;
 use rand::thread_rng;
-
-use super::message::{ConsensusMessage, CreateTransactionRequest, TransactionResponse};
+use std::sync::Arc;
 
 mod agent;
 mod commit;
@@ -54,7 +41,7 @@ pub struct ConsensusInner {
     pub public: Arc<Consensus>,
     pub ledger: DynLedger,
     pub memory_pool: MemoryPool,
-    pub storage: DynStorage,
+    pub storage: DynStorage<N>,
     pub recommit_taint: Option<u32>, // height of first recommitted block
 }
 
@@ -62,7 +49,7 @@ impl ConsensusInner {
     /// Adds entry to memory pool if valid in the current ledger.
     pub(crate) fn insert_into_mempool(
         &mut self,
-        transaction: SerialTransaction,
+        transaction: Transaction<N>,
     ) -> Result<Option<Digest>, ConsensusError> {
         let transaction_id: Digest = transaction.id.into();
 

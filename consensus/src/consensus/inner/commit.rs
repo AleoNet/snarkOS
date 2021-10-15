@@ -23,7 +23,7 @@ use tokio::task;
 
 impl ConsensusInner {
     /// Receive a block from an external source and process it based on ledger state.
-    pub(super) async fn receive_block(&mut self, block: &SerialBlock) -> Result<(), ConsensusError> {
+    pub(super) async fn receive_block(&mut self, block: &Block<N>) -> Result<(), ConsensusError> {
         self.storage.insert_block(block).await?;
 
         let hash = block.header.hash();
@@ -41,7 +41,7 @@ impl ConsensusInner {
         Ok(())
     }
 
-    pub(super) async fn try_commit_block(&mut self, hash: &Digest, block: &SerialBlock) -> Result<(), ConsensusError> {
+    pub(super) async fn try_commit_block(&mut self, hash: &Digest, block: &Block<N>) -> Result<(), ConsensusError> {
         let canon = self.storage.canon().await?;
 
         match self.storage.get_block_state(&block.header.previous_block_hash).await? {
@@ -145,7 +145,7 @@ impl ConsensusInner {
     pub(super) async fn verify_and_commit_block(
         &mut self,
         hash: &Digest,
-        block: &SerialBlock,
+        block: &Block<N>,
     ) -> Result<(), ConsensusError> {
         let now = std::time::Instant::now();
 
@@ -175,7 +175,7 @@ impl ConsensusInner {
 
     /// Check if the block is valid.
     /// Verify transactions and transaction fees.
-    pub(super) async fn verify_block(&mut self, block: &SerialBlock) -> Result<bool, ConsensusError> {
+    pub(super) async fn verify_block(&mut self, block: &Block<N>) -> Result<bool, ConsensusError> {
         let canon = self.storage.canon().await?;
         // Verify the block header
         if block.header.previous_block_hash != canon.hash {
@@ -300,7 +300,7 @@ impl ConsensusInner {
         )
     }
 
-    async fn inner_commit_block(&mut self, block: &SerialBlock) -> Result<Digest, ConsensusError> {
+    async fn inner_commit_block(&mut self, block: &Block<N>) -> Result<Digest, ConsensusError> {
         let mut commitments = vec![];
         let mut serial_numbers = vec![];
         let mut memos = vec![];
@@ -320,7 +320,7 @@ impl ConsensusInner {
         Ok(digest)
     }
 
-    pub(super) async fn commit_block(&mut self, hash: &Digest, block: &SerialBlock) -> Result<(), ConsensusError> {
+    pub(super) async fn commit_block(&mut self, hash: &Digest, block: &Block<N>) -> Result<(), ConsensusError> {
         let digest = self.inner_commit_block(block).await?;
 
         self.storage.commit_block(hash, digest).await?;

@@ -69,7 +69,7 @@ pub struct InnerNode {
     /// The sync handler of this node.
     pub sync: OnceCell<Arc<Sync>>,
     /// The node's storage.
-    pub storage: DynStorage,
+    pub storage: DynStorage<N>,
     /// The node's start-up timestamp.
     pub launched: DateTime<Utc>,
     /// The tasks spawned by the node.
@@ -118,7 +118,7 @@ impl Node {
 
 impl Node {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config, storage: DynStorage) -> Result<Self, NetworkError> {
+    pub async fn new(config: Config, storage: DynStorage<N>) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
             id: config.node_id.unwrap_or_else(|| thread_rng().gen()),
             state: Default::default(),

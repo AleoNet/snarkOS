@@ -25,13 +25,12 @@ mod miner {
 
     use futures::executor::block_on;
     use snarkos_consensus::{error::ConsensusError, MineContext};
-    use snarkos_storage::{SerialBlockHeader, SerialTransaction};
     use snarkos_testing::{sync::*, wait_until};
     use snarkvm_algorithms::{
         traits::{commitment::CommitmentScheme, encryption::EncryptionScheme, signature::SignatureScheme},
         SNARKError,
     };
-    use snarkvm_dpc::{Address, DPCComponents, PrivateKey};
+    use snarkvm_dpc::{Address, BlockHeader, DPCComponents, PrivateKey, Transaction};
     use snarkvm_posw::{error::PoswError, txids_to_roots};
 
     use rand::{CryptoRng, Rng, SeedableRng};
@@ -51,7 +50,7 @@ mod miner {
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
-    async fn test_find_block(transactions: &[SerialTransaction], parent_header: &SerialBlockHeader) {
+    async fn test_find_block(transactions: &[Transaction<N>], parent_header: &BlockHeader<N>) {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let mut rng = ChaChaRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
 

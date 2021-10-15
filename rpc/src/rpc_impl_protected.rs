@@ -26,17 +26,17 @@ use crate::{
     RpcImpl,
 };
 use snarkos_consensus::{CreatePartialTransactionRequest, CreateTransactionRequest};
-use snarkos_storage::VMRecord;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::{instantiated::Components, EncryptedRecord, Payload, Record as DPCRecord, TransactionKernel},
+    testnet1::{instantiated::Components, RecordCiphertext},
     Account,
     AccountScheme,
     Address,
     DPCComponents,
+    Payload,
     PrivateKey,
     ProgramScheme,
-    RecordScheme as RecordModel,
+    Record,
     ViewKey,
 };
 use snarkvm_utilities::{
@@ -344,14 +344,14 @@ impl ProtectedRpcFunctions for RpcImpl {
     async fn create_account(&self) -> Result<RpcAccount, RpcError> {
         let rng = &mut thread_rng();
 
-        let account = Account::<Components>::new(
+        let account = Account::<N>::new(
             &self.dpc()?.system_parameters.account_signature,
             &self.dpc()?.system_parameters.account_commitment,
             &self.dpc()?.system_parameters.account_encryption,
             rng,
         )?;
 
-        let view_key = ViewKey::<Components>::from_private_key(
+        let view_key = ViewKey::<N>::from_private_key(
             &self.dpc()?.system_parameters.account_signature,
             &self.dpc()?.system_parameters.account_commitment,
             &account.private_key,
@@ -371,22 +371,22 @@ impl ProtectedRpcFunctions for RpcImpl {
         transaction_input: TransactionInputs,
     ) -> Result<CreateRawTransactionOuput, RpcError> {
         assert!(!transaction_input.old_records.is_empty());
-        assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
+        assert!(transaction_input.old_records.len() <= N::NUM_INPUT_RECORDS);
         assert!(!transaction_input.old_account_private_keys.is_empty());
-        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_INPUT_RECORDS);
+        assert!(transaction_input.old_account_private_keys.len() <= N::NUM_INPUT_RECORDS);
         assert!(!transaction_input.recipients.is_empty());
-        assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.recipients.len() <= N::NUM_OUTPUT_RECORDS);
 
         let consensus = &self.node.expect_sync().consensus;
 
         // Fetch birth/death programs
         let program_id = self.dpc()?.noop_program.id();
-        let new_birth_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![program_id.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_birth_program_ids = vec![program_id.clone(); N::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![program_id.clone(); N::NUM_OUTPUT_RECORDS];
 
-        let mut old_account_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        let mut old_account_private_keys = Vec::with_capacity(N::NUM_INPUT_RECORDS);
         for private_key_string in transaction_input.old_account_private_keys {
-            old_account_private_keys.push(PrivateKey::<Components>::from_str(&private_key_string)?);
+            old_account_private_keys.push(PrivateKey::<N>::from_str(&private_key_string)?);
         }
 
         // Decode old records
@@ -394,7 +394,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         let mut old_records = Vec::with_capacity(transaction_input.old_records.len());
         for (i, record_string) in transaction_input.old_records.iter().enumerate() {
             let record_bytes = hex::decode(record_string)?;
-            let old_record = DPCRecord::<Components>::read_le(&record_bytes[..])?;
+            let old_record = DPCRecord::<N>::read_le(&record_bytes[..])?;
 
             let (sn, _) = old_record.to_serial_number(
                 &consensus.dpc.system_parameters.account_signature,
@@ -410,18 +410,18 @@ impl ProtectedRpcFunctions for RpcImpl {
         let sn_randomness: [u8; 32] = thread_rng().gen();
 
         // Fill any unused old_record indices with dummy records
-        while old_records.len() < Components::NUM_INPUT_RECORDS {
+        while old_records.len() < N::NUM_INPUT_RECORDS {
             let old_sn_nonce = self.dpc()?.system_parameters.serial_number_nonce.hash(&sn_randomness)?;
             let private_key = old_account_private_keys[0].clone();
 
-            let address = Address::<Components>::from_private_key(
+            let address = Address::<N>::from_private_key(
                 &self.dpc()?.system_parameters.account_signature,
                 &self.dpc()?.system_parameters.account_commitment,
                 &self.dpc()?.system_parameters.account_encryption,
                 &private_key,
             )?;
 
-            let dummy_record = DPCRecord::<Components>::new(
+            let dummy_record = DPCRecord::<N>::new(
                 &self.dpc()?.system_parameters.record_commitment,
                 address,
                 true, // The input record is dummy
@@ -441,31 +441,31 @@ impl ProtectedRpcFunctions for RpcImpl {
             old_account_private_keys.push(private_key);
         }
 
-        assert_eq!(old_records.len(), Components::NUM_INPUT_RECORDS);
+        assert_eq!(old_records.len(), N::NUM_INPUT_RECORDS);
 
         // Decode new recipient data
-        let mut new_record_owners = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_is_dummy_flags = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
-        let mut new_values = Vec::with_capacity(Components::NUM_OUTPUT_RECORDS);
+        let mut new_record_owners = Vec::with_capacity(N::NUM_OUTPUT_RECORDS);
+        let mut new_is_dummy_flags = Vec::with_capacity(N::NUM_OUTPUT_RECORDS);
+        let mut new_values = Vec::with_capacity(N::NUM_OUTPUT_RECORDS);
         for recipient in transaction_input.recipients {
-            new_record_owners.push(Address::<Components>::from_str(&recipient.address)?);
+            new_record_owners.push(Address::<N>::from_str(&recipient.address)?);
             new_is_dummy_flags.push(false);
             new_values.push(recipient.amount);
         }
 
         // Fill any unused new_record indices with dummy output values
-        while new_record_owners.len() < Components::NUM_OUTPUT_RECORDS {
+        while new_record_owners.len() < N::NUM_OUTPUT_RECORDS {
             new_record_owners.push(new_record_owners[0].clone());
             new_is_dummy_flags.push(true);
             new_values.push(0);
         }
 
-        assert_eq!(new_record_owners.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_is_dummy_flags.len(), Components::NUM_OUTPUT_RECORDS);
-        assert_eq!(new_values.len(), Components::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_record_owners.len(), N::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_is_dummy_flags.len(), N::NUM_OUTPUT_RECORDS);
+        assert_eq!(new_values.len(), N::NUM_OUTPUT_RECORDS);
 
         // Default record payload
-        let new_payloads = vec![Payload::default(); Components::NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![Payload::default(); N::NUM_OUTPUT_RECORDS];
 
         // Decode memo
         let mut memo = [0u8; 32];
@@ -481,7 +481,7 @@ impl ProtectedRpcFunctions for RpcImpl {
         }
 
         let mut new_records = vec![];
-        for j in 0..Components::NUM_OUTPUT_RECORDS {
+        for j in 0..N::NUM_OUTPUT_RECORDS {
             new_records.push(
                 DPCRecord::new_full(
                     &consensus.dpc.system_parameters.serial_number_nonce,
@@ -529,11 +529,11 @@ impl ProtectedRpcFunctions for RpcImpl {
         let rng = &mut thread_rng();
 
         assert!(!transaction_input.old_records.is_empty());
-        assert!(transaction_input.old_records.len() <= Components::NUM_INPUT_RECORDS);
+        assert!(transaction_input.old_records.len() <= N::NUM_INPUT_RECORDS);
         assert!(!transaction_input.old_account_private_keys.is_empty());
-        assert!(transaction_input.old_account_private_keys.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.old_account_private_keys.len() <= N::NUM_OUTPUT_RECORDS);
         assert!(!transaction_input.recipients.is_empty());
-        assert!(transaction_input.recipients.len() <= Components::NUM_OUTPUT_RECORDS);
+        assert!(transaction_input.recipients.len() <= N::NUM_OUTPUT_RECORDS);
 
         let mut builder = TransactionKernelBuilder::new();
 
@@ -543,15 +543,15 @@ impl ProtectedRpcFunctions for RpcImpl {
             .iter()
             .zip_eq(&transaction_input.old_account_private_keys)
         {
-            let record = DPCRecord::<Components>::from_str(record_string)?;
-            let private_key = PrivateKey::<Components>::from_str(private_key_string)?;
+            let record = DPCRecord::<N>::from_str(record_string)?;
+            let private_key = PrivateKey::<N>::from_str(private_key_string)?;
 
             builder = builder.add_input(private_key, record)?;
         }
 
         // Add individual transaction outputs to the transaction kernel builder.
         for recipient in &transaction_input.recipients {
-            let address = Address::<Components>::from_str(&recipient.address)?;
+            let address = Address::<N>::from_str(&recipient.address)?;
 
             builder = builder.add_output(address, recipient.amount)?;
         }
@@ -584,18 +584,18 @@ impl ProtectedRpcFunctions for RpcImpl {
     /// Create a new transaction for a given transaction kernel.
     async fn create_transaction(
         &self,
-        private_keys: [String; Components::NUM_INPUT_RECORDS],
+        private_keys: [String; N::NUM_INPUT_RECORDS],
         transaction_kernel: String,
     ) -> Result<CreateRawTransactionOuput, RpcError> {
         // Decode the private keys
-        let mut old_private_keys = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
+        let mut old_private_keys = Vec::with_capacity(N::NUM_INPUT_RECORDS);
         for private_key in private_keys.iter() {
-            old_private_keys.push(PrivateKey::<Components>::from_str(private_key)?.into());
+            old_private_keys.push(PrivateKey::<N>::from_str(private_key)?.into());
         }
 
         // Decode the transaction kernel
         let transaction_kernel_bytes = hex::decode(transaction_kernel)?;
-        let transaction_kernel = TransactionKernel::<Components>::read_le(&transaction_kernel_bytes[..])?;
+        let transaction_kernel = TransactionKernel::<N>::read_le(&transaction_kernel_bytes[..])?;
 
         let response = self
             .node
@@ -648,10 +648,10 @@ impl ProtectedRpcFunctions for RpcImpl {
     async fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError> {
         // Read the encrypted_record
         let encrypted_record_bytes = hex::decode(decryption_input.encrypted_record)?;
-        let encrypted_record = EncryptedRecord::<Components>::read_le(&encrypted_record_bytes[..])?;
+        let encrypted_record = RecordCiphertext::<N>::read_le(&encrypted_record_bytes[..])?;
 
         // Read the view key
-        let view_key = ViewKey::<Components>::from_str(&decryption_input.account_view_key)?;
+        let view_key = ViewKey::<N>::from_str(&decryption_input.account_view_key)?;
 
         // Decrypt the record ciphertext
         let record = encrypted_record.decrypt(&self.dpc()?.system_parameters, &view_key)?;
@@ -663,7 +663,7 @@ impl ProtectedRpcFunctions for RpcImpl {
     /// Returns information about a record from serialized record bytes.
     async fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError> {
         let record_bytes = hex::decode(record_bytes)?;
-        let record = DPCRecord::<Components>::read_le(&record_bytes[..])?;
+        let record = DPCRecord::<N>::read_le(&record_bytes[..])?;
 
         let owner = record.owner().to_string();
         let payload = RPCRecordPayload {

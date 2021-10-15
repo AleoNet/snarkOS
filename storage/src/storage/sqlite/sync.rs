@@ -14,28 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{convert::TryInto, net::SocketAddr};
+#[cfg(feature = "test")]
+use crate::key_value::KeyValueColumn;
+
+use crate::{BlockFilter, BlockOrder, CanonData, DigestTree, Peer, SyncStorage};
+use snarkvm_dpc::{AleoAmount, Block, BlockHeader, Network, ProofOfSuccinctWork, Record, Transaction};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use hash_hasher::HashedMap;
 use rusqlite::{params, OptionalExtension, Row, ToSql};
-use snarkvm_dpc::{AleoAmount, MerkleRootHash, Network, PedersenMerkleRootHash, ProofOfSuccinctWork};
+use std::{convert::TryInto, net::SocketAddr};
 use tracing::*;
-
-#[cfg(feature = "test")]
-use crate::key_value::KeyValueColumn;
-use crate::{
-    BlockFilter,
-    BlockOrder,
-    CanonData,
-    DigestTree,
-    FixMode,
-    Peer,
-    SerialRecord,
-    SerialTransaction,
-    SyncStorage,
-    ValidatorError,
-};
 
 use super::*;
 
@@ -45,7 +34,7 @@ fn read_static_blob<const S: usize>(row: &Row, index: usize) -> rusqlite::Result
         .map_err(|_| rusqlite::Error::InvalidQuery)
 }
 
-impl SqliteStorage {
+impl<N: Network> SqliteStorage<N> {
     /// Counter used for tracking migrations, incremented on each schema change, and checked in [`migrate`] function below to update schema.
     const SCHEMA_INDEX: u32 = 3;
 
@@ -159,7 +148,7 @@ impl SqliteStorage {
     }
 }
 
-impl SyncStorage for SqliteStorage {
+impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
     fn init(&mut self) -> Result<()> {
         self.conn.execute(
             r"
@@ -186,7 +175,7 @@ impl SyncStorage for SqliteStorage {
         Ok(())
     }
 
-    fn insert_block(&mut self, block: &SerialBlock) -> Result<()> {
+    fn insert_block(&mut self, block: &Block<N>) -> Result<()> {
         self.optimize()?;
         let hash = block.header.hash();
 
@@ -344,7 +333,7 @@ impl SyncStorage for SqliteStorage {
             .map(|x| Digest::from(&x[..])))
     }
 
-    fn get_block_header(&mut self, hash: &Digest) -> Result<SerialBlockHeader> {
+    fn get_block_header(&mut self, hash: &Digest) -> Result<BlockHeader<N>> {
         self.optimize()?;
 
         self.conn
@@ -361,11 +350,11 @@ impl SyncStorage for SqliteStorage {
             FROM blocks WHERE hash = ?",
                 [hash],
                 |row| {
-                    Ok(SerialBlockHeader {
+                    Ok(BlockHeader {
                         previous_block_hash: row.get(0)?,
-                        merkle_root_hash: MerkleRootHash(read_static_blob(row, 1)?),
-                        pedersen_merkle_root_hash: PedersenMerkleRootHash(read_static_blob(row, 2)?),
-                        proof: ProofOfSuccinctWork(read_static_blob(row, 3)?),
+                        merkle_root_hash: N::CommitmentsRoot::read_le(read_static_blob(row, 1)?)?,
+                        pedersen_merkle_root_hash: N::BlockHeaderRoot::from_le(read_static_blob(row, 2)?)?,
+                        proof: ProofOfSuccinctWork::read_le(read_static_blob(row, 3)?)?,
                         time: row.get(4)?,
                         difficulty_target: row.get(5)?,
                         nonce: row.get(6)?,
@@ -404,7 +393,7 @@ impl SyncStorage for SqliteStorage {
         Ok(out)
     }
 
-    fn get_block(&mut self, hash: &Digest) -> Result<SerialBlock> {
+    fn get_block(&mut self, hash: &Digest) -> Result<Block<N>> {
         self.optimize()?;
 
         let header = self.get_block_header(hash)?;
@@ -434,7 +423,7 @@ impl SyncStorage for SqliteStorage {
         ORDER BY transaction_blocks.block_order ASC",
         )?;
         let rows = stmt.query_map([hash], |row| {
-            Ok(SerialTransaction {
+            Ok(Transaction {
                 id: read_static_blob(row, 0)?,
                 network: Network::from_id(row.get(1)?),
                 ledger_digest: row.get(2)?,
@@ -450,7 +439,7 @@ impl SyncStorage for SqliteStorage {
                 inner_circuit_id: row.get(16)?,
             })
         })?;
-        Ok(SerialBlock {
+        Ok(Block {
             header,
             transactions: rows.collect::<rusqlite::Result<_>>()?,
         })
@@ -537,7 +526,7 @@ impl SyncStorage for SqliteStorage {
         self.get_block_state(hash)
     }
 
-    fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<SerialBlock>> {
+    fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<Block<N>>> {
         self.optimize()?;
 
         match self.get_block_state(hash)? {
@@ -764,7 +753,7 @@ impl SyncStorage for SqliteStorage {
             .map_err(Into::into)
     }
 
-    fn get_transaction(&mut self, transaction_id: &Digest) -> Result<SerialTransaction> {
+    fn get_transaction(&mut self, transaction_id: &Digest) -> Result<Transaction<N>> {
         self.optimize()?;
 
         self.conn
@@ -793,7 +782,7 @@ impl SyncStorage for SqliteStorage {
         ",
                 [transaction_id],
                 |row| {
-                    Ok(SerialTransaction {
+                    Ok(Transaction {
                         id: read_static_blob(row, 0)?,
                         network: Network::from_id(row.get(1)?),
                         ledger_digest: row.get(2)?,
@@ -829,7 +818,7 @@ impl SyncStorage for SqliteStorage {
         Ok(digests)
     }
 
-    fn get_record(&mut self, commitment: &Digest) -> Result<Option<SerialRecord>> {
+    fn get_record(&mut self, commitment: &Digest) -> Result<Option<Record<N>>> {
         self.conn
             .query_row(
                 r"
@@ -848,7 +837,7 @@ impl SyncStorage for SqliteStorage {
         ",
                 [commitment],
                 |row| {
-                    Ok(SerialRecord {
+                    Ok(Record {
                         owner: row
                             .get::<_, String>(0)?
                             .parse()
@@ -870,7 +859,7 @@ impl SyncStorage for SqliteStorage {
             .map_err(Into::into)
     }
 
-    fn store_records(&mut self, records: &[SerialRecord]) -> Result<()> {
+    fn store_records(&mut self, records: &[Record<N>]) -> Result<()> {
         self.optimize()?;
 
         let mut stmt = self.conn.prepare_cached(
@@ -1002,7 +991,7 @@ impl SyncStorage for SqliteStorage {
         unimplemented!()
     }
 
-    fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<SerialBlock>> {
+    fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<Block<N>>> {
         self.optimize()?;
 
         let digests = self.get_block_hashes(limit, BlockFilter::CanonOnly(BlockOrder::Unordered))?;
@@ -1270,11 +1259,6 @@ impl SyncStorage for SqliteStorage {
         })?;
 
         Ok(query.collect::<Result<Vec<_>, rusqlite::Error>>()?)
-    }
-
-    fn validate(&mut self, _limit: Option<u32>, _fix_mode: FixMode) -> Vec<ValidatorError> {
-        warn!("called validator on sqlite, which is a NOP");
-        vec![]
     }
 
     #[cfg(feature = "test")]

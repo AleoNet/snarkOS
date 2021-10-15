@@ -15,9 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::DynStorage;
+use snarkvm_dpc::Network;
+
 use anyhow::*;
 
-pub async fn migrate(from: &DynStorage, to: &DynStorage) -> Result<()> {
+pub async fn migrate<N: Network>(from: &DynStorage<N>, to: &DynStorage<N>) -> Result<()> {
     let blocks = from.get_canon_blocks(None).await?;
 
     // transfer blocks

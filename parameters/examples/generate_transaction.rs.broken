@@ -83,7 +83,7 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
     };
     let public_parameters = <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(false)?;
 
-    let recipient = AccountAddress::<Components>::from_str(&recipient)?;
+    let recipient = AccountAddress::<N>::from_str(&recipient)?;
 
     let crh_parameters = <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes()?[..])
         .expect("read bytes as hash for MerkleParameters in ledger");
@@ -126,9 +126,9 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
 
     // Generate dummy input records
 
-    let old_account_private_keys = vec![dummy_account.private_key.clone(); Components::NUM_INPUT_RECORDS];
-    let mut old_records = Vec::with_capacity(Components::NUM_INPUT_RECORDS);
-    for i in 0..Components::NUM_INPUT_RECORDS {
+    let old_account_private_keys = vec![dummy_account.private_key.clone(); N::NUM_INPUT_RECORDS];
+    let mut old_records = Vec::with_capacity(N::NUM_INPUT_RECORDS);
+    for i in 0..N::NUM_INPUT_RECORDS {
         let old_sn_nonce = consensus
             .public_parameters
             .system_parameters
@@ -150,16 +150,16 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
 
     // Construct new records
 
-    let new_record_owners = vec![recipient; Components::NUM_OUTPUT_RECORDS];
-    let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
-    let new_birth_program_ids = vec![noop_program_id.clone(); Components::NUM_OUTPUT_RECORDS];
-    let new_death_program_ids = vec![noop_program_id; Components::NUM_OUTPUT_RECORDS];
+    let new_record_owners = vec![recipient; N::NUM_OUTPUT_RECORDS];
+    let new_payloads = vec![RecordPayload::default(); N::NUM_OUTPUT_RECORDS];
+    let new_birth_program_ids = vec![noop_program_id.clone(); N::NUM_OUTPUT_RECORDS];
+    let new_death_program_ids = vec![noop_program_id; N::NUM_OUTPUT_RECORDS];
 
     let mut new_is_dummy_flags = vec![false];
-    new_is_dummy_flags.extend(vec![true; Components::NUM_OUTPUT_RECORDS - 1]);
+    new_is_dummy_flags.extend(vec![true; N::NUM_OUTPUT_RECORDS - 1]);
 
     let mut new_values = vec![value];
-    new_values.extend(vec![0; Components::NUM_OUTPUT_RECORDS - 1]);
+    new_values.extend(vec![0; N::NUM_OUTPUT_RECORDS - 1]);
 
     // Memo is a dummy for now
 

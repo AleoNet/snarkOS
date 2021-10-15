@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_storage::VMRecord;
-use snarkvm_dpc::testnet1::instantiated::{Testnet1DPC, Testnet1Transaction};
+use snarkvm_dpc::{testnet1::Testnet1DPC, Transaction};
 use tokio::task;
 
 use crate::DeserializedLedger;
@@ -23,7 +22,7 @@ use crate::DeserializedLedger;
 use super::*;
 
 impl ConsensusInner {
-    pub(super) async fn receive_transaction(&mut self, transaction: Box<SerialTransaction>) -> bool {
+    pub(super) async fn receive_transaction(&mut self, transaction: Box<Transaction<N>>) -> bool {
         if transaction.value_balance.is_negative() {
             error!("Received a transaction that was a coinbase transaction");
             return false;
@@ -59,7 +58,7 @@ impl ConsensusInner {
     /// Check if the transactions are valid.
     pub(super) async fn verify_transactions(
         &mut self,
-        transactions: Vec<SerialTransaction>,
+        transactions: Vec<Transaction<N>>,
     ) -> Result<bool, ConsensusError> {
         let consensus = self.public.clone();
         self.push_recommit_taint().await?;
@@ -86,7 +85,7 @@ impl ConsensusInner {
 
             let verification_result = consensus
                 .dpc
-                .verify_transactions(&deserialized[..], &ledger.deserialize::<Components>());
+                .verify_transactions(&deserialized[..], &ledger.deserialize::<N>());
 
             (ledger, Ok(verification_result))
         })
@@ -114,12 +113,12 @@ impl ConsensusInner {
             request
                 .old_records
                 .iter()
-                .map(|x| <DPCRecord<Components> as VMRecord>::deserialize(x))
+                .map(|x| <DPCRecord<N> as VMRecord>::deserialize(x))
                 .collect::<Result<Vec<_>, _>>()?,
             request
                 .new_records
                 .into_iter()
-                .map(|x| DPCRecord::<Components>::deserialize(&x))
+                .map(|x| DPCRecord::<N>::deserialize(&x))
                 .collect::<Result<Vec<_>>>()?,
             request.memo,
             &mut rng,
@@ -134,7 +133,7 @@ impl ConsensusInner {
             &old_private_keys,
             transaction_kernel,
             program_proofs,
-            &self.ledger.deserialize::<Components>(),
+            &self.ledger.deserialize::<N>(),
             &mut rng,
         )?;
 
@@ -155,7 +154,7 @@ impl ConsensusInner {
 
         let mut rng = thread_rng();
         // Offline execution to generate a DPC transaction
-        let transaction_kernel: Box<TransactionKernel<Components>> = request
+        let transaction_kernel: Box<TransactionKernel<N>> = request
             .kernel
             .downcast()
             .expect("illegal kernel passed to create partial transaction");
@@ -170,7 +169,7 @@ impl ConsensusInner {
             &old_private_keys,
             *transaction_kernel,
             program_proofs,
-            &self.ledger.deserialize::<Components>(),
+            &self.ledger.deserialize::<N>(),
             &mut rng,
         )?;
 

@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_consensus::{ConsensusParameters, MemoryPool};
-use snarkos_storage::VMBlock;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     testnet1::instantiated::{Components, Testnet1Transaction},
@@ -68,7 +67,7 @@ pub async fn create_test_consensus() -> Arc<snarkos_consensus::Consensus> {
     let genesis_block: Block<Testnet1Transaction> = genesis();
     let ledger = FIXTURE_VK.ledger();
 
-    let genesis_block = <Block<Testnet1Transaction> as VMBlock>::serialize(&genesis_block).unwrap();
+    let genesis_block = genesis_block.to_bytes_le().unwrap();
     let consensus = snarkos_consensus::Consensus::new(
         TEST_CONSENSUS_PARAMS.clone(),
         FIXTURE.dpc.clone(),

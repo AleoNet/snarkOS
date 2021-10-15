@@ -20,7 +20,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use snarkos_storage::{BlockStatus, Digest, VMBlock};
+use snarkos_storage::{BlockStatus, Digest};
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, Transaction},
     Block,
@@ -110,7 +110,7 @@ impl Node {
         let now = Instant::now();
 
         let (block, block_struct) = task::spawn_blocking(move || {
-            let deserialized = match Block::<Transaction<Components>>::deserialize(&block) {
+            let deserialized = match Block::<Transaction<N>>::deserialize(&block) {
                 Ok(block) => block,
                 Err(error) => {
                     error!(
@@ -121,7 +121,7 @@ impl Node {
                 }
             };
 
-            let block_struct = <Block<Transaction<Components>> as VMBlock>::serialize(&deserialized)?;
+            let block_struct = <Block<Transaction<N>>>::serialize(&deserialized)?;
 
             Ok((block, block_struct))
         })

@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{message::*, NetworkError, Node};
-use snarkos_storage::VMTransaction;
 use snarkvm_dpc::testnet1::instantiated::Testnet1Transaction;
 use snarkvm_utilities::bytes::{FromBytes, ToBytes};
 

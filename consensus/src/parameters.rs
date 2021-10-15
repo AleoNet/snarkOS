@@ -16,11 +16,11 @@
 
 use crate::{difficulty::bitcoin_retarget, error::ConsensusError, DeserializedLedger};
 use snarkos_profiler::{end_timer, start_timer};
-use snarkos_storage::SerialBlockHeader;
 use snarkvm_algorithms::SNARK;
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::{
     testnet1::instantiated::{Components, Testnet1DPC},
+    BlockHeader,
     DPCComponents,
     DPCScheme,
     MerkleRootHash,
@@ -55,7 +55,7 @@ pub struct ConsensusParameters {
 
 impl ConsensusParameters {
     /// Calculate the difficulty for the next block based off how long it took to mine the last one.
-    pub fn get_block_difficulty(&self, prev_header: &SerialBlockHeader, block_timestamp: i64) -> u64 {
+    pub fn get_block_difficulty(&self, prev_header: &BlockHeader<N>, block_timestamp: i64) -> u64 {
         bitcoin_retarget(
             block_timestamp,
             prev_header.time,
@@ -73,8 +73,8 @@ impl ConsensusParameters {
     /// 6. The nonce is within the limit.
     pub fn verify_header(
         &self,
-        header: &SerialBlockHeader,
-        parent_header: &SerialBlockHeader,
+        header: &BlockHeader<N>,
+        parent_header: &BlockHeader<N>,
         merkle_root_hash: &MerkleRootHash,
         pedersen_merkle_root_hash: &PedersenMerkleRootHash,
     ) -> Result<(), ConsensusError> {
@@ -131,8 +131,8 @@ impl ConsensusParameters {
     ) -> Result<Vec<<Testnet1DPC as DPCScheme<DeserializedLedger<'a, Components>>>::Execution>, ConsensusError> {
         let local_data = transaction_kernel.into_local_data();
 
-        let mut program_proofs = Vec::with_capacity(Components::NUM_TOTAL_RECORDS);
-        for position in 0..Components::NUM_TOTAL_RECORDS {
+        let mut program_proofs = Vec::with_capacity(N::NUM_TOTAL_RECORDS);
+        for position in 0..N::NUM_TOTAL_RECORDS {
             program_proofs.push(dpc.noop_program.execute(&local_data, position as u8, rng)?);
         }
 

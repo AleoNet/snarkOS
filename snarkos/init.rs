@@ -24,9 +24,7 @@ use snarkos_storage::{
     AsyncStorage,
     DynStorage,
     RocksDb,
-    SerialBlock,
     SqliteStorage,
-    VMBlock,
 };
 
 use snarkvm_algorithms::{MerkleParameters, CRH, SNARK};
@@ -46,11 +44,11 @@ use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::{fs, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
-pub fn init_ephemeral_storage() -> anyhow::Result<DynStorage> {
+pub fn init_ephemeral_storage() -> anyhow::Result<DynStorage<N>> {
     Ok(Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral()?)))
 }
 
-pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>> {
+pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage<N>>> {
     let mut path = config.node.dir.clone();
     path.push(&config.node.db);
 
@@ -59,7 +57,7 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>>
     }
 
     info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-    let storage: DynStorage = {
+    let storage: DynStorage<N> = {
         let mut sqlite_path = path.clone();
         sqlite_path.push("sqlite.db");
 
@@ -78,7 +76,7 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>>
         if rocks_identity_path.exists() {
             info!("Empty sqlite DB with existing rocksdb found, migrating...");
             let rocks_storage = RocksDb::open(&path)?;
-            let rocks_storage: DynStorage = Arc::new(AsyncStorage::new(KeyValueStore::new(rocks_storage)));
+            let rocks_storage: DynStorage<N> = Arc::new(AsyncStorage::new(KeyValueStore::new(rocks_storage)));
 
             snarkos_storage::migrate(&rocks_storage, &storage).await?;
         }
@@ -124,7 +122,7 @@ pub async fn init_storage(config: &Config) -> anyhow::Result<Option<DynStorage>>
     Ok(Some(storage))
 }
 
-pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<Sync> {
+pub async fn init_sync(config: &Config, storage: DynStorage<N>) -> anyhow::Result<Sync> {
     let memory_pool = MemoryPool::new(); // from_storage(&storage).await?;
 
     debug!("Loading Aleo parameters...");
@@ -173,7 +171,6 @@ pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<S
     )?));
 
     let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
-    let genesis_block: SerialBlock = <Block<Testnet1Transaction> as VMBlock>::serialize(&genesis_block)?;
 
     let consensus = Consensus::new(
         consensus_params,
@@ -201,7 +198,7 @@ pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<S
         let mut processed = 0usize;
         let mut imported = 0usize;
         while let Ok(block) = Block::<Testnet1Transaction>::read_le(&mut blocks) {
-            let block = <Block<Testnet1Transaction> as VMBlock>::serialize(&block)?;
+            let block = block.to_bytes_le()?;
             // Skip possible duplicate blocks etc.
             if consensus.receive_block(block).await {
                 imported += 1;
@@ -227,7 +224,7 @@ pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<S
     Ok(sync)
 }
 
-pub async fn init_node(config: &Config, storage: DynStorage) -> anyhow::Result<Node> {
+pub async fn init_node(config: &Config, storage: DynStorage<N>) -> anyhow::Result<Node> {
     let address = format!("{}:{}", config.node.ip, config.node.port);
     let desired_address = address.parse::<SocketAddr>()?;
 
@@ -248,7 +245,7 @@ pub async fn init_node(config: &Config, storage: DynStorage) -> anyhow::Result<N
     Ok(node)
 }
 
-pub fn init_rpc(config: &Config, node: Node, storage: DynStorage) -> anyhow::Result<()> {
+pub fn init_rpc(config: &Config, node: Node, storage: DynStorage<N>) -> anyhow::Result<()> {
     let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
         .parse()
         .expect("Invalid RPC server address!");
@@ -268,7 +265,7 @@ pub fn init_rpc(config: &Config, node: Node, storage: DynStorage) -> anyhow::Res
 }
 
 pub fn init_miner(config: &Config, node: Node) {
-    match Address::<Components>::from_str(&config.miner.miner_address) {
+    match Address::<N>::from_str(&config.miner.miner_address) {
         Ok(miner_address) => {
             let handle = MinerInstance::new(miner_address, node.clone()).spawn();
             node.register_task(handle);

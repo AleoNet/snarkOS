@@ -14,23 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::*;
-use std::{net::SocketAddr, sync::Arc};
-
 #[cfg(feature = "test")]
 use crate::key_value::KeyValueColumn;
-use crate::{
-    Digest,
-    DigestTree,
-    FixMode,
-    Peer,
-    SerialBlock,
-    SerialBlockHeader,
-    SerialRecord,
-    SerialTransaction,
-    TransactionLocation,
-    ValidatorError,
-};
+
+use crate::{Digest, DigestTree, Peer, TransactionLocation};
+use snarkvm_dpc::{Block, BlockHeader, Network, Record, Transaction};
+
+use anyhow::*;
+use std::{net::SocketAddr, sync::Arc};
 
 /// Current state of a block in storage
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -90,9 +81,9 @@ pub enum BlockOrder {
 /// An application level storage interface
 /// Requires atomicity within each method implementation, but doesn't require any kind of consistency between invocations other than call-order enforcement.
 #[async_trait::async_trait]
-pub trait Storage: Send + Sync {
+pub trait Storage<N: Network>: Send + Sync {
     /// Inserts a block into storage, not committing it.
-    async fn insert_block(&self, block: &SerialBlock) -> Result<()>;
+    async fn insert_block(&self, block: &Block<N>) -> Result<()>;
 
     /// Deletes a block from storage, including any associated data. Must not be called on a committed block.
     async fn delete_block(&self, hash: &Digest) -> Result<()>;
@@ -101,7 +92,7 @@ pub trait Storage: Send + Sync {
     async fn get_block_hash(&self, block_num: u32) -> Result<Option<Digest>>;
 
     /// Gets a block header for a given hash
-    async fn get_block_header(&self, hash: &Digest) -> Result<SerialBlockHeader>;
+    async fn get_block_header(&self, hash: &Digest) -> Result<BlockHeader<N>>;
 
     /// Gets a block status for a given hash
     async fn get_block_state(&self, hash: &Digest) -> Result<BlockStatus>;
@@ -110,7 +101,7 @@ pub trait Storage: Send + Sync {
     async fn get_block_states(&self, hashes: &[Digest]) -> Result<Vec<BlockStatus>>;
 
     /// Gets a block header and transaction blob for a given hash.
-    async fn get_block(&self, hash: &Digest) -> Result<SerialBlock>;
+    async fn get_block(&self, hash: &Digest) -> Result<Block<N>>;
 
     /// Finds a fork path from any applicable canon node within `oldest_fork_threshold` to `hash`.
     async fn get_fork_path(&self, hash: &Digest, oldest_fork_threshold: usize) -> Result<ForkDescription>;
@@ -125,7 +116,7 @@ pub trait Storage: Send + Sync {
     async fn recommit_block(&self, hash: &Digest) -> Result<BlockStatus>;
 
     /// Decommits a block and all descendent blocks, returning them in ascending order
-    async fn decommit_blocks(&self, hash: &Digest) -> Result<Vec<SerialBlock>>;
+    async fn decommit_blocks(&self, hash: &Digest) -> Result<Vec<Block<N>>>;
 
     /// Gets the current canon state of storage
     async fn canon(&self) -> Result<CanonData>;
@@ -156,7 +147,7 @@ pub trait Storage: Send + Sync {
     async fn get_transaction_location(&self, transaction_id: Digest) -> Result<Option<TransactionLocation>>;
 
     /// Gets a transaction from a transaction id
-    async fn get_transaction(&self, transaction_id: Digest) -> Result<SerialTransaction> {
+    async fn get_transaction(&self, transaction_id: Digest) -> Result<Transaction<N>> {
         let location = self
             .get_transaction_location(transaction_id)
             .await?
@@ -175,10 +166,10 @@ pub trait Storage: Send + Sync {
     async fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Digest>>;
 
     /// Gets a record blob given a commitment.
-    async fn get_record(&self, commitment: Digest) -> Result<Option<SerialRecord>>;
+    async fn get_record(&self, commitment: Digest) -> Result<Option<Record<N>>>;
 
     /// Stores a series of new record blobs and their commitments.
-    async fn store_records(&self, records: &[SerialRecord]) -> Result<()>;
+    async fn store_records(&self, records: &[Record<N>]) -> Result<()>;
 
     /// Gets all known commitments for canon chain in block-number ascending order
     async fn get_commitments(&self, block_start: u32) -> Result<Vec<Digest>>;
@@ -202,7 +193,7 @@ pub trait Storage: Send + Sync {
     ) -> Result<()>;
 
     /// Gets a dump of all stored canon blocks, in block-number ascending order. A maintenance function, not intended for general use.
-    async fn get_canon_blocks(&self, limit: Option<u32>) -> Result<Vec<SerialBlock>>;
+    async fn get_canon_blocks(&self, limit: Option<u32>) -> Result<Vec<Block<N>>>;
 
     /// Similar to `Storage::get_canon_blocks`, gets hashes of all blocks subject to `filter` and `limit` in filter-defined order. A maintenance function, not intended for general use.
     async fn get_block_hashes(&self, limit: Option<u32>, filter: BlockFilter) -> Result<Vec<Digest>>;
@@ -215,9 +206,6 @@ pub trait Storage: Send + Sync {
 
     /// Looks up all known [`Peer`]s.
     async fn fetch_peers(&self) -> Result<Vec<Peer>>;
-
-    /// Performs low-level storage validation; it's mostly intended for test purposes, as there is a lower level `KeyValueStorage` interface available outside of them.
-    async fn validate(&self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError>;
 
     /// Stores the given key+value pair in the given column.
     #[cfg(feature = "test")]
@@ -235,4 +223,4 @@ pub trait Storage: Send + Sync {
 }
 
 /// A wrapper over storage implementations
-pub type DynStorage = Arc<dyn Storage>;
+pub type DynStorage<N> = Arc<dyn Storage<N>>;

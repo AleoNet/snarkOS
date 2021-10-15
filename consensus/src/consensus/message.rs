@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::any::Any;
+use snarkos_storage::PrivateKey;
+use snarkvm_dpc::{Block, Record, Transaction};
 
-use snarkos_storage::{PrivateKey, SerialBlock, SerialRecord, SerialTransaction};
+use std::any::Any;
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
 pub struct CreateTransactionRequest {
-    pub old_records: Vec<SerialRecord>,
+    pub old_records: Vec<Record<N>>,
     pub old_account_private_keys: Vec<PrivateKey>,
-    pub new_records: Vec<SerialRecord>,
+    pub new_records: Vec<Record<N>>,
     pub memo: [u8; 32],
 }
 pub struct CreatePartialTransactionRequest {
@@ -33,14 +34,14 @@ pub struct CreatePartialTransactionRequest {
 }
 
 pub struct TransactionResponse {
-    pub records: Vec<SerialRecord>,
-    pub transaction: SerialTransaction,
+    pub records: Vec<Record<N>>,
+    pub transaction: Transaction<N>,
 }
 
 pub(super) enum ConsensusMessage {
-    ReceiveTransaction(Box<SerialTransaction>),
-    VerifyTransactions(Vec<SerialTransaction>),
-    ReceiveBlock(Box<SerialBlock>),
+    ReceiveTransaction(Box<Transaction<N>>),
+    VerifyTransactions(Vec<Transaction<N>>),
+    ReceiveBlock(Box<Block<N>>),
     FetchMemoryPool(usize), // max size of memory pool to fetch
     CreateTransaction(Box<CreateTransactionRequest>),
     CreatePartialTransaction(CreatePartialTransactionRequest),

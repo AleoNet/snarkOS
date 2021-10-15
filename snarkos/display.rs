@@ -74,7 +74,7 @@ fn render_welcome(config: &Config) -> String {
 
     let mut is_miner = config.miner.is_miner;
     if is_miner {
-        match Address::<Components>::from_str(&config.miner.miner_address) {
+        match Address::<N>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
                 output += &format!("Your Aleo address is {}.\n\n", miner_address)
                     .bold()

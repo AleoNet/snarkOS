@@ -15,9 +15,17 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, Consensus};
-use snarkos_storage::{SerialBlock, SerialBlockHeader, SerialRecord, SerialTransaction};
 use snarkvm_algorithms::SNARKError;
-use snarkvm_dpc::{testnet1::instantiated::*, Address, BlockHeader, BlockHeaderHash, DPCComponents, ProgramScheme};
+use snarkvm_dpc::{
+    testnet1::instantiated::*,
+    Address,
+    Block,
+    BlockHeader,
+    DPCComponents,
+    ProgramScheme,
+    Record,
+    Transaction,
+};
 use snarkvm_posw::{error::PoswError, txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{to_bytes_le, ToBytes};
 
@@ -41,13 +49,13 @@ lazy_static::lazy_static! {
 #[derive(Clone)]
 pub struct MineContext {
     /// The coinbase address that mining rewards are assigned to.
-    address: Address<Components>,
+    address: Address<N>,
     /// The sync parameters for the network of this miner.
     pub consensus: Arc<Consensus>,
 }
 
 impl MineContext {
-    pub async fn prepare(address: Address<Components>, consensus: Arc<Consensus>) -> Result<Self, ConsensusError> {
+    pub async fn prepare(address: Address<N>, consensus: Arc<Consensus>) -> Result<Self, ConsensusError> {
         Ok(Self { address, consensus })
     }
 
@@ -55,12 +63,12 @@ impl MineContext {
     async fn add_coinbase_transaction(
         &self,
         block_number: u32,
-        transactions: &mut Vec<SerialTransaction>,
-    ) -> Result<Vec<SerialRecord>, ConsensusError> {
+        transactions: &mut Vec<Transaction<N>>,
+    ) -> Result<Vec<Record<N>>, ConsensusError> {
         let program_vk_hash = self.consensus.dpc.noop_program.id();
 
-        let new_birth_programs = vec![program_vk_hash.clone(); Components::NUM_OUTPUT_RECORDS];
-        let new_death_programs = vec![program_vk_hash.clone(); Components::NUM_OUTPUT_RECORDS];
+        let new_birth_programs = vec![program_vk_hash.clone(); N::NUM_OUTPUT_RECORDS];
+        let new_death_programs = vec![program_vk_hash.clone(); N::NUM_OUTPUT_RECORDS];
 
         for transaction in transactions.iter() {
             if self.consensus.parameters.network_id != transaction.network {
@@ -80,7 +88,7 @@ impl MineContext {
                 program_vk_hash,
                 new_birth_programs,
                 new_death_programs,
-                vec![self.address.clone(); Components::NUM_OUTPUT_RECORDS]
+                vec![self.address.clone(); N::NUM_OUTPUT_RECORDS]
                     .into_iter()
                     .map(|x| x.into())
                     .collect(),
@@ -96,8 +104,8 @@ impl MineContext {
     pub async fn establish_block(
         &self,
         block_number: u32,
-        mut transactions: Vec<SerialTransaction>,
-    ) -> Result<(Vec<SerialTransaction>, Vec<SerialRecord>), ConsensusError> {
+        mut transactions: Vec<Transaction<N>>,
+    ) -> Result<(Vec<Transaction<N>>, Vec<Record<N>>), ConsensusError> {
         let coinbase_records = self.add_coinbase_transaction(block_number, &mut transactions).await?;
 
         // Verify transactions
@@ -114,10 +122,10 @@ impl MineContext {
     /// Returns BlockHeader with nonce solution.
     pub fn find_block(
         &self,
-        transactions: &[SerialTransaction],
-        parent_header: &SerialBlockHeader,
+        transactions: &[Transaction<N>],
+        parent_header: &BlockHeader<N>,
         terminator: &AtomicBool,
-    ) -> Result<SerialBlockHeader, ConsensusError> {
+    ) -> Result<BlockHeader<N>, ConsensusError> {
         let txids = transactions.iter().map(|x| x.id).collect::<Vec<_>>();
         let (merkle_root_hash, pedersen_merkle_root_hash, subroots) = txids_to_roots(&txids);
 
@@ -152,7 +160,7 @@ impl MineContext {
         };
 
         Ok(BlockHeader {
-            previous_block_hash: BlockHeaderHash(parent_header.hash().bytes().unwrap()),
+            previous_block_hash: N::BlockHash::read_le(parent_header.hash().bytes().unwrap())?,
             merkle_root_hash,
             pedersen_merkle_root_hash,
             time,
@@ -165,10 +173,7 @@ impl MineContext {
 
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
-    pub async fn mine_block(
-        &self,
-        terminator: Arc<AtomicBool>,
-    ) -> Result<(SerialBlock, Vec<SerialRecord>), ConsensusError> {
+    pub async fn mine_block(&self, terminator: Arc<AtomicBool>) -> Result<(Block<N>, Vec<Record<N>>), ConsensusError> {
         let candidate_transactions = self.consensus.fetch_memory_pool().await;
 
         let canon = self.consensus.storage.canon().await?;
@@ -197,7 +202,7 @@ impl MineContext {
 
         debug!("Miner@{}: found a block", canon.block_height);
 
-        let block = SerialBlock { header, transactions };
+        let block = Block { header, transactions };
 
         //todo: remove this
         self.consensus.receive_block(block.clone()).await;

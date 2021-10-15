@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::{BlockStatus, Digest, TransactionLocation};
+use snarkvm_dpc::Network;
+
 use anyhow::*;
 use rusqlite::{
     types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
@@ -22,24 +25,25 @@ use rusqlite::{
     ToSql,
 };
 use std::{
+    marker::PhantomData,
     path::Path,
     time::{Duration, Instant},
 };
 
-use crate::{BlockStatus, Digest, SerialBlock, SerialBlockHeader, TransactionLocation};
-
 mod sync;
 
-pub struct SqliteStorage {
+pub struct SqliteStorage<N: Network> {
     conn: Connection,
     last_optimize: Instant,
+    _network: PhantomData<N>,
 }
 
-impl SqliteStorage {
+impl<N: Network> SqliteStorage<N> {
     pub fn new_ephemeral() -> Result<Self> {
         Ok(Self {
             conn: Connection::open_in_memory()?,
             last_optimize: Instant::now(),
+            _network: PhantomData,
         })
     }
 
@@ -50,6 +54,7 @@ impl SqliteStorage {
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
             )?,
             last_optimize: Instant::now(),
+            _network: PhantomData,
         })
     }
 

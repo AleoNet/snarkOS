@@ -34,7 +34,7 @@ use snarkvm_utilities::FromBytes;
 use std::sync::Arc;
 
 // Initialize a test blockchain
-pub fn initialize_test_blockchain() -> (DynStorage, DynLedger) {
+pub fn initialize_test_blockchain() -> (DynStorage<N>, DynLedger) {
     let ledger_parameters = {
         type Parameters = <Components as Testnet1Components>::MerkleParameters;
         let parameters: <<Parameters as MerkleParameters>::H as CRH>::Parameters =

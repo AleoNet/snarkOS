@@ -20,14 +20,14 @@
 
 use crate::error::ConsensusError;
 use indexmap::{IndexMap, IndexSet};
-use snarkos_storage::{Digest, SerialTransaction};
-use snarkvm_dpc::BlockHeader;
+use snarkos_storage::Digest;
+use snarkvm_dpc::{BlockHeader, Transaction};
 
 /// Stores a transaction and it's size in the memory pool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MempoolEntry {
     pub(crate) size_in_bytes: usize,
-    pub(crate) transaction: SerialTransaction,
+    pub(crate) transaction: Transaction<N>,
 }
 
 /// Stores transactions received by the server.
@@ -52,7 +52,7 @@ impl MemoryPool {
     }
 
     /// Removes transaction from memory pool based on the transaction id.
-    pub fn remove(&mut self, transaction_id: &Digest) -> Result<Option<SerialTransaction>, ConsensusError> {
+    pub fn remove(&mut self, transaction_id: &Digest) -> Result<Option<Transaction<N>>, ConsensusError> {
         match self.transactions.remove(transaction_id) {
             Some(entry) => {
                 for commitment in &entry.transaction.new_commitments {
@@ -75,7 +75,7 @@ impl MemoryPool {
     }
 
     /// Get candidate transactions for a new block.
-    pub fn get_candidates(&self, max_size: usize) -> Vec<&SerialTransaction> {
+    pub fn get_candidates(&self, max_size: usize) -> Vec<&Transaction<N>> {
         let max_size = max_size - (BLOCK_HEADER_SIZE + COINBASE_TRANSACTION_SIZE);
 
         let mut block_size = 0;

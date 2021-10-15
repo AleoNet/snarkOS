@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_storage::{BlockStatus, VMBlock};
+use snarkos_storage::BlockStatus;
 use snarkvm_utilities::to_bytes_le;
 use tokio::time::sleep;
 
@@ -164,7 +164,7 @@ async fn block_responder_side() {
         unreachable!();
     };
     let block: Block<Testnet1Transaction> = snarkvm_dpc::Block::deserialize(&block).unwrap();
-    let block = <_ as VMBlock>::serialize(&block).unwrap();
+    let block = block.to_bytes_le().unwrap();
 
     assert_eq!(block, block_struct_1);
 }

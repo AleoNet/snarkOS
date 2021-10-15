@@ -19,7 +19,6 @@ use snarkos_parameters::transaction_1::Transaction1;
 use snarkvm_dpc::{
     testnet1::{instantiated::Components, Testnet1Components, Transaction},
     BlockHeader,
-    BlockHeaderHash,
     MerkleRootHash,
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
@@ -64,7 +63,7 @@ pub fn store(path: &Path, bytes: &[u8]) -> IoResult<()> {
 }
 
 fn main() {
-    let bytes = generate::<Components>().unwrap();
+    let bytes = generate::<N>().unwrap();
     let filename = PathBuf::from("block_header.genesis");
     store(&filename, &bytes).unwrap();
 }

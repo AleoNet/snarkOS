@@ -16,13 +16,13 @@ Currently, all serialized formats are defined exclusively by snarkVM to maintain
 
 All of the following types:
 
-`SerialBlock`, `SerialTransaction`, `SerialBlockHeader`, `SerialRecord`
+`Block<N>`, `Transaction<N>`, `BlockHeader<N>`, `Record<N>`
 
 are subject to the following serialization/deserialization stages
 
-* `snarkvm_dpc::*::Block<?>` -> `SerialBlock` -> raw bytes
-* `snarkvm_dpc::*::Transaction<?>` -> `SerialTransaction` -> raw bytes
-* `snarkvm_dpc::*::BlockHeader` -> `SerialBlockHeader` -> raw bytes
-* `snarkvm_dpc::*::Record<?>` -> `SerialRecord` -> raw bytes
+* `snarkvm_dpc::*::Block<?>` -> `Block<N>` -> raw bytes
+* `snarkvm_dpc::*::Transaction<?>` -> `Transaction<N>` -> raw bytes
+* `snarkvm_dpc::*::BlockHeader` -> `BlockHeader<N>` -> raw bytes
+* `snarkvm_dpc::*::Record<?>` -> `Record<N>` -> raw bytes
 
 In practice, until a new serialization format is implemented, there is some conversion back and forth as needed.

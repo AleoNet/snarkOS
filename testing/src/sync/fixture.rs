@@ -22,9 +22,10 @@ use snarkos_consensus::{DynLedger, MerkleLedger};
 use snarkos_storage::{AsyncStorage, DynStorage, SqliteStorage};
 use snarkvm_algorithms::{MerkleParameters, CRH};
 use snarkvm_dpc::{
-    testnet1::{instantiated::*, NoopProgram, Testnet1Components},
+    testnet1::{instantiated::*, NoopProgram},
     Account,
     Block,
+    Network,
 };
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
@@ -38,17 +39,17 @@ pub static FIXTURE: Lazy<Fixture> = Lazy::new(|| setup(false));
 pub static FIXTURE_VK: Lazy<Fixture> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
-pub struct Fixture {
+pub struct Fixture<N: Network> {
     pub dpc: Arc<Testnet1DPC>,
-    pub test_accounts: [Account<Components>; 3],
+    pub test_accounts: [Account<N>; 3],
     pub ledger_parameters: Arc<CommitmentMerkleParameters>,
     pub genesis_block: Block<Testnet1Transaction>,
-    pub program: NoopProgram<Components>,
+    pub program: NoopProgram<N>,
     pub rng: ChaChaRng,
 }
 
-impl Fixture {
-    pub fn storage(&self) -> DynStorage {
+impl<N: Network> Fixture<N> {
+    pub fn storage(&self) -> DynStorage<N> {
         Arc::new(AsyncStorage::new(SqliteStorage::new_ephemeral().unwrap()))
     }
 
@@ -67,7 +68,7 @@ impl Fixture {
     }
 }
 
-fn setup(verify_only: bool) -> Fixture {
+fn setup<N: Network>(verify_only: bool) -> Fixture<N> {
     let mut rng = ChaChaRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH

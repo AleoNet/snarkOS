@@ -19,7 +19,6 @@ mod protected_rpc_tests {
     use snarkos_consensus::Consensus;
     use snarkos_network::Node;
     use snarkos_rpc::*;
-    use snarkos_storage::VMTransaction;
     use snarkos_testing::{
         network::{test_config, test_node, ConsensusSetup, TestSetup},
         sync::*,
@@ -29,11 +28,11 @@ mod protected_rpc_tests {
     use snarkvm_dpc::{
         testnet1::{
             instantiated::{Components, Testnet1Transaction},
-            record::Record as DPCRecord,
             TransactionKernel,
         },
         Address,
         PrivateKey,
+        Record,
         ViewKey,
     };
     use snarkvm_utilities::{
@@ -210,7 +209,7 @@ mod protected_rpc_tests {
 
         let record_info = record_info["result"].clone();
 
-        let owner: Address<Components> = record.owner.clone().into();
+        let owner: Address<N> = record.owner.clone().into();
         let owner = owner.to_string();
         let is_dummy = record.is_dummy;
         let value = record.value.0;
@@ -319,7 +318,7 @@ mod protected_rpc_tests {
 
         for record_value in result["encoded_records"].as_array().unwrap() {
             let record_bytes = hex::decode(record_value.as_str().unwrap()).unwrap();
-            let _record: DPCRecord<Components> = FromBytes::read_le(&record_bytes[..]).unwrap();
+            let _record: DPCRecord<N> = FromBytes::read_le(&record_bytes[..]).unwrap();
         }
 
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
@@ -370,8 +369,7 @@ mod protected_rpc_tests {
         let result = extracted["result"].clone();
 
         let transaction_kernel_bytes = hex::decode(result.as_str().unwrap()).unwrap();
-        let _transaction_kernel: TransactionKernel<Components> =
-            FromBytes::read_le(&transaction_kernel_bytes[..]).unwrap();
+        let _transaction_kernel: TransactionKernel<N> = FromBytes::read_le(&transaction_kernel_bytes[..]).unwrap();
     }
 
     #[tokio::test]
@@ -412,7 +410,7 @@ mod protected_rpc_tests {
 
         for record_value in result["encoded_records"].as_array().unwrap() {
             let record_bytes = hex::decode(record_value.as_str().unwrap()).unwrap();
-            let _record: DPCRecord<Components> = FromBytes::read_le(&record_bytes[..]).unwrap();
+            let _record: DPCRecord<N> = FromBytes::read_le(&record_bytes[..]).unwrap();
         }
 
         let transaction_string = result["encoded_transaction"].as_str().unwrap();
@@ -435,8 +433,8 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = Address::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<N>::from_str(&account.private_key).unwrap();
+        let _address = Address::<N>::from_str(&account.address).unwrap();
 
         let request = format!("{{ \"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"{}\" }}", method);
         let response = rpc.handle_request(&request, meta).await.unwrap();
@@ -445,8 +443,8 @@ mod protected_rpc_tests {
 
         let account: RpcAccount = serde_json::from_value(extracted["result"].clone()).unwrap();
 
-        let _private_key = PrivateKey::<Components>::from_str(&account.private_key).unwrap();
-        let _address = Address::<Components>::from_str(&account.address).unwrap();
+        let _private_key = PrivateKey::<N>::from_str(&account.private_key).unwrap();
+        let _address = Address::<N>::from_str(&account.address).unwrap();
     }
 
     #[tokio::test]

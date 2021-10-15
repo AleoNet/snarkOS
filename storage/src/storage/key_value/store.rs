@@ -14,21 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryInto,
-    net::SocketAddr,
-};
-
-use anyhow::*;
-use snarkvm_dpc::{
-    testnet1::{instantiated::Components, Record},
-    BlockHeaderHash,
-    StorageError,
-};
-use snarkvm_utilities::{has_duplicates, FromBytes, ToBytes};
-use tracing::debug;
-
+use super::KEY_BEST_BLOCK_NUMBER;
 use crate::{
     key_value::{KeyValueColumn, KEY_CURR_CM_INDEX, KEY_CURR_MEMO_INDEX, KEY_CURR_SN_INDEX},
     BlockFilter,
@@ -36,29 +22,35 @@ use crate::{
     BlockStatus,
     CanonData,
     Digest,
-    FixMode,
     KeyValueStorage,
     Peer,
-    SerialBlock,
-    SerialBlockHeader,
-    SerialRecord,
-    SerialTransaction,
+    StorageError,
     SyncStorage,
     TransactionLocation,
-    VMRecord,
-    Validator,
-    ValidatorError,
 };
+use snarkvm_dpc::{Block, BlockHeader, Network, Record, Transaction};
+use snarkvm_utilities::{has_duplicates, FromBytes, ToBytes};
 
-use super::KEY_BEST_BLOCK_NUMBER;
+use anyhow::*;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+    marker::PhantomData,
+    net::SocketAddr,
+};
+use tracing::debug;
 
-pub struct KeyValueStore<S: KeyValueStorage + Validator + 'static> {
+pub struct KeyValueStore<N: Network, S: KeyValueStorage + 'static> {
     inner: Option<S>, // the option is only for the purposes of validation, which requires ownership
+    _network: PhantomData<N>,
 }
 
-impl<S: KeyValueStorage + Validator + 'static> KeyValueStore<S> {
+impl<N: Network, S: KeyValueStorage + 'static> KeyValueStore<N, S> {
     pub fn new(inner: S) -> Self {
-        KeyValueStore { inner: Some(inner) }
+        KeyValueStore {
+            inner: Some(inner),
+            _network: PhantomData,
+        }
     }
 
     fn inner(&mut self) -> &mut S {
@@ -103,7 +95,7 @@ impl<S: KeyValueStorage + Validator + 'static> KeyValueStore<S> {
 
         let serializing = new_children
             .iter()
-            .map(|x| Some(BlockHeaderHash(x.bytes()?)))
+            .map(|x| Some(N::BlockHash::read_le(&x.bytes()?)?))
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| anyhow!("invalid block header length"))?;
 
@@ -119,7 +111,7 @@ impl<S: KeyValueStorage + Validator + 'static> KeyValueStore<S> {
         sn_index: &mut u32,
         cm_index: &mut u32,
         memo_index: &mut u32,
-        transaction: &SerialTransaction,
+        transaction: &Transaction<N>,
     ) -> Result<Vec<(Digest, u32)>> {
         let mut commitments = vec![];
         // we are leaving validation to the ledger
@@ -157,7 +149,7 @@ impl<S: KeyValueStorage + Validator + 'static> KeyValueStore<S> {
         sn_index: &mut u32,
         cm_index: &mut u32,
         memo_index: &mut u32,
-        transaction: &SerialTransaction,
+        transaction: &Transaction<N>,
     ) -> Result<()> {
         for serial in transaction.old_serial_numbers.iter() {
             self.inner().delete(KeyValueColumn::SerialNumber, &serial[..])?;
@@ -191,7 +183,7 @@ impl<S: KeyValueStorage + Validator + 'static> KeyValueStore<S> {
     }
 }
 
-impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> {
+impl<N: Network, S: KeyValueStorage + 'static> SyncStorage<N> for KeyValueStore<N, S> {
     fn init(&mut self) -> Result<()> {
         Ok(())
     }
@@ -200,13 +192,13 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         Ok(self
             .inner()
             .get(KeyValueColumn::ChildHashes, &hash[..])?
-            .map(|x| bincode::deserialize::<'_, Vec<BlockHeaderHash>>(&x[..]))
+            .map(|x| bincode::deserialize::<'_, Vec<N::BlockHash>>(&x[..]))
             .transpose()?
             .map(|x| x.into_iter().map(|x| x.0[..].into()).collect())
             .unwrap_or_else(Vec::new))
     }
 
-    fn insert_block(&mut self, block: &SerialBlock) -> Result<()> {
+    fn insert_block(&mut self, block: &Block<N>) -> Result<()> {
         let hash = block.header.hash();
         match self.get_block_state(&hash)? {
             BlockStatus::Unknown => (),
@@ -294,12 +286,12 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         Ok(hash)
     }
 
-    fn get_block_header(&mut self, hash: &Digest) -> Result<SerialBlockHeader> {
+    fn get_block_header(&mut self, hash: &Digest) -> Result<BlockHeader<N>> {
         let header = self
             .inner()
             .get(KeyValueColumn::BlockHeader, &hash[..])?
             .ok_or_else(|| anyhow!("block header missing"))?;
-        let header = SerialBlockHeader::read_le(&mut &header[..])?;
+        let header = BlockHeader::<N>::read_le(&mut &header[..])?;
         Ok(header)
     }
 
@@ -328,14 +320,14 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
             .collect::<Result<Vec<_>>>()
     }
 
-    fn get_block(&mut self, hash: &Digest) -> Result<SerialBlock> {
+    fn get_block(&mut self, hash: &Digest) -> Result<Block<N>> {
         let header = self.get_block_header(hash)?;
         let raw_transactions = self
             .inner()
             .get(KeyValueColumn::BlockTransactions, &hash[..])?
             .ok_or_else(|| anyhow!("missing transactions for block"))?;
-        let transactions = SerialBlock::read_transactions(&mut &raw_transactions[..])?;
-        Ok(SerialBlock { header, transactions })
+        let transactions = Block::<N>::read_transactions(&mut &raw_transactions[..])?;
+        Ok(Block { header, transactions })
     }
 
     fn canon_height(&mut self) -> Result<u32> {
@@ -370,13 +362,13 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         }
     }
 
-    fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<SerialBlock>> {
+    fn get_canon_blocks(&mut self, limit: Option<u32>) -> Result<Vec<Block<N>>> {
         let index = self.inner().get_column(KeyValueColumn::BlockIndex)?
             .into_iter()
             .filter(|(key, _)| key.len() == 4) // only interested in block index -> block hash maps
             .map(|(key, value)| (Self::read_u32(&key[..]).expect("invalid key"), value[..].into()))
             .collect::<Vec<(u32, Digest)>>();
-        let mut blocks: HashMap<u32, SerialBlock> = HashMap::new();
+        let mut blocks: HashMap<u32, Block<N>> = HashMap::new();
         let mut max_block_number = 0u32;
         for (block_number, hash) in index {
             if let Some(limit) = limit {
@@ -507,7 +499,7 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         Ok(BlockStatus::Committed(new_best_block_number as usize))
     }
 
-    fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<SerialBlock>> {
+    fn decommit_blocks(&mut self, hash: &Digest) -> Result<Vec<Block<N>>> {
         match self.get_block_state(hash)? {
             BlockStatus::Committed(_) => (),
             _ => return Err(anyhow!("attempted to decommit uncommitted block")),
@@ -635,18 +627,18 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         Ok(out)
     }
 
-    fn get_record(&mut self, commitment: &Digest) -> Result<Option<SerialRecord>> {
+    fn get_record(&mut self, commitment: &Digest) -> Result<Option<Record<N>>> {
         let raw = self.inner().get(KeyValueColumn::Records, &commitment[..])?;
         match raw {
             None => Ok(None),
             Some(record) => {
-                let record = Record::<Components>::read_le(&mut &record[..])?;
-                Ok(Some(<Record<Components> as VMRecord>::serialize(&record)?))
+                let record = Record::<N>::read_le(&mut &record[..])?;
+                Ok(Some(record.to_bytes_le()?))
             }
         }
     }
 
-    fn store_records(&mut self, records: &[SerialRecord]) -> Result<()> {
+    fn store_records(&mut self, records: &[Record<N>]) -> Result<()> {
         for record in records {
             let mut record_data = vec![];
             record.write_le(&mut record_data)?;
@@ -683,18 +675,6 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         unimplemented!()
     }
 
-    fn validate(&mut self, limit: Option<u32>, fix_mode: FixMode) -> Vec<ValidatorError> {
-        let errors = if let Some(inner) = std::mem::take(&mut self.inner) {
-            let (errors, inner) = futures::executor::block_on(inner.validate(limit, fix_mode));
-            self.inner = Some(inner);
-            errors
-        } else {
-            unreachable!()
-        };
-
-        errors
-    }
-
     #[cfg(feature = "test")]
     fn store_item(&mut self, col: KeyValueColumn, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         self.inner().store(col, &key, &value)
@@ -705,7 +685,7 @@ impl<S: KeyValueStorage + Validator + 'static> SyncStorage for KeyValueStore<S> 
         self.inner().delete(col, &key)
     }
 
-    fn get_transaction(&mut self, transaction_id: &Digest) -> Result<SerialTransaction> {
+    fn get_transaction(&mut self, transaction_id: &Digest) -> Result<Transaction<N>> {
         let location = self
             .get_transaction_location(transaction_id)?
             .ok_or_else(|| anyhow!("transaction not found"))?;

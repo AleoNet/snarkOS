@@ -18,13 +18,13 @@ mod consensus_integration {
     use std::sync::atomic::AtomicBool;
 
     use snarkos_consensus::miner::MineContext;
-    use snarkos_storage::{SerialBlockHeader, SerialTransaction};
     use snarkos_testing::sync::*;
+    use snarkvm_dpc::{BlockHeader, Transaction};
     use snarkvm_posw::txids_to_roots;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
-    async fn test_find_block(transactions: &[SerialTransaction], parent_header: &SerialBlockHeader) {
+    async fn test_find_block(transactions: &[Transaction<N>], parent_header: &BlockHeader<N>) {
         let consensus = snarkos_testing::sync::create_test_consensus().await;
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = MineContext::prepare(miner_address, consensus.clone()).await.unwrap();

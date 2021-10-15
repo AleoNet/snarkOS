@@ -16,26 +16,29 @@
 
 #![allow(clippy::needless_lifetimes)]
 
-pub mod exporter;
-pub use exporter::*;
-
-pub mod trim;
-pub use trim::*;
-
-pub mod storage;
-pub use storage::*;
-
-pub mod objects;
-pub use objects::*;
+#[macro_use]
+extern crate thiserror;
 
 pub mod digest;
 pub use digest::*;
 
-pub mod validator;
-pub use validator::*;
+pub mod errors;
+pub use errors::*;
+
+pub mod exporter;
+pub use exporter::*;
 
 pub mod migrate;
 pub use migrate::*;
+
+pub mod objects;
+pub use objects::*;
+
+pub mod storage;
+pub use storage::*;
+
+pub mod trim;
+pub use trim::*;
 
 /// The number of block hashes that are returned by the `Ledger::get_block_locator_hashes` call.
 pub const NUM_LOCATOR_HASHES: u32 = 64;

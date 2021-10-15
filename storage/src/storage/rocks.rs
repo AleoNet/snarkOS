@@ -17,8 +17,8 @@
 use crate::{
     key_value::{KeyValueColumn, Value},
     KeyValueStorage,
+    StorageError,
 };
-use snarkvm_dpc::errors::StorageError;
 
 use anyhow::*;
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, IteratorMode, Options, WriteBatch, DB};

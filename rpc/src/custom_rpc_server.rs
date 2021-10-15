@@ -62,7 +62,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 15] = [
 /// RPC failures do not affect the rest of the node.
 pub fn start_rpc_server(
     rpc_addr: SocketAddr,
-    storage: DynStorage,
+    storage: DynStorage<N>,
     node_server: Node,
     username: Option<String>,
     password: Option<String>,

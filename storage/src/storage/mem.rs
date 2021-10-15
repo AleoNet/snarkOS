@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::borrow::Cow;
-
 use crate::{
     key_value::{KeyValueColumn, Value},
     KeyValueStorage,
 };
+
 use anyhow::*;
 use indexmap::IndexMap;
+use std::borrow::Cow;
 
 type Store = IndexMap<KeyValueColumn, IndexMap<Vec<u8>, Vec<u8>>>;
 

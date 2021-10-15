@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::*;
-use snarkvm_utilities::ToBytes;
-use tracing::*;
-
-use std::{fs, io::BufWriter, path::Path};
-
 use crate::DynStorage;
+use snarkvm_dpc::Network;
+use snarkvm_utilities::ToBytes;
+
+use anyhow::*;
+use std::{fs, io::BufWriter, path::Path};
+use tracing::*;
 
 /// Serializes the node's stored canon blocks into a single file written to `location`; `limit` specifies the limit
 /// on the number of blocks to export, with None being no limit (a full export). Returns the number of exported
 /// blocks.
-pub async fn export_canon_blocks(
-    storage: DynStorage,
+pub async fn export_canon_blocks<N: Network>(
+    storage: DynStorage<N>,
     limit: Option<u32>,
     location: &Path,
 ) -> Result<usize, anyhow::Error> {

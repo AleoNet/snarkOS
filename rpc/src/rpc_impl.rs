@@ -21,10 +21,11 @@
 use crate::{error::RpcError, rpc_trait::RpcFunctions, rpc_types::*};
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use serde::{de::DeserializeOwned, Serialize};
+
 use snarkos_consensus::{get_block_reward, ConsensusParameters};
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
-use snarkos_storage::{BlockStatus, Digest, DynStorage, VMTransaction};
+use snarkos_storage::{BlockStatus, Digest, DynStorage};
 use snarkvm_dpc::{
     testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
     TransactionScheme,
@@ -34,6 +35,7 @@ use snarkvm_utilities::{
     to_bytes_le,
     CanonicalSerialize,
 };
+
 use std::future::Future;
 
 use chrono::Utc;
@@ -57,7 +59,7 @@ impl Deref for RpcImpl {
 #[doc(hidden)]
 pub struct RpcInner {
     /// Blockchain database storage.
-    pub(crate) storage: DynStorage,
+    pub(crate) storage: DynStorage<N>,
 
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
@@ -68,7 +70,7 @@ pub struct RpcInner {
 
 impl RpcImpl {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(storage: DynStorage, credentials: Option<RpcCredentials>, node: Node) -> Self {
+    pub fn new(storage: DynStorage<N>, credentials: Option<RpcCredentials>, node: Node) -> Self {
         Self(Arc::new(RpcInner {
             storage,
             credentials,
