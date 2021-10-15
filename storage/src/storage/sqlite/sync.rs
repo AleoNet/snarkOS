@@ -19,6 +19,7 @@ use crate::key_value::KeyValueColumn;
 
 use crate::{BlockFilter, BlockOrder, CanonData, DigestTree, Peer, SyncStorage};
 use snarkvm_dpc::{AleoAmount, Block, BlockHeader, Network, ProofOfSuccinctWork, Record, Transaction};
+use snarkvm_utilities::ToBytes;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use hash_hasher::HashedMap;
@@ -53,7 +54,7 @@ impl<N: Network> SqliteStorage<N> {
                 proof BLOB NOT NULL,
                 time INTEGER NOT NULL,
                 difficulty_target INTEGER NOT NULL,
-                nonce INTEGER NOT NULL
+                nonce BLOB NOT NULL
             );
             CREATE INDEX previous_block_id_lookup ON blocks(previous_block_id);
             CREATE INDEX previous_block_hash_lookup ON blocks(previous_block_hash);
@@ -64,13 +65,11 @@ impl<N: Network> SqliteStorage<N> {
                 transaction_id BLOB UNIQUE NOT NULL,
                 network INTEGER NOT NULL,
                 ledger_digest BLOB NOT NULL,
-                old_serial_number1 BLOB NOT NULL,
-                old_serial_number2 BLOB NOT NULL,
-                new_commitment1 BLOB NOT NULL,
-                new_commitment2 BLOB NOT NULL,
+                serial_number_0 BLOB NOT NULL,
+                serial_number_1 BLOB NOT NULL,
+                commitment_0 BLOB NOT NULL,
+                commitment_1 BLOB NOT NULL,
                 value_balance INTEGER NOT NULL,
-                signature1 BLOB NOT NULL,
-                signature2 BLOB NOT NULL,
                 new_record1 BLOB NOT NULL,
                 new_record2 BLOB NOT NULL,
                 proof BLOB NOT NULL,
@@ -230,13 +229,11 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 transaction_id,
                 network,
                 ledger_digest,
-                old_serial_number1,
-                old_serial_number2,
-                new_commitment1,
-                new_commitment2,
+                serial_number_0,
+                serial_number_1,
+                commitment_0,
+                commitment_1,
                 value_balance,
-                signature1,
-                signature2,
                 new_record1,
                 new_record2,
                 proof,
@@ -244,8 +241,6 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 inner_circuit_id
             )
             VALUES (
-                ?,
-                ?,
                 ?,
                 ?,
                 ?,
@@ -286,8 +281,6 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 &transaction.new_commitments[0],
                 &transaction.new_commitments[1],
                 transaction.value_balance.0,
-                &transaction.signatures[0],
-                &transaction.signatures[1],
                 &transaction.new_records[0],
                 &transaction.new_records[1],
                 &transaction.transaction_proof[..],
@@ -392,13 +385,11 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             transactions.transaction_id,
             network,
             ledger_digest,
-            old_serial_number1,
-            old_serial_number2,
-            new_commitment1,
-            new_commitment2,
+            serial_number_0,
+            serial_number_1,
+            commitment_0,
+            commitment_1,
             value_balance,
-            signature1,
-            signature2,
             new_record1,
             new_record2,
             transactions.proof,
@@ -418,11 +409,9 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                 serial_numbers: vec![row.get(3)?, row.get(4)?],
                 new_commitments: vec![row.get(5)?, row.get(6)?],
                 value_balance: AleoAmount(row.get(7)?),
-                signatures: vec![row.get(8)?, row.get(9)?],
-                new_records: vec![row.get(10)?, row.get(11)?],
-                transaction_proof: row.get(12)?,
-                memorandum: row.get(13)?,
-                inner_circuit_id: row.get(14)?,
+                transaction_proof: row.get(8)?,
+                memorandum: row.get(9)?,
+                inner_circuit_id: row.get(10)?,
             })
         })?;
         Ok(Block {
@@ -749,13 +738,11 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             transactions.transaction_id,
             network,
             ledger_digest,
-            old_serial_number1,
-            old_serial_number2,
-            new_commitment1,
-            new_commitment2,
+            serial_number_0,
+            serial_number_1,
+            commitment_0,
+            commitment_1,
             value_balance,
-            signature1,
-            signature2,
             new_record1,
             new_record2,
             proof,
@@ -773,11 +760,9 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
                         serial_numbers: vec![row.get(3)?, row.get(4)?],
                         new_commitments: vec![row.get(5)?, row.get(6)?],
                         value_balance: AleoAmount(row.get(7)?),
-                        signatures: vec![row.get(8)?, row.get(9)?],
-                        new_records: vec![row.get(10)?, row.get(11)?],
-                        transaction_proof: row.get(12)?,
-                        memorandum: row.get(13)?,
-                        inner_circuit_id: row.get(14)?,
+                        transaction_proof: row.get(8)?,
+                        memorandum: row.get(9)?,
+                        inner_circuit_id: row.get(10)?,
                     })
                 },
             )
@@ -810,26 +795,22 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
             payload,
             program_id,
             serial_number_nonce,
-            commitment_randomness,
-            commitment
+            commitment_randomness
         FROM miner_records
         WHERE commitment = ?
         ",
                 [commitment],
                 |row| {
-                    Ok(Record {
-                        owner: row
-                            .get::<_, String>(0)?
+                    Ok(Record::from(
+                        row.get::<_, String>(0)?
                             .parse()
                             .map_err(|_| rusqlite::Error::InvalidQuery)?,
-                        value: AleoAmount(row.get(1)?),
-                        payload: row.get(2)?,
-                        program_id: row.get(3)?,
-                        serial_number_nonce: row.get(4)?,
-                        commitment_randomness: row.get(5)?,
-                        commitment: row.get(6)?,
-                        position: None,
-                    })
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    )?)
                 },
             )
             .optional()
@@ -874,8 +855,8 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
         let mut stmt = self.conn.prepare_cached(
             r"
         SELECT
-        transactions.new_commitment1,
-        transactions.new_commitment2
+        transactions.commitment_0,
+        transactions.commitment_1
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
         INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
@@ -898,8 +879,8 @@ impl<N: Network> SyncStorage<N> for SqliteStorage<N> {
         let mut stmt = self.conn.prepare_cached(
             r"
         SELECT
-        transactions.old_serial_number1,
-        transactions.old_serial_number2
+        transactions.serial_number_0,
+        transactions.serial_number_1
         FROM transactions
         INNER JOIN transaction_blocks ON transaction_blocks.transaction_id = transactions.id
         INNER JOIN blocks ON blocks.id = transaction_blocks.block_id
