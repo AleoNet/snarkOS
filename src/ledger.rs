@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{ledger::LedgerStore, Storage};
+use crate::{state::ledger::LedgerStore, storage::Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;

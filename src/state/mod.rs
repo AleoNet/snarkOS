@@ -15,5 +15,3 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod ledger;
-pub mod state;
-pub mod storage;
