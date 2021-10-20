@@ -18,6 +18,7 @@ use crate::storage::{DataMap, Map, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
+use std::sync::{Arc, Mutex};
 
 const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -25,7 +26,7 @@ const TWO_HOURS_UNIX: i64 = 7200;
 pub(crate) struct LedgerState<N: Network> {
     /// The current state of the ledger.
     latest_state: (u32, N::BlockHash, N::LedgerRoot),
-    ledger_tree: LedgerTree<N>,
+    ledger_tree: Arc<Mutex<LedgerTree<N>>>,
     ledger_roots: DataMap<N::LedgerRoot, u32>,
     blocks: BlockState<N>,
 }
@@ -38,7 +39,7 @@ impl<N: Network> LedgerState<N> {
         // Initialize the ledger.
         let mut ledger = Self {
             latest_state: (genesis.height(), genesis.block_hash(), genesis.ledger_root()),
-            ledger_tree: LedgerTree::<N>::new()?,
+            ledger_tree: Arc::new(Mutex::new(LedgerTree::<N>::new()?)),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
         };
@@ -70,11 +71,11 @@ impl<N: Network> LedgerState<N> {
             }
 
             // Ensure the ledger tree matches the state of ledger roots.
-            let candidate_ledger_root = ledger.ledger_tree.root();
+            let candidate_ledger_root = ledger.ledger_tree.lock().unwrap().root();
             if block.ledger_root() != candidate_ledger_root {
                 return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", block_height));
             }
-            ledger.ledger_tree.add(&block.block_hash())?;
+            ledger.ledger_tree.lock().unwrap().add(&block.block_hash())?;
         }
 
         // Update the latest state.
@@ -306,9 +307,9 @@ impl<N: Network> LedgerState<N> {
         }
 
         self.blocks.add_block(block)?;
-        self.ledger_tree.add(&block.block_hash())?;
+        self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
         self.ledger_roots.insert(&block.ledger_root(), &block_height)?;
-        self.latest_state = (block_height, block.block_hash(), self.ledger_tree.root());
+        self.latest_state = (block_height, block.block_hash(), self.ledger_tree.lock().unwrap().root());
         Ok(())
     }
 

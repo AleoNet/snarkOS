@@ -33,7 +33,7 @@ pub enum NodeType {
 }
 
 #[rustfmt::skip]
-pub trait Environment<N: Network>: 'static + Send + Sync {
+pub trait Environment<N: Network>: 'static + Clone + Send + Sync {
     const NODE_TYPE: NodeType;
 
     /// If `true`, a mining node will craft public coinbase transactions.
@@ -77,6 +77,7 @@ pub trait Environment<N: Network>: 'static + Send + Sync {
     const PROTOCOL_VERSION: u32 = 3;
 }
 
+#[derive(Clone, Debug)]
 pub struct Miner;
 
 #[rustfmt::skip]

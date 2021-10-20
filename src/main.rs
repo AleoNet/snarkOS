@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{Miner, Node};
-use snarkos_ledger::{ledger::Ledger, storage::rocksdb::RocksDB};
 
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
@@ -24,7 +23,6 @@ use snarkvm::{
 
 use ::rand::thread_rng;
 use anyhow::Result;
-use std::sync::atomic::AtomicBool;
 use tokio::{net::TcpListener, task};
 
 #[tokio::main]
@@ -36,10 +34,11 @@ async fn main() -> Result<()> {
     // let listener = TcpListener::bind(&addr).await?;
     // println!("Listening on: {}", addr);
 
-    let transaction = Testnet2::genesis_block().to_coinbase_transaction()?;
     let account = Account::<Testnet2>::new(&mut thread_rng());
-    let node = Node::<Testnet2, Miner>::new(account.address()).await?;
-    std::future::pending::<()>().await;
 
+    let node = Node::<Testnet2, Miner>::new()?;
+    node.start_miner(account.address());
+
+    std::future::pending::<()>().await;
     Ok(())
 }

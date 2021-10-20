@@ -28,8 +28,9 @@ use std::{
         atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
+    time::Duration,
 };
-use tokio::task;
+use tokio::{net::TcpListener, task};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -41,14 +42,14 @@ pub enum Status {
 }
 
 /// A node server implementation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Node<N: Network, E: Environment<N>> {
     /// The current status of the node.
-    status: AtomicU8,
+    status: Arc<AtomicU8>,
+    /// The local address of this node.
+    local_ip: OnceCell<SocketAddr>,
     /// The ledger state of the node.
     ledger: Ledger<N>,
-    /// The local address of this node.
-    local_addr: OnceCell<SocketAddr>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
     /// A terminator bit for the miner.
@@ -58,37 +59,17 @@ pub struct Node<N: Network, E: Environment<N>> {
 }
 
 impl<N: Network, E: Environment<N>> Node<N, E> {
-    pub async fn new(miner_address: Address<N>) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         // Initialize the node.
         let node = Self {
-            status: AtomicU8::new(0),
+            status: Arc::new(AtomicU8::new(0)),
+            local_ip: OnceCell::new(),
             ledger: Ledger::<N>::open::<RocksDB, _>(".ledger")?,
-            local_addr: OnceCell::new(),
             tasks: Tasks::new(),
             terminator: Arc::new(AtomicBool::new(false)),
             _phantom: PhantomData,
         };
-
-        // If the node is a mining node, initialize a miner.
-        if E::NODE_TYPE == NodeType::Miner {
-            let mut ledger = node.ledger.clone();
-            let terminator = node.terminator.clone();
-            node.add_task(task::spawn(async move {
-                loop {
-                    if let Err(error) = ledger.mine_next_block(miner_address, &terminator, &mut thread_rng()) {
-                        error!("{}", error);
-                    }
-                }
-            }));
-        }
-
         Ok(node)
-    }
-
-    /// Adds the given task handle to the node.
-    #[inline]
-    pub fn add_task(&self, handle: task::JoinHandle<()>) {
-        self.tasks.append(handle);
     }
 
     /// Returns the current status of the node.
@@ -116,6 +97,81 @@ impl<N: Network, E: Environment<N>> Node<N, E> {
             }
             _ => (),
         }
+    }
+
+    /// Updates the local IP address of the node to the given address.
+    #[inline]
+    pub fn set_local_ip(&self, ip_address: SocketAddr) {
+        self.local_ip.set(ip_address).expect("The local IP address was set more than once!");
+    }
+
+    // /// Initializes a listener for connections.
+    // pub async fn start_listener(&self) -> Result<()> {
+    //     let listener = TcpListener::bind(&self.config.desired_address).await?;
+    //
+    //     // Update the local IP address of the node.
+    //     let discovered_local_ip = listener.local_addr()?;
+    //     self.set_local_ip(discovered_local_ip);
+    //
+    //     info!("Initializing the listener...");
+    //     let node = self.clone();
+    //     self.add_task(task::spawn(async move {
+    //         info!("Listening for peers at {}", discovered_local_ip);
+    //         loop {
+    //             match listener.accept().await {
+    //                 Ok((stream, remote_address)) => {
+    //                     if !node.can_connect() {
+    //                         continue;
+    //                     }
+    //                     let node_clone = node.clone();
+    //                     tokio::spawn(async move {
+    //                         if let Err(error) = node_clone.peer_book.receive_connection(node_clone.clone(), remote_address, stream) {
+    //                             error!("Failed to receive a connection: {}", error);
+    //                         }
+    //                     });
+    //                     // Adds a small delay to avoid connecting above the limit.
+    //                     tokio::time::sleep(Duration::from_millis(1)).await;
+    //                 }
+    //                 Err(error) => error!("Failed to accept a connection: {}", error),
+    //             }
+    //             // metrics::increment_counter!(connections::ALL_ACCEPTED);
+    //         }
+    //     }));
+    //     Ok(())
+    // }
+
+    /// Initializes a miner.
+    #[inline]
+    pub fn start_miner(&self, miner_address: Address<N>) {
+        // If the node is a mining node, initialize a miner.
+        if E::NODE_TYPE == NodeType::Miner {
+            let node = self.clone();
+            self.add_task(task::spawn(async move {
+                let rng = &mut thread_rng();
+                let mut ledger = node.ledger.clone();
+                loop {
+                    // Retrieve the status of the node.
+                    let status = node.status();
+                    // Ensure the node is not syncing or shutting down.
+                    if status != Status::Syncing && status != Status::ShuttingDown {
+                        // Set the status of the node to mining.
+                        node.set_status(Status::Mining);
+                        // Start the mining process.
+                        let miner = ledger.mine_next_block(miner_address, &node.terminator, rng);
+                        // Ensure the miner did not error.
+                        if let Err(error) = miner {
+                            error!("{}", error);
+                        }
+                    }
+                }
+            }));
+        }
+    }
+
+    /// Adds the given task handle to the node.
+    #[inline]
+    pub fn add_task(&self, handle: task::JoinHandle<()>) {
+        self.tasks.append(handle);
     }
 
     /// Disconnects from peers and proceeds to shut down the node.
