@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod iterator;
-pub(crate) use iterator::*;
+mod iterator;
+use iterator::*;
 
-pub(crate) mod keys;
-pub(crate) use keys::*;
+mod keys;
+use keys::*;
 
-pub(crate) mod map;
+mod map;
 pub(crate) use map::*;
 
-pub(crate) mod values;
-pub(crate) use values::*;
+mod values;
+use values::*;
 
 use crate::storage::{Map, Storage};
 

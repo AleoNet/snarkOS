@@ -14,87 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(feature = "rocks")]
 pub mod rocksdb;
-
-use anyhow::Result;
-use serde::{de::DeserializeOwned, Deserializer, Serialize};
-use std::{borrow::Borrow, path::Path};
-
+#[cfg(feature = "rocks")]
 pub type DataMap<K, V> = crate::storage::rocksdb::DataMap<K, V>;
 
-pub trait Storage: Serialize {
-    ///
-    /// Opens storage at the given `path` and `context`.
-    ///
-    fn open<P: AsRef<Path>>(path: P, context: u16) -> Result<Self>
-    where
-        Self: Sized;
-
-    ///
-    /// Opens a map with the given `context` from storage.
-    ///
-    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, context: &str) -> Result<DataMap<K, V>>;
-
-    ///
-    /// Imports the given serialized bytes to reconstruct storage.
-    ///
-    fn import<'de, D: Deserializer<'de>>(&self, deserializer: D) -> Result<(), D::Error>;
-
-    ///
-    /// Exports the current state of storage into serialized bytes.
-    ///
-    fn export(&self) -> Result<serde_json::Value>;
-}
-
-pub trait Map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
-    type Iterator: Iterator<Item = (K, V)>;
-    type Keys: Iterator<Item = K>;
-    type Values: Iterator<Item = V>;
-
-    ///
-    /// Returns `true` if the given key exists in the map.
-    ///
-    fn contains_key<Q>(&self, key: &Q) -> Result<bool>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized;
-
-    ///
-    /// Returns the value for the given key from the map, if it exists.
-    ///
-    fn get<Q>(&self, key: &Q) -> Result<Option<V>>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized;
-
-    ///
-    /// Inserts the given key-value pair into the map.
-    ///
-    fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized;
-
-    ///
-    /// Removes the key-value pair for the given key from the map.
-    ///
-    fn remove<Q>(&self, key: &Q) -> Result<()>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized;
-
-    ///
-    /// Returns an iterator visiting each key-value pair in the map.
-    ///
-    fn iter(&self) -> Self::Iterator;
-
-    ///
-    /// Returns an iterator over each key in the map.
-    ///
-    fn keys(&self) -> Self::Keys;
-
-    ///
-    /// Returns an iterator over each value in the map.
-    ///
-    fn values(&self) -> Self::Values;
-}
+pub mod traits;
+pub use traits::*;
