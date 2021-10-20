@@ -50,6 +50,27 @@ impl<N: Network, E: Environment<N>> Peers<N, E> {
         }
     }
 
+    pub async fn connect_to(&self, node: Node<N, E>, address: SocketAddr) -> Result<()> {
+        if let Some(_) = self.connected_peers.get(&address) {
+            Ok(())
+        } else {
+            // if let Some(mut peer) = self.disconnected_peers.get(&address) {
+            //     if peer.judge_bad_offline() {
+            //         // dont reconnect to bad peers
+            //         return Ok(None);
+            //     }
+            // }
+            let peer = if let Some(mut peer) = self.disconnected_peers.remove(address).await {
+                peer
+            } else {
+                Peer::new(address)
+            };
+            self.pending_connections.fetch_add(1, Ordering::SeqCst);
+            peer.connect(node);
+            Ok(())
+        }
+    }
+
     pub fn receive_connection(&self, node: Node<N, E>, remote_ip: SocketAddr, stream: TcpStream) -> Result<()> {
         self.pending_connections.fetch_add(1, Ordering::SeqCst);
         Peer::receive(remote_ip, node, stream);

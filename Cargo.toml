@@ -82,6 +82,9 @@ version = "0.1"
 default-features = false
 features = [ "log" ]
 
+[dependencies.tracing-subscriber]
+version = "0.2"
+
 [dependencies.twox-hash]
 version = "1.6"
 

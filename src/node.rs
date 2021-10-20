@@ -16,7 +16,7 @@
 
 use crate::{
     helpers::Tasks,
-    network::{peers::Peers, Version},
+    network::{errors::NetworkError, peers::Peers, Version},
     Environment,
     NodeType,
 };
@@ -117,6 +117,7 @@ impl<N: Network, E: Environment<N>> Node<N, E> {
     }
 
     /// Initializes a listener for connections.
+    #[inline]
     pub async fn start_listener(&self) -> Result<()> {
         let listener = TcpListener::bind(&format!("127.0.0.1:{}", E::NODE_PORT)).await?;
 
@@ -150,6 +151,32 @@ impl<N: Network, E: Environment<N>> Node<N, E> {
         Ok(())
     }
 
+    /// Initializes the peers.
+    #[inline]
+    pub async fn connect_to(&self, remote_ip: SocketAddr) -> Result<()> {
+        debug!("Connecting to {}...", remote_ip);
+
+        // The local IP address must be known by now.
+        let own_address = self.expect_local_addr();
+
+        // // Don't connect if maximum number of connections has been reached.
+        // if !self.can_connect() {
+        //     return Err(NetworkError::TooManyConnections);
+        // }
+
+        if remote_ip == own_address
+            || ((remote_ip.ip().is_unspecified() || remote_ip.ip().is_loopback()) && remote_ip.port() == own_address.port())
+        {
+            return Err(NetworkError::SelfConnectAttempt.into());
+        }
+        // if self.peers.is_connected(remote_ip) {
+        //     return Err(NetworkError::PeerAlreadyConnected.into());
+        // }
+
+        self.peers.connect_to(self.clone(), remote_ip).await?;
+        Ok(())
+    }
+
     /// Initializes a miner.
     #[inline]
     pub fn start_miner(&self, miner_address: Address<N>) {
@@ -177,39 +204,6 @@ impl<N: Network, E: Environment<N>> Node<N, E> {
             }));
         }
     }
-
-    // #[inline]
-    // async fn connect(&self, remote_address: SocketAddr) -> Result<(), NetworkError> {
-    //     debug!("Connecting to {}...", remote_address);
-    //
-    //     // Local address must be known by now.
-    //     let own_address = self.local_ip;
-    //
-    //     // Don't connect if maximum number of connections has been reached.
-    //     if !self.can_connect() {
-    //         return Err(NetworkError::TooManyConnections);
-    //     }
-    //
-    //     if remote_address == own_address
-    //         || ((remote_address.ip().is_unspecified() || remote_address.ip().is_loopback())
-    //         && remote_address.port() == own_address.port())
-    //     {
-    //         return Err(NetworkError::SelfConnectAttempt);
-    //     }
-    //     if self.peer_book.is_connected(remote_address) {
-    //         return Err(NetworkError::PeerAlreadyConnected);
-    //     }
-    //
-    //     // metrics::increment_counter!(ALL_INITIATED);
-    //
-    //     // let stored_peer = self.storage.lookup_peers(vec![remote_address]).await?.remove(0);
-    //
-    //     self.peer_book
-    //         .get_or_connect(self.clone(), remote_address, stored_peer.as_ref())
-    //         .await?;
-    //
-    //     Ok(())
-    // }
 
     /// Adds the given task handle to the node.
     #[inline]

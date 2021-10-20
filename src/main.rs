@@ -24,6 +24,24 @@ use snarkvm::{
 use ::rand::thread_rng;
 use anyhow::Result;
 use tokio::{net::TcpListener, task};
+use tracing_subscriber::EnvFilter;
+
+pub fn initialize_logger() {
+    let verbosity = 4;
+
+    match verbosity {
+        1 => std::env::set_var("RUST_LOG", "info"),
+        2 => std::env::set_var("RUST_LOG", "debug"),
+        3 | 4 => std::env::set_var("RUST_LOG", "trace"),
+        _ => std::env::set_var("RUST_LOG", "info"),
+    };
+
+    // disable undesirable logs
+    let filter = EnvFilter::from_default_env().add_directive("mio=off".parse().unwrap());
+
+    // initialize tracing
+    tracing_subscriber::fmt().with_env_filter(filter).with_target(verbosity == 4).init();
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,9 +52,13 @@ async fn main() -> Result<()> {
     // let listener = TcpListener::bind(&addr).await?;
     // println!("Listening on: {}", addr);
 
+    initialize_logger();
+    tracing::trace!("Hello world");
+
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
     let node = Node::<Testnet2, Miner>::new()?;
+    node.start_listener().await?;
     node.start_miner(account.address());
 
     std::future::pending::<()>().await;

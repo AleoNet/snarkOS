@@ -61,13 +61,13 @@ pub(super) enum PeerAction<N: Network> {
     SoftFail,
 }
 
-pub struct PeerIOHandle<N: Network, E: Environment<N>> {
+pub struct PeerHandler<N: Network, E: Environment<N>> {
     reader: Option<OwnedReadHalf>,
     writer: OwnedWriteHalf,
     cipher: Cipher<N, E>,
 }
 
-impl<N: Network, E: Environment<N>> PeerIOHandle<N, E> {
+impl<N: Network, E: Environment<N>> PeerHandler<N, E> {
     pub async fn write_payload(&mut self, message: &Message<N>) -> Result<()> {
         let serialized_message = bincode::serialize(message)?;
         self.cipher.write_packet(&mut self.writer, &serialized_message[..]).await?;
@@ -144,33 +144,64 @@ impl<N: Network, E: Environment<N>> Peer<N, E> {
         tokio::spawn(async move {
             self.set_connecting();
 
-            let result = match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(self.ip)).await {
+            // Initiate a connection request to the IP address of the peer.
+            let stream = match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(self.ip)).await {
                 Ok(stream) => match stream {
-                    Ok(stream) => self.handle_sender(stream, node.version()).await,
-                    Err(error) => Err(anyhow!("Failed to send outgoing connection to '{}': '{:?}'", self.ip, error)),
+                    Ok(stream) => stream,
+                    Err(error) => {
+                        self.set_connecting_failed();
+                        return Err(anyhow!("Failed to send outgoing connection to '{}': '{:?}'", self.ip, error));
+                    }
                 },
-                Err(_) => Err(IoError::new(ErrorKind::TimedOut, "connection timed out").into()),
+                Err(_) => {
+                    self.set_connecting_failed();
+                    return Err(IoError::new(ErrorKind::TimedOut, "connection timed out").into());
+                }
             };
 
-            match result {
-                Ok(network) => {
-                    self.set_connected();
-                    if let Err(error) = self.run(node, network, receiver).await {
-                        if !error.is_trivial() {
-                            self.set_fail();
-                            error!("Unrecoverable failure communicating to outbound peer '{}': '{:?}'", self.ip, error);
-                        } else {
-                            warn!("Unrecoverable failure communicating to outbound peer '{}': '{:?}'", self.ip, error);
-                        }
-                    }
+            // On initial success, split the stream into a reader and writer for communicating.
+            let (mut reader, mut writer) = stream.into_split();
+
+            // Initiate the handshake sequence.
+            let handshake = match timeout(
+                Duration::from_secs(E::HANDSHAKE_TIMEOUT_SECS),
+                initiator_handshake::<N, E, _, _>(self.ip, &node.version(), &mut writer, &mut reader),
+            )
+            .await
+            {
+                Ok(Ok(handshake)) => handshake,
+                Ok(Err(error)) => {
+                    self.set_connecting_failed();
+                    return Err(error);
                 }
                 Err(error) => {
-                    self.quality.connect_failed();
-                    self.set_fail();
                     error!("Failed to send outgoing connection to '{}': '{:?}'", self.ip, error);
+                    self.set_connecting_failed();
+                    return Err(NetworkError::HandshakeTimeout.into());
+                }
+            };
+
+            info!("Connected to {}", self.ip);
+
+            let handler = PeerHandler {
+                reader: Some(reader),
+                writer,
+                cipher: Cipher::new(handshake.noise, handshake.buffer, handshake.noise_buffer),
+            };
+
+            self.set_connected();
+
+            if let Err(error) = self.run(node, handler, receiver).await {
+                if !error.is_trivial() {
+                    self.set_fail();
+                    error!("Unrecoverable failure communicating to outbound peer '{}': '{:?}'", self.ip, error);
+                } else {
+                    warn!("Unrecoverable failure communicating to outbound peer '{}': '{:?}'", self.ip, error);
                 }
             }
+
             self.set_disconnected();
+            Ok(())
         });
     }
 
@@ -202,11 +233,11 @@ impl<N: Network, E: Environment<N>> Peer<N, E> {
         });
     }
 
-    async fn handle_sender(&mut self, stream: TcpStream, our_version: Version) -> Result<PeerIOHandle<N, E>> {
+    async fn handle_sender(&mut self, stream: TcpStream, our_version: Version) -> Result<PeerHandler<N, E>> {
         let (mut reader, mut writer) = stream.into_split();
 
         let result = timeout(
-            Duration::from_secs(E::HANDSHAKE_TIMEOUT_SECS as u64),
+            Duration::from_secs(E::HANDSHAKE_TIMEOUT_SECS),
             initiator_handshake::<N, E, _, _>(self.ip, &our_version, &mut writer, &mut reader),
         )
         .await;
@@ -219,7 +250,7 @@ impl<N: Network, E: Environment<N>> Peer<N, E> {
 
         info!("Connected to peer {}", self.ip);
 
-        Ok(PeerIOHandle {
+        Ok(PeerHandler {
             reader: Some(reader),
             writer,
             cipher: Cipher::new(handshake.noise, handshake.buffer, handshake.noise_buffer),
@@ -230,10 +261,10 @@ impl<N: Network, E: Environment<N>> Peer<N, E> {
         remote_address: SocketAddr,
         stream: TcpStream,
         our_version: Version,
-    ) -> Result<(Peer<N, E>, PeerIOHandle<N, E>)> {
+    ) -> Result<(Peer<N, E>, PeerHandler<N, E>)> {
         let (mut reader, mut writer) = stream.into_split();
 
-        let handshake_timeout = Duration::from_secs(E::HANDSHAKE_TIMEOUT_SECS as u64);
+        let handshake_timeout = Duration::from_secs(E::HANDSHAKE_TIMEOUT_SECS);
         let result = timeout(
             handshake_timeout,
             responder_handshake::<N, E, _, _>(remote_address, &our_version, &mut writer, &mut reader),
@@ -259,7 +290,7 @@ impl<N: Network, E: Environment<N>> Peer<N, E> {
                 sync_state: Default::default(),
                 block_received_cache: BlockCache::default(),
             },
-            PeerIOHandle {
+            PeerHandler {
                 reader: Some(reader),
                 writer,
                 cipher: Cipher::new(handshake.noise, handshake.buffer, handshake.noise_buffer),
@@ -270,7 +301,7 @@ impl<N: Network, E: Environment<N>> Peer<N, E> {
     async fn run(
         &mut self,
         node: Node<N, E>,
-        mut network: PeerIOHandle<N, E>,
+        mut network: PeerHandler<N, E>,
         mut receiver: mpsc::Receiver<PeerAction<N>>,
     ) -> Result<(), NetworkError> {
         let mut reader = network.take_reader();
@@ -328,20 +359,25 @@ impl<N: Network, E: Environment<N>> Peer<N, E> {
         Ok(())
     }
 
-    pub(super) fn set_connected(&mut self) {
-        self.quality.connected();
-    }
-
-    pub(super) fn set_connecting(&mut self) {
+    fn set_connecting(&mut self) {
         self.quality.connecting();
     }
 
-    pub(super) fn set_disconnected(&mut self) {
+    fn set_connecting_failed(&mut self) {
+        self.quality.connect_failed();
+        self.set_fail();
+    }
+
+    fn set_connected(&mut self) {
+        self.quality.connected();
+    }
+
+    fn set_disconnected(&mut self) {
         self.sync_state.reset();
         self.quality.disconnected();
     }
 
-    pub(super) fn set_fail(&mut self) {
+    fn set_fail(&mut self) {
         self.quality.set_fail();
     }
 

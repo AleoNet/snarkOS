@@ -16,13 +16,17 @@
 
 // This network module is a concoction of legacy mess, consider this code untrusted.
 
-mod errors;
-use errors::*;
+pub(super) mod errors;
+pub(super) use errors::*;
 
 pub(crate) mod handshake;
+
 mod message;
+
 mod peer;
+
 mod peer_quality;
+
 pub(crate) mod peers;
 
 pub mod version;
