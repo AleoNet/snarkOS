@@ -29,3 +29,4 @@ version = "1"
 [features]
 default = ["rocks"]
 rocks = ["bincode", "rocksdb"]
+noconfig = []
