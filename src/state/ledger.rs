@@ -21,15 +21,15 @@ use anyhow::{anyhow, Result};
 
 const TWO_HOURS_UNIX: i64 = 7200;
 
-pub(crate) struct LedgerStore<N: Network> {
+pub(crate) struct LedgerState<N: Network> {
     /// The current state of the ledger.
     latest_state: (u32, N::BlockHash, N::LedgerRoot),
     ledger_roots: DataMap<N::LedgerRoot, u32>,
-    blocks: BlockStore<N>,
+    blocks: BlockState<N>,
 }
 
-impl<N: Network> LedgerStore<N> {
-    /// Initializes a new instance of `LedgerStore`.
+impl<N: Network> LedgerState<N> {
+    /// Initializes a new instance of `LedgerState`.
     pub(crate) fn open<S: Storage>(storage: S) -> Result<Self> {
         // Retrieve the genesis block.
         let genesis = N::genesis_block();
@@ -37,7 +37,7 @@ impl<N: Network> LedgerStore<N> {
         let mut ledger = Self {
             latest_state: (genesis.height(), genesis.block_hash(), genesis.ledger_root()),
             ledger_roots: storage.open_map("ledger_roots")?,
-            blocks: BlockStore::open(storage)?,
+            blocks: BlockState::open(storage)?,
         };
 
         // Determine the latest block height.
@@ -317,21 +317,21 @@ impl<N: Network> LedgerStore<N> {
     }
 }
 
-struct BlockStore<N: Network> {
+struct BlockState<N: Network> {
     block_heights: DataMap<u32, N::BlockHash>,
     block_headers: DataMap<N::BlockHash, BlockHeader<N>>,
     block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>>,
-    transactions: TransactionStore<N>,
+    transactions: TransactionState<N>,
 }
 
-impl<N: Network> BlockStore<N> {
-    /// Initializes a new instance of `BlockStore`.
+impl<N: Network> BlockState<N> {
+    /// Initializes a new instance of `BlockState`.
     pub(crate) fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
             block_heights: storage.open_map("block_heights")?,
             block_headers: storage.open_map("block_headers")?,
             block_transactions: storage.open_map("block_transactions")?,
-            transactions: TransactionStore::open(storage)?,
+            transactions: TransactionState::open(storage)?,
         })
     }
 
@@ -511,7 +511,7 @@ impl<N: Network> BlockStore<N> {
     }
 }
 
-struct TransactionStore<N: Network> {
+struct TransactionState<N: Network> {
     transactions: DataMap<N::TransactionID, (N::BlockHash, u16, Vec<N::TransitionID>)>,
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
     serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
@@ -520,8 +520,8 @@ struct TransactionStore<N: Network> {
     // events: DataMap<N::TransactionID, Vec<Event<N>>>,
 }
 
-impl<N: Network> TransactionStore<N> {
-    /// Initializes a new instance of `TransactionStore`.
+impl<N: Network> TransactionState<N> {
+    /// Initializes a new instance of `TransactionState`.
     pub(crate) fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
             transactions: storage.open_map("transactions")?,

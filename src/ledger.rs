@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::ledger::LedgerStore, storage::Storage};
+use crate::{state::LedgerState, storage::Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -22,7 +22,7 @@ use std::path::Path;
 
 pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
-    canon: LedgerStore<N>,
+    canon: LedgerState<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: MemoryPool<N>,
 }
@@ -40,7 +40,7 @@ impl<N: Network> Ledger<N> {
         // storage_2.import(value)?;
 
         Ok(Self {
-            canon: LedgerStore::open::<S>(storage)?,
+            canon: LedgerState::open::<S>(storage)?,
             memory_pool: MemoryPool::new(),
         })
     }
