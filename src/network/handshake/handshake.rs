@@ -15,143 +15,75 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    peer::{network::PeerIOHandle},
-    network::NetworkError,
-    Peer,
-    Version,Environment,
-    network::handshake::cipher::Cipher
+    network::{handshake::cipher::Cipher, NetworkError, Version},
+    Environment,
 };
 use snarkvm::dpc::Network;
-use snarkos_metrics::{self as metrics, handshakes::*};
 
-use std::{net::SocketAddr, time::Duration};
+use anyhow::Result;
 use snow::TransportState;
+use std::{net::SocketAddr, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
 };
 
-pub struct HandshakeData {
+pub struct Handshake {
     pub version: Version,
     pub noise: TransportState,
     pub buffer: Vec<u8>,
     pub noise_buffer: Box<[u8]>,
 }
 
-async fn responder_handshake<N: Network, E: Environment<N>, W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
+pub(crate) async fn initiator_handshake<N: Network, E: Environment<N>, W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     remote_address: SocketAddr,
     own_version: &Version,
     writer: &mut W,
     reader: &mut R,
-) -> Result<HandshakeData, NetworkError> {
+) -> Result<Handshake> {
     let builder = snow::Builder::with_resolver(
-        E::HANDSHAKE_PATTERN
-            .parse()
-            .expect("Invalid noise handshake pattern!"),
-        Box::new(snow::resolvers::SodiumResolver),
-    );
-    let static_key = builder.generate_keypair()?.private;
-    let noise_builder = builder.local_private_key(&static_key).psk(3, E::HANDSHAKE_PSK);
-    let mut noise = noise_builder.build_responder()?;
-    let mut buffer: Vec<u8> = vec![0u8; E::NOISE_BUF_LEN];
-    let mut noise_buffer: Box<[u8]> = vec![0u8; E::NOISE_BUF_LEN].into();
-    // <- e
-    reader.read_exact(&mut buffer[..1]).await?;
-    let len = buffer[0] as usize;
-    if len == 0 {
-        return Err(NetworkError::InvalidHandshake);
-    }
-    let len = reader.read_exact(&mut buffer[..len]).await?;
-    noise.read_message(&buffer[..len], &mut noise_buffer)?;
-    // trace!("received e (XX handshake part 1/3) from {}", remote_address);
-
-    // -> e, ee, s, es
-    let serialized_version = Version::serialize(own_version).unwrap();
-    let len = noise.write_message(&serialized_version, &mut noise_buffer)?;
-    writer.write_all(&[len as u8]).await?;
-    writer.write_all(&noise_buffer[..len]).await?;
-    writer.flush().await?;
-    // trace!("sent e, ee, s, es (XX handshake part 2/3) to {}", remote_address);
-
-    // <- s, se, psk
-    reader.read_exact(&mut buffer[..1]).await?;
-    let len = buffer[0] as usize;
-    if len == 0 {
-        return Err(NetworkError::InvalidHandshake);
-    }
-    let len = reader.read_exact(&mut buffer[..len]).await?;
-    let len = noise.read_message(&buffer[..len], &mut noise_buffer)?;
-    let peer_version = Version::deserialize(&noise_buffer[..len])?;
-    // trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
-
-    if peer_version.node_id == own_version.node_id {
-        return Err(NetworkError::SelfConnectAttempt);
-    }
-    if peer_version.version != E::PROTOCOL_VERSION {
-        return Err(NetworkError::InvalidHandshake);
-    }
-
-    // metrics::increment_counter!(SUCCESSES_RESP);
-    Ok(HandshakeData {
-        version: peer_version,
-        noise: noise.into_transport_mode()?,
-        buffer,
-        noise_buffer,
-    })
-}
-
-async fn initiator_handshake<N: Network, E: Environment<N>, W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
-    remote_address: SocketAddr,
-    own_version: &Version,
-    writer: &mut W,
-    reader: &mut R,
-) -> Result<HandshakeData, NetworkError> {
-    let builder = snow::Builder::with_resolver(
-        E::HANDSHAKE_PATTERN
-            .parse()
-            .expect("Invalid noise handshake pattern!"),
+        E::HANDSHAKE_PATTERN.parse().expect("Invalid noise handshake pattern!"),
         Box::new(snow::resolvers::SodiumResolver),
     );
     let static_key = builder.generate_keypair()?.private;
     let noise_builder = builder.local_private_key(&static_key).psk(3, E::HANDSHAKE_PSK);
     let mut noise = noise_builder.build_initiator()?;
-    let mut buffer: Vec<u8> = vec![0u8; E::NOISE_BUF_LEN];
-    let mut noise_buffer: Box<[u8]> = vec![0u8; E::NOISE_BUF_LEN].into();
+    let mut buffer: Vec<u8> = vec![0u8; E::NOISE_BUFFER_LENGTH];
+    let mut noise_buffer: Box<[u8]> = vec![0u8; E::NOISE_BUFFER_LENGTH].into();
     // -> e
     let len = noise.write_message(&[], &mut buffer)?;
     writer.write_all(&[len as u8]).await?;
     writer.write_all(&buffer[..len]).await?;
     writer.flush().await?;
-    // trace!("sent e (XX handshake part 1/3) to {}", remote_address);
+    trace!("sent e (XX handshake part 1/3) to {}", remote_address);
 
     // <- e, ee, s, es
     reader.read_exact(&mut noise_buffer[..1]).await?;
     let len = noise_buffer[0] as usize;
     if len == 0 {
-        return Err(NetworkError::InvalidHandshake);
+        return Err(NetworkError::InvalidHandshake.into());
     }
     let len = reader.read_exact(&mut noise_buffer[..len]).await?;
     let len = noise.read_message(&noise_buffer[..len], &mut buffer)?;
-    let version = Version::deserialize(&buffer[..len])?;
-    // trace!("received e, ee, s, es (XX handshake part 2/3) from {}", remote_address);
+    let version: Version = bincode::deserialize(&buffer[..len])?;
+    trace!("received e, ee, s, es (XX handshake part 2/3) from {}", remote_address);
 
     if version.node_id == own_version.node_id {
-        return Err(NetworkError::SelfConnectAttempt);
+        return Err(NetworkError::SelfConnectAttempt.into());
     }
     if version.version != E::PROTOCOL_VERSION {
-        return Err(NetworkError::InvalidHandshake);
+        return Err(NetworkError::InvalidHandshake.into());
     }
 
     // -> s, se, psk
-    let own_version = Version::serialize(own_version)?;
+    let own_version = bincode::serialize(own_version)?;
     let len = noise.write_message(&own_version, &mut buffer)?;
     writer.write_all(&[len as u8]).await?;
     writer.write_all(&buffer[..len]).await?;
     writer.flush().await?;
-    // trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
+    trace!("sent s, se, psk (XX handshake part 3/3) to {}", remote_address);
 
-    // metrics::increment_counter!(SUCCESSES_INIT);
-    Ok(HandshakeData {
+    Ok(Handshake {
         version,
         noise: noise.into_transport_mode()?,
         buffer,
@@ -159,79 +91,63 @@ async fn initiator_handshake<N: Network, E: Environment<N>, W: AsyncWrite + Unpi
     })
 }
 
-impl Peer {
-    pub(super) async fn inner_handshake_initiator(
-        &mut self,
-        stream: TcpStream,
-        our_version: Version,
-    ) -> Result<PeerIOHandle, NetworkError> {
-        let (mut reader, mut writer) = stream.into_split();
+pub(crate) async fn responder_handshake<N: Network, E: Environment<N>, W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
+    remote_address: SocketAddr,
+    own_version: &Version,
+    writer: &mut W,
+    reader: &mut R,
+) -> Result<Handshake> {
+    let builder = snow::Builder::with_resolver(
+        E::HANDSHAKE_PATTERN.parse().expect("Invalid noise handshake pattern!"),
+        Box::new(snow::resolvers::SodiumResolver),
+    );
+    let static_key = builder.generate_keypair()?.private;
+    let noise_builder = builder.local_private_key(&static_key).psk(3, E::HANDSHAKE_PSK);
+    let mut noise = noise_builder.build_responder()?;
+    let mut buffer: Vec<u8> = vec![0u8; E::NOISE_BUFFER_LENGTH];
+    let mut noise_buffer: Box<[u8]> = vec![0u8; E::NOISE_BUFFER_LENGTH].into();
+    // <- e
+    reader.read_exact(&mut buffer[..1]).await?;
+    let len = buffer[0] as usize;
+    if len == 0 {
+        return Err(NetworkError::InvalidHandshake.into());
+    }
+    let len = reader.read_exact(&mut buffer[..len]).await?;
+    noise.read_message(&buffer[..len], &mut noise_buffer)?;
+    trace!("received e (XX handshake part 1/3) from {}", remote_address);
 
-        let result = tokio::time::timeout(
-            Duration::from_secs(crate::HANDSHAKE_TIMEOUT_SECS as u64),
-            initiator_handshake(self.address, &our_version, &mut writer, &mut reader),
-        )
-            .await;
+    // -> e, ee, s, es
+    let serialized_version = bincode::serialize(own_version).unwrap();
+    let len = noise.write_message(&serialized_version, &mut noise_buffer)?;
+    writer.write_all(&[len as u8]).await?;
+    writer.write_all(&noise_buffer[..len]).await?;
+    writer.flush().await?;
+    trace!("sent e, ee, s, es (XX handshake part 2/3) to {}", remote_address);
 
-        let data = match result {
-            Ok(Ok(data)) => data,
-            Ok(Err(e)) => {
-                // metrics::increment_counter!(FAILURES_INIT);
-                return Err(e);
-            }
-            Err(_) => {
-                // metrics::increment_counter!(TIMEOUTS_INIT);
-                return Err(NetworkError::HandshakeTimeout);
-            }
-        };
+    // <- s, se, psk
+    reader.read_exact(&mut buffer[..1]).await?;
+    let len = buffer[0] as usize;
+    if len == 0 {
+        return Err(NetworkError::InvalidHandshake.into());
+    }
+    let len = reader.read_exact(&mut buffer[..len]).await?;
+    let len = noise.read_message(&buffer[..len], &mut noise_buffer)?;
+    let peer_version: Version = bincode::deserialize(&noise_buffer[..len])?;
+    trace!("received s, se, psk (XX handshake part 3/3) from {}", remote_address);
 
-        // info!("Connected to peer {}", self.address);
-
-        Ok(PeerIOHandle {
-            reader: Some(reader),
-            writer,
-            cipher: Cipher::new(data.noise, data.buffer, data.noise_buffer),
-        })
+    if peer_version.node_id == own_version.node_id {
+        return Err(NetworkError::SelfConnectAttempt.into());
+    }
+    if peer_version.version != E::PROTOCOL_VERSION {
+        return Err(NetworkError::InvalidHandshake.into());
     }
 
-    pub(super) async fn inner_handshake_responder(
-        address: SocketAddr,
-        stream: TcpStream,
-        our_version: Version,
-    ) -> Result<(Peer, PeerIOHandle), NetworkError> {
-        let (mut reader, mut writer) = stream.into_split();
-
-        let result = tokio::time::timeout(
-            Duration::from_secs(crate::HANDSHAKE_TIMEOUT_SECS as u64),
-            responder_handshake(address, &our_version, &mut writer, &mut reader),
-        )
-            .await;
-
-        let data = match result {
-            Ok(Ok(data)) => data,
-            Ok(Err(e)) => {
-                // metrics::increment_counter!(FAILURES_RESP);
-                return Err(e);
-            }
-            Err(_) => {
-                // metrics::increment_counter!(TIMEOUTS_RESP);
-                return Err(NetworkError::HandshakeTimeout);
-            }
-        };
-
-        let mut peer_address = address;
-        peer_address.set_port(data.version.listening_port);
-        let peer = Peer::new(peer_address, None);
-
-        // info!("Connected to peer {}", peer_address);
-
-        let network = PeerIOHandle {
-            reader: Some(reader),
-            writer,
-            cipher: Cipher::new(data.noise, data.buffer, data.noise_buffer),
-        };
-        Ok((peer, network))
-    }
+    Ok(Handshake {
+        version: peer_version,
+        noise: noise.into_transport_mode()?,
+        buffer,
+        noise_buffer,
+    })
 }
 
 // #[cfg(test)]

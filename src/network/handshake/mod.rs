@@ -14,5 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod cipher;
-mod handshake;
+pub(crate) mod cipher;
+pub(crate) use cipher::*;
+
+pub(crate) mod handshake;
+pub(crate) use handshake::*;

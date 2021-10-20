@@ -17,6 +17,7 @@
 use snarkvm::dpc::Network;
 
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NodeType {
@@ -33,7 +34,7 @@ pub enum NodeType {
 }
 
 #[rustfmt::skip]
-pub trait Environment<N: Network>: 'static + Clone + Send + Sync {
+pub trait Environment<N: Network>: 'static + Clone + Default + Send + Sync {
     const NODE_TYPE: NodeType;
 
     /// If `true`, a mining node will craft public coinbase transactions.
@@ -61,9 +62,9 @@ pub trait Environment<N: Network>: 'static + Clone + Send + Sync {
     /// The pre-shared key for the noise handshake.
     const HANDSHAKE_PSK: &'static [u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
     /// The spec-compliant size of the noise buffer.
-    const NOISE_BUF_LEN: usize = 65535;
+    const NOISE_BUFFER_LENGTH: usize = 65535;
     /// The spec-compliant size of the noise tag field.
-    const NOISE_TAG_LEN: usize = 16;
+    const NOISE_TAG_LENGTH: usize = 16;
 
     /// The amount of time after which a peer will be considered inactive an disconnected from if they have
     /// not sent any messages in the meantime.
@@ -73,11 +74,18 @@ pub trait Environment<N: Network>: 'static + Clone + Send + Sync {
     /// The maximum number of peers shared at once in response to a `GetPeers` message.
     const SHARED_PEER_COUNT: usize = 25;
 
+    const BLOCK_CACHE_SIZE: usize = 64;
+
+    const CONNECTION_TIMEOUT_SECS: u64 = 3;
+
+    const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
+    const FAILURE_THRESHOLD: usize = 5;
+
     /// The version of the network protocol; it can be incremented in order to force users to update.
     const PROTOCOL_VERSION: u32 = 3;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Miner;
 
 #[rustfmt::skip]

@@ -16,10 +16,11 @@
 
 use snarkvm::dpc::{Block, Network};
 
+use serde::{Deserialize, Serialize};
 use std::{fmt, net::SocketAddr};
 
 /// A message transmitted over the network.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Message<N: Network> {
     // #[doc = include_str!("../../documentation/network_messages/block.md")]
     // Block(Block<N>),

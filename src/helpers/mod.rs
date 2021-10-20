@@ -14,5 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+pub(crate) mod cache;
+pub(crate) use cache::*;
+
 pub(crate) mod tasks;
 pub(crate) use tasks::*;

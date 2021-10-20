@@ -20,7 +20,7 @@ edition = "2018"
 members = ["ledger"]
 
 [dependencies]
-snarkvm = { path = "../snarkVM" }
+snarkvm = { path = "../snarkVM", features = ["parameters"] }
 
 [dependencies.snarkos-ledger]
 path = "./ledger"
@@ -28,6 +28,15 @@ version = "2.0.0"
 
 [dependencies.anyhow]
 version = "1"
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.chrono]
+version = "0.4"
+
+[dependencies.circular-queue]
+version = "0.2"
 
 [dependencies.mpmc-map]
 version = "0.2"
@@ -72,3 +81,7 @@ features = [
 version = "0.1"
 default-features = false
 features = [ "log" ]
+
+[dependencies.twox-hash]
+version = "1.6"
+

@@ -14,16 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// This network module is a concoction of legacy mess, consider this code untrusted.
+use serde::{Deserialize, Serialize};
 
-mod errors;
-use errors::*;
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct Version {
+    /// The version number of the sender's node server.
+    pub version: u32,
+    /// The listening port of the sender.
+    pub listening_port: u16,
+    /// The node id of the sender.
+    pub node_id: u64,
+}
 
-pub(crate) mod handshake;
-mod message;
-mod peer;
-mod peer_quality;
-pub(crate) mod peers;
-
-pub mod version;
-pub use version::*;
+impl Version {
+    pub fn new(version: u32, listening_port: u16, node_id: u64) -> Self {
+        Self {
+            version,
+            listening_port,
+            node_id,
+        }
+    }
+}

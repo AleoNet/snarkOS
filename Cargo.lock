@@ -292,6 +292,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "circular-queue"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d34327ead1c743a10db339de35fb58957564b99d248a67985c55638b22c59b5"
+dependencies = [
+ "version_check 0.9.3",
+]
+
+[[package]]
 name = "clang-sys"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1302,6 +1311,9 @@ name = "snarkos"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "bincode",
+ "chrono",
+ "circular-queue",
  "mpmc-map",
  "once_cell",
  "rand",
@@ -1311,6 +1323,7 @@ dependencies = [
  "snow",
  "tokio",
  "tracing",
+ "twox-hash",
 ]
 
 [[package]]
@@ -1332,6 +1345,7 @@ name = "snarkvm"
 version = "0.7.5"
 dependencies = [
  "snarkvm-dpc",
+ "snarkvm-parameters",
  "snarkvm-utilities",
 ]
 
@@ -1574,6 +1588,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1711,6 +1731,17 @@ name = "tracing-core"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f4ed65637b8390770814083d20756f87bfa2c21bf2f110babdc5438351746e4"
+
+[[package]]
+name = "twox-hash"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
+dependencies = [
+ "cfg-if 1.0.0",
+ "rand",
+ "static_assertions",
+]
 
 [[package]]
 name = "typenum"

@@ -14,50 +14,53 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// use mpmc_map::MpmcMap;
-// use std::{
-//     net::SocketAddr,
-//     sync::{atomic::AtomicU32, Arc},
-// };
-//
-// #[derive(Debug)]
-// pub enum PeerEventData {
-//     Connected(PeerHandle),
-//     Disconnect(Box<Peer>),
-//     FailHandshake,
-// }
-//
-// #[derive(Debug)]
-// pub struct PeerEvent {
-//     pub address: SocketAddr,
-//     pub data: PeerEventData,
-// }
-//
-// /// A data structure containing information about a peer.
-// #[derive(Debug, Clone)]
-// pub struct Peer {
-//     /// The address of the node's listener socket.
-//     pub address: SocketAddr,
-//     /// The latest broadcast block height of the peer.
-//     pub block_height: u32,
-//     /// Quantifies the node's connection quality with the peer.
-//     pub quality: PeerQuality,
-//     /// Tracks the node's sync state with the peer.
-//     pub sync_state: SyncState,
-//
-//     /// The cache of received blocks from the peer.
-//     pub block_received_cache: BlockCache<{ crate::PEER_BLOCK_CACHE_SIZE }>,
-// }
-//
-// ///
-// /// A data structure for storing the peers of this node server.
-// ///
-// pub struct Peers {
-//     /// The list of connected peers.
-//     connected_peers: MpmcMap<SocketAddr, PeerHandle>,
-//     /// The list of disconnected peers.
-//     disconnected_peers: MpmcMap<SocketAddr, Peer>,
-//
-//     pending_connections: Arc<AtomicU32>,
-//     peer_events: wrapped_mpsc::Sender<PeerEvent>,
-// }
+use crate::{network::peer::Peer, Environment, Node};
+use snarkvm::dpc::Network;
+
+use anyhow::Result;
+use mpmc_map::MpmcMap;
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+};
+use tokio::net::TcpStream;
+
+///
+/// A data structure for storing the peers of this node server.
+///
+#[derive(Clone, Debug)]
+pub struct Peers<N: Network, E: Environment<N>> {
+    /// The list of connected peers.
+    connected_peers: MpmcMap<SocketAddr, Peer<N, E>>,
+    /// The list of disconnected peers.
+    disconnected_peers: MpmcMap<SocketAddr, Peer<N, E>>,
+    /// The current number of pending connections.
+    pending_connections: Arc<AtomicU32>,
+}
+
+impl<N: Network, E: Environment<N>> Peers<N, E> {
+    pub fn new() -> Self {
+        Self {
+            connected_peers: Default::default(),
+            disconnected_peers: Default::default(),
+            pending_connections: Default::default(),
+        }
+    }
+
+    pub fn receive_connection(&self, node: Node<N, E>, remote_ip: SocketAddr, stream: TcpStream) -> Result<()> {
+        self.pending_connections.fetch_add(1, Ordering::SeqCst);
+        Peer::receive(remote_ip, node, stream);
+        Ok(())
+    }
+
+    pub async fn fetch_received_peer_data(&self, ip: SocketAddr) -> Peer<N, E> {
+        if let Some(peer) = self.disconnected_peers.remove(ip).await {
+            peer
+        } else {
+            Peer::new(ip)
+        }
+    }
+}
