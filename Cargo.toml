@@ -1,5 +1,5 @@
 [package]
-name = "snarkOS"
+name = "snarkos"
 version = "2.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
@@ -16,29 +16,56 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[workspace]
+members = ["ledger"]
+
 [dependencies]
 snarkvm = { path = "../snarkVM" }
+
+[dependencies.snarkos-ledger]
+path = "./ledger"
+version = "2.0.0"
 
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.bincode]
-version = "1.0"
-optional = true
+[dependencies.once_cell]
+version = "1"
 
-[dependencies.chrono]
-version = "0.4"
-
-[dependencies.rocksdb]
-version = "0.11"
-optional = true
+[dependencies.rand]
+version = "0.8"
 
 [dependencies.serde]
 version = "1"
 
-[dependencies.serde_json]
-version = "1"
+#[dependencies.serde_json]
+#version = "1"
 
-[features]
-default = ["rocks"]
-rocks = ["bincode", "rocksdb"]
+[dependencies.snow]
+version = "0.8"
+default-features = false
+features = [
+    "libsodium-resolver",
+    "chacha20poly1305",
+    "blake2",
+    "sha2",
+    "x25519-dalek",
+    "rand"
+]
+
+[dependencies.tokio]
+version = "1"
+features = [
+    "io-util",
+    "parking_lot",
+    "macros",
+    "net",
+    "rt-multi-thread",
+    "sync",
+    "time"
+]
+
+[dependencies.tracing]
+default-features = false
+features = [ "log" ]
+version = "0.1"

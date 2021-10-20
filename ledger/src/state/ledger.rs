@@ -21,9 +21,11 @@ use anyhow::{anyhow, Result};
 
 const TWO_HOURS_UNIX: i64 = 7200;
 
+#[derive(Clone, Debug)]
 pub(crate) struct LedgerState<N: Network> {
     /// The current state of the ledger.
     latest_state: (u32, N::BlockHash, N::LedgerRoot),
+    ledger_tree: LedgerTree<N>,
     ledger_roots: DataMap<N::LedgerRoot, u32>,
     blocks: BlockState<N>,
 }
@@ -36,6 +38,7 @@ impl<N: Network> LedgerState<N> {
         // Initialize the ledger.
         let mut ledger = Self {
             latest_state: (genesis.height(), genesis.block_hash(), genesis.ledger_root()),
+            ledger_tree: LedgerTree::<N>::new()?,
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
         };
@@ -65,6 +68,13 @@ impl<N: Network> LedgerState<N> {
                 }
                 None => return Err(anyhow!("Ledger is missing ledger root for block {}", block_height)),
             }
+
+            // Ensure the ledger tree matches the state of ledger roots.
+            let candidate_ledger_root = ledger.ledger_tree.root();
+            if block.ledger_root() != candidate_ledger_root {
+                return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", block_height));
+            }
+            ledger.ledger_tree.add(&block.block_hash())?;
         }
 
         // Update the latest state.
@@ -210,7 +220,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Ensure the previous block hash matches.
-        if block.previous_block_hash() != current_block.previous_block_hash() {
+        if block.previous_block_hash() != current_block.block_hash() {
             return Err(anyhow!(
                 "Block {} has an incorrect previous block hash in the canon chain",
                 block_height
@@ -286,7 +296,7 @@ impl<N: Network> LedgerState<N> {
             for ledger_root in &transaction.ledger_roots() {
                 if !self.contains_ledger_root(ledger_root)? {
                     return Err(anyhow!(
-                        "Transaction {} in block {} references a non-existent ledger root {}",
+                        "Transaction {} in block {} references non-existent ledger root {}",
                         transaction.transaction_id(),
                         block_height,
                         ledger_root
@@ -296,8 +306,9 @@ impl<N: Network> LedgerState<N> {
         }
 
         self.blocks.add_block(block)?;
+        self.ledger_tree.add(&block.block_hash())?;
         self.ledger_roots.insert(&block.ledger_root(), &block_height)?;
-        self.latest_state = (block_height, block.block_hash(), block.ledger_root());
+        self.latest_state = (block_height, block.block_hash(), self.ledger_tree.root());
         Ok(())
     }
 
@@ -317,6 +328,7 @@ impl<N: Network> LedgerState<N> {
     }
 }
 
+#[derive(Clone, Debug)]
 struct BlockState<N: Network> {
     block_heights: DataMap<u32, N::BlockHash>,
     block_headers: DataMap<N::BlockHash, BlockHeader<N>>,
@@ -511,6 +523,7 @@ impl<N: Network> BlockState<N> {
     }
 }
 
+#[derive(Clone, Debug)]
 struct TransactionState<N: Network> {
     transactions: DataMap<N::TransactionID, (N::BlockHash, u16, Vec<N::TransitionID>)>,
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,

@@ -18,8 +18,10 @@ use crate::{state::LedgerState, storage::Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
-use std::path::Path;
+use rand::{CryptoRng, Rng};
+use std::{path::Path, sync::atomic::AtomicBool};
 
+#[derive(Clone, Debug)]
 pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
@@ -163,5 +165,46 @@ impl<N: Network> Ledger<N> {
     /// Adds the given block as the next block in the ledger to storage.
     pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
         self.canon.add_next_block(block)
+    }
+
+    /// Mines a new block and adds it to the canon blocks.
+    pub fn mine_next_block<R: Rng + CryptoRng>(&mut self, recipient: Address<N>, terminator: &AtomicBool, rng: &mut R) -> Result<()> {
+        // Prepare the new block.
+        let previous_block_hash = self.latest_block_hash();
+        let block_height = self.latest_block_height() + 1;
+
+        // Compute the block difficulty target.
+        let previous_timestamp = self.latest_block_timestamp()?;
+        let previous_difficulty_target = self.latest_block_difficulty_target()?;
+        let block_timestamp = chrono::Utc::now().timestamp();
+        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+
+        // Construct the new block transactions.
+        let amount = Block::<N>::block_reward(block_height);
+        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
+        let transactions = Transactions::from(&[vec![coinbase_transaction], self.memory_pool.transactions()].concat())?;
+
+        // Construct the ledger root.
+        let ledger_root = self.canon.latest_ledger_root();
+
+        // Mine the next block.
+        let block = Block::mine(
+            previous_block_hash,
+            block_height,
+            block_timestamp,
+            difficulty_target,
+            ledger_root,
+            transactions,
+            terminator,
+            rng,
+        )?;
+
+        // Attempt to add the block to the canon chain.
+        self.add_next_block(&block)?;
+
+        // On success, clear the memory pool of its transactions.
+        self.memory_pool.clear_transactions();
+
+        Ok(())
     }
 }

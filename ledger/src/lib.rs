@@ -14,15 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate tracing;
+pub mod ledger;
+pub use ledger::*;
 
-pub mod environment;
-pub use environment::*;
+pub(crate) mod state;
 
-mod helpers;
-
-pub mod network;
-
-pub mod node;
-pub use node::*;
+pub mod storage;

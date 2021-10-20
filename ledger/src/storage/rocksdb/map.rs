@@ -16,6 +16,7 @@
 
 use super::*;
 
+#[derive(Clone, Debug)]
 pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
     pub(super) rocksdb: Arc<rocksdb::DB>,
     pub(super) context: Vec<u8>,
