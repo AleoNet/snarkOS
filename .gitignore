@@ -1,0 +1,9 @@
+.vscode
+**/*.idea/
+**/target
+**/.DS_Store
+**/.ledger
+**inner.proving*
+**outer.proving*
+**posw.proving*
+**universal.srs*

@@ -1,0 +1,16 @@
+# https://github.com/rust-lang/rustfmt/blob/master/Configurations.md
+
+# Stable configurations
+edition = "2018"
+max_width = 140
+merge_derives = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Nightly configurations
+imports_layout = "HorizontalVertical"
+license_template_path = ".resources/license_header"
+imports_granularity = "Crate"
+overflow_delimited_expr = true
+reorder_impl_items = true
+version = "Two"
