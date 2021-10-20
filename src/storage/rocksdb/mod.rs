@@ -20,6 +20,9 @@ pub(crate) use iterator::*;
 pub(crate) mod keys;
 pub(crate) use keys::*;
 
+pub(crate) mod map;
+pub(crate) use map::*;
+
 pub(crate) mod values;
 pub(crate) use values::*;
 
@@ -27,7 +30,7 @@ use crate::storage::{Map, Storage};
 
 use anyhow::Result;
 use serde::{
-    de::{DeserializeOwned, SeqAccess, Visitor},
+    de::{self, DeserializeOwned},
     ser::SerializeSeq,
     Deserializer,
     Serialize,
@@ -86,14 +89,14 @@ impl Storage for RocksDB {
             rocksdb: RocksDB,
         }
 
-        impl<'de> Visitor<'de> for RocksDBVisitor {
+        impl<'de> de::Visitor<'de> for RocksDBVisitor {
             type Value = ();
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "a rocksdb seq")
             }
 
-            fn visit_seq<A: SeqAccess<'de>>(self, mut map: A) -> std::result::Result<(), A::Error> {
+            fn visit_seq<A: de::SeqAccess<'de>>(self, mut map: A) -> std::result::Result<(), A::Error> {
                 while let Some((key, value)) = map.next_element::<(Vec<_>, Vec<_>)>()? {
                     self.rocksdb.rocksdb.put(&key, &value).map_err(|e| serde::de::Error::custom(e))?;
                 }
@@ -128,108 +131,5 @@ impl Serialize for RocksDB {
             iterator.next();
         }
         map.end()
-    }
-}
-
-pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
-    rocksdb: Arc<rocksdb::DB>,
-    context: Vec<u8>,
-    _phantom: PhantomData<(K, V)>,
-}
-
-impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<K, V> for DataMap<K, V> {
-    type Iterator = Iter<K, V>;
-    type Keys = Keys<K>;
-    type Values = Values<V>;
-
-    ///
-    /// Returns `true` if the given key exists in the map.
-    ///
-    fn contains_key<Q>(&self, key: &Q) -> Result<bool>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized,
-    {
-        self.get(key).map(|v| v.is_some())
-    }
-
-    ///
-    /// Returns the value for the given key from the map, if it exists.
-    ///
-    fn get<Q>(&self, key: &Q) -> Result<Option<V>>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized,
-    {
-        let mut key_buf = self.context.clone();
-        key_buf.reserve(bincode::serialized_size(&key)? as usize);
-        bincode::serialize_into(&mut key_buf, &key)?;
-        match self.rocksdb.get(&key_buf)? {
-            Some(data) => Ok(Some(bincode::deserialize(&data)?)),
-            None => Ok(None),
-        }
-    }
-
-    ///
-    /// Inserts the given key-value pair into the map.
-    ///
-    fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized,
-    {
-        let mut key_buf = self.context.clone();
-        key_buf.reserve(bincode::serialized_size(&key)? as usize);
-        bincode::serialize_into(&mut key_buf, &key)?;
-        let value_buf = bincode::serialize(value)?;
-
-        self.rocksdb.put(&key_buf, &value_buf)?;
-        Ok(())
-    }
-
-    ///
-    /// Removes the key-value pair for the given key from the map.
-    ///
-    fn remove<Q>(&self, key: &Q) -> Result<()>
-    where
-        K: Borrow<Q>,
-        Q: Serialize + ?Sized,
-    {
-        let mut key_buf = self.context.clone();
-        key_buf.reserve(bincode::serialized_size(&key)? as usize);
-        bincode::serialize_into(&mut key_buf, &key)?;
-
-        self.rocksdb.delete(&key_buf)?;
-        Ok(())
-    }
-
-    ///
-    /// Returns an iterator visiting each key-value pair in the map.
-    ///
-    fn iter(&self) -> Self::Iterator {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Iter::new(db_iter, self.context.clone())
-    }
-
-    ///
-    /// Returns an iterator over each key in the map.
-    ///
-    fn keys(&self) -> Self::Keys {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Keys::new(db_iter, self.context.clone())
-    }
-
-    ///
-    /// Returns an iterator over each value in the map.
-    ///
-    fn values(&self) -> Self::Values {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Values::new(db_iter, self.context.clone())
     }
 }
