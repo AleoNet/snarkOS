@@ -63,6 +63,7 @@ impl Consensus {
         ledger: DynLedger,
         storage: DynStorage,
         memory_pool: MemoryPool,
+        revalidate: bool,
     ) -> Arc<Self> {
         let (sender, receiver) = wrapped_mpsc::channel(snarkos_metrics::queues::CONSENSUS, 256);
         let created = Arc::new(Self {
@@ -85,6 +86,12 @@ impl Consensus {
             .agent(receiver)
             .await;
         });
+
+        if revalidate {
+            if let Err(e) = created.revalidate().await {
+                error!("failed to revalidate canon chain: {:?}", e);
+            };
+        }
 
         if let Err(e) = created.fast_forward().await {
             match e {
@@ -164,6 +171,12 @@ impl Consensus {
     /// Used for testing/rectifying use of `force_decommit`
     pub async fn fast_forward(&self) -> Result<(), ConsensusError> {
         self.send(ConsensusMessage::FastForward()).await
+    }
+
+    /// Revalidates canon blocks
+    /// Used to confirm/fix invalid blocks in storage
+    pub async fn revalidate(&self) -> Result<(), ConsensusError> {
+        self.send(ConsensusMessage::Revalidate()).await
     }
 
     /// Fully reset the ledger and the storage

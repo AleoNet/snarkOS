@@ -18,6 +18,7 @@ use std::{net::SocketAddr, time::Duration};
 
 use snarkos_metrics::wrapped_mpsc;
 use snarkos_storage::Digest;
+use tokio::time::Instant;
 
 use crate::{Node, Peer, SyncInbound};
 use anyhow::*;
@@ -109,11 +110,12 @@ impl SyncBase {
         moving_timeout_sec: u64,
         mut handler: F,
     ) {
-        loop {
-            let timeout = tokio::time::sleep(Duration::from_secs(timeout_sec));
-            let extra_time = Duration::from_secs(moving_timeout_sec);
+        let must_end = Instant::now() + Duration::from_secs(timeout_sec);
+        let timeout = tokio::time::sleep_until(must_end);
+        let extra_time = Duration::from_secs(moving_timeout_sec);
+        tokio::pin!(timeout);
 
-            tokio::pin!(timeout);
+        loop {
             tokio::select! {
                 biased;
 
@@ -127,8 +129,8 @@ impl SyncBase {
                     if handler(msg.unwrap()) {
                         break;
                     }
-                    let updated_timeout = timeout.deadline() + extra_time;
-                    timeout.as_mut().reset(updated_timeout);
+                    let new_timeout = (Instant::now() + extra_time).min(must_end);
+                    timeout.as_mut().reset(new_timeout);
                 },
             }
         }

@@ -329,6 +329,29 @@ impl SyncStorage for SqliteStorage {
         ",
             [hash],
         )?;
+
+        // clean messy sqlite fk constraints
+        self.conn.execute(
+            r"
+            DELETE FROM transaction_blocks
+            WHERE id IN (
+                SELECT tb.id FROM transaction_blocks tb
+                LEFT JOIN blocks b ON b.id = tb.block_id WHERE b.id IS NULL
+            );
+        ",
+            [],
+        )?;
+
+        self.conn.execute(
+            r"
+            DELETE FROM transactions
+            WHERE id IN (
+                SELECT t.id FROM transactions t
+                LEFT JOIN transaction_blocks tb ON tb.transaction_id = t.id WHERE tb.id IS NULL
+            );
+        ",
+            [],
+        )?;
         Ok(())
     }
 
@@ -1307,24 +1330,32 @@ impl SyncStorage for SqliteStorage {
     }
 
     fn trim(&mut self) -> Result<()> {
-        // Remove transactions belonging to non-canon blocks.
+        // Remove non-canon blocks.
+        self.conn
+            .execute(r"DELETE FROM blocks WHERE blocks.canon_height IS NULL", [])?;
+
+        // Remove hanging transactions
         self.conn.execute(
             r"
-            DELETE FROM transactions
+            DELETE FROM transaction_blocks
             WHERE id IN (
-                SELECT transactions.id
-                FROM transactions
-                LEFT JOIN transaction_blocks on transaction_blocks.transaction_id = transactions.id
-                LEFT JOIN blocks on blocks.id = transaction_blocks.block_id
-                WHERE transaction_blocks.transaction_id IS NULL OR blocks.canon_height IS NULL
-            )
+                SELECT tb.id FROM transaction_blocks tb
+                LEFT JOIN blocks b ON b.id = tb.block_id WHERE b.id IS NULL
+            );
         ",
             [],
         )?;
 
-        // Remove non-canon blocks.
-        self.conn
-            .execute(r"DELETE FROM blocks WHERE blocks.canon_height IS NULL", [])?;
+        self.conn.execute(
+            r"
+            DELETE FROM transactions
+            WHERE id IN (
+                SELECT t.id FROM transactions t
+                LEFT JOIN transaction_blocks tb ON tb.transaction_id = t.id WHERE tb.id IS NULL
+            );
+        ",
+            [],
+        )?;
 
         // Compact the storage file.
         self.conn.execute("VACUUM", [])?;

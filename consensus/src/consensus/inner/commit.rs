@@ -17,7 +17,7 @@
 use super::*;
 use crate::ledger::dummy::DummyLedger;
 use snarkos_metrics as metrics;
-use snarkos_storage::DigestTree;
+use snarkos_storage::{DigestTree, SerialBlockHeader};
 use snarkvm_dpc::AleoAmount;
 use tokio::task;
 
@@ -155,8 +155,16 @@ impl ConsensusInner {
             BlockStatus::Uncommitted => (),
         }
 
+        let canon = self.storage.canon().await?;
+        let canon_header = self.storage.get_block_header(&canon.hash).await?;
+
         // 1. Verify that the block valid
-        if !self.verify_block(block).await? {
+        if !self
+            .verify_block(block, canon_header, canon.block_height as u32)
+            .await?
+        {
+            debug!("failed to validate block '{}', deleting from storage...", hash);
+            self.storage.delete_block(hash).await?;
             return Err(ConsensusError::InvalidBlock(hash.clone()));
         }
 
@@ -175,10 +183,14 @@ impl ConsensusInner {
 
     /// Check if the block is valid.
     /// Verify transactions and transaction fees.
-    pub(super) async fn verify_block(&mut self, block: &SerialBlock) -> Result<bool, ConsensusError> {
-        let canon = self.storage.canon().await?;
+    pub(super) async fn verify_block(
+        &mut self,
+        block: &SerialBlock,
+        parent_header: SerialBlockHeader,
+        parent_height: u32,
+    ) -> Result<bool, ConsensusError> {
         // Verify the block header
-        if block.header.previous_block_hash != canon.hash {
+        if block.header.previous_block_hash != parent_header.hash() {
             return Err(anyhow!("attempted to commit a block that wasn't a direct child of tip of canon").into());
         }
 
@@ -206,7 +218,7 @@ impl ConsensusInner {
 
         // Check that there is only 1 coinbase transaction
         // Check that the block value balances are correct
-        let expected_block_reward = crate::get_block_reward(canon.block_height as u32).0;
+        let expected_block_reward = crate::get_block_reward(parent_height).0;
         if total_value_balance.0 + expected_block_reward != 0 {
             trace!("total_value_balance: {:?}", total_value_balance);
             trace!("expected_block_reward: {:?}", expected_block_reward);
@@ -215,7 +227,6 @@ impl ConsensusInner {
         }
 
         let block_header = block.header.clone();
-        let parent_header = self.storage.get_block_header(&canon.hash).await?;
         let transaction_ids: Vec<[u8; 32]> = block.transactions.iter().map(|x| x.id).collect();
         let consensus = self.public.clone();
 
@@ -340,6 +351,27 @@ impl ConsensusInner {
         }
         self.cleanse_memory_pool()?;
         Ok(out)
+    }
+
+    pub(super) async fn revalidate(&mut self) -> Result<(), ConsensusError> {
+        let blocks = self.storage.get_canon_blocks(None).await?;
+        let mut last_header = None;
+        for (i, block) in blocks.into_iter().enumerate() {
+            if i == 0 {
+                last_header = Some(block.header);
+                continue;
+            }
+            if !self
+                .verify_block(&block, last_header.take().unwrap(), i as u32 - 1)
+                .await?
+            {
+                info!("found invalid block in canon chain at height {}, decomitting...", i);
+                self.decommit_ledger_block(&block.header.hash()).await?;
+                break;
+            }
+            last_header = Some(block.header);
+        }
+        Ok(())
     }
 
     pub(super) async fn try_to_fast_forward(&mut self) -> Result<(), ConsensusError> {
