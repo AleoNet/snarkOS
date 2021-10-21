@@ -118,6 +118,7 @@ impl MineContext {
         parent_header: &SerialBlockHeader,
         terminator: &AtomicBool,
     ) -> Result<SerialBlockHeader, ConsensusError> {
+        info!("FABIANO: finding a block launched");
         let txids = transactions.iter().map(|x| x.id).collect::<Vec<_>>();
         let (merkle_root_hash, pedersen_merkle_root_hash, subroots) = txids_to_roots(&txids);
 
@@ -132,6 +133,7 @@ impl MineContext {
             &mut thread_rng(),
             self.consensus.parameters.max_nonce,
         );
+        info!("FABIANO: finding a block finished main proc");
         let (nonce, proof) = match mined {
             Err(PoswError::SnarkError(SNARKError::Terminated)) => {
                 // technically a race condition, but non-critical
@@ -193,7 +195,13 @@ impl MineContext {
 
         let ctx = self.clone();
         let txs = transactions.clone();
-        let header = task::spawn_blocking(move || ctx.find_block(&txs, &canon_header, &terminator)).await??;
+        info!("FABIANO: about to find a block");
+        let header = task::spawn_blocking(move || {
+            info!("FABIANO: block finder thread launched");
+            let x = ctx.find_block(&txs, &canon_header, &terminator);
+            info!("FABIANO: block finder thread terminated, is_ok: {}", x.is_ok());
+            x
+        }).await??;
 
         debug!("Miner@{}: found a block", canon.block_height);
 
