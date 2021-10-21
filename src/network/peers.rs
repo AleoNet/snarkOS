@@ -22,7 +22,7 @@ use anyhow::{anyhow, Result};
 use futures::SinkExt;
 use once_cell::sync::OnceCell;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
@@ -48,6 +48,8 @@ pub(crate) struct Peers<N: Network> {
     peers: HashMap<SocketAddr, Outbound<N>>,
     /// The local address of this node.
     local_ip: OnceCell<SocketAddr>,
+    /// A set of candidate peer IPs.
+    candidate_peers: HashSet<SocketAddr>,
 }
 
 impl<N: Network> Peers<N> {
@@ -56,6 +58,7 @@ impl<N: Network> Peers<N> {
         Self {
             peers: HashMap::new(),
             local_ip: OnceCell::new(),
+            candidate_peers: HashSet::new(),
         }
     }
 
@@ -64,9 +67,26 @@ impl<N: Network> Peers<N> {
         self.peers.contains_key(&ip)
     }
 
+    /// Returns the list of connected peers.
+    pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
+        self.peers.keys().cloned().collect()
+    }
+
     /// Returns the number of connected peers.
     pub(crate) fn num_connected_peers(&self) -> usize {
         self.peers.len()
+    }
+
+    /// Adds the given peer IPs to the set of candidate peers.
+    pub(crate) fn add_candidate_peers<E: Environment>(&mut self, peers: Vec<SocketAddr>) {
+        for ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
+            if self.candidate_peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
+                // Ensure the peer is a new candidate.
+                if !self.peers.contains_key(ip) && !self.candidate_peers.contains(ip) {
+                    self.candidate_peers.insert(*ip);
+                }
+            }
+        }
     }
 
     /// Returns the local IP address of the node.
@@ -78,25 +98,34 @@ impl<N: Network> Peers<N> {
     }
 
     /// Sends the given message to specified peer.
-    async fn send(&mut self, peer: SocketAddr, message: &Message<N>) -> Result<()> {
+    pub(crate) async fn send(&mut self, peer: SocketAddr, message: &Message<N>) {
         match self.peers.get(&peer) {
             Some(outbound) => {
-                outbound.send(message.clone()).await?;
-                Ok(())
+                debug!("Sending '{}' to {}", message.name(), peer);
+                if let Err(error) = outbound.send(message.clone()).await {
+                    error!("{}", error);
+                    self.peers.remove(&peer);
+                }
             }
-            None => Err(anyhow!("Attempted to send to a non-connected peer {}", peer)),
+            None => error!("Attempted to send to a non-connected peer {}", peer),
+        }
+    }
+
+    /// Sends the given message to every connected peer.
+    pub(crate) async fn broadcast(&mut self, message: &Message<N>) {
+        for peer in self.connected_peers() {
+            self.send(peer, message).await;
         }
     }
 
     /// Sends the given message to every connected peer, except for the sender.
-    pub(crate) async fn broadcast(&mut self, sender: SocketAddr, message: &Message<N>) -> Result<()> {
-        for peer in self.peers.iter_mut() {
-            if *peer.0 != sender {
-                info!("Sending {} to {}", message.name(), peer.0);
-                let _ = peer.1.send(message.clone()).await?;
+    pub(crate) async fn propagate(&mut self, sender: SocketAddr, message: &Message<N>) {
+        for peer in self.connected_peers() {
+            trace!("Preparing to propagate '{}' to {}", message.name(), peer);
+            if peer != sender {
+                self.send(peer, message).await;
             }
         }
-        Ok(())
     }
 
     /// Initiates a connection request to the given IP address.
@@ -112,7 +141,7 @@ impl<N: Network> Peers<N> {
             .set(discovered_local_ip)
             .expect("The local IP address was set more than once!");
 
-        info!("Initializing the listener...");
+        debug!("Initializing the listener...");
         Ok(task::spawn(async move {
             info!("Listening for peers at {}", discovered_local_ip);
             loop {
@@ -170,9 +199,9 @@ impl<N: Network> Peers<N> {
         else {
             let peers_clone = peers.clone();
             tokio::spawn(async move {
-                debug!("Received a connection request from {}", peer_ip);
-                if let Err(error) = Peer::handler(peers_clone, stream).await {
-                    error!("Failed to receive a connection from {}: {}", peer_ip, error);
+                trace!("Received a connection request from {}", peer_ip);
+                if let Err(error) = Peer::handler::<E>(peers_clone, stream).await {
+                    trace!("{}", error);
                 }
             });
         }
@@ -197,7 +226,7 @@ struct Peer<N: Network> {
 
 impl<N: Network> Peer<N> {
     /// Create a new instance of `Peer`.
-    async fn new(peers: Arc<Mutex<Peers<N>>>, stream: TcpStream) -> Result<Self> {
+    async fn new<E: Environment>(peers: Arc<Mutex<Peers<N>>>, stream: TcpStream) -> Result<Self> {
         // Construct the socket.
         let mut socket = Framed::new(stream, BytesCodec::new());
 
@@ -206,6 +235,9 @@ impl<N: Network> Peer<N> {
 
         // Get the IP address of the peer.
         let mut peer_ip = socket.get_ref().peer_addr()?;
+
+        // TODO (howardwu): Move this upstream.
+        let genesis_block_header = N::genesis_block().header().clone();
 
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(local_ip.port(), CHALLENGE_HEIGHT);
@@ -221,10 +253,22 @@ impl<N: Network> Peer<N> {
                 // Process the message.
                 match message {
                     Message::ChallengeRequest(listener_port, _block_height) => {
-                        // Update the peer IP to the listener port.
-                        peer_ip.set_port(listener_port);
+                        // Verify the listener port.
+                        if peer_ip.port() != listener_port {
+                            // Update the peer IP to the listener port.
+                            peer_ip.set_port(listener_port);
+                            // Ensure the claimed listener port is open.
+                            match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
+                                Ok(stream) => {
+                                    if let Err(error) = stream {
+                                        return Err(anyhow!("Failed to connect to '{}': '{:?}'", peer_ip, error));
+                                    }
+                                }
+                                Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
+                            };
+                        }
                         // Send the challenge response.
-                        let message = Message::ChallengeResponse(N::genesis_block().header().clone());
+                        let message = Message::ChallengeResponse(genesis_block_header.clone());
                         debug!("Sending '{}-B' to {}", message.name(), peer_ip);
                         socket.send(Bytes::from(message.serialize()?)).await?;
                     }
@@ -240,7 +284,7 @@ impl<N: Network> Peer<N> {
             // An error occurred.
             Some(Err(error)) => return Err(anyhow!("Failed to get challenge request from {}: {:?}", peer_ip, error)),
             // Did not receive anything.
-            None => return Err(anyhow!("Failed to get challenge request from {}, peer has disconnected", peer_ip)),
+            None => return Err(anyhow!("Dropped prior to the challenge request of {}", peer_ip)),
         };
 
         // Wait for the challenge response to come in.
@@ -253,10 +297,7 @@ impl<N: Network> Peer<N> {
                 match message {
                     Message::ChallengeResponse(block_header) => {
                         // TODO (howardwu): Check that the block headers are the same.
-                        match block_header.height() == CHALLENGE_HEIGHT
-                            && &block_header == N::genesis_block().header()
-                            && block_header.is_valid()
-                        {
+                        match block_header.height() == CHALLENGE_HEIGHT && block_header == genesis_block_header && block_header.is_valid() {
                             true => {
                                 // Sleep for 1 second to ensure challenge is complete for both parties.
                                 tokio::time::sleep(Duration::from_secs(1)).await;
@@ -309,20 +350,31 @@ impl<N: Network> Peer<N> {
     }
 
     /// A handler to process an individual peer.
-    async fn handler(peers: Arc<Mutex<Peers<N>>>, stream: TcpStream) -> Result<(), Box<dyn Error>> {
+    async fn handler<E: Environment>(peers: Arc<Mutex<Peers<N>>>, stream: TcpStream) -> Result<(), Box<dyn Error>> {
         // Register our peer with state which internally sets up some channels.
-        let mut peer = Peer::new(peers.clone(), stream).await?;
+        let mut peer = Peer::new::<E>(peers.clone(), stream).await?;
         let peer_ip = peer.ip();
 
         info!("Connected to {}", peer_ip);
+
+        let peers_clone = peers.clone();
+        tokio::spawn(async move {
+            loop {
+                // Update the peers.
+                let mut peers = peers_clone.lock().await;
+                peers.broadcast(&Message::PeerRequest).await;
+                // Sleep for 120 seconds.
+                tokio::time::sleep(Duration::from_secs(120)).await;
+            }
+        });
 
         // Process incoming messages until this stream is disconnected.
         loop {
             tokio::select! {
                 // Message channel is routing a message outbound to the peer.
                 Some(message) = peer.router.recv() => {
-                    // Disconnect if the peer has not communicated back in 5 minutes.
-                    if peer.last_seen.elapsed() > Duration::from_secs(280) {
+                    // Disconnect if the peer has not communicated back in 2 minutes.
+                    if peer.last_seen.elapsed() > Duration::from_secs(120) {
                         break;
                     } else {
                         trace!("Routing a message outbound to {}", peer_ip);
@@ -332,30 +384,39 @@ impl<N: Network> Peer<N> {
                 result = peer.socket.next() => match result {
                     // Received a message from the peer.
                     Some(Ok(message)) => {
-                        // let mut peers = peers.lock().await;
-                        let message = Message::<N>::deserialize(&message)?;
-
-                        debug!("Received '{}' from {}", message.name(), peer_ip);
-
-                        // Update the last seen timestamp.
-                        peer.last_seen = Instant::now();
+                        // Deserialize the message.
+                        let message = match Message::<N>::deserialize(&message) {
+                            Ok(message) => {
+                                // Update the last seen timestamp.
+                                peer.last_seen = Instant::now();
+                                debug!("Received '{}' from {}", message.name(), peer_ip);
+                                message
+                            },
+                            Err(error) => {
+                                error!("{}", error);
+                                break;
+                            }
+                        };
 
                         // Process the message.
                         match message {
                             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => break, // Peer is not following the protocol.
+                            Message::PeerRequest => {
+                                peer.send(&Message::PeerResponse(peers.lock().await.connected_peers())).await?;
+                            }
+                            Message::PeerResponse(peer_ips) => {
+                                peers.lock().await.add_candidate_peers::<E>(peer_ips)
+                            }
                             Message::Ping(block_height) => {
                                 trace!("Received 'Ping({})' from {}", block_height, peer_ip);
                                 peer.send(&Message::Pong).await?;
                             },
                             Message::Pong => {
-                                // Sleep for 20 seconds.
-                                tokio::time::sleep(Duration::from_secs(20)).await;
+                                // Sleep for 60 seconds.
+                                tokio::time::sleep(Duration::from_secs(60)).await;
                                 peer.send(&Message::Ping(1)).await?;
-                                // peers.send(ip, &Message::Ping(4)).await?;
-                                // peers.broadcast(ip, &message).await?;
                             }
                         }
-
                     }
                     // An error occurred.
                     Some(Err(error)) => {
@@ -372,11 +433,9 @@ impl<N: Network> Peer<N> {
         }
 
         // When this is reached, it means the peer has disconnected.
-        {
-            let mut peers = peers.lock().await;
-            peers.peers.remove(&peer_ip);
-            tracing::info!("{} has disconnected", peer_ip);
-        }
+        let mut peers = peers.lock().await;
+        peers.peers.remove(&peer_ip);
+        tracing::info!("Disconnecting from {}", peer_ip);
 
         Ok(())
     }

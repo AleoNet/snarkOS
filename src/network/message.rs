@@ -17,6 +17,7 @@
 use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
+use std::net::SocketAddr;
 
 #[derive(Clone, Debug)]
 pub enum Message<N: Network> {
@@ -24,6 +25,10 @@ pub enum Message<N: Network> {
     ChallengeRequest(u16, u32),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(BlockHeader<N>),
+    /// PeerRequest := ()
+    PeerRequest,
+    /// PeerResponse := (\[peer_ip\])
+    PeerResponse(Vec<SocketAddr>),
     /// Ping := (block_height)
     Ping(u32),
     /// Pong := ()
@@ -37,6 +42,8 @@ impl<N: Network> Message<N> {
         match self {
             Self::ChallengeRequest(..) => "ChallengeRequest",
             Self::ChallengeResponse(..) => "ChallengeResponse",
+            Self::PeerRequest => "PeerRequest",
+            Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
             Self::Pong => "Pong",
         }
@@ -48,8 +55,10 @@ impl<N: Network> Message<N> {
         match self {
             Self::ChallengeRequest(..) => 0,
             Self::ChallengeResponse(..) => 1,
-            Self::Ping(..) => 2,
-            Self::Pong => 3,
+            Self::PeerRequest => 2,
+            Self::PeerResponse(..) => 3,
+            Self::Ping(..) => 4,
+            Self::Pong => 5,
         }
     }
 
@@ -61,6 +70,8 @@ impl<N: Network> Message<N> {
                 Ok([listener_port.to_le_bytes().to_vec(), block_height.to_le_bytes().to_vec()].concat())
             }
             Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
+            Self::PeerRequest => Ok(vec![]),
+            Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(block_height) => Ok(block_height.to_le_bytes().to_vec()),
             Self::Pong => Ok(vec![]),
         }
@@ -91,10 +102,15 @@ impl<N: Network> Message<N> {
                 bincode::deserialize(&data[2..])?,
             )),
             1 => Ok(Self::ChallengeResponse(bincode::deserialize(data)?)),
-            2 => Ok(Self::Ping(bincode::deserialize(data)?)),
-            3 => match data.len() == 0 {
+            2 => match data.len() == 0 {
+                true => Ok(Self::PeerRequest),
+                false => Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
+            },
+            3 => Ok(Self::PeerResponse(bincode::deserialize(data)?)),
+            4 => Ok(Self::Ping(bincode::deserialize(data)?)),
+            5 => match data.len() == 0 {
                 true => Ok(Self::Pong),
-                false => Err(anyhow!("Invalid 'Pong' message")),
+                false => Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
             },
             _ => Err(anyhow!("Invalid message ID {}", id)),
         }
