@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::dpc::Network;
-
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -34,7 +32,7 @@ pub enum NodeType {
 }
 
 #[rustfmt::skip]
-pub trait Environment<N: Network>: 'static + Clone + Default + Send + Sync {
+pub trait Environment: 'static + Clone + Default + Send + Sync {
     const NODE_TYPE: NodeType;
 
     /// If `true`, a mining node will craft public coinbase transactions.
@@ -42,10 +40,10 @@ pub trait Environment<N: Network>: 'static + Clone + Default + Send + Sync {
     /// If `true`, a node will remote fetch blocks from genesis.
     const FAST_SYNC: bool = true;
 
-    /// The port for communication with a node server.
-    const NODE_PORT: u16 = 4130 + N::NETWORK_ID;
-    /// The port for communication with an RPC server.
-    const RPC_PORT: u16 = 3030 + N::NETWORK_ID;
+    // /// The port for communication with a node server.
+    // const NODE_PORT: u16 = 4130 + N::NETWORK_ID;
+    // /// The port for communication with an RPC server.
+    // const RPC_PORT: u16 = 3030 + N::NETWORK_ID;
 
     /// The list of peer nodes to bootstrap the node server with.
     const PEER_NODES: Vec<&'static str>;
@@ -53,9 +51,9 @@ pub trait Environment<N: Network>: 'static + Clone + Default + Send + Sync {
     const SYNC_NODES: Vec<&'static str>;
 
     /// The minimum number of peers required to maintain connections with.
-    const MINIMUM_NUMBER_OF_PEERS: u16 = 5;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 5;
     /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: u16 = 25;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 25;
 
     /// The maximum amount of time in which a handshake with a regular node can conclude before dropping the
     /// connection; it should be no greater than the `peer_sync_interval`.
@@ -91,7 +89,7 @@ pub trait Environment<N: Network>: 'static + Clone + Default + Send + Sync {
 pub struct Miner;
 
 #[rustfmt::skip]
-impl<N: Network> Environment<N> for Miner {
+impl Environment for Miner {
     const NODE_TYPE: NodeType = NodeType::Miner;
 
     const COINBASE_IS_PUBLIC: bool = true;

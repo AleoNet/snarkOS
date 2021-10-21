@@ -14,11 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, peers::Peers, Environment, NodeType};
+use crate::{
+    helpers::Tasks,
+    network::{errors::NetworkError, peers::Peers, Version},
+    Environment,
+    NodeType,
+};
 use snarkos_ledger::{ledger::Ledger, storage::rocksdb::RocksDB};
 use snarkvm::dpc::{Address, Block, Network};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use once_cell::sync::OnceCell;
 use rand::{thread_rng, Rng};
 use std::{
     marker::PhantomData,
@@ -29,11 +35,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{
-    net::TcpListener,
-    sync::{mpsc, Mutex},
-    task,
-};
+use tokio::{net::TcpListener, task};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -45,14 +47,16 @@ pub enum Status {
 }
 
 /// A node server implementation.
-#[derive(Clone)]
-pub struct Node<E: Environment, N: Network> {
+#[derive(Clone, Debug)]
+pub struct Node<N: Network, E: Environment<N>> {
     /// A random numeric identifier for the node.
     id: u64,
     /// The current status of the node.
     status: Arc<AtomicU8>,
+    /// The local address of this node.
+    local_ip: OnceCell<SocketAddr>,
     /// The list of peers for the node.
-    peers: Arc<Mutex<Peers>>,
+    pub(super) peers: Peers<N, E>,
     /// The ledger state of the node.
     ledger: Ledger<N>,
     /// The list of tasks spawned by the node.
@@ -63,14 +67,15 @@ pub struct Node<E: Environment, N: Network> {
     _phantom: PhantomData<E>,
 }
 
-impl<E: Environment, N: Network> Node<E, N> {
+impl<N: Network, E: Environment<N>> Node<N, E> {
     pub fn new() -> Result<Self> {
         // Initialize the node.
         let node = Self {
             id: thread_rng().gen(),
             status: Arc::new(AtomicU8::new(0)),
-            peers: Arc::new(Mutex::new(Peers::new())),
-            ledger: Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?,
+            local_ip: OnceCell::new(),
+            peers: Peers::<N, E>::new(),
+            ledger: Ledger::<N>::open::<RocksDB, _>(".ledger")?,
             tasks: Tasks::new(),
             terminator: Arc::new(AtomicBool::new(false)),
             _phantom: PhantomData,
@@ -94,6 +99,7 @@ impl<E: Environment, N: Network> Node<E, N> {
     #[inline]
     pub fn set_status(&self, state: Status) {
         self.status.store(state as u8, Ordering::SeqCst);
+
         match state {
             Status::ShuttingDown => {
                 // debug!("Shutting down");
@@ -104,21 +110,78 @@ impl<E: Environment, N: Network> Node<E, N> {
         }
     }
 
-    /// Initializes the listener for peers.
+    /// Updates the local IP address of the node to the given address.
     #[inline]
-    pub async fn start_listener(&self, port: &str) -> Result<()> {
-        let peers = self.peers.clone();
-        let listener = Peers::listen::<E>(peers, port).await?;
-        self.add_task(listener)
+    pub fn set_local_ip(&self, ip_address: SocketAddr) {
+        self.local_ip.set(ip_address).expect("The local IP address was set more than once!");
+    }
+
+    /// Initializes a listener for connections.
+    #[inline]
+    pub async fn start_listener(&self) -> Result<()> {
+        let listener = TcpListener::bind(&format!("127.0.0.1:{}", E::NODE_PORT)).await?;
+
+        // Update the local IP address of the node.
+        let discovered_local_ip = listener.local_addr()?;
+        self.set_local_ip(discovered_local_ip);
+
+        info!("Initializing the listener...");
+        let node = self.clone();
+        self.add_task(task::spawn(async move {
+            info!("Listening for peers at {}", discovered_local_ip);
+            loop {
+                match listener.accept().await {
+                    Ok((stream, remote_address)) => {
+                        // if !node.can_connect() {
+                        //     continue;
+                        // }
+                        let node_clone = node.clone();
+                        tokio::spawn(async move {
+                            if let Err(error) = node_clone.peers.receive_connection(node_clone.clone(), remote_address, stream) {
+                                error!("Failed to receive a connection: {}", error);
+                            }
+                        });
+                        // Adds a small delay to avoid connecting above the limit.
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                    Err(error) => error!("Failed to accept a connection: {}", error),
+                }
+            }
+        }));
+        Ok(())
+    }
+
+    /// Initializes the peers.
+    #[inline]
+    pub async fn connect_to(&self, remote_ip: SocketAddr) -> Result<()> {
+        debug!("Connecting to {}...", remote_ip);
+
+        // The local IP address must be known by now.
+        let own_address = self.expect_local_addr();
+
+        // // Don't connect if maximum number of connections has been reached.
+        // if !self.can_connect() {
+        //     return Err(NetworkError::TooManyConnections);
+        // }
+
+        if remote_ip == own_address
+            || ((remote_ip.ip().is_unspecified() || remote_ip.ip().is_loopback()) && remote_ip.port() == own_address.port())
+        {
+            return Err(NetworkError::SelfConnectAttempt.into());
+        }
+        // if self.peers.is_connected(remote_ip) {
+        //     return Err(NetworkError::PeerAlreadyConnected.into());
+        // }
+
+        self.peers.connect_to(self.clone(), remote_ip).await?;
+        Ok(())
     }
 
     /// Initializes a miner.
     #[inline]
-    pub fn start_miner(&self, miner_address: Address<N>) -> Result<()> {
+    pub fn start_miner(&self, miner_address: Address<N>) {
         // If the node is a mining node, initialize a miner.
-        if E::NODE_TYPE != NodeType::Miner {
-            Err(anyhow!("Node is not a mining node"))
-        } else {
+        if E::NODE_TYPE == NodeType::Miner {
             let node = self.clone();
             self.add_task(task::spawn(async move {
                 let rng = &mut thread_rng();
@@ -138,54 +201,27 @@ impl<E: Environment, N: Network> Node<E, N> {
                         }
                     }
                 }
-            }))
+            }));
         }
     }
 
-    // /// Initializes the peers.
-    // #[inline]
-    // pub async fn connect_to(&self, remote_ip: SocketAddr) -> Result<()> {
-    //     debug!("Connecting to {}...", remote_ip);
-    //
-    //     // The local IP address must be known by now.
-    //     let own_address = self.expect_local_addr();
-    //
-    //     // // Don't connect if maximum number of connections has been reached.
-    //     // if !self.can_connect() {
-    //     //     return Err(NetworkError::TooManyConnections);
-    //     // }
-    //
-    //     if remote_ip == own_address
-    //         || ((remote_ip.ip().is_unspecified() || remote_ip.ip().is_loopback()) && remote_ip.port() == own_address.port())
-    //     {
-    //         return Err(NetworkError::SelfConnectAttempt.into());
-    //     }
-    //     // if self.peers.is_connected(remote_ip) {
-    //     //     return Err(NetworkError::PeerAlreadyConnected.into());
-    //     // }
-    //
-    //     self.peers.connect_to(self.clone(), remote_ip).await?;
-    //     Ok(())
-    // }
-
     /// Adds the given task handle to the node.
     #[inline]
-    pub fn add_task(&self, handle: task::JoinHandle<()>) -> Result<()> {
+    pub fn add_task(&self, handle: task::JoinHandle<()>) {
         self.tasks.append(handle);
-        Ok(())
     }
 
-    // /// Returns a version message for this node.
-    // #[inline]
-    // pub fn version(&self) -> Version {
-    //     Version::new(E::PROTOCOL_VERSION, self.expect_local_addr().port(), self.id)
-    // }
-    //
-    // #[deprecated]
-    // #[inline]
-    // pub fn expect_local_addr(&self) -> SocketAddr {
-    //     self.local_ip.get().copied().expect("no address set!")
-    // }
+    /// Returns a version message for this node.
+    #[inline]
+    pub fn version(&self) -> Version {
+        Version::new(E::PROTOCOL_VERSION, self.expect_local_addr().port(), self.id)
+    }
+
+    #[deprecated]
+    #[inline]
+    pub fn expect_local_addr(&self) -> SocketAddr {
+        self.local_ip.get().copied().expect("no address set!")
+    }
 
     /// Disconnects from peers and proceeds to shut down the node.
     #[inline]

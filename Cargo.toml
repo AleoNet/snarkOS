@@ -21,6 +21,8 @@ members = ["ledger"]
 
 [dependencies]
 snarkvm = { path = "../snarkVM", features = ["parameters"] }
+futures = { version = "0.3.0", features = ["thread-pool"]}
+bytes = "1.0.0"
 
 [dependencies.snarkos-ledger]
 path = "./ledger"
@@ -76,6 +78,13 @@ features = [
     "sync",
     "time"
 ]
+
+[dependencies.tokio-util]
+version = "=0.6.3"
+features = ["full"]
+
+[dependencies.tokio-stream]
+version = "=0.1"
 
 [dependencies.tracing]
 version = "0.1"

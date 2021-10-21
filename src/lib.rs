@@ -20,9 +20,18 @@ extern crate tracing;
 pub mod environment;
 pub use environment::*;
 
+pub mod errors;
+pub use errors::*;
+
 mod helpers;
 
-pub mod network;
+// pub mod network;
 
 pub mod node;
 pub use node::*;
+
+pub mod peers;
+pub use peers::*;
+
+pub mod version;
+pub use version::*;

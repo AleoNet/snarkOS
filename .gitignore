@@ -2,7 +2,7 @@
 **/*.idea/
 **/target
 **/.DS_Store
-**/.ledger
+**/.ledger*
 **inner.proving*
 **outer.proving*
 **posw.proving*

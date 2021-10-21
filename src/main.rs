@@ -23,7 +23,6 @@ use snarkvm::{
 
 use ::rand::thread_rng;
 use anyhow::Result;
-use tokio::{net::TcpListener, task};
 use tracing_subscriber::EnvFilter;
 
 pub fn initialize_logger() {
@@ -45,10 +44,8 @@ pub fn initialize_logger() {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // let addr = env::args()
-    //     .nth(1)
-    //     .unwrap_or_else(|| "127.0.0.1:8080".to_string());
-    //
+    let port = env::args().nth(1).unwrap_or_else(|| "4132".to_string());
+
     // let listener = TcpListener::bind(&addr).await?;
     // println!("Listening on: {}", addr);
 
@@ -57,9 +54,10 @@ async fn main() -> Result<()> {
 
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
-    let node = Node::<Testnet2, Miner>::new()?;
-    node.start_listener().await?;
-    node.start_miner(account.address());
+    let node = Node::<Miner, Testnet2>::new()?;
+    node.start_listener(&port).await?;
+    // node.connect_to("144.126.212.176:4132".parse().unwrap()).await?;
+    // node.start_miner(account.address());
 
     std::future::pending::<()>().await;
     Ok(())
