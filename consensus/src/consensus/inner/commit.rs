@@ -353,27 +353,6 @@ impl ConsensusInner {
         Ok(out)
     }
 
-    pub(super) async fn revalidate(&mut self) -> Result<(), ConsensusError> {
-        let blocks = self.storage.get_canon_blocks(None).await?;
-        let mut last_header = None;
-        for (i, block) in blocks.into_iter().enumerate() {
-            if i == 0 {
-                last_header = Some(block.header);
-                continue;
-            }
-            if !self
-                .verify_block(&block, last_header.take().unwrap(), i as u32 - 1)
-                .await?
-            {
-                info!("found invalid block in canon chain at height {}, decomitting...", i);
-                self.decommit_ledger_block(&block.header.hash()).await?;
-                break;
-            }
-            last_header = Some(block.header);
-        }
-        Ok(())
-    }
-
     pub(super) async fn try_to_fast_forward(&mut self) -> Result<(), ConsensusError> {
         let canon = self.storage.canon().await?;
         let mut children = self.storage.get_block_digest_tree(&canon.hash).await?;

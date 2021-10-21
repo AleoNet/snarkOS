@@ -182,7 +182,7 @@ pub async fn init_sync(config: &Config, storage: DynStorage) -> anyhow::Result<S
         ledger,
         storage.clone(),
         memory_pool,
-        true, // todo: make this configurable
+        !config.storage.no_recanonize,
     )
     .await;
     info!("Loaded Ledger");

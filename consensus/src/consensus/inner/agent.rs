@@ -91,15 +91,11 @@ impl ConsensusInner {
                     response.send(Box::new(out)).ok();
                 }
                 ConsensusMessage::ForceDecommit(hash) => {
-                    let out = self.decommit_ledger_block(&hash[..].into()).await;
+                    let out = self.decommit_ledger_block(&hash).await;
                     response.send(Box::new(out)).ok();
                 }
                 ConsensusMessage::FastForward() => {
                     let out = self.try_to_fast_forward().await;
-                    response.send(Box::new(out)).ok();
-                }
-                ConsensusMessage::Revalidate() => {
-                    let out = self.revalidate().await;
                     response.send(Box::new(out)).ok();
                 }
                 #[cfg(feature = "test")]
