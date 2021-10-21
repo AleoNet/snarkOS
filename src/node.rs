@@ -29,11 +29,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{
-    net::TcpListener,
-    sync::{mpsc, Mutex},
-    task,
-};
+use tokio::{sync::Mutex, task};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]

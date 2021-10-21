@@ -14,12 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Environment;
 use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
-use once_cell::sync::OnceCell;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub enum Message<N: Network> {
@@ -99,7 +96,7 @@ impl<N: Network> Message<N> {
                 true => Ok(Self::Pong),
                 false => Err(anyhow!("Invalid 'Pong' message")),
             },
-            _ => Err(anyhow!("Invalid message ID")),
+            _ => Err(anyhow!("Invalid message ID {}", id)),
         }
     }
 }

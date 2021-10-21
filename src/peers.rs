@@ -21,7 +21,12 @@ use ::bytes::Bytes;
 use anyhow::{anyhow, Result};
 use futures::SinkExt;
 use once_cell::sync::OnceCell;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, Mutex},
@@ -186,6 +191,8 @@ struct Peer<N: Network> {
     /// The `router` half of the MPSC message channel, used to receive messages from peers.
     /// When a message is received off of this `Router`, it will be written to the socket.
     router: Router<N>,
+    /// The timestamp of the last message received from this peer.
+    last_seen: Instant,
 }
 
 impl<N: Network> Peer<N> {
@@ -201,18 +208,16 @@ impl<N: Network> Peer<N> {
         let mut peer_ip = socket.get_ref().peer_addr()?;
 
         // Send a challenge request to the peer.
-        socket
-            .send(Bytes::from(
-                Message::<N>::ChallengeRequest(local_ip.port(), CHALLENGE_HEIGHT).serialize()?,
-            ))
-            .await?;
+        let message = Message::<N>::ChallengeRequest(local_ip.port(), CHALLENGE_HEIGHT);
+        debug!("Sending '{}' to {}", message.name(), peer_ip);
+        socket.send(Bytes::from(message.serialize()?)).await?;
 
         // Wait for the counterparty challenge request to come in.
         match socket.next().await {
             Some(Ok(message)) => {
                 // Deserialize the message.
                 let message = Message::<N>::deserialize(&message)?;
-                info!("Received '{}' from {}", message.name(), peer_ip);
+                debug!("Received '{}' from {}", message.name(), peer_ip);
                 // Process the message.
                 match message {
                     Message::ChallengeRequest(listener_port, _block_height) => {
@@ -220,6 +225,7 @@ impl<N: Network> Peer<N> {
                         peer_ip.set_port(listener_port);
                         // Send the challenge response.
                         let message = Message::ChallengeResponse(N::genesis_block().header().clone());
+                        debug!("Sending '{}' to {}", message.name(), peer_ip);
                         socket.send(Bytes::from(message.serialize()?)).await?;
                     }
                     message => {
@@ -242,13 +248,18 @@ impl<N: Network> Peer<N> {
             Some(Ok(message)) => {
                 // Deserialize the message.
                 let message = Message::<N>::deserialize(&message)?;
-                info!("Received '{}' from {}", message.name(), peer_ip);
+                debug!("Received '{}' from {}", message.name(), peer_ip);
                 // Process the message.
                 match message {
                     Message::ChallengeResponse(block_header) => {
-                        match block_header.height() == CHALLENGE_HEIGHT && block_header.is_valid() {
+                        // TODO (howardwu): Check that the block headers are the same.
+                        match block_header.height() == CHALLENGE_HEIGHT
+                            && &block_header == N::genesis_block().header()
+                            && block_header.is_valid()
+                        {
                             true => {
                                 let message = Message::<N>::Ping(0);
+                                debug!("Sending '{}' to {}", message.name(), peer_ip);
                                 socket.send(Bytes::from(message.serialize()?)).await?;
                             }
                             false => return Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
@@ -279,6 +290,7 @@ impl<N: Network> Peer<N> {
             ip: peer_ip,
             socket,
             router,
+            last_seen: Instant::now(),
         })
     }
 
@@ -288,7 +300,7 @@ impl<N: Network> Peer<N> {
     }
 
     async fn send(&mut self, message: &Message<N>) -> Result<()> {
-        info!("Sending '{}' to {}", message.name(), self.socket.get_ref().peer_addr()?);
+        debug!("Sending '{}' to {}", message.name(), self.socket.get_ref().peer_addr()?);
         self.socket.send(Bytes::from(message.serialize()?)).await?;
         Ok(())
     }
@@ -306,8 +318,13 @@ impl<N: Network> Peer<N> {
             tokio::select! {
                 // Message channel is routing a message outbound to the peer.
                 Some(message) = peer.router.recv() => {
-                    trace!("Routing a message outbound to {}", peer_ip);
-                    peer.send(&message).await?;
+                    // Disconnect if the peer has not communicated back in 5 minutes.
+                    if peer.last_seen.elapsed() > Duration::from_secs(280) {
+                        break;
+                    } else {
+                        trace!("Routing a message outbound to {}", peer_ip);
+                        peer.send(&message).await?;
+                    }
                 }
                 result = peer.socket.next() => match result {
                     // Received a message from the peer.
@@ -315,12 +332,16 @@ impl<N: Network> Peer<N> {
                         // let mut peers = peers.lock().await;
                         let message = Message::<N>::deserialize(&message)?;
 
-                        info!("Received '{}' from {}", message.name(), peer_ip);
+                        debug!("Received '{}' from {}", message.name(), peer_ip);
 
+                        // Update the last seen timestamp.
+                        peer.last_seen = Instant::now();
+
+                        // Process the message.
                         match message {
                             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => break, // Peer is not following the protocol.
                             Message::Ping(block_height) => {
-                                debug!("Received 'Ping({})' from {}", block_height, peer_ip);
+                                trace!("Received 'Ping({})' from {}", block_height, peer_ip);
                                 peer.send(&Message::Pong).await?;
                             },
                             Message::Pong => {
