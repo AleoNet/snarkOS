@@ -88,9 +88,11 @@ impl Consensus {
         });
 
         if revalidate {
+            info!("Revalidating canon chain...");
             if let Err(e) = created.revalidate().await {
                 error!("failed to revalidate canon chain: {:?}", e);
             };
+            info!("Revalidation finished");
         }
 
         if let Err(e) = created.fast_forward().await {
