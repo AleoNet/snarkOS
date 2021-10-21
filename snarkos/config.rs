@@ -129,6 +129,7 @@ pub struct Storage {
     pub scan_for_forks: bool,
     /// If `Some`, will reset canon to at most this block height.
     pub max_head: Option<u32>,
+    pub no_recanonize: bool,
 }
 
 impl Default for Config {
@@ -176,6 +177,7 @@ impl Default for Config {
                 trim: false,
                 validate: false,
                 scan_for_forks: false,
+                no_recanonize: false,
                 max_head: None,
             },
         }
@@ -250,6 +252,7 @@ impl Config {
             "no-jsonrpc" => self.no_jsonrpc(arguments.is_present(option)),
             "trim-storage" => self.trim_storage(arguments.is_present(option)),
             "validate-storage" => self.validate_storage(arguments.is_present(option)),
+            "no-recanonize" => self.storage.no_recanonize = arguments.is_present(option),
             // Options
             "connect" => self.connect(arguments.value_of(option)),
             "export-canon-blocks" => self.export_canon_blocks(clap::value_t!(arguments.value_of(*option), u32).ok()),
@@ -452,6 +455,7 @@ impl CLI for ConfigCli {
         flag::IS_MINER,
         flag::TRIM_STORAGE,
         flag::VALIDATE_STORAGE,
+        flag::NO_RECANONIZE,
     ];
     const NAME: NameType = "snarkOS";
     const OPTIONS: &'static [OptionType] = &[
@@ -498,6 +502,7 @@ impl CLI for ConfigCli {
             "rpc-password",
             "trim-storage",
             "validate-storage",
+            "no-recanonize",
             "verbose",
             "max-head",
         ]);

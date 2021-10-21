@@ -16,7 +16,7 @@
 
 use std::any::Any;
 
-use snarkos_storage::{PrivateKey, SerialBlock, SerialRecord, SerialTransaction};
+use snarkos_storage::{Digest, PrivateKey, SerialBlock, SerialRecord, SerialTransaction};
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
@@ -44,9 +44,8 @@ pub(super) enum ConsensusMessage {
     FetchMemoryPool(usize), // max size of memory pool to fetch
     CreateTransaction(Box<CreateTransactionRequest>),
     CreatePartialTransaction(CreatePartialTransactionRequest),
-    ForceDecommit(Vec<u8>),
+    ForceDecommit(Digest),
     FastForward(),
-    Revalidate(),
     #[cfg(feature = "test")]
     Reset(),
 }

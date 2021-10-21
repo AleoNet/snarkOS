@@ -24,14 +24,14 @@ use snarkvm_algorithms::MerkleParameters;
 
 use super::indexed_merkle_tree::IndexedMerkleTree;
 
-pub struct MerkleLedger<P: MerkleParameters> {
+pub struct MerkleLedger<P: MerkleParameters + 'static> {
     ledger_digests: IndexSet<Digest>,
     commitments: IndexedMerkleTree<P>,
     serial_numbers: IndexedMerkleTree<P>,
     memos: IndexedDigests,
 }
 
-impl<P: MerkleParameters> MerkleLedger<P> {
+impl<P: MerkleParameters + 'static> MerkleLedger<P> {
     pub fn new(
         parameters: Arc<P>,
         ledger_digests: &[Digest],
@@ -48,7 +48,7 @@ impl<P: MerkleParameters> MerkleLedger<P> {
     }
 }
 
-impl<P: MerkleParameters> Ledger for MerkleLedger<P> {
+impl<P: MerkleParameters + 'static> Ledger for MerkleLedger<P> {
     fn extend(
         &mut self,
         new_commitments: &[Digest],

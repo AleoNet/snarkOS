@@ -75,11 +75,12 @@ impl Consensus {
         });
 
         let created2 = created.clone();
+        let storage2 = storage.clone();
         tokio::spawn(async move {
             ConsensusInner {
                 public: created2,
                 ledger,
-                storage,
+                storage: storage2,
                 memory_pool,
                 recommit_taint: None,
             }
@@ -88,9 +89,17 @@ impl Consensus {
         });
 
         if revalidate {
-            if let Err(e) = created.revalidate().await {
-                error!("failed to revalidate canon chain: {:?}", e);
-            };
+            info!("Revalidating canon chain...");
+            match storage.get_block_hash(1).await {
+                Err(e) => warn!("failed to fetch first block for revalidation: {:?}", e),
+                Ok(None) => (),
+                Ok(Some(hash)) => {
+                    if let Err(e) = created.force_decommit(hash).await {
+                        warn!("failed to revalidate canon chain: {:?}", e);
+                    }
+                }
+            }
+            info!("Revalidation finished");
         }
 
         if let Err(e) = created.fast_forward().await {
@@ -164,19 +173,13 @@ impl Consensus {
     /// Forcefully decommit a block hash and its decendents
     /// Used for testing
     pub async fn force_decommit(&self, hash: Digest) -> Result<(), ConsensusError> {
-        self.send(ConsensusMessage::ForceDecommit(hash.0.to_vec())).await
+        self.send(ConsensusMessage::ForceDecommit(hash)).await
     }
 
     /// Run a fast forward operation
     /// Used for testing/rectifying use of `force_decommit`
     pub async fn fast_forward(&self) -> Result<(), ConsensusError> {
         self.send(ConsensusMessage::FastForward()).await
-    }
-
-    /// Revalidates canon blocks
-    /// Used to confirm/fix invalid blocks in storage
-    pub async fn revalidate(&self) -> Result<(), ConsensusError> {
-        self.send(ConsensusMessage::Revalidate()).await
     }
 
     /// Fully reset the ledger and the storage
