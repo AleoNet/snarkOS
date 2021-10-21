@@ -14,57 +14,89 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::dpc::{Block, Network};
+use snarkvm::prelude::*;
 
-use serde::{Deserialize, Serialize};
-use std::{fmt, net::SocketAddr};
+use anyhow::{anyhow, Result};
 
-/// A message transmitted over the network.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub enum Message<N: Network> {
-    // #[doc = include_str!("../../documentation/network_messages/block.md")]
-    // Block(Block<N>),
-    // #[doc = include_str!("../../documentation/network_messages/get_blocks.md")]
-    GetBlock(N::BlockHash),
-    // #[doc = include_str!("../../documentation/network_messages/get_memory_pool.md")]
-    // GetMemoryPool,
-    // #[doc = include_str!("../../documentation/network_messages/get_peers.md")]
-    GetPeers,
-    // #[doc = include_str!("../../documentation/network_messages/get_sync.md")]
-    // GetSync(Vec<Digest>),
-    // #[doc = include_str!("../../documentation/network_messages/memory_pool.md")]
-    // MemoryPool(Vec<Vec<u8>>),
-    // #[doc = include_str!("../../documentation/network_messages/peers.md")]
-    Peers(Vec<SocketAddr>),
-    // #[doc = include_str!("../../documentation/network_messages/ping.md")]
+    /// ChallengeRequest := (listener_port, block_height)
+    ChallengeRequest(u16, u32),
+    /// ChallengeResponse := (block_header)
+    ChallengeResponse(BlockHeader<N>),
+    /// Ping := (block_height)
     Ping(u32),
-    // #[doc = include_str!("../../documentation/network_messages/pong.md")]
+    /// Pong := ()
     Pong,
-    // #[doc = include_str!("../../documentation/network_messages/sync.md")]
-    // Sync(Vec<Digest>),
-    // #[doc = include_str!("../../documentation/network_messages/sync_block.md")]
-    // SyncBlock(Vec<u8>, Option<u32>),
-    // #[doc = include_str!("../../documentation/network_messages/transaction.md")]
-    // Transaction(Vec<u8>),
 }
 
-impl<N: Network> fmt::Display for Message<N> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let str = match self {
-            // Self::Block(..) => "block",
-            Self::GetBlock(..) => "getblock",
-            // Self::GetMemoryPool => "getmempool",
-            Self::GetPeers => "getpeers",
-            // Self::GetSync(..) => "getsync",
-            // Self::MemoryPool(..) => "memorypool",
-            Self::Peers(..) => "peers",
-            Self::Ping(..) => "ping",
-            Self::Pong => "pong",
-            // Self::Sync(..) => "sync",
-            // Self::SyncBlock(..) => "syncblock",
-            // Self::Transaction(..) => "transaction",
-        };
+impl<N: Network> Message<N> {
+    /// Returns the message name.
+    #[inline]
+    pub fn name(&self) -> &str {
+        match self {
+            Self::ChallengeRequest(..) => "ChallengeRequest",
+            Self::ChallengeResponse(..) => "ChallengeResponse",
+            Self::Ping(..) => "Ping",
+            Self::Pong => "Pong",
+        }
+    }
 
-        f.write_str(str)
+    /// Returns the message ID.
+    #[inline]
+    pub fn id(&self) -> u16 {
+        match self {
+            Self::ChallengeRequest(..) => 0,
+            Self::ChallengeResponse(..) => 1,
+            Self::Ping(..) => 2,
+            Self::Pong => 3,
+        }
+    }
+
+    /// Returns the message data as bytes.
+    #[inline]
+    pub fn data(&self) -> Result<Vec<u8>> {
+        match self {
+            Self::ChallengeRequest(listener_port, block_height) => {
+                Ok([listener_port.to_le_bytes().to_vec(), block_height.to_le_bytes().to_vec()].concat())
+            }
+            Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
+            Self::Ping(block_height) => Ok(block_height.to_le_bytes().to_vec()),
+            Self::Pong => Ok(vec![]),
+        }
+    }
+
+    /// Serializes the given message into bytes.
+    #[inline]
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        Ok([self.id().to_le_bytes().to_vec(), self.data()?].concat())
+    }
+
+    /// Deserializes the given buffer into a message.
+    #[inline]
+    pub fn deserialize(buffer: &[u8]) -> Result<Self> {
+        // Ensure the buffer contains at least the length of an ID.
+        if buffer.len() < 2 {
+            return Err(anyhow!("Invalid message buffer"));
+        }
+
+        // Split the buffer into the ID and data portion.
+        let id = u16::from_le_bytes([buffer[0], buffer[1]]);
+        let data = &buffer[2..];
+
+        // Deserialize the data field.
+        match id {
+            0 => Ok(Self::ChallengeRequest(
+                bincode::deserialize(&data[0..2])?,
+                bincode::deserialize(&data[2..])?,
+            )),
+            1 => Ok(Self::ChallengeResponse(bincode::deserialize(data)?)),
+            2 => Ok(Self::Ping(bincode::deserialize(data)?)),
+            3 => match data.len() == 0 {
+                true => Ok(Self::Pong),
+                false => Err(anyhow!("Invalid 'Pong' message")),
+            },
+            _ => Err(anyhow!("Invalid message ID {}", id)),
+        }
     }
 }

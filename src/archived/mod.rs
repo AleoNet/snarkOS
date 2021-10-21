@@ -14,11 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod errors;
-pub(crate) use errors::*;
+// This network module is a concoction of legacy mess, consider this code untrusted.
 
-pub(crate) mod message;
-pub(crate) use message::*;
+pub(super) mod errors;
+pub(super) use errors::*;
+
+pub(crate) mod handshake;
+
+mod message;
+
+mod peer;
+
+mod peer_quality;
 
 pub(crate) mod peers;
-pub(crate) use peers::*;
+
+pub mod version;
+pub use version::*;

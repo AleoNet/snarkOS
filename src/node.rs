@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, peers::Peers, Environment, NodeType};
+use crate::{helpers::Tasks, Environment, NodeType, Peers};
 use snarkos_ledger::{ledger::Ledger, storage::rocksdb::RocksDB};
 use snarkvm::dpc::{Address, Block, Network};
 
@@ -27,7 +27,6 @@ use std::{
         atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
-    time::Duration,
 };
 use tokio::{sync::Mutex, task};
 
