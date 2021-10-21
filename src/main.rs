@@ -35,19 +35,18 @@ pub fn initialize_logger() {
         _ => std::env::set_var("RUST_LOG", "info"),
     };
 
-    // disable undesirable logs
-    let filter = EnvFilter::from_default_env().add_directive("mio=off".parse().unwrap());
+    // Filter out undesirable logs.
+    let filter = EnvFilter::from_default_env()
+        .add_directive("mio=off".parse().unwrap())
+        .add_directive("tokio_util=off".parse().unwrap());
 
-    // initialize tracing
+    // Initialize tracing.
     tracing_subscriber::fmt().with_env_filter(filter).with_target(verbosity == 4).init();
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let port = env::args().nth(1).unwrap_or_else(|| "4132".to_string());
-
-    // let listener = TcpListener::bind(&addr).await?;
-    // println!("Listening on: {}", addr);
+    let port = env::args().nth(1).unwrap_or_else(|| "4132".to_string()).parse()?;
 
     initialize_logger();
     tracing::trace!("Hello world");
@@ -55,8 +54,8 @@ async fn main() -> Result<()> {
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
     let node = Node::<Miner, Testnet2>::new()?;
-    node.start_listener(&port).await?;
-    // node.connect_to("144.126.212.176:4132".parse().unwrap()).await?;
+    node.start_listener(port).await?;
+    node.connect_to("127.0.0.1:4133".parse().unwrap()).await;
     // node.start_miner(account.address());
 
     std::future::pending::<()>().await;

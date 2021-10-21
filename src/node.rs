@@ -52,7 +52,7 @@ pub struct Node<E: Environment, N: Network> {
     /// The current status of the node.
     status: Arc<AtomicU8>,
     /// The list of peers for the node.
-    peers: Arc<Mutex<Peers>>,
+    peers: Arc<Mutex<Peers<N>>>,
     /// The ledger state of the node.
     ledger: Ledger<N>,
     /// The list of tasks spawned by the node.
@@ -106,7 +106,7 @@ impl<E: Environment, N: Network> Node<E, N> {
 
     /// Initializes the listener for peers.
     #[inline]
-    pub async fn start_listener(&self, port: &str) -> Result<()> {
+    pub async fn start_listener(&self, port: u16) -> Result<()> {
         let peers = self.peers.clone();
         let listener = Peers::listen::<E>(peers, port).await?;
         self.add_task(listener)
@@ -142,31 +142,14 @@ impl<E: Environment, N: Network> Node<E, N> {
         }
     }
 
-    // /// Initializes the peers.
-    // #[inline]
-    // pub async fn connect_to(&self, remote_ip: SocketAddr) -> Result<()> {
-    //     debug!("Connecting to {}...", remote_ip);
-    //
-    //     // The local IP address must be known by now.
-    //     let own_address = self.expect_local_addr();
-    //
-    //     // // Don't connect if maximum number of connections has been reached.
-    //     // if !self.can_connect() {
-    //     //     return Err(NetworkError::TooManyConnections);
-    //     // }
-    //
-    //     if remote_ip == own_address
-    //         || ((remote_ip.ip().is_unspecified() || remote_ip.ip().is_loopback()) && remote_ip.port() == own_address.port())
-    //     {
-    //         return Err(NetworkError::SelfConnectAttempt.into());
-    //     }
-    //     // if self.peers.is_connected(remote_ip) {
-    //     //     return Err(NetworkError::PeerAlreadyConnected.into());
-    //     // }
-    //
-    //     self.peers.connect_to(self.clone(), remote_ip).await?;
-    //     Ok(())
-    // }
+    /// Initializes the peers.
+    #[inline]
+    pub async fn connect_to(&self, remote_ip: SocketAddr) {
+        debug!("Connecting to {}...", remote_ip);
+        if let Err(error) = Peers::connect_to::<E>(self.peers.clone(), remote_ip).await {
+            error!("{}", error)
+        }
+    }
 
     /// Adds the given task handle to the node.
     #[inline]

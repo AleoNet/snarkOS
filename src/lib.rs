@@ -27,6 +27,9 @@ mod helpers;
 
 // pub mod network;
 
+pub mod message;
+pub use message::*;
+
 pub mod node;
 pub use node::*;
 
