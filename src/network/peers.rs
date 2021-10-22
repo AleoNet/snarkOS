@@ -44,10 +44,11 @@ type Router<N> = mpsc::Receiver<Message<N>>;
 
 /// A map of peers connected to the node server.
 pub(crate) struct Peers<N: Network> {
-    peers: HashMap<SocketAddr, Outbound<N>>,
     /// The local address of this node.
     local_ip: OnceCell<SocketAddr>,
-    /// A set of candidate peer IPs.
+    /// The set of connected peer IPs.
+    connected_peers: HashMap<SocketAddr, Outbound<N>>,
+    /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
 }
 
@@ -55,36 +56,9 @@ impl<N: Network> Peers<N> {
     /// Initializes a new instance of `Peers`.
     pub(crate) fn new() -> Self {
         Self {
-            peers: HashMap::new(),
             local_ip: OnceCell::new(),
+            connected_peers: HashMap::new(),
             candidate_peers: HashSet::new(),
-        }
-    }
-
-    /// Returns `true` if the node is connected to the given IP.
-    pub(crate) fn is_connected_to(&self, ip: SocketAddr) -> bool {
-        self.peers.contains_key(&ip)
-    }
-
-    /// Returns the list of connected peers.
-    pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.peers.keys().cloned().collect()
-    }
-
-    /// Returns the number of connected peers.
-    pub(crate) fn num_connected_peers(&self) -> usize {
-        self.peers.len()
-    }
-
-    /// Adds the given peer IPs to the set of candidate peers.
-    pub(crate) fn add_candidate_peers<E: Environment>(&mut self, peers: Vec<SocketAddr>) {
-        for ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
-            if self.candidate_peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
-                // Ensure the peer is a new candidate.
-                if !self.peers.contains_key(ip) && !self.candidate_peers.contains(ip) {
-                    self.candidate_peers.insert(*ip);
-                }
-            }
         }
     }
 
@@ -96,14 +70,41 @@ impl<N: Network> Peers<N> {
         }
     }
 
+    /// Returns `true` if the node is connected to the given IP.
+    pub(crate) fn is_connected_to(&self, ip: SocketAddr) -> bool {
+        self.connected_peers.contains_key(&ip)
+    }
+
+    /// Returns the number of connected peers.
+    pub(crate) fn num_connected_peers(&self) -> usize {
+        self.connected_peers.len()
+    }
+
+    /// Returns the list of connected peers.
+    pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
+        self.connected_peers.keys().cloned().collect()
+    }
+
+    /// Adds the given peer IPs to the set of candidate peers.
+    pub(crate) fn add_candidate_peers<E: Environment>(&mut self, peers: Vec<SocketAddr>) {
+        for ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
+            if self.candidate_peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
+                // Ensure the peer is a new candidate.
+                if !self.connected_peers.contains_key(ip) && !self.candidate_peers.contains(ip) {
+                    self.candidate_peers.insert(*ip);
+                }
+            }
+        }
+    }
+
     /// Sends the given message to specified peer.
     pub(crate) async fn send(&mut self, peer: SocketAddr, message: &Message<N>) {
-        match self.peers.get(&peer) {
+        match self.connected_peers.get(&peer) {
             Some(outbound) => {
-                debug!("Sending '{}' to {}", message.name(), peer);
+                trace!("Sending '{}' to {}", message.name(), peer);
                 if let Err(error) = outbound.send(message.clone()).await {
                     error!("{}", error);
-                    self.peers.remove(&peer);
+                    self.connected_peers.remove(&peer);
                 }
             }
             None => error!("Attempted to send to a non-connected peer {}", peer),
@@ -132,17 +133,12 @@ impl<N: Network> Peers<N> {
         let listener = TcpListener::bind(&format!("127.0.0.1:{}", port)).await?;
 
         // Update the local IP address of the node.
-        let discovered_local_ip = listener.local_addr()?;
-        peers
-            .lock()
-            .await
-            .local_ip
-            .set(discovered_local_ip)
-            .expect("The local IP address was set more than once!");
+        let local_ip = listener.local_addr()?;
+        peers.lock().await.local_ip.set(local_ip).expect("Overwriting the local IP");
 
         debug!("Initializing the listener...");
         Ok(task::spawn(async move {
-            info!("Listening for peers at {}", discovered_local_ip);
+            info!("Listening for peers at {}", local_ip);
             loop {
                 // Asynchronously wait for an inbound TcpStream.
                 match listener.accept().await {
@@ -188,18 +184,17 @@ impl<N: Network> Peers<N> {
     async fn process<E: Environment>(peers: Arc<Mutex<Self>>, peer_ip: SocketAddr, stream: TcpStream) {
         // Ensure the node does not surpass the maximum number of peer connections.
         if peers.lock().await.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
-            trace!("Dropping a connection request from {} (maximum peers reached)", peer_ip);
+            debug!("Dropping a connection request from {} (maximum peers reached)", peer_ip);
         }
         // Ensure the node is not already connected to this peer.
         else if peers.lock().await.is_connected_to(peer_ip) {
-            trace!("Dropping a connection request from {} (peer is already connected)", peer_ip);
+            debug!("Dropping a connection request from {} (peer is already connected)", peer_ip);
         }
         // Spawn a handler to be run asynchronously.
         else {
-            let peers_clone = peers.clone();
             tokio::spawn(async move {
-                trace!("Received a connection request from {}", peer_ip);
-                if let Err(error) = Peer::handler::<E>(peers_clone, stream).await {
+                debug!("Received a connection request from {}", peer_ip);
+                if let Err(error) = Peer::handler::<E>(peers.clone(), stream).await {
                     trace!("{}", error);
                 }
             });
@@ -213,7 +208,7 @@ const CHALLENGE_HEIGHT: u32 = 0;
 /// The state for each connected client.
 struct Peer<N: Network> {
     /// The IP address of the peer, with the port set to the listener port.
-    ip: SocketAddr,
+    listener_ip: SocketAddr,
     /// The TCP socket that handles sending and receiving data with this peer.
     socket: Framed<TcpStream, Message<N>>,
     /// The `router` half of the MPSC message channel, used to receive messages from peers.
@@ -321,10 +316,10 @@ impl<N: Network> Peer<N> {
         let (outbound, router) = mpsc::channel(1024);
 
         // Add an entry for this `Peer` in the peers.
-        peers.lock().await.peers.insert(peer_ip, outbound);
+        peers.lock().await.connected_peers.insert(peer_ip, outbound);
 
         Ok(Peer {
-            ip: peer_ip,
+            listener_ip: peer_ip,
             socket,
             router,
             last_seen: Instant::now(),
@@ -332,10 +327,11 @@ impl<N: Network> Peer<N> {
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
-    fn ip(&self) -> SocketAddr {
-        self.ip
+    fn peer_ip(&self) -> SocketAddr {
+        self.listener_ip
     }
 
+    /// Sends the given message to this peer.
     async fn send(&mut self, message: Message<N>) -> Result<()> {
         trace!("Sending '{}' to {}", message.name(), self.socket.get_ref().peer_addr()?);
         self.socket.send(message).await?;
@@ -346,7 +342,7 @@ impl<N: Network> Peer<N> {
     async fn handler<E: Environment>(peers: Arc<Mutex<Peers<N>>>, stream: TcpStream) -> Result<(), Box<dyn Error>> {
         // Register our peer with state which internally sets up some channels.
         let mut peer = Peer::new::<E>(peers.clone(), stream).await?;
-        let peer_ip = peer.ip();
+        let peer_ip = peer.peer_ip();
 
         info!("Connected to {}", peer_ip);
 
@@ -415,7 +411,7 @@ impl<N: Network> Peer<N> {
 
         // When this is reached, it means the peer has disconnected.
         let mut peers = peers.lock().await;
-        peers.peers.remove(&peer_ip);
+        peers.connected_peers.remove(&peer_ip);
         info!("Disconnecting from {}", peer_ip);
 
         Ok(())
