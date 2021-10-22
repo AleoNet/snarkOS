@@ -16,8 +16,10 @@
 
 use snarkvm::prelude::*;
 
+use ::bytes::{Buf, BytesMut};
 use anyhow::{anyhow, Result};
 use std::net::SocketAddr;
+use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone, Debug)]
 pub enum Message<N: Network> {
@@ -113,6 +115,85 @@ impl<N: Network> Message<N> {
                 false => Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
             },
             _ => Err(anyhow!("Invalid message ID {}", id)),
+        }
+    }
+}
+
+const MAX: usize = 8 * 1024 * 1024;
+
+impl<N: Network> Encoder<Message<N>> for Message<N> {
+    type Error = anyhow::Error;
+
+    fn encode(&mut self, message: Message<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        // Serialize the message into a buffer.
+        let buffer = message.serialize()?;
+
+        // Ensure the message does not exceed the maximum length limit.
+        if buffer.len() > MAX {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Frame of length {} is too large.", buffer.len()),
+            )
+            .into());
+        }
+
+        // Convert the length into a byte array.
+        // The cast to u32 cannot overflow due to the length check above.
+        let len_slice = u32::to_le_bytes(buffer.len() as u32);
+
+        // Reserve space in the buffer.
+        dst.reserve(4 + buffer.len());
+
+        // Write the length and string to the buffer.
+        dst.extend_from_slice(&len_slice);
+        dst.extend_from_slice(&buffer);
+        Ok(())
+    }
+}
+
+impl<N: Network> Decoder for Message<N> {
+    type Error = std::io::Error;
+    type Item = Message<N>;
+
+    fn decode(&mut self, source: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        // Ensure there is enough bytes to read the length marker.
+        if source.len() < 4 {
+            return Ok(None);
+        }
+
+        // Read the length marker.
+        let mut length_bytes = [0u8; 4];
+        length_bytes.copy_from_slice(&source[..4]);
+        let length = u32::from_le_bytes(length_bytes) as usize;
+
+        // Check that the length is not too large to avoid a denial of
+        // service attack where the node server runs out of memory.
+        if length > MAX {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Frame of length {} is too large.", length),
+            ));
+        }
+
+        if source.len() < 4 + length {
+            // The full message has not yet arrived.
+            //
+            // We reserve more space in the buffer. This is not strictly
+            // necessary, but is a good idea performance-wise.
+            source.reserve(4 + length - source.len());
+
+            // We inform `Framed` that we need more bytes to form the next frame.
+            return Ok(None);
+        }
+
+        // Use `advance` to modify the source such that it no longer contains this frame.
+        let buffer = source[4..4 + length].to_vec();
+        source.advance(4 + length);
+
+        // Convert the buffer to a message, or fail if it is not valid.
+        match Message::deserialize(&buffer) {
+            Ok(message) => Ok(Some(message)),
+            Err(error) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
         }
     }
 }
