@@ -18,7 +18,7 @@ use snarkvm::prelude::*;
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{anyhow, Result};
-use std::net::SocketAddr;
+use std::{io::Cursor, net::SocketAddr};
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone, Debug)]
@@ -31,10 +31,18 @@ pub enum Message<N: Network> {
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>),
-    /// Ping := (block_height)
-    Ping(u32),
+    /// Ping := (version, block_height)
+    Ping(u32, u32),
     /// Pong := ()
     Pong,
+    /// SyncRequest := (block_height)
+    SyncRequest(u32),
+    /// SyncResponse := (block_height, block)
+    SyncResponse(u32, Block<N>),
+    /// UnconfirmedBlock := (block_height, block)
+    UnconfirmedBlock(u32, Block<N>),
+    /// UnconfirmedTransaction := (transaction)
+    UnconfirmedTransaction(Transaction<N>),
 }
 
 impl<N: Network> Message<N> {
@@ -48,6 +56,10 @@ impl<N: Network> Message<N> {
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
             Self::Pong => "Pong",
+            Self::SyncRequest(..) => "SyncRequest",
+            Self::SyncResponse(..) => "SyncResponse",
+            Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
+            Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
         }
     }
 
@@ -61,6 +73,10 @@ impl<N: Network> Message<N> {
             Self::PeerResponse(..) => 3,
             Self::Ping(..) => 4,
             Self::Pong => 5,
+            Self::SyncRequest(..) => 6,
+            Self::SyncResponse(..) => 7,
+            Self::UnconfirmedBlock(..) => 8,
+            Self::UnconfirmedTransaction(..) => 9,
         }
     }
 
@@ -68,14 +84,16 @@ impl<N: Network> Message<N> {
     #[inline]
     pub fn data(&self) -> Result<Vec<u8>> {
         match self {
-            Self::ChallengeRequest(listener_port, block_height) => {
-                Ok([listener_port.to_le_bytes().to_vec(), block_height.to_le_bytes().to_vec()].concat())
-            }
+            Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
             Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(block_height) => Ok(block_height.to_le_bytes().to_vec()),
+            Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
             Self::Pong => Ok(vec![]),
+            Self::SyncRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
+            Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
+            Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
+            Self::UnconfirmedTransaction(transaction) => transaction.to_bytes_le(),
         }
     }
 
@@ -94,28 +112,40 @@ impl<N: Network> Message<N> {
         }
 
         // Split the buffer into the ID and data portion.
-        let id = u16::from_le_bytes([buffer[0], buffer[1]]);
-        let data = &buffer[2..];
+        let (id, data) = (u16::from_le_bytes([buffer[0], buffer[1]]), &buffer[2..]);
 
         // Deserialize the data field.
-        match id {
-            0 => Ok(Self::ChallengeRequest(
-                bincode::deserialize(&data[0..2])?,
-                bincode::deserialize(&data[2..])?,
-            )),
-            1 => Ok(Self::ChallengeResponse(bincode::deserialize(data)?)),
+        let message = match id {
+            0 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..])?),
+            1 => Self::ChallengeResponse(bincode::deserialize(data)?),
             2 => match data.len() == 0 {
-                true => Ok(Self::PeerRequest),
-                false => Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
+                true => Self::PeerRequest,
+                false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
-            3 => Ok(Self::PeerResponse(bincode::deserialize(data)?)),
-            4 => Ok(Self::Ping(bincode::deserialize(data)?)),
+            3 => Self::PeerResponse(bincode::deserialize(data)?),
+            4 => Self::Ping(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[2..])?),
             5 => match data.len() == 0 {
-                true => Ok(Self::Pong),
-                false => Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
+                true => Self::Pong,
+                false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
             },
-            _ => Err(anyhow!("Invalid message ID {}", id)),
-        }
+            6 => Self::SyncRequest(bincode::deserialize(data)?),
+            7 => {
+                let mut cursor = Cursor::new(data);
+                let block_height: u32 = FromBytes::read_le(&mut cursor)?;
+                let block: Block<N> = FromBytes::read_le(&mut cursor)?;
+                Self::SyncResponse(block_height, block)
+            }
+            8 => {
+                let mut cursor = Cursor::new(data);
+                let block_height: u32 = FromBytes::read_le(&mut cursor)?;
+                let block: Block<N> = FromBytes::read_le(&mut cursor)?;
+                Self::UnconfirmedBlock(block_height, block)
+            }
+            9 => Self::UnconfirmedTransaction(FromBytes::from_bytes_le(&data)?),
+            _ => return Err(anyhow!("Invalid message ID {}", id)),
+        };
+
+        Ok(message)
     }
 }
 

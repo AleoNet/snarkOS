@@ -148,7 +148,7 @@ impl<E: Environment, N: Network> Node<E, N> {
 
     /// Adds the given task handle to the node.
     #[inline]
-    pub fn add_task(&self, handle: task::JoinHandle<()>) -> Result<()> {
+    fn add_task(&self, handle: task::JoinHandle<()>) -> Result<()> {
         self.tasks.append(handle);
         Ok(())
     }

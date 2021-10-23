@@ -84,7 +84,7 @@ pub trait Environment: 'static + Clone + Default + Send + Sync {
     const FAILURE_THRESHOLD: usize = 5;
 
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const PROTOCOL_VERSION: u32 = 3;
+    const MESSAGE_VERSION: u32 = 3;
 }
 
 #[derive(Clone, Debug, Default)]

@@ -294,15 +294,13 @@ impl<N: Network> LedgerState<N> {
             }
 
             // Ensure the transaction in the block references a valid past or current ledger root.
-            for ledger_root in &transaction.ledger_roots() {
-                if !self.contains_ledger_root(ledger_root)? {
-                    return Err(anyhow!(
-                        "Transaction {} in block {} references non-existent ledger root {}",
-                        transaction.transaction_id(),
-                        block_height,
-                        ledger_root
-                    ));
-                }
+            if !self.contains_ledger_root(&transaction.ledger_root())? {
+                return Err(anyhow!(
+                    "Transaction {} in block {} references non-existent ledger root {}",
+                    transaction.transaction_id(),
+                    block_height,
+                    &transaction.ledger_root()
+                ));
             }
         }
 
@@ -526,7 +524,7 @@ impl<N: Network> BlockState<N> {
 
 #[derive(Clone, Debug)]
 struct TransactionState<N: Network> {
-    transactions: DataMap<N::TransactionID, (N::BlockHash, u16, Vec<N::TransitionID>)>,
+    transactions: DataMap<N::TransactionID, (N::BlockHash, u16, N::LedgerRoot, Vec<N::TransitionID>)>,
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
     serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
     commitments: DataMap<N::Commitment, N::TransitionID>,
@@ -602,8 +600,8 @@ impl<N: Network> TransactionState<N> {
     /// Returns the transaction for a given transaction ID.
     pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         // Retrieve the transition IDs.
-        let transition_ids = match self.transactions.get(transaction_id)? {
-            Some((_, _, transition_ids)) => transition_ids,
+        let (ledger_root, transition_ids) = match self.transactions.get(transaction_id)? {
+            Some((_, _, ledger_root, transition_ids)) => (ledger_root, transition_ids),
             None => return Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
         };
 
@@ -616,7 +614,7 @@ impl<N: Network> TransactionState<N> {
             };
         }
 
-        Transaction::from(*N::inner_circuit_id(), transitions, vec![])
+        Transaction::from(*N::inner_circuit_id(), ledger_root, transitions, vec![])
     }
 
     /// Adds the given transaction to storage.
@@ -628,10 +626,11 @@ impl<N: Network> TransactionState<N> {
         } else {
             let transition_ids = transaction.transition_ids();
             let transitions = transaction.transitions();
+            let ledger_root = transaction.ledger_root();
 
             // Insert the transaction ID.
             self.transactions
-                .insert(&transaction_id, &(block_hash, transaction_index, transition_ids))?;
+                .insert(&transaction_id, &(block_hash, transaction_index, ledger_root, transition_ids))?;
 
             for (i, transition) in transitions.iter().enumerate() {
                 let transition_id = transition.transition_id();
@@ -666,7 +665,7 @@ impl<N: Network> TransactionState<N> {
         } else {
             // Retrieve the transition IDs from the transaction.
             let transition_ids = match self.transactions.get(&transaction_id)? {
-                Some((_, _, transition_ids)) => transition_ids,
+                Some((_, _, _, transition_ids)) => transition_ids,
                 None => return Err(anyhow!("Transaction {} missing from transactions map", transaction_id)),
             };
 

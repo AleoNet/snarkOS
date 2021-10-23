@@ -86,7 +86,7 @@ impl<N: Network> Peers<N> {
     }
 
     /// Adds the given peer IPs to the set of candidate peers.
-    pub(crate) fn add_candidate_peers<E: Environment>(&mut self, peers: Vec<SocketAddr>) {
+    pub(crate) fn add_candidate_peers<E: Environment>(&mut self, peers: &[SocketAddr]) {
         for ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
             if self.candidate_peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
                 // Ensure the peer is a new candidate.
@@ -290,7 +290,7 @@ impl<N: Network> Peer<N> {
                         {
                             true => {
                                 // Send the first ping sequence.
-                                let message = Message::<N>::Ping(0);
+                                let message = Message::<N>::Ping(E::MESSAGE_VERSION, 0);
                                 trace!("Sending '{}' to {}", message.name(), peer_ip);
                                 socket.send(message).await?;
                             }
@@ -374,10 +374,9 @@ impl<N: Network> Peer<N> {
                     Some(Ok(message)) => {
                         // Update the last seen timestamp.
                         peer.last_seen = Instant::now();
-
                         // Process the message.
                         trace!("Received '{}' from {}", message.name(), peer_ip);
-                        match message {
+                        match &message {
                             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => break, // Peer is not following the protocol.
                             Message::PeerRequest => {
                                 peer.send(Message::PeerResponse(peers.lock().await.connected_peers())).await?;
@@ -385,24 +384,41 @@ impl<N: Network> Peer<N> {
                             Message::PeerResponse(peer_ips) => {
                                 peers.lock().await.add_candidate_peers::<E>(peer_ips)
                             }
-                            Message::Ping(block_height) => {
-                                peer.send(Message::Pong).await?;
+                            Message::Ping(version, block_height) => {
+                                match *version >= E::MESSAGE_VERSION {
+                                    true => peer.send(Message::Pong).await?,
+                                    false => {
+                                        warn!("Dropping {} with outdated version {}", peer_ip, version);
+                                        break;
+                                    }
+                                }
                             },
                             Message::Pong => {
                                 // Sleep for 60 seconds.
                                 tokio::time::sleep(Duration::from_secs(60)).await;
-                                peer.send(Message::Ping(1)).await?;
+                                peer.send(Message::Ping(E::MESSAGE_VERSION, 1)).await?;
+                            },
+                            Message::SyncRequest(block_height) => {
+                                // TODO (howardwu) - Send a block back.
+                                // peer.send(Message::SyncResponse(block_height, )).await?;
+                            },
+                            Message::SyncResponse(_block_height, _block) => {
+                                // TODO (howardwu) - Add to the ledger.
+                            }
+                            Message::UnconfirmedBlock(_block_height, _block) => {
+                                // TODO (howardwu) - Add to the ledger memory pool.
+                                // Propagate the unconfirmed block to the connected peers.
+                                peers.lock().await.propagate(peer_ip, &message).await;
+                            }
+                            Message::UnconfirmedTransaction(_transaction) => {
+                                // TODO (howardwu) - Add to the ledger memory pool.
+                                // Propagate the unconfirmed transaction to the connected peers.
+                                peers.lock().await.propagate(peer_ip, &message).await;
                             }
                         }
                     }
                     // An error occurred.
-                    Some(Err(error)) => {
-                        error!(
-                            "Failed to process message from {}: {:?}",
-                            peer_ip,
-                            error
-                        );
-                    }
+                    Some(Err(error)) => error!("Failed to read message from {}: {}", peer_ip, error),
                     // The stream has been disconnected.
                     None => break,
                 },
