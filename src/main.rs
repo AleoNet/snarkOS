@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
 
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
-    let node = Node::<Miner, Testnet2>::new()?;
+    let node = Node::<Testnet2, Miner>::new()?;
     node.start_listener(port).await?;
     node.connect_to("127.0.0.1:4133".parse().unwrap()).await;
     // node.start_miner(account.address());

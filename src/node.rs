@@ -21,7 +21,6 @@ use snarkvm::dpc::{Address, Block, Network};
 use anyhow::{anyhow, Result};
 use rand::{thread_rng, Rng};
 use std::{
-    marker::PhantomData,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, AtomicU8, Ordering},
@@ -41,24 +40,22 @@ pub enum Status {
 
 /// A node server implementation.
 #[derive(Clone)]
-pub struct Node<E: Environment, N: Network> {
+pub struct Node<N: Network, E: Environment> {
     /// A random numeric identifier for the node.
     id: u64,
     /// The current status of the node.
     status: Arc<AtomicU8>,
     /// The list of peers for the node.
-    peers: Arc<Mutex<Peers<N>>>,
+    peers: Arc<Mutex<Peers<N, E>>>,
     /// The ledger state of the node.
     ledger: Ledger<N>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
-    /// Phantom data.
-    _phantom: PhantomData<E>,
 }
 
-impl<E: Environment, N: Network> Node<E, N> {
+impl<N: Network, E: Environment> Node<N, E> {
     pub fn new() -> Result<Self> {
         // Initialize the node.
         let node = Self {
@@ -68,7 +65,6 @@ impl<E: Environment, N: Network> Node<E, N> {
             ledger: Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?,
             tasks: Tasks::new(),
             terminator: Arc::new(AtomicBool::new(false)),
-            _phantom: PhantomData,
         };
         Ok(node)
     }
@@ -103,7 +99,7 @@ impl<E: Environment, N: Network> Node<E, N> {
     #[inline]
     pub async fn start_listener(&self, port: u16) -> Result<()> {
         let peers = self.peers.clone();
-        let listener = Peers::listen::<E>(peers, port).await?;
+        let listener = Peers::listen(peers, port).await?;
         self.add_task(listener)
     }
 
@@ -141,7 +137,7 @@ impl<E: Environment, N: Network> Node<E, N> {
     #[inline]
     pub async fn connect_to(&self, remote_ip: SocketAddr) {
         debug!("Connecting to {}...", remote_ip);
-        if let Err(error) = Peers::connect_to::<E>(self.peers.clone(), remote_ip).await {
+        if let Err(error) = Peers::connect_to(self.peers.clone(), remote_ip).await {
             error!("{}", error)
         }
     }

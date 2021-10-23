@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::Environment;
 use snarkvm::prelude::*;
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{anyhow, Result};
-use std::{io::Cursor, net::SocketAddr};
+use std::{io::Cursor, marker::PhantomData, net::SocketAddr};
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone, Debug)]
-pub enum Message<N: Network> {
+pub enum Message<N: Network, E: Environment> {
     /// ChallengeRequest := (listener_port, block_height)
     ChallengeRequest(u16, u32),
     /// ChallengeResponse := (block_header)
@@ -43,9 +44,11 @@ pub enum Message<N: Network> {
     UnconfirmedBlock(u32, Block<N>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
+    /// Unused
+    Unused(PhantomData<E>),
 }
 
-impl<N: Network> Message<N> {
+impl<N: Network, E: Environment> Message<N, E> {
     /// Returns the message name.
     #[inline]
     pub fn name(&self) -> &str {
@@ -60,6 +63,7 @@ impl<N: Network> Message<N> {
             Self::SyncResponse(..) => "SyncResponse",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
+            Self::Unused(..) => "Unused",
         }
     }
 
@@ -77,6 +81,7 @@ impl<N: Network> Message<N> {
             Self::SyncResponse(..) => 7,
             Self::UnconfirmedBlock(..) => 8,
             Self::UnconfirmedTransaction(..) => 9,
+            Self::Unused(..) => 10,
         }
     }
 
@@ -94,6 +99,7 @@ impl<N: Network> Message<N> {
             Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::UnconfirmedTransaction(transaction) => transaction.to_bytes_le(),
+            Self::Unused(_) => Ok(vec![]),
         }
     }
 
@@ -149,17 +155,15 @@ impl<N: Network> Message<N> {
     }
 }
 
-const MAX: usize = 8 * 1024 * 1024;
-
-impl<N: Network> Encoder<Message<N>> for Message<N> {
+impl<N: Network, E: Environment> Encoder<Message<N, E>> for Message<N, E> {
     type Error = anyhow::Error;
 
-    fn encode(&mut self, message: Message<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, message: Message<N, E>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Serialize the message into a buffer.
         let buffer = message.serialize()?;
 
         // Ensure the message does not exceed the maximum length limit.
-        if buffer.len() > MAX {
+        if buffer.len() > E::MAX_MESSAGE_SIZE {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Frame of length {} is too large.", buffer.len()),
@@ -181,9 +185,9 @@ impl<N: Network> Encoder<Message<N>> for Message<N> {
     }
 }
 
-impl<N: Network> Decoder for Message<N> {
+impl<N: Network, E: Environment> Decoder for Message<N, E> {
     type Error = std::io::Error;
-    type Item = Message<N>;
+    type Item = Message<N, E>;
 
     fn decode(&mut self, source: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Ensure there is enough bytes to read the length marker.
@@ -198,7 +202,7 @@ impl<N: Network> Decoder for Message<N> {
 
         // Check that the length is not too large to avoid a denial of
         // service attack where the node server runs out of memory.
-        if length > MAX {
+        if length > E::MAX_MESSAGE_SIZE {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Frame of length {} is too large.", length),

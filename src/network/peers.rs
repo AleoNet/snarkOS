@@ -37,23 +37,27 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
 /// Shorthand for the parent half of the message channel.
-type Outbound<N> = mpsc::Sender<Message<N>>;
+type Outbound<N, E> = mpsc::Sender<Message<N, E>>;
 
 /// Shorthand for the child half of the message channel.
-type Router<N> = mpsc::Receiver<Message<N>>;
+type Router<N, E> = mpsc::Receiver<Message<N, E>>;
 
+///
 /// A map of peers connected to the node server.
-pub(crate) struct Peers<N: Network> {
+///
+pub(crate) struct Peers<N: Network, E: Environment> {
     /// The local address of this node.
     local_ip: OnceCell<SocketAddr>,
     /// The set of connected peer IPs.
-    connected_peers: HashMap<SocketAddr, Outbound<N>>,
+    connected_peers: HashMap<SocketAddr, Outbound<N, E>>,
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
 }
 
-impl<N: Network> Peers<N> {
+impl<N: Network, E: Environment> Peers<N, E> {
+    ///
     /// Initializes a new instance of `Peers`.
+    ///
     pub(crate) fn new() -> Self {
         Self {
             local_ip: OnceCell::new(),
@@ -62,7 +66,9 @@ impl<N: Network> Peers<N> {
         }
     }
 
+    ///
     /// Returns the local IP address of the node.
+    ///
     pub(crate) fn local_ip(&self) -> Result<SocketAddr> {
         match self.local_ip.get() {
             Some(local_ip) => Ok(*local_ip),
@@ -70,25 +76,43 @@ impl<N: Network> Peers<N> {
         }
     }
 
+    ///
     /// Returns `true` if the node is connected to the given IP.
+    ///
     pub(crate) fn is_connected_to(&self, ip: SocketAddr) -> bool {
         self.connected_peers.contains_key(&ip)
     }
 
+    ///
     /// Returns the number of connected peers.
+    ///
     pub(crate) fn num_connected_peers(&self) -> usize {
         self.connected_peers.len()
     }
 
+    ///
     /// Returns the list of connected peers.
+    ///
     pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.keys().cloned().collect()
     }
 
+    /// Returns the list of candidate peers.
+    pub(crate) fn candidate_peers(&self) -> &HashSet<SocketAddr> {
+        &self.candidate_peers
+    }
+
+    ///
     /// Adds the given peer IPs to the set of candidate peers.
-    pub(crate) fn add_candidate_peers<E: Environment>(&mut self, peers: &[SocketAddr]) {
-        for ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
-            if self.candidate_peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
+    ///
+    /// This method skips adding any given peers if the combined size exceeds the threshold,
+    /// as the peer providing this list could be subverting the protocol.
+    ///
+    pub(crate) fn add_candidate_peers(&mut self, peers: &[SocketAddr]) {
+        // Ensure the combined number of peers does not surpass the threshold.
+        if self.candidate_peers.len() + peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
+            // Proceed to insert each new candidate peer IP.
+            for ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
                 // Ensure the peer is a new candidate.
                 if !self.connected_peers.contains_key(ip) && !self.candidate_peers.contains(ip) {
                     self.candidate_peers.insert(*ip);
@@ -97,8 +121,10 @@ impl<N: Network> Peers<N> {
         }
     }
 
+    ///
     /// Sends the given message to specified peer.
-    pub(crate) async fn send(&mut self, peer: SocketAddr, message: &Message<N>) {
+    ///
+    pub(crate) async fn send(&mut self, peer: SocketAddr, message: &Message<N, E>) {
         match self.connected_peers.get(&peer) {
             Some(outbound) => {
                 trace!("Sending '{}' to {}", message.name(), peer);
@@ -111,15 +137,19 @@ impl<N: Network> Peers<N> {
         }
     }
 
+    ///
     /// Sends the given message to every connected peer.
-    pub(crate) async fn broadcast(&mut self, message: &Message<N>) {
+    ///
+    pub(crate) async fn broadcast(&mut self, message: &Message<N, E>) {
         for peer in self.connected_peers() {
             self.send(peer, message).await;
         }
     }
 
+    ///
     /// Sends the given message to every connected peer, except for the sender.
-    pub(crate) async fn propagate(&mut self, sender: SocketAddr, message: &Message<N>) {
+    ///
+    pub(crate) async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
         for peer in self.connected_peers() {
             trace!("Preparing to propagate '{}' to {}", message.name(), peer);
             if peer != sender {
@@ -128,14 +158,38 @@ impl<N: Network> Peers<N> {
         }
     }
 
+    ///
     /// Initiates a connection request to the given IP address.
-    pub(crate) async fn listen<E: Environment>(peers: Arc<Mutex<Self>>, port: u16) -> Result<JoinHandle<()>> {
+    ///
+    pub(crate) async fn listen(peers: Arc<Mutex<Self>>, port: u16) -> Result<JoinHandle<()>> {
         let listener = TcpListener::bind(&format!("127.0.0.1:{}", port)).await?;
 
         // Update the local IP address of the node.
         let local_ip = listener.local_addr()?;
         peers.lock().await.local_ip.set(local_ip).expect("Overwriting the local IP");
 
+        // Initialize a process to maintain an adequate number of peers.
+        let peers_clone = peers.clone();
+        tokio::spawn(async move {
+            loop {
+                // Sleep for 30 seconds.
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                // Request more peers if the number of connected peers is below the threshold.
+                {
+                    let peers = peers_clone.lock().await;
+                    for peer_ip in peers.candidate_peers() {
+                        if peers.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
+                            if let Err(error) = Peers::connect_to(peers_clone.clone(), *peer_ip).await {
+                                trace!("Failed to connect to {}: {}", peer_ip, error);
+                            }
+                        }
+                    }
+                }
+                peers_clone.lock().await.broadcast(&Message::PeerRequest).await;
+            }
+        });
+
+        // Initialize the connection listener.
         debug!("Initializing the listener...");
         Ok(task::spawn(async move {
             info!("Listening for peers at {}", local_ip);
@@ -144,7 +198,7 @@ impl<N: Network> Peers<N> {
                 match listener.accept().await {
                     Ok((stream, remote_ip)) => {
                         // Process the inbound connection request.
-                        Peers::process::<E>(peers.clone(), remote_ip, stream).await;
+                        Peers::process(peers.clone(), remote_ip, stream).await;
                         // Add a small delay to avoid connecting above the limit.
                         tokio::time::sleep(Duration::from_millis(1)).await;
                     }
@@ -155,7 +209,7 @@ impl<N: Network> Peers<N> {
     }
 
     /// Initiates a connection request to the given IP address.
-    pub(crate) async fn connect_to<E: Environment>(peers: Arc<Mutex<Self>>, peer_ip: SocketAddr) -> Result<()> {
+    pub(crate) async fn connect_to(peers: Arc<Mutex<Self>>, peer_ip: SocketAddr) -> Result<()> {
         debug!("Connecting to {}...", peer_ip);
 
         // The local IP address must be known by now.
@@ -176,12 +230,12 @@ impl<N: Network> Peers<N> {
             Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
         };
 
-        Self::process::<E>(peers, peer_ip, stream).await;
+        Self::process(peers, peer_ip, stream).await;
         Ok(())
     }
 
     /// Handles a new peer connection.
-    async fn process<E: Environment>(peers: Arc<Mutex<Self>>, peer_ip: SocketAddr, stream: TcpStream) {
+    async fn process(peers: Arc<Mutex<Self>>, peer_ip: SocketAddr, stream: TcpStream) {
         // Ensure the node does not surpass the maximum number of peer connections.
         if peers.lock().await.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
             debug!("Dropping a connection request from {} (maximum peers reached)", peer_ip);
@@ -194,7 +248,7 @@ impl<N: Network> Peers<N> {
         else {
             tokio::spawn(async move {
                 debug!("Received a connection request from {}", peer_ip);
-                if let Err(error) = Peer::handler::<E>(peers.clone(), stream).await {
+                if let Err(error) = Peer::handler(peers.clone(), stream).await {
                     trace!("{}", error);
                 }
             });
@@ -206,23 +260,23 @@ impl<N: Network> Peers<N> {
 const CHALLENGE_HEIGHT: u32 = 0;
 
 /// The state for each connected client.
-struct Peer<N: Network> {
+struct Peer<N: Network, E: Environment> {
     /// The IP address of the peer, with the port set to the listener port.
     listener_ip: SocketAddr,
     /// The TCP socket that handles sending and receiving data with this peer.
-    socket: Framed<TcpStream, Message<N>>,
+    socket: Framed<TcpStream, Message<N, E>>,
     /// The `router` half of the MPSC message channel, used to receive messages from peers.
     /// When a message is received off of this `Router`, it will be written to the socket.
-    router: Router<N>,
+    router: Router<N, E>,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
 }
 
-impl<N: Network> Peer<N> {
+impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
-    async fn new<E: Environment>(peers: Arc<Mutex<Peers<N>>>, stream: TcpStream) -> Result<Self> {
+    async fn new(peers: Arc<Mutex<Peers<N, E>>>, stream: TcpStream) -> Result<Self> {
         // Construct the socket.
-        let mut socket = Framed::new(stream, Message::<N>::Pong);
+        let mut socket = Framed::new(stream, Message::<N, E>::Pong);
 
         // The local IP address must be known by now.
         let local_ip = peers.lock().await.local_ip()?;
@@ -234,7 +288,7 @@ impl<N: Network> Peer<N> {
         let genesis_block_header = N::genesis_block().header();
 
         // Send a challenge request to the peer.
-        let message = Message::<N>::ChallengeRequest(local_ip.port(), CHALLENGE_HEIGHT);
+        let message = Message::<N, E>::ChallengeRequest(local_ip.port(), CHALLENGE_HEIGHT);
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         socket.send(message).await?;
 
@@ -290,7 +344,7 @@ impl<N: Network> Peer<N> {
                         {
                             true => {
                                 // Send the first ping sequence.
-                                let message = Message::<N>::Ping(E::MESSAGE_VERSION, 0);
+                                let message = Message::<N, E>::Ping(E::MESSAGE_VERSION, 0);
                                 trace!("Sending '{}' to {}", message.name(), peer_ip);
                                 socket.send(message).await?;
                             }
@@ -332,29 +386,19 @@ impl<N: Network> Peer<N> {
     }
 
     /// Sends the given message to this peer.
-    async fn send(&mut self, message: Message<N>) -> Result<()> {
+    async fn send(&mut self, message: Message<N, E>) -> Result<()> {
         trace!("Sending '{}' to {}", message.name(), self.socket.get_ref().peer_addr()?);
         self.socket.send(message).await?;
         Ok(())
     }
 
     /// A handler to process an individual peer.
-    async fn handler<E: Environment>(peers: Arc<Mutex<Peers<N>>>, stream: TcpStream) -> Result<(), Box<dyn Error>> {
+    async fn handler(peers: Arc<Mutex<Peers<N, E>>>, stream: TcpStream) -> Result<(), Box<dyn Error>> {
         // Register our peer with state which internally sets up some channels.
-        let mut peer = Peer::new::<E>(peers.clone(), stream).await?;
+        let mut peer = Peer::new(peers.clone(), stream).await?;
         let peer_ip = peer.peer_ip();
 
         info!("Connected to {}", peer_ip);
-
-        let peers_clone = peers.clone();
-        tokio::spawn(async move {
-            loop {
-                // Update the peers.
-                peers_clone.lock().await.broadcast(&Message::PeerRequest).await;
-                // Sleep for 120 seconds.
-                tokio::time::sleep(Duration::from_secs(120)).await;
-            }
-        });
 
         // Process incoming messages until this stream is disconnected.
         loop {
@@ -382,7 +426,7 @@ impl<N: Network> Peer<N> {
                                 peer.send(Message::PeerResponse(peers.lock().await.connected_peers())).await?;
                             }
                             Message::PeerResponse(peer_ips) => {
-                                peers.lock().await.add_candidate_peers::<E>(peer_ips)
+                                peers.lock().await.add_candidate_peers(peer_ips)
                             }
                             Message::Ping(version, block_height) => {
                                 match *version >= E::MESSAGE_VERSION {
@@ -394,8 +438,8 @@ impl<N: Network> Peer<N> {
                                 }
                             },
                             Message::Pong => {
-                                // Sleep for 60 seconds.
-                                tokio::time::sleep(Duration::from_secs(60)).await;
+                                // Sleep for 30 seconds.
+                                tokio::time::sleep(Duration::from_secs(30)).await;
                                 peer.send(Message::Ping(E::MESSAGE_VERSION, 1)).await?;
                             },
                             Message::SyncRequest(block_height) => {
@@ -414,6 +458,10 @@ impl<N: Network> Peer<N> {
                                 // TODO (howardwu) - Add to the ledger memory pool.
                                 // Propagate the unconfirmed transaction to the connected peers.
                                 peers.lock().await.propagate(peer_ip, &message).await;
+                            }
+                            Message::Unused(_) => {
+                                // Peer is not following the protocol.
+                                break;
                             }
                         }
                     }
