@@ -442,6 +442,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 tokio::time::sleep(Duration::from_secs(30)).await;
                                 peer.send(Message::Ping(E::MESSAGE_VERSION, 1)).await?;
                             },
+                            Message::RebaseRequest(_block_headers) => {
+                                // TODO (howardwu) - Process the rebase request.
+                            },
+                            Message::RebaseResponse => {
+                                // TODO (howardwu) - Add logic for this.
+                            }
                             Message::SyncRequest(block_height) => {
                                 // TODO (howardwu) - Send a block back.
                                 // peer.send(Message::SyncResponse(block_height, )).await?;

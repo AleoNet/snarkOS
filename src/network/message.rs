@@ -36,6 +36,10 @@ pub enum Message<N: Network, E: Environment> {
     Ping(u32, u32),
     /// Pong := ()
     Pong,
+    /// RebaseRequest := (\[block_header\])
+    RebaseRequest(Vec<BlockHeader<N>>),
+    /// RebaseResponse := ()
+    RebaseResponse,
     /// SyncRequest := (block_height)
     SyncRequest(u32),
     /// SyncResponse := (block_height, block)
@@ -59,6 +63,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
             Self::Pong => "Pong",
+            Self::RebaseRequest(..) => "RebaseRequest",
+            Self::RebaseResponse => "RebaseResponse",
             Self::SyncRequest(..) => "SyncRequest",
             Self::SyncResponse(..) => "SyncResponse",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
@@ -77,11 +83,13 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => 3,
             Self::Ping(..) => 4,
             Self::Pong => 5,
-            Self::SyncRequest(..) => 6,
-            Self::SyncResponse(..) => 7,
-            Self::UnconfirmedBlock(..) => 8,
-            Self::UnconfirmedTransaction(..) => 9,
-            Self::Unused(..) => 10,
+            Self::RebaseRequest(..) => 6,
+            Self::RebaseResponse => 7,
+            Self::SyncRequest(..) => 8,
+            Self::SyncResponse(..) => 9,
+            Self::UnconfirmedBlock(..) => 10,
+            Self::UnconfirmedTransaction(..) => 11,
+            Self::Unused(..) => 12,
         }
     }
 
@@ -95,6 +103,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
             Self::Pong => Ok(vec![]),
+            Self::RebaseRequest(block_headers) => Ok(to_bytes_le![block_headers.len() as u16, block_headers]?),
+            Self::RebaseResponse => Ok(vec![]),
             Self::SyncRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
             Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
@@ -134,20 +144,33 @@ impl<N: Network, E: Environment> Message<N, E> {
                 true => Self::Pong,
                 false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
             },
-            6 => Self::SyncRequest(bincode::deserialize(data)?),
-            7 => {
+            6 => {
+                let mut cursor = Cursor::new(data);
+                let block_headers_length: u16 = FromBytes::read_le(&mut cursor)?;
+                let mut block_headers = Vec::with_capacity(block_headers_length as usize);
+                for _ in 0..block_headers_length {
+                    block_headers.push(FromBytes::read_le(&mut cursor)?);
+                }
+                Self::RebaseRequest(block_headers)
+            }
+            7 => match data.len() == 0 {
+                true => Self::RebaseResponse,
+                false => return Err(anyhow!("Invalid 'RebaseResponse' message: {:?} {:?}", buffer, data)),
+            },
+            8 => Self::SyncRequest(bincode::deserialize(data)?),
+            9 => {
                 let mut cursor = Cursor::new(data);
                 let block_height: u32 = FromBytes::read_le(&mut cursor)?;
                 let block: Block<N> = FromBytes::read_le(&mut cursor)?;
                 Self::SyncResponse(block_height, block)
             }
-            8 => {
+            10 => {
                 let mut cursor = Cursor::new(data);
                 let block_height: u32 = FromBytes::read_le(&mut cursor)?;
                 let block: Block<N> = FromBytes::read_le(&mut cursor)?;
                 Self::UnconfirmedBlock(block_height, block)
             }
-            9 => Self::UnconfirmedTransaction(FromBytes::from_bytes_le(&data)?),
+            11 => Self::UnconfirmedTransaction(FromBytes::from_bytes_le(&data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 
