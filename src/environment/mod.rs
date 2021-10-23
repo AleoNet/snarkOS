@@ -55,7 +55,7 @@ pub trait Environment: 'static + Clone + Default + Send + Sync {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 25;
     /// The maximum number of candidate peers permitted to be stored in the node.
-    const MAXIMUM_CANDIDATE_PEERS: usize = 100_000;
+    const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
 
     /// The maximum amount of time in which a handshake with a regular node can conclude before dropping the
     /// connection; it should be no greater than the `peer_sync_interval`.

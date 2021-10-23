@@ -27,7 +27,7 @@ use std::{
         Arc,
     },
 };
-use tokio::{sync::Mutex, task};
+use tokio::{sync::RwLock, task};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -46,7 +46,7 @@ pub struct Node<N: Network, E: Environment> {
     /// The current status of the node.
     status: Arc<AtomicU8>,
     /// The list of peers for the node.
-    peers: Arc<Mutex<Peers<N, E>>>,
+    peers: Arc<RwLock<Peers<N, E>>>,
     /// The ledger state of the node.
     ledger: Ledger<N>,
     /// The list of tasks spawned by the node.
@@ -61,7 +61,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         let node = Self {
             id: thread_rng().gen(),
             status: Arc::new(AtomicU8::new(0)),
-            peers: Arc::new(Mutex::new(Peers::new())),
+            peers: Arc::new(RwLock::new(Peers::new())),
             ledger: Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?,
             tasks: Tasks::new(),
             terminator: Arc::new(AtomicBool::new(false)),
@@ -135,9 +135,9 @@ impl<N: Network, E: Environment> Node<N, E> {
 
     /// Initializes the peers.
     #[inline]
-    pub async fn connect_to(&self, remote_ip: SocketAddr) {
-        debug!("Connecting to {}...", remote_ip);
-        if let Err(error) = Peers::connect_to(self.peers.clone(), remote_ip).await {
+    pub async fn connect_to(&self, peer_ip: SocketAddr) {
+        trace!("Attempting connection to {}...", peer_ip);
+        if let Err(error) = Peers::connect_to(self.peers.clone(), peer_ip).await {
             error!("{}", error)
         }
     }
