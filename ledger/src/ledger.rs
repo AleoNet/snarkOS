@@ -26,7 +26,7 @@ pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
     /// The pool of unconfirmed transactions.
-    memory_pool: MemoryPool<N>,
+    pub memory_pool: MemoryPool<N>,
 }
 
 impl<N: Network> Ledger<N> {
@@ -164,7 +164,9 @@ impl<N: Network> Ledger<N> {
 
     /// Adds the given block as the next block in the ledger to storage.
     pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
-        self.canon.add_next_block(block)
+        self.canon.add_next_block(block)?;
+        // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
+        Ok(())
     }
 
     /// Mines a new block and adds it to the canon blocks.

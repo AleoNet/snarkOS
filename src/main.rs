@@ -56,7 +56,9 @@ async fn main() -> Result<()> {
     let node = Node::<Testnet2, Miner>::new()?;
     node.start_listener(port).await?;
     node.connect_to("127.0.0.1:4133".parse().unwrap()).await;
-    // node.start_miner(account.address());
+    if port == 4134 {
+        node.start_miner(account.address())?;
+    }
 
     std::future::pending::<()>().await;
     Ok(())

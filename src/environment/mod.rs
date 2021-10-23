@@ -21,13 +21,11 @@ use std::time::Duration;
 pub enum NodeType {
     /// A client node is a full node, capable of sending and receiving blocks.
     Client,
-    /// A crawler node is a discovery node, capable of indexing the known network.
-    Crawler,
     /// A mining node is a full node, capable of producing new blocks.
     Miner,
-    /// A peer node is a bootstrap node, capable of sharing peers of the network.
+    /// A peer node is a discovery node, capable of sharing peers of the network.
     Peer,
-    /// A sync node is a bootstrap node, capable of sharing blocks for the network.
+    /// A sync node is a discovery node, capable of syncing nodes for the network.
     Sync,
 }
 

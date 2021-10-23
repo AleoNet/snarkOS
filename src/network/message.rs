@@ -165,6 +165,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 Self::SyncResponse(block_height, block)
             }
             10 => {
+                debug!("Deserializing unconfirmed block {:?}", data);
                 let mut cursor = Cursor::new(data);
                 let block_height: u32 = FromBytes::read_le(&mut cursor)?;
                 let block: Block<N> = FromBytes::read_le(&mut cursor)?;

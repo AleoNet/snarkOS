@@ -127,7 +127,7 @@ impl<N: Network> LedgerState<N> {
 
     /// Returns `true` if the given ledger root exists in storage.
     pub(crate) fn contains_ledger_root(&self, ledger_root: &N::LedgerRoot) -> Result<bool> {
-        self.ledger_roots.contains_key(ledger_root)
+        Ok(*ledger_root == self.latest_ledger_root() || self.ledger_roots.contains_key(ledger_root)?)
     }
 
     /// Returns `true` if the given block height exists in storage.
@@ -263,9 +263,9 @@ impl<N: Network> LedgerState<N> {
             return Err(anyhow!("Block {} has a repeat block hash in the canon chain", block_height));
         }
 
-        // Ensure the ledger root does not already exist.
-        if self.contains_ledger_root(&block.ledger_root())? {
-            return Err(anyhow!("Block {} declares a previously existing ledger root", block_height));
+        // Ensure the ledger root in the block matches the current ledger root.
+        if block.ledger_root() != self.latest_ledger_root() {
+            return Err(anyhow!("Block {} declares an incorrect ledger root", block_height));
         }
 
         // Ensure the canon chain does not already contain the given serial numbers.
@@ -311,8 +311,8 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
-    /// Removes the latest block from storage.
-    pub(crate) fn remove_last_block(&mut self) -> Result<()> {
+    /// Removes the latest block from storage, returning the removed block on success.
+    pub(crate) fn remove_last_block(&mut self) -> Result<Block<N>> {
         let block = self.latest_block()?;
         let block_height = block.height();
 
@@ -323,7 +323,7 @@ impl<N: Network> LedgerState<N> {
             false => (block_height - 1, block.previous_block_hash(), block.ledger_root()),
         };
 
-        Ok(())
+        Ok(block)
     }
 }
 

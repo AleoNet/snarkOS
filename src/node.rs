@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, Environment, NodeType, Peers};
+use crate::{helpers::Tasks, miner::Miner, Environment, NodeType, Peers};
 use snarkos_ledger::{ledger::Ledger, storage::rocksdb::RocksDB};
-use snarkvm::dpc::{Address, Block, Network};
+use snarkvm::dpc::{Address, Network};
 
 use anyhow::{anyhow, Result};
 use rand::{thread_rng, Rng};
@@ -41,35 +41,37 @@ pub enum Status {
 /// A node server implementation.
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {
-    /// A random numeric identifier for the node.
-    id: u64,
     /// The current status of the node.
     status: Arc<AtomicU8>,
     /// The list of peers for the node.
     peers: Arc<RwLock<Peers<N, E>>>,
     /// The ledger state of the node.
-    ledger: Ledger<N>,
-    /// The list of tasks spawned by the node.
-    tasks: Tasks<task::JoinHandle<()>>,
+    ledger: Arc<RwLock<Ledger<N>>>,
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
+    /// The list of tasks spawned by the node.
+    tasks: Tasks<task::JoinHandle<()>>,
 }
 
 impl<N: Network, E: Environment> Node<N, E> {
     pub fn new() -> Result<Self> {
+        // Open the ledger from storage.
+        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
+
         // Initialize the node.
         let node = Self {
-            id: thread_rng().gen(),
             status: Arc::new(AtomicU8::new(0)),
             peers: Arc::new(RwLock::new(Peers::new())),
-            ledger: Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?,
-            tasks: Tasks::new(),
+            ledger: Arc::new(RwLock::new(ledger)),
             terminator: Arc::new(AtomicBool::new(false)),
+            tasks: Tasks::new(),
         };
         Ok(node)
     }
 
+    ///
     /// Returns the current status of the node.
+    ///
     #[inline]
     pub fn status(&self) -> Status {
         match self.status.load(Ordering::SeqCst) {
@@ -81,25 +83,19 @@ impl<N: Network, E: Environment> Node<N, E> {
         }
     }
 
-    /// Updates the node to the given status.
+    /// Initializes the node.
     #[inline]
-    pub fn set_status(&self, state: Status) {
-        self.status.store(state as u8, Ordering::SeqCst);
-        match state {
-            Status::ShuttingDown => {
-                // debug!("Shutting down");
-                self.terminator.store(true, Ordering::SeqCst);
-                self.tasks.flush();
-            }
-            _ => (),
-        }
+    pub async fn start(&self) -> Result<()> {
+        // Connect to a peer and sync node.
+        // Start the node in sync mode.
+        // Once synced, start the miner.
+        Ok(())
     }
 
     /// Initializes the listener for peers.
     #[inline]
     pub async fn start_listener(&self, port: u16) -> Result<()> {
-        let peers = self.peers.clone();
-        let listener = Peers::listen(peers, port).await?;
+        let listener = Peers::listen(self.ledger(), self.peers(), port).await?;
         self.add_task(listener)
     }
 
@@ -107,29 +103,9 @@ impl<N: Network, E: Environment> Node<N, E> {
     #[inline]
     pub fn start_miner(&self, miner_address: Address<N>) -> Result<()> {
         // If the node is a mining node, initialize a miner.
-        if E::NODE_TYPE != NodeType::Miner {
-            Err(anyhow!("Node is not a mining node"))
-        } else {
-            let node = self.clone();
-            self.add_task(task::spawn(async move {
-                let rng = &mut thread_rng();
-                let mut ledger = node.ledger.clone();
-                loop {
-                    // Retrieve the status of the node.
-                    let status = node.status();
-                    // Ensure the node is not syncing or shutting down.
-                    if status != Status::Syncing && status != Status::ShuttingDown {
-                        // Set the status of the node to mining.
-                        node.set_status(Status::Mining);
-                        // Start the mining process.
-                        let miner = ledger.mine_next_block(miner_address, &node.terminator, rng);
-                        // Ensure the miner did not error.
-                        if let Err(error) = miner {
-                            error!("{}", error);
-                        }
-                    }
-                }
-            }))
+        match E::NODE_TYPE == NodeType::Miner {
+            true => self.add_task(Miner::spawn(self.clone(), miner_address)),
+            false => Err(anyhow!("Node is not a mining node")),
         }
     }
 
@@ -137,7 +113,7 @@ impl<N: Network, E: Environment> Node<N, E> {
     #[inline]
     pub async fn connect_to(&self, peer_ip: SocketAddr) {
         trace!("Attempting connection to {}...", peer_ip);
-        if let Err(error) = Peers::connect_to(self.peers.clone(), peer_ip).await {
+        if let Err(error) = Peers::connect_to(self.ledger(), self.peers(), peer_ip).await {
             error!("{}", error)
         }
     }
@@ -160,6 +136,44 @@ impl<N: Network, E: Environment> Node<N, E> {
     // pub fn expect_local_addr(&self) -> SocketAddr {
     //     self.local_ip.get().copied().expect("no address set!")
     // }
+
+    ///
+    /// Returns the peers for the node.
+    ///
+    #[inline]
+    pub(crate) fn peers(&self) -> Arc<RwLock<Peers<N, E>>> {
+        self.peers.clone()
+    }
+
+    ///
+    /// Returns the ledger for the node.
+    ///
+    #[inline]
+    pub(crate) fn ledger(&self) -> Arc<RwLock<Ledger<N>>> {
+        self.ledger.clone()
+    }
+
+    ///
+    /// Returns the current terminator bit for the node.
+    ///
+    #[inline]
+    pub(crate) fn terminator(&self) -> Arc<AtomicBool> {
+        self.terminator.clone()
+    }
+
+    /// Updates the node to the given status.
+    #[inline]
+    pub(crate) fn set_status(&self, state: Status) {
+        self.status.store(state as u8, Ordering::SeqCst);
+        match state {
+            Status::ShuttingDown => {
+                // debug!("Shutting down");
+                self.terminator.store(true, Ordering::SeqCst);
+                self.tasks.flush();
+            }
+            _ => (),
+        }
+    }
 
     /// Disconnects from peers and proceeds to shut down the node.
     #[inline]
