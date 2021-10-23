@@ -174,7 +174,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initiates a connection request to the given IP address.
     ///
-    pub(super) async fn listen(peers: Arc<RwLock<Self>>, port: u16) -> Result<JoinHandle<()>> {
+    pub(crate) async fn listen(peers: Arc<RwLock<Self>>, port: u16) -> Result<JoinHandle<()>> {
         let listener = TcpListener::bind(&format!("127.0.0.1:{}", port)).await?;
 
         // Update the local IP address of the node.
@@ -188,12 +188,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Sleep for 10 seconds.
                 tokio::time::sleep(Duration::from_secs(10)).await;
                 // Skip if the number of connected peers is above the minimum threshold.
-                if peers_clone.read().await.num_connected_peers() > E::MINIMUM_NUMBER_OF_PEERS {
-                    continue;
-                }
-
-                trace!("Refreshing the list of peers");
-
+                match peers_clone.read().await.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
+                    true => trace!("Refreshing the list of peers"),
+                    false => continue,
+                };
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 for peer_ip in peers_clone.read().await.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
                     trace!("Attempting connection to {}...", peer_ip);
@@ -228,7 +226,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initiates a connection request to the given IP address.
     ///
-    pub(super) async fn connect_to(peers: Arc<RwLock<Self>>, peer_ip: SocketAddr) -> Result<()> {
+    pub(crate) async fn connect_to(peers: Arc<RwLock<Self>>, peer_ip: SocketAddr) -> Result<()> {
         // The local IP address must be known by now.
         let local_ip = peers.read().await.local_ip()?;
 
@@ -290,7 +288,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
 // TODO (howardwu): Consider changing this.
 const CHALLENGE_HEIGHT: u32 = 0;
 
+///
 /// The state for each connected client.
+///
 struct Peer<N: Network, E: Environment> {
     /// The IP address of the peer, with the port set to the listener port.
     listener_ip: SocketAddr,
