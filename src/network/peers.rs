@@ -118,8 +118,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub async fn update(&mut self, operation: PeersOperation<N, E>) {
         match operation {
-            PeersOperation::AddCandidatePeer(peer_ip) => {
-                self.add_candidate_peers(&[peer_ip]);
+            PeersOperation::AddCandidatePeers(peer_ips) => {
+                self.add_candidate_peers(&peer_ips);
             }
             PeersOperation::AddConnectedPeer(peer_ip, outbound) => {
                 // Add an entry for this `Peer` in the connected peers.
@@ -140,6 +140,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersOperation::Broadcast(message) => {
                 self.broadcast(&message).await;
             }
+            PeersOperation::SendPeerRequest(recipient) => {
+                // Send a `PeerResponse` message.
+                self.send(recipient, &Message::PeerRequest).await;
+            }
             PeersOperation::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
                 self.send(recipient, &Message::PeerResponse(self.connected_peers())).await;
@@ -156,16 +160,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Spawn a handler to be run asynchronously.
                 else {
                     debug!("Received a connection request from {}", peer_ip);
-                    if let Err(error) = Peer::handler(stream, self.local_ip, peers_handler).await {
-                        trace!("{}", error);
-                    }
+                    Peer::handler(stream, self.local_ip, peers_handler).await;
                 }
             }
 
             PeersOperation::ConnectNewPeer(peer_ip, peers_handler) => {
                 // Ensure the remote IP is not this node.
-                let local_ip = self.local_ip;
-                if peer_ip == local_ip || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == local_ip.port()
+                if peer_ip == self.local_ip
+                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
                 {
                     debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
                 }
@@ -182,16 +184,39 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Connecting to {}...", peer_ip);
                     match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
                         Ok(stream) => match stream {
-                            Ok(stream) => {
-                                if let Err(error) = Peer::handler(stream, self.local_ip, peers_handler).await {
-                                    trace!("{}", error);
-                                }
+                            Ok(stream) => Peer::handler(stream, self.local_ip, peers_handler).await,
+                            Err(error) => {
+                                error!("Failed to connect to '{}': '{:?}'", peer_ip, error);
+                                self.candidate_peers.remove(&peer_ip);
                             }
-                            Err(error) => error!("Failed to connect to '{}': '{:?}'", peer_ip, error),
                         },
-                        Err(error) => error!("Unable to reach '{}': '{:?}'", peer_ip, error),
+                        Err(error) => {
+                            error!("Unable to reach '{}': '{:?}'", peer_ip, error);
+                            self.candidate_peers.remove(&peer_ip);
+                        }
                     };
                 }
+            }
+            PeersOperation::Heartbeat(peers_handler) => {
+                // Skip if the number of connected peers is above the minimum threshold.
+                match self.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
+                    true => trace!("Attempting to discover new peers"),
+                    false => return,
+                };
+
+                // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
+                for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
+                    trace!("Attempting connection to {}...", peer_ip);
+                    if let Err(error) = peers_handler
+                        .send(PeersOperation::ConnectNewPeer(*peer_ip, peers_handler.clone()))
+                        .await
+                    {
+                        error!("Failed to transmit the operation: '{}'", error);
+                    }
+                }
+
+                // Request more peers if the number of connected peers is below the threshold.
+                self.broadcast(&Message::PeerRequest).await;
             }
         }
     }
@@ -383,6 +408,8 @@ pub(crate) struct Peer<N: Network, E: Environment> {
     last_seen: Instant,
     /// The block height of this peer.
     block_height: u32,
+    /// The number of failures.
+    failures: u64,
     /// The TCP socket that handles sending and receiving data with this peer.
     socket: Framed<TcpStream, Message<N, E>>,
     /// The `router` half of the MPSC message channel, used to receive messages from peers.
@@ -396,6 +423,40 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Construct the socket.
         let mut socket = Framed::new(stream, Message::<N, E>::Pong);
 
+        // Perform the handshake before proceeding.
+        let peer_ip = Peer::handshake(&mut socket, local_ip).await?;
+
+        // Create a channel for this peer.
+        let (outbound, router) = mpsc::channel(1024);
+
+        // Add an entry for this `Peer` in the connected peers.
+        peers_handler.send(PeersOperation::AddConnectedPeer(peer_ip, outbound)).await?;
+
+        Ok(Peer {
+            listener_ip: peer_ip,
+            last_seen: Instant::now(),
+            block_height: 0u32,
+            failures: 0u64,
+            socket,
+            router,
+        })
+    }
+
+    /// Returns the IP address of the peer, with the port set to the listener port.
+    fn peer_ip(&self) -> SocketAddr {
+        self.listener_ip
+    }
+
+    /// Sends the given message to this peer.
+    async fn send(&mut self, message: Message<N, E>) -> Result<()> {
+        trace!("Sending '{}' to {}", message.name(), self.socket.get_ref().peer_addr()?);
+        self.socket.send(message).await?;
+        // self.socket.flush().await?;
+        Ok(())
+    }
+
+    /// Performs the handshake protocol, returning the listener IP of the peer upon success.
+    async fn handshake(socket: &mut Framed<TcpStream, Message<N, E>>, local_ip: SocketAddr) -> Result<SocketAddr> {
         // Get the IP address of the peer.
         let mut peer_ip = socket.get_ref().peer_addr()?;
 
@@ -419,15 +480,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             // Update the peer IP to the listener port.
                             peer_ip.set_port(listener_port);
                             // Ensure the claimed listener port is open.
-                            match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
-                                Ok(stream) => {
-                                    // Error if the stream is not open.
-                                    if let Err(error) = stream {
-                                        return Err(anyhow!("Failed to connect to '{}': '{:?}'", peer_ip, error));
-                                    }
-                                }
+                            let stream = match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
+                                Ok(stream) => stream,
                                 Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
                             };
+                            // Error if the stream is not open.
+                            if let Err(error) = stream {
+                                return Err(anyhow!("Failed to connect to '{}': '{:?}'", peer_ip, error));
+                            }
                         }
                         // Send the challenge response.
                         let message = Message::ChallengeResponse(genesis_block_header.clone());
@@ -463,6 +523,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 let message = Message::<N, E>::Ping(E::MESSAGE_VERSION, 0);
                                 trace!("Sending '{}' to {}", message.name(), peer_ip);
                                 socket.send(message).await?;
+                                Ok(peer_ip)
                             }
                             false => return Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
@@ -481,187 +542,158 @@ impl<N: Network, E: Environment> Peer<N, E> {
             // Did not receive anything.
             None => return Err(anyhow!("Failed to get challenge response from {}, peer has disconnected", peer_ip)),
         }
-
-        // Create a channel for this peer.
-        let (outbound, router) = mpsc::channel(1024);
-
-        // Add an entry for this `Peer` in the connected peers.
-        peers_handler.send(PeersOperation::AddConnectedPeer(peer_ip, outbound)).await?;
-
-        Ok(Peer {
-            listener_ip: peer_ip,
-            last_seen: Instant::now(),
-            block_height: 0u32,
-            socket,
-            router,
-        })
-    }
-
-    /// Returns the IP address of the peer, with the port set to the listener port.
-    fn peer_ip(&self) -> SocketAddr {
-        self.listener_ip
-    }
-
-    /// Sends the given message to this peer.
-    async fn send(&mut self, message: Message<N, E>) -> Result<()> {
-        trace!("Sending '{}' to {}", message.name(), self.socket.get_ref().peer_addr()?);
-        self.socket.send(message).await?;
-        // self.socket.flush().await?;
-        Ok(())
     }
 
     /// A handler to process an individual peer.
-    pub(crate) async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_handler: PeersHandler<N, E>) -> Result<(), Box<dyn Error>> {
+    async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_handler: PeersHandler<N, E>) {
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            if let Ok(mut peer) = Peer::new(stream, local_ip, peers_handler.clone()).await {
-                let peer_ip = peer.peer_ip();
+            let mut peer = match Peer::new(stream, local_ip, peers_handler.clone()).await {
+                Ok(mut peer) => peer,
+                Err(error) => return,
+            };
 
-                info!("Connected to {}", peer_ip);
+            // Retrieve the peer IP.
+            let peer_ip = peer.peer_ip();
+            info!("Connected to {}", peer_ip);
 
-                // Process incoming messages until this stream is disconnected.
-                loop {
-                    tokio::select! {
-                        // Message channel is routing a message outbound to the peer.
-                        Some(message) = peer.router.recv() => {
-                            // Disconnect if the peer has not communicated back in 4 minutes.
-                            if peer.last_seen.elapsed() > Duration::from_secs(240) {
-                                warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
-                                break;
-                            } else {
-                                trace!("Routing a message outbound to {}", peer_ip);
-
-                                         if let Err(error) = peer.send(message).await {
-                                                warn!("[OutboundRouter] {}", error);
-                                            }
-
+            // Process incoming messages until this stream is disconnected.
+            loop {
+                tokio::select! {
+                    // Message channel is routing a message outbound to the peer.
+                    Some(message) = peer.router.recv() => {
+                        // Disconnect if the peer has not communicated back in 4 minutes.
+                        if peer.last_seen.elapsed() > Duration::from_secs(240) {
+                            warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
+                            break;
+                        } else {
+                            trace!("Routing a message outbound to {}", peer_ip);
+                            if let Err(error) = peer.send(message).await {
+                                warn!("[OutboundRouter] {}", error);
+                                peer.failures += 1;
                             }
                         }
-                        result = peer.socket.next() => match result {
-                            // Received a message from the peer.
-                            Some(Ok(message)) => {
-                                // Disconnect if the peer has not communicated back in 4 minutes.
-                                match peer.last_seen.elapsed() > Duration::from_secs(240) {
-                                    true => {
-                                        let last_seen = peer.last_seen.elapsed().as_secs();
-                                        warn!("Failed to receive a message from {} in {} seconds", peer_ip, last_seen);
-                                        break;
-                                    },
-                                    false => {
-                                        // Update the last seen timestamp.
-                                        peer.last_seen = Instant::now();
-                                    }
-                                }
-                                // Process the message.
-                                trace!("Received '{}' from {}", message.name(), peer_ip);
-                                match &message {
-                                    Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
-                                        // Peer is not following the protocol.
-                                        warn!("Peer {} is not following the protocol", peer_ip);
-                                        break;
-                                    },
-                                    Message::PeerRequest => {
-                                        // Send a `PeerResponse` message.
-                                        // if let Err(error) = peer.send(Message::PeerResponse(peers.read().await.connected_peers())).await {
-                                        //     warn!("[PeerRequest] {}", error);
-                                        // }
-                                        if let Err(error) = peers_handler.send(PeersOperation::SendPeerResponse(peer_ip)).await {
-                                            warn!("[PeerRequest] {}", error);
-                                        }
-                                    }
-                                    Message::PeerResponse(peer_ips) => {
-                                        // Add the given peer IPs to the list of candidate peers.
-                                        for peer_ip in peer_ips {
-                                            if let Err(error) = peers_handler.send(PeersOperation::AddCandidatePeer(*peer_ip)).await {
-                                                warn!("[PeerResponse] {}", error);
-                                            }
-                                        }
-                                        // if let Err(error) = peers.write().await.add_candidate_peers(peer_ips) {
-                                        //     warn!("[PeerResponse] {}", error);
-                                        // }
-                                    }
-                                    Message::Ping(version, block_height) => {
-                                        // Ensure the message protocol version is not outdated.
-                                        if *version < E::MESSAGE_VERSION {
-                                            warn!("Dropping {} with outdated version {}", peer_ip, version);
-                                            break;
-                                        }
-                                        // Set the block height of the peer.
-                                        peer.block_height = *block_height;
-                                        // Send a `Pong` message.
-                                        if let Err(error) = peer.send(Message::Pong).await {
-                                            warn!("[PeerRequest] {}", error);
-                                        }
-                                    },
-                                    Message::Pong => {
-                                        // Sleep for 10 seconds.
-                                        tokio::time::sleep(Duration::from_secs(10)).await;
-                                        // Send a `Ping` message.
-                                        if let Err(error) = peer.send(Message::Ping(E::MESSAGE_VERSION, 1)).await {
-                                            warn!("[Pong] {}", error);
-                                        }
-                                    },
-                                    Message::RebaseRequest(_block_headers) => {
-                                        // TODO (howardwu) - Process the rebase request.
-                                        // If peer is syncing, reject this message.
-                                    },
-                                    Message::RebaseResponse => {
-                                        // TODO (howardwu) - Add logic for this.
-                                        // If peer is syncing, reject this message.
-                                    }
-                                    Message::SyncRequest(block_height) => {
-                                        // TODO (howardwu) - Send a block back.
-                                        // peer.send(Message::SyncResponse(block_height, )).await?;
-                                    },
-                                    Message::SyncResponse(_block_height, _block) => {
-                                        // TODO (howardwu) - Add to the ledger.
-                                    }
-                                    Message::UnconfirmedBlock(block_height, block) => {
-                                        // TODO (howardwu) - Add to the ledger memory pool.
-                                        // If peer is syncing, reject this message.
-                                        info!("Received an unconfirmed block {} from {}", block_height, peer_ip);
-
-                                        // let latest_block_height = ledger.read().await.latest_block_height();
-                                        // if *block_height == latest_block_height + 1 {
-                                        //     ledger.write().await.add_next_block(block)?;
-                                        // }
-
-                                        // Propagate the unconfirmed block to the connected peers.
-                                                if let Err(error) = peers_handler.send(PeersOperation::Propagate(peer_ip, message)).await {
-                                                warn!("[UnconfirmedBlock] {}", error);
-                                            }
-                                    }
-                                    Message::UnconfirmedTransaction(_transaction) => {
-                                        // If peer is syncing, reject this message.
-
-                                        // TODO (howardwu) - Add to the ledger memory pool.
-                                        // Propagate the unconfirmed transaction to the connected peers.
-                                        // peers_handler.send(PeersOperation::Propagate(peer_ip, message)).await?;
-                                                if let Err(error) = peers_handler.send(PeersOperation::Propagate(peer_ip, message)).await {
-                                                warn!("[UnconfirmedTransaction] {}", error);
-                                            }
-                                    }
-                                    Message::Unused(_) => {
-                                        // Peer is not following the protocol.
-                                        break;
-                                    }
+                    }
+                    result = peer.socket.next() => match result {
+                        // Received a message from the peer.
+                        Some(Ok(message)) => {
+                            // Disconnect if the peer has not communicated back in 4 minutes.
+                            match peer.last_seen.elapsed() > Duration::from_secs(240) {
+                                true => {
+                                    let last_seen = peer.last_seen.elapsed().as_secs();
+                                    warn!("Failed to receive a message from {} in {} seconds", peer_ip, last_seen);
+                                    break;
+                                },
+                                false => {
+                                    // Update the last seen timestamp.
+                                    peer.last_seen = Instant::now();
                                 }
                             }
-                            // An error occurred.
-                            Some(Err(error)) => error!("Failed to read message from {}: {}", peer_ip, error),
-                            // The stream has been disconnected.
-                            None => break,
-                        },
-                    }
-                }
+                            // Process the message.
+                            trace!("Received '{}' from {}", message.name(), peer_ip);
+                            match &message {
+                                Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
+                                    // Peer is not following the protocol.
+                                    warn!("Peer {} is not following the protocol", peer_ip);
+                                    break;
+                                },
+                                Message::PeerRequest => {
+                                    // Send a `PeerResponse` message.
+                                    if let Err(error) = peers_handler.send(PeersOperation::SendPeerResponse(peer_ip)).await {
+                                        warn!("[PeerRequest] {}", error);
+                                        peer.failures += 1;
+                                    }
+                                }
+                                Message::PeerResponse(peer_ips) => {
+                                    // Add the given peer IPs to the list of candidate peers.
+                                    if let Err(error) = peers_handler.send(PeersOperation::AddCandidatePeers(peer_ips.to_vec())).await {
+                                        warn!("[PeerResponse] {}", error);
+                                        peer.failures += 1;
+                                    }
+                                }
+                                Message::Ping(version, block_height) => {
+                                    // Ensure the message protocol version is not outdated.
+                                    if *version < E::MESSAGE_VERSION {
+                                        warn!("Dropping {} with outdated version {}", peer_ip, version);
+                                        break;
+                                    }
+                                    // Set the block height of the peer.
+                                    peer.block_height = *block_height;
+                                    // Send a `Pong` message.
+                                    if let Err(error) = peer.send(Message::Pong).await {
+                                        warn!("[PeerRequest] {}", error);
+                                        peer.failures += 1;
+                                    }
+                                },
+                                Message::Pong => {
+                                    // Sleep for 10 seconds.
+                                    tokio::time::sleep(Duration::from_secs(10)).await;
+                                    // Send a `Ping` message.
+                                    if let Err(error) = peer.send(Message::Ping(E::MESSAGE_VERSION, 1)).await {
+                                        warn!("[Pong] {}", error);
+                                        peer.failures += 1;
+                                    }
+                                },
+                                Message::RebaseRequest(_block_headers) => {
+                                    // TODO (howardwu) - Process the rebase request.
+                                    // If peer is syncing, reject this message.
+                                },
+                                Message::RebaseResponse => {
+                                    // TODO (howardwu) - Add logic for this.
+                                    // If peer is syncing, reject this message.
+                                }
+                                Message::SyncRequest(block_height) => {
+                                    // TODO (howardwu) - Send a block back.
+                                    // peer.send(Message::SyncResponse(block_height, )).await?;
+                                },
+                                Message::SyncResponse(_block_height, _block) => {
+                                    // TODO (howardwu) - Add to the ledger.
+                                }
+                                Message::UnconfirmedBlock(block_height, block) => {
+                                    // TODO (howardwu) - Add to the ledger memory pool.
+                                    // If peer is syncing, reject this message.
+                                    info!("Received an unconfirmed block {} from {}", block_height, peer_ip);
 
-                // When this is reached, it means the peer has disconnected.
-                if let Ok(_) = peers_handler.send(PeersOperation::RemoveConnectedPeer(peer_ip)).await {
-                    info!("Disconnecting from {}", peer_ip);
+                                    // let latest_block_height = ledger.read().await.latest_block_height();
+                                    // if *block_height == latest_block_height + 1 {
+                                    //     ledger.write().await.add_next_block(block)?;
+                                    // }
+
+                                    // Propagate the unconfirmed block to the connected peers.
+                                    if let Err(error) = peers_handler.send(PeersOperation::Propagate(peer_ip, message)).await {
+                                        warn!("[UnconfirmedBlock] {}", error);
+                                        peer.failures += 1;
+                                    }
+                                }
+                                Message::UnconfirmedTransaction(_transaction) => {
+                                    // If peer is syncing, reject this message.
+
+                                    // TODO (howardwu) - Add to the ledger memory pool.
+                                    // Propagate the unconfirmed transaction to the connected peers.
+                                    if let Err(error) = peers_handler.send(PeersOperation::Propagate(peer_ip, message)).await {
+                                        warn!("[UnconfirmedTransaction] {}", error);
+                                        peer.failures += 1;
+                                    }
+                                }
+                                Message::Unused(_) => {
+                                    // Peer is not following the protocol.
+                                    break;
+                                }
+                            }
+                        }
+                        // An error occurred.
+                        Some(Err(error)) => error!("Failed to read message from {}: {}", peer_ip, error),
+                        // The stream has been disconnected.
+                        None => break,
+                    },
                 }
             }
-        });
 
-        Ok(())
+            // When this is reached, it means the peer has disconnected.
+            info!("Disconnecting from {}", peer_ip);
+            if let Err(error) = peers_handler.send(PeersOperation::RemoveConnectedPeer(peer_ip)).await {
+                error!("Failed to disconnect from {}: {}", peer_ip, error);
+            }
+        });
     }
 }

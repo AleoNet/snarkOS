@@ -41,15 +41,17 @@ use tokio_util::codec::Framed;
 
 #[derive(Debug)]
 pub enum PeersOperation<N: Network, E: Environment> {
-    AddCandidatePeer(SocketAddr),
+    AddCandidatePeers(Vec<SocketAddr>),
     AddConnectedPeer(SocketAddr, Outbound<N, E>),
     RemoveCandidatePeer(SocketAddr),
     RemoveConnectedPeer(SocketAddr),
     Propagate(SocketAddr, Message<N, E>),
     Broadcast(Message<N, E>),
+    SendPeerRequest(SocketAddr),
     SendPeerResponse(SocketAddr),
     HandleNewPeer(TcpStream, SocketAddr, PeersHandler<N, E>),
     ConnectNewPeer(SocketAddr, PeersHandler<N, E>),
+    Heartbeat(PeersHandler<N, E>),
 }
 
 pub enum LedgerEvent<N: Network, E: Environment> {
@@ -85,11 +87,8 @@ impl<N: Network, E: Environment> Initialize<N, E> {
     ///
     pub(crate) async fn initialize(port: u16) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
-        let (listener, local_ip) = match TcpListener::bind(&format!("127.0.0.1:{}", port)).await {
-            Ok(listener) => {
-                let local_ip = listener.local_addr().expect("Failed to fetch the local IP");
-                (listener, local_ip)
-            }
+        let (local_ip, listener) = match TcpListener::bind(&format!("127.0.0.1:{}", port)).await {
+            Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
 
@@ -97,12 +96,10 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         let mut tasks = Tasks::new();
 
         // Initialize a new instance for managing peers.
-        let (peers, peers_handler, peers_task) = Self::initialize_peers(local_ip);
-        tasks.append(peers_task);
+        let (peers, peers_handler) = Self::initialize_peers(&mut tasks, local_ip);
 
         // Initialize the connection listener for new peers.
-        let listener_task = Self::initialize_listener(listener, local_ip, peers_handler.clone());
-        tasks.append(listener_task);
+        Self::initialize_listener(&mut tasks, local_ip, listener, peers_handler.clone());
 
         peers_handler
             .send(PeersOperation::ConnectNewPeer(
@@ -126,34 +123,6 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         // let (mut demand_tx, demand_rx) = mpsc::channel::<MorePeers>(128);
         //
 
-        // // Initialize a process to maintain an adequate number of peers.
-        // let ledger_clone = ledger.clone();
-        // let peers_clone = peers.clone();
-        // task::spawn(async move {
-        //     loop {
-        //         // Sleep for 30 seconds.
-        //         tokio::time::sleep(Duration::from_secs(30)).await;
-        //
-        //         // Skip if the number of connected peers is above the minimum threshold.
-        //         match peers_clone.read().await.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
-        //             true => trace!("Attempting to find new peer connections"),
-        //             false => continue,
-        //         };
-        //
-        //         // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
-        //         for peer_ip in peers_clone.read().await.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
-        //             trace!("Attempting connection to {}...", peer_ip);
-        //             if let Err(error) = Peers::connect_to(ledger_clone.clone(), peers_clone.clone(), *peer_ip).await {
-        //                 peers_clone.write().await.candidate_peers.remove(peer_ip);
-        //                 trace!("Failed to connect to {}: {}", peer_ip, error);
-        //             }
-        //         }
-        //
-        //         // Request more peers if the number of connected peers is below the threshold.
-        //         peers_clone.write().await.broadcast(&Message::PeerRequest).await;
-        //     }
-        // });
-
         // Ok(Self { peers, ledger, tasks })
         Ok(Self { peers, tasks })
     }
@@ -161,7 +130,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
     ///
     /// Initialize a new instance for managing peers.
     ///
-    fn initialize_peers(local_ip: SocketAddr) -> (Arc<Mutex<Peers<N, E>>>, PeersHandler<N, E>, task::JoinHandle<()>) {
+    fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<Mutex<Peers<N, E>>>, PeersHandler<N, E>) {
         let peers = Arc::new(Mutex::new(Peers::new(local_ip)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
@@ -169,50 +138,54 @@ impl<N: Network, E: Environment> Initialize<N, E> {
 
         // Initialize the peers router process.
         let peers_clone = peers.clone();
-        let peers_task = task::spawn(async move {
+        tasks.append(task::spawn(async move {
             // Asynchronously wait for a peers operation.
-
-            // while let Some(operation) = peers_router.recv().await {
-            //     // Hold the peers threaded mutex briefly, to update the state of a single peer.
-            //     peers_clone.lock().await.update(operation).await;
-            // }
-
             loop {
                 tokio::select! {
                     // Channel is routing an operation to peers.
                     Some(operation) = peers_router.recv() => {
-                        // Hold the peers threaded mutex briefly, to update the state of a single peer.
+                        // Hold the peers mutex briefly, to update the state of the peers.
                         peers_clone.lock().await.update(operation).await;
                     }
-                    // result = peers_router.next().await => match result {
-                    //     Some(operation) {
-                    //         // Hold the peers threaded mutex briefly, to update the state of a single peer.
-                    //         peers_clone.lock().expect("Mutex was poisoned").update(operation).await;
-                    //     }
-                    //     None => error("Failed to parse operation for peers")
-                    // }
+                }
+            }
+        }));
+
+        // Initialize a process to maintain an adequate number of peers.
+        let peers_handler_clone = peers_handler.clone();
+        task::spawn(async move {
+            loop {
+                // Sleep for 30 seconds.
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                // Transmit the heartbeat operation.
+                let operation = PeersOperation::Heartbeat(peers_handler_clone.clone());
+                if let Err(error) = peers_handler_clone.send(operation).await {
+                    error!("Failed to send operation to peers: {}", error)
                 }
             }
         });
 
-        (peers, peers_handler, peers_task)
+        (peers, peers_handler)
     }
 
     ///
     /// Initialize the connection listener for new peers.
     ///
-    fn initialize_listener(listener: TcpListener, local_ip: SocketAddr, peers_handler: PeersHandler<N, E>) -> task::JoinHandle<()> {
-        task::spawn(async move {
+    fn initialize_listener(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        local_ip: SocketAddr,
+        listener: TcpListener,
+        peers_handler: PeersHandler<N, E>,
+    ) {
+        tasks.append(task::spawn(async move {
             info!("Listening for peers at {}", local_ip);
             loop {
                 // Asynchronously wait for an inbound TcpStream.
                 match listener.accept().await {
                     // Process the inbound connection request.
                     Ok((stream, peer_ip)) => {
-                        if let Err(error) = peers_handler
-                            .send(PeersOperation::HandleNewPeer(stream, peer_ip, peers_handler.clone()))
-                            .await
-                        {
+                        let operation = PeersOperation::HandleNewPeer(stream, peer_ip, peers_handler.clone());
+                        if let Err(error) = peers_handler.send(operation).await {
                             error!("Failed to send operation to peers: {}", error)
                         }
                     }
@@ -221,7 +194,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
                 // Add a small delay to prevent overloading the network from handshakes.
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
-        })
+        }));
     }
 
     // ///
