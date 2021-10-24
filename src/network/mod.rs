@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod miner;
+pub(crate) mod initialize;
+
+// pub(crate) mod miner;
 // pub(crate) use miner::*;
 
 pub(crate) mod message;

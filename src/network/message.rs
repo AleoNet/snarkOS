@@ -107,7 +107,12 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::RebaseResponse => Ok(vec![]),
             Self::SyncRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
             Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
-            Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
+            Self::UnconfirmedBlock(block_height, block) => {
+                // info!("seriliazing unconfirmed block {}", block_height);
+                let serialized = to_bytes_le![block_height, block]?;
+                // info!("done serializing {:?}", serialized);
+                Ok(serialized)
+            }
             Self::UnconfirmedTransaction(transaction) => transaction.to_bytes_le(),
             Self::Unused(_) => Ok(vec![]),
         }

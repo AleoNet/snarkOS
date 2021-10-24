@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{fmt::Debug, time::Duration};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NodeType {
@@ -30,7 +30,7 @@ pub enum NodeType {
 }
 
 #[rustfmt::skip]
-pub trait Environment: 'static + Clone + Default + Send + Sync {
+pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const NODE_TYPE: NodeType;
 
     /// If `true`, a mining node will craft public coinbase transactions.

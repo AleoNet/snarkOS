@@ -37,14 +37,14 @@ version = "1.0"
 [dependencies.chrono]
 version = "0.4"
 
-[dependencies.circular-queue]
-version = "0.2"
-
-[dependencies.mpmc-map]
-version = "0.2"
+#[dependencies.circular-queue]
+#version = "0.2"
 
 [dependencies.once_cell]
 version = "1"
+
+[dependencies.parking_lot]
+version = "0.11"
 
 [dependencies.rand]
 version = "0.8"
@@ -55,23 +55,22 @@ version = "1"
 #[dependencies.serde_json]
 #version = "1"
 
-[dependencies.snow]
-version = "0.8"
-default-features = false
-features = [
-    "libsodium-resolver",
-    "chacha20poly1305",
-    "blake2",
-    "sha2",
-    "x25519-dalek",
-    "rand"
-]
+#[dependencies.snow]
+#version = "0.8"
+#default-features = false
+#features = [
+#    "libsodium-resolver",
+#    "chacha20poly1305",
+#    "blake2",
+#    "sha2",
+#    "x25519-dalek",
+#    "rand"
+#]
 
 [dependencies.tokio]
 version = "1"
 features = [
     "io-util",
-    "parking_lot",
     "macros",
     "net",
     "rt-multi-thread",
@@ -80,8 +79,8 @@ features = [
 ]
 
 [dependencies.tokio-util]
-version = "=0.6.3"
-features = ["full"]
+version = "=0.6.8"
+features = ["codec"]
 
 [dependencies.tokio-stream]
 version = "=0.1"
@@ -94,6 +93,6 @@ features = [ "log" ]
 [dependencies.tracing-subscriber]
 version = "0.2"
 
-[dependencies.twox-hash]
-version = "1.6"
+#[dependencies.twox-hash]
+#version = "1.6"
 
