@@ -71,27 +71,22 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
 
-        // Initialize the connection listener for new peers.
-        Self::initialize_listener(&mut tasks, local_ip, listener, peers_router.clone());
-
-        peers_router
-            .send(PeersRequest::ConnectNewPeer(
-                "127.0.0.1:4133".parse().unwrap(),
-                peers_router.clone(),
-            ))
-            .await?;
-
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, local_ip, peers_router.clone(), miner)?;
+        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks)?;
 
-        // // Initialize a new instance of the miner.
-        // let (miner, miner_router) = match E::NODE_TYPE == NodeType::Miner {
-        //     true => Self::initialize_miner(&mut tasks, ledger_router),
-        //     false => return Err(anyhow!("Node is not a mining node")),
-        // };
+        // Initialize the connection listener for new peers.
+        Self::initialize_listener(&mut tasks, local_ip, listener, peers_router.clone(), ledger_router.clone());
+
+        // Initialize a new instance of the heartbeat.
+        Self::initialize_heartbeat(&mut tasks, peers_router.clone(), ledger_router.clone());
+
+        let message = PeersRequest::ConnectNewPeer("127.0.0.1:4133".parse().unwrap(), peers_router.clone(), ledger_router.clone());
+        peers_router.send(message).await?;
+
+        // Initialize a new instance of the miner.
+        Self::initialize_miner(&mut tasks, miner, peers_router, ledger_router);
 
         Ok(Self { ledger, peers, tasks })
-        // Ok(Self { peers, tasks })
     }
 
     ///
@@ -122,21 +117,33 @@ impl<N: Network, E: Environment> Initialize<N, E> {
             }
         }));
 
-        // // Initialize a process to maintain an adequate number of peers.
-        // let peers_router_clone = peers_router.clone();
-        // task::spawn(async move {
-        //     loop {
-        //         // Sleep for 30 seconds.
-        //         tokio::time::sleep(Duration::from_secs(30)).await;
-        //         // Transmit the heartbeat request.
-        //         let request = PeersRequest::Heartbeat(peers_router_clone.clone());
-        //         if let Err(error) = peers_router_clone.send(request).await {
-        //             error!("Failed to send request to peers: {}", error)
-        //         }
-        //     }
-        // });
-
         (peers, peers_router)
+    }
+
+    ///
+    /// Initialize a new instance for managing the ledger.
+    ///
+    fn initialize_ledger(tasks: &mut Tasks<task::JoinHandle<()>>) -> Result<(Arc<Mutex<Ledger<N>>>, LedgerRouter<N, E>)> {
+        // Open the ledger from storage.
+        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
+        let ledger = Arc::new(Mutex::new(ledger));
+
+        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
+        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
+
+        // Initialize the ledger router process.
+        let ledger_clone = ledger.clone();
+        tasks.append(task::spawn(async move {
+            // Asynchronously wait for a ledger request.
+            while let Some(request) = ledger_handler.recv().await {
+                // Hold the ledger mutex briefly, to update the state of the ledger.
+                if let Err(error) = ledger_clone.lock().await.update::<E>(request).await {
+                    error!("{}", error);
+                }
+            }
+        }));
+
+        Ok((ledger, ledger_router))
     }
 
     ///
@@ -147,6 +154,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         local_ip: SocketAddr,
         listener: TcpListener,
         peers_router: PeersRouter<N, E>,
+        ledger_router: LedgerRouter<N, E>,
     ) {
         tasks.append(task::spawn(async move {
             info!("Listening for peers at {}", local_ip);
@@ -155,7 +163,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
                 match listener.accept().await {
                     // Process the inbound connection request.
                     Ok((stream, peer_ip)) => {
-                        let request = PeersRequest::HandleNewPeer(stream, peer_ip, peers_router.clone());
+                        let request = PeersRequest::HandleNewPeer(stream, peer_ip, peers_router.clone(), ledger_router.clone());
                         if let Err(error) = peers_router.send(request).await {
                             error!("Failed to send request to peers: {}", error)
                         }
@@ -169,92 +177,53 @@ impl<N: Network, E: Environment> Initialize<N, E> {
     }
 
     ///
-    /// Initialize a new instance for managing the ledger.
+    /// Initialize a new instance of the heartbeat.
     ///
-    fn initialize_ledger(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        local_ip: SocketAddr,
-        peers_router: PeersRouter<N, E>,
-        miner: Option<Address<N>>,
-    ) -> Result<(Arc<Mutex<Ledger<N>>>, LedgerRouter<N, E>)> {
-        // Open the ledger from storage.
-        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
-        let ledger = Arc::new(Mutex::new(ledger));
-
-        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
-        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
-
-        // Initialize the ledger router process.
-        let ledger_clone = ledger.clone();
+    fn initialize_heartbeat(tasks: &mut Tasks<task::JoinHandle<()>>, peers_router: PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
+        // Initialize a process to maintain an adequate number of peers.
         let peers_router_clone = peers_router.clone();
+        let ledger_router_clone = ledger_router.clone();
         tasks.append(task::spawn(async move {
-            // Asynchronously wait for a ledger request.
-            while let Some(request) = ledger_handler.recv().await {
-                // trace!("{:?}", request);
-                // Hold the ledger mutex briefly, to update the state of the ledger.
-                if let Err(error) = ledger_clone.lock().await.update::<E>(request).await {
-                    error!("{}", error);
+            loop {
+                // Transmit the heartbeat request.
+                let request = PeersRequest::Heartbeat(peers_router_clone.clone(), ledger_router_clone.clone());
+                if let Err(error) = peers_router_clone.send(request).await {
+                    error!("Failed to send request to peers: {}", error)
                 }
+                // Sleep for 30 seconds.
+                tokio::time::sleep(Duration::from_secs(30)).await;
             }
         }));
+    }
 
-        if let Some(recipient) = miner {
-            if E::NODE_TYPE == NodeType::Miner {
+    ///
+    /// Initialize a new instance of the miner.
+    ///
+    fn initialize_miner(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        miner: Option<Address<N>>,
+        peers_router: PeersRouter<N, E>,
+        ledger_router: LedgerRouter<N, E>,
+    ) {
+        if E::NODE_TYPE == NodeType::Miner {
+            if let Some(recipient) = miner {
                 let ledger_router = ledger_router.clone();
-                let peers_router_clone = peers_router.clone();
+                let peers_router = peers_router.clone();
                 tasks.append(task::spawn(async move {
                     loop {
                         // Start the mining process.
-                        if let Err(error) = ledger_router.send(LedgerRequest::Mine(recipient, peers_router_clone.clone())).await {
+                        if let Err(error) = ledger_router.send(LedgerRequest::Mine(recipient, peers_router.clone())).await {
                             error!("Miner error: {}", error);
                         }
-                        // Sleep for 1 seconds.
+                        // Sleep for 1 second.
                         tokio::time::sleep(Duration::from_secs(1)).await;
-
-                        // // Ensure the miner did not error.
-                        // if let Err(error) = result {
-                        //     // Sleep for 10 seconds.
-                        //     tokio::time::sleep(Duration::from_secs(10)).await;
-                        //     warn!("{}", error);
-                        // }
                     }
                 }));
+            } else {
+                error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
         }
-
-        Ok((ledger, ledger_router))
     }
-
-    // ///
-    // /// Initialize a new instance for the miner.
-    // ///
-    // fn initialize_miner(tasks: &mut Tasks<task::JoinHandle<()>>, ledger_router: LedgerRouter<N, E>) -> Result<(
-    //     Arc<Mutex<Miner<N>>>,
-    //     MinerHandler<N, E>,
-    // )> {
-    //     // If the node is a mining node, initialize a miner.
-    //     let miner = match E::NODE_TYPE == NodeType::Miner {
-    //         true => Miner::spawn(self.clone(), miner_address),
-    //         false => return Err(anyhow!("Node is not a mining node")),
-    //     };
-    //
-    //     let miner = Arc::new(Mutex::new(miner));
-    //
-    //     // Initialize an mpsc channel for sending requests to the `Miner` struct.
-    //     let (miner_handler, mut miner_router) = mpsc::channel(128);
-    //
-    //     // Initialize the miner router process.
-    //     let miner_clone = miner.clone();
-    //     tasks.append(tokio::spawn(async move {
-    //         // Asynchronously wait for a miner request.
-    //         while let Some(event) = miner_router.next().await {
-    //             // Hold the miner threaded mutex briefly, to update the state of the miner.
-    //             miner_clone.lock().expect("Mutex was poisoned").update(event);
-    //         }
-    //     }));
-    //
-    //     Ok((miner, miner_handler))
-    // }
 
     // ///
     // /// Initiates a connection request to the given IP address.

@@ -24,7 +24,10 @@ use rand::{thread_rng, CryptoRng, Rng};
 use std::{
     net::SocketAddr,
     path::Path,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 use tokio::{sync::mpsc, task};
 
@@ -48,7 +51,7 @@ pub struct Ledger<N: Network> {
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
     /// A status bit for the miner.
-    is_mining: bool,
+    is_mining: Arc<AtomicBool>,
 }
 
 impl<N: Network> Ledger<N> {
@@ -58,7 +61,7 @@ impl<N: Network> Ledger<N> {
             canon: LedgerState::open::<S, P>(path)?,
             memory_pool: MemoryPool::new(),
             terminator: Arc::new(AtomicBool::new(false)),
-            is_mining: false,
+            is_mining: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -205,9 +208,9 @@ impl<N: Network> Ledger<N> {
     /// Mines a new block and adds it to the canon blocks.
     fn mine_next_block<E: Environment>(&mut self, recipient: Address<N>, peers_router: PeersRouter<N, E>) -> Result<()> {
         // Ensure the ledger is not already mining.
-        match self.is_mining {
+        match self.is_mining.load(Ordering::SeqCst) {
             true => return Ok(()),
-            false => self.is_mining = true,
+            false => self.is_mining.store(true, Ordering::SeqCst),
         }
 
         // Prepare the new block.
@@ -224,6 +227,7 @@ impl<N: Network> Ledger<N> {
         let ledger_root = self.canon.latest_ledger_root();
         let unconfirmed_transactions = self.memory_pool.transactions();
         let terminator = self.terminator.clone();
+        let is_mining = self.is_mining.clone();
 
         task::spawn(async move {
             // Craft a coinbase transaction.
@@ -256,7 +260,10 @@ impl<N: Network> Ledger<N> {
                 &terminator,
                 &mut thread_rng(),
             ) {
-                Ok(block) => block,
+                Ok(block) => {
+                    is_mining.store(false, Ordering::SeqCst);
+                    block
+                }
                 Err(error) => {
                     error!("Failed to mine the next block: {}", error);
                     return;

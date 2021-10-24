@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ledger::Ledger, Environment, Message};
+use crate::{
+    ledger::{Ledger, LedgerRouter},
+    Environment,
+    Message,
+};
 use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -46,9 +50,9 @@ pub enum PeersRequest<N: Network, E: Environment> {
     Broadcast(Message<N, E>),
     SendPeerRequest(SocketAddr),
     SendPeerResponse(SocketAddr),
-    HandleNewPeer(TcpStream, SocketAddr, PeersRouter<N, E>),
-    ConnectNewPeer(SocketAddr, PeersRouter<N, E>),
-    Heartbeat(PeersRouter<N, E>),
+    HandleNewPeer(TcpStream, SocketAddr, PeersRouter<N, E>, LedgerRouter<N, E>),
+    ConnectNewPeer(SocketAddr, PeersRouter<N, E>, LedgerRouter<N, E>),
+    Heartbeat(PeersRouter<N, E>, LedgerRouter<N, E>),
 }
 
 /// Shorthand for the parent half of the message channel.
@@ -163,7 +167,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Send a `PeerResponse` message.
                 self.send(recipient, &Message::PeerResponse(self.connected_peers())).await;
             }
-            PeersRequest::HandleNewPeer(stream, peer_ip, peers_router) => {
+            PeersRequest::HandleNewPeer(stream, peer_ip, peers_router, ledger_router) => {
                 // Ensure the node does not surpass the maximum number of peer connections.
                 if self.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Dropping connection request from {} (maximum peers reached)", peer_ip);
@@ -179,7 +183,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
             }
 
-            PeersRequest::ConnectNewPeer(peer_ip, peers_router) => {
+            PeersRequest::ConnectNewPeer(peer_ip, peers_router, ledger_router) => {
                 // Ensure the remote IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -212,7 +216,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     };
                 }
             }
-            PeersRequest::Heartbeat(peers_router) => {
+            PeersRequest::Heartbeat(peers_router, ledger_router) => {
                 // Skip if the number of connected peers is above the minimum threshold.
                 match self.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
                     true => trace!("Attempting to discover new peers"),
@@ -223,7 +227,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
                     trace!("Attempting connection to {}...", peer_ip);
                     if let Err(error) = peers_router
-                        .send(PeersRequest::ConnectNewPeer(*peer_ip, peers_router.clone()))
+                        .send(PeersRequest::ConnectNewPeer(*peer_ip, peers_router.clone(), ledger_router.clone()))
                         .await
                     {
                         error!("Failed to transmit the request: '{}'", error);
