@@ -16,9 +16,6 @@
 
 pub(crate) mod initialize;
 
-// pub(crate) mod miner;
-// pub(crate) use miner::*;
-
 pub(crate) mod message;
 pub(crate) use message::*;
 

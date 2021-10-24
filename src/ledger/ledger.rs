@@ -14,36 +14,51 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::LedgerState, storage::Storage};
+use crate::{Environment, Message, PeersRequest, PeersRouter};
+use snarkos_ledger::{storage::Storage, LedgerState};
+
 use snarkvm::dpc::prelude::*;
 
-use anyhow::Result;
-use rand::{CryptoRng, Rng};
-use std::{path::Path, sync::atomic::AtomicBool};
+use anyhow::{anyhow, Result};
+use rand::{thread_rng, CryptoRng, Rng};
+use std::{
+    net::SocketAddr,
+    path::Path,
+    sync::{atomic::AtomicBool, Arc},
+};
+use tokio::{sync::mpsc, task};
+
+/// Shorthand for the parent half of the message channel.
+pub(crate) type LedgerRouter<N, E> = mpsc::Sender<LedgerRequest<N, E>>;
+/// Shorthand for the child half of the message channel.
+type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
+
+#[derive(Debug)]
+pub enum LedgerRequest<N: Network, E: Environment> {
+    Mine(Address<N>, PeersRouter<N, E>),
+    UnconfirmedBlock(SocketAddr, Block<N>, PeersRouter<N, E>),
+}
 
 #[derive(Clone, Debug)]
 pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
     /// The pool of unconfirmed transactions.
-    pub memory_pool: MemoryPool<N>,
+    memory_pool: MemoryPool<N>,
+    /// A terminator bit for the miner.
+    terminator: Arc<AtomicBool>,
+    /// A status bit for the miner.
+    is_mining: bool,
 }
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
-        // Open storage.
-        let context = N::NETWORK_ID;
-        let storage = S::open(path, context)?;
-
-        // let value = storage.export()?;
-        // println!("{}", value);
-        // let storage_2 = S::open(".ledger_2", context)?;
-        // storage_2.import(value)?;
-
         Ok(Self {
-            canon: LedgerState::open::<S>(storage)?,
+            canon: LedgerState::open::<S, P>(path)?,
             memory_pool: MemoryPool::new(),
+            terminator: Arc::new(AtomicBool::new(false)),
+            is_mining: false,
         })
     }
 
@@ -165,12 +180,36 @@ impl<N: Network> Ledger<N> {
     /// Adds the given block as the next block in the ledger to storage.
     pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
         self.canon.add_next_block(block)?;
+        // On success, clear the memory pool of its transactions.
         // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
+        self.memory_pool.clear_transactions();
         Ok(())
     }
 
+    ///
+    /// Performs the given `request` to the ledger.
+    /// All requests must go through this `update`, so that a unified view is preserved.
+    ///
+    pub(crate) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
+        match request {
+            LedgerRequest::Mine(recipient, peers_router) => {
+                if let Err(error) = self.mine_next_block(recipient, peers_router) {
+                    error!("Failed to mine the next block: {}", error)
+                }
+                Ok(())
+            }
+            LedgerRequest::UnconfirmedBlock(peer_ip, block, peers_router) => self.add_unconfirmed_block(peer_ip, block, peers_router).await,
+        }
+    }
+
     /// Mines a new block and adds it to the canon blocks.
-    pub fn mine_next_block<R: Rng + CryptoRng>(&mut self, recipient: Address<N>, terminator: &AtomicBool, rng: &mut R) -> Result<()> {
+    fn mine_next_block<E: Environment>(&mut self, recipient: Address<N>, peers_router: PeersRouter<N, E>) -> Result<()> {
+        // Ensure the ledger is not already mining.
+        match self.is_mining {
+            true => return Ok(()),
+            false => self.is_mining = true,
+        }
+
         // Prepare the new block.
         let previous_block_hash = self.latest_block_hash();
         let block_height = self.latest_block_height() + 1;
@@ -181,32 +220,85 @@ impl<N: Network> Ledger<N> {
         let block_timestamp = chrono::Utc::now().timestamp();
         let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
 
-        // Construct the new block transactions.
-        let amount = Block::<N>::block_reward(block_height);
-        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
-        let transactions = Transactions::from(&[vec![coinbase_transaction], self.memory_pool.transactions()].concat())?;
-
-        // Construct the ledger root.
+        // Construct the ledger root and unconfirmed transactions.
         let ledger_root = self.canon.latest_ledger_root();
+        let unconfirmed_transactions = self.memory_pool.transactions();
+        let terminator = self.terminator.clone();
 
-        // Mine the next block.
-        let block = Block::mine(
-            previous_block_hash,
-            block_height,
-            block_timestamp,
-            difficulty_target,
-            ledger_root,
-            transactions,
-            terminator,
-            rng,
-        )?;
+        task::spawn(async move {
+            // Craft a coinbase transaction.
+            let amount = Block::<N>::block_reward(block_height);
+            let coinbase_transaction = match Transaction::<N>::new_coinbase(recipient, amount, &mut thread_rng()) {
+                Ok(coinbase) => coinbase,
+                Err(error) => {
+                    error!("{}", error);
+                    return;
+                }
+            };
 
-        // Attempt to add the block to the canon chain.
-        self.add_next_block(&block)?;
+            // Construct the new block transactions.
+            let transactions = match Transactions::from(&[vec![coinbase_transaction], unconfirmed_transactions].concat()) {
+                Ok(transactions) => transactions,
+                Err(error) => {
+                    error!("{}", error);
+                    return;
+                }
+            };
 
-        // On success, clear the memory pool of its transactions.
-        self.memory_pool.clear_transactions();
+            // Mine the next block.
+            let block = match Block::mine(
+                previous_block_hash,
+                block_height,
+                block_timestamp,
+                difficulty_target,
+                ledger_root,
+                transactions,
+                &terminator,
+                &mut thread_rng(),
+            ) {
+                Ok(block) => block,
+                Err(error) => {
+                    error!("Failed to mine the next block: {}", error);
+                    return;
+                }
+            };
+
+            if let Err(error) = peers_router
+                .send(PeersRequest::Broadcast(Message::UnconfirmedBlock(block.height(), block)))
+                .await
+            {
+                error!("Failed to broadcast mined block: {}", error);
+            }
+        });
 
         Ok(())
+    }
+
+    ///
+    /// Adds the given unconfirmed block:
+    ///     1) as the next block in the ledger if the block height increments by one, or
+    ///     2) to the memory pool for later use.
+    ///
+    async fn add_unconfirmed_block<E: Environment>(
+        &mut self,
+        peer_ip: SocketAddr,
+        block: Block<N>,
+        peers_router: PeersRouter<N, E>,
+    ) -> Result<()> {
+        if block.height() + 1 == self.latest_block_height() {
+            self.add_next_block(&block)?;
+            debug!("Advancing ledger to block {}", self.latest_block_height());
+            // TODO (howardwu) - Set the terminator bit to true.
+            Ok(())
+        } else if block.height() + 1 > self.latest_block_height() {
+            debug!("Adding unconfirmed block {} to memory pool", block.height());
+            self.memory_pool.add_block(block.clone())?;
+            peers_router
+                .send(PeersRequest::Propagate(peer_ip, Message::UnconfirmedBlock(block.height(), block)))
+                .await?;
+            Ok(())
+        } else {
+            return Err(anyhow!("Attempted to add a stale block to the memory pool"));
+        }
     }
 }

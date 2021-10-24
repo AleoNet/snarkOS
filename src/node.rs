@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, network::initialize::Initialize, Environment, NodeType, Peers};
-use snarkos_ledger::{ledger::Ledger, storage::rocksdb::RocksDB};
+use crate::{helpers::Tasks, ledger::Ledger, network::initialize::Initialize, Environment, NodeType, Peers};
+use snarkos_ledger::storage::rocksdb::RocksDB;
 use snarkvm::dpc::{Address, Network};
 
 use anyhow::{anyhow, Result};
@@ -48,24 +48,21 @@ pub struct Node<N: Network, E: Environment> {
     // /// The ledger state of the node.
     // ledger: Arc<RwLock<Ledger<N>>>,
     initialize: Initialize<N, E>,
-    /// A terminator bit for the miner.
-    terminator: Arc<AtomicBool>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
 }
 
 impl<N: Network, E: Environment> Node<N, E> {
-    pub async fn new(port: u16) -> Result<Self> {
+    pub async fn new(port: u16, miner: Option<Address<N>>) -> Result<Self> {
         // Open the ledger from storage.
-        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
+        // let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
 
         // Initialize the node.
         let node = Self {
             status: Arc::new(AtomicU8::new(0)),
             // peers: Arc::new(RwLock::new(Peers::new())),
             // ledger: Arc::new(RwLock::new(ledger)),
-            initialize: Initialize::initialize(port).await?,
-            terminator: Arc::new(AtomicBool::new(false)),
+            initialize: Initialize::initialize(port, miner).await?,
             tasks: Tasks::new(),
         };
         Ok(node)
@@ -182,13 +179,13 @@ impl<N: Network, E: Environment> Node<N, E> {
     //     self.ledger.clone()
     // }
 
-    ///
-    /// Returns the current terminator bit for the node.
-    ///
-    #[inline]
-    pub(crate) fn terminator(&self) -> Arc<AtomicBool> {
-        self.terminator.clone()
-    }
+    // ///
+    // /// Returns the current terminator bit for the node.
+    // ///
+    // #[inline]
+    // pub(crate) fn terminator(&self) -> Arc<AtomicBool> {
+    //     self.terminator.clone()
+    // }
 
     /// Updates the node to the given status.
     #[inline]
@@ -197,7 +194,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         match state {
             Status::ShuttingDown => {
                 // debug!("Shutting down");
-                self.terminator.store(true, Ordering::SeqCst);
+                // self.terminator.store(true, Ordering::SeqCst);
                 self.tasks.flush();
             }
             _ => (),

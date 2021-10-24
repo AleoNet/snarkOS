@@ -14,12 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    network::initialize::{PeersHandler, PeersOperation},
-    Environment,
-    Message,
-};
-use snarkos_ledger::ledger::Ledger;
+use crate::{ledger::Ledger, Environment, Message};
 use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -41,10 +36,30 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
+#[derive(Debug)]
+pub enum PeersRequest<N: Network, E: Environment> {
+    AddCandidatePeers(Vec<SocketAddr>),
+    AddConnectedPeer(SocketAddr, OutboundRouter<N, E>),
+    RemoveCandidatePeer(SocketAddr),
+    RemoveConnectedPeer(SocketAddr),
+    Propagate(SocketAddr, Message<N, E>),
+    Broadcast(Message<N, E>),
+    SendPeerRequest(SocketAddr),
+    SendPeerResponse(SocketAddr),
+    HandleNewPeer(TcpStream, SocketAddr, PeersRouter<N, E>),
+    ConnectNewPeer(SocketAddr, PeersRouter<N, E>),
+    Heartbeat(PeersRouter<N, E>),
+}
+
 /// Shorthand for the parent half of the message channel.
-pub(crate) type Outbound<N, E> = mpsc::Sender<Message<N, E>>;
+pub(crate) type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
 /// Shorthand for the child half of the message channel.
-type OutboundRouter<N, E> = mpsc::Receiver<Message<N, E>>;
+type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
+
+/// Shorthand for the parent half of the message channel.
+pub(crate) type OutboundRouter<N, E> = mpsc::Sender<Message<N, E>>;
+/// Shorthand for the child half of the message channel.
+type OutboundHandler<N, E> = mpsc::Receiver<Message<N, E>>;
 
 ///
 /// A map of peers connected to the node server.
@@ -53,7 +68,7 @@ pub(crate) struct Peers<N: Network, E: Environment> {
     /// The local address of this node.
     local_ip: SocketAddr,
     /// The set of connected peer IPs.
-    connected_peers: HashMap<SocketAddr, Outbound<N, E>>,
+    connected_peers: HashMap<SocketAddr, OutboundRouter<N, E>>,
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
 }
@@ -113,42 +128,42 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
-    /// Performs the given `operation` to the peers.
-    /// All operations must go through this `update`, so that a unified view is preserved.
+    /// Performs the given `request` to the peers.
+    /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub async fn update(&mut self, operation: PeersOperation<N, E>) {
-        match operation {
-            PeersOperation::AddCandidatePeers(peer_ips) => {
+    pub(crate) async fn update(&mut self, request: PeersRequest<N, E>) {
+        match request {
+            PeersRequest::AddCandidatePeers(peer_ips) => {
                 self.add_candidate_peers(&peer_ips);
             }
-            PeersOperation::AddConnectedPeer(peer_ip, outbound) => {
+            PeersRequest::AddConnectedPeer(peer_ip, outbound) => {
                 // Add an entry for this `Peer` in the connected peers.
                 self.connected_peers.insert(peer_ip, outbound);
                 // Remove an entry for this `Peer` in the candidate peers, if it exists.
                 self.candidate_peers.remove(&peer_ip);
             }
-            PeersOperation::RemoveCandidatePeer(peer_ip) => {
+            PeersRequest::RemoveCandidatePeer(peer_ip) => {
                 self.candidate_peers.remove(&peer_ip);
             }
-            PeersOperation::RemoveConnectedPeer(peer_ip) => {
+            PeersRequest::RemoveConnectedPeer(peer_ip) => {
                 self.connected_peers.remove(&peer_ip);
                 self.candidate_peers.insert(peer_ip);
             }
-            PeersOperation::Propagate(sender, message) => {
+            PeersRequest::Propagate(sender, message) => {
                 self.propagate(sender, &message).await;
             }
-            PeersOperation::Broadcast(message) => {
+            PeersRequest::Broadcast(message) => {
                 self.broadcast(&message).await;
             }
-            PeersOperation::SendPeerRequest(recipient) => {
+            PeersRequest::SendPeerRequest(recipient) => {
                 // Send a `PeerResponse` message.
                 self.send(recipient, &Message::PeerRequest).await;
             }
-            PeersOperation::SendPeerResponse(recipient) => {
+            PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
                 self.send(recipient, &Message::PeerResponse(self.connected_peers())).await;
             }
-            PeersOperation::HandleNewPeer(stream, peer_ip, peers_handler) => {
+            PeersRequest::HandleNewPeer(stream, peer_ip, peers_router) => {
                 // Ensure the node does not surpass the maximum number of peer connections.
                 if self.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Dropping connection request from {} (maximum peers reached)", peer_ip);
@@ -160,11 +175,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Spawn a handler to be run asynchronously.
                 else {
                     debug!("Received a connection request from {}", peer_ip);
-                    Peer::handler(stream, self.local_ip, peers_handler).await;
+                    Peer::handler(stream, self.local_ip, peers_router).await;
                 }
             }
 
-            PeersOperation::ConnectNewPeer(peer_ip, peers_handler) => {
+            PeersRequest::ConnectNewPeer(peer_ip, peers_router) => {
                 // Ensure the remote IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -184,7 +199,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Connecting to {}...", peer_ip);
                     match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
                         Ok(stream) => match stream {
-                            Ok(stream) => Peer::handler(stream, self.local_ip, peers_handler).await,
+                            Ok(stream) => Peer::handler(stream, self.local_ip, peers_router).await,
                             Err(error) => {
                                 error!("Failed to connect to '{}': '{:?}'", peer_ip, error);
                                 self.candidate_peers.remove(&peer_ip);
@@ -197,7 +212,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     };
                 }
             }
-            PeersOperation::Heartbeat(peers_handler) => {
+            PeersRequest::Heartbeat(peers_router) => {
                 // Skip if the number of connected peers is above the minimum threshold.
                 match self.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
                     true => trace!("Attempting to discover new peers"),
@@ -207,11 +222,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
                     trace!("Attempting connection to {}...", peer_ip);
-                    if let Err(error) = peers_handler
-                        .send(PeersOperation::ConnectNewPeer(*peer_ip, peers_handler.clone()))
+                    if let Err(error) = peers_router
+                        .send(PeersRequest::ConnectNewPeer(*peer_ip, peers_router.clone()))
                         .await
                     {
-                        error!("Failed to transmit the operation: '{}'", error);
+                        error!("Failed to transmit the request: '{}'", error);
                     }
                 }
 
@@ -401,7 +416,7 @@ const CHALLENGE_HEIGHT: u32 = 0;
 ///
 /// The state for each connected client.
 ///
-pub(crate) struct Peer<N: Network, E: Environment> {
+struct Peer<N: Network, E: Environment> {
     /// The IP address of the peer, with the port set to the listener port.
     listener_ip: SocketAddr,
     /// The timestamp of the last message received from this peer.
@@ -412,14 +427,14 @@ pub(crate) struct Peer<N: Network, E: Environment> {
     failures: u64,
     /// The TCP socket that handles sending and receiving data with this peer.
     socket: Framed<TcpStream, Message<N, E>>,
-    /// The `router` half of the MPSC message channel, used to receive messages from peers.
-    /// When a message is received on this `OutboundRouter`, it will be written to the socket.
-    router: OutboundRouter<N, E>,
+    /// The `handler` half of the MPSC message channel, used to receive messages from peers.
+    /// When a message is received on this `OutboundHandler`, it will be written to the socket.
+    handler: OutboundHandler<N, E>,
 }
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
-    async fn new(stream: TcpStream, local_ip: SocketAddr, peers_handler: PeersHandler<N, E>) -> Result<Self> {
+    async fn new(stream: TcpStream, local_ip: SocketAddr, peers_handler: PeersRouter<N, E>) -> Result<Self> {
         // Construct the socket.
         let mut socket = Framed::new(stream, Message::<N, E>::Pong);
 
@@ -427,10 +442,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let peer_ip = Peer::handshake(&mut socket, local_ip).await?;
 
         // Create a channel for this peer.
-        let (outbound, router) = mpsc::channel(1024);
+        let (outbound_router, handler) = mpsc::channel(1024);
 
         // Add an entry for this `Peer` in the connected peers.
-        peers_handler.send(PeersOperation::AddConnectedPeer(peer_ip, outbound)).await?;
+        peers_handler.send(PeersRequest::AddConnectedPeer(peer_ip, outbound_router)).await?;
 
         Ok(Peer {
             listener_ip: peer_ip,
@@ -438,7 +453,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             block_height: 0u32,
             failures: 0u64,
             socket,
-            router,
+            handler,
         })
     }
 
@@ -545,10 +560,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
-    async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_handler: PeersHandler<N, E>) {
+    async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_router: PeersRouter<N, E>) {
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, peers_handler.clone()).await {
+            let mut peer = match Peer::new(stream, local_ip, peers_router.clone()).await {
                 Ok(mut peer) => peer,
                 Err(error) => return,
             };
@@ -561,7 +576,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             loop {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
-                    Some(message) = peer.router.recv() => {
+                    Some(message) = peer.handler.recv() => {
                         // Disconnect if the peer has not communicated back in 4 minutes.
                         if peer.last_seen.elapsed() > Duration::from_secs(240) {
                             warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
@@ -599,14 +614,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 },
                                 Message::PeerRequest => {
                                     // Send a `PeerResponse` message.
-                                    if let Err(error) = peers_handler.send(PeersOperation::SendPeerResponse(peer_ip)).await {
+                                    if let Err(error) = peers_router.send(PeersRequest::SendPeerResponse(peer_ip)).await {
                                         warn!("[PeerRequest] {}", error);
                                         peer.failures += 1;
                                     }
                                 }
                                 Message::PeerResponse(peer_ips) => {
                                     // Add the given peer IPs to the list of candidate peers.
-                                    if let Err(error) = peers_handler.send(PeersOperation::AddCandidatePeers(peer_ips.to_vec())).await {
+                                    if let Err(error) = peers_router.send(PeersRequest::AddCandidatePeers(peer_ips.to_vec())).await {
                                         warn!("[PeerResponse] {}", error);
                                         peer.failures += 1;
                                     }
@@ -660,7 +675,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // }
 
                                     // Propagate the unconfirmed block to the connected peers.
-                                    if let Err(error) = peers_handler.send(PeersOperation::Propagate(peer_ip, message)).await {
+                                    if let Err(error) = peers_router.send(PeersRequest::Propagate(peer_ip, message)).await {
                                         warn!("[UnconfirmedBlock] {}", error);
                                         peer.failures += 1;
                                     }
@@ -670,7 +685,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     // TODO (howardwu) - Add to the ledger memory pool.
                                     // Propagate the unconfirmed transaction to the connected peers.
-                                    if let Err(error) = peers_handler.send(PeersOperation::Propagate(peer_ip, message)).await {
+                                    if let Err(error) = peers_router.send(PeersRequest::Propagate(peer_ip, message)).await {
                                         warn!("[UnconfirmedTransaction] {}", error);
                                         peer.failures += 1;
                                     }
@@ -691,7 +706,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
             // When this is reached, it means the peer has disconnected.
             info!("Disconnecting from {}", peer_ip);
-            if let Err(error) = peers_handler.send(PeersOperation::RemoveConnectedPeer(peer_ip)).await {
+            if let Err(error) = peers_router.send(PeersRequest::RemoveConnectedPeer(peer_ip)).await {
                 error!("Failed to disconnect from {}: {}", peer_ip, error);
             }
         });

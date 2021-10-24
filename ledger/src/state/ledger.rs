@@ -18,12 +18,15 @@ use crate::storage::{DataMap, Map, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
-use std::sync::{Arc, Mutex};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 const TWO_HOURS_UNIX: i64 = 7200;
 
 #[derive(Clone, Debug)]
-pub(crate) struct LedgerState<N: Network> {
+pub struct LedgerState<N: Network> {
     /// The current state of the ledger.
     latest_state: (u32, N::BlockHash, N::LedgerRoot),
     ledger_tree: Arc<Mutex<LedgerTree<N>>>,
@@ -33,7 +36,11 @@ pub(crate) struct LedgerState<N: Network> {
 
 impl<N: Network> LedgerState<N> {
     /// Initializes a new instance of `LedgerState`.
-    pub(crate) fn open<S: Storage>(storage: S) -> Result<Self> {
+    pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+        // Open storage.
+        let context = N::NETWORK_ID;
+        let storage = S::open(path, context)?;
+
         // Retrieve the genesis block.
         let genesis = N::genesis_block();
         // Initialize the ledger.
@@ -82,126 +89,131 @@ impl<N: Network> LedgerState<N> {
         let block = ledger.get_block(latest_block_height)?;
         ledger.latest_state = (block.height(), block.block_hash(), block.ledger_root());
 
+        // let value = storage.export()?;
+        // println!("{}", value);
+        // let storage_2 = S::open(".ledger_2", context)?;
+        // storage_2.import(value)?;
+
         Ok(ledger)
     }
 
     /// Returns the latest block height.
-    pub(crate) fn latest_block_height(&self) -> u32 {
+    pub fn latest_block_height(&self) -> u32 {
         self.latest_state.0
     }
 
     /// Returns the latest block hash.
-    pub(crate) fn latest_block_hash(&self) -> N::BlockHash {
+    pub fn latest_block_hash(&self) -> N::BlockHash {
         self.latest_state.1
     }
 
     /// Returns the latest ledger root.
-    pub(crate) fn latest_ledger_root(&self) -> N::LedgerRoot {
+    pub fn latest_ledger_root(&self) -> N::LedgerRoot {
         self.latest_state.2
     }
 
     /// Returns the latest block timestamp.
-    pub(crate) fn latest_block_timestamp(&self) -> Result<i64> {
+    pub fn latest_block_timestamp(&self) -> Result<i64> {
         Ok(self.latest_block_header()?.timestamp())
     }
 
     /// Returns the latest block difficulty target.
-    pub(crate) fn latest_block_difficulty_target(&self) -> Result<u64> {
+    pub fn latest_block_difficulty_target(&self) -> Result<u64> {
         Ok(self.latest_block_header()?.difficulty_target())
     }
 
     /// Returns the latest block header.
-    pub(crate) fn latest_block_header(&self) -> Result<BlockHeader<N>> {
+    pub fn latest_block_header(&self) -> Result<BlockHeader<N>> {
         self.get_block_header(self.latest_block_height())
     }
 
     /// Returns the transactions from the latest block.
-    pub(crate) fn latest_block_transactions(&self) -> Result<Transactions<N>> {
+    pub fn latest_block_transactions(&self) -> Result<Transactions<N>> {
         self.get_block_transactions(self.latest_block_height())
     }
 
     /// Returns the latest block.
-    pub(crate) fn latest_block(&self) -> Result<Block<N>> {
+    pub fn latest_block(&self) -> Result<Block<N>> {
         self.get_block(self.latest_block_height())
     }
 
     /// Returns `true` if the given ledger root exists in storage.
-    pub(crate) fn contains_ledger_root(&self, ledger_root: &N::LedgerRoot) -> Result<bool> {
+    pub fn contains_ledger_root(&self, ledger_root: &N::LedgerRoot) -> Result<bool> {
         Ok(*ledger_root == self.latest_ledger_root() || self.ledger_roots.contains_key(ledger_root)?)
     }
 
     /// Returns `true` if the given block height exists in storage.
-    pub(crate) fn contains_block_height(&self, block_height: u32) -> Result<bool> {
+    pub fn contains_block_height(&self, block_height: u32) -> Result<bool> {
         self.blocks.contains_block_height(block_height)
     }
 
     /// Returns `true` if the given block hash exists in storage.
-    pub(crate) fn contains_block_hash(&self, block_hash: &N::BlockHash) -> Result<bool> {
+    pub fn contains_block_hash(&self, block_hash: &N::BlockHash) -> Result<bool> {
         self.blocks.contains_block_hash(block_hash)
     }
 
     /// Returns `true` if the given transaction ID exists in storage.
-    pub(crate) fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
+    pub fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
         self.blocks.contains_transaction(transaction_id)
     }
 
     /// Returns `true` if the given serial number exists in storage.
-    pub(crate) fn contains_serial_number(&self, serial_number: &N::SerialNumber) -> Result<bool> {
+    pub fn contains_serial_number(&self, serial_number: &N::SerialNumber) -> Result<bool> {
         self.blocks.contains_serial_number(serial_number)
     }
 
     /// Returns `true` if the given commitment exists in storage.
-    pub(crate) fn contains_commitment(&self, commitment: &N::Commitment) -> Result<bool> {
+    pub fn contains_commitment(&self, commitment: &N::Commitment) -> Result<bool> {
         self.blocks.contains_commitment(commitment)
     }
 
     /// Returns `true` if the given ciphertext ID exists in storage.
-    pub(crate) fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
+    pub fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
         self.blocks.contains_ciphertext_id(ciphertext_id)
     }
 
     /// Returns the record ciphertext for a given ciphertext ID.
-    pub(crate) fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
+    pub fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
         self.blocks.get_ciphertext(ciphertext_id)
     }
 
     /// Returns the transition for a given transition ID.
-    pub(crate) fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
+    pub fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
         self.blocks.get_transition(transition_id)
     }
 
     /// Returns the transaction for a given transaction ID.
-    pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
+    pub fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.blocks.get_transaction(transaction_id)
     }
 
     /// Returns the block hash for the given block height.
-    pub(crate) fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
+    pub fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         self.blocks.get_block_hash(block_height)
     }
 
     /// Returns the previous block hash for the given block height.
-    pub(crate) fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
+    pub fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         self.blocks.get_previous_block_hash(block_height)
     }
 
     /// Returns the block header for the given block height.
-    pub(crate) fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
+    pub fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
         self.blocks.get_block_header(block_height)
     }
 
     /// Returns the transactions from the block of the given block height.
-    pub(crate) fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
+    pub fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
         self.blocks.get_block_transactions(block_height)
     }
 
     /// Returns the block for a given block height.
-    pub(crate) fn get_block(&self, block_height: u32) -> Result<Block<N>> {
+    pub fn get_block(&self, block_height: u32) -> Result<Block<N>> {
         self.blocks.get_block(block_height)
     }
 
     /// Adds the given block as the next block in the ledger to storage.
-    pub(crate) fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
+    pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
         // Ensure the block itself is valid.
         if !block.is_valid() {
             return Err(anyhow!("Block {} is invalid", block.height()));
@@ -312,7 +324,7 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Removes the latest block from storage, returning the removed block on success.
-    pub(crate) fn remove_last_block(&mut self) -> Result<Block<N>> {
+    pub fn remove_last_block(&mut self) -> Result<Block<N>> {
         let block = self.latest_block()?;
         let block_height = block.height();
 
@@ -337,7 +349,7 @@ struct BlockState<N: Network> {
 
 impl<N: Network> BlockState<N> {
     /// Initializes a new instance of `BlockState`.
-    pub(crate) fn open<S: Storage>(storage: S) -> Result<Self> {
+    fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
             block_heights: storage.open_map("block_heights")?,
             block_headers: storage.open_map("block_headers")?,
@@ -347,57 +359,57 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Returns `true` if the given block height exists in storage.
-    pub(crate) fn contains_block_height(&self, block_height: u32) -> Result<bool> {
+    fn contains_block_height(&self, block_height: u32) -> Result<bool> {
         self.block_heights.contains_key(&block_height)
     }
 
     /// Returns `true` if the given block hash exists in storage.
-    pub(crate) fn contains_block_hash(&self, block_hash: &N::BlockHash) -> Result<bool> {
+    fn contains_block_hash(&self, block_hash: &N::BlockHash) -> Result<bool> {
         self.block_headers.contains_key(block_hash)
     }
 
     /// Returns `true` if the given transaction ID exists in storage.
-    pub(crate) fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
+    fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
         self.transactions.contains_transaction(transaction_id)
     }
 
     /// Returns `true` if the given serial number exists in storage.
-    pub(crate) fn contains_serial_number(&self, serial_number: &N::SerialNumber) -> Result<bool> {
+    fn contains_serial_number(&self, serial_number: &N::SerialNumber) -> Result<bool> {
         self.transactions.contains_serial_number(serial_number)
     }
 
     /// Returns `true` if the given commitment exists in storage.
-    pub(crate) fn contains_commitment(&self, commitment: &N::Commitment) -> Result<bool> {
+    fn contains_commitment(&self, commitment: &N::Commitment) -> Result<bool> {
         self.transactions.contains_commitment(commitment)
     }
 
     /// Returns `true` if the given ciphertext ID exists in storage.
-    pub(crate) fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
+    fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
         self.transactions.contains_ciphertext_id(ciphertext_id)
     }
 
     /// Returns the record ciphertext for a given ciphertext ID.
-    pub(crate) fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
+    fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
         self.transactions.get_ciphertext(ciphertext_id)
     }
 
     /// Returns the transition for a given transition ID.
-    pub(crate) fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
+    fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
         self.transactions.get_transition(transition_id)
     }
 
     /// Returns the transaction for a given transaction ID.
-    pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
+    fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.transactions.get_transaction(transaction_id)
     }
 
     /// Returns the block hash for the given block height.
-    pub(crate) fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
+    fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         self.get_previous_block_hash(block_height + 1)
     }
 
     /// Returns the previous block hash for the given block height.
-    pub(crate) fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
+    fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         match block_height == 0 {
             true => Ok(N::genesis_block().previous_block_hash()),
             false => match self.block_heights.get(&(block_height - 1))? {
@@ -408,7 +420,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Returns the block header for the given block height.
-    pub(crate) fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
+    fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
         // Retrieve the block hash.
         let block_hash = self.get_block_hash(block_height)?;
 
@@ -419,7 +431,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Returns the transactions from the block of the given block height.
-    pub(crate) fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
+    fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
         // Retrieve the block hash.
         let block_hash = self.get_block_hash(block_height)?;
 
@@ -442,7 +454,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Returns the block for a given block height.
-    pub(crate) fn get_block(&self, block_height: u32) -> Result<Block<N>> {
+    fn get_block(&self, block_height: u32) -> Result<Block<N>> {
         // Retrieve the previous block hash.
         let previous_block_hash = self.get_previous_block_hash(block_height)?;
         // Retrieve the block header.
@@ -454,7 +466,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Adds the given block to storage.
-    pub(crate) fn add_block(&self, block: &Block<N>) -> Result<()> {
+    fn add_block(&self, block: &Block<N>) -> Result<()> {
         // Ensure the block does not exist.
         let block_height = block.height();
         if self.block_heights.contains_key(&block_height)? {
@@ -481,7 +493,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Removes the given block height from storage.
-    pub(crate) fn remove_block(&self, block_height: u32) -> Result<()> {
+    fn remove_block(&self, block_height: u32) -> Result<()> {
         // Ensure the block exists.
         if self.block_heights.contains_key(&block_height)? {
             Err(anyhow!("Block {} does not exists in storage", block_height))
@@ -534,7 +546,7 @@ struct TransactionState<N: Network> {
 
 impl<N: Network> TransactionState<N> {
     /// Initializes a new instance of `TransactionState`.
-    pub(crate) fn open<S: Storage>(storage: S) -> Result<Self> {
+    fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
             transactions: storage.open_map("transactions")?,
             transitions: storage.open_map("transitions")?,
@@ -546,12 +558,12 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Returns `true` if the given transaction ID exists in storage.
-    pub(crate) fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
+    fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
         self.transactions.contains_key(transaction_id)
     }
 
     /// Returns `true` if the given serial number exists in storage.
-    pub(crate) fn contains_serial_number(&self, serial_number: &N::SerialNumber) -> Result<bool> {
+    fn contains_serial_number(&self, serial_number: &N::SerialNumber) -> Result<bool> {
         self.serial_numbers.contains_key(serial_number)
     }
 

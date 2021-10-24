@@ -15,4 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub(crate) mod ledger;
-pub use ledger::LedgerState;
+pub(crate) use ledger::{Ledger, LedgerRequest, LedgerRouter};
+
+// pub(crate) mod miner;
+// pub(crate) use miner::*;

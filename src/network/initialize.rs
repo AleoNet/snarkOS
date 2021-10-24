@@ -14,69 +14,42 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, network::peers::Peer, peers::Outbound, Environment, Message, NodeType, Peers};
-use snarkos_ledger::{ledger::Ledger, storage::rocksdb::RocksDB};
+use crate::{
+    helpers::Tasks,
+    ledger::{Ledger, LedgerRequest, LedgerRouter},
+    peers::{OutboundRouter, PeersRequest, PeersRouter},
+    Environment,
+    Message,
+    NodeType,
+    Peers,
+};
+use snarkos_ledger::storage::rocksdb::RocksDB;
 use snarkvm::prelude::*;
 
-use anyhow::{anyhow, Result};
+use ::rand::{thread_rng, Rng};
+use anyhow::Result;
 use futures::SinkExt;
-use once_cell::sync::OnceCell;
-// use rand::{thread_rng, Rng};
-use std::{
-    collections::{HashMap, HashSet},
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
 use std::{net::SocketAddr, sync::Arc};
 
 use tokio::{
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
     sync::{mpsc, Mutex},
     task,
-    task::JoinHandle,
     time::timeout,
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
-#[derive(Debug)]
-pub enum PeersOperation<N: Network, E: Environment> {
-    AddCandidatePeers(Vec<SocketAddr>),
-    AddConnectedPeer(SocketAddr, Outbound<N, E>),
-    RemoveCandidatePeer(SocketAddr),
-    RemoveConnectedPeer(SocketAddr),
-    Propagate(SocketAddr, Message<N, E>),
-    Broadcast(Message<N, E>),
-    SendPeerRequest(SocketAddr),
-    SendPeerResponse(SocketAddr),
-    HandleNewPeer(TcpStream, SocketAddr, PeersHandler<N, E>),
-    ConnectNewPeer(SocketAddr, PeersHandler<N, E>),
-    Heartbeat(PeersHandler<N, E>),
-}
-
-pub enum LedgerEvent<N: Network, E: Environment> {
-    UnconfirmedBlock(Block<N>),
-    Unused(std::marker::PhantomData<E>),
-}
-
-/// Shorthand for the parent half of the message channel.
-pub(crate) type PeersHandler<N, E> = mpsc::Sender<PeersOperation<N, E>>;
-/// Shorthand for the child half of the message channel.
-pub(crate) type PeersRouter<N, E> = mpsc::Receiver<PeersOperation<N, E>>;
-
-/// Shorthand for the parent half of the message channel.
-pub(crate) type LedgerHandler<N, E> = mpsc::Sender<LedgerEvent<N, E>>;
-/// Shorthand for the child half of the message channel.
-pub(crate) type LedgerRouter<N, E> = mpsc::Receiver<LedgerEvent<N, E>>;
-
 ///
 /// A set of operations to initialize the node server.
 ///
 pub(crate) struct Initialize<N: Network, E: Environment> {
+    /// The ledger state of the node.
+    ledger: Arc<Mutex<Ledger<N>>>,
     /// The list of peers for the node.
     peers: Arc<Mutex<Peers<N, E>>>,
-    // /// The ledger state of the node.
-    // ledger: Arc<Mutex<Ledger<N>>>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
 }
@@ -85,7 +58,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
     ///
     /// Starts the connection listener for peers.
     ///
-    pub(crate) async fn initialize(port: u16) -> Result<Self> {
+    pub(crate) async fn initialize(port: u16, miner: Option<Address<N>>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(&format!("127.0.0.1:{}", port)).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
@@ -96,76 +69,74 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         let mut tasks = Tasks::new();
 
         // Initialize a new instance for managing peers.
-        let (peers, peers_handler) = Self::initialize_peers(&mut tasks, local_ip);
+        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
 
         // Initialize the connection listener for new peers.
-        Self::initialize_listener(&mut tasks, local_ip, listener, peers_handler.clone());
+        Self::initialize_listener(&mut tasks, local_ip, listener, peers_router.clone());
 
-        peers_handler
-            .send(PeersOperation::ConnectNewPeer(
+        peers_router
+            .send(PeersRequest::ConnectNewPeer(
                 "127.0.0.1:4133".parse().unwrap(),
-                peers_handler.clone(),
+                peers_router.clone(),
             ))
             .await?;
 
-        // // Initialize a new instance for managing the ledger.
-        // let (ledger, ledger_handler, ledger_task) = Self::initialize_ledger();
-        // tasks.append(ledger_task);
+        // Initialize a new instance for managing the ledger.
+        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, local_ip, peers_router.clone(), miner)?;
 
         // // Initialize a new instance of the miner.
-        // let (miner, miner_handler, miner_task) = Self::initialize_miner(ledger_handler);
-        // tasks.append(miner_task);
+        // let (miner, miner_router) = match E::NODE_TYPE == NodeType::Miner {
+        //     true => Self::initialize_miner(&mut tasks, ledger_router),
+        //     false => return Err(anyhow!("Node is not a mining node")),
+        // };
 
-        // // Initialize an mpsc channel for peer changes, with a generous buffer.
-        // let (peerset_tx, peerset_rx) = mpsc::channel::<PeerChange>(128);
-        //
-        // // Initialize an mpsc channel for peers demand signaling.
-        // let (mut demand_tx, demand_rx) = mpsc::channel::<MorePeers>(128);
-        //
-
-        // Ok(Self { peers, ledger, tasks })
-        Ok(Self { peers, tasks })
+        Ok(Self { ledger, peers, tasks })
+        // Ok(Self { peers, tasks })
     }
 
     ///
     /// Initialize a new instance for managing peers.
     ///
-    fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<Mutex<Peers<N, E>>>, PeersHandler<N, E>) {
+    fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<Mutex<Peers<N, E>>>, PeersRouter<N, E>) {
         let peers = Arc::new(Mutex::new(Peers::new(local_ip)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
-        let (peers_handler, mut peers_router) = mpsc::channel(1024);
+        let (peers_router, mut peers_handler) = mpsc::channel(1024);
 
         // Initialize the peers router process.
         let peers_clone = peers.clone();
         tasks.append(task::spawn(async move {
-            // Asynchronously wait for a peers operation.
+            // Asynchronously wait for a peers request.
+            // while let Some(request) = peers_handler.recv().await {
+            //     // Hold the peers mutex briefly, to update the state of the peers.
+            //     peers_clone.lock().await.update(request).await;
+            // }
             loop {
                 tokio::select! {
-                    // Channel is routing an operation to peers.
-                    Some(operation) = peers_router.recv() => {
+                    // Channel is routing a request to peers.
+                    Some(request) = peers_handler.recv() => {
                         // Hold the peers mutex briefly, to update the state of the peers.
-                        peers_clone.lock().await.update(operation).await;
+                        peers_clone.lock().await.update(request).await;
                     }
                 }
             }
         }));
 
-        // Initialize a process to maintain an adequate number of peers.
-        let peers_handler_clone = peers_handler.clone();
-        task::spawn(async move {
-            loop {
-                // Sleep for 30 seconds.
-                tokio::time::sleep(Duration::from_secs(30)).await;
-                // Transmit the heartbeat operation.
-                let operation = PeersOperation::Heartbeat(peers_handler_clone.clone());
-                if let Err(error) = peers_handler_clone.send(operation).await {
-                    error!("Failed to send operation to peers: {}", error)
-                }
-            }
-        });
+        // // Initialize a process to maintain an adequate number of peers.
+        // let peers_router_clone = peers_router.clone();
+        // task::spawn(async move {
+        //     loop {
+        //         // Sleep for 30 seconds.
+        //         tokio::time::sleep(Duration::from_secs(30)).await;
+        //         // Transmit the heartbeat request.
+        //         let request = PeersRequest::Heartbeat(peers_router_clone.clone());
+        //         if let Err(error) = peers_router_clone.send(request).await {
+        //             error!("Failed to send request to peers: {}", error)
+        //         }
+        //     }
+        // });
 
-        (peers, peers_handler)
+        (peers, peers_router)
     }
 
     ///
@@ -175,7 +146,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         listener: TcpListener,
-        peers_handler: PeersHandler<N, E>,
+        peers_router: PeersRouter<N, E>,
     ) {
         tasks.append(task::spawn(async move {
             info!("Listening for peers at {}", local_ip);
@@ -184,9 +155,9 @@ impl<N: Network, E: Environment> Initialize<N, E> {
                 match listener.accept().await {
                     // Process the inbound connection request.
                     Ok((stream, peer_ip)) => {
-                        let operation = PeersOperation::HandleNewPeer(stream, peer_ip, peers_handler.clone());
-                        if let Err(error) = peers_handler.send(operation).await {
-                            error!("Failed to send operation to peers: {}", error)
+                        let request = PeersRequest::HandleNewPeer(stream, peer_ip, peers_router.clone());
+                        if let Err(error) = peers_router.send(request).await {
+                            error!("Failed to send request to peers: {}", error)
                         }
                     }
                     Err(error) => error!("Failed to accept a connection: {}", error),
@@ -197,39 +168,70 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         }));
     }
 
-    // ///
-    // /// Initialize a new instance for managing the ledger.
-    // ///
-    // fn initialize_ledger() -> (Arc<Mutex<Ledger<N>>>, LedgerHandler<N, E>, task::JoinHandle<()>) {
-    //     // Open the ledger from storage.
-    //     let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
-    //
-    //     let ledger = Arc::new(Mutex::new(ledger));
-    //
-    //     // Initialize an mpsc channel for sending requests to the `Ledger` struct.
-    //     let (ledger_handler, mut ledger_router) = mpsc::channel(1024);
-    //
-    //     // Initialize the ledger router process.
-    //     let ledger_clone = ledger.clone();
-    //     let ledger_task = tokio::spawn(async move {
-    //         // Asynchronously wait for a ledger operation.
-    //         while let Some(event) = ledger_router.next().await {
-    //             // Hold the ledger threaded mutex briefly, to update the state of the ledger.
-    //             ledger_clone.lock().expect("Mutex was poisoned").update(event);
-    //         }
-    //     });
-    //
-    //     (ledger, ledger_handler, ledger_task)
-    // }
+    ///
+    /// Initialize a new instance for managing the ledger.
+    ///
+    fn initialize_ledger(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        local_ip: SocketAddr,
+        peers_router: PeersRouter<N, E>,
+        miner: Option<Address<N>>,
+    ) -> Result<(Arc<Mutex<Ledger<N>>>, LedgerRouter<N, E>)> {
+        // Open the ledger from storage.
+        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
+        let ledger = Arc::new(Mutex::new(ledger));
+
+        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
+        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
+
+        // Initialize the ledger router process.
+        let ledger_clone = ledger.clone();
+        let peers_router_clone = peers_router.clone();
+        tasks.append(task::spawn(async move {
+            // Asynchronously wait for a ledger request.
+            while let Some(request) = ledger_handler.recv().await {
+                // trace!("{:?}", request);
+                // Hold the ledger mutex briefly, to update the state of the ledger.
+                if let Err(error) = ledger_clone.lock().await.update::<E>(request).await {
+                    error!("{}", error);
+                }
+            }
+        }));
+
+        if let Some(recipient) = miner {
+            if E::NODE_TYPE == NodeType::Miner {
+                let ledger_router = ledger_router.clone();
+                let peers_router_clone = peers_router.clone();
+                tasks.append(task::spawn(async move {
+                    loop {
+                        // Start the mining process.
+                        if let Err(error) = ledger_router.send(LedgerRequest::Mine(recipient, peers_router_clone.clone())).await {
+                            error!("Miner error: {}", error);
+                        }
+                        // Sleep for 1 seconds.
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+
+                        // // Ensure the miner did not error.
+                        // if let Err(error) = result {
+                        //     // Sleep for 10 seconds.
+                        //     tokio::time::sleep(Duration::from_secs(10)).await;
+                        //     warn!("{}", error);
+                        // }
+                    }
+                }));
+            }
+        }
+
+        Ok((ledger, ledger_router))
+    }
 
     // ///
     // /// Initialize a new instance for the miner.
     // ///
-    // fn initialize_miner(ledger_handler: LedgerHandler<N, E>)-> (
+    // fn initialize_miner(tasks: &mut Tasks<task::JoinHandle<()>>, ledger_router: LedgerRouter<N, E>) -> Result<(
     //     Arc<Mutex<Miner<N>>>,
     //     MinerHandler<N, E>,
-    //     task::JoinHandle<()>,
-    // ) {
+    // )> {
     //     // If the node is a mining node, initialize a miner.
     //     let miner = match E::NODE_TYPE == NodeType::Miner {
     //         true => Miner::spawn(self.clone(), miner_address),
@@ -243,15 +245,15 @@ impl<N: Network, E: Environment> Initialize<N, E> {
     //
     //     // Initialize the miner router process.
     //     let miner_clone = miner.clone();
-    //     let ledger_task = tokio::spawn(async move {
-    //         // Asynchronously wait for a miner operation.
+    //     tasks.append(tokio::spawn(async move {
+    //         // Asynchronously wait for a miner request.
     //         while let Some(event) = miner_router.next().await {
     //             // Hold the miner threaded mutex briefly, to update the state of the miner.
     //             miner_clone.lock().expect("Mutex was poisoned").update(event);
     //         }
-    //     });
+    //     }));
     //
-    //     (miner, miner_handler, ledger_task)
+    //     Ok((miner, miner_handler))
     // }
 
     // ///

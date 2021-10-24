@@ -53,8 +53,13 @@ async fn main() -> Result<()> {
 
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
-    let node = Node::<Testnet2, Miner>::new(port).await?;
-    // node.start(port, account.address()).await;
-    std::future::pending::<()>().await;
+    if port == 4134 {
+        let node = Node::<Testnet2, Miner>::new(port, Some(account.address())).await?;
+        std::future::pending::<()>().await;
+    } else {
+        let node = Node::<Testnet2, Miner>::new(port, None).await?;
+        std::future::pending::<()>().await;
+    }
+
     Ok(())
 }
