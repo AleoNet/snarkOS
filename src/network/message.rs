@@ -139,7 +139,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
             3 => Self::PeerResponse(bincode::deserialize(data)?),
-            4 => Self::Ping(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[2..])?),
+            4 => Self::Ping(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..])?),
             5 => match data.len() == 0 {
                 true => Self::Pong,
                 false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),

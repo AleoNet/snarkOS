@@ -454,8 +454,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
                     Some(message) = peer.outbound_handler.recv() => {
-                        // Disconnect if the peer has not communicated back in 4 minutes.
-                        if peer.last_seen.elapsed() > Duration::from_secs(240) {
+                        // Disconnect if the peer has not communicated back in 3 minutes.
+                        if peer.last_seen.elapsed() > Duration::from_secs(180) {
                             warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
                             // Route a `Disconnect` to the state manager.
                             if let Err(error) = state_router.send(StateRequest::Disconnect(peer_ip)).await {
@@ -463,7 +463,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             }
                             break;
                         } else {
-                            trace!("Routing a message outbound to {}", peer_ip);
+                            // Route a message to the peer.
                             if let Err(error) = peer.send(message).await {
                                 warn!("[OutboundRouter] {}", error);
                             }
@@ -472,8 +472,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     result = peer.outbound_socket.next() => match result {
                         // Received a message from the peer.
                         Some(Ok(message)) => {
-                            // Disconnect if the peer has not communicated back in 4 minutes.
-                            match peer.last_seen.elapsed() > Duration::from_secs(240) {
+                            // Disconnect if the peer has not communicated back in 3 minutes.
+                            match peer.last_seen.elapsed() > Duration::from_secs(180) {
                                 true => {
                                     let last_seen = peer.last_seen.elapsed().as_secs();
                                     warn!("Failed to receive a message from {} in {} seconds", peer_ip, last_seen);

@@ -152,7 +152,7 @@ impl<N: Network, E: Environment> State<N, E> {
                     // Route a `SyncResponse` to the ledger.
                     let request = LedgerRequest::SyncResponse(block.clone());
                     if let Err(error) = ledger_router.send(request).await {
-                        warn!("[UnconfirmedBlock] {}", error);
+                        warn!("[SyncResponse] {}", error);
                     }
                 }
 
@@ -207,8 +207,8 @@ impl<N: Network, E: Environment> State<N, E> {
                 }
             }
             StateRequest::Pong(peer_ip) => {
-                // Sleep for 10 seconds.
-                tokio::time::sleep(Duration::from_secs(10)).await;
+                // Sleep for 15 seconds.
+                tokio::time::sleep(Duration::from_secs(15)).await;
                 // Fetch the latest block height of this ledger.
                 let block_height = ledger.read().await.latest_block_height();
                 // Send a `Ping` message to the peer.
