@@ -24,6 +24,13 @@ snarkvm = { path = "../snarkVM", features = ["parameters"] }
 futures = { version = "0.3.0", features = ["thread-pool"]}
 bytes = "1.0.0"
 
+#tui = { version = "0.16" }
+#log = "0.4"
+#slog = "2.5"
+#fxhash = "0.2"
+#lazy_static = "1.0"
+#termion = "1.5"
+
 [dependencies.snarkos-ledger]
 path = "./ledger"
 version = "2.0.0"

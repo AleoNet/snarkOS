@@ -16,11 +16,10 @@
 
 use crate::{Environment, Message, PeersRequest, PeersRouter};
 use snarkos_ledger::{storage::Storage, LedgerState};
-
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
-use rand::{thread_rng, CryptoRng, Rng};
+use rand::thread_rng;
 use std::{
     net::SocketAddr,
     path::Path,
@@ -31,17 +30,31 @@ use std::{
 };
 use tokio::{sync::mpsc, task};
 
-/// Shorthand for the parent half of the message channel.
+/// Shorthand for the parent half of the `Ledger` message channel.
 pub(crate) type LedgerRouter<N, E> = mpsc::Sender<LedgerRequest<N, E>>;
-/// Shorthand for the child half of the message channel.
+/// Shorthand for the child half of the `Ledger` message channel.
 type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
 
+///
+/// An enum of requests that the `Ledger` struct processes.
+///
 #[derive(Debug)]
 pub enum LedgerRequest<N: Network, E: Environment> {
+    /// Mine := (miner_address, peers_router)
     Mine(Address<N>, PeersRouter<N, E>),
+    /// SyncRequest := (peer_ip, block_height, peers_router)
+    SyncRequest(SocketAddr, u32, PeersRouter<N, E>),
+    /// SyncResponse := (peer_ip, block_height, block, peers_router)
+    SyncResponse(SocketAddr, u32, Block<N>, PeersRouter<N, E>),
+    /// UnconfirmedBlock := (peer_ip, block, peers_router)
     UnconfirmedBlock(SocketAddr, Block<N>, PeersRouter<N, E>),
+    /// UnconfirmedTransaction := (peer_ip, transaction, peers_router)
+    UnconfirmedTransaction(SocketAddr, Transaction<N>, PeersRouter<N, E>),
 }
 
+///
+/// A ledger for a specific network on the node server.
+///
 #[derive(Clone, Debug)]
 pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
@@ -180,15 +193,6 @@ impl<N: Network> Ledger<N> {
         self.canon.get_block(block_height)
     }
 
-    /// Adds the given block as the next block in the ledger to storage.
-    pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
-        self.canon.add_next_block(block)?;
-        // On success, clear the memory pool of its transactions.
-        // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
-        self.memory_pool.clear_transactions();
-        Ok(())
-    }
-
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -201,7 +205,25 @@ impl<N: Network> Ledger<N> {
                 }
                 Ok(())
             }
+            LedgerRequest::SyncRequest(peer_ip, block_height, peers_router) => {
+                let request = match self.get_block(block_height) {
+                    Ok(block) => PeersRequest::MessagePropagate(peer_ip, Message::SyncResponse(block.height(), block)),
+                    Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
+                };
+                peers_router.send(request).await?;
+                Ok(())
+            }
+            LedgerRequest::SyncResponse(peer_ip, block_height, block, peers_router) => {
+                if let Err(error) = self.add_sync_block::<E>(block).await {
+                    let request = PeersRequest::Failure(peer_ip, format!("{}", error));
+                    peers_router.send(request).await?;
+                }
+                Ok(())
+            }
             LedgerRequest::UnconfirmedBlock(peer_ip, block, peers_router) => self.add_unconfirmed_block(peer_ip, block, peers_router).await,
+            LedgerRequest::UnconfirmedTransaction(peer_ip, transaction, peers_router) => {
+                self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
+            }
         }
     }
 
@@ -261,6 +283,7 @@ impl<N: Network> Ledger<N> {
                 &mut thread_rng(),
             ) {
                 Ok(block) => {
+                    // Set the mining status to off.
                     is_mining.store(false, Ordering::SeqCst);
                     block
                 }
@@ -270,15 +293,35 @@ impl<N: Network> Ledger<N> {
                 }
             };
 
-            if let Err(error) = peers_router
-                .send(PeersRequest::Broadcast(Message::UnconfirmedBlock(block.height(), block)))
-                .await
-            {
+            // Broadcast the next block.
+            let request = PeersRequest::MessageBroadcast(Message::UnconfirmedBlock(block.height(), block));
+            if let Err(error) = peers_router.send(request).await {
                 error!("Failed to broadcast mined block: {}", error);
             }
         });
 
         Ok(())
+    }
+
+    ///
+    /// Adds the given block as the next block in the ledger if the block height increments by one.
+    ///
+    async fn add_sync_block<E: Environment>(&mut self, block: Block<N>) -> Result<()> {
+        if block.height() + 1 == self.latest_block_height() {
+            match self.canon.add_next_block(&block) {
+                Ok(()) => {
+                    // On success, filter the memory pool of its transactions and the block if it exists.
+                    // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
+                    self.memory_pool.clear_transactions();
+                    debug!("Advancing ledger to block {}", self.latest_block_height());
+                    // TODO (howardwu) - Set the terminator bit to true.
+                }
+                Err(error) => error!("{}", error),
+            };
+            Ok(())
+        } else {
+            return Err(anyhow!("Attempted to add the wrong block to the ledger"));
+        }
     }
 
     ///
@@ -293,19 +336,63 @@ impl<N: Network> Ledger<N> {
         peers_router: PeersRouter<N, E>,
     ) -> Result<()> {
         if block.height() + 1 == self.latest_block_height() {
-            self.add_next_block(&block)?;
-            debug!("Advancing ledger to block {}", self.latest_block_height());
-            // TODO (howardwu) - Set the terminator bit to true.
+            match self.canon.add_next_block(&block) {
+                Ok(()) => {
+                    // On success, filter the memory pool of its transactions and the block if it exists.
+                    // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
+                    self.memory_pool.clear_transactions();
+
+                    debug!("Advancing ledger to block {}", self.latest_block_height());
+                    // Upon success, propagate the unconfirmed block to the connected peers.
+                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block.height(), block));
+                    peers_router.send(request).await?;
+                    // TODO (howardwu) - Set the terminator bit to true.
+                }
+                Err(error) => error!("{}", error),
+            };
             Ok(())
         } else if block.height() + 1 > self.latest_block_height() {
             debug!("Adding unconfirmed block {} to memory pool", block.height());
-            self.memory_pool.add_block(block.clone())?;
-            peers_router
-                .send(PeersRequest::Propagate(peer_ip, Message::UnconfirmedBlock(block.height(), block)))
-                .await?;
+            // Ensure the unconfirmed block is new.
+            if !self.contains_block_hash(&block.block_hash())? {
+                // Attempt to add the unconfirmed block to the memory pool.
+                match self.memory_pool.add_block(block.clone()) {
+                    Ok(()) => {
+                        // Upon success, propagate the unconfirmed block to the connected peers.
+                        let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block.height(), block));
+                        peers_router.send(request).await?;
+                    }
+                    Err(error) => error!("{}", error),
+                }
+            }
             Ok(())
         } else {
             return Err(anyhow!("Attempted to add a stale block to the memory pool"));
         }
+    }
+
+    ///
+    /// Adds the given unconfirmed transaction to the memory pool.
+    ///
+    async fn add_unconfirmed_transaction<E: Environment>(
+        &mut self,
+        peer_ip: SocketAddr,
+        transaction: Transaction<N>,
+        peers_router: PeersRouter<N, E>,
+    ) -> Result<()> {
+        debug!("Adding unconfirmed transaction {} to memory pool", transaction.transaction_id());
+        // Ensure the unconfirmed transaction is new.
+        if !self.contains_transaction(&transaction.transaction_id())? {
+            // Attempt to add the unconfirmed transaction to the memory pool.
+            match self.memory_pool.add_transaction(&transaction) {
+                Ok(()) => {
+                    // Upon success, propagate the unconfirmed transaction to the connected peers.
+                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(transaction));
+                    peers_router.send(request).await?;
+                }
+                Err(error) => error!("{}", error),
+            }
+        }
+        Ok(())
     }
 }

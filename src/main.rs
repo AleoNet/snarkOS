@@ -49,7 +49,6 @@ async fn main() -> Result<()> {
     let port = env::args().nth(1).unwrap_or_else(|| "4132".to_string()).parse()?;
 
     initialize_logger();
-    tracing::trace!("Hello world");
 
     let account = Account::<Testnet2>::new(&mut thread_rng());
 

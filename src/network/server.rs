@@ -17,9 +17,8 @@
 use crate::{
     helpers::Tasks,
     ledger::{Ledger, LedgerRequest, LedgerRouter},
-    peers::{OutboundRouter, PeersRequest, PeersRouter},
+    peers::{PeersRequest, PeersRouter},
     Environment,
-    Message,
     NodeType,
     Peers,
 };
@@ -28,24 +27,17 @@ use snarkvm::prelude::*;
 
 use ::rand::{thread_rng, Rng};
 use anyhow::Result;
-use futures::SinkExt;
-use std::time::Duration;
-
-use std::{net::SocketAddr, sync::Arc};
-
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, Mutex},
     task,
-    time::timeout,
 };
-use tokio_stream::StreamExt;
-use tokio_util::codec::Framed;
 
 ///
-/// A set of operations to initialize the node server.
+/// A set of operations to initialize the node server for a specific network.
 ///
-pub(crate) struct Initialize<N: Network, E: Environment> {
+pub(crate) struct Server<N: Network, E: Environment> {
     /// The ledger state of the node.
     ledger: Arc<Mutex<Ledger<N>>>,
     /// The list of peers for the node.
@@ -54,7 +46,7 @@ pub(crate) struct Initialize<N: Network, E: Environment> {
     tasks: Tasks<task::JoinHandle<()>>,
 }
 
-impl<N: Network, E: Environment> Initialize<N, E> {
+impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Starts the connection listener for peers.
     ///
@@ -80,7 +72,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(&mut tasks, peers_router.clone(), ledger_router.clone());
 
-        let message = PeersRequest::ConnectNewPeer("127.0.0.1:4133".parse().unwrap(), peers_router.clone(), ledger_router.clone());
+        let message = PeersRequest::Connect("127.0.0.1:4133".parse().unwrap(), peers_router.clone(), ledger_router.clone());
         peers_router.send(message).await?;
 
         // Initialize a new instance of the miner.
@@ -163,7 +155,7 @@ impl<N: Network, E: Environment> Initialize<N, E> {
                 match listener.accept().await {
                     // Process the inbound connection request.
                     Ok((stream, peer_ip)) => {
-                        let request = PeersRequest::HandleNewPeer(stream, peer_ip, peers_router.clone(), ledger_router.clone());
+                        let request = PeersRequest::PeerConnecting(stream, peer_ip, peers_router.clone(), ledger_router.clone());
                         if let Err(error) = peers_router.send(request).await {
                             error!("Failed to send request to peers: {}", error)
                         }
