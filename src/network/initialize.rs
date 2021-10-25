@@ -18,6 +18,7 @@ use crate::{
     helpers::Tasks,
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{PeersRequest, PeersRouter},
+    rpc::start_rpc_server,
     Environment,
     NodeType,
     Peers,
@@ -76,7 +77,11 @@ impl<N: Network, E: Environment> Server<N, E> {
         peers_router.send(message).await?;
 
         // Initialize a new instance of the miner.
-        Self::initialize_miner(&mut tasks, miner, peers_router, ledger_router);
+        Self::initialize_miner(&mut tasks, miner, peers_router.clone(), ledger_router.clone());
+
+        // Initialize a new instance of the RPC server.
+        let rpc_ip = "127.0.0.1:3030".parse()?;
+        Self::initialize_rpc(&mut tasks, rpc_ip, None, None, peers_router, ledger_router);
 
         Ok(Self { ledger, peers, tasks })
     }
@@ -85,6 +90,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance for managing peers.
     ///
     fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<Mutex<Peers<N, E>>>, PeersRouter<N, E>) {
+        // Initialize the `Peers` struct.
         let peers = Arc::new(Mutex::new(Peers::new(local_ip)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
@@ -94,10 +100,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         let peers_clone = peers.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a peers request.
-            // while let Some(request) = peers_handler.recv().await {
-            //     // Hold the peers mutex briefly, to update the state of the peers.
-            //     peers_clone.lock().await.update(request).await;
-            // }
             loop {
                 tokio::select! {
                     // Channel is routing a request to peers.
@@ -217,41 +219,19 @@ impl<N: Network, E: Environment> Server<N, E> {
         }
     }
 
-    // ///
-    // /// Initiates a connection request to the given IP address.
-    // ///
-    // pub(crate) async fn connect_to(ledger: Arc<RwLock<Ledger<N>>>, peers: Arc<RwLock<Self>>, peer_ip: SocketAddr) -> Result<()> {
-    //     // The local IP address must be known by now.
-    //     let local_ip = peers.read().await.local_ip()?;
-    //
-    //     // Ensure the remote IP is not this node.
-    //     if peer_ip == local_ip || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == local_ip.port() {
-    //         debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
-    //         Ok(())
-    //     }
-    //     // Ensure the node does not surpass the maximum number of peer connections.
-    //     else if peers.read().await.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
-    //         debug!("Skipping connection request to {} (maximum peers reached)", peer_ip);
-    //         Ok(())
-    //     }
-    //     // Ensure the peer is a new connection.
-    //     else if peers.read().await.is_connected_to(peer_ip) {
-    //         debug!("Skipping connection request to {} (already connected)", peer_ip);
-    //         Ok(())
-    //     }
-    //     // Attempt to open a TCP stream.
-    //     else {
-    //         debug!("Connecting to {}...", peer_ip);
-    //         let stream = match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
-    //             Ok(stream) => match stream {
-    //                 Ok(stream) => stream,
-    //                 Err(error) => return Err(anyhow!("Failed to connect to '{}': '{:?}'", peer_ip, error)),
-    //             },
-    //             Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
-    //         };
-    //
-    //         Self::spawn_handler(ledger.clone(), peers, peer_ip, stream).await;
-    //         Ok(())
-    //     }
-    // }
+    ///
+    /// Initialize a new instance of the RPC server.
+    ///
+    fn initialize_rpc(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        rpc_ip: SocketAddr,
+        username: Option<String>,
+        password: Option<String>,
+        peers_router: PeersRouter<N, E>,
+        ledger_router: LedgerRouter<N, E>,
+    ) {
+        let ledger_router = ledger_router.clone();
+        let peers_router = peers_router.clone();
+        tasks.append(start_rpc_server(rpc_ip, username, password));
+    }
 }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, network::server::Server, Environment};
+use crate::{helpers::Tasks, network::initialize::Server, Environment};
 use snarkvm::dpc::{Address, Network};
 
 use anyhow::{anyhow, Result};
@@ -52,6 +52,7 @@ impl<N: Network, E: Environment> Node<N, E> {
             server: Server::initialize(port, miner).await?,
             tasks: Tasks::new(),
         };
+
         Ok(node)
     }
 

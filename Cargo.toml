@@ -24,6 +24,8 @@ snarkvm = { path = "../snarkVM", features = ["parameters"] }
 futures = { version = "0.3.0", features = ["thread-pool"]}
 bytes = "1.0.0"
 
+jsonrpc-http-server = "18.0"
+
 #tui = { version = "0.16" }
 #log = "0.4"
 #slog = "2.5"
