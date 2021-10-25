@@ -149,8 +149,6 @@ pub struct NodeBlockStats {
     pub commit_time: f64,
     /// The number of duplicate blocks received.
     pub duplicates: u64,
-    /// The number of duplicate sync blocks received.
-    pub duplicates_sync: u64,
     /// The number of orphan blocks received.
     pub orphans: u64,
 }

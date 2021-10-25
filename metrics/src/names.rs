@@ -74,7 +74,6 @@ pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
     pub const MINED: &str = "snarkos_blocks_mined_total";
     pub const DUPLICATES: &str = "snarkos_blocks_duplicates_total";
-    pub const DUPLICATES_SYNC: &str = "snarkos_blocks_duplicates_sync_total";
     pub const ORPHANS: &str = "snarkos_blocks_orphan_total";
     pub const INBOUND_PROCESSING_TIME: &str = "snarkos_blocks_inbound_processing_time";
     pub const COMMIT_TIME: &str = "snarkos_blocks_commit_time";
