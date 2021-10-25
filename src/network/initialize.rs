@@ -31,7 +31,7 @@ use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, Mutex},
+    sync::{mpsc, RwLock},
     task,
 };
 
@@ -39,10 +39,10 @@ use tokio::{
 /// A set of operations to initialize the node server for a specific network.
 ///
 pub(crate) struct Server<N: Network, E: Environment> {
-    /// The ledger state of the node.
-    ledger: Arc<Mutex<Ledger<N>>>,
     /// The list of peers for the node.
-    peers: Arc<Mutex<Peers<N, E>>>,
+    peers: Arc<RwLock<Peers<N, E>>>,
+    /// The ledger state of the node.
+    ledger: Arc<RwLock<Ledger<N>>>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
 }
@@ -81,17 +81,26 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize a new instance of the RPC server.
         let rpc_ip = "127.0.0.1:3030".parse()?;
-        Self::initialize_rpc(&mut tasks, rpc_ip, None, None, peers_router, ledger_router);
+        Self::initialize_rpc(
+            &mut tasks,
+            rpc_ip,
+            None,
+            None,
+            peers.clone(),
+            peers_router,
+            ledger.clone(),
+            ledger_router,
+        );
 
-        Ok(Self { ledger, peers, tasks })
+        Ok(Self { peers, ledger, tasks })
     }
 
     ///
     /// Initialize a new instance for managing peers.
     ///
-    fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<Mutex<Peers<N, E>>>, PeersRouter<N, E>) {
+    fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
-        let peers = Arc::new(Mutex::new(Peers::new(local_ip)));
+        let peers = Arc::new(RwLock::new(Peers::new(local_ip)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
@@ -104,8 +113,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                 tokio::select! {
                     // Channel is routing a request to peers.
                     Some(request) = peers_handler.recv() => {
-                        // Hold the peers mutex briefly, to update the state of the peers.
-                        peers_clone.lock().await.update(request).await;
+                        // Hold the peers write lock briefly, to update the state of the peers.
+                        peers_clone.write().await.update(request).await;
                     }
                 }
             }
@@ -117,10 +126,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance for managing the ledger.
     ///
-    fn initialize_ledger(tasks: &mut Tasks<task::JoinHandle<()>>) -> Result<(Arc<Mutex<Ledger<N>>>, LedgerRouter<N, E>)> {
+    fn initialize_ledger(tasks: &mut Tasks<task::JoinHandle<()>>) -> Result<(Arc<RwLock<Ledger<N>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
         let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
-        let ledger = Arc::new(Mutex::new(ledger));
+        let ledger = Arc::new(RwLock::new(ledger));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
@@ -130,8 +139,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a ledger request.
             while let Some(request) = ledger_handler.recv().await {
-                // Hold the ledger mutex briefly, to update the state of the ledger.
-                if let Err(error) = ledger_clone.lock().await.update::<E>(request).await {
+                // Hold the ledger write lock briefly, to update the state of the ledger.
+                if let Err(error) = ledger_clone.write().await.update::<E>(request).await {
                     error!("{}", error);
                 }
             }
@@ -227,7 +236,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         rpc_ip: SocketAddr,
         username: Option<String>,
         password: Option<String>,
+        peers: Arc<RwLock<Peers<N, E>>>,
         peers_router: PeersRouter<N, E>,
+        ledger: Arc<RwLock<Ledger<N>>>,
         ledger_router: LedgerRouter<N, E>,
     ) {
         let ledger_router = ledger_router.clone();

@@ -143,7 +143,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(crate) async fn update(&mut self, request: PeersRequest<N, E>) {
+    pub(super) async fn update(&mut self, request: PeersRequest<N, E>) {
         match request {
             PeersRequest::Connect(peer_ip, peers_router, ledger_router) => {
                 // Ensure the remote IP is not this node.

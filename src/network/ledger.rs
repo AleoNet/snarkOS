@@ -197,7 +197,7 @@ impl<N: Network> Ledger<N> {
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(crate) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
+    pub(super) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
         match request {
             LedgerRequest::Mine(recipient, peers_router) => {
                 if let Err(error) = self.mine_next_block(recipient, peers_router) {
