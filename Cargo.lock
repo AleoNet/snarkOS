@@ -2667,7 +2667,7 @@ checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 
 [[package]]
 name = "snarkos"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "anyhow",
  "capnpc",
@@ -2699,7 +2699,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-benchmarks"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "criterion",
  "csv",
@@ -2728,7 +2728,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-consensus"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2760,7 +2760,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-metrics"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "circular-queue",
  "metrics",
@@ -2774,7 +2774,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-network"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2819,7 +2819,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-parameters"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "chrono",
  "curl",
@@ -2838,14 +2838,14 @@ dependencies = [
 
 [[package]]
 name = "snarkos-profiler"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "colored",
 ]
 
 [[package]]
 name = "snarkos-rpc"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2877,7 +2877,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-storage"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2911,7 +2911,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-testing"
-version = "1.3.16"
+version = "1.3.17"
 dependencies = [
  "anyhow",
  "bincode",
