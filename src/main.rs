@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
 
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
-    if port == 4134 {
+    if port == 4134 || port == 4135 {
         let node = Node::<Testnet2, Miner>::new(port, Some(account.address())).await?;
         std::future::pending::<()>().await;
     } else {

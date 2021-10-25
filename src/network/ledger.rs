@@ -40,12 +40,12 @@ type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum LedgerRequest<N: Network, E: Environment> {
-    /// Mine := (miner_address, peers_router)
-    Mine(Address<N>, PeersRouter<N, E>),
-    /// SyncRequest := (peer_ip, block_height, peers_router)
-    SyncRequest(SocketAddr, u32, PeersRouter<N, E>),
-    /// SyncResponse := (peer_ip, block_height, block, peers_router)
-    SyncResponse(SocketAddr, u32, Block<N>, PeersRouter<N, E>),
+    /// Mine := (local_ip, miner_address, peers_router, ledger_router)
+    Mine(SocketAddr, Address<N>, PeersRouter<N, E>, LedgerRouter<N, E>),
+    // /// SyncRequest := (peer_ip, block_height, peers_router)
+    // SyncRequest(SocketAddr, u32, PeersRouter<N, E>),
+    /// SyncResponse := (block)
+    SyncResponse(Block<N>),
     /// UnconfirmedBlock := (peer_ip, block, peers_router)
     UnconfirmedBlock(SocketAddr, Block<N>, PeersRouter<N, E>),
     /// UnconfirmedTransaction := (peer_ip, transaction, peers_router)
@@ -76,6 +76,11 @@ impl<N: Network> Ledger<N> {
             terminator: Arc::new(AtomicBool::new(false)),
             is_mining: Arc::new(AtomicBool::new(false)),
         })
+    }
+
+    /// Returns `true` if the ledger is currently mining.
+    pub fn is_mining(&self) -> bool {
+        self.is_mining.load(Ordering::SeqCst)
     }
 
     /// Returns the latest block height.
@@ -199,27 +204,21 @@ impl<N: Network> Ledger<N> {
     ///
     pub(super) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
         match request {
-            LedgerRequest::Mine(recipient, peers_router) => {
-                if let Err(error) = self.mine_next_block(recipient, peers_router) {
+            LedgerRequest::Mine(local_ip, recipient, peers_router, ledger_router) => {
+                if let Err(error) = self.mine_next_block(local_ip, recipient, peers_router, ledger_router) {
                     error!("Failed to mine the next block: {}", error)
                 }
                 Ok(())
             }
-            LedgerRequest::SyncRequest(peer_ip, block_height, peers_router) => {
-                let request = match self.get_block(block_height) {
-                    Ok(block) => PeersRequest::MessagePropagate(peer_ip, Message::SyncResponse(block.height(), block)),
-                    Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
-                };
-                peers_router.send(request).await?;
-                Ok(())
-            }
-            LedgerRequest::SyncResponse(peer_ip, block_height, block, peers_router) => {
-                if let Err(error) = self.add_sync_block::<E>(block).await {
-                    let request = PeersRequest::Failure(peer_ip, format!("{}", error));
-                    peers_router.send(request).await?;
-                }
-                Ok(())
-            }
+            // LedgerRequest::SyncRequest(peer_ip, block_height, peers_router) => {
+            //     let request = match self.get_block(block_height) {
+            //         Ok(block) => PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block.height(), block)),
+            //         Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
+            //     };
+            //     peers_router.send(request).await?;
+            //     Ok(())
+            // }
+            LedgerRequest::SyncResponse(block) => self.add_sync_block::<E>(block).await,
             LedgerRequest::UnconfirmedBlock(peer_ip, block, peers_router) => self.add_unconfirmed_block(peer_ip, block, peers_router).await,
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction, peers_router) => {
                 self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
@@ -228,7 +227,13 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Mines a new block and adds it to the canon blocks.
-    fn mine_next_block<E: Environment>(&mut self, recipient: Address<N>, peers_router: PeersRouter<N, E>) -> Result<()> {
+    fn mine_next_block<E: Environment>(
+        &mut self,
+        local_ip: SocketAddr,
+        recipient: Address<N>,
+        peers_router: PeersRouter<N, E>,
+        ledger_router: LedgerRouter<N, E>,
+    ) -> Result<()> {
         // Ensure the ledger is not already mining.
         match self.is_mining.load(Ordering::SeqCst) {
             true => return Ok(()),
@@ -294,8 +299,8 @@ impl<N: Network> Ledger<N> {
             };
 
             // Broadcast the next block.
-            let request = PeersRequest::MessageBroadcast(Message::UnconfirmedBlock(block.height(), block));
-            if let Err(error) = peers_router.send(request).await {
+            let request = LedgerRequest::UnconfirmedBlock(local_ip, block, peers_router);
+            if let Err(error) = ledger_router.send(request).await {
                 error!("Failed to broadcast mined block: {}", error);
             }
         });
@@ -304,23 +309,37 @@ impl<N: Network> Ledger<N> {
     }
 
     ///
-    /// Adds the given block as the next block in the ledger if the block height increments by one.
+    /// Adds the given sync block:
+    ///     1) as the next block in the ledger if the block height increments by one, or
+    ///     2) to the memory pool for later use.
     ///
     async fn add_sync_block<E: Environment>(&mut self, block: Block<N>) -> Result<()> {
-        if block.height() + 1 == self.latest_block_height() {
+        // Ensure the sync block is new.
+        if self.contains_block_hash(&block.block_hash())? {
+            trace!("Canon chain already contains block {}", block.height());
+            Ok(())
+        } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.latest_block_hash() {
             match self.canon.add_next_block(&block) {
                 Ok(()) => {
                     // On success, filter the memory pool of its transactions and the block if it exists.
                     // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
                     self.memory_pool.clear_transactions();
-                    debug!("Advancing ledger to block {}", self.latest_block_height());
+                    info!("Ledger advanced to block {}", self.latest_block_height());
                     // TODO (howardwu) - Set the terminator bit to true.
                 }
-                Err(error) => error!("{}", error),
+                Err(error) => warn!("{}", error),
             };
             Ok(())
         } else {
-            return Err(anyhow!("Attempted to add the wrong block to the ledger"));
+            trace!("Adding sync block {} to memory pool", block.height());
+            // Ensure the unconfirmed block is new.
+            if !self.contains_block_hash(&block.block_hash())? {
+                // Attempt to add the unconfirmed block to the memory pool.
+                if let Err(error) = self.memory_pool.add_block(block.clone()) {
+                    trace!("{}", error);
+                }
+            }
+            Ok(())
         }
     }
 
@@ -335,39 +354,38 @@ impl<N: Network> Ledger<N> {
         block: Block<N>,
         peers_router: PeersRouter<N, E>,
     ) -> Result<()> {
-        if block.height() + 1 == self.latest_block_height() {
+        // Ensure the unconfirmed block is new.
+        if self.contains_block_hash(&block.block_hash())? {
+            trace!("Canon chain already contains block {}", block.height());
+            Ok(())
+        } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.latest_block_hash() {
             match self.canon.add_next_block(&block) {
                 Ok(()) => {
                     // On success, filter the memory pool of its transactions and the block if it exists.
                     // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
                     self.memory_pool.clear_transactions();
 
-                    debug!("Advancing ledger to block {}", self.latest_block_height());
+                    debug!("Ledger has advanced to block {}", self.latest_block_height());
                     // Upon success, propagate the unconfirmed block to the connected peers.
                     let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block.height(), block));
                     peers_router.send(request).await?;
                     // TODO (howardwu) - Set the terminator bit to true.
                 }
-                Err(error) => error!("{}", error),
+                Err(error) => warn!("{}", error),
             };
             Ok(())
-        } else if block.height() + 1 > self.latest_block_height() {
-            debug!("Adding unconfirmed block {} to memory pool", block.height());
-            // Ensure the unconfirmed block is new.
-            if !self.contains_block_hash(&block.block_hash())? {
-                // Attempt to add the unconfirmed block to the memory pool.
-                match self.memory_pool.add_block(block.clone()) {
-                    Ok(()) => {
-                        // Upon success, propagate the unconfirmed block to the connected peers.
-                        let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block.height(), block));
-                        peers_router.send(request).await?;
-                    }
-                    Err(error) => error!("{}", error),
+        } else {
+            trace!("Adding unconfirmed block {} to memory pool", block.height());
+            // Attempt to add the unconfirmed block to the memory pool.
+            match self.memory_pool.add_block(block.clone()) {
+                Ok(()) => {
+                    // Upon success, propagate the unconfirmed block to the connected peers.
+                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block.height(), block));
+                    peers_router.send(request).await?;
                 }
+                Err(error) => trace!("{}", error),
             }
             Ok(())
-        } else {
-            return Err(anyhow!("Attempted to add a stale block to the memory pool"));
         }
     }
 

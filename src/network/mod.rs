@@ -26,3 +26,6 @@ pub(crate) mod peers;
 pub(crate) use peers::*;
 
 pub(crate) mod rpc;
+
+pub(crate) mod state;
+pub(crate) use state::*;

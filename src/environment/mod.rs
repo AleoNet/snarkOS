@@ -49,7 +49,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const SYNC_NODES: Vec<&'static str>;
 
     /// The minimum number of peers required to maintain connections with.
-    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 2;
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
     /// The maximum number of candidate peers permitted to be stored in the node.
