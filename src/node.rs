@@ -45,11 +45,11 @@ pub struct Node<N: Network, E: Environment> {
 }
 
 impl<N: Network, E: Environment> Node<N, E> {
-    pub async fn new(port: u16, miner: Option<Address<N>>) -> Result<Self> {
+    pub async fn new(port: u16, storage_id: u8, miner: Option<Address<N>>) -> Result<Self> {
         // Initialize the node.
         let node = Self {
             status: Arc::new(AtomicU8::new(0)),
-            server: Server::initialize(port, miner).await?,
+            server: Server::initialize(port, storage_id, miner).await?,
             tasks: Tasks::new(),
         };
 

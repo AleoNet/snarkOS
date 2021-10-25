@@ -26,7 +26,6 @@ use crate::{
 use snarkos_ledger::storage::rocksdb::RocksDB;
 use snarkvm::prelude::*;
 
-use ::rand::{thread_rng, Rng};
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
@@ -51,7 +50,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Starts the connection listener for peers.
     ///
-    pub(crate) async fn initialize(port: u16, miner: Option<Address<N>>) -> Result<Self> {
+    pub(crate) async fn initialize(port: u16, storage_id: u8, miner: Option<Address<N>>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", port)).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
@@ -65,7 +64,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
 
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks)?;
+        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, storage_id)?;
 
         // Initialize a new instance for managing state.
         let (state, state_router) =
@@ -132,9 +131,9 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance for managing the ledger.
     ///
-    fn initialize_ledger(tasks: &mut Tasks<task::JoinHandle<()>>) -> Result<(Arc<RwLock<Ledger<N>>>, LedgerRouter<N, E>)> {
+    fn initialize_ledger(tasks: &mut Tasks<task::JoinHandle<()>>, storage_id: u8) -> Result<(Arc<RwLock<Ledger<N>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
-        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", thread_rng().gen::<u8>()))?;
+        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", storage_id))?;
         let ledger = Arc::new(RwLock::new(ledger));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.

@@ -47,6 +47,9 @@ pub fn initialize_logger() {
 #[tokio::main]
 async fn main() -> Result<()> {
     let port = env::args().nth(1).unwrap_or_else(|| "4132".to_string()).parse()?;
+    if port < 4130 {
+        panic!("Until configuration files are established, the port must be at least 4130 or greater");
+    }
 
     initialize_logger();
 
@@ -54,10 +57,10 @@ async fn main() -> Result<()> {
 
     // Please do not run a miner yet.
     if port == 4134 || port == 4135 {
-        let _node = Node::<Testnet2, Miner>::new(port, Some(account.address())).await?;
+        let _node = Node::<Testnet2, Miner>::new(port, (port as u16 - 4130) as u8, Some(account.address())).await?;
         std::future::pending::<()>().await;
     } else {
-        let _node = Node::<Testnet2, Client>::new(port, None).await?;
+        let _node = Node::<Testnet2, Client>::new(port, (port as u16 - 4130) as u8, None).await?;
         std::future::pending::<()>().await;
     }
 
