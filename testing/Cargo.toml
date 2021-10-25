@@ -126,5 +126,5 @@ version = "0.2"
 optional = true
 
 [dependencies.tracing-subscriber]
-version = "0.2"
+version = "0.3"
 optional = true
