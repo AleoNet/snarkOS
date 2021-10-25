@@ -18,7 +18,7 @@ use crate::{
     helpers::Tasks,
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
-    rpc::start_rpc_server,
+    rpc::initialize_rpc_server,
     state::{State, StateRequest, StateRouter},
     Environment,
     NodeType,
@@ -53,7 +53,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     pub(crate) async fn initialize(port: u16, miner: Option<Address<N>>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
-        let (local_ip, listener) = match TcpListener::bind(&format!("127.0.0.1:{}", port)).await {
+        let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", port)).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
@@ -77,7 +77,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(&mut tasks, peers_router.clone(), state_router.clone());
 
-        let message = PeersRequest::Connect("127.0.0.1:4133".parse().unwrap(), peers_router.clone(), state_router.clone());
+        let message = PeersRequest::Connect("0.0.0.0:4133".parse().unwrap(), peers_router.clone(), state_router.clone());
         peers_router.send(message).await?;
 
         // Sleep for 15 seconds.
@@ -95,17 +95,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         );
 
         // Initialize a new instance of the RPC server.
-        let rpc_ip = "127.0.0.1:3030".parse()?;
-        Self::initialize_rpc(
-            &mut tasks,
-            rpc_ip,
-            None,
-            None,
-            peers.clone(),
-            peers_router,
-            ledger.clone(),
-            ledger_router,
-        );
+        let rpc_ip = "0.0.0.0:3032".parse()?;
+        Self::initialize_rpc(&mut tasks, rpc_ip, None, None, ledger.clone(), ledger_router);
 
         Ok(Self { peers, ledger, tasks })
     }
@@ -304,13 +295,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         rpc_ip: SocketAddr,
         username: Option<String>,
         password: Option<String>,
-        peers: Arc<RwLock<Peers<N, E>>>,
-        peers_router: PeersRouter<N, E>,
         ledger: Arc<RwLock<Ledger<N>>>,
         ledger_router: LedgerRouter<N, E>,
     ) {
         let ledger_router = ledger_router.clone();
-        let peers_router = peers_router.clone();
-        tasks.append(start_rpc_server(rpc_ip, username, password));
+        tasks.append(initialize_rpc_server::<N>(rpc_ip, username, password, ledger.clone()));
     }
 }

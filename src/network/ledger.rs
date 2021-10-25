@@ -21,6 +21,7 @@ use snarkvm::dpc::prelude::*;
 use anyhow::{anyhow, Result};
 use rand::thread_rng;
 use std::{
+    collections::HashMap,
     net::SocketAddr,
     path::Path,
     sync::{
@@ -59,6 +60,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
 pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
+    /// The map of candidate blocks.
+    candidate_blocks: HashMap<N::BlockHash, Block<N>>,
     /// The pool of unconfirmed transactions.
     memory_pool: MemoryPool<N>,
     /// A terminator bit for the miner.
@@ -72,6 +75,7 @@ impl<N: Network> Ledger<N> {
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(Self {
             canon: LedgerState::open::<S, P>(path)?,
+            candidate_blocks: Default::default(),
             memory_pool: MemoryPool::new(),
             terminator: Arc::new(AtomicBool::new(false)),
             is_mining: Arc::new(AtomicBool::new(false)),
@@ -365,7 +369,7 @@ impl<N: Network> Ledger<N> {
                     // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
                     self.memory_pool.clear_transactions();
 
-                    debug!("Ledger has advanced to block {}", self.latest_block_height());
+                    info!("Ledger has advanced to block {}", self.latest_block_height());
                     // Upon success, propagate the unconfirmed block to the connected peers.
                     let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block.height(), block));
                     peers_router.send(request).await?;

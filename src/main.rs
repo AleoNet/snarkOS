@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{Miner, Node};
+use snarkos::{Client, Miner, Node};
 
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
@@ -52,11 +52,12 @@ async fn main() -> Result<()> {
 
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
+    // Please do not run a miner yet.
     if port == 4134 || port == 4135 {
-        let node = Node::<Testnet2, Miner>::new(port, Some(account.address())).await?;
+        let _node = Node::<Testnet2, Miner>::new(port, Some(account.address())).await?;
         std::future::pending::<()>().await;
     } else {
-        let node = Node::<Testnet2, Miner>::new(port, None).await?;
+        let _node = Node::<Testnet2, Client>::new(port, None).await?;
         std::future::pending::<()>().await;
     }
 

@@ -14,20 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// This network module is a concoction of legacy mess, consider this code untrusted.
+pub(crate) mod rpc;
+pub(crate) use rpc::*;
 
-pub(super) mod errors;
-pub(super) use errors::*;
+pub(crate) mod rpc_impl;
+pub(crate) use rpc_impl::*;
 
-pub(crate) mod handshake;
-
-mod message;
-
-mod peer;
-
-mod peer_quality;
-
-pub(crate) mod peers;
-
-pub mod version;
-pub use version::*;
+pub(crate) mod rpc_trait;
+pub(crate) use rpc_trait::*;

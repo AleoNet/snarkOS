@@ -176,7 +176,7 @@ impl<N: Network, E: Environment> State<N, E> {
                 if let Some(peer_ip) = maximal_peer {
                     if maximum_block_height > latest_block_height {
                         let num_blocks = std::cmp::min(maximum_block_height - latest_block_height, 32);
-                        trace!("Preparing to sync the next {} blocks from {}", num_blocks, peer_ip);
+                        debug!("Preparing to sync the next {} blocks from {}", num_blocks, peer_ip);
                         self.is_syncing.store(true, Ordering::SeqCst);
                         // Add sync requests for each block height up to the maximum block height.
                         for block_height in (latest_block_height + 1)..(latest_block_height + 1 + num_blocks) {
@@ -245,9 +245,14 @@ impl<N: Network, E: Environment> State<N, E> {
                         self.add_failure(peer_ip, "Block height does not match".to_string());
                     }
                     // Process the sync response.
-                    else if block.is_valid() {
+                    else {
                         // Add the block to the candidate blocks.
                         self.candidate_blocks.insert(block.previous_block_hash(), block.clone());
+                        // Route a `SyncResponse` to the ledger.
+                        let request = LedgerRequest::SyncResponse(block.clone());
+                        if let Err(error) = ledger_router.send(request).await {
+                            warn!("[SyncResponse] {}", error);
+                        }
                         // Check if syncing with this peer is complete.
                         if let Some(requests) = self.sync_requests.get(&peer_ip) {
                             if requests.is_empty() {
@@ -345,7 +350,7 @@ impl<N: Network, E: Environment> State<N, E> {
     fn add_sync_request(&mut self, peer_ip: SocketAddr, block_height: u32) {
         match self.sync_requests.get_mut(&peer_ip) {
             Some(requests) => match requests.insert(block_height) {
-                true => trace!("Added sync request for block {} from {}", block_height, peer_ip),
+                true => debug!("Requesting block {} from {}", block_height, peer_ip),
                 false => self.add_failure(peer_ip, format!("Duplicate sync request from {}", peer_ip)),
             },
             None => self.add_failure(peer_ip, format!("Missing sync requests for {}", peer_ip)),

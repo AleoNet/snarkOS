@@ -88,6 +88,19 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
 }
 
 #[derive(Clone, Debug, Default)]
+pub struct Client;
+
+#[rustfmt::skip]
+impl Environment for Client {
+    const NODE_TYPE: NodeType = NodeType::Client;
+
+    const COINBASE_IS_PUBLIC: bool = true;
+
+    const PEER_NODES: Vec<&'static str> = vec![];
+    const SYNC_NODES: Vec<&'static str> = vec![];
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct Miner;
 
 #[rustfmt::skip]

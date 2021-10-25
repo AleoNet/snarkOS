@@ -23,7 +23,6 @@ members = ["ledger"]
 snarkvm = { path = "../snarkVM", features = ["parameters"] }
 futures = { version = "0.3.0", features = ["thread-pool"]}
 bytes = "1.0.0"
-jsonrpc-http-server = "18.0"
 
 [dependencies.snarkos-ledger]
 path = "./ledger"
@@ -31,6 +30,9 @@ version = "2.0.0"
 
 [dependencies.anyhow]
 version = "1"
+
+[dependencies.async-trait]
+version = "0.1"
 
 [dependencies.bincode]
 version = "1.0"
@@ -40,6 +42,19 @@ version = "0.4"
 
 #[dependencies.circular-queue]
 #version = "0.2"
+
+[dependencies.hex]
+version = "0.4.2"
+
+[dependencies.hyper]
+version = "0.14"
+features = [ "http1", "runtime", "server" ]
+
+[dependencies.json-rpc-types]
+version = "1.0.1"
+
+[dependencies.jsonrpc-core]
+version = "18"
 
 [dependencies.once_cell]
 version = "1"
@@ -53,8 +68,11 @@ version = "0.8"
 [dependencies.serde]
 version = "1"
 
-#[dependencies.serde_json]
-#version = "1"
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.thiserror]
+version = "1.0"
 
 #[dependencies.snow]
 #version = "0.8"
@@ -88,8 +106,6 @@ version = "=0.1"
 
 [dependencies.tracing]
 version = "0.1"
-default-features = false
-features = [ "log" ]
 
 [dependencies.tracing-subscriber]
 version = "0.2"
