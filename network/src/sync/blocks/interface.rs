@@ -208,6 +208,10 @@ impl Node {
                 .await;
         }
 
+        if let Some(time_received) = time_received {
+            metrics::histogram!(snarkos_metrics::internal_rtt::GETBLOCKS, time_received.elapsed());
+        }
+
         Ok(())
     }
 
