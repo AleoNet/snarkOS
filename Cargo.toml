@@ -146,7 +146,8 @@ features = [ "log" ]
 version = "0.1"
 
 [dependencies.tracing-subscriber]
-version = "0.2"
+version = "0.3"
+features = [ "env-filter" ]
 
 [build-dependencies.capnpc]
 version = "0.14"
