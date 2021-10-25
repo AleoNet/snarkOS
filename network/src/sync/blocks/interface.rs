@@ -177,8 +177,17 @@ impl Node {
             let block = self.storage.get_block(hash).await?;
             blocks.push(block);
         }
-        let blocks: Vec<_> =
-            task::spawn_blocking(move || blocks.into_iter().map(|block| block.serialize()).collect()).await?;
+
+        let blocks: Vec<_> = if !blocks.is_empty() {
+            task::spawn_blocking(move || blocks.into_iter().map(|block| block.serialize()).collect()).await?
+        } else {
+            // Update the related internal RTT metric even if there is no response.
+            if let Some(time_received) = time_received {
+                metrics::histogram!(snarkos_metrics::internal_rtt::GETBLOCKS, time_received.elapsed());
+            }
+
+            return Ok(());
+        };
 
         for (i, (block, hash)) in blocks.into_iter().zip(header_hashes.into_iter()).enumerate() {
             let height = match self.storage.get_block_state(&hash).await? {
