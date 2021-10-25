@@ -13,7 +13,6 @@ None
 | `blocks.inbound_processing_time` | f64  | The average processing time of an inbound block in seconds                   |
 | `blocks.commit_time`             | f64  | The block verification and commit time in seconds                            |
 | `blocks.duplicates`              | u64  | The number of duplicate blocks received                                      |
-| `blocks.duplicates_sync`         | u64  | The number of duplicate sync blocks received                                 |
 | `connections.all_accepted`       | u64  | The number of connection requests the node has received                      |
 | `connections.all_initiated`      | u64  | The number of connection requests the node has made                          |
 | `connections.all_rejected`       | u64  | The number of connection requests the node has rejected                      |
