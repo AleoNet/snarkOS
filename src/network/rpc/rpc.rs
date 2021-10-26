@@ -16,9 +16,13 @@
 
 //! Logic for instantiating the RPC server.
 
-use crate::network::{
-    rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
-    Ledger,
+use crate::{
+    network::{
+        rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
+        Ledger,
+        StateRouter,
+    },
+    Environment,
 };
 use snarkvm::dpc::Network;
 
@@ -52,12 +56,15 @@ pub struct Meta {
 
 impl Metadata for Meta {}
 
-const METHODS_EXPECTING_PARAMS: [&str; 3] = [
+const METHODS_EXPECTING_PARAMS: [&str; 7] = [
     // public
     "getblock",
+    "getblockheight",
     "getblockhash",
     "gettransaction",
-    // "sendtransaction",
+    "gettransition",
+    "getciphertext",
+    "sendtransaction",
     // "validaterawtransaction",
     // // private
     // "createrawtransaction",
@@ -71,22 +78,23 @@ const METHODS_EXPECTING_PARAMS: [&str; 3] = [
 
 /// Starts a local RPC HTTP server at `rpc_port` in a dedicated `tokio` task.
 /// RPC failures do not affect the rest of the node.
-pub fn initialize_rpc_server<N: Network>(
+pub fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: Option<String>,
     password: Option<String>,
     ledger: Arc<RwLock<Ledger<N>>>,
+    state_router: StateRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
         _ => None,
     };
 
-    let rpc_impl = RpcImpl::new(credentials, ledger);
+    let rpc_impl = RpcImpl::new(credentials, ledger, state_router);
 
     let service = make_service_fn(move |_conn| {
         let rpc = rpc_impl.clone();
-        async move { Ok::<_, Infallible>(service_fn(move |req| handle_rpc::<N>(rpc.clone(), req))) }
+        async move { Ok::<_, Infallible>(service_fn(move |req| handle_rpc::<N, E>(rpc.clone(), req))) }
     });
 
     let server = Server::bind(&rpc_addr).serve(service);
@@ -96,7 +104,10 @@ pub fn initialize_rpc_server<N: Network>(
     })
 }
 
-async fn handle_rpc<N: Network>(rpc: RpcImpl<N>, req: hyper::Request<Body>) -> Result<hyper::Response<Body>, Infallible> {
+async fn handle_rpc<N: Network, E: Environment>(
+    rpc: RpcImpl<N, E>,
+    req: hyper::Request<Body>,
+) -> Result<hyper::Response<Body>, Infallible> {
     // Obtain the username and password, if present.
     let auth = req
         .headers()
@@ -150,6 +161,18 @@ async fn handle_rpc<N: Network>(rpc: RpcImpl<N>, req: hyper::Request<Body>) -> R
     // Handle the request method.
     let response = match &*req.method {
         // public
+        "latestblock" => {
+            let result = rpc.latest_block().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "latestblockheight" => {
+            let result = rpc.latest_block_height().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "latestblockhash" => {
+            let result = rpc.latest_block_hash().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "getblock" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
                 let result = rpc.get_block(height).await.map_err(convert_crate_err);
@@ -160,12 +183,11 @@ async fn handle_rpc<N: Network>(rpc: RpcImpl<N>, req: hyper::Request<Body>) -> R
                 jrt::Response::error(jrt::Version::V2, err, req.id.clone())
             }
         },
-        "getblockcount" => {
-            let result = rpc.get_block_count().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "getbestblockhash" => {
-            let result = rpc.get_best_block_hash().await.map_err(convert_crate_err);
+        "getblockheight" => {
+            let result = rpc
+                .get_block_height(params[0].as_str().unwrap_or("").into())
+                .await
+                .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getblockhash" => match serde_json::from_value::<u32>(params.remove(0)) {
@@ -185,16 +207,30 @@ async fn handle_rpc<N: Network>(rpc: RpcImpl<N>, req: hyper::Request<Body>) -> R
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
+        "gettransition" => {
+            let result = rpc
+                .get_transition(params[0].as_str().unwrap_or("").into())
+                .await
+                .map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "getciphertext" => {
+            let result = rpc
+                .get_ciphertext(params[0].as_str().unwrap_or("").into())
+                .await
+                .map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "sendtransaction" => {
+            let result = rpc
+                .send_transaction(params[0].as_str().unwrap_or("").into())
+                .await
+                .map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         // "decoderawtransaction" => {
         //     let result = rpc
         //         .decode_raw_transaction(params[0].as_str().unwrap_or("").into())
-        //         .await
-        //         .map_err(convert_crate_err);
-        //     result_to_response(&req, result)
-        // }
-        // "sendtransaction" => {
-        //     let result = rpc
-        //         .send_raw_transaction(params[0].as_str().unwrap_or("").into())
         //         .await
         //         .map_err(convert_crate_err);
         //     result_to_response(&req, result)

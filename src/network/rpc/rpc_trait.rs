@@ -17,31 +17,43 @@
 //! Definition of the public and private RPC endpoints.
 
 use crate::network::rpc::rpc_impl::RpcError;
-use snarkvm::dpc::{Block, Network, Transaction};
+use snarkvm::dpc::{Block, Network, RecordCiphertext, Transaction, Transition};
 
 use std::net::SocketAddr;
 
 /// Definition of public RPC endpoints.
 #[async_trait::async_trait]
 pub trait RpcFunctions<N: Network> {
+    // #[doc = include_str!("../documentation/public_endpoints/latestblock.md")]
+    async fn latest_block(&self) -> Result<Block<N>, RpcError>;
+
+    // #[doc = include_str!("../documentation/public_endpoints/latestblockheight.md")]
+    async fn latest_block_height(&self) -> Result<u32, RpcError>;
+
+    // #[doc = include_str!("../documentation/public_endpoints/latestblockhash.md")]
+    async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError>;
+
     // #[doc = include_str!("../documentation/public_endpoints/getblock.md")]
     async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError>;
 
-    // #[doc = include_str!("../documentation/public_endpoints/getblockcount.md")]
-    async fn get_block_count(&self) -> Result<u32, RpcError>;
-
-    // #[doc = include_str!("../documentation/public_endpoints/getbestblockhash.md")]
-    async fn get_best_block_hash(&self) -> Result<N::BlockHash, RpcError>;
+    // #[doc = include_str!("../documentation/public_endpoints/getblockheight.md")]
+    async fn get_block_height(&self, block_hash: String) -> Result<u32, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/getblockhash.md")]
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError>;
 
-    // #[doc = include_str!("../documentation/public_endpoints/getrawtransaction.md")]
+    // #[doc = include_str!("../documentation/public_endpoints/gettransaction.md")]
     async fn get_transaction(&self, transaction_id: String) -> Result<Transaction<N>, RpcError>;
 
+    // #[doc = include_str!("../documentation/public_endpoints/gettransition.md")]
+    async fn get_transition(&self, transition_id: String) -> Result<Transition<N>, RpcError>;
+
+    // #[doc = include_str!("../documentation/public_endpoints/getciphertext.md")]
+    async fn get_ciphertext(&self, ciphertext_id: String) -> Result<RecordCiphertext<N>, RpcError>;
+
     // #[doc = include_str!("../documentation/public_endpoints/sendtransaction.md")]
-    // async fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError>;
-    //
+    async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
+
     // #[doc = include_str!("../documentation/public_endpoints/validaterawtransaction.md")]
     // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError>;
     //

@@ -179,6 +179,11 @@ impl<N: Network> Ledger<N> {
         self.canon.get_transaction(transaction_id)
     }
 
+    /// Returns the block height for the given block hash.
+    pub fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
+        self.canon.get_block_height(block_hash)
+    }
+
     /// Returns the block hash for the given block height.
     pub fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         self.canon.get_block_hash(block_height)

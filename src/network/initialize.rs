@@ -100,7 +100,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // // Initialize a new instance of the RPC server.
         let rpc_ip = format!("0.0.0.0:{}", rpc_port).parse()?;
-        Self::initialize_rpc(&mut tasks, rpc_ip, None, None, ledger.clone(), ledger_router);
+        Self::initialize_rpc(&mut tasks, rpc_ip, None, None, ledger.clone(), state_router);
 
         Ok(Self { peers, ledger, tasks })
     }
@@ -311,9 +311,14 @@ impl<N: Network, E: Environment> Server<N, E> {
         username: Option<String>,
         password: Option<String>,
         ledger: Arc<RwLock<Ledger<N>>>,
-        ledger_router: LedgerRouter<N, E>,
+        state_router: StateRouter<N, E>,
     ) {
-        let ledger_router = ledger_router.clone();
-        tasks.append(initialize_rpc_server::<N>(rpc_ip, username, password, ledger.clone()));
+        tasks.append(initialize_rpc_server::<N, E>(
+            rpc_ip,
+            username,
+            password,
+            ledger.clone(),
+            state_router.clone(),
+        ));
     }
 }

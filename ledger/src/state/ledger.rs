@@ -67,6 +67,11 @@ impl<N: Network> LedgerState<N> {
 
         // Retrieve each block from genesis to validate state.
         for block_height in 0..=latest_block_height {
+            // Log the trace every 10 blocks.
+            if block_height % 10 == 0 {
+                trace!("Validating the state of block {}", block_height);
+            }
+
             // Ensure the ledger contains the block at given block height.
             let block = ledger.get_block(block_height)?;
 
@@ -189,6 +194,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the transaction for a given transaction ID.
     pub fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.blocks.get_transaction(transaction_id)
+    }
+
+    /// Returns the block height for the given block hash.
+    pub fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
+        self.blocks.get_block_height(block_hash)
     }
 
     /// Returns the block hash for the given block height.
@@ -405,6 +415,14 @@ impl<N: Network> BlockState<N> {
     /// Returns the transaction for a given transaction ID.
     fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.transactions.get_transaction(transaction_id)
+    }
+
+    /// Returns the block height for the given block hash.
+    fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
+        match self.block_headers.get(block_hash)? {
+            Some(block_header) => Ok(block_header.height()),
+            None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
+        }
     }
 
     /// Returns the block hash for the given block height.

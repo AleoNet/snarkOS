@@ -18,12 +18,17 @@
 //!
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
-use crate::network::{
-    rpc::{rpc::*, rpc_trait::RpcFunctions},
-    Ledger,
+use crate::{
+    network::{
+        rpc::{rpc::*, rpc_trait::RpcFunctions},
+        Ledger,
+        StateRequest,
+        StateRouter,
+    },
+    Environment,
 };
 use snarkvm::{
-    dpc::{Block, Network, Transaction},
+    dpc::{Block, Network, RecordCiphertext, Transaction, Transition},
     utilities::FromBytes,
 };
 
@@ -70,10 +75,10 @@ impl From<RpcError> for std::io::Error {
 
 /// Implements RPC HTTP endpoint functions for a node.
 #[derive(Clone)]
-pub struct RpcImpl<N: Network>(Arc<RpcInner<N>>);
+pub struct RpcImpl<N: Network, E: Environment>(Arc<RpcInner<N, E>>);
 
-impl<N: Network> Deref for RpcImpl<N> {
-    type Target = RpcInner<N>;
+impl<N: Network, E: Environment> Deref for RpcImpl<N, E> {
+    type Target = RpcInner<N, E>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -81,16 +86,21 @@ impl<N: Network> Deref for RpcImpl<N> {
 }
 
 #[doc(hidden)]
-pub struct RpcInner<N: Network> {
+pub struct RpcInner<N: Network, E: Environment> {
     ledger: Arc<RwLock<Ledger<N>>>,
+    state_router: StateRouter<N, E>,
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
 }
 
-impl<N: Network> RpcImpl<N> {
+impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(credentials: Option<RpcCredentials>, ledger: Arc<RwLock<Ledger<N>>>) -> Self {
-        Self(Arc::new(RpcInner { ledger, credentials }))
+    pub fn new(credentials: Option<RpcCredentials>, ledger: Arc<RwLock<Ledger<N>>>, state_router: StateRouter<N, E>) -> Self {
+        Self(Arc::new(RpcInner {
+            ledger,
+            credentials,
+            state_router,
+        }))
     }
 
     /// A helper function used to pass a single value to the RPC handler.
@@ -135,17 +145,25 @@ impl<N: Network> RpcImpl<N> {
     pub fn add(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
 
+        d.add_method_with_meta("latestblock", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.map_rpc(|rpc| async move { rpc.latest_block().await }, params, meta)
+        });
+        d.add_method_with_meta("latestblockheight", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.map_rpc(|rpc| async move { rpc.latest_block_height().await }, params, meta)
+        });
+        d.add_method_with_meta("latestblockhash", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.map_rpc(|rpc| async move { rpc.latest_block_hash().await }, params, meta)
+        });
         d.add_method_with_meta("getblock", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_block(x).await }, params, meta)
         });
-        d.add_method_with_meta("getblockcount", |rpc, params, meta| {
+        d.add_method_with_meta("getblockheight", |rpc, params, meta| {
             let rpc = rpc.clone();
-            rpc.map_rpc(|rpc| async move { rpc.get_block_count().await }, params, meta)
-        });
-        d.add_method_with_meta("getbestblockhash", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc(|rpc| async move { rpc.get_best_block_hash().await }, params, meta)
+            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_block_height(x).await }, params, meta)
         });
         d.add_method_with_meta("getblockhash", |rpc, params, meta| {
             let rpc = rpc.clone();
@@ -155,10 +173,18 @@ impl<N: Network> RpcImpl<N> {
             let rpc = rpc.clone();
             rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_transaction(x).await }, params, meta)
         });
-        // d.add_method_with_meta("sendtransaction", |rpc, params, meta| {
-        //     let rpc = rpc.clone();
-        //     rpc.map_rpc_singlet(|rpc, x| async move { rpc.send_raw_transaction(x).await }, params, meta)
-        // });
+        d.add_method_with_meta("gettransition", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_transition(x).await }, params, meta)
+        });
+        d.add_method_with_meta("getciphertext", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_ciphertext(x).await }, params, meta)
+        });
+        d.add_method_with_meta("sendtransaction", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.map_rpc_singlet(|rpc, x| async move { rpc.send_transaction(x).await }, params, meta)
+        });
         // d.add_method_with_meta("validaterawtransaction", |rpc, params, meta| {
         //     let rpc = rpc.clone();
         //     rpc.map_rpc_singlet(
@@ -177,20 +203,31 @@ impl<N: Network> RpcImpl<N> {
 }
 
 #[async_trait::async_trait]
-impl<N: Network> RpcFunctions<N> for RpcImpl<N> {
-    /// Returns information about a block from a block height.
+impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
+    /// Returns the block from the head of the canonical chain.
+    async fn latest_block(&self) -> Result<Block<N>, RpcError> {
+        Ok(self.ledger.read().await.latest_block()?)
+    }
+
+    /// Returns the number of blocks in the canonical chain.
+    async fn latest_block_height(&self) -> Result<u32, RpcError> {
+        Ok(self.ledger.read().await.latest_block_height())
+    }
+
+    /// Returns the block hash from the head of the canonical chain.
+    async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError> {
+        Ok(self.ledger.read().await.latest_block_hash())
+    }
+
+    /// Returns the block given the block height.
     async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError> {
         Ok(self.ledger.read().await.get_block(block_height)?)
     }
 
-    /// Returns the number of blocks in the canonical chain, including the genesis.
-    async fn get_block_count(&self) -> Result<u32, RpcError> {
-        Ok(self.ledger.read().await.latest_block_height() + 1)
-    }
-
-    /// Returns the block hash of the head of the canonical chain.
-    async fn get_best_block_hash(&self) -> Result<N::BlockHash, RpcError> {
-        Ok(self.ledger.read().await.latest_block_hash())
+    /// Returns the number of blocks in the canonical chain.
+    async fn get_block_height(&self, block_hash: String) -> Result<u32, RpcError> {
+        let block_hash: N::BlockHash = FromBytes::from_bytes_le(&hex::decode(block_hash)?)?;
+        Ok(self.ledger.read().await.get_block_height(&block_hash)?)
     }
 
     /// Returns the block hash for the given block height, it exists in the canonical chain.
@@ -204,26 +241,29 @@ impl<N: Network> RpcFunctions<N> for RpcImpl<N> {
         Ok(self.ledger.read().await.get_transaction(&transaction_id)?)
     }
 
-    // /// Send raw transaction bytes to this node to be added into the mempool.
-    // /// If valid, the transaction will be stored and propagated to all peers.
-    // /// Returns the transaction id if valid.
-    // async fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
-    //     let transaction_bytes = hex::decode(transaction_bytes)?;
-    //     let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
-    //     let transaction_hex_id = hex::encode(transaction.transaction_id()?);
-    //
-    //     if !self
-    //         .sync_handler()?
-    //         .consensus
-    //         .receive_transaction(transaction.serialize()?)
-    //         .await
-    //     {
-    //         return Ok("Transaction did not verify".into());
-    //     }
-    //
-    //     Ok(transaction_hex_id)
-    // }
-    //
+    /// Returns a transition given the transition ID.
+    async fn get_transition(&self, transition_id: String) -> Result<Transition<N>, RpcError> {
+        let transition_id: N::TransitionID = FromBytes::from_bytes_le(&hex::decode(transition_id)?)?;
+        Ok(self.ledger.read().await.get_transition(&transition_id)?)
+    }
+
+    /// Returns the ciphertext given the ciphertext ID.
+    async fn get_ciphertext(&self, ciphertext_id: String) -> Result<RecordCiphertext<N>, RpcError> {
+        let ciphertext_id: N::CiphertextID = FromBytes::from_bytes_le(&hex::decode(ciphertext_id)?)?;
+        Ok(self.ledger.read().await.get_ciphertext(&ciphertext_id)?)
+    }
+
+    /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
+    async fn send_transaction(&self, transaction_hex: String) -> Result<N::TransactionID, RpcError> {
+        let transaction: Transaction<N> = FromBytes::from_bytes_le(&hex::decode(transaction_hex)?)?;
+        // Route an `UnconfirmedTransaction` to the state manager.
+        let request = StateRequest::UnconfirmedTransaction("0.0.0.0:3032".parse().unwrap(), transaction.clone());
+        if let Err(error) = self.state_router.send(request).await {
+            warn!("[UnconfirmedTransaction] {}", error);
+        }
+        Ok(transaction.transaction_id())
+    }
+
     // /// Validate and return if the transaction is valid.
     // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
     //     let transaction_bytes = hex::decode(transaction_bytes)?;
