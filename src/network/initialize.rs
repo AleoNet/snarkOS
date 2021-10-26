@@ -77,6 +77,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_heartbeat(&mut tasks, peers_router.clone(), ledger_router.clone(), state_router.clone());
 
         if node_port != 4135 {
+            let message = PeersRequest::Connect("144.126.212.176:4135".parse().unwrap(), peers_router.clone(), state_router.clone());
+            peers_router.send(message).await?;
+
             let message = PeersRequest::Connect("0.0.0.0:4135".parse().unwrap(), peers_router.clone(), state_router.clone());
             peers_router.send(message).await?;
         }
