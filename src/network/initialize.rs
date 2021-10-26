@@ -148,7 +148,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             while let Some(request) = ledger_handler.recv().await {
                 // Hold the ledger write lock briefly, to update the state of the ledger.
                 if let Err(error) = ledger_clone.write().await.update::<E>(request).await {
-                    error!("{}", error);
+                    trace!("{}", error);
                 }
             }
         }));

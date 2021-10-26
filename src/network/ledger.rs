@@ -342,11 +342,7 @@ impl<N: Network> Ledger<N> {
         } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.latest_block_hash() {
             match self.canon.add_next_block(block) {
                 Ok(()) => {
-                    info!(
-                        "Ledger has advanced to block {} ({})",
-                        self.latest_block_height(),
-                        self.latest_block_hash()
-                    );
+                    info!("Ledger advanced to block {}", self.latest_block_height());
                     // On success, filter the memory pool of its transactions and the block if it exists.
                     // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
                     self.memory_pool.clear_transactions();
@@ -362,10 +358,20 @@ impl<N: Network> Ledger<N> {
             // Ensure the unconfirmed block is well-formed.
             match block.is_valid() {
                 true => {
-                    // Add the block to the unconfirmed blocks.
-                    trace!("Adding unconfirmed block {} to memory pool", block.height());
-                    self.unconfirmed_blocks.insert(block.previous_block_hash(), block.clone());
-                    Ok(())
+                    // Ensure the unconfirmed block does not already exist in the memory pool.
+                    match !self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
+                        true => {
+                            // Add the block to the unconfirmed blocks.
+                            trace!("Adding unconfirmed block {} to memory pool", block.height());
+                            self.unconfirmed_blocks.insert(block.previous_block_hash(), block.clone());
+                            Ok(())
+                        }
+                        false => {
+                            let error = format!("Unconfirmed block {} already exists in the memory pool", block.height());
+                            trace!("{}", error);
+                            Err(anyhow!(error))
+                        }
+                    }
                 }
                 false => {
                     let error = format!("Unconfirmed block {} is invalid", block.height());

@@ -28,7 +28,7 @@ const TWO_HOURS_UNIX: i64 = 7200;
 #[derive(Clone, Debug)]
 pub struct LedgerState<N: Network> {
     /// The current state of the ledger.
-    latest_state: (u32, N::BlockHash, N::LedgerRoot),
+    latest_state: (u32, N::BlockHash),
     ledger_tree: Arc<Mutex<LedgerTree<N>>>,
     ledger_roots: DataMap<N::LedgerRoot, u32>,
     blocks: BlockState<N>,
@@ -45,7 +45,7 @@ impl<N: Network> LedgerState<N> {
         let genesis = N::genesis_block();
         // Initialize the ledger.
         let mut ledger = Self {
-            latest_state: (genesis.height(), genesis.block_hash(), genesis.ledger_root()),
+            latest_state: (genesis.height(), genesis.block_hash()),
             ledger_tree: Arc::new(Mutex::new(LedgerTree::<N>::new()?)),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
@@ -59,8 +59,15 @@ impl<N: Network> LedgerState<N> {
 
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
+            ledger.ledger_tree.lock().unwrap().add(&genesis.block_hash())?;
+            ledger.ledger_roots.insert(&genesis.ledger_root(), &genesis.height())?;
+            ledger
+                .ledger_roots
+                .insert(&ledger.ledger_tree.lock().unwrap().root(), &(genesis.height() + 1))?;
             ledger.blocks.add_block(genesis)?;
         }
+
+        // TODO (howardwu): Verify that the sequence of ledger roots and block hashes is well-formed.
 
         // Retrieve each block from genesis to validate state.
         for block_height in 0..latest_block_height {
@@ -70,7 +77,7 @@ impl<N: Network> LedgerState<N> {
             // Ensure the ledger roots match their expected block heights.
             match ledger.ledger_roots.get(&block.ledger_root())? {
                 Some(height) => {
-                    if height != block_height {
+                    if block_height != height {
                         return Err(anyhow!("Ledger expected block {}, found block {}", block_height, height));
                     }
                 }
@@ -87,8 +94,8 @@ impl<N: Network> LedgerState<N> {
 
         // Update the latest state.
         let block = ledger.get_block(latest_block_height)?;
-        ledger.latest_state = (block.height(), block.block_hash(), block.ledger_root());
-        trace!("Loaded ledger from block {} ({})", block.height(), block.block_hash());
+        ledger.latest_state = (block.height(), block.block_hash());
+        trace!("Loaded ledger from block {}", block.height());
 
         // let value = storage.export()?;
         // println!("{}", value);
@@ -110,7 +117,7 @@ impl<N: Network> LedgerState<N> {
 
     /// Returns the latest ledger root.
     pub fn latest_ledger_root(&self) -> N::LedgerRoot {
-        self.latest_state.2
+        self.ledger_tree.lock().unwrap().root()
     }
 
     /// Returns the latest block timestamp.
@@ -319,8 +326,8 @@ impl<N: Network> LedgerState<N> {
 
         self.blocks.add_block(block)?;
         self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
-        self.ledger_roots.insert(&block.ledger_root(), &current_block.height())?;
-        self.latest_state = (block_height, block.block_hash(), self.ledger_tree.lock().unwrap().root());
+        self.ledger_roots.insert(&block.ledger_root(), &block.height())?;
+        self.latest_state = (block_height, block.block_hash());
         Ok(())
     }
 
@@ -332,8 +339,8 @@ impl<N: Network> LedgerState<N> {
         self.blocks.remove_block(block_height)?;
         self.ledger_roots.remove(&block.ledger_root())?;
         self.latest_state = match block_height == 0 {
-            true => (0, block.previous_block_hash(), block.ledger_root()),
-            false => (block_height - 1, block.previous_block_hash(), block.ledger_root()),
+            true => (0, block.previous_block_hash()),
+            false => (block_height - 1, block.previous_block_hash()),
         };
 
         Ok(block)
