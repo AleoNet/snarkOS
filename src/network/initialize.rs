@@ -74,7 +74,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_listener(&mut tasks, local_ip, listener, peers_router.clone(), state_router.clone());
 
         // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(&mut tasks, peers_router.clone(), state_router.clone());
+        Self::initialize_heartbeat(&mut tasks, peers_router.clone(), ledger_router.clone(), state_router.clone());
 
         if node_port != 4135 {
             let message = PeersRequest::Connect("127.0.0.1:4135".parse().unwrap(), peers_router.clone(), state_router.clone());
@@ -223,9 +223,15 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance of the heartbeat.
     ///
-    fn initialize_heartbeat(tasks: &mut Tasks<task::JoinHandle<()>>, peers_router: PeersRouter<N, E>, state_router: StateRouter<N, E>) {
+    fn initialize_heartbeat(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        peers_router: PeersRouter<N, E>,
+        ledger_router: LedgerRouter<N, E>,
+        state_router: StateRouter<N, E>,
+    ) {
         // Initialize a process to maintain an adequate number of peers.
         let peers_router_clone = peers_router.clone();
+        let ledger_router_clone = ledger_router.clone();
         let state_router_clone = state_router.clone();
         tasks.append(task::spawn(async move {
             loop {
@@ -233,6 +239,11 @@ impl<N: Network, E: Environment> Server<N, E> {
                 let request = PeersRequest::Heartbeat(peers_router.clone(), state_router.clone());
                 if let Err(error) = peers_router_clone.send(request).await {
                     error!("Failed to send request to peers: {}", error)
+                }
+                // Transmit a heartbeat request to the ledger.
+                let request = LedgerRequest::Heartbeat;
+                if let Err(error) = ledger_router_clone.send(request).await {
+                    error!("Failed to send request to ledger: {}", error)
                 }
                 // Transmit a heartbeat request to the state manager.
                 let request = StateRequest::Heartbeat;

@@ -76,8 +76,6 @@ pub(crate) struct State<N: Network, E: Environment> {
     failures: HashMap<SocketAddr, Vec<String>>,
     /// A boolean that is `true` when syncing.
     is_syncing: Arc<AtomicBool>,
-
-    candidate_blocks: HashMap<N::BlockHash, Block<N>>,
     _phantom: PhantomData<(N, E)>,
 }
 
@@ -93,8 +91,6 @@ impl<N: Network, E: Environment> State<N, E> {
             sync_requests: Default::default(),
             failures: Default::default(),
             is_syncing: Arc::new(AtomicBool::new(false)),
-
-            candidate_blocks: Default::default(),
             _phantom: PhantomData,
         }
     }
@@ -129,40 +125,13 @@ impl<N: Network, E: Environment> State<N, E> {
                 }
             }
             StateRequest::Heartbeat => {
-                // Retrieve the latest block of the ledger.
-                let latest_block = match ledger.read().await.latest_block() {
-                    Ok(block) => block,
-                    Err(error) => {
-                        error!("{}", error);
-                        return;
-                    }
-                };
-
-                // Check for candidate blocks to fast forward the ledger.
-                let mut block = latest_block.clone();
-                while self.candidate_blocks.contains_key(&block.block_hash()) {
-                    block = match self.candidate_blocks.get(&block.block_hash()) {
-                        Some(block) => block.clone(),
-                        None => {
-                            error!("Failed to find the candidate block");
-                            break;
-                        }
-                    };
-
-                    // Route a `SyncResponse` to the ledger.
-                    let request = LedgerRequest::SyncResponse(block.clone());
-                    if let Err(error) = ledger_router.send(request).await {
-                        warn!("[SyncResponse] {}", error);
-                    }
-                }
-
                 // Ensure the state manager is not already syncing.
                 if self.is_syncing() {
                     return;
                 }
 
-                // Retrieve the current block height of the ledger.
-                let latest_block_height = latest_block.height();
+                // Retrieve the latest block height of the ledger.
+                let latest_block_height = ledger.read().await.latest_block_height();
                 // Iterate through the peers to check if this node needs to catch up.
                 let mut maximal_peer = None;
                 let mut maximum_block_height = 0;
@@ -246,8 +215,6 @@ impl<N: Network, E: Environment> State<N, E> {
                     }
                     // Process the sync response.
                     else {
-                        // Add the block to the candidate blocks.
-                        self.candidate_blocks.insert(block.previous_block_hash(), block.clone());
                         // Route a `SyncResponse` to the ledger.
                         let request = LedgerRequest::SyncResponse(block.clone());
                         if let Err(error) = ledger_router.send(request).await {
