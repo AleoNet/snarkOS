@@ -451,7 +451,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 Err(error) => {
                     trace!("{}", error);
                     return;
-                },
+                }
             };
 
             // Retrieve the peer IP.

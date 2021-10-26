@@ -46,21 +46,23 @@ pub fn initialize_logger() {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let port = env::args().nth(1).unwrap_or_else(|| "4132".to_string()).parse()?;
-    if port < 4130 {
+    let node_port = env::args().nth(1).unwrap_or_else(|| "4132".to_string()).parse()?;
+    if node_port < 4130 {
         panic!("Until configuration files are established, the port must be at least 4130 or greater");
     }
+
+    let rpc_port = env::args().nth(2).unwrap_or_else(|| "3032".to_string()).parse()?;
 
     initialize_logger();
 
     let account = Account::<Testnet2>::new(&mut thread_rng());
 
     // Please do not run a miner yet.
-    if port == 4134 || port == 4135 {
-        let _node = Node::<Testnet2, Miner>::new(port, (port as u16 - 4130) as u8, Some(account.address())).await?;
+    if node_port == 4134 || node_port == 4135 {
+        let _node = Node::<Testnet2, Miner>::new(node_port, rpc_port, (node_port as u16 - 4130) as u8, Some(account.address())).await?;
         std::future::pending::<()>().await;
     } else {
-        let _node = Node::<Testnet2, Client>::new(port, (port as u16 - 4130) as u8, None).await?;
+        let _node = Node::<Testnet2, Client>::new(node_port, rpc_port, (node_port as u16 - 4130) as u8, None).await?;
         std::future::pending::<()>().await;
     }
 
