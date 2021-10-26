@@ -43,7 +43,7 @@ use crate::{
 };
 
 enum Message {
-    InsertBlock(SerialBlock),
+    InsertBlock(Box<SerialBlock>),
     DeleteBlock(Digest),
     GetBlockHash(u32),
     GetBlockHeader(Digest),
@@ -268,7 +268,7 @@ impl AsyncStorage {
 #[async_trait::async_trait]
 impl Storage for AsyncStorage {
     async fn insert_block(&self, block: &SerialBlock) -> Result<()> {
-        self.send(Message::InsertBlock(block.clone())).await
+        self.send(Message::InsertBlock(Box::new(block.clone()))).await
     }
 
     async fn delete_block(&self, hash: &Digest) -> Result<()> {
