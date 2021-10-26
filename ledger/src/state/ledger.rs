@@ -59,18 +59,14 @@ impl<N: Network> LedgerState<N> {
 
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
-            ledger.ledger_tree.lock().unwrap().add(&genesis.block_hash())?;
             ledger.ledger_roots.insert(&genesis.ledger_root(), &genesis.height())?;
-            ledger
-                .ledger_roots
-                .insert(&ledger.ledger_tree.lock().unwrap().root(), &(genesis.height() + 1))?;
             ledger.blocks.add_block(genesis)?;
         }
 
         // TODO (howardwu): Verify that the sequence of ledger roots and block hashes is well-formed.
 
         // Retrieve each block from genesis to validate state.
-        for block_height in 0..latest_block_height {
+        for block_height in 0..=latest_block_height {
             // Ensure the ledger contains the block at given block height.
             let block = ledger.get_block(block_height)?;
 

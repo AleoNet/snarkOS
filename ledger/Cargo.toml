@@ -28,6 +28,8 @@ optional = true
 
 [dependencies.chrono]
 version = "0.4"
+default-features = false
+features = [ "clock", "serde" ]
 
 [dependencies.rand]
 version = "0.8"

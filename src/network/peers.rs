@@ -165,7 +165,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         Ok(stream) => match stream {
                             Ok(stream) => Peer::handler(stream, self.local_ip, peers_router, state_router).await,
                             Err(error) => {
-                                error!("Failed to connect to '{}': '{:?}'", peer_ip, error);
+                                trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
                                 self.candidate_peers.remove(&peer_ip);
                             }
                         },
