@@ -67,7 +67,8 @@ version = "0.14"
 
 [dependencies.chrono]
 version = "0.4"
-features = [ "serde" ]
+default-features = false
+features = [ "serde", "clock" ]
 
 [dependencies.circular-queue]
 version = "0.2"
