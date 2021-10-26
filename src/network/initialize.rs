@@ -52,7 +52,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     pub(crate) async fn initialize(port: u16, storage_id: u8, miner: Option<Address<N>>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
-        let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", port)).await {
+        let (local_ip, listener) = match TcpListener::bind(&format!("127.0.0.1:{}", port)).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
@@ -76,8 +76,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(&mut tasks, peers_router.clone(), state_router.clone());
 
-        let message = PeersRequest::Connect("0.0.0.0:4133".parse().unwrap(), peers_router.clone(), state_router.clone());
-        peers_router.send(message).await?;
+        if port != 4135 {
+            let message = PeersRequest::Connect("127.0.0.1:4135".parse().unwrap(), peers_router.clone(), state_router.clone());
+            peers_router.send(message).await?;
+        }
 
         // Sleep for 15 seconds.
         tokio::time::sleep(Duration::from_secs(15)).await;
@@ -94,7 +96,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         );
 
         // Initialize a new instance of the RPC server.
-        let rpc_ip = "0.0.0.0:3032".parse()?;
+        let rpc_ip = "127.0.0.1:3032".parse()?;
         Self::initialize_rpc(&mut tasks, rpc_ip, None, None, ledger.clone(), ledger_router);
 
         Ok(Self { peers, ledger, tasks })

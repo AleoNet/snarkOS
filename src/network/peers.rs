@@ -144,7 +144,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     pub(super) async fn update(&mut self, request: PeersRequest<N, E>) {
         match request {
             PeersRequest::Connect(peer_ip, peers_router, state_router) => {
-                // Ensure the remote IP is not this node.
+                // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
                 {
@@ -203,8 +203,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.send(sender, &message).await;
             }
             PeersRequest::PeerConnecting(stream, peer_ip, peers_router, state_router) => {
+                // Ensure the peer IP is not this node.
+                if peer_ip == self.local_ip
+                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
+                {
+                    debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
+                }
                 // Ensure the node does not surpass the maximum number of peer connections.
-                if self.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
+                else if self.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Dropping connection request from {} (maximum peers reached)", peer_ip);
                 }
                 // Ensure the node is not already connected to this peer.
@@ -442,7 +448,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(stream, local_ip, peers_router.clone()).await {
                 Ok(peer) => peer,
-                Err(error) => return,
+                Err(error) => {
+                    trace!("{}", error);
+                    return;
+                },
             };
 
             // Retrieve the peer IP.
