@@ -230,7 +230,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks.append(task::spawn(async move {
             loop {
                 // Transmit a heartbeat request to the peers.
-                let request = PeersRequest::Heartbeat(peers_router_clone.clone(), state_router.clone());
+                let request = PeersRequest::Heartbeat(peers_router.clone(), state_router.clone());
                 if let Err(error) = peers_router_clone.send(request).await {
                     error!("Failed to send request to peers: {}", error)
                 }
