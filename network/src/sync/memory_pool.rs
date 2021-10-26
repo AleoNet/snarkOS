@@ -103,6 +103,10 @@ impl Node {
             self.peer_book
                 .send_to(remote_address, Payload::MemoryPool(transactions), time_received)
                 .await;
+        } else if let Some(time_received) = time_received {
+            // Even if there is no memory pool to respond with, calculate the related metric.
+            // If at some point an empty Payload::MemoryPool can be sent, this branch should be removed.
+            metrics::histogram!(snarkos_metrics::internal_rtt::GETMEMORYPOOL, time_received.elapsed());
         }
         Ok(())
     }
