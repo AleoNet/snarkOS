@@ -58,23 +58,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum amount of time in which a handshake with a regular node can conclude before dropping the
     /// connection; it should be no greater than the `peer_sync_interval`.
     const HANDSHAKE_TIMEOUT_SECS: u64 = 5;
-    /// The noise handshake pattern.
-    const HANDSHAKE_PATTERN: &'static str = "Noise_XXpsk3_25519_ChaChaPoly_SHA256";
-    /// The pre-shared key for the noise handshake.
-    const HANDSHAKE_PSK: &'static [u8] = b"b765e427e836e0029a1e2a22ba60c52a"; // the PSK must be 32B
-    /// The spec-compliant size of the noise buffer.
-    const NOISE_BUFFER_LENGTH: usize = 65535;
-    /// The spec-compliant size of the noise tag field.
-    const NOISE_TAG_LENGTH: usize = 16;
 
     /// The amount of time after which a peer will be considered inactive an disconnected from if they have
     /// not sent any messages in the meantime.
     const MAX_PEER_INACTIVITY_SECS: u8 = 30;
     /// The maximum size of a message that can be transmitted in the network.
     const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
-    // /// The maximum number of peers shared at once in response to a `GetPeers` message.
-    // const SHARED_PEER_COUNT: usize = 25;
-    // const BLOCK_CACHE_SIZE: usize = 64;
 
     const CONNECTION_TIMEOUT_SECS: u64 = 3;
 
