@@ -212,14 +212,6 @@
         },
         {
           "exemplar": true,
-          "expr": "snarkos_blocks_duplicates_sync_total",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "duplicate SyncBlocks",
-          "refId": "D"
-        },
-        {
-          "exemplar": true,
           "expr": "snarkos_misc_rpc_requests_total",
           "hide": false,
           "interval": "",
