@@ -370,6 +370,6 @@ impl FromStr for TransactionKernel {
 
 impl fmt::Display for TransactionKernel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.transaction_kernel.to_string())
+        write!(f, "{}", self.transaction_kernel)
     }
 }

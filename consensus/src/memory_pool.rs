@@ -56,18 +56,24 @@ impl MemoryPool {
         match self.transactions.remove(transaction_id) {
             Some(entry) => {
                 for commitment in &entry.transaction.new_commitments {
-                    if !self.commitments.remove(commitment) {
-                        panic!("missing commitment from memory pool during removal");
-                    }
+                    assert!(
+                        self.commitments.remove(commitment),
+                        "missing commitment from memory pool during removal"
+                    );
                 }
+
                 for serial in &entry.transaction.old_serial_numbers {
-                    if !self.serial_numbers.remove(serial) {
-                        panic!("missing serial from memory pool during removal");
-                    }
+                    assert!(
+                        self.serial_numbers.remove(serial),
+                        "missing serial from memory pool during removal"
+                    );
                 }
-                if !self.memos.remove(&entry.transaction.memorandum) {
-                    panic!("missing memo from memory pool during removal");
-                }
+
+                assert!(
+                    self.memos.remove(&entry.transaction.memorandum),
+                    "missing memo from memory pool during removal"
+                );
+
                 Ok(Some(entry.transaction))
             }
             None => Ok(None),

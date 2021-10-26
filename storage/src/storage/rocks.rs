@@ -158,7 +158,7 @@ impl RocksDb {
         let mut cf_names: Vec<String> = Vec::with_capacity(cfs.len());
 
         for column in 0..num_cfs {
-            let column_name = format!("col{}", column.to_string());
+            let column_name = format!("col{}", column);
 
             let mut cf_opts = Options::default();
             cf_opts.set_max_write_buffer_number(16);

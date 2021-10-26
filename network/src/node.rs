@@ -153,9 +153,8 @@ impl Node {
     }
 
     pub fn set_sync(&mut self, sync: Sync) {
-        if self.sync.set(Arc::new(sync)).is_err() {
-            panic!("sync was set more than once!");
-        }
+        // Panic if the sync was set more than once.
+        assert!(self.sync.set(Arc::new(sync)).is_ok(), "sync was set more than once!");
     }
 
     /// Returns a reference to the sync objects.

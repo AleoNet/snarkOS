@@ -114,7 +114,7 @@ impl ConsensusInner {
             request
                 .old_records
                 .iter()
-                .map(|x| <DPCRecord<Components> as VMRecord>::deserialize(x))
+                .map(<DPCRecord<Components> as VMRecord>::deserialize)
                 .collect::<Result<Vec<_>, _>>()?,
             request
                 .new_records

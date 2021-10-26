@@ -19,14 +19,6 @@ use crate::DynStorage;
 use anyhow::*;
 use tracing::*;
 
-#[derive(Debug, Default)]
-struct StorageTrimSummary {
-    all_ops: usize,
-    obsolete_blocks: usize,
-    obsolete_txs: usize,
-    updated_parents: usize,
-}
-
 /// Removes obsolete objects from the database; can be used for cleanup purposes, but it can also provide
 /// some insight into the features of the chain, e.g. the number of blocks and transactions that were
 /// ultimately not accepted into the canonical chain.

@@ -220,11 +220,10 @@ impl<T: KeyValueStorage + Send + 'static> Validator for T {
     /// the validation process should also attempt to fix the issues it encounters. The validator temporarily takes
     /// ownership of the storage, and later returns it in a tuple, together with a vector of errors it has detected
     async fn validate(mut self, limit: Option<u32>, fix_mode: FixMode) -> (Vec<ValidatorError>, Self) {
-        if limit.is_some() && [FixMode::SuperfluousTestnet1TxComponents, FixMode::Everything].contains(&fix_mode) {
-            panic!(
-                "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
-            );
-        }
+        assert!(
+            !(limit.is_some() && [FixMode::SuperfluousTestnet1TxComponents, FixMode::Everything].contains(&fix_mode)),
+            "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
+        );
 
         info!("Validating the storage...");
 
