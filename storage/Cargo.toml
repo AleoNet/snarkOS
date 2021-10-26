@@ -125,4 +125,5 @@ path = "../consensus"
 version = "=0.7.9"
 
 [dev-dependencies.tracing-subscriber]
-version = "0.2"
+version = "0.3"
+features = [ "env-filter" ]
