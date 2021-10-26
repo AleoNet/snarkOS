@@ -71,7 +71,7 @@ impl<N: Network> LedgerState<N> {
             match ledger.ledger_roots.get(&block.ledger_root())? {
                 Some(height) => {
                     if height != block_height {
-                        return Err(anyhow!("Ledger expected block {}, found block {}", height, block_height));
+                        return Err(anyhow!("Ledger expected block {}, found block {}", block_height, height));
                     }
                 }
                 None => return Err(anyhow!("Ledger is missing ledger root for block {}", block_height)),
@@ -88,7 +88,7 @@ impl<N: Network> LedgerState<N> {
         // Update the latest state.
         let block = ledger.get_block(latest_block_height)?;
         ledger.latest_state = (block.height(), block.block_hash(), block.ledger_root());
-        trace!("Starting ledger at block {} ({})", block.height(), block.block_hash());
+        trace!("Loaded ledger from block {} ({})", block.height(), block.block_hash());
 
         // let value = storage.export()?;
         // println!("{}", value);
