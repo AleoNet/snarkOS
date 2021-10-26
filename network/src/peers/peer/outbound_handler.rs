@@ -115,7 +115,6 @@ impl Peer {
                 if let (Some(time_received), Some(histogram)) = (time_received, match &message {
                     Payload::Peers(_) => Some(metrics::internal_rtt::GETPEERS),
                     Payload::Sync(_) => Some(metrics::internal_rtt::GETSYNC),
-                    Payload::SyncBlock(_, _) => Some(metrics::internal_rtt::GETBLOCKS),
                     Payload::MemoryPool(_) => Some(metrics::internal_rtt::GETMEMORYPOOL),
                     _ => None,
                 }) {
