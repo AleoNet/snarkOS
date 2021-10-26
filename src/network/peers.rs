@@ -270,7 +270,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             Some(outbound) => {
                 trace!("Sending '{}' to {}", message.name(), peer);
                 if let Err(error) = outbound.send(message.clone()).await {
-                    error!("{}", error);
+                    trace!("Outbound channel failed: {}", error);
                     self.connected_peers.remove(&peer);
                 }
             }
@@ -466,10 +466,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         // Disconnect if the peer has not communicated back in 3 minutes.
                         if peer.last_seen.elapsed() > Duration::from_secs(180) {
                             warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
-                            // Route a `Disconnect` to the state manager.
-                            if let Err(error) = state_router.send(StateRequest::Disconnect(peer_ip)).await {
-                                warn!("[Timeout] {}", error);
-                            }
                             break;
                         } else {
                             // Route a message to the peer.
@@ -486,10 +482,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 true => {
                                     let last_seen = peer.last_seen.elapsed().as_secs();
                                     warn!("Failed to receive a message from {} in {} seconds", peer_ip, last_seen);
-                                    // Route a `Disconnect` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::Disconnect(peer_ip)).await {
-                                        warn!("[Timeout] {}", error);
-                                    }
                                     break;
                                 },
                                 false => {
@@ -566,26 +558,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[UnconfirmedTransaction] {}", error);
                                     }
                                 }
-                                Message::Unused(_) => {
-                                    // Route a `Disconnect` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::Disconnect(peer_ip)).await {
-                                        warn!("[Unused] {}", error);
-                                    }
-                                    // Peer is not following the protocol.
-                                    break;
-                                }
+                                Message::Unused(_) => break, // Peer is not following the protocol.
                             }
                         }
                         // An error occurred.
                         Some(Err(error)) => error!("Failed to read message from {}: {}", peer_ip, error),
                         // The stream has been disconnected.
-                        None => {
-                            // Route a `Disconnect` to the state manager.
-                            if let Err(error) = state_router.send(StateRequest::Disconnect(peer_ip)).await {
-                                warn!("[Peer::None] {}", error);
-                            }
-                            break;
-                        },
+                        None => break,
                     },
                 }
             }
