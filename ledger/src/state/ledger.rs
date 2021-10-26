@@ -557,7 +557,7 @@ impl<N: Network> TransactionState<N> {
             serial_numbers: storage.open_map("serial_numbers")?,
             commitments: storage.open_map("commitments")?,
             ciphertext_ids: storage.open_map("ciphertext_ids")?,
-            // events
+            // events: storage.open_map("events")?,
         })
     }
 
