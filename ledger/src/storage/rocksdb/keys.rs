@@ -38,16 +38,21 @@ impl<K: DeserializeOwned> Iterator for Keys<K> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.db_iter.valid() {
-            let key = self.db_iter.key().and_then(|key| {
-                if &key[0..self.prefix.len()] == &self.prefix[..] {
-                    match bincode::deserialize(&key[self.prefix.len()..]) {
-                        Ok(k) => k,
-                        _ => None,
+            let key = match self
+                .db_iter
+                .key()
+                .and_then(|k| {
+                    if &k[0..self.prefix.len()] == &self.prefix[..] {
+                        Some(k)
+                    } else {
+                        None
                     }
-                } else {
-                    None
-                }
-            });
+                })
+                .map(|k| bincode::deserialize(&k[self.prefix.len()..]).ok())
+            {
+                Some(key) => key,
+                None => None,
+            };
 
             self.db_iter.next();
             key

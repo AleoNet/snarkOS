@@ -71,7 +71,7 @@ impl<N: Network> LedgerState<N> {
             match ledger.ledger_roots.get(&block.ledger_root())? {
                 Some(height) => {
                     if height != block_height {
-                        return Err(anyhow!("Ledger has incorrect ledger root at block {}", block_height));
+                        return Err(anyhow!("Ledger expected block {}, found block {}", height, block_height));
                     }
                 }
                 None => return Err(anyhow!("Ledger is missing ledger root for block {}", block_height)),
@@ -88,6 +88,7 @@ impl<N: Network> LedgerState<N> {
         // Update the latest state.
         let block = ledger.get_block(latest_block_height)?;
         ledger.latest_state = (block.height(), block.block_hash(), block.ledger_root());
+        trace!("Starting ledger at block {} ({})", block.height(), block.block_hash());
 
         // let value = storage.export()?;
         // println!("{}", value);
@@ -318,7 +319,7 @@ impl<N: Network> LedgerState<N> {
 
         self.blocks.add_block(block)?;
         self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
-        self.ledger_roots.insert(&block.ledger_root(), &block_height)?;
+        self.ledger_roots.insert(&block.ledger_root(), &current_block.height())?;
         self.latest_state = (block_height, block.block_hash(), self.ledger_tree.lock().unwrap().root());
         Ok(())
     }

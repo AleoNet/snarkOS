@@ -42,6 +42,9 @@ version = "1"
 [dependencies.serde_json]
 version = "1"
 
+[dependencies.tracing]
+version = "0.1"
+
 [features]
 default = ["rocks"]
 rocks = ["bincode", "rocksdb"]

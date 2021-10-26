@@ -334,10 +334,11 @@ impl<N: Network> Ledger<N> {
     ///     2) to the memory pool for later use.
     ///
     fn add_block<E: Environment>(&mut self, block: &Block<N>) -> Result<()> {
-        // Ensure the unconfirmed block is new.
+        // Ensure the given block is new.
         if self.contains_block_hash(&block.block_hash())? {
-            trace!("Canon chain already contains block {}", block.height());
-            Ok(())
+            let error = format!("Canon chain already contains block {}", block.height());
+            trace!("{}", error);
+            Err(anyhow!("{}", error))
         } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.latest_block_hash() {
             match self.canon.add_next_block(block) {
                 Ok(()) => {

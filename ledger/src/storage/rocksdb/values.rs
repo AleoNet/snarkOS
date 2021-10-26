@@ -41,18 +41,15 @@ impl<V: DeserializeOwned> Iterator for Values<V> {
             let value = self
                 .db_iter
                 .key()
-                .and_then(|key| {
-                    if &key[0..self.prefix.len()] == &self.prefix[..] {
-                        Some(key)
+                .and_then(|k| {
+                    if &k[0..self.prefix.len()] == &self.prefix[..] {
+                        Some(k)
                     } else {
                         None
                     }
                 })
-                .and_then(|_| match self.db_iter.value() {
-                    Some(value) => match bincode::deserialize(&value) {
-                        Ok(v) => v,
-                        _ => None,
-                    },
+                .and_then(|_| match self.db_iter.value().map(|v| bincode::deserialize(&v).ok()) {
+                    Some(value) => value,
                     None => None,
                 });
 
