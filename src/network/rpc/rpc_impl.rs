@@ -224,13 +224,13 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.read().await.get_block(block_height)?)
     }
 
-    /// Returns the number of blocks in the canonical chain.
+    /// Returns the block height for the given the block hash.
     async fn get_block_height(&self, block_hash: String) -> Result<u32, RpcError> {
         let block_hash: N::BlockHash = FromBytes::from_bytes_le(&hex::decode(block_hash)?)?;
         Ok(self.ledger.read().await.get_block_height(&block_hash)?)
     }
 
-    /// Returns the block hash for the given block height, it exists in the canonical chain.
+    /// Returns the block hash for the given block height, if it exists in the canonical chain.
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError> {
         Ok(self.ledger.read().await.get_block_hash(block_height)?)
     }
