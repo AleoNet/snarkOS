@@ -45,8 +45,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat,
     /// Mine := (local_ip, miner_address, peers_router, ledger_router)
     Mine(SocketAddr, Address<N>, PeersRouter<N, E>, LedgerRouter<N, E>),
-    /// ForkRequest := (peer_ip, block headers, peers_router)
-    ForkRequest(SocketAddr, Vec<BlockHeader<N>>, PeersRouter<N, E>),
+    /// ForkRequest := (peer_ip, block hashes and heights, peers_router)
+    ForkRequest(SocketAddr, Vec<(u32, N::BlockHash)>, PeersRouter<N, E>),
     // /// SyncRequest := (peer_ip, block_height, peers_router)
     // SyncRequest(SocketAddr, u32, PeersRouter<N, E>),
     /// SyncResponse := (block)
@@ -444,19 +444,72 @@ impl<N: Network> Ledger<N> {
 
     ///
     /// Handles the fork request.
+    /// A fork request contains a sequence of block hashes that gives a insight to the
+    /// peers block state.
     ///
     async fn handle_fork_request<E: Environment>(
         &mut self,
         peer_ip: SocketAddr,
-        block_headers: Vec<BlockHeader<N>>,
+        block_hashes: Vec<(u32, N::BlockHash)>,
         peers_router: PeersRouter<N, E>,
     ) -> Result<()> {
-        // TODO (raychu86): Find the most recent shared block header.
+        if block_hashes.len() > 0 {
+            // The most recent block height shared with the peer.
+            let mut latest_shared_block_height = 0;
 
-        for block_header in block_headers {}
+            // The latest block height the peer has shared.
+            let mut latest_peer_block_height = 0;
 
-        let request = PeersRequest::MessageSend(peer_ip, Message::ForkResponse);
-        peers_router.send(request).await?;
+            // Scan the block hashes sent by the peer.
+            for (block_height, block_hash) in block_hashes {
+                if let Ok(expected_block_height) = self.canon.get_block_height(&block_hash) {
+                    // Check if the declared height for the block hash is valid.
+                    if expected_block_height != block_height {
+                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                        trace!("{}", error);
+                        return Err(anyhow!(error));
+                    } else {
+                        // Update the latest shared block height.
+                        if expected_block_height > latest_shared_block_height {
+                            latest_shared_block_height = expected_block_height
+                        }
+
+                        // Update the latest peer block height.
+                        if expected_block_height > latest_peer_block_height {
+                            latest_peer_block_height = expected_block_height
+                        }
+                    }
+                }
+            }
+
+            // TODO (raychu86): Consider if we just want to make this 1 directional. i.e. don't request blocks,
+            //   just send if it's relevant.
+
+            // The peer is ahead of you.
+            if latest_peer_block_height > self.latest_block_height() {
+                // Request new blocks from peer.
+
+                // Check that a fork would be under the fork threshold.
+                if latest_peer_block_height - latest_shared_block_height < E::FORK_THRESHOLD as u32 {
+                    // TODO (raychu86): Request blocks from latest_shared_block_height to latest_peer_block_height.
+                } else {
+                    let error = format!(
+                        "Fork of size {} is larger than the fork threshold {}",
+                        latest_peer_block_height - latest_shared_block_height,
+                        E::FORK_THRESHOLD
+                    );
+                    trace!("{}", error);
+                    return Err(anyhow!(error));
+                }
+            } else if latest_peer_block_height < self.latest_block_height() {
+                // You are ahead of your peer.
+
+                // TODO (raychu86): Give peer information about new blocks.
+                let request = PeersRequest::MessageSend(peer_ip, Message::ForkResponse);
+                peers_router.send(request).await?;
+            }
+        }
+
         Ok(())
     }
 }

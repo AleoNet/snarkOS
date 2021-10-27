@@ -53,9 +53,9 @@ pub enum StateRequest<N: Network, E: Environment> {
     Ping(SocketAddr, u32, u32, PeersRouter<N, E>),
     /// Pong := (peer_ip)
     Pong(SocketAddr),
-    /// ForkRequest := (peer_ip, block headers, peers_router)
-    ForkRequest(SocketAddr, Vec<BlockHeader<N>>, PeersRouter<N, E>),
-    /// ForkResponse // TODO (raychu86): Implement this.
+    /// ForkRequest := (peer_ip, block hashes and heights, peers_router)
+    ForkRequest(SocketAddr, Vec<(u32, N::BlockHash)>, PeersRouter<N, E>),
+    /// ForkResponse
     ForkResponse,
     /// SyncRequest := (peer_ip, block_height)
     SyncRequest(SocketAddr, u32),
