@@ -187,7 +187,7 @@ async fn handle_rpc<N: Network, E: Environment>(
         "getblocks" => {
             match (
                 serde_json::from_value::<u32>(params.remove(0)),
-                serde_json::from_value::<u32>(params.remove(0)),
+                serde_json::from_value::<u32>(params.remove(1)),
             ) {
                 (Ok(start_block_height), Ok(end_block_height)) => {
                     let result = rpc

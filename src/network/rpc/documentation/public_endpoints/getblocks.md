@@ -26,5 +26,5 @@ Each block in the array will contain the following:
 
 ### Example
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock", "params": [100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocks", "params": [1, 100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
