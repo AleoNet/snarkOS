@@ -274,7 +274,7 @@ workflows:
       - fmt
   build-docker:
     jobs:
-      - build:
+      - build
       - publish-latest:
           requires:
             - build 
