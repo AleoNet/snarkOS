@@ -283,4 +283,4 @@ workflows:
             - build
           filters:
             branches:
-              only: docker-automation
+              only: docker-automation 
