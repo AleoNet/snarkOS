@@ -40,6 +40,12 @@ commands:
           paths:
             - .cache/sccache
             - .cargo
+executors:
+  docker-publisher:
+    environment:
+      IMAGE_NAME: wcannon/snarkOS-test
+    docker:
+      - image: circleci/buildpack-deps:stretch
 jobs:
   rust-stable:
     docker:
@@ -213,6 +219,41 @@ jobs:
           command: cargo fmt --all -- --check
       - clear_environment:
           cache_key: snarkos-fmt-cache
+  
+  build:
+    executor: docker-publisher
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build Docker image
+          command: |
+            docker build -f Dockerfile-test -t $IMAGE_NAME:latest .
+      - run:
+          name: Archive Docker image
+          command: docker save -o image.tar $IMAGE_NAME
+      - persist_to_workspace:
+          root: .
+          paths:
+            - ./image.tar
+  publish-latest:
+    executor: docker-publisher
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - setup_remote_docker
+      - run:
+          name: Load archived Docker image
+          command: docker load -i /tmp/workspace/image.tar
+      - run:
+          name: Publish Docker Image to Docker Hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker push $IMAGE_NAME:latest
+
+
+
+
 
 workflows:
   version: 2
@@ -231,3 +272,15 @@ workflows:
       - snarkos-storage
       - snarkos-testing
       - fmt
+  build-docker:
+    jobs:
+      - build:
+          filters:
+            branches:
+              only: docker-automation
+      - publish-latest:
+          requires:
+            - build
+          filters:
+            branches:
+              only: docker-automation
