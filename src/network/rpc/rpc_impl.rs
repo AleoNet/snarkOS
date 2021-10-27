@@ -32,13 +32,21 @@ use snarkvm::{
     utilities::FromBytes,
 };
 
+use anyhow::anyhow;
 use chrono::Utc;
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{future::Future, ops::Deref, sync::Arc};
+use std::{
+    cmp::{max, min},
+    future::Future,
+    ops::Deref,
+    sync::Arc,
+};
 use tokio::sync::RwLock;
 
 type JsonRPCError = jsonrpc_core::Error;
+
+pub const MAX_RESPONSE_BLOCKS: u32 = 50;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
@@ -126,6 +134,31 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
         }
     }
 
+    /// A helper function used to pass two values to the RPC handler.
+    pub async fn map_rpc_doublet<A: DeserializeOwned, O: Serialize, Fut: Future<Output = Result<O, RpcError>>, F: Fn(Self, A, A) -> Fut>(
+        self,
+        callee: F,
+        params: Params,
+        _meta: Meta,
+    ) -> Result<Value, JsonRPCError> {
+        let value = match params {
+            Params::Array(arr) => arr,
+            _ => return Err(JsonRPCError::invalid_request()),
+        };
+        if value.len() != 2 {
+            return Err(JsonRPCError::invalid_params("Invalid params length".to_string()));
+        }
+        let first_val: A =
+            serde_json::from_value(value[0].clone()).map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+        let second_val: A =
+            serde_json::from_value(value[1].clone()).map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
+
+        match callee(self, first_val, second_val).await {
+            Ok(result) => Ok(serde_json::to_value(result).expect("serialization failed")),
+            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
+        }
+    }
+
     /// A helper function used to pass calls to the RPC handler.
     pub async fn map_rpc<O: Serialize, Fut: Future<Output = Result<O, RpcError>>, F: Fn(Self) -> Fut>(
         self,
@@ -160,6 +193,10 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
         d.add_method_with_meta("getblock", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_block(x).await }, params, meta)
+        });
+        d.add_method_with_meta("getblocks", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.map_rpc_doublet(|rpc, x, y| async move { rpc.get_blocks(x, y).await }, params, meta)
         });
         d.add_method_with_meta("getblockheight", |rpc, params, meta| {
             let rpc = rpc.clone();
@@ -222,6 +259,23 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns the block given the block height.
     async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError> {
         Ok(self.ledger.read().await.get_block(block_height)?)
+    }
+
+    /// Returns up to `MAX_RESPONSE_BLOCKS` blocks from the given `start_block_height` to `end_block_height`.
+    async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
+        if end_block_height < start_block_height {
+            return Err(RpcError::AnyhowError(anyhow!(
+                "Invalid start/end block heights: {}, {}",
+                start_block_height,
+                end_block_height
+            )));
+        }
+
+        // Ensure we don't get more than MAX_RESPONSE_BLOCKS blocks
+        let safe_start_height = max(start_block_height, end_block_height.saturating_sub(MAX_RESPONSE_BLOCKS - 1));
+
+        let ledger = self.ledger.read().await;
+        Ok(ledger.get_blocks(safe_start_height, end_block_height)?)
     }
 
     /// Returns the block height for the given the block hash.

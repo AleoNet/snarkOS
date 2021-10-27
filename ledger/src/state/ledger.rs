@@ -226,6 +226,11 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_block(block_height)
     }
 
+    /// Returns the blocks from `start_block_height` to `end_block_height`.
+    pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+        self.blocks.get_blocks(start_block_height, end_block_height)
+    }
+
     /// Adds the given block as the next block in the ledger to storage.
     pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
         // Ensure the block itself is valid.
@@ -485,6 +490,14 @@ impl<N: Network> BlockState<N> {
         let transactions = self.get_block_transactions(block_height)?;
 
         Block::from(previous_block_hash, block_header, transactions)
+    }
+
+    /// Returns the blocks for a given block height range.
+    fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+        (start_block_height..=end_block_height)
+            .into_iter()
+            .map(|height| self.get_block(height))
+            .collect()
     }
 
     /// Adds the given block to storage.

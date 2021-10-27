@@ -209,6 +209,11 @@ impl<N: Network> Ledger<N> {
         self.canon.get_block(block_height)
     }
 
+    /// Returns the blocks from `start_block_height` to `end_block_height`.
+    pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+        self.canon.get_blocks(start_block_height, end_block_height)
+    }
+
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
