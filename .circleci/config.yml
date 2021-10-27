@@ -43,7 +43,7 @@ commands:
 executors:
   docker-publisher:
     environment:
-      IMAGE_NAME: wcannon/snarkOS-test
+      IMAGE_NAME: wcannon/snarkos-test
     docker:
       - image: circleci/buildpack-deps:stretch
 jobs:
