@@ -1,4 +1,5 @@
 Returns up to `MAX_RESPONSE_BLOCKS` blocks from the given `start_block_height` to `end_block_height`.
+
 ### Arguments
 
 |       Parameter      |  Type  | Required |                         Description                         |
@@ -26,5 +27,5 @@ Each block in the array will contain the following:
 
 ### Example
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocks", "params": [1, 100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocks", "params": [1, 50] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
