@@ -275,12 +275,6 @@ workflows:
   build-docker:
     jobs:
       - build:
-          filters:
-            branches:
-              only: docker-automation
       - publish-latest:
           requires:
-            - build
-          filters:
-            branches:
-              only: docker-automation 
+            - build 
