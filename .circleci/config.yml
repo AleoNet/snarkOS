@@ -248,6 +248,8 @@ jobs:
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
+            MyVar="${DOCKERHUB_USERNAME:-NoUsernameSet}"
+            echo $MyVar
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             docker push $IMAGE_NAME:latest
 
