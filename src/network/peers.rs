@@ -526,11 +526,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[Pong] {}", error);
                                     }
                                 },
-                                Message::RebaseRequest(_block_headers) => {
-                                    // TODO (howardwu) - Process the rebase request.
+                                Message::ForkRequest(block_headers) => {
+                                    // TODO (howardwu) - Process the fork request.
                                     // If peer is syncing, reject this message.
+
+                                    // Route the `ForkRequest` to the state manager.
+                                    if let Err(error) = state_router.send(StateRequest::ForkRequest(peer_ip, block_headers.clone(), peers_router.clone())).await {
+                                        warn!("[ForkRequest] {}", error);
+                                    }
                                 },
-                                Message::RebaseResponse => {
+                                Message::ForkResponse => {
                                     // TODO (howardwu) - Add logic for this.
                                     // If peer is syncing, reject this message.
                                 }

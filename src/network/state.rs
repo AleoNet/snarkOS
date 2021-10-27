@@ -53,6 +53,10 @@ pub enum StateRequest<N: Network, E: Environment> {
     Ping(SocketAddr, u32, u32, PeersRouter<N, E>),
     /// Pong := (peer_ip)
     Pong(SocketAddr),
+    /// ForkRequest := (peer_ip, block headers, peers_router)
+    ForkRequest(SocketAddr, Vec<BlockHeader<N>>, PeersRouter<N, E>),
+    /// ForkResponse // TODO (raychu86): Implement this.
+    ForkResponse,
     /// SyncRequest := (peer_ip, block_height)
     SyncRequest(SocketAddr, u32),
     /// SyncResponse := (peer_ip, block_height, block)
@@ -185,6 +189,18 @@ impl<N: Network, E: Environment> State<N, E> {
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Ping] {}", error);
                 }
+            }
+            StateRequest::ForkRequest(peer_ip, block_headers, peer_router) => {
+                // Process the fork request.
+                trace!("Received fork request from {}", peer_ip);
+                // Route an `ForkRequest` to the ledger.
+                let request = LedgerRequest::ForkRequest(peer_ip, block_headers, peers_router.clone());
+                if let Err(error) = ledger_router.send(request).await {
+                    warn!("[ForkRequest] {}", error);
+                }
+            }
+            StateRequest::ForkResponse => {
+                unimplemented!()
             }
             StateRequest::SyncRequest(peer_ip, block_height) => {
                 // Fetch the block of the given block height from the ledger.

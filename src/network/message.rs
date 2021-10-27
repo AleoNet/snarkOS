@@ -36,10 +36,10 @@ pub enum Message<N: Network, E: Environment> {
     Ping(u32, u32),
     /// Pong := ()
     Pong,
-    /// RebaseRequest := (\[block_header\])
-    RebaseRequest(Vec<BlockHeader<N>>),
-    /// RebaseResponse := ()
-    RebaseResponse,
+    /// ForkRequest := (\[block_header\])
+    ForkRequest(Vec<BlockHeader<N>>),
+    /// ForkResponse := ()
+    ForkResponse,
     /// SyncRequest := (block_height)
     SyncRequest(u32),
     /// SyncResponse := (block_height, block)
@@ -63,8 +63,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
             Self::Pong => "Pong",
-            Self::RebaseRequest(..) => "RebaseRequest",
-            Self::RebaseResponse => "RebaseResponse",
+            Self::ForkRequest(..) => "ForkRequest",
+            Self::ForkResponse => "ForkResponse",
             Self::SyncRequest(..) => "SyncRequest",
             Self::SyncResponse(..) => "SyncResponse",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
@@ -83,8 +83,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => 3,
             Self::Ping(..) => 4,
             Self::Pong => 5,
-            Self::RebaseRequest(..) => 6,
-            Self::RebaseResponse => 7,
+            Self::ForkRequest(..) => 6,
+            Self::ForkResponse => 7,
             Self::SyncRequest(..) => 8,
             Self::SyncResponse(..) => 9,
             Self::UnconfirmedBlock(..) => 10,
@@ -103,8 +103,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
             Self::Pong => Ok(vec![]),
-            Self::RebaseRequest(block_headers) => Ok(to_bytes_le![block_headers.len() as u16, block_headers]?),
-            Self::RebaseResponse => Ok(vec![]),
+            Self::ForkRequest(block_headers) => Ok(to_bytes_le![block_headers.len() as u16, block_headers]?),
+            Self::ForkResponse => Ok(vec![]),
             Self::SyncRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
             Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
@@ -151,11 +151,11 @@ impl<N: Network, E: Environment> Message<N, E> {
                 for _ in 0..block_headers_length {
                     block_headers.push(FromBytes::read_le(&mut cursor)?);
                 }
-                Self::RebaseRequest(block_headers)
+                Self::ForkRequest(block_headers)
             }
             7 => match data.len() == 0 {
-                true => Self::RebaseResponse,
-                false => return Err(anyhow!("Invalid 'RebaseResponse' message: {:?} {:?}", buffer, data)),
+                true => Self::ForkResponse,
+                false => return Err(anyhow!("Invalid 'ForkResponse' message: {:?} {:?}", buffer, data)),
             },
             8 => Self::SyncRequest(bincode::deserialize(data)?),
             9 => {

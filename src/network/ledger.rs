@@ -45,6 +45,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat,
     /// Mine := (local_ip, miner_address, peers_router, ledger_router)
     Mine(SocketAddr, Address<N>, PeersRouter<N, E>, LedgerRouter<N, E>),
+    /// ForkRequest := (peer_ip, block headers, peers_router)
+    ForkRequest(SocketAddr, Vec<BlockHeader<N>>, PeersRouter<N, E>),
     // /// SyncRequest := (peer_ip, block_height, peers_router)
     // SyncRequest(SocketAddr, u32, PeersRouter<N, E>),
     /// SyncResponse := (block)
@@ -240,6 +242,9 @@ impl<N: Network> Ledger<N> {
                 }
                 Ok(())
             }
+            LedgerRequest::ForkRequest(peer_ip, block_headers, peers_router) => {
+                self.handle_fork_request(peer_ip, block_headers, peers_router).await
+            }
             // LedgerRequest::SyncRequest(peer_ip, block_height, peers_router) => {
             //     let request = match self.get_block(block_height) {
             //         Ok(block) => PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block.height(), block)),
@@ -434,6 +439,24 @@ impl<N: Network> Ledger<N> {
                 Err(error) => error!("{}", error),
             }
         }
+        Ok(())
+    }
+
+    ///
+    /// Handles the fork request.
+    ///
+    async fn handle_fork_request<E: Environment>(
+        &mut self,
+        peer_ip: SocketAddr,
+        block_headers: Vec<BlockHeader<N>>,
+        peers_router: PeersRouter<N, E>,
+    ) -> Result<()> {
+        // TODO (raychu86): Find the most recent shared block header.
+
+        for block_header in block_headers {}
+
+        let request = PeersRequest::MessageSend(peer_ip, Message::ForkResponse);
+        peers_router.send(request).await?;
         Ok(())
     }
 }
