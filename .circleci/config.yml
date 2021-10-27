@@ -222,6 +222,9 @@ jobs:
   
   build:
     executor: docker-publisher
+    shell: /bin/sh -leo pipefail
+    environment:
+      - BASH_ENV: /etc/profile
     steps:
       - checkout
       - setup_remote_docker
@@ -238,6 +241,9 @@ jobs:
             - ./image.tar
   publish-latest:
     executor: docker-publisher
+    shell: /bin/sh -leo pipefail
+    environment:
+      - BASH_ENV: /etc/profile
     steps:
       - attach_workspace:
           at: /tmp/workspace
