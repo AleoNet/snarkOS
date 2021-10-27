@@ -1,12 +1,20 @@
-Returns the block given the block height.
-
+Returns up to `MAX_RESPONSE_BLOCKS` blocks from the given `start_block_height` to `end_block_height`.
 ### Arguments
 
-|    Parameter   |  Type  | Required |                Description              |
-|:--------------:|:------:|:--------:|:---------------------------------------:|
-| `block_height` | number |    Yes   | The block height of the requested block |
+|       Parameter      |  Type  | Required |                         Description                         |
+|:--------------------:|:------:|:--------:|:-----------------------------------------------------------:|
+| `start_block_height` | number |    Yes   | The block height of the first requested block in the array. |
+| `end_block_height`   | number |    Yes   | The block height of the last requested block in the array.  |
 
 ### Response
+
+|     Parameter         |  Type  |                Description               |
+|:---------------------:|:------:|:----------------------------------------:|
+| `None`                |  array | The array of requested blocks            |
+
+
+#### JSON Block object
+Each block in the array will contain the following:
 
 |        Parameter            |  Type  |                            Description                            |
 |:---------------------------:|:------:|:-----------------------------------------------------------------:|
