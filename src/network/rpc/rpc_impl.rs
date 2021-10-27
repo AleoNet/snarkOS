@@ -264,18 +264,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns up to `MAX_RESPONSE_BLOCKS` blocks from the given `start_block_height` to `end_block_height`.
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
         if end_block_height < start_block_height {
-            return Err(RpcError::AnyhowError(anyhow!(
-                "Invalid start/end block heights: {}, {}",
-                start_block_height,
-                end_block_height
-            )));
+            return Err(anyhow!("Invalid start/end block heights: {}, {}", start_block_height, end_block_height).into());
         }
-
         // Ensure we don't get more than MAX_RESPONSE_BLOCKS blocks
         let safe_start_height = max(start_block_height, end_block_height.saturating_sub(MAX_RESPONSE_BLOCKS - 1));
-
-        let ledger = self.ledger.read().await;
-        Ok(ledger.get_blocks(safe_start_height, end_block_height)?)
+        Ok(self.ledger.read().await.get_blocks(safe_start_height, end_block_height)?)
     }
 
     /// Returns the block height for the given the block hash.
