@@ -36,6 +36,9 @@ pub trait RpcFunctions<N: Network> {
     // #[doc = include_str!("../documentation/public_endpoints/getblock.md")]
     async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError>;
 
+    // #[doc = include_str!("../documentation/public_endpoints/getblocks.md")]
+    async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError>;
+
     // #[doc = include_str!("../documentation/public_endpoints/getblockheight.md")]
     async fn get_block_height(&self, block_hash: String) -> Result<u32, RpcError>;
 

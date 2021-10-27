@@ -56,9 +56,10 @@ pub struct Meta {
 
 impl Metadata for Meta {}
 
-const METHODS_EXPECTING_PARAMS: [&str; 7] = [
+const METHODS_EXPECTING_PARAMS: [&str; 8] = [
     // public
     "getblock",
+    "getblocks",
     "getblockheight",
     "getblockhash",
     "gettransaction",
@@ -183,6 +184,24 @@ async fn handle_rpc<N: Network, E: Environment>(
                 jrt::Response::error(jrt::Version::V2, err, req.id.clone())
             }
         },
+        "getblocks" => {
+            match (
+                serde_json::from_value::<u32>(params.remove(0)),
+                serde_json::from_value::<u32>(params.remove(0)),
+            ) {
+                (Ok(start_block_height), Ok(end_block_height)) => {
+                    let result = rpc
+                        .get_blocks(start_block_height, end_block_height)
+                        .await
+                        .map_err(convert_crate_err);
+                    result_to_response(&req, result)
+                }
+                (Err(_), _) | (_, Err(_)) => {
+                    let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
+                    jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                }
+            }
+        }
         "getblockheight" => {
             let result = rpc
                 .get_block_height(params[0].as_str().unwrap_or("").into())
