@@ -535,9 +535,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[ForkRequest] {}", error);
                                     }
                                 },
-                                Message::ForkResponse => {
+                                Message::ForkResponse(latest_shared_height, target_height) => {
                                     // TODO (howardwu) - Add logic for this.
                                     // If peer is syncing, reject this message.
+
+
+
                                 }
                                 Message::SyncRequest(block_height) => {
                                     // Route the `SyncRequest` to the state manager.

@@ -38,8 +38,8 @@ pub enum Message<N: Network, E: Environment> {
     Pong,
     /// ForkRequest := (\[(block height, block_hash)\])
     ForkRequest(Vec<(u32, N::BlockHash)>),
-    /// ForkResponse := ()
-    ForkResponse,
+    /// ForkResponse := (latest shared block height, target block height)
+    ForkResponse(u32, u32),
     /// SyncRequest := (block_height)
     SyncRequest(u32),
     /// SyncResponse := (block_height, block)
@@ -64,7 +64,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Ping(..) => "Ping",
             Self::Pong => "Pong",
             Self::ForkRequest(..) => "ForkRequest",
-            Self::ForkResponse => "ForkResponse",
+            Self::ForkResponse(..) => "ForkResponse",
             Self::SyncRequest(..) => "SyncRequest",
             Self::SyncResponse(..) => "SyncResponse",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
@@ -84,7 +84,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Ping(..) => 4,
             Self::Pong => 5,
             Self::ForkRequest(..) => 6,
-            Self::ForkResponse => 7,
+            Self::ForkResponse(..) => 7,
             Self::SyncRequest(..) => 8,
             Self::SyncResponse(..) => 9,
             Self::UnconfirmedBlock(..) => 10,
@@ -104,7 +104,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
             Self::Pong => Ok(vec![]),
             Self::ForkRequest(block_hashes) => Ok(to_bytes_le![block_hashes.len() as u16, block_hashes]?),
-            Self::ForkResponse => Ok(vec![]),
+            Self::ForkResponse(latest_shared_height, target_height) => Ok(to_bytes_le![latest_shared_height, target_height]?),
             Self::SyncRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
             Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
@@ -155,10 +155,13 @@ impl<N: Network, E: Environment> Message<N, E> {
                 }
                 Self::ForkRequest(block_hashes)
             }
-            7 => match data.len() == 0 {
-                true => Self::ForkResponse,
-                false => return Err(anyhow!("Invalid 'ForkResponse' message: {:?} {:?}", buffer, data)),
-            },
+            7 => {
+                let mut cursor = Cursor::new(data);
+                let shared_block_height: u32 = FromBytes::read_le(&mut cursor)?;
+                let target_height: u32 = FromBytes::read_le(&mut cursor)?;
+
+                Self::ForkResponse(shared_block_height, target_height)
+            }
             8 => Self::SyncRequest(bincode::deserialize(data)?),
             9 => {
                 let mut cursor = Cursor::new(data);
