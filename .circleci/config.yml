@@ -237,8 +237,6 @@ jobs:
           paths:
             - ./image.tar
   publish-latest:
-    environment:
-      - BASH_ENV: /etc/profile
     steps:
       - attach_workspace:
           at: /tmp/workspace
