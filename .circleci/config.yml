@@ -227,13 +227,11 @@ jobs:
           name: "Build snarkos Docker Image ARM V8"
           command: |
             docker build -f Dockerfile-test -t $IMAGE_NAME .
-            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push $IMAGE_NAME
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push -a $DOCKERHUB_USERNAME/$IMAGE_NAME
+            docker push $IMAGE_NAME
 
 
 
