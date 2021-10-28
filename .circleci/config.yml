@@ -251,7 +251,7 @@ jobs:
             DOCKERHUB_PASS: $DOCKERHUB_PASS
             DOCKERHUB_USERNAME: $DOCKERHUB_USERNAME
           command: |
-            echo <%= ENV['DOCKERHUB_PASS'] %> | docker login -u <%= ENV['DOCKERHUB_USERNAME'] %> } --password-stdin
+            echo <%= ENV['DOCKERHUB_PASS'] %> | docker login -u <%= ENV['DOCKERHUB_USERNAME'] %>  --password-stdin
             docker push ${IMAGE_NAME}:latest
 
 
