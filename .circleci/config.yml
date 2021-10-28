@@ -224,9 +224,14 @@ jobs:
     steps:
       - checkout
       - run:
-          name: "Build Docker Image ARM V8"
+          name: "Build snarkos Docker Image ARM V8"
           command: |
             docker build -t $DOCKERHUB_USERNAME/$IMAGE_NAME -f Dockerfile-test.
+            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            docker push -a $DOCKERHUB_USERNAME/$IMAGE_NAME
+      - run:
+          name: "Push snarkos Docker Image ARM V8"
+          command: |
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
             docker push -a $DOCKERHUB_USERNAME/$IMAGE_NAME
 
