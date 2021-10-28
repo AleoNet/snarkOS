@@ -220,13 +220,13 @@ jobs:
       image: ubuntu-2004:202101-01
     resource_class: arm.medium
     environment:
-      IMAGE_NAME: wcannon/snarkos-test
+      IMAGE_NAME: wcannon/snarkos-test-arm
     steps:
       - checkout
       - run:
           name: "Build snarkos Docker Image ARM V8"
           command: |
-            docker build -f Dockerfile-test -t $IMAGE_NAME .
+            docker build -f Dockerfile -t $IMAGE_NAME .
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
