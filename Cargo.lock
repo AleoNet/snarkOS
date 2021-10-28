@@ -2734,6 +2734,7 @@ dependencies = [
  "chrono",
  "criterion",
  "futures 0.3.17",
+ "hash_hasher",
  "hex",
  "indexmap",
  "lazy_static",
