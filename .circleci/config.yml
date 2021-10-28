@@ -220,7 +220,7 @@ jobs:
       - clear_environment:
           cache_key: snarkos-fmt-cache
   
-  build:
+  build-docker:
     executor: docker-publisher
     steps:
       - checkout
@@ -236,7 +236,7 @@ jobs:
           root: .
           paths:
             - ./image.tar
-  publish-latest:
+  publish-latest-docker:
     executor: docker-publisher
     steps:
       - attach_workspace:
@@ -251,9 +251,7 @@ jobs:
             DOCKERHUB_PASS: $DOCKERHUB_PASS
             DOCKERHUB_USERNAME: $DOCKERHUB_USERNAME
           command: |
-            MyVar=${DOCKERHUB_USERNAME:-NoUsernameSet}
-            echo $MyVar
-            echo ${DOCKERHUB_PASS} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin
+            echo <%= ENV['DOCKERHUB_PASS'] %> | docker login -u <%= ENV['DOCKERHUB_USERNAME'] %> } --password-stdin
             docker push ${IMAGE_NAME}:latest
 
 
@@ -279,7 +277,7 @@ workflows:
       - fmt
   build-docker:
     jobs:
-      - build
-      - publish-latest:
+      - build-docker
+      - publish-latest-docker:
           requires:
-            - build 
+            - build-docker
