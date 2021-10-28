@@ -248,7 +248,7 @@ jobs:
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
-            docker login -u $DOCKERHUB_USERNAME  $DOCKER_TOKEN
+            echo $DOCKER_TOKEN | docker login -u $DOCKERHUB_USERNAME
             docker push ${IMAGE_NAME}:latest
 
 
