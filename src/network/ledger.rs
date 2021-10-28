@@ -30,6 +30,7 @@ use std::{
     },
 };
 use tokio::{sync::mpsc, task};
+use snarkvm::algorithms::merkle_tree::MerklePath;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub(crate) type LedgerRouter<N, E> = mpsc::Sender<LedgerRequest<N, E>>;
@@ -216,6 +217,10 @@ impl<N: Network> Ledger<N> {
     /// Returns the blocks from `start_block_height` to `end_block_height`.
     pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
         self.canon.get_blocks(start_block_height, end_block_height)
+    }
+    /// Returns the ledger root and ledger inclusion proof for a given block hash.
+    pub fn ledger_proof(&self, block_hash: &N::BlockHash) -> Result<(N::LedgerRoot, MerklePath<N::LedgerRootParameters>)> {
+        self.canon.ledger_proof(block_hash)
     }
 
     /// Returns the block locator hashes of the current ledger.

@@ -22,6 +22,7 @@ use std::{
     path::Path,
     sync::{Arc, Mutex},
 };
+use snarkvm::algorithms::merkle_tree::MerklePath;
 
 const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -376,6 +377,15 @@ impl<N: Network> LedgerState<N> {
         *ledger_tree = new_ledger_tree;
 
         Ok(())
+    }
+
+    /// Returns the ledger root and ledger inclusion proof for a given block hash.
+    pub fn ledger_proof(&self, block_hash: &N::BlockHash) -> Result<(N::LedgerRoot, MerklePath<N::LedgerRootParameters>)> {
+        let mut guard = self.ledger_tree.lock().unwrap();
+        let ledger_root = guard.root();
+        let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(block_hash)?;
+
+        Ok((ledger_root, ledger_root_inclusion_proof))
     }
 }
 
