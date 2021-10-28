@@ -320,7 +320,7 @@ impl<N: Network> Ledger<N> {
                 Ok(())
             }
             LedgerRequest::ForkRequest(peer_ip, block_headers, peers_router) => {
-                self.handle_fork_request(peer_ip, block_headers, peers_router).await
+                self.process_fork_request(peer_ip, block_headers, peers_router).await
             }
             LedgerRequest::ForkResponse(peer_ip, latest_shared_block_height, target_block_height) => {
                 self.handle_fork_response::<E>(peer_ip, latest_shared_block_height, target_block_height)
@@ -524,11 +524,10 @@ impl<N: Network> Ledger<N> {
     }
 
     ///
-    /// Handles the fork request.
-    /// A fork request contains a sequence of block hashes that gives a insight to the
-    /// peers block state.
+    /// Processes a fork request, which contains a sequence of block hashes that
+    /// gives a insight to the ledger state of the peer.
     ///
-    async fn handle_fork_request<E: Environment>(
+    async fn process_fork_request<E: Environment>(
         &mut self,
         peer_ip: SocketAddr,
         block_hashes: Vec<(u32, N::BlockHash)>,
@@ -536,31 +535,30 @@ impl<N: Network> Ledger<N> {
     ) -> Result<()> {
         debug!("Handling fork request from peer {}", peer_ip);
         if block_hashes.len() > 0 {
-            // Height of the most recent shared block.
-            let mut latest_shared_block_height = 0;
-
-            // Height of the peer's latest block.
-            let mut latest_peer_block_height = 0;
+            // Find the last common block between this ledger and the peer, before forking.
+            let mut fork_point_block_height = 0;
+            // Find the latest block height of the peer.
+            let mut latest_block_height_of_peer = 0;
 
             // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, block_hash) in block_hashes {
+            for (candidate_block_height, block_hash) in block_hashes {
+                // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
                 if let Ok(expected_block_height) = self.canon.get_block_height(&block_hash) {
-                    // Check if the declared height for the block hash is valid.
-                    if expected_block_height != block_height {
+                    if expected_block_height != candidate_block_height {
                         let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
                         trace!("{}", error);
                         return Err(anyhow!(error));
                     } else {
-                        // Update the latest shared block height.
-                        if expected_block_height > latest_shared_block_height {
-                            latest_shared_block_height = expected_block_height
+                        // Update the fork point block height, as this block hash exists in this ledger.
+                        if expected_block_height > fork_point_block_height {
+                            fork_point_block_height = expected_block_height
                         }
                     }
                 }
 
-                // Update the latest peer block height.
-                if block_height > latest_peer_block_height {
-                    latest_peer_block_height = block_height
+                // Update the latest block height of the peer.
+                if candidate_block_height > latest_block_height_of_peer {
+                    latest_block_height_of_peer = candidate_block_height
                 }
             }
 
@@ -568,28 +566,26 @@ impl<N: Network> Ledger<N> {
             //   just send if it's relevant.
 
             // The peer is ahead of you.
-            if latest_peer_block_height > self.latest_block_height() {
+            if latest_block_height_of_peer > self.latest_block_height() {
                 debug!(
                     "Peer {} is ahead of you. Current block height: {}. Peer block height: {}",
                     peer_ip,
                     self.latest_block_height(),
-                    latest_peer_block_height
+                    latest_block_height_of_peer
                 );
 
                 // Request new blocks from peer.
-            } else if latest_peer_block_height < self.latest_block_height() {
+            } else if latest_block_height_of_peer < self.latest_block_height() {
                 // You are ahead of your peer.
                 debug!(
                     "Sending fork response to peer {} for block heights between {} and {}",
                     peer_ip,
-                    latest_shared_block_height,
+                    fork_point_block_height,
                     self.latest_block_height()
                 );
 
-                let request = PeersRequest::MessageSend(
-                    peer_ip,
-                    Message::ForkResponse(latest_shared_block_height, self.latest_block_height()),
-                );
+                let request =
+                    PeersRequest::MessageSend(peer_ip, Message::ForkResponse(fork_point_block_height, self.latest_block_height()));
                 peers_router.send(request).await?;
             }
         }
