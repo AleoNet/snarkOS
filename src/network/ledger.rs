@@ -559,8 +559,8 @@ impl<N: Network> Ledger<N> {
                 }
 
                 // Update the latest peer block height.
-                if expected_block_height > latest_peer_block_height {
-                    latest_peer_block_height = expected_block_height
+                if block_height > latest_peer_block_height {
+                    latest_peer_block_height = block_height
                 }
             }
 
