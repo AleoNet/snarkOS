@@ -19,6 +19,7 @@
 //! `MemoryPool` keeps a vector of transactions seen by the miner.
 
 use crate::error::ConsensusError;
+use hash_hasher::HashBuildHasher;
 use indexmap::{IndexMap, IndexSet};
 use snarkos_storage::{Digest, SerialTransaction};
 use snarkvm_dpc::BlockHeader;
@@ -35,10 +36,10 @@ pub(crate) struct MempoolEntry {
 #[derive(Debug, Default)]
 pub struct MemoryPool {
     /// The mapping of all unconfirmed transaction IDs to their corresponding transaction data.
-    pub(crate) transactions: IndexMap<Digest, MempoolEntry>,
-    pub(crate) commitments: IndexSet<Digest>,
-    pub(crate) serial_numbers: IndexSet<Digest>,
-    pub(crate) memos: IndexSet<Digest>,
+    pub(crate) transactions: IndexMap<Digest, MempoolEntry, HashBuildHasher>,
+    pub(crate) commitments: IndexSet<Digest, HashBuildHasher>,
+    pub(crate) serial_numbers: IndexSet<Digest, HashBuildHasher>,
+    pub(crate) memos: IndexSet<Digest, HashBuildHasher>,
 }
 
 const BLOCK_HEADER_SIZE: usize = BlockHeader::size();

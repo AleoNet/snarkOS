@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use crate::{IndexedDigests, Ledger};
 use anyhow::*;
+use hash_hasher::HashBuildHasher;
 use indexmap::IndexSet;
 use snarkos_storage::Digest;
 use snarkvm_algorithms::MerkleParameters;
@@ -25,7 +26,7 @@ use snarkvm_algorithms::MerkleParameters;
 use super::indexed_merkle_tree::IndexedMerkleTree;
 
 pub struct MerkleLedger<P: MerkleParameters + 'static> {
-    ledger_digests: IndexSet<Digest>,
+    ledger_digests: IndexSet<Digest, HashBuildHasher>,
     commitments: IndexedMerkleTree<P>,
     serial_numbers: IndexedMerkleTree<P>,
     memos: IndexedDigests,

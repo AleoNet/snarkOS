@@ -15,12 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::*;
+use hash_hasher::HashBuildHasher;
 use indexmap::IndexSet;
 use snarkos_storage::Digest;
 
 #[derive(Clone)]
 pub struct IndexedDigests {
-    indexed_digests: IndexSet<Digest>,
+    indexed_digests: IndexSet<Digest, HashBuildHasher>,
 }
 
 impl IndexedDigests {
