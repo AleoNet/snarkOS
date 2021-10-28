@@ -536,10 +536,10 @@ impl<N: Network> Ledger<N> {
     ) -> Result<()> {
         debug!("Handling fork request from peer {}", peer_ip);
         if block_hashes.len() > 0 {
-            // The latest block height shared with the peer.
+            // Height of the most recent shared block.
             let mut latest_shared_block_height = 0;
 
-            // The latest block height the peer has shared.
+            // Height of the peer's latest block.
             let mut latest_peer_block_height = 0;
 
             // Verify the integrity of the block hashes sent by the peer.
@@ -555,12 +555,12 @@ impl<N: Network> Ledger<N> {
                         if expected_block_height > latest_shared_block_height {
                             latest_shared_block_height = expected_block_height
                         }
-
-                        // Update the latest peer block height.
-                        if expected_block_height > latest_peer_block_height {
-                            latest_peer_block_height = expected_block_height
-                        }
                     }
+                }
+
+                // Update the latest peer block height.
+                if expected_block_height > latest_peer_block_height {
+                    latest_peer_block_height = expected_block_height
                 }
             }
 
