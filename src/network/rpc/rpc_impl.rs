@@ -317,8 +317,8 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the ledger root and ledger inclusion proof for a given block hash.
-    async fn ledger_proof(&self, block_hash: String) -> Result<(N::LedgerRoot, String), RpcError> {
-        let block_hash: N::BlockHash = FromBytes::from_bytes_le(&hex::decode(block_hash)?)?;
+    async fn ledger_proof(&self, block_hash: serde_json::Value) -> Result<(N::LedgerRoot, String), RpcError> {
+        let block_hash: N::BlockHash = serde_json::from_value(block_hash)?;
         let (ledger_root, ledger_root_inclusion_proof) = self.ledger.read().await.ledger_proof(&block_hash)?;
 
         Ok((

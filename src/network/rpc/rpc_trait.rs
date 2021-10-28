@@ -57,7 +57,7 @@ pub trait RpcFunctions<N: Network> {
     // #[doc = include_str!("../documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
 
-    async fn ledger_proof(&self, block_hash: String) -> Result<(N::LedgerRoot, String), RpcError>;
+    async fn ledger_proof(&self, block_hash: serde_json::Value) -> Result<(N::LedgerRoot, String), RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/validaterawtransaction.md")]
     // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError>;
