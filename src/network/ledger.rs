@@ -45,7 +45,7 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat,
     /// Mine := (local_ip, miner_address, peers_router, ledger_router)
     Mine(SocketAddr, Address<N>, PeersRouter<N, E>, LedgerRouter<N, E>),
-    /// ForkRequest := (peer_ip, block hashes and heights, peers_router)
+    /// ForkRequest := (peer_ip, \[(block_height, block_hash)\], peers_router)
     ForkRequest(SocketAddr, Vec<(u32, N::BlockHash)>, PeersRouter<N, E>),
     /// ForkResponse := (peer_ip, latest_shared_block_height, target_block_height)
     ForkResponse(SocketAddr, u32, u32),
@@ -218,72 +218,74 @@ impl<N: Network> Ledger<N> {
         self.canon.get_blocks(start_block_height, end_block_height)
     }
 
-    /// Returns the the ledger's current block locator hashes.
+    /// Returns the block locator hashes of the current ledger.
     pub fn get_block_locator_hashes(&self) -> Result<Vec<(u32, N::BlockHash)>> {
         const NUM_LOCATOR_HASHES: u32 = 64;
 
-        let block_height = self.latest_block_height();
+        // Retrieve the latest block height.
+        let latest_block_height = self.latest_block_height();
 
-        // The number of locator hashes left to obtain; accounts for the genesis block.
-        let mut num_locator_hashes = std::cmp::min(NUM_LOCATOR_HASHES - 1, block_height);
+        // Determine the number of block locator hashes to obtain (with the genesis block as one block locator hash).
+        let mut num_block_locators = std::cmp::min(NUM_LOCATOR_HASHES - 1, latest_block_height);
+        // Determine the number of latest blocks to include as block locator hashes (linear).
+        let num_latest_blocks = std::cmp::min(10, num_block_locators);
 
-        // The output list of block locator hashes.
-        let mut block_locator_hashes = Vec::with_capacity(num_locator_hashes as usize);
+        // Initialize the list of block locator hashes.
+        let mut block_locator_hashes = Vec::with_capacity(num_block_locators as usize);
+        // Initialize the current block height that a block locator hash is obtained from.
+        let mut block_locator_height = latest_block_height;
 
-        // The index of the current block for which a locator hash is obtained.
-        let mut hash_index = block_height;
-
-        // The number of top blocks to provide locator hashes for.
-        let num_top_blocks = std::cmp::min(10, num_locator_hashes);
-
-        for _ in 0..num_top_blocks {
-            block_locator_hashes.push((hash_index, self.get_block_hash(hash_index)?));
-            hash_index -= 1; // safe; num_top_blocks is never higher than the height
+        // Add the latest block locator hashes.
+        for _ in 0..num_latest_blocks {
+            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            block_locator_height -= 1; // safe; num_latest_blocks is never higher than the height
         }
 
-        num_locator_hashes -= num_top_blocks;
-        if num_locator_hashes == 0 {
+        // Return if the number of block locators has been satisfied.
+        num_block_locators -= num_latest_blocks;
+        if num_block_locators == 0 {
             block_locator_hashes.push((0, self.get_block_hash(0)?));
             return Ok(block_locator_hashes);
         }
 
-        // Calculate the average distance between block hashes based on the desired number of locator hashes.
-        let mut proportional_step = hash_index / num_locator_hashes;
+        // Determine the proportional step for the next round of block locators, which are spread apart.
+        // This is calculated as the average distance between block hashes based on the desired number of block locator hashes.
+        let mut proportional_step = block_locator_height / num_block_locators;
 
         // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
         // lower or close to the proportional step distance.
         let num_quadratic_steps = (proportional_step as f32).log2() as u32;
 
-        // The remaining hashes should have a proportional index distance between them.
-        let num_proportional_steps = num_locator_hashes - num_quadratic_steps;
+        // The remaining block hashes should have a proportional distance in block height between them.
+        let num_proportional_steps = num_block_locators - num_quadratic_steps;
 
         // Obtain a few hashes increasing the distance quadratically.
         let mut quadratic_step = 2; // the size of the first quadratic step
         for _ in 0..num_quadratic_steps {
-            block_locator_hashes.push((hash_index, self.get_block_hash(hash_index)?));
-            hash_index = hash_index.saturating_sub(quadratic_step);
+            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            block_locator_height = block_locator_height.saturating_sub(quadratic_step);
             quadratic_step *= 2;
         }
 
         // Update the size of the proportional step so that the hashes of the remaining blocks have the same distance
         // between one another.
-        proportional_step = hash_index / num_proportional_steps;
+        proportional_step = block_locator_height / num_proportional_steps;
 
         // Tweak: in order to avoid "jumping" by too many indices with the last step,
         // increase the value of each step by 1 if the last step is too large. This
         // can result in the final number of locator hashes being a bit lower, but
         // it's preferable to having a large gap between values.
-        if hash_index - proportional_step * num_proportional_steps > 2 * proportional_step {
+        if block_locator_height - proportional_step * num_proportional_steps > 2 * proportional_step {
             proportional_step += 1;
         }
 
         // Obtain the rest of hashes with a proportional distance between them.
         for _ in 0..num_proportional_steps {
-            block_locator_hashes.push((hash_index, self.get_block_hash(hash_index)?));
-            if hash_index == 0 {
+            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            if block_locator_height == 0 {
                 return Ok(block_locator_hashes);
             }
-            hash_index = hash_index.saturating_sub(proportional_step);
+            block_locator_height = block_locator_height.saturating_sub(proportional_step);
         }
 
         block_locator_hashes.push((0, self.get_block_hash(0)?));
@@ -534,13 +536,13 @@ impl<N: Network> Ledger<N> {
     ) -> Result<()> {
         debug!("Handling fork request from peer {}", peer_ip);
         if block_hashes.len() > 0 {
-            // The most recent block height shared with the peer.
+            // The latest block height shared with the peer.
             let mut latest_shared_block_height = 0;
 
             // The latest block height the peer has shared.
             let mut latest_peer_block_height = 0;
 
-            // Scan the block hashes sent by the peer.
+            // Verify the integrity of the block hashes sent by the peer.
             for (block_height, block_hash) in block_hashes {
                 if let Ok(expected_block_height) = self.canon.get_block_height(&block_hash) {
                     // Check if the declared height for the block hash is valid.
