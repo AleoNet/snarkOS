@@ -356,6 +356,27 @@ impl<N: Network> LedgerState<N> {
 
         Ok(block)
     }
+
+    // TODO (raychu86): Make this more efficient.
+    /// Update the ledger tree.
+    pub fn regenerate_ledger_tree(&mut self) -> Result<()> {
+        // Add the current block hashes to create the new ledger tree.
+        let mut new_ledger_tree = LedgerTree::<N>::new()?;
+
+        let mut block_hashes = vec![];
+        for height in 0..=self.latest_block_height() {
+            let block_hash = self.get_block_hash(height)?;
+
+            block_hashes.push(block_hash);
+        }
+        new_ledger_tree.add_all(&block_hashes)?;
+
+        // Update the current ledger tree with the current state.
+        let mut ledger_tree = self.ledger_tree.lock().unwrap();
+        *ledger_tree = new_ledger_tree;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]

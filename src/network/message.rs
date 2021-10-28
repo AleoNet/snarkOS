@@ -36,10 +36,10 @@ pub enum Message<N: Network, E: Environment> {
     Ping(u32, u32),
     /// Pong := ()
     Pong,
-    /// RebaseRequest := (\[block_header\])
-    RebaseRequest(Vec<BlockHeader<N>>),
-    /// RebaseResponse := ()
-    RebaseResponse,
+    /// ForkRequest := (\[(block height, block_hash)\])
+    ForkRequest(Vec<(u32, N::BlockHash)>),
+    /// ForkResponse := (latest shared block height, target block height)
+    ForkResponse(u32, u32),
     /// SyncRequest := (block_height)
     SyncRequest(u32),
     /// SyncResponse := (block_height, block)
@@ -63,8 +63,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
             Self::Pong => "Pong",
-            Self::RebaseRequest(..) => "RebaseRequest",
-            Self::RebaseResponse => "RebaseResponse",
+            Self::ForkRequest(..) => "ForkRequest",
+            Self::ForkResponse(..) => "ForkResponse",
             Self::SyncRequest(..) => "SyncRequest",
             Self::SyncResponse(..) => "SyncResponse",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
@@ -83,8 +83,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => 3,
             Self::Ping(..) => 4,
             Self::Pong => 5,
-            Self::RebaseRequest(..) => 6,
-            Self::RebaseResponse => 7,
+            Self::ForkRequest(..) => 6,
+            Self::ForkResponse(..) => 7,
             Self::SyncRequest(..) => 8,
             Self::SyncResponse(..) => 9,
             Self::UnconfirmedBlock(..) => 10,
@@ -103,8 +103,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
             Self::Pong => Ok(vec![]),
-            Self::RebaseRequest(block_headers) => Ok(to_bytes_le![block_headers.len() as u16, block_headers]?),
-            Self::RebaseResponse => Ok(vec![]),
+            Self::ForkRequest(block_hashes) => Ok(to_bytes_le![block_hashes.len() as u16, block_hashes]?),
+            Self::ForkResponse(latest_shared_height, target_height) => Ok(to_bytes_le![latest_shared_height, target_height]?),
             Self::SyncRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
             Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
@@ -146,17 +146,22 @@ impl<N: Network, E: Environment> Message<N, E> {
             },
             6 => {
                 let mut cursor = Cursor::new(data);
-                let block_headers_length: u16 = FromBytes::read_le(&mut cursor)?;
-                let mut block_headers = Vec::with_capacity(block_headers_length as usize);
-                for _ in 0..block_headers_length {
-                    block_headers.push(FromBytes::read_le(&mut cursor)?);
+                let block_hashes_length: u16 = FromBytes::read_le(&mut cursor)?;
+                let mut block_hashes = Vec::with_capacity(block_hashes_length as usize);
+                for _ in 0..block_hashes_length {
+                    let block_height: u32 = FromBytes::read_le(&mut cursor)?;
+                    let block_hash = FromBytes::read_le(&mut cursor)?;
+                    block_hashes.push((block_height, block_hash));
                 }
-                Self::RebaseRequest(block_headers)
+                Self::ForkRequest(block_hashes)
             }
-            7 => match data.len() == 0 {
-                true => Self::RebaseResponse,
-                false => return Err(anyhow!("Invalid 'RebaseResponse' message: {:?} {:?}", buffer, data)),
-            },
+            7 => {
+                let mut cursor = Cursor::new(data);
+                let shared_block_height: u32 = FromBytes::read_le(&mut cursor)?;
+                let target_height: u32 = FromBytes::read_le(&mut cursor)?;
+
+                Self::ForkResponse(shared_block_height, target_height)
+            }
             8 => Self::SyncRequest(bincode::deserialize(data)?),
             9 => {
                 let mut cursor = Cursor::new(data);

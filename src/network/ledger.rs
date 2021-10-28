@@ -45,6 +45,10 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat,
     /// Mine := (local_ip, miner_address, peers_router, ledger_router)
     Mine(SocketAddr, Address<N>, PeersRouter<N, E>, LedgerRouter<N, E>),
+    /// ForkRequest := (peer_ip, block hashes and heights, peers_router)
+    ForkRequest(SocketAddr, Vec<(u32, N::BlockHash)>, PeersRouter<N, E>),
+    /// ForkResponse := (peer_ip, latest_shared_block_height, target_block_height)
+    ForkResponse(SocketAddr, u32, u32),
     // /// SyncRequest := (peer_ip, block_height, peers_router)
     // SyncRequest(SocketAddr, u32, PeersRouter<N, E>),
     /// SyncResponse := (block)
@@ -214,6 +218,79 @@ impl<N: Network> Ledger<N> {
         self.canon.get_blocks(start_block_height, end_block_height)
     }
 
+    /// Returns the the ledger's current block locator hashes.
+    pub fn get_block_locator_hashes(&self) -> Result<Vec<(u32, N::BlockHash)>> {
+        const NUM_LOCATOR_HASHES: u32 = 64;
+
+        let block_height = self.latest_block_height();
+
+        // The number of locator hashes left to obtain; accounts for the genesis block.
+        let mut num_locator_hashes = std::cmp::min(NUM_LOCATOR_HASHES - 1, block_height);
+
+        // The output list of block locator hashes.
+        let mut block_locator_hashes = Vec::with_capacity(num_locator_hashes as usize);
+
+        // The index of the current block for which a locator hash is obtained.
+        let mut hash_index = block_height;
+
+        // The number of top blocks to provide locator hashes for.
+        let num_top_blocks = std::cmp::min(10, num_locator_hashes);
+
+        for _ in 0..num_top_blocks {
+            block_locator_hashes.push((hash_index, self.get_block_hash(hash_index)?));
+            hash_index -= 1; // safe; num_top_blocks is never higher than the height
+        }
+
+        num_locator_hashes -= num_top_blocks;
+        if num_locator_hashes == 0 {
+            block_locator_hashes.push((0, self.get_block_hash(0)?));
+            return Ok(block_locator_hashes);
+        }
+
+        // Calculate the average distance between block hashes based on the desired number of locator hashes.
+        let mut proportional_step = hash_index / num_locator_hashes;
+
+        // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
+        // lower or close to the proportional step distance.
+        let num_quadratic_steps = (proportional_step as f32).log2() as u32;
+
+        // The remaining hashes should have a proportional index distance between them.
+        let num_proportional_steps = num_locator_hashes - num_quadratic_steps;
+
+        // Obtain a few hashes increasing the distance quadratically.
+        let mut quadratic_step = 2; // the size of the first quadratic step
+        for _ in 0..num_quadratic_steps {
+            block_locator_hashes.push((hash_index, self.get_block_hash(hash_index)?));
+            hash_index = hash_index.saturating_sub(quadratic_step);
+            quadratic_step *= 2;
+        }
+
+        // Update the size of the proportional step so that the hashes of the remaining blocks have the same distance
+        // between one another.
+        proportional_step = hash_index / num_proportional_steps;
+
+        // Tweak: in order to avoid "jumping" by too many indices with the last step,
+        // increase the value of each step by 1 if the last step is too large. This
+        // can result in the final number of locator hashes being a bit lower, but
+        // it's preferable to having a large gap between values.
+        if hash_index - proportional_step * num_proportional_steps > 2 * proportional_step {
+            proportional_step += 1;
+        }
+
+        // Obtain the rest of hashes with a proportional distance between them.
+        for _ in 0..num_proportional_steps {
+            block_locator_hashes.push((hash_index, self.get_block_hash(hash_index)?));
+            if hash_index == 0 {
+                return Ok(block_locator_hashes);
+            }
+            hash_index = hash_index.saturating_sub(proportional_step);
+        }
+
+        block_locator_hashes.push((0, self.get_block_hash(0)?));
+
+        Ok(block_locator_hashes)
+    }
+
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -239,6 +316,13 @@ impl<N: Network> Ledger<N> {
                     error!("Failed to mine the next block: {}", error)
                 }
                 Ok(())
+            }
+            LedgerRequest::ForkRequest(peer_ip, block_headers, peers_router) => {
+                self.handle_fork_request(peer_ip, block_headers, peers_router).await
+            }
+            LedgerRequest::ForkResponse(peer_ip, latest_shared_block_height, target_block_height) => {
+                self.handle_fork_response::<E>(peer_ip, latest_shared_block_height, target_block_height)
+                    .await
             }
             // LedgerRequest::SyncRequest(peer_ip, block_height, peers_router) => {
             //     let request = match self.get_block(block_height) {
@@ -434,6 +518,129 @@ impl<N: Network> Ledger<N> {
                 Err(error) => error!("{}", error),
             }
         }
+        Ok(())
+    }
+
+    ///
+    /// Handles the fork request.
+    /// A fork request contains a sequence of block hashes that gives a insight to the
+    /// peers block state.
+    ///
+    async fn handle_fork_request<E: Environment>(
+        &mut self,
+        peer_ip: SocketAddr,
+        block_hashes: Vec<(u32, N::BlockHash)>,
+        peers_router: PeersRouter<N, E>,
+    ) -> Result<()> {
+        debug!("Handling fork request from peer {}", peer_ip);
+        if block_hashes.len() > 0 {
+            // The most recent block height shared with the peer.
+            let mut latest_shared_block_height = 0;
+
+            // The latest block height the peer has shared.
+            let mut latest_peer_block_height = 0;
+
+            // Scan the block hashes sent by the peer.
+            for (block_height, block_hash) in block_hashes {
+                if let Ok(expected_block_height) = self.canon.get_block_height(&block_hash) {
+                    // Check if the declared height for the block hash is valid.
+                    if expected_block_height != block_height {
+                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                        trace!("{}", error);
+                        return Err(anyhow!(error));
+                    } else {
+                        // Update the latest shared block height.
+                        if expected_block_height > latest_shared_block_height {
+                            latest_shared_block_height = expected_block_height
+                        }
+
+                        // Update the latest peer block height.
+                        if expected_block_height > latest_peer_block_height {
+                            latest_peer_block_height = expected_block_height
+                        }
+                    }
+                }
+            }
+
+            // TODO (raychu86): FORK - Consider if we just want to make this 1 directional. i.e. don't request blocks,
+            //   just send if it's relevant.
+
+            // The peer is ahead of you.
+            if latest_peer_block_height > self.latest_block_height() {
+                debug!(
+                    "Peer {} is ahead of you. Current block height: {}. Peer block height: {}",
+                    peer_ip,
+                    self.latest_block_height(),
+                    latest_peer_block_height
+                );
+
+                // Request new blocks from peer.
+            } else if latest_peer_block_height < self.latest_block_height() {
+                // You are ahead of your peer.
+                debug!(
+                    "Sending fork response to peer {} for block heights between {} and {}",
+                    peer_ip,
+                    latest_shared_block_height,
+                    self.latest_block_height()
+                );
+
+                let request = PeersRequest::MessageSend(
+                    peer_ip,
+                    Message::ForkResponse(latest_shared_block_height, self.latest_block_height()),
+                );
+                peers_router.send(request).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    ///
+    /// Handles the fork request.
+    /// A fork request contains a sequence of block hashes that gives a insight to the
+    /// peers block state.
+    ///
+    async fn handle_fork_response<E: Environment>(
+        &mut self,
+        peer_ip: SocketAddr,
+        latest_shared_block_height: u32,
+        target_block_height: u32,
+    ) -> Result<()> {
+        debug!("Handling fork response from peer {}", peer_ip);
+        if target_block_height > self.latest_block_height() {
+            if target_block_height - latest_shared_block_height <= E::FORK_THRESHOLD as u32 {
+                // Remove latest blocks until the latest_shared_block_height.
+                while self.latest_block_height() > latest_shared_block_height {
+                    if let Err(error) = self.canon.remove_last_block() {
+                        trace!("{}", error);
+                        return Err(anyhow!("{}", error));
+                    }
+                }
+
+                // Regenerate the ledger tree.
+                if let Err(error) = self.canon.regenerate_ledger_tree() {
+                    trace!("{}", error);
+                    return Err(anyhow!("{}", error));
+                }
+            } else {
+                let error = format!(
+                    "Fork size {} larger than fork threshold {}",
+                    target_block_height - latest_shared_block_height,
+                    E::FORK_THRESHOLD
+                );
+                trace!("{}", error);
+                return Err(anyhow!("{}", error));
+            }
+        } else {
+            let error = format!(
+                "Fork target height {} is not greater than current block height {}",
+                target_block_height,
+                self.latest_block_height()
+            );
+            trace!("{}", error);
+            return Err(anyhow!("{}", error));
+        }
+
         Ok(())
     }
 }

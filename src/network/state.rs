@@ -53,6 +53,10 @@ pub enum StateRequest<N: Network, E: Environment> {
     Ping(SocketAddr, u32, u32, PeersRouter<N, E>),
     /// Pong := (peer_ip)
     Pong(SocketAddr),
+    /// ForkRequest := (peer_ip, block hashes and heights, peers_router)
+    ForkRequest(SocketAddr, Vec<(u32, N::BlockHash)>, PeersRouter<N, E>),
+    /// ForkResponse := (peer_ip, latest shared block height, target block height)
+    ForkResponse(SocketAddr, u32, u32),
     /// SyncRequest := (peer_ip, block_height)
     SyncRequest(SocketAddr, u32),
     /// SyncResponse := (peer_ip, block_height, block)
@@ -184,6 +188,60 @@ impl<N: Network, E: Environment> State<N, E> {
                 let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION, block_height));
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Ping] {}", error);
+                }
+            }
+            StateRequest::ForkRequest(peer_ip, block_headers, peer_router) => {
+                // Process the fork request.
+                trace!("Received fork request from {}", peer_ip);
+
+                // Route an `ForkRequest` to the ledger.
+                let request = LedgerRequest::ForkRequest(peer_ip, block_headers, peers_router.clone());
+                if let Err(error) = ledger_router.send(request).await {
+                    warn!("[ForkRequest] {}", error);
+                }
+            }
+            StateRequest::ForkResponse(peer_ip, latest_shared_height, target_block_height) => {
+                // Process the fork response.
+                trace!("Received fork response from {}", peer_ip);
+
+                // Do not process the request if currently syncing.
+                if self.is_syncing() {
+                    return;
+                }
+
+                // Check that a fork would be under the fork threshold.
+                if target_block_height - latest_shared_height < E::FORK_THRESHOLD as u32 {
+                    // Remove the blocks until the latest shared height.
+                    let request = LedgerRequest::ForkResponse(peer_ip, latest_shared_height, target_block_height);
+                    if let Err(error) = ledger_router.send(request).await {
+                        warn!("[ForkResponse] {}", error);
+                        return;
+                    }
+
+                    // Start syncing to new node.
+                    self.is_syncing.store(true, Ordering::SeqCst);
+
+                    // Add sync requests for each block height up to the maximum block height.
+                    for block_height in latest_shared_height + 1..=target_block_height {
+                        if !self.contains_sync_request(peer_ip, block_height) {
+                            // Add the sync request to the state manager.
+                            self.add_sync_request(peer_ip, block_height);
+                            // Request the next block from the peer.
+                            let request = PeersRequest::MessageSend(peer_ip, Message::SyncRequest(block_height));
+                            // Send a `SyncRequest` message to the peer.
+                            if let Err(error) = peers_router.send(request).await {
+                                warn!("[SyncRequest] {}", error);
+                            }
+                        }
+                    }
+                } else {
+                    let error = format!(
+                        "Fork of size {} is larger than the fork threshold {}",
+                        target_block_height - latest_shared_height,
+                        E::FORK_THRESHOLD
+                    );
+                    warn!("{}", error);
+                    return;
                 }
             }
             StateRequest::SyncRequest(peer_ip, block_height) => {
