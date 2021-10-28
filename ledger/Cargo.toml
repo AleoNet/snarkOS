@@ -48,6 +48,9 @@ version = "1"
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.tempfile]
+version = "3.2"
+
 [features]
 default = ["rocks"]
 rocks = ["bincode", "rocksdb"]

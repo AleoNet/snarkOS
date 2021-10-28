@@ -26,6 +26,9 @@ pub(crate) use map::*;
 mod values;
 use values::*;
 
+#[cfg(test)]
+mod tests;
+
 use crate::storage::{Map, Storage};
 
 use anyhow::Result;
