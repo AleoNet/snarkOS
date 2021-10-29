@@ -242,8 +242,7 @@ jobs:
           name: "Save arm64 image tag"
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            echo $ARM_TAG
-            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
+            echo "$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
       - persist_to_workspace:
           root: my_workspace
           paths:
@@ -275,7 +274,7 @@ jobs:
           name: "Save amd64 image tag"
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64" > my_workspace/docker_tag_amd
+            echo "$CIRCLE_BRANCH-$VERSION-amd64" > my_workspace/docker_tag_amd
       - persist_to_workspace:
           root: my_workspace
           paths:
