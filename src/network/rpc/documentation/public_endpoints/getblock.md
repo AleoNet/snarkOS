@@ -3,7 +3,7 @@ Returns the block given the block height.
 ### Arguments
 
 |    Parameter   |  Type  | Required |                Description              |
-|:-------------- |:------:|:--------:|:---------------------------------------:|
+|:--------------:|:------:|:--------:|:---------------------------------------:|
 | `block_height` | number |    Yes   | The block height of the requested block |
 
 ### Response

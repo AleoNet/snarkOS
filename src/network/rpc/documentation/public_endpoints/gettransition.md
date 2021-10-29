@@ -3,7 +3,7 @@ Returns a transition given the transition ID.
 ### Arguments
 
 |    Parameter    |  Type  | Required |                     Description                    |
-|:--------------- |:------:|:--------:|:--------------------------------------------------:|
+|:---------------:|:------:|:--------:|:--------------------------------------------------:|
 | `transition_id` | string |    Yes   | The transition id of the requested transition info |
 
 ### Response

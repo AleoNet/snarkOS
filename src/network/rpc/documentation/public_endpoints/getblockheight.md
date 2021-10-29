@@ -3,7 +3,7 @@ Returns the block height for the given the block hash.
 ### Arguments
 
 |   Parameter  |  Type  | Required |                  Description                 |
-|:------------ |:------:|:--------:|:--------------------------------------------:|
+|:------------:|:------:|:--------:|:--------------------------------------------:|
 | `block_hash` | number |    Yes   | The block hash of the requested block height |
 
 ### Response
