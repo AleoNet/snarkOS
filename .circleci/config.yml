@@ -224,6 +224,7 @@ jobs:
       IMAGE_NAME: wcannon/snarkos
     steps:
       - checkout
+      - run: mkdir -p my_workspace
       - run:
           name: "Build snarkos Docker Image ARM V8"
           no_output_timeout: 2h
@@ -256,6 +257,7 @@ jobs:
       IMAGE_NAME: wcannon/snarkos
     steps:
       - checkout
+      - run: mkdir -p my_workspace
       - run:
           name: "Build snarkos Docker Image AMD"
           no_output_timeout: 2h
@@ -329,4 +331,7 @@ workflows:
       - build-and-publish-docker-arm
       - build-and-publish-docker-amd
       - publish_snarkos_manifest
+        requires:
+          - build-and-publish-docker-arm
+          - build-and-publish-docker-amd
 
