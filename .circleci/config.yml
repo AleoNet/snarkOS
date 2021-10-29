@@ -233,7 +233,7 @@ jobs:
           name: "Push snarkos Docker Image ARM V8"
           command: |
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push $IMAGE_NAME
+            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64
             
   build-and-publish-docker-amd:
     machine:
@@ -253,7 +253,7 @@ jobs:
           name: "Push snarkos Docker Image AMD"
           command: |
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push $IMAGE_NAME
+            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64
 
 
 workflows:
