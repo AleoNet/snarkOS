@@ -3,7 +3,7 @@ Returns a ciphertext given the ciphertext ID.
 ### Arguments
 
 |    Parameter    |  Type  | Required |                     Description                    |
-|:--------------- |:------:|:--------:|:--------------------------------------------------:|
+|:---------------:|:------:|:--------:|:--------------------------------------------------:|
 | `ciphertext_id` | string |    Yes   | The ciphertext id of the requested ciphertext info |
 
 ### Response
