@@ -221,14 +221,14 @@ jobs:
       docker_layer_caching: true
     resource_class: arm.large
     environment:
-      IMAGE_NAME: wcannon/snarkos-test-arm
+      IMAGE_NAME: wcannon/snarkos
     steps:
       - checkout
       - run:
           name: "Build snarkos Docker Image ARM V8"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile-test -t $IMAGE_NAME .
+            docker build -f Dockerfile-test -t $IMAGE_NAME:latest $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64 .
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
@@ -241,14 +241,14 @@ jobs:
       docker_layer_caching: true
     resource_class: large
     environment:
-      IMAGE_NAME: wcannon/snarkos-test-amd
+      IMAGE_NAME: wcannon/snarkos
     steps:
       - checkout
       - run:
           name: "Build snarkos Docker Image AMD"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile-test -t $IMAGE_NAME .
+            docker build -f Dockerfile-test -t $IMAGE_NAME:latest $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64 .
       - run:
           name: "Push snarkos Docker Image AMD"
           command: |
