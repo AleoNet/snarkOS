@@ -228,7 +228,7 @@ jobs:
           name: "Build snarkos Docker Image ARM V8"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile -t $IMAGE_NAME .
+            docker build -f Dockerfile-test -t $IMAGE_NAME .
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
@@ -248,7 +248,7 @@ jobs:
           name: "Build snarkos Docker Image AMD"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile -t $IMAGE_NAME .
+            docker build -f Dockerfile-test -t $IMAGE_NAME .
       - run:
           name: "Push snarkos Docker Image AMD"
           command: |
