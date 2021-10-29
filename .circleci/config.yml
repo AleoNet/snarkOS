@@ -233,8 +233,17 @@ jobs:
           name: "Push snarkos Docker Image ARM V8"
           command: |
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
             docker push $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64
-            
+      - run:
+          name: "Save arm64 image tag"
+          command: |
+            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64" > my_workspace/docker_tag_arm
+      - persist_to_workspace:
+          root: my_workspace
+          paths:
+            - docker_tag_arm
+    
   build-and-publish-docker-amd:
     machine:
       image: ubuntu-2004:202101-01
@@ -254,7 +263,43 @@ jobs:
           command: |
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
             docker push $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64
+      - run:
+          name: "Save amd64 image tag"
+          command: |
+            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64" > my_workspace/docker_tag_amd
+      - persist_to_workspace:
+          root: my_workspace
+          paths:
+            - docker_tag_amd
 
+   publish_snarkos_manifest:
+    machine:
+      image: ubuntu-2004:202101-01
+      docker_layer_caching: true
+    resource_class: medium
+    environment:
+      IMAGE_NAME: wcannon/snarkos
+    steps:
+      - checkout
+      - attach_workspace:
+          at: my_workspace
+      - run:
+          name: "Pull ARM docker image"
+          command: |
+            ARM_TAG=$(cat my_workspace/docker_tag_arm)
+            docker pull $IMAGE_NAME:${ARM_TAG}
+      - run:
+          name: "Pull AMD docker image"
+          command: |
+            AMD_TAG=$(cat my_workspace/docker_tag_amd)
+            docker pull $IMAGE_NAME:${VERSION}  
+      - run:
+          name: "Create and push docker multi arch manifest"
+          command: |
+            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            docker manifest create $IMAGE_NAME:${BRANCH}-latest --amend $IMAGE_NAME:${ARM_TAG} --amend $IMAGE_NAME:${AMD_TAG}
+            docker manifest inspect $IMAGE_NAME:${BRANCH}-latest
+            docker manifest push $IMAGE_NAME:${BRANCH}-latest
 
 workflows:
   version: 2
@@ -277,4 +322,5 @@ workflows:
     jobs:
       - build-and-publish-docker-arm
       - build-and-publish-docker-amd
+      - publish_snarkos_manifest
 
