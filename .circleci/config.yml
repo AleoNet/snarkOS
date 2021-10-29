@@ -242,6 +242,7 @@ jobs:
           name: "Save arm64 image tag"
           command: |
             VERSION=$(git rev-parse --short HEAD)
+            echo $ARM_TAG
             echo "$IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
       - persist_to_workspace:
           root: my_workspace
@@ -295,12 +296,14 @@ jobs:
           name: "Pull ARM docker image"
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
-            docker pull $IMAGE_NAME:${ARM_TAG}
+            echo $ARM_TAG
+            docker pull $IMAGE_NAME:$ARM_TAG
       - run:
           name: "Pull AMD docker image"
           command: |
             AMD_TAG=$(cat my_workspace/docker_tag_amd)
-            docker pull $IMAGE_NAME:${VERSION}  
+            echo $AMD_TAG
+            docker pull $IMAGE_NAME:$AMD_TAG  
       - run:
           name: "Create and push docker multi arch manifest"
           command: |
