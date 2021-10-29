@@ -228,17 +228,20 @@ jobs:
           name: "Build snarkos Docker Image ARM V8"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile-test -t $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64 .
+            VERSION=$(git rev-parse --short HEAD)
+            docker build -f Dockerfile-test -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64 .
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
+            VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
             # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
-            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64
+            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64
       - run:
           name: "Save arm64 image tag"
           command: |
-            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64" > my_workspace/docker_tag_arm
+            VERSION=$(git rev-parse --short HEAD)
+            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
       - persist_to_workspace:
           root: my_workspace
           paths:
@@ -257,22 +260,25 @@ jobs:
           name: "Build snarkos Docker Image AMD"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile-test -t $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64 .
+            VERSION=$(git rev-parse --short HEAD)
+            docker build -f Dockerfile-test -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64 .
       - run:
           name: "Push snarkos Docker Image AMD"
           command: |
+            VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64
+            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64
       - run:
           name: "Save amd64 image tag"
           command: |
-            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64" > my_workspace/docker_tag_amd
+            VERSION=$(git rev-parse --short HEAD)
+            echo "$IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64" > my_workspace/docker_tag_amd
       - persist_to_workspace:
           root: my_workspace
           paths:
             - docker_tag_amd
 
-   publish_snarkos_manifest:
+  publish_snarkos_manifest:
     machine:
       image: ubuntu-2004:202101-01
       docker_layer_caching: true
