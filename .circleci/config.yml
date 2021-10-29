@@ -306,6 +306,8 @@ jobs:
       - run:
           name: "Create and push docker multi arch manifest"
           command: |
+            ARM_TAG=$(cat my_workspace/docker_tag_arm)
+            AMD_TAG=$(cat my_workspace/docker_tag_amd)
             echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
             echo $IMAGE_NAME
             echo $CIRCLE_BRANCH
