@@ -331,7 +331,7 @@ workflows:
       - build-and-publish-docker-arm
       - build-and-publish-docker-amd
       - publish_snarkos_manifest:
-        requires:
-          - build-and-publish-docker-arm
-          - build-and-publish-docker-amd
+          requires:
+            - build-and-publish-docker-arm
+            - build-and-publish-docker-amd
 
