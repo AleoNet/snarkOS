@@ -63,34 +63,31 @@ impl<N: Network> LedgerState<N> {
             ledger.blocks.add_block(genesis)?;
         }
 
-        // TODO (howardwu): Verify that the sequence of ledger roots and block hashes is well-formed.
-
         // Retrieve each block from genesis to validate state.
         for block_height in 0..=latest_block_height {
-            // Log the trace every 10 blocks.
-            if block_height % 10 == 0 {
-                trace!("Validating the state of block {}", block_height);
-            }
+            // Validate the ledger root every 200 blocks.
+            if block_height % 200 == 0 || block_height == latest_block_height {
+                trace!("Validating the ledger root up to block {}", block_height);
 
-            // Ensure the ledger contains the block at given block height.
-            let block = ledger.get_block(block_height)?;
-
-            // Ensure the ledger roots match their expected block heights.
-            match ledger.ledger_roots.get(&block.ledger_root())? {
-                Some(height) => {
-                    if block_height != height {
-                        return Err(anyhow!("Ledger expected block {}, found block {}", block_height, height));
+                // Ensure the ledger roots match their expected block heights.
+                let expected_ledger_root = ledger.get_ledger_root(block_height)?;
+                match ledger.ledger_roots.get(&expected_ledger_root)? {
+                    Some(height) => {
+                        if block_height != height {
+                            return Err(anyhow!("Ledger expected block {}, found block {}", block_height, height));
+                        }
                     }
+                    None => return Err(anyhow!("Ledger is missing ledger root for block {}", block_height)),
                 }
-                None => return Err(anyhow!("Ledger is missing ledger root for block {}", block_height)),
+
+                // Ensure the ledger tree matches the state of ledger roots.
+                if expected_ledger_root != ledger.ledger_tree.lock().unwrap().root() {
+                    return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", block_height));
+                }
             }
 
-            // Ensure the ledger tree matches the state of ledger roots.
-            let candidate_ledger_root = ledger.ledger_tree.lock().unwrap().root();
-            if block.ledger_root() != candidate_ledger_root {
-                return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", block_height));
-            }
-            ledger.ledger_tree.lock().unwrap().add(&block.block_hash())?;
+            // Add the block hash to the ledger tree.
+            ledger.ledger_tree.lock().unwrap().add(&ledger.get_block_hash(block_height)?)?;
         }
 
         // Update the latest state.
@@ -229,6 +226,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the blocks from `start_block_height` to `end_block_height`.
     pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
         self.blocks.get_blocks(start_block_height, end_block_height)
+    }
+
+    /// Returns the ledger root in the block header of the given block height.
+    pub fn get_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
+        self.blocks.get_ledger_root(block_height)
     }
 
     /// Adds the given block as the next block in the ledger to storage.
@@ -519,6 +521,14 @@ impl<N: Network> BlockState<N> {
             .into_iter()
             .map(|height| self.get_block(height))
             .collect()
+    }
+
+    /// Returns the ledger root in the block header of the given block height.
+    pub fn get_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
+        // Retrieve the block header.
+        let block_header = self.get_block_header(block_height)?;
+        // Return the ledger root in the block header.
+        Ok(block_header.ledger_root())
     }
 
     /// Adds the given block to storage.
