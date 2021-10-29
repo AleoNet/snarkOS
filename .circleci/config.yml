@@ -225,6 +225,7 @@ jobs:
       - checkout
       - run:
           name: "Build snarkos Docker Image ARM V8"
+          no_output_timeout: 2h
           command: |
             docker build -f Dockerfile -t $IMAGE_NAME .
       - run:
