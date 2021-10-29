@@ -59,7 +59,7 @@ impl<N: Network> LedgerState<N> {
 
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
-            ledger.ledger_roots.insert(&genesis.ledger_root(), &genesis.height())?;
+            ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
             ledger.blocks.add_block(genesis)?;
         }
 
@@ -297,7 +297,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Ensure the ledger root in the block matches the current ledger root.
-        if block.ledger_root() != self.latest_ledger_root() {
+        if block.previous_ledger_root() != self.latest_ledger_root() {
             return Err(anyhow!("Block {} declares an incorrect ledger root", block_height));
         }
 
@@ -339,7 +339,7 @@ impl<N: Network> LedgerState<N> {
 
         self.blocks.add_block(block)?;
         self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
-        self.ledger_roots.insert(&block.ledger_root(), &block.height())?;
+        self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
         self.latest_state = (block_height, block.block_hash());
         Ok(())
     }
@@ -350,7 +350,7 @@ impl<N: Network> LedgerState<N> {
         let block_height = block.height();
 
         self.blocks.remove_block(block_height)?;
-        self.ledger_roots.remove(&block.ledger_root())?;
+        self.ledger_roots.remove(&block.previous_ledger_root())?;
         self.latest_state = match block_height == 0 {
             true => (0, block.previous_block_hash()),
             false => (block_height - 1, block.previous_block_hash()),
@@ -528,7 +528,7 @@ impl<N: Network> BlockState<N> {
         // Retrieve the block header.
         let block_header = self.get_block_header(block_height)?;
         // Return the ledger root in the block header.
-        Ok(block_header.ledger_root())
+        Ok(block_header.previous_ledger_root())
     }
 
     /// Adds the given block to storage.
