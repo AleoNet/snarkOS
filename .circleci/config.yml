@@ -228,7 +228,7 @@ jobs:
           name: "Build snarkos Docker Image ARM V8"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile-test -t $IMAGE_NAME:latest $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64 .
+            docker build -f Dockerfile-test -t $IMAGE_NAME:latest -t $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-arm64 .
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
@@ -248,7 +248,7 @@ jobs:
           name: "Build snarkos Docker Image AMD"
           no_output_timeout: 2h
           command: |
-            docker build -f Dockerfile-test -t $IMAGE_NAME:latest $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64 .
+            docker build -f Dockerfile-test -t $IMAGE_NAME:latest -t $IMAGE_NAME:$CIRCLE_BRANCH-$CIRCLE_BUILD_NUM-amd64 .
       - run:
           name: "Push snarkos Docker Image AMD"
           command: |
