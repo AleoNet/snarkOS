@@ -242,7 +242,7 @@ async fn handle_rpc<N: Network, E: Environment>(
         }
         "sendtransaction" => {
             let result = rpc
-                .send_transaction(params.remove(0))
+                .send_transaction(params[0].as_str().unwrap_or("").into())
                 .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)

@@ -55,7 +55,7 @@ pub trait RpcFunctions<N: Network> {
     async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/sendtransaction.md")]
-    async fn send_transaction(&self, transaction_bytes: serde_json::Value) -> Result<N::TransactionID, RpcError>;
+    async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/validaterawtransaction.md")]
     // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError>;

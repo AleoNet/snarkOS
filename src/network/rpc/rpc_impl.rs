@@ -301,8 +301,8 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
-    async fn send_transaction(&self, transaction_hex: serde_json::Value) -> Result<N::TransactionID, RpcError> {
-        let transaction: Transaction<N> = serde_json::from_value(transaction_hex)?;
+    async fn send_transaction(&self, transaction_hex: String) -> Result<N::TransactionID, RpcError> {
+        let transaction: Transaction<N> = FromBytes::from_bytes_le(&hex::decode(transaction_hex)?)?;
         // Route an `UnconfirmedTransaction` to the state manager.
         let request = StateRequest::UnconfirmedTransaction("0.0.0.0:3032".parse().unwrap(), transaction.clone());
         if let Err(error) = self.state_router.send(request).await {
