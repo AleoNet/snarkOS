@@ -204,7 +204,7 @@ async fn handle_rpc<N: Network, E: Environment>(
         }
         "getblockheight" => {
             let result = rpc
-                .get_block_height(params[0].as_str().unwrap_or("").into())
+                .get_block_height(params.remove(0))
                 .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
@@ -221,21 +221,21 @@ async fn handle_rpc<N: Network, E: Environment>(
         },
         "gettransaction" => {
             let result = rpc
-                .get_transaction(params[0].as_str().unwrap_or("").into())
+                .get_transaction(params.remove(0))
                 .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "gettransition" => {
             let result = rpc
-                .get_transition(params[0].as_str().unwrap_or("").into())
+                .get_transition(params.remove(0))
                 .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getciphertext" => {
             let result = rpc
-                .get_ciphertext(params[0].as_str().unwrap_or("").into())
+                .get_ciphertext(params.remove(0))
                 .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)

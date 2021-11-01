@@ -272,8 +272,8 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the block height for the given the block hash.
-    async fn get_block_height(&self, block_hash: String) -> Result<u32, RpcError> {
-        let block_hash: N::BlockHash = FromBytes::from_bytes_le(&hex::decode(block_hash)?)?;
+    async fn get_block_height(&self, block_hash: serde_json::Value) -> Result<u32, RpcError> {
+        let block_hash: N::BlockHash = serde_json::from_value(block_hash)?;
         Ok(self.ledger.read().await.get_block_height(&block_hash)?)
     }
 
@@ -283,20 +283,20 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns a transaction given the transaction ID.
-    async fn get_transaction(&self, transaction_id: String) -> Result<Transaction<N>, RpcError> {
-        let transaction_id: N::TransactionID = FromBytes::from_bytes_le(&hex::decode(transaction_id)?)?;
+    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Transaction<N>, RpcError> {
+        let transaction_id: N::TransactionID = serde_json::from_value(transaction_id)?;
         Ok(self.ledger.read().await.get_transaction(&transaction_id)?)
     }
 
     /// Returns a transition given the transition ID.
-    async fn get_transition(&self, transition_id: String) -> Result<Transition<N>, RpcError> {
-        let transition_id: N::TransitionID = FromBytes::from_bytes_le(&hex::decode(transition_id)?)?;
+    async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError> {
+        let transition_id: N::TransitionID = serde_json::from_value(transition_id)?;
         Ok(self.ledger.read().await.get_transition(&transition_id)?)
     }
 
     /// Returns the ciphertext given the ciphertext ID.
-    async fn get_ciphertext(&self, ciphertext_id: String) -> Result<RecordCiphertext<N>, RpcError> {
-        let ciphertext_id: N::CiphertextID = FromBytes::from_bytes_le(&hex::decode(ciphertext_id)?)?;
+    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError> {
+        let ciphertext_id: N::CiphertextID = serde_json::from_value(ciphertext_id)?;
         Ok(self.ledger.read().await.get_ciphertext(&ciphertext_id)?)
     }
 
