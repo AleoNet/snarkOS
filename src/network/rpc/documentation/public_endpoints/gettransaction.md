@@ -3,7 +3,7 @@ Returns a transaction given the transaction ID.
 ### Arguments
 
 |     Parameter    |  Type  | Required |                   Description                   |
-|:---------------- |:------:|:--------:|:-----------------------------------------------:|
+|:----------------:|:------:|:--------:|:-----------------------------------------------:|
 | `transaction_id` | string |    Yes   | The transaction id of the requested transaction |
 
 ### Response

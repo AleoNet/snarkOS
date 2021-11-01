@@ -40,23 +40,24 @@ pub trait RpcFunctions<N: Network> {
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/getblockheight.md")]
-    async fn get_block_height(&self, block_hash: String) -> Result<u32, RpcError>;
+    async fn get_block_height(&self, block_hash: serde_json::Value) -> Result<u32, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/getblockhash.md")]
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/gettransaction.md")]
-    async fn get_transaction(&self, transaction_id: String) -> Result<Transaction<N>, RpcError>;
+    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Transaction<N>, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/gettransition.md")]
-    async fn get_transition(&self, transition_id: String) -> Result<Transition<N>, RpcError>;
+    async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/getciphertext.md")]
-    async fn get_ciphertext(&self, ciphertext_id: String) -> Result<RecordCiphertext<N>, RpcError>;
+    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
 
+    // #[doc = include_str!("../documentation/public_endpoints/ledgerproof.md")]
     async fn ledger_proof(&self, block_hash: serde_json::Value) -> Result<(N::LedgerRoot, String), RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/validaterawtransaction.md")]

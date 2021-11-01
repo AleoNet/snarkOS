@@ -3,7 +3,7 @@ Returns the block hash for the given block height, if it exists in the canonical
 ### Arguments
 
 |    Parameter   |  Type  | Required |                  Description                 |
-|:-------------- |:------:|:--------:|:--------------------------------------------:|
+|:--------------:|:------:|:--------:|:--------------------------------------------:|
 | `block_height` | number |    Yes   | The block height of the requested block hash |
 
 ### Response

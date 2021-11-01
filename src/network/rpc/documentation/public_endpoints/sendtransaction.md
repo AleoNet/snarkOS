@@ -5,7 +5,7 @@ If the given transaction is valid, it is added to the memory pool and propagated
 ### Arguments
 
 |     Parameter     |  Type  | Required |              Description             |
-|:----------------- |:------:|:--------:|:------------------------------------:|
+|:-----------------:|:------:|:--------:|:------------------------------------:|
 | `transaction_hex` | string |    Yes   | The raw transaction hex to broadcast |
 
 ### Response
