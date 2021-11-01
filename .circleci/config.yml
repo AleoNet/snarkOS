@@ -230,7 +230,7 @@ jobs:
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile-test -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64 .
+            docker build -f Dockerfile -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64 .
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
@@ -263,7 +263,7 @@ jobs:
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile-test -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64 .
+            docker build -f Dockerfile -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64 .
       - run:
           name: "Push snarkos Docker Image AMD"
           command: |
@@ -337,7 +337,7 @@ workflows:
   build-snarkos-docker-images:
     when:
       or:
-        - equal: [ main, << pipeline.git.branch >> ]
+        - equal: [ master, << pipeline.git.branch >> ]
         - equal: [ staging, << pipeline.git.branch >> ]
         - equal: [ groth16, << pipeline.git.branch >> ]
         - equal: [ docker-automation, << pipeline.git.branch >> ]
