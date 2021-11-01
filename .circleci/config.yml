@@ -335,6 +335,12 @@ workflows:
       - snarkos-testing
       - fmt
   build-snarkos-docker-images:
+    when:
+      or:
+        - equal: [ main, << pipeline.git.branch >> ]
+        - equal: [ staging, << pipeline.git.branch >> ]
+        - equal: [ groth16, << pipeline.git.branch >> ]
+        - equal: [ docker-automation, << pipeline.git.branch >> ]
     jobs:
       - build-and-publish-docker-arm
       - build-and-publish-docker-amd
