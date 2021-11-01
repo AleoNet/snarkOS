@@ -235,7 +235,7 @@ jobs:
           name: "Push snarkos Docker Image ARM V8"
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
             docker push $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64
       - run:
@@ -268,7 +268,7 @@ jobs:
           name: "Push snarkos Docker Image AMD"
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             docker push $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64
       - run:
           name: "Save amd64 image tag"
@@ -308,7 +308,7 @@ jobs:
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
             AMD_TAG=$(cat my_workspace/docker_tag_amd)
-            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             echo $IMAGE_NAME
             echo $CIRCLE_BRANCH
             echo $ARM_TAG
