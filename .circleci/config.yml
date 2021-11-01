@@ -221,7 +221,7 @@ jobs:
       docker_layer_caching: true
     resource_class: arm.large
     environment:
-      IMAGE_NAME: wcannon/snarkos
+      IMAGE_NAME: aleohq/snarkos
     steps:
       - checkout
       - run: mkdir -p my_workspace
@@ -254,7 +254,7 @@ jobs:
       docker_layer_caching: true
     resource_class: large
     environment:
-      IMAGE_NAME: wcannon/snarkos
+      IMAGE_NAME: aleohq/snarkos
     steps:
       - checkout
       - run: mkdir -p my_workspace
@@ -286,7 +286,7 @@ jobs:
       docker_layer_caching: true
     resource_class: medium
     environment:
-      IMAGE_NAME: wcannon/snarkos
+      IMAGE_NAME: aleohq/snarkos
     steps:
       - checkout
       - attach_workspace:
