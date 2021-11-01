@@ -727,7 +727,7 @@ impl<N: Network> TransactionState<N> {
                 }
                 // Insert the ciphertext IDs.
                 for ciphertext_id in transition.to_ciphertext_ids() {
-                    self.ciphertext_ids.insert(&ciphertext_id?, &transition_id)?;
+                    self.ciphertext_ids.insert(&*ciphertext_id?, &transition_id)?;
                 }
             }
 
@@ -770,7 +770,7 @@ impl<N: Network> TransactionState<N> {
                 }
                 // Remove the ciphertext IDs.
                 for ciphertext_id in transition.to_ciphertext_ids() {
-                    self.ciphertext_ids.remove(&ciphertext_id?)?;
+                    self.ciphertext_ids.remove(&*ciphertext_id?)?;
                 }
             }
 
