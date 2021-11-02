@@ -24,6 +24,10 @@ use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone, Debug)]
 pub enum Message<N: Network, E: Environment> {
+    /// BlockRequest := (block_height)
+    BlockRequest(u32),
+    /// BlockResponse := (block_height, block)
+    BlockResponse(u32, Block<N>),
     /// ChallengeRequest := (listener_port, block_height)
     ChallengeRequest(u16, u32),
     /// ChallengeResponse := (block_header)
@@ -36,14 +40,10 @@ pub enum Message<N: Network, E: Environment> {
     Ping(u32, u32),
     /// Pong := ()
     Pong,
-    /// ForkRequest := (\[(block height, block_hash)\])
-    ForkRequest(Vec<(u32, N::BlockHash)>),
-    /// ForkResponse := (latest shared block height, target block height)
-    ForkResponse(u32, u32),
-    /// SyncRequest := (block_height)
-    SyncRequest(u32),
-    /// SyncResponse := (block_height, block)
-    SyncResponse(u32, Block<N>),
+    /// SyncRequest := ()
+    SyncRequest,
+    /// SyncResponse := (\[(block height, block_hash)\])
+    SyncResponse(Vec<(u32, N::BlockHash)>),
     /// UnconfirmedBlock := (block_height, block)
     UnconfirmedBlock(u32, Block<N>),
     /// UnconfirmedTransaction := (transaction)
@@ -57,15 +57,15 @@ impl<N: Network, E: Environment> Message<N, E> {
     #[inline]
     pub fn name(&self) -> &str {
         match self {
+            Self::BlockRequest(..) => "BlockRequest",
+            Self::BlockResponse(..) => "BlockResponse",
             Self::ChallengeRequest(..) => "ChallengeRequest",
             Self::ChallengeResponse(..) => "ChallengeResponse",
             Self::PeerRequest => "PeerRequest",
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
             Self::Pong => "Pong",
-            Self::ForkRequest(..) => "ForkRequest",
-            Self::ForkResponse(..) => "ForkResponse",
-            Self::SyncRequest(..) => "SyncRequest",
+            Self::SyncRequest => "SyncRequest",
             Self::SyncResponse(..) => "SyncResponse",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
@@ -77,15 +77,15 @@ impl<N: Network, E: Environment> Message<N, E> {
     #[inline]
     pub fn id(&self) -> u16 {
         match self {
-            Self::ChallengeRequest(..) => 0,
-            Self::ChallengeResponse(..) => 1,
-            Self::PeerRequest => 2,
-            Self::PeerResponse(..) => 3,
-            Self::Ping(..) => 4,
-            Self::Pong => 5,
-            Self::ForkRequest(..) => 6,
-            Self::ForkResponse(..) => 7,
-            Self::SyncRequest(..) => 8,
+            Self::BlockRequest(..) => 0,
+            Self::BlockResponse(..) => 1,
+            Self::ChallengeRequest(..) => 2,
+            Self::ChallengeResponse(..) => 3,
+            Self::PeerRequest => 4,
+            Self::PeerResponse(..) => 5,
+            Self::Ping(..) => 6,
+            Self::Pong => 7,
+            Self::SyncRequest => 8,
             Self::SyncResponse(..) => 9,
             Self::UnconfirmedBlock(..) => 10,
             Self::UnconfirmedTransaction(..) => 11,
@@ -97,16 +97,16 @@ impl<N: Network, E: Environment> Message<N, E> {
     #[inline]
     pub fn data(&self) -> Result<Vec<u8>> {
         match self {
+            Self::BlockRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
+            Self::BlockResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
             Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
             Self::Pong => Ok(vec![]),
-            Self::ForkRequest(block_hashes) => Ok(to_bytes_le![block_hashes.len() as u16, block_hashes]?),
-            Self::ForkResponse(latest_shared_height, target_height) => Ok(to_bytes_le![latest_shared_height, target_height]?),
-            Self::SyncRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
-            Self::SyncResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
+            Self::SyncRequest => Ok(vec![]),
+            Self::SyncResponse(block_locators) => Ok(to_bytes_le![block_locators.len() as u32, block_locators]?),
             Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::UnconfirmedTransaction(transaction) => transaction.to_bytes_le(),
             Self::Unused(_) => Ok(vec![]),
@@ -132,42 +132,37 @@ impl<N: Network, E: Environment> Message<N, E> {
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..])?),
-            1 => Self::ChallengeResponse(bincode::deserialize(data)?),
-            2 => match data.len() == 0 {
-                true => Self::PeerRequest,
-                false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
-            },
-            3 => Self::PeerResponse(bincode::deserialize(data)?),
-            4 => Self::Ping(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..])?),
-            5 => match data.len() == 0 {
-                true => Self::Pong,
-                false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
-            },
-            6 => {
-                let mut cursor = Cursor::new(data);
-                let block_hashes_length: u16 = FromBytes::read_le(&mut cursor)?;
-                let mut block_hashes = Vec::with_capacity(block_hashes_length as usize);
-                for _ in 0..block_hashes_length {
-                    let block_height: u32 = FromBytes::read_le(&mut cursor)?;
-                    let block_hash = FromBytes::read_le(&mut cursor)?;
-                    block_hashes.push((block_height, block_hash));
-                }
-                Self::ForkRequest(block_hashes)
-            }
-            7 => {
-                let mut cursor = Cursor::new(data);
-                let shared_block_height: u32 = FromBytes::read_le(&mut cursor)?;
-                let target_height: u32 = FromBytes::read_le(&mut cursor)?;
-
-                Self::ForkResponse(shared_block_height, target_height)
-            }
-            8 => Self::SyncRequest(bincode::deserialize(data)?),
-            9 => {
+            0 => Self::BlockRequest(bincode::deserialize(data)?),
+            1 => {
                 let mut cursor = Cursor::new(data);
                 let block_height: u32 = FromBytes::read_le(&mut cursor)?;
                 let block: Block<N> = FromBytes::read_le(&mut cursor)?;
-                Self::SyncResponse(block_height, block)
+                Self::BlockResponse(block_height, block)
+            }
+            2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..])?),
+            3 => Self::ChallengeResponse(bincode::deserialize(data)?),
+            4 => match data.len() == 0 {
+                true => Self::PeerRequest,
+                false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
+            },
+            5 => Self::PeerResponse(bincode::deserialize(data)?),
+            6 => Self::Ping(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..])?),
+            7 => match data.len() == 0 {
+                true => Self::Pong,
+                false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
+            },
+            8 => match data.len() == 0 {
+                true => Self::SyncRequest,
+                false => return Err(anyhow!("Invalid 'SyncRequest' message: {:?} {:?}", buffer, data)),
+            },
+            9 => {
+                let mut cursor = Cursor::new(data);
+                let block_locators_length: u32 = FromBytes::read_le(&mut cursor)?;
+                let mut block_locators = Vec::with_capacity(block_locators_length as usize);
+                for _ in 0..block_locators_length {
+                    block_locators.push(FromBytes::read_le(&mut cursor)?);
+                }
+                Self::SyncResponse(block_locators)
             }
             10 => {
                 let mut cursor = Cursor::new(data);
@@ -191,7 +186,7 @@ impl<N: Network, E: Environment> Encoder<Message<N, E>> for Message<N, E> {
         let buffer = message.serialize()?;
 
         // Ensure the message does not exceed the maximum length limit.
-        if buffer.len() > E::MAX_MESSAGE_SIZE {
+        if buffer.len() > E::MAXIMUM_MESSAGE_SIZE {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Frame of length {} is too large.", buffer.len()),
@@ -230,7 +225,7 @@ impl<N: Network, E: Environment> Decoder for Message<N, E> {
 
         // Check that the length is not too large to avoid a denial of
         // service attack where the node server runs out of memory.
-        if length > E::MAX_MESSAGE_SIZE {
+        if length > E::MAXIMUM_MESSAGE_SIZE {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Frame of length {} is too large.", length),

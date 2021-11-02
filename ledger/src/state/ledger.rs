@@ -70,7 +70,7 @@ impl<N: Network> LedgerState<N> {
                 trace!("Validating the ledger root up to block {}", block_height);
 
                 // Ensure the ledger roots match their expected block heights.
-                let expected_ledger_root = ledger.get_ledger_root(block_height)?;
+                let expected_ledger_root = ledger.get_previous_ledger_root(block_height)?;
                 match ledger.ledger_roots.get(&expected_ledger_root)? {
                     Some(height) => {
                         if block_height != height {
@@ -223,14 +223,19 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_block(block_height)
     }
 
-    /// Returns the blocks from `start_block_height` to `end_block_height`.
+    /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
         self.blocks.get_blocks(start_block_height, end_block_height)
     }
 
+    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
+    pub fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
+        self.blocks.get_block_hashes(start_block_height, end_block_height)
+    }
+
     /// Returns the ledger root in the block header of the given block height.
-    pub fn get_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
-        self.blocks.get_ledger_root(block_height)
+    pub fn get_previous_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
+        self.blocks.get_previous_ledger_root(block_height)
     }
 
     /// Adds the given block as the next block in the ledger to storage.
@@ -515,7 +520,7 @@ impl<N: Network> BlockState<N> {
         Block::from(previous_block_hash, block_header, transactions)
     }
 
-    /// Returns the blocks for a given block height range.
+    /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
         (start_block_height..=end_block_height)
             .into_iter()
@@ -523,8 +528,16 @@ impl<N: Network> BlockState<N> {
             .collect()
     }
 
+    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
+    fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
+        (start_block_height..=end_block_height)
+            .into_iter()
+            .map(|height| self.get_block_hash(height))
+            .collect()
+    }
+
     /// Returns the ledger root in the block header of the given block height.
-    pub fn get_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
+    fn get_previous_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
         // Retrieve the block header.
         let block_header = self.get_block_header(block_height)?;
         // Return the ledger root in the block header.

@@ -63,7 +63,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// not sent any messages in the meantime.
     const MAX_PEER_INACTIVITY_SECS: u8 = 30;
     /// The maximum size of a message that can be transmitted in the network.
-    const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
+    const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
     const CONNECTION_TIMEOUT_SECS: u64 = 3;
 
@@ -73,7 +73,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The version of the network protocol; it can be incremented in order to force users to update.
     const MESSAGE_VERSION: u32 = 0;
 
-    const FORK_THRESHOLD: usize = 1024;
+    const MAXIMUM_FORK_DEPTH: u32 = 1024;
 }
 
 #[derive(Clone, Debug, Default)]
