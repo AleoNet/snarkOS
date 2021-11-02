@@ -204,10 +204,7 @@ async fn handle_rpc<N: Network, E: Environment>(
             }
         }
         "getblockheight" => {
-            let result = rpc
-                .get_block_height(params.remove(0))
-                .await
-                .map_err(convert_crate_err);
+            let result = rpc.get_block_height(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getblockhash" => match serde_json::from_value::<u32>(params.remove(0)) {
@@ -221,24 +218,15 @@ async fn handle_rpc<N: Network, E: Environment>(
             }
         },
         "gettransaction" => {
-            let result = rpc
-                .get_transaction(params.remove(0))
-                .await
-                .map_err(convert_crate_err);
+            let result = rpc.get_transaction(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "gettransition" => {
-            let result = rpc
-                .get_transition(params.remove(0))
-                .await
-                .map_err(convert_crate_err);
+            let result = rpc.get_transition(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getciphertext" => {
-            let result = rpc
-                .get_ciphertext(params.remove(0))
-                .await
-                .map_err(convert_crate_err);
+            let result = rpc.get_ciphertext(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "sendtransaction" => {
