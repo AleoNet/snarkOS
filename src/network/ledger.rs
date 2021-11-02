@@ -41,18 +41,16 @@ type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum LedgerRequest<N: Network, E: Environment> {
+    // /// BlockRequest := (peer_ip, block_height, peers_router)
+    // BlockRequest(SocketAddr, u32, PeersRouter<N, E>),
+    /// BlockResponse := (block)
+    BlockResponse(Block<N>),
     /// Heartbeat := ()
     Heartbeat,
     /// Mine := (local_ip, miner_address, peers_router, ledger_router)
     Mine(SocketAddr, Address<N>, PeersRouter<N, E>, LedgerRouter<N, E>),
-    /// ForkRequest := (peer_ip, \[(block_height, block_hash)\], peers_router)
-    ForkRequest(SocketAddr, Vec<(u32, N::BlockHash)>, PeersRouter<N, E>),
-    /// ForkResponse := (peer_ip, latest_shared_block_height, target_block_height)
-    ForkResponse(SocketAddr, u32, u32),
-    // /// SyncRequest := (peer_ip, block_height, peers_router)
-    // SyncRequest(SocketAddr, u32, PeersRouter<N, E>),
-    /// SyncResponse := (block)
-    SyncResponse(Block<N>),
+    /// SyncRequest := (peer_ip, peers_router)
+    SyncRequest(SocketAddr, PeersRouter<N, E>),
     /// UnconfirmedBlock := (peer_ip, block, peers_router)
     UnconfirmedBlock(SocketAddr, Block<N>, PeersRouter<N, E>),
     /// UnconfirmedTransaction := (peer_ip, transaction, peers_router)
@@ -213,7 +211,7 @@ impl<N: Network> Ledger<N> {
         self.canon.get_block(block_height)
     }
 
-    /// Returns the blocks from `start_block_height` to `end_block_height`.
+    /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
         self.canon.get_blocks(start_block_height, end_block_height)
     }
@@ -221,6 +219,16 @@ impl<N: Network> Ledger<N> {
     /// Returns the ledger root and ledger inclusion proof for a given record commitment.
     pub fn get_ledger_inclusion_proof(&self, record_commitment: &N::Commitment) -> Result<LedgerProof<N>> {
         self.canon.get_ledger_inclusion_proof(*record_commitment)
+    }
+
+    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
+    pub fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
+        self.canon.get_block_hashes(start_block_height, end_block_height)
+    }
+
+    /// Returns the ledger root in the block header of the given block height.
+    pub fn get_previous_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
+        self.canon.get_previous_ledger_root(block_height)
     }
 
     /// Returns the block locator hashes of the current ledger.
@@ -304,6 +312,15 @@ impl<N: Network> Ledger<N> {
     ///
     pub(super) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
         match request {
+            // LedgerRequest::BlockRequest(peer_ip, block_height, peers_router) => {
+            //     let request = match self.get_block(block_height) {
+            //         Ok(block) => PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block.height(), block)),
+            //         Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
+            //     };
+            //     peers_router.send(request).await?;
+            //     Ok(())
+            // }
+            LedgerRequest::BlockResponse(block) => self.add_block::<E>(&block),
             LedgerRequest::Heartbeat => {
                 // Check for candidate blocks to fast forward the ledger.
                 let mut block = &self.latest_block()?;
@@ -324,22 +341,7 @@ impl<N: Network> Ledger<N> {
                 }
                 Ok(())
             }
-            LedgerRequest::ForkRequest(peer_ip, block_headers, peers_router) => {
-                self.process_fork_request(peer_ip, block_headers, peers_router).await
-            }
-            LedgerRequest::ForkResponse(peer_ip, latest_shared_block_height, target_block_height) => {
-                self.handle_fork_response::<E>(peer_ip, latest_shared_block_height, target_block_height)
-                    .await
-            }
-            // LedgerRequest::SyncRequest(peer_ip, block_height, peers_router) => {
-            //     let request = match self.get_block(block_height) {
-            //         Ok(block) => PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block.height(), block)),
-            //         Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
-            //     };
-            //     peers_router.send(request).await?;
-            //     Ok(())
-            // }
-            LedgerRequest::SyncResponse(block) => self.add_block::<E>(&block),
+            LedgerRequest::SyncRequest(peer_ip, peers_router) => self.process_sync_request(peer_ip, peers_router).await,
             LedgerRequest::UnconfirmedBlock(peer_ip, block, peers_router) => self.add_unconfirmed_block(peer_ip, block, peers_router).await,
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction, peers_router) => {
                 self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
@@ -529,121 +531,149 @@ impl<N: Network> Ledger<N> {
     }
 
     ///
-    /// Processes a fork request, which contains a sequence of block hashes that
-    /// gives a insight to the ledger state of the peer.
+    /// Returns the block locators from this ledger, up to the fork depth,
+    /// in a sync response to the given peer.
     ///
-    async fn process_fork_request<E: Environment>(
-        &mut self,
-        peer_ip: SocketAddr,
-        block_hashes: Vec<(u32, N::BlockHash)>,
-        peers_router: PeersRouter<N, E>,
-    ) -> Result<()> {
-        debug!("Handling fork request from peer {}", peer_ip);
-        if block_hashes.len() > 0 {
-            // Find the last common block between this ledger and the peer, before forking.
-            let mut fork_point_block_height = 0;
-            // Find the latest block height of the peer.
-            let mut latest_block_height_of_peer = 0;
+    async fn process_sync_request<E: Environment>(&mut self, peer_ip: SocketAddr, peers_router: PeersRouter<N, E>) -> Result<()> {
+        // Retrieve the latest block height.
+        let latest_block_height = self.latest_block_height();
 
-            // Verify the integrity of the block hashes sent by the peer.
-            for (candidate_block_height, block_hash) in block_hashes {
-                // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.canon.get_block_height(&block_hash) {
-                    if expected_block_height != candidate_block_height {
-                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
-                        trace!("{}", error);
-                        return Err(anyhow!(error));
-                    } else {
-                        // Update the fork point block height, as this block hash exists in this ledger.
-                        if expected_block_height > fork_point_block_height {
-                            fork_point_block_height = expected_block_height
-                        }
-                    }
-                }
+        // Retrieve the latest block hashes, up to the maximum fork depth.
+        let start_block_height = latest_block_height.saturating_sub(E::MAXIMUM_FORK_DEPTH);
+        let end_block_height = latest_block_height;
+        let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
 
-                // Update the latest block height of the peer.
-                if candidate_block_height > latest_block_height_of_peer {
-                    latest_block_height_of_peer = candidate_block_height
-                }
-            }
+        // Convert the block hashes into block locators, by including the block height with each block hash.
+        let block_locators = block_hashes
+            .iter()
+            .enumerate()
+            .map(|(i, block_hash)| (start_block_height + i as u32, *block_hash))
+            .collect();
 
-            // TODO (raychu86): FORK - Consider if we just want to make this 1 directional. i.e. don't request blocks,
-            //   just send if it's relevant.
-
-            // The peer is ahead of you.
-            if latest_block_height_of_peer > self.latest_block_height() {
-                debug!(
-                    "Peer {} is ahead of you. Current block height: {}. Peer block height: {}",
-                    peer_ip,
-                    self.latest_block_height(),
-                    latest_block_height_of_peer
-                );
-
-                // Request new blocks from peer.
-            } else if latest_block_height_of_peer < self.latest_block_height() {
-                // You are ahead of your peer.
-                debug!(
-                    "Sending fork response to peer {} for block heights between {} and {}",
-                    peer_ip,
-                    fork_point_block_height,
-                    self.latest_block_height()
-                );
-
-                let request =
-                    PeersRequest::MessageSend(peer_ip, Message::ForkResponse(fork_point_block_height, self.latest_block_height()));
-                peers_router.send(request).await?;
-            }
-        }
+        // Send the sync response to the peer.
+        let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
+        peers_router.send(request).await?;
 
         Ok(())
     }
 
-    ///
-    /// Handles the fork request.
-    /// A fork request contains a sequence of block hashes that gives a insight to the
-    /// peers block state.
-    ///
-    async fn handle_fork_response<E: Environment>(
-        &mut self,
-        peer_ip: SocketAddr,
-        latest_shared_block_height: u32,
-        target_block_height: u32,
-    ) -> Result<()> {
-        debug!("Handling fork response from peer {}", peer_ip);
-        if target_block_height > self.latest_block_height() {
-            if target_block_height - latest_shared_block_height <= E::FORK_THRESHOLD as u32 {
-                // Remove latest blocks until the latest_shared_block_height.
-                while self.latest_block_height() > latest_shared_block_height {
-                    if let Err(error) = self.canon.remove_last_block() {
-                        trace!("{}", error);
-                        return Err(anyhow!("{}", error));
-                    }
-                }
+    // ///
+    // /// Processes a fork request, which contains a sequence of block hashes that
+    // /// gives a insight to the ledger state of the peer.
+    // ///
+    // async fn process_sync_request<E: Environment>(
+    //     &mut self,
+    //     peer_ip: SocketAddr,
+    //     block_hashes: Vec<(u32, N::BlockHash)>,
+    //     peers_router: PeersRouter<N, E>,
+    // ) -> Result<()> {
+    //     // debug!("Handling fork request from peer {}", peer_ip);
+    //     // if block_hashes.len() > 0 {
+    //     //     // Find the last common block between this ledger and the peer, before forking.
+    //     //     let mut fork_point_block_height = 0;
+    //     //     // Find the latest block height of the peer.
+    //     //     let mut latest_block_height_of_peer = 0;
+    //     //
+    //     //     // Verify the integrity of the block hashes sent by the peer.
+    //     //     for (candidate_block_height, block_hash) in block_hashes {
+    //     //         // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
+    //     //         if let Ok(expected_block_height) = self.canon.get_block_height(&block_hash) {
+    //     //             if expected_block_height != candidate_block_height {
+    //     //                 let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+    //     //                 trace!("{}", error);
+    //     //                 return Err(anyhow!(error));
+    //     //             } else {
+    //     //                 // Update the fork point block height, as this block hash exists in this ledger.
+    //     //                 if expected_block_height > fork_point_block_height {
+    //     //                     fork_point_block_height = expected_block_height
+    //     //                 }
+    //     //             }
+    //     //         }
+    //     //
+    //     //         // Update the latest block height of the peer.
+    //     //         if candidate_block_height > latest_block_height_of_peer {
+    //     //             latest_block_height_of_peer = candidate_block_height
+    //     //         }
+    //     //     }
+    //     //
+    //     //     // TODO (raychu86): FORK - Consider if we just want to make this 1 directional. i.e. don't request blocks,
+    //     //     //   just send if it's relevant.
+    //     //
+    //     //     // The peer is ahead of you.
+    //     //     if latest_block_height_of_peer > self.latest_block_height() {
+    //     //         debug!(
+    //     //             "Peer {} is ahead of you. Current block height: {}. Peer block height: {}",
+    //     //             peer_ip,
+    //     //             self.latest_block_height(),
+    //     //             latest_block_height_of_peer
+    //     //         );
+    //     //
+    //     //         // Request new blocks from peer.
+    //     //     } else if latest_block_height_of_peer < self.latest_block_height() {
+    //     //         // You are ahead of your peer.
+    //     //         debug!(
+    //     //             "Sending fork response to peer {} for block heights between {} and {}",
+    //     //             peer_ip,
+    //     //             fork_point_block_height,
+    //     //             self.latest_block_height()
+    //     //         );
+    //     //
+    //     //         let request =
+    //     //             PeersRequest::MessageSend(peer_ip, Message::SyncResponse(fork_point_block_height, self.latest_block_height()));
+    //     //         peers_router.send(request).await?;
+    //     //     }
+    //     // }
+    //     //
+    //     // Ok(())
+    // }
 
-                // Regenerate the ledger tree.
-                if let Err(error) = self.canon.regenerate_ledger_tree() {
-                    trace!("{}", error);
-                    return Err(anyhow!("{}", error));
-                }
-            } else {
-                let error = format!(
-                    "Fork size {} larger than fork threshold {}",
-                    target_block_height - latest_shared_block_height,
-                    E::FORK_THRESHOLD
-                );
-                trace!("{}", error);
-                return Err(anyhow!("{}", error));
-            }
-        } else {
-            let error = format!(
-                "Fork target height {} is not greater than current block height {}",
-                target_block_height,
-                self.latest_block_height()
-            );
-            trace!("{}", error);
-            return Err(anyhow!("{}", error));
-        }
-
-        Ok(())
-    }
+    // ///
+    // /// Handles the fork request.
+    // /// A fork request contains a sequence of block hashes that gives a insight to the
+    // /// peers block state.
+    // ///
+    // async fn process_fork_response<E: Environment>(
+    //     &mut self,
+    //     peer_ip: SocketAddr,
+    //     fork_point_block_height: u32,
+    //     target_block_height: u32,
+    // ) -> Result<()> {
+    //     debug!("Handling fork response from peer {}", peer_ip);
+    //
+    //     if target_block_height > self.latest_block_height() {
+    //         if target_block_height - fork_point_block_height <= E::FORK_THRESHOLD as u32 {
+    //             // Remove latest blocks until the fork_point_block_height.
+    //             while self.latest_block_height() > fork_point_block_height {
+    //                 if let Err(error) = self.canon.remove_last_block() {
+    //                     trace!("{}", error);
+    //                     return Err(anyhow!("{}", error));
+    //                 }
+    //             }
+    //
+    //             // Regenerate the ledger tree.
+    //             if let Err(error) = self.canon.regenerate_ledger_tree() {
+    //                 trace!("{}", error);
+    //                 return Err(anyhow!("{}", error));
+    //             }
+    //         } else {
+    //             let error = format!(
+    //                 "Fork size {} larger than fork threshold {}",
+    //                 target_block_height - fork_point_block_height,
+    //                 E::FORK_THRESHOLD
+    //             );
+    //             trace!("{}", error);
+    //             return Err(anyhow!("{}", error));
+    //         }
+    //     } else {
+    //         let error = format!(
+    //             "Fork target height {} is not greater than current block height {}",
+    //             target_block_height,
+    //             self.latest_block_height()
+    //         );
+    //         trace!("{}", error);
+    //         return Err(anyhow!("{}", error));
+    //     }
+    //
+    //     Ok(())
+    // }
 }

@@ -492,6 +492,18 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             // Process the message.
                             trace!("Received '{}' from {}", message.name(), peer_ip);
                             match &message {
+                                Message::BlockRequest(block_height) => {
+                                    // Route the `BlockRequest` to the state manager.
+                                    if let Err(error) = state_router.send(StateRequest::BlockRequest(peer_ip, *block_height)).await {
+                                        warn!("[BlockRequest] {}", error);
+                                    }
+                                },
+                                Message::BlockResponse(block_height, block) => {
+                                    // Route the `BlockResponse` to the state manager.
+                                    if let Err(error) = state_router.send(StateRequest::BlockResponse(peer_ip, *block_height, block.clone())).await {
+                                        warn!("[BlockResponse] {}", error);
+                                    }
+                                }
                                 Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
                                     // Peer is not following the protocol.
                                     warn!("Peer {} is not following the protocol", peer_ip);
@@ -526,31 +538,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[Pong] {}", error);
                                     }
                                 },
-                                Message::ForkRequest(block_headers) => {
-                                    // TODO (howardwu) - Process the fork request.
-                                    // If peer is syncing, reject this message.
-
-                                    // Route the `ForkRequest` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::ForkRequest(peer_ip, block_headers.clone(), peers_router.clone())).await {
-                                        warn!("[ForkRequest] {}", error);
-                                    }
-                                },
-                                Message::ForkResponse(latest_shared_height, target_height) => {
-                                    // TODO (howardwu) - Add logic for this.
-                                    // If peer is syncing, reject this message.
-
-
-
-                                }
-                                Message::SyncRequest(block_height) => {
+                                Message::SyncRequest => {
                                     // Route the `SyncRequest` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::SyncRequest(peer_ip, *block_height)).await {
+                                    if let Err(error) = state_router.send(StateRequest::SyncRequest(peer_ip, peers_router.clone())).await {
                                         warn!("[SyncRequest] {}", error);
                                     }
                                 },
-                                Message::SyncResponse(block_height, block) => {
+                                Message::SyncResponse(block_locators) => {
                                     // Route the `SyncResponse` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::SyncResponse(peer_ip, *block_height, block.clone())).await {
+                                    if let Err(error) = state_router.send(StateRequest::SyncResponse(peer_ip, block_locators.clone())).await {
                                         warn!("[SyncResponse] {}", error);
                                     }
                                 }
