@@ -74,6 +74,8 @@ pub(crate) struct State<N: Network, E: Environment> {
     version: HashMap<SocketAddr, u32>,
     /// The map of each peer to their block height.
     block_height: HashMap<SocketAddr, u32>,
+    /// The map of each peer to their ledger state := (is_fork, common_ancestor, latest_block_height).
+    ledger_state: HashMap<SocketAddr, Option<(bool, Option<u32>, u32)>>,
     /// The map of each peer to their block requests.
     block_requests: HashMap<SocketAddr, HashSet<u32>>,
     /// The map of each peer to their failure messages.
@@ -92,6 +94,7 @@ impl<N: Network, E: Environment> State<N, E> {
             local_ip,
             version: Default::default(),
             block_height: Default::default(),
+            ledger_state: Default::default(),
             block_requests: Default::default(),
             failures: Default::default(),
             is_syncing: Arc::new(AtomicBool::new(false)),
@@ -259,7 +262,101 @@ impl<N: Network, E: Environment> State<N, E> {
                 // Process the sync response.
                 else {
                     trace!("Received sync response from {}", peer_ip);
-                    // TODO (howardwu): Process the sync response.
+
+                    // Construct a HashMap of the block locators.
+                    let block_locators: HashMap<u32, N::BlockHash> = block_locators.iter().cloned().collect();
+                    let (start_block_height, end_block_height) = match (block_locators.keys().min(), block_locators.keys().max()) {
+                        (Some(min), Some(max)) => (*min, *max),
+                        _ => {
+                            error!("Failed to find the starting and ending block height in a sync response");
+                            return;
+                        }
+                    };
+
+                    // Ensure the block locators are linear.
+                    for i in start_block_height..=end_block_height {
+                        if !block_locators.contains_key(&i) {
+                            self.add_failure(peer_ip, format!("Received a sync response missing a block locator for block {}", i));
+                            return;
+                        }
+                    }
+
+                    // Ensure the number of block locators is within the maximum fork depth.
+                    if end_block_height - start_block_height + 1 > E::MAXIMUM_FORK_DEPTH {
+                        self.add_failure(peer_ip, "Received a sync response that exceeds the maximum fork depth".to_string());
+                        return;
+                    }
+
+                    // Acquire a reader for the ledger.
+                    let ledger = ledger.read().await;
+
+                    // Retrieve the latest block height of this ledger.
+                    let latest_block_height = ledger.latest_block_height();
+                    // Find the block hash, from the peer, corresponding to the latest block height.
+                    if let Some(block_hash) = block_locators.get(&latest_block_height) {
+                        // Retrieve the latest block hash of this ledger.
+                        let latest_block_hash = ledger.latest_block_hash();
+                        // Determine if the peer is a fork based on the block hash.
+                        let is_fork = *block_hash == latest_block_hash;
+
+                        // If the peer is on a fork, determine the block height that is the common ancestor.
+                        match is_fork {
+                            true => {
+                                // Initialize a tracker of the common ancestor.
+                                let mut common_ancestor = 0;
+
+                                // TODO (howardwu): Clean up this logic. It should be working, however can be polished.
+
+                                // Retrieve the block hashes of this ledger.
+                                for block_height in start_block_height..=end_block_height {
+                                    // Retrieve the block height from this ledger.
+                                    // If the block height does not exist, this means we have found the common ancestor.
+                                    let expected_block_hash = match ledger.get_block_hash(block_height) {
+                                        Ok(block_hash) => block_hash,
+                                        _ => match block_height == 0 {
+                                            true => {
+                                                common_ancestor = 0;
+                                                break;
+                                            }
+                                            false => {
+                                                common_ancestor = block_height - 1;
+                                                break;
+                                            }
+                                        },
+                                    };
+
+                                    // Find the common ancestor of the two ledgers.
+                                    if block_locators.get(&block_height) != Some(&expected_block_hash) {
+                                        match block_height == 0 {
+                                            true => {
+                                                common_ancestor = 0;
+                                                break;
+                                            }
+                                            false => {
+                                                common_ancestor = block_height - 1;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Determine the common ancestor of the two ledgers.
+                                match common_ancestor == 0 {
+                                    true => {
+                                        self.add_failure(peer_ip, "Peer has incorrect genesis block".to_string());
+                                        // Update the ledger state of the peer.
+                                        self.update_ledger_state(peer_ip, Some((true, Some(0), 0)));
+                                    }
+                                    false => {
+                                        // Update the ledger state of the peer.
+                                        self.update_ledger_state(peer_ip, Some((true, Some(common_ancestor), end_block_height)));
+                                    }
+                                }
+                            }
+                            // Update the ledger state of the peer.
+                            false => self.update_ledger_state(peer_ip, Some((false, None, end_block_height))),
+                        };
+                    }
                 }
             }
             StateRequest::UnconfirmedBlock(peer_ip, block_height, block) => {
@@ -309,6 +406,9 @@ impl<N: Network, E: Environment> State<N, E> {
         if !self.block_height.contains_key(&peer_ip) {
             self.block_height.insert(peer_ip, block_height);
         }
+        if !self.ledger_state.contains_key(&peer_ip) {
+            self.ledger_state.insert(peer_ip, None);
+        }
         if !self.block_requests.contains_key(&peer_ip) {
             self.block_requests.insert(peer_ip, Default::default());
         }
@@ -326,6 +426,9 @@ impl<N: Network, E: Environment> State<N, E> {
         }
         if self.block_height.contains_key(peer_ip) {
             self.block_height.remove(peer_ip);
+        }
+        if self.ledger_state.contains_key(peer_ip) {
+            self.ledger_state.remove(peer_ip);
         }
         if self.block_requests.contains_key(peer_ip) {
             self.block_requests.remove(peer_ip);
@@ -352,6 +455,16 @@ impl<N: Network, E: Environment> State<N, E> {
         match self.block_height.get_mut(&peer_ip) {
             Some(height) => *height = block_height,
             None => self.add_failure(peer_ip, format!("Missing block height for {}", peer_ip)),
+        };
+    }
+
+    ///
+    /// Updates the ledger state of the given peer.
+    ///
+    fn update_ledger_state(&mut self, peer_ip: SocketAddr, is_forked: Option<(bool, Option<u32>, u32)>) {
+        match self.ledger_state.get_mut(&peer_ip) {
+            Some(status) => *status = is_forked,
+            None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)),
         };
     }
 

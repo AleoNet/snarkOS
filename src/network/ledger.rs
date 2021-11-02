@@ -41,6 +41,8 @@ type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum LedgerRequest<N: Network, E: Environment> {
+    // /// BlockRequest := (peer_ip, block_height, peers_router)
+    // BlockRequest(SocketAddr, u32, PeersRouter<N, E>),
     /// BlockResponse := (block)
     BlockResponse(Block<N>),
     /// Heartbeat := ()
@@ -49,10 +51,6 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Mine(SocketAddr, Address<N>, PeersRouter<N, E>, LedgerRouter<N, E>),
     /// SyncRequest := (peer_ip, peers_router)
     SyncRequest(SocketAddr, PeersRouter<N, E>),
-    // /// SyncResponse := (peer_ip, fork_point_block_height, target_block_height)
-    // SyncResponse(SocketAddr, u32, u32),
-    // /// BlockRequest := (peer_ip, block_height, peers_router)
-    // BlockRequest(SocketAddr, u32, PeersRouter<N, E>),
     /// UnconfirmedBlock := (peer_ip, block, peers_router)
     UnconfirmedBlock(SocketAddr, Block<N>, PeersRouter<N, E>),
     /// UnconfirmedTransaction := (peer_ip, transaction, peers_router)
@@ -309,6 +307,14 @@ impl<N: Network> Ledger<N> {
     ///
     pub(super) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
         match request {
+            // LedgerRequest::BlockRequest(peer_ip, block_height, peers_router) => {
+            //     let request = match self.get_block(block_height) {
+            //         Ok(block) => PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block.height(), block)),
+            //         Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
+            //     };
+            //     peers_router.send(request).await?;
+            //     Ok(())
+            // }
             LedgerRequest::BlockResponse(block) => self.add_block::<E>(&block),
             LedgerRequest::Heartbeat => {
                 // Check for candidate blocks to fast forward the ledger.
@@ -331,18 +337,6 @@ impl<N: Network> Ledger<N> {
                 Ok(())
             }
             LedgerRequest::SyncRequest(peer_ip, peers_router) => self.process_sync_request(peer_ip, peers_router).await,
-            // LedgerRequest::SyncResponse(peer_ip, fork_point_block_height, target_block_height) => {
-            //     self.process_fork_response::<E>(peer_ip, fork_point_block_height, target_block_height)
-            //         .await
-            // }
-            // LedgerRequest::BlockRequest(peer_ip, block_height, peers_router) => {
-            //     let request = match self.get_block(block_height) {
-            //         Ok(block) => PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block.height(), block)),
-            //         Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
-            //     };
-            //     peers_router.send(request).await?;
-            //     Ok(())
-            // }
             LedgerRequest::UnconfirmedBlock(peer_ip, block, peers_router) => self.add_unconfirmed_block(peer_ip, block, peers_router).await,
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction, peers_router) => {
                 self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
