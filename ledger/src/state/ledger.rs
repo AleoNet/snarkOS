@@ -22,7 +22,6 @@ use std::{
     path::Path,
     sync::{Arc, Mutex},
 };
-use snarkvm::algorithms::merkle_tree::MerklePath;
 
 const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -381,13 +380,89 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
-    /// Returns the ledger root and ledger inclusion proof for a given block hash.
-    pub fn ledger_proof(&self, block_hash: &N::BlockHash) -> Result<(N::LedgerRoot, MerklePath<N::LedgerRootParameters>)> {
-        let mut guard = self.ledger_tree.lock().unwrap();
-        let ledger_root = guard.root();
-        let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(block_hash)?;
+    ///
+    /// Returns a ledger proof for the given commitment.
+    ///
+    pub fn get_ledger_inclusion_proof(&self, commitment: N::Commitment) -> Result<LedgerProof<N>> {
+        // TODO (raychu86): Add getter functions.
+        let commitment_transition_id = match self.blocks.transactions.commitments.get(&commitment)? {
+            Some(transition_id) => transition_id,
+            None => return Err(anyhow!("commitment {} missing from commitments map", commitment)),
+        };
 
-        Ok((ledger_root, ledger_root_inclusion_proof))
+        let transaction_id = match self.blocks.transactions.transitions.get(&commitment_transition_id)? {
+            Some((transaction_id, _, _)) => transaction_id,
+            None => return Err(anyhow!("transition id {} missing from transactions map", commitment_transition_id)),
+        };
+
+        let transaction = self.get_transaction(&transaction_id)?;
+
+        let block_hash = match self.blocks.transactions.transactions.get(&transaction_id)? {
+            Some((block_hash, _, _, _)) => block_hash,
+            None => return Err(anyhow!("transaction id {} missing from transactions map", transaction_id)),
+        };
+
+        let block_header = match self.blocks.block_headers.get(&block_hash)? {
+            Some(block_header) => block_header,
+            None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
+        };
+
+        let block_height = block_header.height();
+
+        let local_proof = {
+            // Initialize a transitions tree.
+            let mut transitions_tree = Transitions::<N>::new()?;
+            // Add all given transition IDs to the tree.
+            transitions_tree.add_all(&transaction.transitions())?;
+            // Return the local proof for the transitions tree.
+            transitions_tree.to_local_proof(commitment)?
+        };
+        let transaction_id = local_proof.transaction_id();
+
+        let transactions = self.get_block_transactions(block_height)?;
+
+        // Compute the transactions inclusion proof.
+        let transactions_inclusion_proof = {
+            // TODO (howardwu): Optimize this operation.
+            let index = transactions
+                .transaction_ids()
+                .enumerate()
+                .filter_map(|(index, id)| match id == transaction_id {
+                    true => Some(index),
+                    false => None,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(1, index.len()); // TODO (howardwu): Clean this up with a proper error handler.
+            transactions.to_transactions_inclusion_proof(index[0], transaction_id)?
+        };
+
+        // Compute the block header inclusion proof.
+        let transactions_root = transactions.to_transactions_root()?;
+        let block_header_inclusion_proof = block_header.to_header_inclusion_proof(1, transactions_root)?;
+        let block_header_root = block_header.to_header_root()?;
+
+        // Determine the latest block height.
+        let current_block_height = self.latest_block_height();
+        let previous_block_hash = self.get_previous_block_hash(current_block_height)?;
+        let current_block_hash = self.latest_block_hash();
+
+        let record_proof = RecordProof::new(
+            current_block_hash,
+            previous_block_hash,
+            block_header_root,
+            block_header_inclusion_proof,
+            transactions_root,
+            transactions_inclusion_proof,
+            local_proof,
+        )?;
+
+        // TODO (howardwu): Optimize this operation.
+
+        let guard = self.ledger_tree.lock().unwrap();
+        let ledger_root = guard.root();
+        let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&current_block_hash)?;
+
+        LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
     }
 }
 
