@@ -20,7 +20,7 @@ edition = "2018"
 members = ["ledger"]
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "8b11e58d" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "ca21955" }
 #snarkvm = { path = "../snarkVM", features = ["parameters"] }
 
 futures = { version = "0.3.0", features = ["thread-pool"]}
