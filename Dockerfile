@@ -67,12 +67,12 @@ RUN set -ex && \
     mkdir -p /aleo/data/params/{git,registry} && \
     mkdir -p /usr/local/cargo/git/checkouts/snarkvm-f1160780ffe17de8/ef32edc/parameters/src/ && \
     mkdir -p /usr/local/cargo/registry/src/github.com-1ecc6299db9ec823/snarkvm-parameters-0.7.9/src/ && \
-    COPY --from=builder /usr/src/snarkOS/target/release/snarkos /aleo/bin/
-    COPY --from=builder /usr/src/snarkOS/target/release/sync_provider /aleo/bin/
-    COPY --from=builder /usr/src/snarkOS/target/release/beacon /aleo/bin/
-    COPY --from=builder /usr/src/snarkOS/target/release/crawler /aleo/bin/
     ln -s /aleo/data/params/registry /usr/local/cargo/registry/src/github.com-1ecc6299db9ec823/snarkvm-parameters-0.7.9/src/testnet1
 
+COPY --from=builder /usr/src/snarkOS/target/release/snarkos /aleo/bin/
+COPY --from=builder /usr/src/snarkOS/target/release/sync_provider /aleo/bin/
+COPY --from=builder /usr/src/snarkOS/target/release/beacon /aleo/bin/
+COPY --from=builder /usr/src/snarkOS/target/release/crawler /aleo/bin/
 COPY --from=builder /usr/src/snarkOS/target/release/snarkos /aleo/bin/
 
 CMD ["bash", "-c", "/aleo/bin/snarkos -d /aleo/data"]
