@@ -407,19 +407,11 @@ impl<N: Network> LedgerState<N> {
             None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
         };
 
-        let block_height = block_header.height();
+        // Generate the local proof for the commitment.
+        let local_proof = transaction.to_local_proof(commitment)?;
 
-        let local_proof = {
-            // Initialize a transitions tree.
-            let mut transitions_tree = Transitions::<N>::new()?;
-            // Add all given transition IDs to the tree.
-            transitions_tree.add_all(&transaction.transitions())?;
-            // Return the local proof for the transitions tree.
-            transitions_tree.to_local_proof(commitment)?
-        };
         let transaction_id = local_proof.transaction_id();
-
-        let transactions = self.get_block_transactions(block_height)?;
+        let transactions = self.get_block_transactions(block_header.height())?;
 
         // Compute the transactions inclusion proof.
         let transactions_inclusion_proof = {
@@ -446,6 +438,7 @@ impl<N: Network> LedgerState<N> {
         let previous_block_hash = self.get_previous_block_hash(current_block_height)?;
         let current_block_hash = self.latest_block_hash();
 
+        // Generate the record proof.
         let record_proof = RecordProof::new(
             current_block_hash,
             previous_block_hash,
@@ -456,8 +449,7 @@ impl<N: Network> LedgerState<N> {
             local_proof,
         )?;
 
-        // TODO (howardwu): Optimize this operation.
-
+        // Generate the ledger root inclusion proof.
         let guard = self.ledger_tree.lock().unwrap();
         let ledger_root = guard.root();
         let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&current_block_hash)?;
