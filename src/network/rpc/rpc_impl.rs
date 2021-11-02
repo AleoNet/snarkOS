@@ -36,6 +36,7 @@ use anyhow::anyhow;
 use chrono::Utc;
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use serde::{de::DeserializeOwned, Serialize};
+use snarkvm::utilities::ToBytes;
 use std::{
     cmp::{max, min},
     future::Future,
@@ -43,7 +44,6 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::RwLock;
-use snarkvm::utilities::ToBytes;
 
 type JsonRPCError = jsonrpc_core::Error;
 
@@ -223,7 +223,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
             let rpc = rpc.clone();
             rpc.map_rpc_singlet(|rpc, x| async move { rpc.send_transaction(x).await }, params, meta)
         });
-        d.add_method_with_meta("ledgerproof", | rpc, params, meta| {
+        d.add_method_with_meta("ledgerproof", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.map_rpc_singlet(|rpc, x| async move { rpc.ledger_proof(x).await }, params, meta)
         });
@@ -316,15 +316,12 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(transaction.transaction_id())
     }
 
-    /// Returns the ledger root and ledger inclusion proof for a given block hash.
-    async fn ledger_proof(&self, block_hash: serde_json::Value) -> Result<(N::LedgerRoot, String), RpcError> {
-        let block_hash: N::BlockHash = serde_json::from_value(block_hash)?;
-        let (ledger_root, ledger_root_inclusion_proof) = self.ledger.read().await.ledger_proof(&block_hash)?;
+    /// Returns the ledger proof for a given record commitment.
+    async fn ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError> {
+        let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
+        let ledger_proof = self.ledger.read().await.get_ledger_inclusion_proof(&record_commitment)?;
 
-        Ok((
-            ledger_root,
-            hex::encode(ledger_root_inclusion_proof.to_bytes_le().expect("Failed to serialize ledger root inclusion proof"))
-        ))
+        Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
     }
     // /// Validate and return if the transaction is valid.
     // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
