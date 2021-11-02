@@ -26,7 +26,10 @@ use snarkos_network::NodeType;
 use clap::ArgMatches;
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// Peer discovery nodes maintained by Aleo.
 /// A node should try and connect to these first after coming online.
@@ -199,19 +202,7 @@ impl Config {
         let mut config_path = snarkos_path.clone();
         config_path.push("config.toml");
 
-        // TODO (howardwu): Revert to this logic after testnet, when configs stabilize.
-        // if !Path::exists(&config_path) {
-        //     // Create a new default `config.toml` file if it doesn't already exist
-        //     fs::create_dir_all(&snarkos_path)?;
-        //
-        //     let default_config_string = toml::to_string(&Config::default())?;
-        //
-        //     fs::write(&config_path, default_config_string)?;
-        // }
-
-        // TODO (howardwu): Revisit this.
-        // For now, override the config.toml file each time.
-        {
+        if !Path::exists(&config_path) {
             // Create a new default `config.toml` file if it doesn't already exist
             fs::create_dir_all(&snarkos_path)?;
 
