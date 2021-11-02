@@ -238,7 +238,7 @@ async fn handle_rpc<N: Network, E: Environment>(
         }
         "ledgerproof" => {
             let result = rpc
-                .ledger_proof(params[0].as_str().unwrap_or("").into())
+                .ledger_proof(params.remove(0))
                 .await
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
