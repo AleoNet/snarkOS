@@ -66,8 +66,9 @@ impl<S: KeyValueStorage + Validator + 'static> KeyValueStore<S> {
     }
 
     fn read_u32(value: &[u8]) -> Result<u32> {
-        if value.len() != 4 {
-            return Err(anyhow!("invalid length for u32: {}"));
+        let len = value.len();
+        if len != 4 {
+            return Err(anyhow!("invalid length for u32: {}", len));
         }
         let mut out = [0u8; 4];
         out.copy_from_slice(value);
