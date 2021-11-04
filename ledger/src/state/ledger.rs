@@ -384,6 +384,83 @@ impl<N: Network> LedgerState<N> {
 
         Ok(())
     }
+
+    ///
+    /// Returns a ledger proof for the given commitment.
+    ///
+    pub fn get_ledger_inclusion_proof(&self, commitment: N::Commitment) -> Result<LedgerProof<N>> {
+        // TODO (raychu86): Add getter functions.
+        let commitment_transition_id = match self.blocks.transactions.commitments.get(&commitment)? {
+            Some(transition_id) => transition_id,
+            None => return Err(anyhow!("commitment {} missing from commitments map", commitment)),
+        };
+
+        let transaction_id = match self.blocks.transactions.transitions.get(&commitment_transition_id)? {
+            Some((transaction_id, _, _)) => transaction_id,
+            None => return Err(anyhow!("transition id {} missing from transactions map", commitment_transition_id)),
+        };
+
+        let transaction = self.get_transaction(&transaction_id)?;
+
+        let block_hash = match self.blocks.transactions.transactions.get(&transaction_id)? {
+            Some((block_hash, _, _, _)) => block_hash,
+            None => return Err(anyhow!("transaction id {} missing from transactions map", transaction_id)),
+        };
+
+        let block_header = match self.blocks.block_headers.get(&block_hash)? {
+            Some(block_header) => block_header,
+            None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
+        };
+
+        // Generate the local proof for the commitment.
+        let local_proof = transaction.to_local_proof(commitment)?;
+
+        let transaction_id = local_proof.transaction_id();
+        let transactions = self.get_block_transactions(block_header.height())?;
+
+        // Compute the transactions inclusion proof.
+        let transactions_inclusion_proof = {
+            // TODO (howardwu): Optimize this operation.
+            let index = transactions
+                .transaction_ids()
+                .enumerate()
+                .filter_map(|(index, id)| match id == transaction_id {
+                    true => Some(index),
+                    false => None,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(1, index.len()); // TODO (howardwu): Clean this up with a proper error handler.
+            transactions.to_transactions_inclusion_proof(index[0], transaction_id)?
+        };
+
+        // Compute the block header inclusion proof.
+        let transactions_root = transactions.to_transactions_root()?;
+        let block_header_inclusion_proof = block_header.to_header_inclusion_proof(1, transactions_root)?;
+        let block_header_root = block_header.to_header_root()?;
+
+        // Determine the latest block height.
+        let current_block_height = self.latest_block_height();
+        let previous_block_hash = self.get_previous_block_hash(current_block_height)?;
+        let current_block_hash = self.latest_block_hash();
+
+        // Generate the record proof.
+        let record_proof = RecordProof::new(
+            current_block_hash,
+            previous_block_hash,
+            block_header_root,
+            block_header_inclusion_proof,
+            transactions_root,
+            transactions_inclusion_proof,
+            local_proof,
+        )?;
+
+        // Generate the ledger root inclusion proof.
+        let guard = self.ledger_tree.lock().unwrap();
+        let ledger_root = guard.root();
+        let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&current_block_hash)?;
+
+        LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
+    }
 }
 
 #[derive(Clone, Debug)]
