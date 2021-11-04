@@ -447,8 +447,14 @@ impl<N: Network> Ledger<N> {
                 Ok(()) => {
                     info!("Ledger advanced to block {}", self.latest_block_height());
                     // On success, filter the memory pool of its transactions and the block if it exists.
-                    // TODO (howardwu): Filter the memory pool, removing any now confirmed transctions.
-                    self.memory_pool.clear_transactions();
+                    let transactions = block.transactions();
+                    self.memory_pool.remove_transactions(transactions);
+
+                    let block_hash = block.block_hash();
+                    if self.memory_pool.contains_block_hash(&block_hash) {
+                        self.memory_pool.remove_block(&block_hash);
+                    }
+
                     // TODO (howardwu) - Set the terminator bit to true.
                     Ok(())
                 }
