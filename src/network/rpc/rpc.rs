@@ -237,10 +237,7 @@ async fn handle_rpc<N: Network, E: Environment>(
             result_to_response(&req, result)
         }
         "ledgerproof" => {
-            let result = rpc
-                .ledger_proof(params.remove(0))
-                .await
-                .map_err(convert_crate_err);
+            let result = rpc.ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         // "decoderawtransaction" => {

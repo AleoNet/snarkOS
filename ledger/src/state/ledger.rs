@@ -438,14 +438,12 @@ impl<N: Network> LedgerState<N> {
         let block_header_inclusion_proof = block_header.to_header_inclusion_proof(1, transactions_root)?;
         let block_header_root = block_header.to_header_root()?;
 
-        // Determine the latest block height.
-        let current_block_height = self.latest_block_height();
-        let previous_block_hash = self.get_previous_block_hash(current_block_height)?;
-        let current_block_hash = self.latest_block_hash();
+        // Determine the previous block hash.
+        let previous_block_hash = self.get_previous_block_hash(self.get_block_height(&block_hash)?)?;
 
         // Generate the record proof.
         let record_proof = RecordProof::new(
-            current_block_hash,
+            block_hash,
             previous_block_hash,
             block_header_root,
             block_header_inclusion_proof,
@@ -457,7 +455,7 @@ impl<N: Network> LedgerState<N> {
         // Generate the ledger root inclusion proof.
         let guard = self.ledger_tree.lock().unwrap();
         let ledger_root = guard.root();
-        let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&current_block_hash)?;
+        let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&block_hash)?;
 
         LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
     }
