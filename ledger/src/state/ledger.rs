@@ -438,14 +438,12 @@ impl<N: Network> LedgerState<N> {
         let block_header_inclusion_proof = block_header.to_header_inclusion_proof(1, transactions_root)?;
         let block_header_root = block_header.to_header_root()?;
 
-        // Determine the latest block height.
-
-        let block_height = self.get_block_height(&block_hash)?;
-        let previous_block_hash = self.get_previous_block_hash(block_height)?;
+        // Determine the previous block hash.
+        let previous_block_hash = self.get_previous_block_hash(self.get_block_height(&block_hash)?)?;
 
         // Generate the record proof.
         let record_proof = RecordProof::new(
-            block_hash.clone(),
+            block_hash,
             previous_block_hash,
             block_header_root,
             block_header_inclusion_proof,
