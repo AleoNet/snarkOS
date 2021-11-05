@@ -109,6 +109,11 @@ impl<N: Network> Ledger<N> {
         self.is_mining.load(Ordering::SeqCst)
     }
 
+    /// Returns `true` if the ledger is currently syncing.
+    pub fn is_syncing(&self) -> bool {
+        self.is_syncing.load(Ordering::SeqCst)
+    }
+
     /// Returns the latest block height.
     pub fn latest_block_height(&self) -> u32 {
         self.canon.latest_block_height()
@@ -491,19 +496,6 @@ impl<N: Network> Ledger<N> {
                     // Determine if the peer is a fork.
                     let is_fork = common_ancestor < self.latest_block_height() && latest_block_height_of_peer > self.latest_block_height();
 
-                    trace!(
-                        "{} is at block {} (is_fork = {}, common_ancestor = {})",
-                        peer_ip,
-                        latest_block_height_of_peer,
-                        is_fork,
-                        common_ancestor,
-                    );
-
-                    // Update the ledger state of the peer.
-                    self.update_ledger_state(peer_ip, (is_fork, common_ancestor, latest_block_height_of_peer));
-
-                    return Ok(());
-
                     // // Construct a HashMap of the block locators.
                     // let block_locators: HashMap<u32, N::BlockHash> = block_locators.iter().cloned().collect();
                     // let (start_block_height, end_block_height) = match (block_locators.keys().min(), block_locators.keys().max()) {
@@ -513,7 +505,26 @@ impl<N: Network> Ledger<N> {
                     //         return;
                     //     }
                     // };
-                    //
+
+                    trace!(
+                        "{} is at block {} (common_ancestor = {})",
+                        peer_ip,
+                        latest_block_height_of_peer,
+                        common_ancestor,
+                    );
+
+                    // trace!(
+                    //     "{} is at block {} (is_fork = {}, common_ancestor = {})",
+                    //     peer_ip,
+                    //     latest_block_height_of_peer,
+                    //     is_fork,
+                    //     common_ancestor,
+                    // );
+
+                    // Update the ledger state of the peer.
+                    self.update_ledger_state(peer_ip, (is_fork, common_ancestor, latest_block_height_of_peer));
+
+                    return Ok(());
                 }
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
@@ -714,19 +725,14 @@ impl<N: Network> Ledger<N> {
                 Ok(()) => {
                     // Upon success, propagate the unconfirmed transaction to the connected peers.
                     let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(transaction));
-                    peers_router.send(request).await?;
+                    if let Err(error) = peers_router.send(request).await {
+                        warn!("[UnconfirmedTransaction] {}", error);
+                    }
                 }
                 Err(error) => error!("{}", error),
             }
         }
         Ok(())
-    }
-
-    ///
-    /// Returns `true` if the state manager is syncing.
-    ///
-    pub(crate) fn is_syncing(&self) -> bool {
-        self.is_syncing.load(Ordering::SeqCst)
     }
 
     ///
@@ -816,33 +822,6 @@ impl<N: Network> Ledger<N> {
             None => error!("Missing failure entry for {}", peer_ip),
         };
     }
-
-    // ///
-    // /// Returns the block locators from this ledger, up to the fork depth,
-    // /// in a sync response to the given peer.
-    // ///
-    // async fn process_sync_request<E: Environment>(&mut self, peer_ip: SocketAddr, peers_router: PeersRouter<N, E>) -> Result<()> {
-    //     // // Retrieve the latest block height.
-    //     // let latest_block_height = self.latest_block_height();
-    //     //
-    //     // // Retrieve the latest block hashes, up to the maximum fork depth.
-    //     // let start_block_height = latest_block_height.saturating_sub(E::MAXIMUM_FORK_DEPTH);
-    //     // let end_block_height = latest_block_height;
-    //     // let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
-    //     //
-    //     // // Convert the block hashes into block locators, by including the block height with each block hash.
-    //     // let block_locators = block_hashes
-    //     //     .iter()
-    //     //     .enumerate()
-    //     //     .map(|(i, block_hash)| (start_block_height + i as u32, *block_hash))
-    //     //     .collect();
-    //
-    //     // Send the sync response to the peer.
-    //     let block_locators = self.latest_block_locators().clone();
-    //     let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
-    //     peers_router.send(request).await?;
-    //     Ok(())
-    // }
 
     // ///
     // /// Processes a fork request, which contains a sequence of block hashes that
