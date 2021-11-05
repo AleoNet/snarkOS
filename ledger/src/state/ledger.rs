@@ -349,19 +349,43 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
-    /// Removes the latest block from storage, returning the removed block on success.
-    pub fn remove_last_block(&mut self) -> Result<Block<N>> {
-        let block = self.latest_block()?;
-        let block_height = block.height();
+    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
+    pub fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
+        // TODO (howardwu): Add a proper safety check that `num_blocks` is within the MAXIMUM_FORK_DEPTH.
+        if num_blocks == 0 || num_blocks > 1024 {
+            return Err(anyhow!("Attempted to remove {} blocks, which is invalid", num_blocks));
+        }
 
-        self.blocks.remove_block(block_height)?;
-        self.ledger_roots.remove(&block.previous_ledger_root())?;
-        self.latest_state = match block_height == 0 {
-            true => (0, block.previous_block_hash()),
-            false => (block_height - 1, block.previous_block_hash()),
-        };
+        // Initialize a list of the removed blocks.
+        let mut blocks = Vec::with_capacity(num_blocks as usize);
 
-        Ok(block)
+        // Initialize the block to remove.
+        let mut block = self.latest_block()?;
+        let mut remaining_blocks = num_blocks;
+
+        while block.height() > 0 && remaining_blocks > 0 {
+            // Update the internal state of the ledger, except for the ledger tree.
+            self.blocks.remove_block(block.height())?;
+            self.ledger_roots.remove(&block.previous_ledger_root())?;
+            self.latest_state = match block.height() == 0 {
+                true => (0, block.previous_block_hash()),
+                false => (block.height() - 1, block.previous_block_hash()),
+            };
+
+            // Append this block to the final output.
+            blocks.push(block);
+            // Retrieve the next block.
+            block = self.latest_block()?;
+            // Decrement the remaining blocks by 1.
+            remaining_blocks -= 1;
+        }
+
+        self.regenerate_ledger_tree()?;
+
+        // Reverse the order of the blocks, so they are in increasing order (i.e. 1, 2, 3...).
+        blocks.reverse();
+        // Return the removed blocks.
+        Ok(blocks)
     }
 
     // TODO (raychu86): Make this more efficient.
@@ -370,11 +394,9 @@ impl<N: Network> LedgerState<N> {
         // Add the current block hashes to create the new ledger tree.
         let mut new_ledger_tree = LedgerTree::<N>::new()?;
 
-        let mut block_hashes = vec![];
+        let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
         for height in 0..=self.latest_block_height() {
-            let block_hash = self.get_block_hash(height)?;
-
-            block_hashes.push(block_hash);
+            block_hashes.push(self.get_block_hash(height)?);
         }
         new_ledger_tree.add_all(&block_hashes)?;
 

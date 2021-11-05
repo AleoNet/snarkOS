@@ -239,7 +239,6 @@ impl<N: Network, E: Environment> State<N, E> {
                 }
                 // Process the sync request.
                 else {
-                    trace!("Received sync request from {}", peer_ip);
                     // Route a `SyncRequest` to the ledger.
                     let request = LedgerRequest::SyncRequest(peer_ip, peers_router.clone());
                     if let Err(error) = ledger_router.send(request).await {
@@ -255,8 +254,6 @@ impl<N: Network, E: Environment> State<N, E> {
                 }
                 // Process the sync response.
                 else {
-                    trace!("Received sync response from {}", peer_ip);
-
                     // Acquire a reader for the ledger.
                     let ledger = ledger.read().await;
 
