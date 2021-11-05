@@ -320,9 +320,9 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     async fn ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError> {
         let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
         let ledger_proof = self.ledger.read().await.get_ledger_inclusion_proof(&record_commitment)?;
-
         Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
     }
+
     // /// Validate and return if the transaction is valid.
     // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
     //     let transaction_bytes = hex::decode(transaction_bytes)?;

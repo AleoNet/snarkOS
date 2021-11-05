@@ -707,6 +707,11 @@ impl<N: Network> BlockState<N> {
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+        // Ensure the starting block height is less than the ending block height.
+        if start_block_height > end_block_height {
+            return Err(anyhow!("Invalid starting and ending block heights"));
+        }
+
         (start_block_height..=end_block_height)
             .into_iter()
             .map(|height| self.get_block(height))

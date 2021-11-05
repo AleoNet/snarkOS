@@ -24,8 +24,8 @@ use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone, Debug)]
 pub enum Message<N: Network, E: Environment> {
-    /// BlockRequest := (block_height)
-    BlockRequest(u32),
+    /// BlockRequest := (start_block_height, end_block_height (inclusive))
+    BlockRequest(u32, u32),
     /// BlockResponse := (block_height, block)
     BlockResponse(u32, Block<N>),
     /// ChallengeRequest := (listener_port, block_height)
@@ -97,7 +97,7 @@ impl<N: Network, E: Environment> Message<N, E> {
     #[inline]
     pub fn data(&self) -> Result<Vec<u8>> {
         match self {
-            Self::BlockRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
+            Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
             Self::BlockResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
             Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
             Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
@@ -132,7 +132,7 @@ impl<N: Network, E: Environment> Message<N, E> {
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::BlockRequest(bincode::deserialize(data)?),
+            0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
             1 => {
                 let mut cursor = Cursor::new(data);
                 let block_height: u32 = FromBytes::read_le(&mut cursor)?;

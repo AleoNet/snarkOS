@@ -268,7 +268,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     async fn send(&mut self, peer: SocketAddr, message: &Message<N, E>) {
         match self.connected_peers.get(&peer) {
             Some(outbound) => {
-                trace!("Sending '{}' to {}", message.name(), peer);
+                // trace!("Sending '{}' to {}", message.name(), peer);
                 if let Err(error) = outbound.send(message.clone()).await {
                     trace!("Outbound channel failed: {}", error);
                     self.connected_peers.remove(&peer);
@@ -492,9 +492,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             // Process the message.
                             trace!("Received '{}' from {}", message.name(), peer_ip);
                             match &message {
-                                Message::BlockRequest(block_height) => {
+                                Message::BlockRequest(start_block_height, end_block_height) => {
                                     // Route the `BlockRequest` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::BlockRequest(peer_ip, *block_height)).await {
+                                    if let Err(error) = state_router.send(StateRequest::BlockRequest(peer_ip, *start_block_height, *end_block_height)).await {
                                         warn!("[BlockRequest] {}", error);
                                     }
                                 },

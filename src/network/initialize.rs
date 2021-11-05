@@ -292,8 +292,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                                 error!("Failed to send request to ledger: {}", error);
                             }
                         }
-                        // Sleep for 1 second.
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        // Sleep for 2 seconds.
+                        tokio::time::sleep(Duration::from_secs(2)).await;
                     }
                 }));
             } else {

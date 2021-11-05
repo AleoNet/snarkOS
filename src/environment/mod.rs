@@ -65,7 +65,13 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
+    /// The maximum number of blocks tha can be requested in one request.
+    const MAXIMUM_BLOCK_REQUEST: u32 = 48;
+
     const CONNECTION_TIMEOUT_SECS: u64 = 3;
+
+    /// The duration of time in seconds to sleep in between ping requests.
+    const PING_SLEEP_IN_SECS: u64 = 15;
 
     const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
     const FAILURE_THRESHOLD: usize = 5;

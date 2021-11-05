@@ -41,8 +41,8 @@ type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum LedgerRequest<N: Network, E: Environment> {
-    /// BlockRequest := (peer_ip, block_height, peers_router)
-    BlockRequest(SocketAddr, u32, PeersRouter<N, E>),
+    // /// BlockRequest := (peer_ip, start_block_height, end_block_height (inclusive), peers_router)
+    // BlockRequest(SocketAddr, u32, u32, PeersRouter<N, E>),
     /// BlockResponse := (block)
     BlockResponse(Block<N>),
     /// Heartbeat := ()
@@ -241,22 +241,29 @@ impl<N: Network> Ledger<N> {
         self.canon.get_block_locators(block_height)
     }
 
+    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
+    pub fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
+        self.canon.remove_last_blocks(num_blocks)
+    }
+
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
     pub(super) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
         match request {
-            LedgerRequest::BlockRequest(peer_ip, block_height, peers_router) => {
-                match self.get_block(block_height) {
-                    Ok(block) => {
-                        let request = PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block.height(), block));
-                        peers_router.send(request).await?;
-                    }
-                    Err(error) => error!("{}", error),
-                }
-                Ok(())
-            }
+            // LedgerRequest::BlockRequest(peer_ip, start_block_height, end_block_height, peers_router) => {
+            //     match self.get_blocks(start_block_height, end_block_height) {
+            //         Ok(blocks) => {
+            //             for block in blocks {
+            //                 let request = PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block.height(), block));
+            //                 peers_router.send(request).await?;
+            //             }
+            //         }
+            //         Err(error) => error!("{}", error),
+            //     }
+            //     Ok(())
+            // }
             LedgerRequest::BlockResponse(block) => self.add_block::<E>(&block),
             LedgerRequest::Heartbeat => {
                 // Check for candidate blocks to fast forward the ledger.
@@ -278,7 +285,13 @@ impl<N: Network> Ledger<N> {
                 }
                 Ok(())
             }
-            LedgerRequest::SyncRequest(peer_ip, peers_router) => self.process_sync_request(peer_ip, peers_router).await,
+            LedgerRequest::SyncRequest(peer_ip, peers_router) => {
+                // Send a sync response to the peer.
+                let block_locators = self.latest_block_locators().clone();
+                let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
+                peers_router.send(request).await?;
+                Ok(())
+            }
             LedgerRequest::UnconfirmedBlock(peer_ip, block, peers_router) => self.add_unconfirmed_block(peer_ip, block, peers_router).await,
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction, peers_router) => {
                 self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
@@ -288,7 +301,7 @@ impl<N: Network> Ledger<N> {
 
     /// Mines a new block and adds it to the canon blocks.
     fn mine_next_block<E: Environment>(
-        &mut self,
+        &self,
         local_ip: SocketAddr,
         recipient: Address<N>,
         peers_router: PeersRouter<N, E>,
@@ -473,34 +486,32 @@ impl<N: Network> Ledger<N> {
         Ok(())
     }
 
-    ///
-    /// Returns the block locators from this ledger, up to the fork depth,
-    /// in a sync response to the given peer.
-    ///
-    async fn process_sync_request<E: Environment>(&mut self, peer_ip: SocketAddr, peers_router: PeersRouter<N, E>) -> Result<()> {
-        // // Retrieve the latest block height.
-        // let latest_block_height = self.latest_block_height();
-        //
-        // // Retrieve the latest block hashes, up to the maximum fork depth.
-        // let start_block_height = latest_block_height.saturating_sub(E::MAXIMUM_FORK_DEPTH);
-        // let end_block_height = latest_block_height;
-        // let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
-        //
-        // // Convert the block hashes into block locators, by including the block height with each block hash.
-        // let block_locators = block_hashes
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, block_hash)| (start_block_height + i as u32, *block_hash))
-        //     .collect();
-
-        let block_locators = self.latest_block_locators().clone();
-
-        // Send the sync response to the peer.
-        let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
-        peers_router.send(request).await?;
-
-        Ok(())
-    }
+    // ///
+    // /// Returns the block locators from this ledger, up to the fork depth,
+    // /// in a sync response to the given peer.
+    // ///
+    // async fn process_sync_request<E: Environment>(&mut self, peer_ip: SocketAddr, peers_router: PeersRouter<N, E>) -> Result<()> {
+    //     // // Retrieve the latest block height.
+    //     // let latest_block_height = self.latest_block_height();
+    //     //
+    //     // // Retrieve the latest block hashes, up to the maximum fork depth.
+    //     // let start_block_height = latest_block_height.saturating_sub(E::MAXIMUM_FORK_DEPTH);
+    //     // let end_block_height = latest_block_height;
+    //     // let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
+    //     //
+    //     // // Convert the block hashes into block locators, by including the block height with each block hash.
+    //     // let block_locators = block_hashes
+    //     //     .iter()
+    //     //     .enumerate()
+    //     //     .map(|(i, block_hash)| (start_block_height + i as u32, *block_hash))
+    //     //     .collect();
+    //
+    //     // Send the sync response to the peer.
+    //     let block_locators = self.latest_block_locators().clone();
+    //     let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
+    //     peers_router.send(request).await?;
+    //     Ok(())
+    // }
 
     // ///
     // /// Processes a fork request, which contains a sequence of block hashes that
