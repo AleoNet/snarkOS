@@ -672,10 +672,16 @@ impl<N: Network> BlockState<N> {
 
     /// Removes the given block height from storage.
     fn remove_block(&self, block_height: u32) -> Result<()> {
-        // Ensure the block exists.
-        if !self.block_heights.contains_key(&block_height)? {
+        // Ensure the block height is not the genesis block.
+        if block_height == 0 {
+            Err(anyhow!("Block {} cannot be removed from storage", block_height))
+        }
+        // Ensure the block at the given block height exists.
+        else if !self.block_heights.contains_key(&block_height)? {
             Err(anyhow!("Block {} does not exist in storage", block_height))
-        } else {
+        }
+        // Remove the block at the given block height.
+        else {
             // Retrieve the block hash.
             let block_hash = match self.block_heights.get(&block_height)? {
                 Some(block_hash) => block_hash,
