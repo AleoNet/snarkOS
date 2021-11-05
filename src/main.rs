@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{Client, Miner, Node};
-use snarkos::commands::CLI;
+use snarkos::{commands::CLI, Client, Miner, Node};
 
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
@@ -24,9 +23,8 @@ use snarkvm::{
 
 use ::rand::thread_rng;
 use anyhow::Result;
-use tracing_subscriber::EnvFilter;
 use structopt::StructOpt;
-
+use tracing_subscriber::EnvFilter;
 
 pub fn initialize_logger() {
     let verbosity = 4;
@@ -75,7 +73,7 @@ async fn main() -> Result<()> {
         println!("\n{:#?}\n", cli);
     }
 
-    cli.mode.start().await?;
+    cli.command.start().await?;
 
     Ok(())
 }

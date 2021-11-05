@@ -14,19 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Node, Client};
-use crate::cli::helpers::initialize_logger;
+use crate::{
+    cli::{commands::*, helpers::initialize_logger},
+    Client,
+    Node,
+};
 
+use ::rand::thread_rng;
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
     prelude::*,
 };
-use ::rand::thread_rng;
 use structopt::StructOpt;
-
-
-pub const DEFAULT_NODE_PORT: u16 = 4132;
-pub const DEFAULT_RPC_PORT: u16 = 3032;
 
 #[derive(StructOpt, Debug)]
 #[structopt(setting = structopt::clap::AppSettings::ColoredHelp)]
@@ -40,7 +39,7 @@ pub enum ClientMode {
         /// The rpc port to receive incoming requests.
         #[structopt(short = "r", long = "rpc-port")]
         rpc_port: Option<u16>,
-    }
+    },
 }
 
 impl ClientMode {
@@ -61,7 +60,6 @@ impl ClientMode {
                 std::future::pending::<()>().await;
             }
         }
-
 
         Ok(())
     }

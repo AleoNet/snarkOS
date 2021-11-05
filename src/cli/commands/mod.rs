@@ -22,6 +22,9 @@ pub use miner::*;
 
 use structopt::StructOpt;
 
+pub const DEFAULT_NODE_PORT: u16 = 4132;
+pub const DEFAULT_RPC_PORT: u16 = 3032;
+
 #[derive(StructOpt, Debug)]
 #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
 pub struct CLI {
@@ -34,25 +37,25 @@ pub struct CLI {
     pub verbose: u8,
 
     #[structopt(subcommand)]
-    pub mode: Mode,
+    pub command: Command,
 }
 
 #[derive(StructOpt, Debug)]
-pub enum Mode {
+pub enum Command {
     #[structopt(name = "client")]
     Client(ClientMode),
 
-    // #[structopt(name = "miner")]
-    // Miner(Miner),
+    #[structopt(name = "miner")]
+    Miner(MinerMode),
     // #[structopt(name = "update")]
     // Update(Update),
 }
 
-impl Mode {
+impl Command {
     pub async fn start(self) -> anyhow::Result<()> {
         match self {
             Self::Client(command) => command.start().await,
-            // Self::Miner(comand) => comand.parse(),
+            Self::Miner(comand) => comand.start().await,
             // Self::Update(command) => command.parse(),
         }
     }
