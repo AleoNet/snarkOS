@@ -22,10 +22,10 @@ use crate::{
     network::{
         rpc::{rpc::*, rpc_trait::RpcFunctions},
         Ledger,
-        StateRequest,
-        StateRouter,
     },
     Environment,
+    LedgerRequest,
+    LedgerRouter,
 };
 use snarkvm::{
     dpc::{Block, Network, RecordCiphertext, Transaction, Transition},
@@ -97,18 +97,18 @@ impl<N: Network, E: Environment> Deref for RpcImpl<N, E> {
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
     ledger: Arc<RwLock<Ledger<N>>>,
-    state_router: StateRouter<N, E>,
+    ledger_router: LedgerRouter<N, E>,
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
 }
 
 impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(credentials: Option<RpcCredentials>, ledger: Arc<RwLock<Ledger<N>>>, state_router: StateRouter<N, E>) -> Self {
+    pub fn new(credentials: Option<RpcCredentials>, ledger: Arc<RwLock<Ledger<N>>>, ledger_router: LedgerRouter<N, E>) -> Self {
         Self(Arc::new(RpcInner {
             ledger,
             credentials,
-            state_router,
+            ledger_router,
         }))
     }
 
@@ -308,9 +308,9 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
     async fn send_transaction(&self, transaction_hex: String) -> Result<N::TransactionID, RpcError> {
         let transaction: Transaction<N> = FromBytes::from_bytes_le(&hex::decode(transaction_hex)?)?;
-        // Route an `UnconfirmedTransaction` to the state manager.
-        let request = StateRequest::UnconfirmedTransaction("0.0.0.0:3032".parse().unwrap(), transaction.clone());
-        if let Err(error) = self.state_router.send(request).await {
+        // Route an `UnconfirmedTransaction` to the ledger.
+        let request = LedgerRequest::UnconfirmedTransaction("0.0.0.0:3032".parse().unwrap(), transaction.clone());
+        if let Err(error) = self.ledger_router.send(request).await {
             warn!("[UnconfirmedTransaction] {}", error);
         }
         Ok(transaction.transaction_id())

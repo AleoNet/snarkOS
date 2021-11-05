@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Environment, Message, StateRequest, StateRouter};
+use crate::{Environment, LedgerRequest, LedgerRouter, Message};
 use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -49,18 +49,18 @@ type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, peers_router, state_router)
-    Connect(SocketAddr, PeersRouter<N, E>, StateRouter<N, E>),
-    /// Heartbeat := (peers_router, state_router)
-    Heartbeat(PeersRouter<N, E>, StateRouter<N, E>),
+    /// Connect := (peer_ip, peers_router, ledger_router)
+    Connect(SocketAddr, PeersRouter<N, E>, LedgerRouter<N, E>),
+    /// Heartbeat := (peers_router, ledger_router)
+    Heartbeat(PeersRouter<N, E>, LedgerRouter<N, E>),
     /// MessageBroadcast := (message)
     MessageBroadcast(Message<N, E>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, peers_router, state_router)
-    PeerConnecting(TcpStream, SocketAddr, PeersRouter<N, E>, StateRouter<N, E>),
+    /// PeerConnecting := (stream, peer_ip, peers_router, ledger_router)
+    PeerConnecting(TcpStream, SocketAddr, PeersRouter<N, E>, LedgerRouter<N, E>),
     /// PeerConnected := (peer_ip, outbound_router)
     PeerConnected(SocketAddr, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -143,7 +143,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&mut self, request: PeersRequest<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, peers_router, state_router) => {
+            PeersRequest::Connect(peer_ip, peers_router, ledger_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -163,7 +163,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Connecting to {}...", peer_ip);
                     match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
                         Ok(stream) => match stream {
-                            Ok(stream) => Peer::handler(stream, self.local_ip, peers_router, state_router).await,
+                            Ok(stream) => Peer::handler(stream, self.local_ip, peers_router, ledger_router).await,
                             Err(error) => {
                                 trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
                                 self.candidate_peers.remove(&peer_ip);
@@ -176,7 +176,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     };
                 }
             }
-            PeersRequest::Heartbeat(peers_router, state_router) => {
+            PeersRequest::Heartbeat(peers_router, ledger_router) => {
                 // Skip if the number of connected peers is above the minimum threshold.
                 match self.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
                     true => trace!("Sending request for more peer connections"),
@@ -185,7 +185,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
                     trace!("Attempting connection to {}...", peer_ip);
-                    let request = PeersRequest::Connect(*peer_ip, peers_router.clone(), state_router.clone());
+                    let request = PeersRequest::Connect(*peer_ip, peers_router.clone(), ledger_router.clone());
                     if let Err(error) = peers_router.send(request).await {
                         error!("Failed to transmit the request: '{}'", error);
                     }
@@ -202,7 +202,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, &message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, peers_router, state_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip, peers_router, ledger_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -220,7 +220,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Spawn a handler to be run asynchronously.
                 else {
                     debug!("Received a connection request from {}", peer_ip);
-                    Peer::handler(stream, self.local_ip, peers_router, state_router).await;
+                    Peer::handler(stream, self.local_ip, peers_router, ledger_router).await;
                 }
             }
             PeersRequest::PeerConnected(peer_ip, outbound) => {
@@ -309,6 +309,8 @@ const CHALLENGE_HEIGHT: u32 = 0;
 struct Peer<N: Network, E: Environment> {
     /// The IP address of the peer, with the port set to the listener port.
     listener_ip: SocketAddr,
+    /// The message version of the peer.
+    version: u32,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -335,6 +337,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
         Ok(Peer {
             listener_ip: peer_ip,
+            version: 0,
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -443,7 +446,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
-    async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_router: PeersRouter<N, E>, state_router: StateRouter<N, E>) {
+    async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_router: PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(stream, local_ip, peers_router.clone()).await {
@@ -493,14 +496,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             trace!("Received '{}' from {}", message.name(), peer_ip);
                             match &message {
                                 Message::BlockRequest(start_block_height, end_block_height) => {
-                                    // Route the `BlockRequest` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::BlockRequest(peer_ip, *start_block_height, *end_block_height)).await {
+                                    // Route the `BlockRequest` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockRequest(peer_ip, *start_block_height, *end_block_height)).await {
                                         warn!("[BlockRequest] {}", error);
                                     }
                                 },
-                                Message::BlockResponse(block_height, block) => {
-                                    // Route the `BlockResponse` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::BlockResponse(peer_ip, *block_height, block.clone())).await {
+                                Message::BlockResponse(block) => {
+                                    // Route the `BlockResponse` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block.clone())).await {
                                         warn!("[BlockResponse] {}", error);
                                     }
                                 }
@@ -527,38 +530,46 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
-                                    // Route the `Ping` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::Ping(peer_ip, *version, peers_router.clone())).await {
-                                        warn!("[Ping] {}", error);
+                                    // Process the `Ping` request.
+                                    else {
+                                        // Update the version of the peer.
+                                        peer.version = *version;
+                                        // Send a `Pong` message to the peer.
+                                        if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, Message::Pong)).await {
+                                            warn!("[Pong] {}", error);
+                                        }
                                     }
                                 },
                                 Message::Pong => {
-                                    // Route the `Pong` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::Pong(peer_ip)).await {
-                                        warn!("[Pong] {}", error);
+                                    // Sleep for the preset time before sending a `Ping` request.
+                                    tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
+                                    // Send a `Ping` request to the peer.
+                                    let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION));
+                                    if let Err(error) = peers_router.send(request).await {
+                                        warn!("[Ping] {}", error);
                                     }
                                 },
                                 Message::SyncRequest => {
-                                    // Route the `SyncRequest` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::SyncRequest(peer_ip, peers_router.clone())).await {
+                                    // Route the `SyncRequest` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::SyncRequest(peer_ip)).await {
                                         warn!("[SyncRequest] {}", error);
                                     }
                                 },
                                 Message::SyncResponse(block_locators) => {
-                                    // Route the `SyncResponse` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::SyncResponse(peer_ip, block_locators.clone())).await {
+                                    // Route the `SyncResponse` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::SyncResponse(peer_ip, block_locators.clone())).await {
                                         warn!("[SyncResponse] {}", error);
                                     }
                                 }
-                                Message::UnconfirmedBlock(block_height, block) => {
-                                    // Route the `UnconfirmedBlock` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::UnconfirmedBlock(peer_ip, *block_height, block.clone())).await {
+                                Message::UnconfirmedBlock(block) => {
+                                    // Route the `UnconfirmedBlock` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block.clone())).await {
                                         warn!("[UnconfirmedBlock] {}", error);
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
-                                    // Route the `UnconfirmedTransaction` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::UnconfirmedTransaction(peer_ip, transaction.clone())).await {
+                                    // Route the `UnconfirmedTransaction` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction.clone())).await {
                                         warn!("[UnconfirmedTransaction] {}", error);
                                     }
                                 }
@@ -574,8 +585,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
             }
 
             // When this is reached, it means the peer has disconnected.
-            // Route a `Disconnect` to the state manager.
-            if let Err(error) = state_router.send(StateRequest::Disconnect(peer_ip)).await {
+            // Route a `Disconnect` to the ledger.
+            if let Err(error) = ledger_router.send(LedgerRequest::Disconnect(peer_ip)).await {
                 warn!("[Peer::Disconnect] {}", error);
             }
         });
