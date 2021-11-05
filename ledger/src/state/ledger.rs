@@ -29,8 +29,13 @@ const TWO_HOURS_UNIX: i64 = 7200;
 pub struct LedgerState<N: Network> {
     /// The current state of the ledger.
     latest_state: (u32, N::BlockHash),
+    /// The current block locators of the ledger.
+    latest_block_locators: Vec<(u32, N::BlockHash)>,
+    /// The current ledger tree of block hashes.
     ledger_tree: Arc<Mutex<LedgerTree<N>>>,
+    /// The ledger root corresponding to each block height.
     ledger_roots: DataMap<N::LedgerRoot, u32>,
+    /// The blocks of the ledger in storage.
     blocks: BlockState<N>,
 }
 
@@ -46,6 +51,7 @@ impl<N: Network> LedgerState<N> {
         // Initialize the ledger.
         let mut ledger = Self {
             latest_state: (genesis.height(), genesis.block_hash()),
+            latest_block_locators: Default::default(),
             ledger_tree: Arc::new(Mutex::new(LedgerTree::<N>::new()?)),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
@@ -93,6 +99,7 @@ impl<N: Network> LedgerState<N> {
         // Update the latest state.
         let block = ledger.get_block(latest_block_height)?;
         ledger.latest_state = (block.height(), block.block_hash());
+        ledger.latest_block_locators = ledger.get_block_locators(block.height())?;
         trace!("Loaded ledger from block {}", block.height());
 
         // let value = storage.export()?;
@@ -116,6 +123,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the latest ledger root.
     pub fn latest_ledger_root(&self) -> N::LedgerRoot {
         self.ledger_tree.lock().unwrap().root()
+    }
+
+    /// Returns the latest block locators.
+    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash)> {
+        &self.latest_block_locators
     }
 
     /// Returns the latest block timestamp.
@@ -238,22 +250,19 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_previous_ledger_root(block_height)
     }
 
-    /// Returns the block locators of the current ledger.
-    pub fn get_block_locators(&self) -> Result<Vec<(u32, N::BlockHash)>> {
+    /// Returns the block locators of the current ledger, from the given block height.
+    pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash)>> {
         const MAXIMUM_BLOCK_LOCATORS: u32 = 64;
 
-        // Retrieve the latest block height.
-        let latest_block_height = self.latest_block_height();
-
         // Determine the number of block locators to obtain (with the genesis block as one block locator).
-        let mut num_block_locators = std::cmp::min(MAXIMUM_BLOCK_LOCATORS - 1, latest_block_height);
+        let mut num_block_locators = std::cmp::min(MAXIMUM_BLOCK_LOCATORS - 1, block_height);
         // Determine the number of latest blocks to include as block locators (linear).
         let num_latest_blocks = std::cmp::min(10, num_block_locators);
 
         // Initialize the list of block locators.
         let mut block_locators = Vec::with_capacity(num_block_locators as usize);
         // Initialize the current block height that a block locator is obtained from.
-        let mut block_locator_height = latest_block_height;
+        let mut block_locator_height = block_height;
 
         // Add the latest block locators.
         for _ in 0..num_latest_blocks {
@@ -420,6 +429,7 @@ impl<N: Network> LedgerState<N> {
         self.blocks.add_block(block)?;
         self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
+        self.latest_block_locators = self.get_block_locators(block.height())?;
         self.latest_state = (block_height, block.block_hash());
         Ok(())
     }
@@ -442,6 +452,7 @@ impl<N: Network> LedgerState<N> {
             // Update the internal state of the ledger, except for the ledger tree.
             self.blocks.remove_block(block.height())?;
             self.ledger_roots.remove(&block.previous_ledger_root())?;
+            self.latest_block_locators = self.get_block_locators(block.height() - 1)?;
             self.latest_state = match block.height() == 0 {
                 true => (0, block.previous_block_hash()),
                 false => (block.height() - 1, block.previous_block_hash()),
@@ -462,26 +473,6 @@ impl<N: Network> LedgerState<N> {
         blocks.reverse();
         // Return the removed blocks.
         Ok(blocks)
-    }
-
-    // TODO (raychu86): Make this more efficient.
-    /// Update the ledger tree.
-    pub fn regenerate_ledger_tree(&mut self) -> Result<()> {
-        // Retrieve all of the block hashes.
-        let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
-        for height in 0..=self.latest_block_height() {
-            block_hashes.push(self.get_block_hash(height)?);
-        }
-
-        // Add the block hashes to create the new ledger tree.
-        let mut new_ledger_tree = LedgerTree::<N>::new()?;
-        new_ledger_tree.add_all(&block_hashes)?;
-
-        // Update the current ledger tree with the current state.
-        let mut ledger_tree = self.ledger_tree.lock().unwrap();
-        *ledger_tree = new_ledger_tree;
-
-        Ok(())
     }
 
     ///
@@ -557,6 +548,26 @@ impl<N: Network> LedgerState<N> {
         let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&block_hash)?;
 
         LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
+    }
+
+    // TODO (raychu86): Make this more efficient.
+    /// Update the ledger tree.
+    fn regenerate_ledger_tree(&mut self) -> Result<()> {
+        // Retrieve all of the block hashes.
+        let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
+        for height in 0..=self.latest_block_height() {
+            block_hashes.push(self.get_block_hash(height)?);
+        }
+
+        // Add the block hashes to create the new ledger tree.
+        let mut new_ledger_tree = LedgerTree::<N>::new()?;
+        new_ledger_tree.add_all(&block_hashes)?;
+
+        // Update the current ledger tree with the current state.
+        let mut ledger_tree = self.ledger_tree.lock().unwrap();
+        *ledger_tree = new_ledger_tree;
+
+        Ok(())
     }
 }
 

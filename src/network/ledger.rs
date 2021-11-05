@@ -106,6 +106,11 @@ impl<N: Network> Ledger<N> {
         self.canon.latest_ledger_root()
     }
 
+    /// Returns the latest block locators.
+    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash)> {
+        self.canon.latest_block_locators()
+    }
+
     /// Returns the latest block timestamp.
     pub fn latest_block_timestamp(&self) -> Result<i64> {
         self.canon.latest_block_timestamp()
@@ -231,9 +236,9 @@ impl<N: Network> Ledger<N> {
         self.canon.get_previous_ledger_root(block_height)
     }
 
-    /// Returns the block locators of the current ledger.
-    pub fn get_block_locators(&self) -> Result<Vec<(u32, N::BlockHash)>> {
-        self.canon.get_block_locators()
+    /// Returns the block locators of the current ledger, from the given block height.
+    pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash)>> {
+        self.canon.get_block_locators(block_height)
     }
 
     ///
@@ -488,7 +493,7 @@ impl<N: Network> Ledger<N> {
         //     .map(|(i, block_hash)| (start_block_height + i as u32, *block_hash))
         //     .collect();
 
-        let block_locators = self.get_block_locators()?;
+        let block_locators = self.latest_block_locators().clone();
 
         // Send the sync response to the peer.
         let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));

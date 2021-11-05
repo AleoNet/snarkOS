@@ -90,6 +90,7 @@ fn test_genesis() {
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp().unwrap());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
     assert_eq!(genesis.clone(), ledger.latest_block().unwrap());
+    assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
 
@@ -121,6 +122,15 @@ fn test_add_next_block() {
     assert_eq!(block.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
     assert_eq!(block.clone(), ledger.latest_block().unwrap());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
+
+    // Retrieve the genesis block.
+    let genesis = Testnet2::genesis_block();
+
+    // Ensure the block locators are correct.
+    let block_locators = ledger.latest_block_locators();
+    assert_eq!(2, block_locators.len());
+    assert_eq!((block.height(), block.block_hash()), block_locators[0]);
+    assert_eq!((genesis.height(), genesis.block_hash()), block_locators[1]);
 }
 
 #[test]
@@ -157,6 +167,7 @@ fn test_remove_last_block() {
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp().unwrap());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
     assert_eq!(genesis.clone(), ledger.latest_block().unwrap());
+    assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
 
@@ -199,5 +210,6 @@ fn test_remove_last_2_blocks() {
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp().unwrap());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
     assert_eq!(genesis.clone(), ledger.latest_block().unwrap());
+    assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
