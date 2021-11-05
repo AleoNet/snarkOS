@@ -41,8 +41,8 @@ type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum LedgerRequest<N: Network, E: Environment> {
-    // /// BlockRequest := (peer_ip, block_height, peers_router)
-    // BlockRequest(SocketAddr, u32, PeersRouter<N, E>),
+    /// BlockRequest := (peer_ip, block_height, peers_router)
+    BlockRequest(SocketAddr, u32, PeersRouter<N, E>),
     /// BlockResponse := (block)
     BlockResponse(Block<N>),
     /// Heartbeat := ()
@@ -231,38 +231,38 @@ impl<N: Network> Ledger<N> {
         self.canon.get_previous_ledger_root(block_height)
     }
 
-    /// Returns the block locator hashes of the current ledger.
-    pub fn get_block_locator_hashes(&self) -> Result<Vec<(u32, N::BlockHash)>> {
-        const NUM_LOCATOR_HASHES: u32 = 64;
+    /// Returns the block locators of the current ledger.
+    pub fn get_block_locators(&self) -> Result<Vec<(u32, N::BlockHash)>> {
+        const MAXIMUM_BLOCK_LOCATORS: u32 = 64;
 
         // Retrieve the latest block height.
         let latest_block_height = self.latest_block_height();
 
-        // Determine the number of block locator hashes to obtain (with the genesis block as one block locator hash).
-        let mut num_block_locators = std::cmp::min(NUM_LOCATOR_HASHES - 1, latest_block_height);
-        // Determine the number of latest blocks to include as block locator hashes (linear).
+        // Determine the number of block locators to obtain (with the genesis block as one block locator).
+        let mut num_block_locators = std::cmp::min(MAXIMUM_BLOCK_LOCATORS - 1, latest_block_height);
+        // Determine the number of latest blocks to include as block locators (linear).
         let num_latest_blocks = std::cmp::min(10, num_block_locators);
 
-        // Initialize the list of block locator hashes.
-        let mut block_locator_hashes = Vec::with_capacity(num_block_locators as usize);
-        // Initialize the current block height that a block locator hash is obtained from.
+        // Initialize the list of block locators.
+        let mut block_locators = Vec::with_capacity(num_block_locators as usize);
+        // Initialize the current block height that a block locator is obtained from.
         let mut block_locator_height = latest_block_height;
 
-        // Add the latest block locator hashes.
+        // Add the latest block locators.
         for _ in 0..num_latest_blocks {
-            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
             block_locator_height -= 1; // safe; num_latest_blocks is never higher than the height
         }
 
         // Return if the number of block locators has been satisfied.
         num_block_locators -= num_latest_blocks;
         if num_block_locators == 0 {
-            block_locator_hashes.push((0, self.get_block_hash(0)?));
-            return Ok(block_locator_hashes);
+            block_locators.push((0, self.get_block_hash(0)?));
+            return Ok(block_locators);
         }
 
         // Determine the proportional step for the next round of block locators, which are spread apart.
-        // This is calculated as the average distance between block hashes based on the desired number of block locator hashes.
+        // This is calculated as the average distance between block hashes based on the desired number of block locators.
         let mut proportional_step = block_locator_height / num_block_locators;
 
         // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
@@ -275,7 +275,7 @@ impl<N: Network> Ledger<N> {
         // Obtain a few hashes increasing the distance quadratically.
         let mut quadratic_step = 2; // the size of the first quadratic step
         for _ in 0..num_quadratic_steps {
-            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
             block_locator_height = block_locator_height.saturating_sub(quadratic_step);
             quadratic_step *= 2;
         }
@@ -294,16 +294,16 @@ impl<N: Network> Ledger<N> {
 
         // Obtain the rest of hashes with a proportional distance between them.
         for _ in 0..num_proportional_steps {
-            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
             if block_locator_height == 0 {
-                return Ok(block_locator_hashes);
+                return Ok(block_locators);
             }
             block_locator_height = block_locator_height.saturating_sub(proportional_step);
         }
 
-        block_locator_hashes.push((0, self.get_block_hash(0)?));
+        block_locators.push((0, self.get_block_hash(0)?));
 
-        Ok(block_locator_hashes)
+        Ok(block_locators)
     }
 
     ///
@@ -312,14 +312,16 @@ impl<N: Network> Ledger<N> {
     ///
     pub(super) async fn update<E: Environment>(&mut self, request: LedgerRequest<N, E>) -> Result<()> {
         match request {
-            // LedgerRequest::BlockRequest(peer_ip, block_height, peers_router) => {
-            //     let request = match self.get_block(block_height) {
-            //         Ok(block) => PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block.height(), block)),
-            //         Err(error) => PeersRequest::Failure(peer_ip, format!("{}", error)),
-            //     };
-            //     peers_router.send(request).await?;
-            //     Ok(())
-            // }
+            LedgerRequest::BlockRequest(peer_ip, block_height, peers_router) => {
+                match self.get_block(block_height) {
+                    Ok(block) => {
+                        let request = PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block.height(), block));
+                        peers_router.send(request).await?;
+                    }
+                    Err(error) => error!("{}", error),
+                }
+                Ok(())
+            }
             LedgerRequest::BlockResponse(block) => self.add_block::<E>(&block),
             LedgerRequest::Heartbeat => {
                 // Check for candidate blocks to fast forward the ledger.
@@ -541,20 +543,22 @@ impl<N: Network> Ledger<N> {
     /// in a sync response to the given peer.
     ///
     async fn process_sync_request<E: Environment>(&mut self, peer_ip: SocketAddr, peers_router: PeersRouter<N, E>) -> Result<()> {
-        // Retrieve the latest block height.
-        let latest_block_height = self.latest_block_height();
+        // // Retrieve the latest block height.
+        // let latest_block_height = self.latest_block_height();
+        //
+        // // Retrieve the latest block hashes, up to the maximum fork depth.
+        // let start_block_height = latest_block_height.saturating_sub(E::MAXIMUM_FORK_DEPTH);
+        // let end_block_height = latest_block_height;
+        // let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
+        //
+        // // Convert the block hashes into block locators, by including the block height with each block hash.
+        // let block_locators = block_hashes
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(i, block_hash)| (start_block_height + i as u32, *block_hash))
+        //     .collect();
 
-        // Retrieve the latest block hashes, up to the maximum fork depth.
-        let start_block_height = latest_block_height.saturating_sub(E::MAXIMUM_FORK_DEPTH);
-        let end_block_height = latest_block_height;
-        let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
-
-        // Convert the block hashes into block locators, by including the block height with each block hash.
-        let block_locators = block_hashes
-            .iter()
-            .enumerate()
-            .map(|(i, block_hash)| (start_block_height + i as u32, *block_hash))
-            .collect();
+        let block_locators = self.get_block_locators()?;
 
         // Send the sync response to the peer.
         let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));

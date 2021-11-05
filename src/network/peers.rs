@@ -418,7 +418,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         {
                             true => {
                                 // Send the first ping sequence.
-                                let message = Message::<N, E>::Ping(E::MESSAGE_VERSION, 0);
+                                let message = Message::<N, E>::Ping(E::MESSAGE_VERSION);
                                 trace!("Sending '{}' to {}", message.name(), peer_ip);
                                 outbound_socket.send(message).await?;
                                 Ok(peer_ip)
@@ -521,14 +521,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version, block_height) => {
+                                Message::Ping(version) => {
                                     // Ensure the message protocol version is not outdated.
                                     if *version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
                                     // Route the `Ping` to the state manager.
-                                    if let Err(error) = state_router.send(StateRequest::Ping(peer_ip, *version, *block_height, peers_router.clone())).await {
+                                    if let Err(error) = state_router.send(StateRequest::Ping(peer_ip, *version, peers_router.clone())).await {
                                         warn!("[Ping] {}", error);
                                     }
                                 },

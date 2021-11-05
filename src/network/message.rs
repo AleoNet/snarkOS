@@ -36,8 +36,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>),
-    /// Ping := (version, block_height)
-    Ping(u32, u32),
+    /// Ping := (version)
+    Ping(u32),
     /// Pong := ()
     Pong,
     /// SyncRequest := ()
@@ -103,7 +103,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
+            Self::Ping(version) => Ok(version.to_le_bytes().to_vec()),
             Self::Pong => Ok(vec![]),
             Self::SyncRequest => Ok(vec![]),
             Self::SyncResponse(block_locators) => Ok(to_bytes_le![block_locators.len() as u32, block_locators]?),
@@ -146,7 +146,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
             5 => Self::PeerResponse(bincode::deserialize(data)?),
-            6 => Self::Ping(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..])?),
+            6 => Self::Ping(bincode::deserialize(&data[0..4])?),
             7 => match data.len() == 0 {
                 true => Self::Pong,
                 false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),

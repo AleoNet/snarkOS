@@ -253,8 +253,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                 if let Err(error) = state_router_clone.send(request).await {
                     error!("Failed to send request to state manager: {}", error)
                 }
-                // Sleep for 5 seconds.
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                // Sleep for 15 seconds.
+                tokio::time::sleep(Duration::from_secs(15)).await;
             }
         }));
     }
