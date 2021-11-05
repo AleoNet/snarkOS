@@ -14,5 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod display;
-pub use display::*;
+use tracing_subscriber::EnvFilter;
+
+pub fn initialize_logger() {
+    let verbosity = 4;
+
+    match verbosity {
+        1 => std::env::set_var("RUST_LOG", "info"),
+        2 => std::env::set_var("RUST_LOG", "debug"),
+        3 | 4 => std::env::set_var("RUST_LOG", "trace"),
+        _ => std::env::set_var("RUST_LOG", "info"),
+    };
+
+    // Filter out undesirable logs.
+    let filter = EnvFilter::from_default_env()
+        .add_directive("mio=off".parse().unwrap())
+        .add_directive("tokio_util=off".parse().unwrap());
+
+    // Initialize tracing.
+    tracing_subscriber::fmt().with_env_filter(filter).with_target(verbosity == 4).init();
+}

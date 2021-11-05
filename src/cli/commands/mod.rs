@@ -13,47 +13,47 @@
 
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
-//
-// pub mod client;
-// pub use client::*;
-//
-// pub mod miner;
-// pub use miner::*;
-//
-// use structopt::StructOpt;
-//
-// #[derive(StructOpt, Debug)]
-// #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
-// pub struct CLI {
-//     /// Enable debug mode
-//     #[structopt(short, long)]
-//     pub debug: bool,
-//
-//     /// Enable verbose mode
-//     #[structopt(short, long, parse(from_occurences))]
-//     pub verbose: u8,
-//
-//     #[structopt(subcommand)]
-//     pub command: Command,
-// }
-//
-// #[dervie(StructOpt, Debug)]
-// pub enum Command {
-//     #[structopt(name = "client")]
-//     Client(Client),
-//
-//     #[structopt(name = "miner")]
-//     Miner(Miner),
-//     // #[structopt(name = "update")]
-//     // Update(Update),
-// }
-//
-// impl Command {
-//     pub fn parse(self) -> anyhow::Result<String> {
-//         match self {
-//             Self::Miner(comand) => comand.parse(),
-//             Self::Client(command) => command.parse(),
-//             // Self::Update(command) => command.parse(),
-//         }
-//     }
-// }
+
+pub mod client;
+pub use client::*;
+
+pub mod miner;
+pub use miner::*;
+
+use structopt::StructOpt;
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
+pub struct CLI {
+    /// Enable debug mode
+    #[structopt(short, long)]
+    pub debug: bool,
+
+    /// Enable verbose mode
+    #[structopt(short, long, parse(from_occurrences))]
+    pub verbose: u8,
+
+    #[structopt(subcommand)]
+    pub mode: Mode,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum Mode {
+    #[structopt(name = "client")]
+    Client(ClientMode),
+
+    // #[structopt(name = "miner")]
+    // Miner(Miner),
+    // #[structopt(name = "update")]
+    // Update(Update),
+}
+
+impl Mode {
+    pub async fn start(self) -> anyhow::Result<()> {
+        match self {
+            Self::Client(command) => command.start().await,
+            // Self::Miner(comand) => comand.parse(),
+            // Self::Update(command) => command.parse(),
+        }
+    }
+}
