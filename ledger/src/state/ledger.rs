@@ -380,6 +380,7 @@ impl<N: Network> LedgerState<N> {
             remaining_blocks -= 1;
         }
 
+        // Regenerate the ledger tree.
         self.regenerate_ledger_tree()?;
 
         // Reverse the order of the blocks, so they are in increasing order (i.e. 1, 2, 3...).
@@ -391,13 +392,14 @@ impl<N: Network> LedgerState<N> {
     // TODO (raychu86): Make this more efficient.
     /// Update the ledger tree.
     pub fn regenerate_ledger_tree(&mut self) -> Result<()> {
-        // Add the current block hashes to create the new ledger tree.
-        let mut new_ledger_tree = LedgerTree::<N>::new()?;
-
+        // Retrieve all of the block hashes.
         let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
         for height in 0..=self.latest_block_height() {
             block_hashes.push(self.get_block_hash(height)?);
         }
+
+        // Add the block hashes to create the new ledger tree.
+        let mut new_ledger_tree = LedgerTree::<N>::new()?;
         new_ledger_tree.add_all(&block_hashes)?;
 
         // Update the current ledger tree with the current state.
@@ -671,8 +673,8 @@ impl<N: Network> BlockState<N> {
     /// Removes the given block height from storage.
     fn remove_block(&self, block_height: u32) -> Result<()> {
         // Ensure the block exists.
-        if self.block_heights.contains_key(&block_height)? {
-            Err(anyhow!("Block {} does not exists in storage", block_height))
+        if !self.block_heights.contains_key(&block_height)? {
+            Err(anyhow!("Block {} does not exist in storage", block_height))
         } else {
             // Retrieve the block hash.
             let block_hash = match self.block_heights.get(&block_height)? {

@@ -83,6 +83,7 @@ fn test_genesis() {
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
     ledger_tree.add(&genesis.block_hash()).expect("Failed to add hash to ledger tree");
 
+    // Ensure the ledger is at the genesis block.
     assert_eq!(0, ledger.latest_block_height());
     assert_eq!(genesis.height(), ledger.latest_block_height());
     assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
@@ -112,11 +113,50 @@ fn test_add_next_block() {
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
     ledger_tree.add(&block.block_hash()).expect("Failed to add hash to ledger tree");
 
+    // Ensure the ledger is at block 1.
     assert_eq!(1, ledger.latest_block_height());
     assert_eq!(block.height(), ledger.latest_block_height());
     assert_eq!(block.block_hash(), ledger.latest_block_hash());
     assert_eq!(block.timestamp(), ledger.latest_block_timestamp().unwrap());
     assert_eq!(block.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
     assert_eq!(block.clone(), ledger.latest_block().unwrap());
+    assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
+}
+
+#[test]
+fn test_remove_last_block() {
+    // Initialize a new ledger.
+    let mut ledger = new_ledger::<Testnet2, RocksDB>();
+    assert_eq!(0, ledger.latest_block_height());
+
+    // Initialize a new ledger tree.
+    let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+    ledger_tree
+        .add(&Testnet2::genesis_block().block_hash())
+        .expect("Failed to add hash to ledger tree");
+
+    // Initialize a new account.
+    let account = Account::<Testnet2>::new(&mut thread_rng());
+
+    // Mine the next block.
+    let block = mine_next_block(&ledger, account.address()).expect("Failed to mine a block");
+    ledger.add_next_block(&block).expect("Failed to add next block to ledger");
+    // ledger_tree.add(&block.block_hash()).expect("Failed to add hash to ledger tree");
+    assert_eq!(1, ledger.latest_block_height());
+
+    // Remove the last block.
+    let blocks = ledger.remove_last_blocks(1).expect("Failed to remove the last block");
+    assert_eq!(vec![block], blocks);
+
+    // Retrieve the genesis block.
+    let genesis = Testnet2::genesis_block();
+
+    // Ensure the ledger is back at the genesis block.
+    assert_eq!(0, ledger.latest_block_height());
+    assert_eq!(genesis.height(), ledger.latest_block_height());
+    assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
+    assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp().unwrap());
+    assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
+    assert_eq!(genesis.clone(), ledger.latest_block().unwrap());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
