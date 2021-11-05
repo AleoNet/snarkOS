@@ -27,14 +27,7 @@ impl ConsensusInner {
         self.storage.insert_block(block).await?;
 
         let hash = block.header.hash();
-        match self.try_commit_block(&hash, block).await {
-            Err(ConsensusError::InvalidBlock(hash)) => {
-                self.storage.delete_block(&hash).await?;
-                return Err(ConsensusError::InvalidBlock(hash));
-            }
-            Ok(_) => {}
-            err => return err,
-        }
+        self.try_commit_block(&hash, block).await?;
 
         self.try_to_fast_forward().await?;
 
