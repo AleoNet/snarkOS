@@ -24,10 +24,10 @@ use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone, Debug)]
 pub enum Message<N: Network, E: Environment> {
-    /// BlockRequest := (block_height)
-    BlockRequest(u32),
-    /// BlockResponse := (block_height, block)
-    BlockResponse(u32, Block<N>),
+    /// BlockRequest := (start_block_height, end_block_height (inclusive))
+    BlockRequest(u32, u32),
+    /// BlockResponse := (block)
+    BlockResponse(Block<N>),
     /// ChallengeRequest := (listener_port, block_height)
     ChallengeRequest(u16, u32),
     /// ChallengeResponse := (block_header)
@@ -36,16 +36,16 @@ pub enum Message<N: Network, E: Environment> {
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>),
-    /// Ping := (version, block_height)
-    Ping(u32, u32),
+    /// Ping := (version)
+    Ping(u32),
     /// Pong := ()
     Pong,
     /// SyncRequest := ()
     SyncRequest,
     /// SyncResponse := (\[(block height, block_hash)\])
     SyncResponse(Vec<(u32, N::BlockHash)>),
-    /// UnconfirmedBlock := (block_height, block)
-    UnconfirmedBlock(u32, Block<N>),
+    /// UnconfirmedBlock := (block)
+    UnconfirmedBlock(Block<N>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
     /// Unused
@@ -97,17 +97,17 @@ impl<N: Network, E: Environment> Message<N, E> {
     #[inline]
     pub fn data(&self) -> Result<Vec<u8>> {
         match self {
-            Self::BlockRequest(block_height) => Ok(block_height.to_le_bytes().to_vec()),
-            Self::BlockResponse(block_height, block) => Ok(to_bytes_le![block_height, block]?),
+            Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
+            Self::BlockResponse(block) => Ok(block.to_bytes_le()?),
             Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
             Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version, block_height) => Ok(to_bytes_le![version, block_height]?),
+            Self::Ping(version) => Ok(version.to_le_bytes().to_vec()),
             Self::Pong => Ok(vec![]),
             Self::SyncRequest => Ok(vec![]),
             Self::SyncResponse(block_locators) => Ok(to_bytes_le![block_locators.len() as u32, block_locators]?),
-            Self::UnconfirmedBlock(block_height, block) => Ok(to_bytes_le![block_height, block]?),
+            Self::UnconfirmedBlock(block) => Ok(block.to_bytes_le()?),
             Self::UnconfirmedTransaction(transaction) => transaction.to_bytes_le(),
             Self::Unused(_) => Ok(vec![]),
         }
@@ -132,12 +132,10 @@ impl<N: Network, E: Environment> Message<N, E> {
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::BlockRequest(bincode::deserialize(data)?),
+            0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
             1 => {
                 let mut cursor = Cursor::new(data);
-                let block_height: u32 = FromBytes::read_le(&mut cursor)?;
-                let block: Block<N> = FromBytes::read_le(&mut cursor)?;
-                Self::BlockResponse(block_height, block)
+                Self::BlockResponse(FromBytes::read_le(&mut cursor)?)
             }
             2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..])?),
             3 => Self::ChallengeResponse(bincode::deserialize(data)?),
@@ -146,7 +144,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
             5 => Self::PeerResponse(bincode::deserialize(data)?),
-            6 => Self::Ping(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..])?),
+            6 => Self::Ping(bincode::deserialize(&data[0..4])?),
             7 => match data.len() == 0 {
                 true => Self::Pong,
                 false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
@@ -166,9 +164,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             }
             10 => {
                 let mut cursor = Cursor::new(data);
-                let block_height: u32 = FromBytes::read_le(&mut cursor)?;
-                let block: Block<N> = FromBytes::read_le(&mut cursor)?;
-                Self::UnconfirmedBlock(block_height, block)
+                Self::UnconfirmedBlock(FromBytes::read_le(&mut cursor)?)
             }
             11 => Self::UnconfirmedTransaction(FromBytes::from_bytes_le(&data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),

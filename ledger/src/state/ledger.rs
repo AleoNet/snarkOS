@@ -29,8 +29,13 @@ const TWO_HOURS_UNIX: i64 = 7200;
 pub struct LedgerState<N: Network> {
     /// The current state of the ledger.
     latest_state: (u32, N::BlockHash),
+    /// The current block locators of the ledger.
+    latest_block_locators: Vec<(u32, N::BlockHash)>,
+    /// The current ledger tree of block hashes.
     ledger_tree: Arc<Mutex<LedgerTree<N>>>,
+    /// The ledger root corresponding to each block height.
     ledger_roots: DataMap<N::LedgerRoot, u32>,
+    /// The blocks of the ledger in storage.
     blocks: BlockState<N>,
 }
 
@@ -46,6 +51,7 @@ impl<N: Network> LedgerState<N> {
         // Initialize the ledger.
         let mut ledger = Self {
             latest_state: (genesis.height(), genesis.block_hash()),
+            latest_block_locators: Default::default(),
             ledger_tree: Arc::new(Mutex::new(LedgerTree::<N>::new()?)),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
@@ -93,6 +99,7 @@ impl<N: Network> LedgerState<N> {
         // Update the latest state.
         let block = ledger.get_block(latest_block_height)?;
         ledger.latest_state = (block.height(), block.block_hash());
+        ledger.latest_block_locators = ledger.get_block_locators(block.height())?;
         trace!("Loaded ledger from block {}", block.height());
 
         // let value = storage.export()?;
@@ -116,6 +123,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the latest ledger root.
     pub fn latest_ledger_root(&self) -> N::LedgerRoot {
         self.ledger_tree.lock().unwrap().root()
+    }
+
+    /// Returns the latest block locators.
+    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash)> {
+        &self.latest_block_locators
     }
 
     /// Returns the latest block timestamp.
@@ -238,6 +250,78 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_previous_ledger_root(block_height)
     }
 
+    /// Returns the block locators of the current ledger, from the given block height.
+    pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash)>> {
+        const MAXIMUM_BLOCK_LOCATORS: u32 = 64;
+
+        // Determine the number of block locators to obtain (with the genesis block as one block locator).
+        let mut num_block_locators = std::cmp::min(MAXIMUM_BLOCK_LOCATORS - 1, block_height);
+        // Determine the number of latest blocks to include as block locators (linear).
+        let num_latest_blocks = std::cmp::min(10, num_block_locators);
+
+        // Initialize the list of block locators.
+        let mut block_locators = Vec::with_capacity(num_block_locators as usize);
+        // Initialize the current block height that a block locator is obtained from.
+        let mut block_locator_height = block_height;
+
+        // Add the latest block locators.
+        for _ in 0..num_latest_blocks {
+            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            block_locator_height -= 1; // safe; num_latest_blocks is never higher than the height
+        }
+
+        // Return if the number of block locators has been satisfied.
+        num_block_locators -= num_latest_blocks;
+        if num_block_locators == 0 {
+            block_locators.push((0, self.get_block_hash(0)?));
+            return Ok(block_locators);
+        }
+
+        // Determine the proportional step for the next round of block locators, which are spread apart.
+        // This is calculated as the average distance between block hashes based on the desired number of block locators.
+        let mut proportional_step = block_locator_height / num_block_locators;
+
+        // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
+        // lower or close to the proportional step distance.
+        let num_quadratic_steps = (proportional_step as f32).log2() as u32;
+
+        // The remaining block hashes should have a proportional distance in block height between them.
+        let num_proportional_steps = num_block_locators - num_quadratic_steps;
+
+        // Obtain a few hashes increasing the distance quadratically.
+        let mut quadratic_step = 2; // the size of the first quadratic step
+        for _ in 0..num_quadratic_steps {
+            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            block_locator_height = block_locator_height.saturating_sub(quadratic_step);
+            quadratic_step *= 2;
+        }
+
+        // Update the size of the proportional step so that the hashes of the remaining blocks have the same distance
+        // between one another.
+        proportional_step = block_locator_height / num_proportional_steps;
+
+        // Tweak: in order to avoid "jumping" by too many indices with the last step,
+        // increase the value of each step by 1 if the last step is too large. This
+        // can result in the final number of locator hashes being a bit lower, but
+        // it's preferable to having a large gap between values.
+        if block_locator_height - proportional_step * num_proportional_steps > 2 * proportional_step {
+            proportional_step += 1;
+        }
+
+        // Obtain the rest of hashes with a proportional distance between them.
+        for _ in 0..num_proportional_steps {
+            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+            if block_locator_height == 0 {
+                return Ok(block_locators);
+            }
+            block_locator_height = block_locator_height.saturating_sub(proportional_step);
+        }
+
+        block_locators.push((0, self.get_block_hash(0)?));
+
+        Ok(block_locators)
+    }
+
     /// Adds the given block as the next block in the ledger to storage.
     pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
         // Ensure the block itself is valid.
@@ -345,44 +429,50 @@ impl<N: Network> LedgerState<N> {
         self.blocks.add_block(block)?;
         self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
+        self.latest_block_locators = self.get_block_locators(block.height())?;
         self.latest_state = (block_height, block.block_hash());
         Ok(())
     }
 
-    /// Removes the latest block from storage, returning the removed block on success.
-    pub fn remove_last_block(&mut self) -> Result<Block<N>> {
-        let block = self.latest_block()?;
-        let block_height = block.height();
-
-        self.blocks.remove_block(block_height)?;
-        self.ledger_roots.remove(&block.previous_ledger_root())?;
-        self.latest_state = match block_height == 0 {
-            true => (0, block.previous_block_hash()),
-            false => (block_height - 1, block.previous_block_hash()),
-        };
-
-        Ok(block)
-    }
-
-    // TODO (raychu86): Make this more efficient.
-    /// Update the ledger tree.
-    pub fn regenerate_ledger_tree(&mut self) -> Result<()> {
-        // Add the current block hashes to create the new ledger tree.
-        let mut new_ledger_tree = LedgerTree::<N>::new()?;
-
-        let mut block_hashes = vec![];
-        for height in 0..=self.latest_block_height() {
-            let block_hash = self.get_block_hash(height)?;
-
-            block_hashes.push(block_hash);
+    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
+    pub fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
+        // TODO (howardwu): Add a proper safety check that `num_blocks` is within the MAXIMUM_FORK_DEPTH.
+        if num_blocks == 0 || num_blocks > 1024 {
+            return Err(anyhow!("Attempted to remove {} blocks, which is invalid", num_blocks));
         }
-        new_ledger_tree.add_all(&block_hashes)?;
 
-        // Update the current ledger tree with the current state.
-        let mut ledger_tree = self.ledger_tree.lock().unwrap();
-        *ledger_tree = new_ledger_tree;
+        // Initialize a list of the removed blocks.
+        let mut blocks = Vec::with_capacity(num_blocks as usize);
 
-        Ok(())
+        // Initialize the block to remove.
+        let mut block = self.latest_block()?;
+        let mut remaining_blocks = num_blocks;
+
+        while block.height() > 0 && remaining_blocks > 0 {
+            // Update the internal state of the ledger, except for the ledger tree.
+            self.blocks.remove_block(block.height())?;
+            self.ledger_roots.remove(&block.previous_ledger_root())?;
+            self.latest_block_locators = self.get_block_locators(block.height() - 1)?;
+            self.latest_state = match block.height() == 0 {
+                true => (0, block.previous_block_hash()),
+                false => (block.height() - 1, block.previous_block_hash()),
+            };
+
+            // Append this block to the final output.
+            blocks.push(block);
+            // Retrieve the next block.
+            block = self.latest_block()?;
+            // Decrement the remaining blocks by 1.
+            remaining_blocks -= 1;
+        }
+
+        // Regenerate the ledger tree.
+        self.regenerate_ledger_tree()?;
+
+        // Reverse the order of the blocks, so they are in increasing order (i.e. 1, 2, 3...).
+        blocks.reverse();
+        // Return the removed blocks.
+        Ok(blocks)
     }
 
     ///
@@ -458,6 +548,26 @@ impl<N: Network> LedgerState<N> {
         let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&block_hash)?;
 
         LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
+    }
+
+    // TODO (raychu86): Make this more efficient.
+    /// Update the ledger tree.
+    fn regenerate_ledger_tree(&mut self) -> Result<()> {
+        // Retrieve all of the block hashes.
+        let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
+        for height in 0..=self.latest_block_height() {
+            block_hashes.push(self.get_block_hash(height)?);
+        }
+
+        // Add the block hashes to create the new ledger tree.
+        let mut new_ledger_tree = LedgerTree::<N>::new()?;
+        new_ledger_tree.add_all(&block_hashes)?;
+
+        // Update the current ledger tree with the current state.
+        let mut ledger_tree = self.ledger_tree.lock().unwrap();
+        *ledger_tree = new_ledger_tree;
+
+        Ok(())
     }
 }
 
@@ -597,6 +707,11 @@ impl<N: Network> BlockState<N> {
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+        // Ensure the starting block height is less than the ending block height.
+        if start_block_height > end_block_height {
+            return Err(anyhow!("Invalid starting and ending block heights"));
+        }
+
         (start_block_height..=end_block_height)
             .into_iter()
             .map(|height| self.get_block(height))
@@ -648,10 +763,16 @@ impl<N: Network> BlockState<N> {
 
     /// Removes the given block height from storage.
     fn remove_block(&self, block_height: u32) -> Result<()> {
-        // Ensure the block exists.
-        if self.block_heights.contains_key(&block_height)? {
-            Err(anyhow!("Block {} does not exists in storage", block_height))
-        } else {
+        // Ensure the block height is not the genesis block.
+        if block_height == 0 {
+            Err(anyhow!("Block {} cannot be removed from storage", block_height))
+        }
+        // Ensure the block at the given block height exists.
+        else if !self.block_heights.contains_key(&block_height)? {
+            Err(anyhow!("Block {} does not exist in storage", block_height))
+        }
+        // Remove the block at the given block height.
+        else {
             // Retrieve the block hash.
             let block_hash = match self.block_heights.get(&block_height)? {
                 Some(block_hash) => block_hash,

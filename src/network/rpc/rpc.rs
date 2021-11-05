@@ -20,9 +20,9 @@ use crate::{
     network::{
         rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
         Ledger,
-        StateRouter,
     },
     Environment,
+    LedgerRouter,
 };
 use snarkvm::dpc::Network;
 
@@ -85,14 +85,14 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     username: Option<String>,
     password: Option<String>,
     ledger: Arc<RwLock<Ledger<N>>>,
-    state_router: StateRouter<N, E>,
+    ledger_router: LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = match (username, password) {
         (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
         _ => None,
     };
 
-    let rpc_impl = RpcImpl::new(credentials, ledger, state_router);
+    let rpc_impl = RpcImpl::new(credentials, ledger, ledger_router);
 
     let service = make_service_fn(move |_conn| {
         let rpc = rpc_impl.clone();

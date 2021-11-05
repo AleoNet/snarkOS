@@ -16,3 +16,6 @@
 
 pub(crate) mod ledger;
 pub use ledger::LedgerState;
+
+#[cfg(test)]
+mod tests;

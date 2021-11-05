@@ -32,12 +32,23 @@ fn test_open_map() {
 }
 
 #[test]
+fn test_insert_and_contains_key() {
+    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
+    let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+
+    map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
+    assert!(map.contains_key(&123456789).expect("Failed to call contains key"));
+    assert!(!map.contains_key(&000000000).expect("Failed to call contains key"));
+}
+
+#[test]
 fn test_insert_and_get() {
     let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
     let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
 
     map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
     assert_eq!(Some("123456789".to_string()), map.get(&123456789).expect("Failed to get"));
+    assert_eq!(None, map.get(&000000000).expect("Failed to get"));
 }
 
 #[test]
