@@ -14,22 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::CLI;
+use snarkos::Node;
 
 use anyhow::Result;
 use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = CLI::from_args();
-
-    if cli.debug {
-        println!("\n{:#?}\n", cli);
-    }
-
-    cli.start().await?;
-
-    std::future::pending::<()>().await;
-
-    Ok(())
+    Node::from_args().start().await
 }

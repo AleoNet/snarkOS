@@ -19,9 +19,6 @@ extern crate thiserror;
 #[macro_use]
 extern crate tracing;
 
-pub mod cli;
-pub use cli::*;
-
 pub mod environment;
 pub use environment::*;
 

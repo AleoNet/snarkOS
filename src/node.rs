@@ -14,82 +14,117 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, network::initialize::Server, Environment};
-use snarkvm::dpc::{Address, Network};
-
-use anyhow::Result;
-use std::sync::{
-    atomic::{AtomicU8, Ordering},
-    Arc,
+use crate::{network::initialize::Server, Client, Environment, Miner, NodeType};
+use snarkvm::{
+    dpc::{prelude::*, testnet2::Testnet2},
+    prelude::*,
 };
-use tokio::task;
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-#[repr(u8)]
-pub enum Status {
-    Idle = 0,
-    Mining,
-    Syncing,
-    ShuttingDown,
+use ::rand::thread_rng;
+use anyhow::Result;
+use colored::*;
+use std::str::FromStr;
+use structopt::StructOpt;
+use tracing_subscriber::EnvFilter;
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
+pub struct Node {
+    /// Specify this as a mining node, with the given miner address.
+    #[structopt(long = "miner")]
+    pub miner: Option<String>,
+    /// Specify the network of this node (default = 2).
+    #[structopt(default_value = "2", short = "n", long = "network")]
+    pub network: u16,
+    /// Specify the port for the node server.
+    #[structopt(long = "node")]
+    pub node: Option<u16>,
+    /// Specify the port for the RPC server.
+    #[structopt(long = "rpc")]
+    pub rpc: Option<u16>,
+    /// Specify the verbosity (default = 3) of the node [possible values: 0, 1, 2, 3]
+    #[structopt(default_value = "3", long = "verbosity")]
+    pub verbosity: u8,
 }
 
-/// A node server implementation.
-// #[derive(Clone)]
-pub struct Node<N: Network, E: Environment> {
-    /// The current status of the node.
-    status: Arc<AtomicU8>,
-    /// The server of the node.
-    server: Server<N, E>,
-    /// The list of tasks spawned by the node.
-    tasks: Tasks<task::JoinHandle<()>>,
-}
+impl Node {
+    /// Starts the node.
+    pub async fn start(self) -> Result<()> {
+        match (self.network, self.miner.is_some()) {
+            (2, true) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
+            (2, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
+            _ => panic!("Unsupported node configuration"),
+        }
+    }
 
-impl<N: Network, E: Environment> Node<N, E> {
-    pub async fn new(node_port: u16, rpc_port: u16, storage_id: u8, miner: Option<Address<N>>) -> Result<Self> {
-        // Initialize the node.
-        let node = Self {
-            status: Arc::new(AtomicU8::new(0)),
-            server: Server::initialize(node_port, rpc_port, storage_id, miner).await?,
-            tasks: Tasks::new(),
+    async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
+        let node_port = self.node.unwrap_or(E::DEFAULT_NODE_PORT);
+        let rpc_port = self.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
+        if node_port < 4130 {
+            panic!("Until configuration files are established, the node port must be at least 4130 or greater");
+        }
+
+        self.print_welcome();
+        self.initialize_logger();
+
+        let miner = match (E::NODE_TYPE, &self.miner) {
+            (NodeType::Miner, Some(address)) => {
+                let miner_address = Address::<N>::from_str(address)?;
+                println!("Your Aleo address is {}.\n\n", miner_address);
+                println!("Starting a mining node on {}.\n", N::NETWORK_NAME);
+                Some(miner_address)
+            }
+            _ => {
+                println!("Starting a client node on {}.\n", N::NETWORK_NAME);
+                None
+            }
         };
 
-        Ok(node)
+        let _server = Server::<N, E>::initialize(node_port, rpc_port, (node_port as u16 - 4130) as u8, miner).await?;
+        std::future::pending::<()>().await;
+        Ok(())
     }
 
-    ///
-    /// Returns the current status of the node.
-    ///
-    #[inline]
-    pub fn status(&self) -> Status {
-        match self.status.load(Ordering::SeqCst) {
-            0 => Status::Idle,
-            1 => Status::Mining,
-            2 => Status::Syncing,
-            3 => Status::ShuttingDown,
-            _ => unreachable!("Invalid status code"),
-        }
+    fn initialize_logger(&self) {
+        match self.verbosity {
+            0 => std::env::set_var("RUST_LOG", "info"),
+            1 => std::env::set_var("RUST_LOG", "debug"),
+            2 | 3 => std::env::set_var("RUST_LOG", "trace"),
+            _ => std::env::set_var("RUST_LOG", "info"),
+        };
+
+        // Filter out undesirable logs.
+        let filter = EnvFilter::from_default_env()
+            .add_directive("mio=off".parse().unwrap())
+            .add_directive("tokio_util=off".parse().unwrap());
+
+        // Initialize tracing.
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_target(self.verbosity == 3)
+            .init();
     }
 
-    /// Updates the node to the given status.
-    #[inline]
-    pub(crate) fn set_status(&self, state: Status) {
-        self.status.store(state as u8, Ordering::SeqCst);
-        match state {
-            Status::ShuttingDown => {
-                // debug!("Shutting down");
-                // self.terminator.store(true, Ordering::SeqCst);
-                self.tasks.flush();
-            }
-            _ => (),
-        }
-    }
+    fn print_welcome(&self) {
+        let mut output = String::new();
+        output += &r#"
 
-    /// Disconnects from peers and proceeds to shut down the node.
-    #[inline]
-    pub async fn shut_down(&self) {
-        self.set_status(Status::ShuttingDown);
-        // for address in self.connected_peers() {
-        //     self.disconnect_from_peer(address).await;
-        // }
+         ╦╬╬╬╬╬╦
+        ╬╬╬╬╬╬╬╬╬                    ▄▄▄▄        ▄▄▄
+       ╬╬╬╬╬╬╬╬╬╬╬                  ▐▓▓▓▓▌       ▓▓▓
+      ╬╬╬╬╬╬╬╬╬╬╬╬╬                ▐▓▓▓▓▓▓▌      ▓▓▓     ▄▄▄▄▄▄       ▄▄▄▄▄▄
+     ╬╬╬╬╬╬╬╬╬╬╬╬╬╬╬              ▐▓▓▓  ▓▓▓▌     ▓▓▓   ▄▓▓▀▀▀▀▓▓▄   ▐▓▓▓▓▓▓▓▓▌
+    ╬╬╬╬╬╬╬╜ ╙╬╬╬╬╬╬╬            ▐▓▓▓▌  ▐▓▓▓▌    ▓▓▓  ▐▓▓▓▄▄▄▄▓▓▓▌ ▐▓▓▓    ▓▓▓▌
+   ╬╬╬╬╬╬╣     ╠╬╬╬╬╬╬           █▓▓▓▓▓▓▓▓▓▓█    ▓▓▓  ▐▓▓▀▀▀▀▀▀▀▀▘ ▐▓▓▓    ▓▓▓▌
+  ╬╬╬╬╬╬╣       ╠╬╬╬╬╬╬         █▓▓▓▌    ▐▓▓▓█   ▓▓▓   ▀▓▓▄▄▄▄▓▓▀   ▐▓▓▓▓▓▓▓▓▌
+ ╬╬╬╬╬╬╣         ╠╬╬╬╬╬╬       ▝▀▀▀▀      ▀▀▀▀▘  ▀▀▀     ▀▀▀▀▀▀       ▀▀▀▀▀▀
+╚╬╬╬╬╬╩           ╩╬╬╬╬╩
+
+"#
+        .white()
+        .bold();
+        output += &"Welcome to Aleo! We thank you for running a network node and supporting privacy.\n\n".bold();
+
+        println!("{}", output);
     }
 }

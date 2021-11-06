@@ -155,7 +155,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Attempt to open a TCP stream.
                 else {
                     debug!("Connecting to {}...", peer_ip);
-                    match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
+                    match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
                         Ok(stream) => match stream {
                             Ok(stream) => Peer::handler(stream, self.local_ip, peers_router, ledger_router).await,
                             Err(error) => {
@@ -378,10 +378,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             // Update the peer IP to the listener port.
                             peer_ip.set_port(listener_port);
                             // Ensure the claimed listener port is open.
-                            let stream = match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_SECS), TcpStream::connect(peer_ip)).await {
-                                Ok(stream) => stream,
-                                Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
-                            };
+                            let stream =
+                                match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
+                                    Ok(stream) => stream,
+                                    Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
+                                };
                             // Error if the stream is not open.
                             if let Err(error) = stream {
                                 return Err(anyhow!("Failed to connect to '{}': '{:?}'", peer_ip, error));
@@ -463,8 +464,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
                     Some(message) = peer.outbound_handler.recv() => {
-                        // Disconnect if the peer has not communicated back in 3 minutes.
-                        if peer.last_seen.elapsed() > Duration::from_secs(180) {
+                        // Disconnect if the peer has not communicated back within the predefined time.
+                        if peer.last_seen.elapsed() > Duration::from_secs(E::MAXIMUM_RADIO_SILENCE_IN_SECS) {
                             warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
                             break;
                         } else {
@@ -477,8 +478,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     result = peer.outbound_socket.next() => match result {
                         // Received a message from the peer.
                         Some(Ok(message)) => {
-                            // Disconnect if the peer has not communicated back in 3 minutes.
-                            match peer.last_seen.elapsed() > Duration::from_secs(180) {
+                            // Disconnect if the peer has not communicated back within the predefined time.
+                            match peer.last_seen.elapsed() > Duration::from_secs(E::MAXIMUM_RADIO_SILENCE_IN_SECS) {
                                 true => {
                                     let last_seen = peer.last_seen.elapsed().as_secs();
                                     warn!("Failed to receive a message from {} in {} seconds", peer_ip, last_seen);

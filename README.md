@@ -1,17 +1,16 @@
 # snarkOS
 
-## Run
+## Development Guide
 
-In one terminal, run:
+In one terminal, start the first node by running:
 ```
-cargo run --release --is-miner -p 4135 --rpc-port 3035
-```
-
-In another terminal, run:
-```
-cargo run --release -p 4132 --rpc-port 3032
+cargo run --release --node 4135 --rpc 3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
 ```
 
+After the first node starts, in a second terminal, run:
+```
+cargo run --release --node 4132 --rpc 3032
+```
 
 ## Usage Guide
 
@@ -43,12 +42,11 @@ USAGE:
 FLAGS:
     -d, --debug       Enable debug mode
     -h, --help        Prints help information
-        --is-miner    Start mining blocks from this node
     -V, --version     Prints version information
 
 OPTIONS:
-        --miner-address <miner-address>    Specify the address that will receive miner rewards
-    -p, --port <port>                      Specify the port the node is run on
-        --rpc-port <rpc-port>              Specify the port the json rpc server is run on
-        --verbose <verbose>                Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2, 3]
+        --miner <address>    Specify the address that will receive miner rewards
+        --node <port>        Specify the port for the node server
+        --rpc <port>         Specify the port for the RPC server
+        --verbose <verbose>  Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2, 3]
 ```
