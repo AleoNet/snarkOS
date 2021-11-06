@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    cli::{commands::*, helpers::initialize_logger},
+    cli::{commands::*, helpers::*},
     Miner,
     Node,
 };
@@ -70,12 +70,12 @@ impl MinerMode {
                 }
 
                 initialize_logger();
+                print_welcome();
 
                 let account = Account::<Testnet2>::from(miner_private_key);
 
                 let _node =
                     Node::<Testnet2, Miner>::new(node_port, rpc_port, (node_port as u16 - 4130) as u8, Some(account.address())).await?;
-                std::future::pending::<()>().await;
             }
         }
 

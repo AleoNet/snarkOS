@@ -14,58 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{commands::CLI, Client, Miner, Node};
+use snarkos::CLI;
 
-use snarkvm::{
-    dpc::{prelude::*, testnet2::Testnet2},
-    prelude::*,
-};
-
-use ::rand::thread_rng;
 use anyhow::Result;
 use structopt::StructOpt;
-use tracing_subscriber::EnvFilter;
-
-pub fn initialize_logger() {
-    let verbosity = 4;
-
-    match verbosity {
-        1 => std::env::set_var("RUST_LOG", "info"),
-        2 => std::env::set_var("RUST_LOG", "debug"),
-        3 | 4 => std::env::set_var("RUST_LOG", "trace"),
-        _ => std::env::set_var("RUST_LOG", "info"),
-    };
-
-    // Filter out undesirable logs.
-    let filter = EnvFilter::from_default_env()
-        .add_directive("mio=off".parse().unwrap())
-        .add_directive("tokio_util=off".parse().unwrap());
-
-    // Initialize tracing.
-    tracing_subscriber::fmt().with_env_filter(filter).with_target(verbosity == 4).init();
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // let node_port = env::args().nth(1).unwrap_or_else(|| "4132".to_string()).parse()?;
-    // if node_port < 4130 {
-    //     panic!("Until configuration files are established, the port must be at least 4130 or greater");
-    // }
-    //
-    // let rpc_port = env::args().nth(2).unwrap_or_else(|| "3032".to_string()).parse()?;
-    //
-    // initialize_logger();
-    //
-    // let account = Account::<Testnet2>::new(&mut thread_rng());
-    //
-    // // Please do not run a miner yet.
-    // if node_port == 4134 || node_port == 4135 {
-    //     let _node = Node::<Testnet2, Miner>::new(node_port, rpc_port, (node_port as u16 - 4130) as u8, Some(account.address())).await?;
-    //     std::future::pending::<()>().await;
-    // } else {
-    //     let _node = Node::<Testnet2, Client>::new(node_port, rpc_port, (node_port as u16 - 4130) as u8, None).await?;
-    //     std::future::pending::<()>().await;
-    // }
 
     let cli = CLI::from_args();
 
@@ -73,7 +28,9 @@ async fn main() -> Result<()> {
         println!("\n{:#?}\n", cli);
     }
 
-    cli.command.start().await?;
+    cli.start().await?;
+
+    std::future::pending::<()>().await;
 
     Ok(())
 }

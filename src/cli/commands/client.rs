@@ -15,12 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    cli::{commands::*, helpers::initialize_logger},
+    cli::{commands::*, helpers::*},
     Client,
     Node,
 };
 
-use ::rand::thread_rng;
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
     prelude::*,
@@ -55,9 +54,9 @@ impl ClientMode {
                 }
 
                 initialize_logger();
+                print_welcome();
 
                 let _node = Node::<Testnet2, Client>::new(node_port, rpc_port, (node_port as u16 - 4130) as u8, None).await?;
-                std::future::pending::<()>().await;
             }
         }
 
