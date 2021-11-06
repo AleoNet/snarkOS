@@ -46,7 +46,7 @@ pub trait RpcFunctions<N: Network> {
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/gettransaction.md")]
-    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Transaction<N>, RpcError>;
+    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<serde_json::Value, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/gettransition.md")]
     async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError>;

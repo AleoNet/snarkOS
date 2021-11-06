@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Environment, Message, PeersRequest, PeersRouter};
-use snarkos_ledger::{storage::Storage, LedgerState};
+use snarkos_ledger::{storage::Storage, LedgerState, Metadata};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -207,6 +207,11 @@ impl<N: Network> Ledger<N> {
     /// Returns the transaction for a given transaction ID.
     pub fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.canon.get_transaction(transaction_id)
+    }
+
+    /// Returns the transaction metadata for a given transaction ID.
+    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+        self.canon.get_transaction_metadata(transaction_id)
     }
 
     /// Returns the block height for the given block hash.

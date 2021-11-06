@@ -18,12 +18,39 @@ use crate::storage::{DataMap, Map, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::{
     path::Path,
     sync::{Arc, Mutex},
 };
 
 const TWO_HOURS_UNIX: i64 = 7200;
+
+///
+/// A helper struct containing transaction metadata.
+///
+/// *Attention*: This data structure is intended for usage in storage only.
+/// Modifications to its layout will impact how metadata is represented in storage.
+///
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Metadata<N: Network> {
+    block_height: u32,
+    block_hash: N::BlockHash,
+    block_timestamp: i64,
+    transaction_index: u16,
+}
+
+impl<N: Network> Metadata<N> {
+    /// Initializes a new instance of `Metadata`.
+    pub fn new(block_height: u32, block_hash: N::BlockHash, block_timestamp: i64, transaction_index: u16) -> Self {
+        Self {
+            block_height,
+            block_hash,
+            block_timestamp,
+            transaction_index,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct LedgerState<N: Network> {
@@ -203,6 +230,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the transaction for a given transaction ID.
     pub fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.blocks.get_transaction(transaction_id)
+    }
+
+    /// Returns the transaction metadata for a given transaction ID.
+    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+        self.blocks.get_transaction_metadata(transaction_id)
     }
 
     /// Returns the block height for the given block hash.
@@ -493,7 +525,7 @@ impl<N: Network> LedgerState<N> {
         let transaction = self.get_transaction(&transaction_id)?;
 
         let block_hash = match self.blocks.transactions.transactions.get(&transaction_id)? {
-            Some((block_hash, _, _, _)) => block_hash,
+            Some((_, _, metadata)) => metadata.block_hash,
             None => return Err(anyhow!("transaction id {} missing from transactions map", transaction_id)),
         };
 
@@ -635,6 +667,11 @@ impl<N: Network> BlockState<N> {
         self.transactions.get_transaction(transaction_id)
     }
 
+    /// Returns the transaction metadata for a given transaction ID.
+    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+        self.transactions.get_transaction_metadata(transaction_id)
+    }
+
     /// Returns the block height for the given block hash.
     fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
         match self.block_headers.get(block_hash)? {
@@ -754,7 +791,8 @@ impl<N: Network> BlockState<N> {
             self.block_transactions.insert(&block_hash, &transaction_ids)?;
             // Insert the transactions.
             for (index, transaction) in transactions.iter().enumerate() {
-                self.transactions.add_transaction(transaction, block_hash, index as u16)?;
+                let metadata = Metadata::<N>::new(block_height, block_hash, block.timestamp(), index as u16);
+                self.transactions.add_transaction(transaction, metadata)?;
             }
 
             Ok(())
@@ -811,7 +849,7 @@ impl<N: Network> BlockState<N> {
 
 #[derive(Clone, Debug)]
 struct TransactionState<N: Network> {
-    transactions: DataMap<N::TransactionID, (N::BlockHash, u16, N::LedgerRoot, Vec<N::TransitionID>)>,
+    transactions: DataMap<N::TransactionID, (N::LedgerRoot, Vec<N::TransitionID>, Metadata<N>)>,
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
     serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
     commitments: DataMap<N::Commitment, N::TransitionID>,
@@ -888,7 +926,7 @@ impl<N: Network> TransactionState<N> {
     pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         // Retrieve the transition IDs.
         let (ledger_root, transition_ids) = match self.transactions.get(transaction_id)? {
-            Some((_, _, ledger_root, transition_ids)) => (ledger_root, transition_ids),
+            Some((ledger_root, transition_ids, _)) => (ledger_root, transition_ids),
             None => return Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
         };
 
@@ -904,8 +942,17 @@ impl<N: Network> TransactionState<N> {
         Transaction::from(*N::inner_circuit_id(), ledger_root, transitions, vec![])
     }
 
+    /// Returns the transaction metadata for a given transaction ID.
+    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+        // Retrieve the metadata from the transactions map.
+        match self.transactions.get(transaction_id)? {
+            Some((_, _, metadata)) => Ok(metadata),
+            None => Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
+        }
+    }
+
     /// Adds the given transaction to storage.
-    pub(crate) fn add_transaction(&self, transaction: &Transaction<N>, block_hash: N::BlockHash, transaction_index: u16) -> Result<()> {
+    pub(crate) fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>) -> Result<()> {
         // Ensure the transaction does not exist.
         let transaction_id = transaction.transaction_id();
         if self.transactions.contains_key(&transaction_id)? {
@@ -917,7 +964,7 @@ impl<N: Network> TransactionState<N> {
 
             // Insert the transaction ID.
             self.transactions
-                .insert(&transaction_id, &(block_hash, transaction_index, ledger_root, transition_ids))?;
+                .insert(&transaction_id, &(ledger_root, transition_ids, metadata))?;
 
             for (i, transition) in transitions.iter().enumerate() {
                 let transition_id = transition.transition_id();
@@ -952,7 +999,7 @@ impl<N: Network> TransactionState<N> {
         } else {
             // Retrieve the transition IDs from the transaction.
             let transition_ids = match self.transactions.get(&transaction_id)? {
-                Some((_, _, _, transition_ids)) => transition_ids,
+                Some((_, transition_ids, _)) => transition_ids,
                 None => return Err(anyhow!("Transaction {} missing from transactions map", transaction_id)),
             };
 

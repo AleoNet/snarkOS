@@ -27,6 +27,7 @@ use crate::{
     LedgerRequest,
     LedgerRouter,
 };
+use snarkos_ledger::Metadata;
 use snarkvm::{
     dpc::{Block, Network, RecordCiphertext, Transaction, Transition},
     utilities::FromBytes,
@@ -287,10 +288,12 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.read().await.get_block_hash(block_height)?)
     }
 
-    /// Returns a transaction given the transaction ID.
-    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Transaction<N>, RpcError> {
+    /// Returns a transaction with metadata given the transaction ID.
+    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Value, RpcError> {
         let transaction_id: N::TransactionID = serde_json::from_value(transaction_id)?;
-        Ok(self.ledger.read().await.get_transaction(&transaction_id)?)
+        let transaction: Transaction<N> = self.ledger.read().await.get_transaction(&transaction_id)?;
+        let metadata: Metadata<N> = self.ledger.read().await.get_transaction_metadata(&transaction_id)?;
+        Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata }))
     }
 
     /// Returns a transition given the transition ID.

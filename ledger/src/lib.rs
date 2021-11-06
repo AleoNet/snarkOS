@@ -18,6 +18,6 @@
 extern crate tracing;
 
 pub(crate) mod state;
-pub use state::LedgerState;
+pub use state::{LedgerState, Metadata};
 
 pub mod storage;
