@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Environment, Message, PeersRequest, PeersRouter};
-use snarkos_ledger::{storage::Storage, LedgerState};
+use crate::{helpers::CircularMap, Environment, Message, PeersRequest, PeersRouter};
+use snarkos_ledger::{storage::Storage, LedgerState, Metadata};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -69,7 +69,7 @@ pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
     /// A map of previous block hashes to unconfirmed blocks.
-    unconfirmed_blocks: HashMap<N::BlockHash, Block<N>>,
+    unconfirmed_blocks: CircularMap<N::BlockHash, Block<N>, 1024>,
     /// The pool of unconfirmed transactions.
     memory_pool: MemoryPool<N>,
     /// A terminator bit for the miner.
@@ -207,6 +207,11 @@ impl<N: Network> Ledger<N> {
     /// Returns the transaction for a given transaction ID.
     pub fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.canon.get_transaction(transaction_id)
+    }
+
+    /// Returns the transaction metadata for a given transaction ID.
+    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+        self.canon.get_transaction_metadata(transaction_id)
     }
 
     /// Returns the block height for the given block hash.
@@ -485,11 +490,11 @@ impl<N: Network> Ledger<N> {
                         }
                     }
 
-                    // Ensure any potential fork is within the maximum fork depth.
-                    if latest_block_height_of_peer - common_ancestor + 1 > E::MAXIMUM_FORK_DEPTH {
-                        self.add_failure(peer_ip, "Received a sync response that exceeds the maximum fork depth".to_string());
-                        return Ok(());
-                    }
+                    // // Ensure any potential fork is within the maximum fork depth.
+                    // if latest_block_height_of_peer - common_ancestor + 1 > E::MAXIMUM_FORK_DEPTH {
+                    //     self.add_failure(peer_ip, "Received a sync response that exceeds the maximum fork depth".to_string());
+                    //     return Ok(());
+                    // }
 
                     // TODO (howardwu): If the distance of (latest_block_height_of_peer - common_ancestor) is less than 10,
                     //  manually check the fork status 1 by 1, as a slow response from the peer could make it look like a fork, based on this simple logic.
@@ -662,9 +667,11 @@ impl<N: Network> Ledger<N> {
                     // Ensure the unconfirmed block does not already exist in the memory pool.
                     match !self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                         true => {
-                            // Add the block to the unconfirmed blocks.
-                            trace!("Adding unconfirmed block {} to memory pool", block.height());
-                            self.unconfirmed_blocks.insert(block.previous_block_hash(), block.clone());
+                            if self.unconfirmed_blocks.len() < E::MAXIMUM_UNCONFIRMED_BLOCKS {
+                                // Add the block to the unconfirmed blocks.
+                                trace!("Adding unconfirmed block {} to memory pool", block.height());
+                                self.unconfirmed_blocks.insert(block.previous_block_hash(), block.clone());
+                            }
                             Ok(())
                         }
                         false => {

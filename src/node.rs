@@ -17,12 +17,12 @@
 use crate::{helpers::Tasks, network::initialize::Server, Environment};
 use snarkvm::dpc::{Address, Network};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::sync::{
     atomic::{AtomicU8, Ordering},
     Arc,
 };
-use tokio::{runtime, task};
+use tokio::task;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]

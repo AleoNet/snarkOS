@@ -22,15 +22,9 @@ use futures::SinkExt;
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
-    sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{
-    net::TcpStream,
-    sync::{mpsc, RwLock},
-    task,
-    time::timeout,
-};
+use tokio::{net::TcpStream, sync::mpsc, task, time::timeout};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -300,7 +294,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 }
 
-// TODO (howardwu): Consider changing this.
+// TODO (howardwu): Consider changing this to a random challenge height.
+//  The tradeoff is that checking genesis ensures your peer is starting at the same genesis block.
+//  Choosing a random height also requires knowing upfront the height of the peer.
+//  As such, leaving it at the genesis block height may be the best option here.
 const CHALLENGE_HEIGHT: u32 = 0;
 
 ///
