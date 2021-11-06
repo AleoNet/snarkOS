@@ -47,6 +47,9 @@ features = [ "clock", "serde" ]
 [dependencies.circular-queue]
 version = "0.2"
 
+[dependencies.colored]
+version = "2.0"
+
 [dependencies.hex]
 version = "0.4.2"
 
@@ -113,6 +116,9 @@ version = "0.1"
 
 [dependencies.tracing-subscriber]
 version = "0.2"
+
+[dependencies.structopt]
+version = "0.3"
 
 [profile.release]
 opt-level = 3
