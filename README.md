@@ -4,12 +4,12 @@
 
 In one terminal, run:
 ```
-cargo run --release 4132 3032
+cargo run --release --is-miner -p 4135 --rpc-port 3035
 ```
 
 In another terminal, run:
 ```
-cargo run --release 4135 3035
+cargo run --release -p 4132 --rpc-port 3032
 ```
 
 
