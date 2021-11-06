@@ -42,7 +42,7 @@ pub struct Node {
     /// Specify the port for the RPC server.
     #[structopt(long = "rpc")]
     pub rpc: Option<u16>,
-    /// Specify the verbosity of the node [possible values: 0, 1, 2, 3]
+    /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "3", long = "verbosity")]
     pub verbosity: u8,
 }
