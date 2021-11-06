@@ -20,7 +20,6 @@ use snarkvm::{
     prelude::*,
 };
 
-use ::rand::thread_rng;
 use anyhow::Result;
 use colored::*;
 use std::str::FromStr;
@@ -45,6 +44,9 @@ pub struct Node {
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "3", long = "verbosity")]
     pub verbosity: u8,
+    /// If the flag is set, the node will only output logs.
+    #[structopt(short, long)]
+    pub nodisplay: bool,
 }
 
 impl Node {
@@ -64,8 +66,10 @@ impl Node {
             panic!("Until configuration files are established, the node port must be at least 4130 or greater");
         }
 
-        self.print_welcome();
-        self.initialize_logger();
+        if self.nodisplay {
+            self.print_welcome();
+            self.initialize_logger();
+        }
 
         let miner = match (E::NODE_TYPE, &self.miner) {
             (NodeType::Miner, Some(address)) => {
