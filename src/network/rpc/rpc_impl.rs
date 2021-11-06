@@ -34,10 +34,9 @@ use snarkvm::{
 };
 
 use anyhow::anyhow;
-use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
-use serde::{de::DeserializeOwned, Serialize};
+use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
-use std::{cmp::max, future::Future, ops::Deref, sync::Arc};
+use std::{cmp::max, ops::Deref, sync::Arc};
 use tokio::sync::RwLock;
 
 type JsonRPCError = jsonrpc_core::Error;
@@ -105,137 +104,6 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
             credentials,
             ledger_router,
         }))
-    }
-
-    /// A helper function used to pass a single value to the RPC handler.
-    pub async fn map_rpc_singlet<A: DeserializeOwned, O: Serialize, Fut: Future<Output = Result<O, RpcError>>, F: Fn(Self, A) -> Fut>(
-        self,
-        callee: F,
-        params: Params,
-        _meta: Meta,
-    ) -> Result<Value, JsonRPCError> {
-        let value = match params {
-            Params::Array(arr) => arr,
-            _ => return Err(JsonRPCError::invalid_request()),
-        };
-        if value.len() != 1 {
-            return Err(JsonRPCError::invalid_params("Invalid params length".to_string()));
-        }
-        let val: A =
-            serde_json::from_value(value[0].clone()).map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
-
-        match callee(self, val).await {
-            Ok(result) => Ok(serde_json::to_value(result).expect("serialization failed")),
-            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
-        }
-    }
-
-    /// A helper function used to pass two values to the RPC handler.
-    pub async fn map_rpc_doublet<A: DeserializeOwned, O: Serialize, Fut: Future<Output = Result<O, RpcError>>, F: Fn(Self, A, A) -> Fut>(
-        self,
-        callee: F,
-        params: Params,
-        _meta: Meta,
-    ) -> Result<Value, JsonRPCError> {
-        let value = match params {
-            Params::Array(arr) => arr,
-            _ => return Err(JsonRPCError::invalid_request()),
-        };
-        if value.len() != 2 {
-            return Err(JsonRPCError::invalid_params("Invalid params length".to_string()));
-        }
-        let first_val: A =
-            serde_json::from_value(value[0].clone()).map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
-        let second_val: A =
-            serde_json::from_value(value[1].clone()).map_err(|e| JsonRPCError::invalid_params(format!("Invalid params: {}.", e)))?;
-
-        match callee(self, first_val, second_val).await {
-            Ok(result) => Ok(serde_json::to_value(result).expect("serialization failed")),
-            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
-        }
-    }
-
-    /// A helper function used to pass calls to the RPC handler.
-    pub async fn map_rpc<O: Serialize, Fut: Future<Output = Result<O, RpcError>>, F: Fn(Self) -> Fut>(
-        self,
-        callee: F,
-        params: Params,
-        _meta: Meta,
-    ) -> Result<Value, JsonRPCError> {
-        params.expect_no_params()?;
-
-        match callee(self).await {
-            Ok(result) => Ok(serde_json::to_value(result).expect("serialization failed")),
-            Err(err) => Err(JsonRPCError::invalid_params(err.to_string())),
-        }
-    }
-
-    /// Expose the public functions as RPC enpoints
-    pub fn add(&self, io: &mut MetaIoHandler<Meta>) {
-        let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
-
-        d.add_method_with_meta("latestblock", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc(|rpc| async move { rpc.latest_block().await }, params, meta)
-        });
-        d.add_method_with_meta("latestblockheight", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc(|rpc| async move { rpc.latest_block_height().await }, params, meta)
-        });
-        d.add_method_with_meta("latestblockhash", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc(|rpc| async move { rpc.latest_block_hash().await }, params, meta)
-        });
-        d.add_method_with_meta("getblock", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_block(x).await }, params, meta)
-        });
-        d.add_method_with_meta("getblocks", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_doublet(|rpc, x, y| async move { rpc.get_blocks(x, y).await }, params, meta)
-        });
-        d.add_method_with_meta("getblockheight", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_block_height(x).await }, params, meta)
-        });
-        d.add_method_with_meta("getblockhash", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_block_hash(x).await }, params, meta)
-        });
-        d.add_method_with_meta("gettransaction", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_transaction(x).await }, params, meta)
-        });
-        d.add_method_with_meta("gettransition", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_transition(x).await }, params, meta)
-        });
-        d.add_method_with_meta("getciphertext", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.get_ciphertext(x).await }, params, meta)
-        });
-        d.add_method_with_meta("sendtransaction", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.send_transaction(x).await }, params, meta)
-        });
-        d.add_method_with_meta("ledgerproof", |rpc, params, meta| {
-            let rpc = rpc.clone();
-            rpc.map_rpc_singlet(|rpc, x| async move { rpc.ledger_proof(x).await }, params, meta)
-        });
-        // d.add_method_with_meta("validaterawtransaction", |rpc, params, meta| {
-        //     let rpc = rpc.clone();
-        //     rpc.map_rpc_singlet(
-        //         |rpc, x| async move { rpc.validate_raw_transaction(x).await },
-        //         params,
-        //         meta,
-        //     )
-        // });
-        // d.add_method_with_meta("getblocktemplate", |rpc, params, meta| {
-        //     let rpc = rpc.clone();
-        //     rpc.map_rpc(|rpc| async move { rpc.get_block_template().await }, params, meta)
-        // });
-
-        io.extend_with(d)
     }
 }
 
