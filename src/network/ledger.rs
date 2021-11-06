@@ -485,11 +485,11 @@ impl<N: Network> Ledger<N> {
                         }
                     }
 
-                    // Ensure any potential fork is within the maximum fork depth.
-                    if latest_block_height_of_peer - common_ancestor + 1 > E::MAXIMUM_FORK_DEPTH {
-                        self.add_failure(peer_ip, "Received a sync response that exceeds the maximum fork depth".to_string());
-                        return Ok(());
-                    }
+                    // // Ensure any potential fork is within the maximum fork depth.
+                    // if latest_block_height_of_peer - common_ancestor + 1 > E::MAXIMUM_FORK_DEPTH {
+                    //     self.add_failure(peer_ip, "Received a sync response that exceeds the maximum fork depth".to_string());
+                    //     return Ok(());
+                    // }
 
                     // TODO (howardwu): If the distance of (latest_block_height_of_peer - common_ancestor) is less than 10,
                     //  manually check the fork status 1 by 1, as a slow response from the peer could make it look like a fork, based on this simple logic.
