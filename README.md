@@ -35,18 +35,20 @@ Full list of CLI flags and options can be viewed with `snarkos --help`:
 
 ```
 snarkOS <version>
-Run an Aleo node (include -h for more options)
+The Aleo Team <hello@aleo.org>
 
 USAGE:
     snarkos [FLAGS] [OPTIONS]
 
 FLAGS:
-    -h, --help           Prints help information
-        --is-miner       Start mining blocks from this node
+    -d, --debug       Enable debug mode
+    -h, --help        Prints help information
+        --is-miner    Start mining blocks from this node
+    -V, --version     Prints version information
 
 OPTIONS:
-        --miner-address <miner-address>          Specify the address that will receive miner rewards
-    -p, --port <port>                            Specify the port the node is run on
-        --rpc-port <rpc-port>                    Specify the port the json rpc server is run on
-        --verbose <verbose>                      Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2, 3]
+        --miner-address <miner-address>    Specify the address that will receive miner rewards
+    -p, --port <port>                      Specify the port the node is run on
+        --rpc-port <rpc-port>              Specify the port the json rpc server is run on
+        --verbose <verbose>                Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2, 3]
 ```

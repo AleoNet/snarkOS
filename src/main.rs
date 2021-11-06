@@ -21,7 +21,6 @@ use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     let cli = CLI::from_args();
 
     if cli.debug {
