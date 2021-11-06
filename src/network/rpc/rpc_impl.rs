@@ -34,16 +34,10 @@ use snarkvm::{
 };
 
 use anyhow::anyhow;
-use chrono::Utc;
 use jsonrpc_core::{IoDelegate, MetaIoHandler, Params, Value};
 use serde::{de::DeserializeOwned, Serialize};
 use snarkvm::utilities::ToBytes;
-use std::{
-    cmp::{max, min},
-    future::Future,
-    ops::Deref,
-    sync::Arc,
-};
+use std::{cmp::max, future::Future, ops::Deref, sync::Arc};
 use tokio::sync::RwLock;
 
 type JsonRPCError = jsonrpc_core::Error;
