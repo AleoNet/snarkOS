@@ -33,7 +33,7 @@ pub struct Node {
     /// Specify this as a mining node, with the given miner address.
     #[structopt(long = "miner")]
     pub miner: Option<String>,
-    /// Specify the network of this node (default = 2).
+    /// Specify the network of this node.
     #[structopt(default_value = "2", short = "n", long = "network")]
     pub network: u16,
     /// Specify the port for the node server.
@@ -42,7 +42,7 @@ pub struct Node {
     /// Specify the port for the RPC server.
     #[structopt(long = "rpc")]
     pub rpc: Option<u16>,
-    /// Specify the verbosity (default = 3) of the node [possible values: 0, 1, 2, 3]
+    /// Specify the verbosity of the node [possible values: 0, 1, 2, 3]
     #[structopt(default_value = "3", long = "verbosity")]
     pub verbosity: u8,
 }
