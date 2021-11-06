@@ -68,6 +68,9 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of blocks tha can be requested in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 48;
 
+    /// The maximum number of unconfirmed blocks that can be held by the ledger.
+    const MAXIMUM_UNCONFIRMED_BLOCKS: usize = 1024;
+
     const CONNECTION_TIMEOUT_SECS: u64 = 3;
 
     /// The duration of time in seconds to sleep in between ping requests.

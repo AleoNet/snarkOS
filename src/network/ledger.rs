@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Environment, Message, PeersRequest, PeersRouter};
+use crate::{helpers::CircularMap, Environment, Message, PeersRequest, PeersRouter};
 use snarkos_ledger::{storage::Storage, LedgerState, Metadata};
 use snarkvm::dpc::prelude::*;
 
@@ -69,7 +69,7 @@ pub struct Ledger<N: Network> {
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
     /// A map of previous block hashes to unconfirmed blocks.
-    unconfirmed_blocks: HashMap<N::BlockHash, Block<N>>,
+    unconfirmed_blocks: CircularMap<N::BlockHash, Block<N>, 1024>,
     /// The pool of unconfirmed transactions.
     memory_pool: MemoryPool<N>,
     /// A terminator bit for the miner.
@@ -667,9 +667,11 @@ impl<N: Network> Ledger<N> {
                     // Ensure the unconfirmed block does not already exist in the memory pool.
                     match !self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                         true => {
-                            // Add the block to the unconfirmed blocks.
-                            trace!("Adding unconfirmed block {} to memory pool", block.height());
-                            self.unconfirmed_blocks.insert(block.previous_block_hash(), block.clone());
+                            if self.unconfirmed_blocks.len() < E::MAXIMUM_UNCONFIRMED_BLOCKS {
+                                // Add the block to the unconfirmed blocks.
+                                trace!("Adding unconfirmed block {} to memory pool", block.height());
+                                self.unconfirmed_blocks.insert(block.previous_block_hash(), block.clone());
+                            }
                             Ok(())
                         }
                         false => {

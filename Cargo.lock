@@ -253,6 +253,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "circular-queue"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d34327ead1c743a10db339de35fb58957564b99d248a67985c55638b22c59b5"
+dependencies = [
+ "version_check 0.9.3",
+]
+
+[[package]]
 name = "clang-sys"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1350,6 +1359,7 @@ dependencies = [
  "bincode",
  "bytes",
  "chrono",
+ "circular-queue",
  "futures",
  "hex",
  "hyper",
