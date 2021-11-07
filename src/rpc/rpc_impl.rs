@@ -27,7 +27,7 @@ use crate::{
 };
 use snarkos_ledger::Metadata;
 use snarkvm::{
-    dpc::{Block, Network, RecordCiphertext, Transaction, Transition},
+    dpc::{Block, BlockHeader, Network, RecordCiphertext, Transaction, Transactions, Transition},
     utilities::FromBytes,
 };
 
@@ -37,41 +37,38 @@ use snarkvm::utilities::ToBytes;
 use std::{cmp::max, ops::Deref, sync::Arc};
 use tokio::sync::RwLock;
 
-type JsonRPCError = jsonrpc_core::Error;
-
 pub const MAX_RESPONSE_BLOCKS: u32 = 50;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
     #[error("{}", _0)]
     AnyhowError(#[from] anyhow::Error),
-
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
-
     #[error("{}", _0)]
     FromHexError(#[from] hex::FromHexError),
-
     #[error("{}", _0)]
     Message(String),
-
     #[error("{}", _0)]
     ParseIntError(#[from] std::num::ParseIntError),
-
     #[error("{}", _0)]
     SerdeJson(#[from] serde_json::Error),
-}
-
-impl From<std::io::Error> for RpcError {
-    fn from(error: std::io::Error) -> Self {
-        RpcError::Crate("std::io", format!("{:?}", error))
-    }
+    #[error("{}", _0)]
+    StdIOError(#[from] std::io::Error),
 }
 
 impl From<RpcError> for std::io::Error {
     fn from(error: RpcError) -> Self {
         std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", error))
     }
+}
+
+#[doc(hidden)]
+pub struct RpcInner<N: Network, E: Environment> {
+    ledger: Arc<RwLock<Ledger<N>>>,
+    ledger_router: LedgerRouter<N, E>,
+    /// RPC credentials for accessing guarded endpoints
+    pub(crate) credentials: Option<RpcCredentials>,
 }
 
 /// Implements RPC HTTP endpoint functions for a node.
@@ -84,14 +81,6 @@ impl<N: Network, E: Environment> Deref for RpcImpl<N, E> {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
-}
-
-#[doc(hidden)]
-pub struct RpcInner<N: Network, E: Environment> {
-    ledger: Arc<RwLock<Ledger<N>>>,
-    ledger_router: LedgerRouter<N, E>,
-    /// RPC credentials for accessing guarded endpoints
-    pub(crate) credentials: Option<RpcCredentials>,
 }
 
 impl<N: Network, E: Environment> RpcImpl<N, E> {
@@ -107,19 +96,34 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
 
 #[async_trait::async_trait]
 impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
-    /// Returns the block from the head of the canonical chain.
+    /// Returns the latest block from the canonical chain.
     async fn latest_block(&self) -> Result<Block<N>, RpcError> {
         Ok(self.ledger.read().await.latest_block().clone())
     }
 
-    /// Returns the number of blocks in the canonical chain.
+    /// Returns the latest block height from the canonical chain.
     async fn latest_block_height(&self) -> Result<u32, RpcError> {
         Ok(self.ledger.read().await.latest_block_height())
     }
 
-    /// Returns the block hash from the head of the canonical chain.
+    /// Returns the latest block hash from the canonical chain.
     async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError> {
         Ok(self.ledger.read().await.latest_block_hash())
+    }
+
+    /// Returns the latest block header from the canonical chain.
+    async fn latest_block_header(&self) -> Result<BlockHeader<N>, RpcError> {
+        Ok(self.ledger.read().await.latest_block_header().clone())
+    }
+
+    /// Returns the latest block transactions from the canonical chain.
+    async fn latest_block_transactions(&self) -> Result<Transactions<N>, RpcError> {
+        Ok(self.ledger.read().await.latest_block_transactions().clone())
+    }
+
+    /// Returns the latest ledger root from the canonical chain.
+    async fn latest_ledger_root(&self) -> Result<N::LedgerRoot, RpcError> {
+        Ok(self.ledger.read().await.latest_ledger_root())
     }
 
     /// Returns the block given the block height.

@@ -80,7 +80,7 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
         // Initialize the display.
         let mut display = Display::<'a, N, E> {
             server,
-            tabs: TabsState::new(vec!["Overview", "Logs"]),
+            tabs: TabsState::new(vec![" Overview ", " Logs "]),
             tick_rate: Duration::from_secs(1),
         };
 
@@ -160,7 +160,7 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
             )
             .select(self.tabs.index)
             .style(Style::default().fg(Color::Cyan))
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::Black));
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::White));
         f.render_widget(tabs, chunks[0]);
 
         // Initialize the page.

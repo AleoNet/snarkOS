@@ -160,7 +160,7 @@ async fn handle_rpc<N: Network, E: Environment>(
 
     // Handle the request method.
     let response = match &*req.method {
-        // public
+        // Public
         "latestblock" => {
             let result = rpc.latest_block().await.map_err(convert_crate_err);
             result_to_response(&req, result)
@@ -171,6 +171,18 @@ async fn handle_rpc<N: Network, E: Environment>(
         }
         "latestblockhash" => {
             let result = rpc.latest_block_hash().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "latestblockheader" => {
+            let result = rpc.latest_block_header().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "latestblocktransactions" => {
+            let result = rpc.latest_block_transactions().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "latestledgerroot" => {
+            let result = rpc.latest_ledger_root().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getblock" => match serde_json::from_value::<u32>(params.remove(0)) {

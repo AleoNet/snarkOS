@@ -17,7 +17,7 @@
 //! Definition of the public and private RPC endpoints.
 
 use crate::rpc::rpc_impl::RpcError;
-use snarkvm::dpc::{Block, Network, RecordCiphertext, Transition};
+use snarkvm::dpc::{Block, BlockHeader, Network, RecordCiphertext, Transactions, Transition};
 
 /// Definition of public RPC endpoints.
 #[async_trait::async_trait]
@@ -31,6 +31,15 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/latestblockhash.md")]
     async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError>;
 
+    // #[doc = include_str!("./documentation/public_endpoints/latestblockheader.md")]
+    async fn latest_block_header(&self) -> Result<BlockHeader<N>, RpcError>;
+
+    // #[doc = include_str!("./documentation/public_endpoints/latestblocktransactions.md")]
+    async fn latest_block_transactions(&self) -> Result<Transactions<N>, RpcError>;
+
+    // #[doc = include_str!("./documentation/public_endpoints/latestledgerroot.md")]
+    async fn latest_ledger_root(&self) -> Result<N::LedgerRoot, RpcError>;
+
     #[doc = include_str!("./documentation/public_endpoints/getblock.md")]
     async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError>;
 
@@ -43,7 +52,8 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getblockhash.md")]
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError>;
 
-    #[doc = include_str!("./documentation/public_endpoints/gettransaction.md")]
+    // TODO (howardwu): @collin fix the return type to include metadata now.
+    // #[doc = include_str!("./documentation/public_endpoints/gettransaction.md")]
     async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<serde_json::Value, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
