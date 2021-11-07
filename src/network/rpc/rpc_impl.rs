@@ -111,7 +111,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
 impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns the block from the head of the canonical chain.
     async fn latest_block(&self) -> Result<Block<N>, RpcError> {
-        Ok(self.ledger.read().await.latest_block()?)
+        Ok(self.ledger.read().await.latest_block().clone())
     }
 
     /// Returns the number of blocks in the canonical chain.

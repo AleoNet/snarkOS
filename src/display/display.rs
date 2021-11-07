@@ -81,7 +81,7 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
         let mut display = Display::<'a, N, E> {
             server,
             tabs: TabsState::new(vec!["Overview", "Logs"]),
-            tick_rate: Duration::from_millis(250),
+            tick_rate: Duration::from_secs(1),
         };
 
         let res = display.render(&mut terminal);

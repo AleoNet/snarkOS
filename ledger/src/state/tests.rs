@@ -40,8 +40,8 @@ fn mine_next_block<N: Network>(ledger: &LedgerState<N>, recipient: Address<N>) -
     let block_height = ledger.latest_block_height() + 1;
 
     // Compute the block difficulty target.
-    let previous_timestamp = ledger.latest_block_timestamp()?;
-    let previous_difficulty_target = ledger.latest_block_difficulty_target()?;
+    let previous_timestamp = ledger.latest_block_timestamp();
+    let previous_difficulty_target = ledger.latest_block_difficulty_target();
     let block_timestamp = chrono::Utc::now().timestamp();
     let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
 
@@ -87,9 +87,9 @@ fn test_genesis() {
     assert_eq!(0, ledger.latest_block_height());
     assert_eq!(genesis.height(), ledger.latest_block_height());
     assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
-    assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp().unwrap());
-    assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
-    assert_eq!(genesis.clone(), ledger.latest_block().unwrap());
+    assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
+    assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
+    assert_eq!(genesis, ledger.latest_block());
     assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
@@ -118,9 +118,9 @@ fn test_add_next_block() {
     assert_eq!(1, ledger.latest_block_height());
     assert_eq!(block.height(), ledger.latest_block_height());
     assert_eq!(block.block_hash(), ledger.latest_block_hash());
-    assert_eq!(block.timestamp(), ledger.latest_block_timestamp().unwrap());
-    assert_eq!(block.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
-    assert_eq!(block.clone(), ledger.latest_block().unwrap());
+    assert_eq!(block.timestamp(), ledger.latest_block_timestamp());
+    assert_eq!(block.difficulty_target(), ledger.latest_block_difficulty_target());
+    assert_eq!(block, ledger.latest_block().clone());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 
     // Retrieve the genesis block.
@@ -164,9 +164,9 @@ fn test_remove_last_block() {
     assert_eq!(0, ledger.latest_block_height());
     assert_eq!(genesis.height(), ledger.latest_block_height());
     assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
-    assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp().unwrap());
-    assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
-    assert_eq!(genesis.clone(), ledger.latest_block().unwrap());
+    assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
+    assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
+    assert_eq!(genesis, ledger.latest_block());
     assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
@@ -207,9 +207,9 @@ fn test_remove_last_2_blocks() {
     assert_eq!(0, ledger.latest_block_height());
     assert_eq!(genesis.height(), ledger.latest_block_height());
     assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
-    assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp().unwrap());
-    assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target().unwrap());
-    assert_eq!(genesis.clone(), ledger.latest_block().unwrap());
+    assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
+    assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
+    assert_eq!(genesis, ledger.latest_block());
     assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }

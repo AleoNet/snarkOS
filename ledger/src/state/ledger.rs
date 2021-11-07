@@ -54,9 +54,9 @@ impl<N: Network> Metadata<N> {
 
 #[derive(Clone, Debug)]
 pub struct LedgerState<N: Network> {
-    /// The current state of the ledger.
-    latest_state: (u32, N::BlockHash),
-    /// The current block locators of the ledger.
+    /// The latest block of the ledger.
+    latest_block: Block<N>,
+    /// The block locators from the latest block of the ledger.
     latest_block_locators: Vec<(u32, N::BlockHash)>,
     /// The current ledger tree of block hashes.
     ledger_tree: Arc<Mutex<LedgerTree<N>>>,
@@ -77,7 +77,7 @@ impl<N: Network> LedgerState<N> {
         let genesis = N::genesis_block();
         // Initialize the ledger.
         let mut ledger = Self {
-            latest_state: (genesis.height(), genesis.block_hash()),
+            latest_block: genesis.clone(),
             latest_block_locators: Default::default(),
             ledger_tree: Arc::new(Mutex::new(LedgerTree::<N>::new()?)),
             ledger_roots: storage.open_map("ledger_roots")?,
@@ -125,7 +125,7 @@ impl<N: Network> LedgerState<N> {
 
         // Update the latest state.
         let block = ledger.get_block(latest_block_height)?;
-        ledger.latest_state = (block.height(), block.block_hash());
+        ledger.latest_block = block.clone();
         ledger.latest_block_locators = ledger.get_block_locators(block.height())?;
         trace!("Loaded ledger from block {}", block.height());
 
@@ -137,19 +137,39 @@ impl<N: Network> LedgerState<N> {
         Ok(ledger)
     }
 
+    /// Returns the latest block.
+    pub fn latest_block(&self) -> &Block<N> {
+        &self.latest_block
+    }
+
     /// Returns the latest block height.
     pub fn latest_block_height(&self) -> u32 {
-        self.latest_state.0
+        self.latest_block.height()
     }
 
     /// Returns the latest block hash.
     pub fn latest_block_hash(&self) -> N::BlockHash {
-        self.latest_state.1
+        self.latest_block.block_hash()
     }
 
-    /// Returns the latest ledger root.
-    pub fn latest_ledger_root(&self) -> N::LedgerRoot {
-        self.ledger_tree.lock().unwrap().root()
+    /// Returns the latest block timestamp.
+    pub fn latest_block_timestamp(&self) -> i64 {
+        self.latest_block.timestamp()
+    }
+
+    /// Returns the latest block difficulty target.
+    pub fn latest_block_difficulty_target(&self) -> u64 {
+        self.latest_block.difficulty_target()
+    }
+
+    /// Returns the latest block header.
+    pub fn latest_block_header(&self) -> &BlockHeader<N> {
+        self.latest_block.header()
+    }
+
+    /// Returns the transactions from the latest block.
+    pub fn latest_block_transactions(&self) -> &Transactions<N> {
+        self.latest_block.transactions()
     }
 
     /// Returns the latest block locators.
@@ -157,29 +177,9 @@ impl<N: Network> LedgerState<N> {
         &self.latest_block_locators
     }
 
-    /// Returns the latest block timestamp.
-    pub fn latest_block_timestamp(&self) -> Result<i64> {
-        Ok(self.latest_block_header()?.timestamp())
-    }
-
-    /// Returns the latest block difficulty target.
-    pub fn latest_block_difficulty_target(&self) -> Result<u64> {
-        Ok(self.latest_block_header()?.difficulty_target())
-    }
-
-    /// Returns the latest block header.
-    pub fn latest_block_header(&self) -> Result<BlockHeader<N>> {
-        self.get_block_header(self.latest_block_height())
-    }
-
-    /// Returns the transactions from the latest block.
-    pub fn latest_block_transactions(&self) -> Result<Transactions<N>> {
-        self.get_block_transactions(self.latest_block_height())
-    }
-
-    /// Returns the latest block.
-    pub fn latest_block(&self) -> Result<Block<N>> {
-        self.get_block(self.latest_block_height())
+    /// Returns the latest ledger root.
+    pub fn latest_ledger_root(&self) -> N::LedgerRoot {
+        self.ledger_tree.lock().unwrap().root()
     }
 
     /// Returns `true` if the given ledger root exists in storage.
@@ -362,7 +362,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Retrieve the current block.
-        let current_block = self.latest_block()?;
+        let current_block = self.latest_block();
 
         // Ensure the block height increments by one.
         let block_height = block.height();
@@ -462,7 +462,7 @@ impl<N: Network> LedgerState<N> {
         self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
         self.latest_block_locators = self.get_block_locators(block.height())?;
-        self.latest_state = (block_height, block.block_hash());
+        self.latest_block = block.clone();
         Ok(())
     }
 
@@ -477,23 +477,22 @@ impl<N: Network> LedgerState<N> {
         let mut blocks = Vec::with_capacity(num_blocks as usize);
 
         // Initialize the block to remove.
-        let mut block = self.latest_block()?;
         let mut remaining_blocks = num_blocks;
 
-        while block.height() > 0 && remaining_blocks > 0 {
+        while self.latest_block.height() > 0 && remaining_blocks > 0 {
             // Update the internal state of the ledger, except for the ledger tree.
-            self.blocks.remove_block(block.height())?;
-            self.ledger_roots.remove(&block.previous_ledger_root())?;
-            self.latest_block_locators = self.get_block_locators(block.height() - 1)?;
-            self.latest_state = match block.height() == 0 {
-                true => (0, block.previous_block_hash()),
-                false => (block.height() - 1, block.previous_block_hash()),
-            };
+            self.blocks.remove_block(self.latest_block.height())?;
+            self.ledger_roots.remove(&self.latest_block.previous_ledger_root())?;
+            self.latest_block_locators = self.get_block_locators(self.latest_block.height() - 1)?;
 
             // Append this block to the final output.
-            blocks.push(block);
-            // Retrieve the next block.
-            block = self.latest_block()?;
+            blocks.push(self.latest_block.clone());
+
+            self.latest_block = match self.latest_block.height() == 0 {
+                true => N::genesis_block().clone(),
+                false => self.get_block(self.latest_block.height() - 1)?,
+            };
+
             // Decrement the remaining blocks by 1.
             remaining_blocks -= 1;
         }

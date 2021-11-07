@@ -114,6 +114,11 @@ impl<N: Network> Ledger<N> {
         self.is_syncing.load(Ordering::SeqCst)
     }
 
+    /// Returns the latest block.
+    pub fn latest_block(&self) -> &Block<N> {
+        self.canon.latest_block()
+    }
+
     /// Returns the latest block height.
     pub fn latest_block_height(&self) -> u32 {
         self.canon.latest_block_height()
@@ -124,9 +129,24 @@ impl<N: Network> Ledger<N> {
         self.canon.latest_block_hash()
     }
 
-    /// Returns the latest ledger root.
-    pub fn latest_ledger_root(&self) -> N::LedgerRoot {
-        self.canon.latest_ledger_root()
+    /// Returns the latest block timestamp.
+    pub fn latest_block_timestamp(&self) -> i64 {
+        self.canon.latest_block_timestamp()
+    }
+
+    /// Returns the latest block difficulty target.
+    pub fn latest_block_difficulty_target(&self) -> u64 {
+        self.canon.latest_block_difficulty_target()
+    }
+
+    /// Returns the latest block header.
+    pub fn latest_block_header(&self) -> &BlockHeader<N> {
+        self.canon.latest_block_header()
+    }
+
+    /// Returns the transactions from the latest block.
+    pub fn latest_block_transactions(&self) -> &Transactions<N> {
+        self.canon.latest_block_transactions()
     }
 
     /// Returns the latest block locators.
@@ -134,29 +154,9 @@ impl<N: Network> Ledger<N> {
         self.canon.latest_block_locators()
     }
 
-    /// Returns the latest block timestamp.
-    pub fn latest_block_timestamp(&self) -> Result<i64> {
-        self.canon.latest_block_timestamp()
-    }
-
-    /// Returns the latest block difficulty target.
-    pub fn latest_block_difficulty_target(&self) -> Result<u64> {
-        self.canon.latest_block_difficulty_target()
-    }
-
-    /// Returns the latest block header.
-    pub fn latest_block_header(&self) -> Result<BlockHeader<N>> {
-        self.canon.latest_block_header()
-    }
-
-    /// Returns the transactions from the latest block.
-    pub fn latest_block_transactions(&self) -> Result<Transactions<N>> {
-        self.canon.latest_block_transactions()
-    }
-
-    /// Returns the latest block.
-    pub fn latest_block(&self) -> Result<Block<N>> {
-        self.canon.latest_block()
+    /// Returns the latest ledger root.
+    pub fn latest_ledger_root(&self) -> N::LedgerRoot {
+        self.canon.latest_ledger_root()
     }
 
     /// Returns `true` if the given ledger root exists in storage.
@@ -349,7 +349,7 @@ impl<N: Network> Ledger<N> {
             }
             LedgerRequest::Heartbeat => {
                 // Check for candidate blocks to fast forward the ledger.
-                let mut block = &self.latest_block()?;
+                let mut block = self.latest_block();
                 let unconfirmed_blocks = self.unconfirmed_blocks.clone();
                 while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.block_hash()) {
                     // Update the block iterator.
@@ -565,8 +565,8 @@ impl<N: Network> Ledger<N> {
         let block_height = self.latest_block_height() + 1;
 
         // Compute the block difficulty target.
-        let previous_timestamp = self.latest_block_timestamp()?;
-        let previous_difficulty_target = self.latest_block_difficulty_target()?;
+        let previous_timestamp = self.latest_block_timestamp();
+        let previous_difficulty_target = self.latest_block_difficulty_target();
         let block_timestamp = chrono::Utc::now().timestamp();
         let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
 
