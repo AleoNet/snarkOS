@@ -82,16 +82,6 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const FAILURE_THRESHOLD: usize = 5;
 
     const MAXIMUM_FORK_DEPTH: u32 = 1024;
-
-    /// Returns the port for communicating with the node server.
-    fn default_node_port() -> u16 {
-        Self::DEFAULT_NODE_PORT
-    }
-
-    /// Returns the port for communicating with the RPC server.
-    fn default_rpc_port() -> u16 {
-        Self::DEFAULT_RPC_PORT
-    }
 }
 
 #[derive(Clone, Debug, Default)]

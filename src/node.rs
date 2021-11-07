@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{network::initialize::Server, Client, Environment, Miner, NodeType};
+use crate::{network::Server, Client, Display, Environment, Miner, NodeType};
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
     prelude::*,
 };
 
 use anyhow::Result;
-use colored::*;
 use std::str::FromStr;
 use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
@@ -66,27 +65,32 @@ impl Node {
             panic!("Until configuration files are established, the node port must be at least 4130 or greater");
         }
 
-        if self.nodisplay {
-            self.print_welcome();
-            self.initialize_logger();
-        }
-
         let miner = match (E::NODE_TYPE, &self.miner) {
             (NodeType::Miner, Some(address)) => {
                 let miner_address = Address::<N>::from_str(address)?;
+                println!("{}", crate::display::welcome_message());
                 println!("Your Aleo address is {}.\n\n", miner_address);
                 println!("Starting a mining node on {}.\n", N::NETWORK_NAME);
                 Some(miner_address)
             }
             _ => {
+                println!("{}", crate::display::welcome_message());
                 println!("Starting a client node on {}.\n", N::NETWORK_NAME);
                 None
             }
         };
 
-        let _server = Server::<N, E>::initialize(node_port, rpc_port, (node_port as u16 - 4130) as u8, miner).await?;
-        std::future::pending::<()>().await;
-        Ok(())
+        if self.nodisplay {
+            self.initialize_logger();
+            let _server = Server::<N, E>::initialize(node_port, rpc_port, (node_port as u16 - 4130) as u8, miner).await?;
+            std::future::pending::<()>().await;
+            Ok(())
+        } else {
+            println!("\nThe snarkOS console is initializing...\n");
+            let server = Server::<N, E>::initialize(node_port, rpc_port, (node_port as u16 - 4130) as u8, miner).await?;
+            let _display = Display::<N, E>::start(server)?;
+            Ok(())
+        }
     }
 
     fn initialize_logger(&self) {
@@ -107,28 +111,5 @@ impl Node {
             .with_env_filter(filter)
             .with_target(self.verbosity == 3)
             .init();
-    }
-
-    fn print_welcome(&self) {
-        let mut output = String::new();
-        output += &r#"
-
-         ╦╬╬╬╬╬╦
-        ╬╬╬╬╬╬╬╬╬                    ▄▄▄▄        ▄▄▄
-       ╬╬╬╬╬╬╬╬╬╬╬                  ▐▓▓▓▓▌       ▓▓▓
-      ╬╬╬╬╬╬╬╬╬╬╬╬╬                ▐▓▓▓▓▓▓▌      ▓▓▓     ▄▄▄▄▄▄       ▄▄▄▄▄▄
-     ╬╬╬╬╬╬╬╬╬╬╬╬╬╬╬              ▐▓▓▓  ▓▓▓▌     ▓▓▓   ▄▓▓▀▀▀▀▓▓▄   ▐▓▓▓▓▓▓▓▓▌
-    ╬╬╬╬╬╬╬╜ ╙╬╬╬╬╬╬╬            ▐▓▓▓▌  ▐▓▓▓▌    ▓▓▓  ▐▓▓▓▄▄▄▄▓▓▓▌ ▐▓▓▓    ▓▓▓▌
-   ╬╬╬╬╬╬╣     ╠╬╬╬╬╬╬           █▓▓▓▓▓▓▓▓▓▓█    ▓▓▓  ▐▓▓▀▀▀▀▀▀▀▀▘ ▐▓▓▓    ▓▓▓▌
-  ╬╬╬╬╬╬╣       ╠╬╬╬╬╬╬         █▓▓▓▌    ▐▓▓▓█   ▓▓▓   ▀▓▓▄▄▄▄▓▓▀   ▐▓▓▓▓▓▓▓▓▌
- ╬╬╬╬╬╬╣         ╠╬╬╬╬╬╬       ▝▀▀▀▀      ▀▀▀▀▘  ▀▀▀     ▀▀▀▀▀▀       ▀▀▀▀▀▀
-╚╬╬╬╬╬╩           ╩╬╬╬╬╩
-
-"#
-        .white()
-        .bold();
-        output += &"Welcome to Aleo! We thank you for running a network node and supporting privacy.\n\n".bold();
-
-        println!("{}", output);
     }
 }

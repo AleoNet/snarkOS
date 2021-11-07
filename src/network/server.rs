@@ -49,6 +49,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Starts the connection listener for peers.
     ///
+    #[inline]
     pub(crate) async fn initialize(node_port: u16, rpc_port: u16, storage_id: u8, miner: Option<Address<N>>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", node_port)).await {
@@ -79,22 +80,39 @@ impl<N: Network, E: Environment> Server<N, E> {
             peers_router.send(message).await?;
         }
 
-        // Sleep for 15 seconds.
-        tokio::time::sleep(Duration::from_secs(15)).await;
+        // Sleep for 4 seconds.
+        tokio::time::sleep(Duration::from_secs(4)).await;
 
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, peers.clone(), ledger.clone(), ledger_router.clone());
 
-        // // Initialize a new instance of the RPC server.
+        // Initialize a new instance of the RPC server.
         let rpc_ip = format!("0.0.0.0:{}", rpc_port).parse()?;
-        Self::initialize_rpc(&mut tasks, rpc_ip, None, None, ledger.clone(), ledger_router);
+        let (username, password) = (None, None);
+        tasks.append(initialize_rpc_server::<N, E>(
+            rpc_ip,
+            username,
+            password,
+            ledger.clone(),
+            ledger_router,
+        ));
 
         Ok(Self { peers, ledger, tasks })
     }
 
     ///
+    /// Disconnects from peers and proceeds to shut down the node.
+    ///
+    #[inline]
+    pub(crate) fn shut_down(&self) {
+        info!("Shutting down...");
+        self.tasks.flush();
+    }
+
+    ///
     /// Initialize a new instance for managing peers.
     ///
+    #[inline]
     fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
         let peers = Arc::new(RwLock::new(Peers::new(local_ip)));
@@ -123,6 +141,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance for managing the ledger.
     ///
+    #[inline]
     fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_id: u8,
@@ -153,6 +172,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize the connection listener for new peers.
     ///
+    #[inline]
     fn initialize_listener(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
@@ -183,6 +203,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance of the heartbeat.
     ///
+    #[inline]
     fn initialize_heartbeat(tasks: &mut Tasks<task::JoinHandle<()>>, peers_router: PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
         // Initialize a process to maintain an adequate number of peers.
         let peers_router_clone = peers_router.clone();
@@ -208,6 +229,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance of the miner.
     ///
+    #[inline]
     fn initialize_miner(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
@@ -244,25 +266,5 @@ impl<N: Network, E: Environment> Server<N, E> {
                 error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
         }
-    }
-
-    ///
-    /// Initialize a new instance of the RPC server.
-    ///
-    fn initialize_rpc(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        rpc_ip: SocketAddr,
-        username: Option<String>,
-        password: Option<String>,
-        ledger: Arc<RwLock<Ledger<N>>>,
-        ledger_router: LedgerRouter<N, E>,
-    ) {
-        tasks.append(initialize_rpc_server::<N, E>(
-            rpc_ip,
-            username,
-            password,
-            ledger.clone(),
-            ledger_router.clone(),
-        ));
     }
 }
