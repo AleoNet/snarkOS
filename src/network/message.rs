@@ -133,10 +133,7 @@ impl<N: Network, E: Environment> Message<N, E> {
         // Deserialize the data field.
         let message = match id {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
-            1 => {
-                let mut cursor = Cursor::new(data);
-                Self::BlockResponse(FromBytes::read_le(&mut cursor)?)
-            }
+            1 => Self::BlockResponse(FromBytes::from_bytes_le(&data)?),
             2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..])?),
             3 => Self::ChallengeResponse(bincode::deserialize(data)?),
             4 => match data.len() == 0 {
@@ -162,10 +159,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 }
                 Self::SyncResponse(block_locators)
             }
-            10 => {
-                let mut cursor = Cursor::new(data);
-                Self::UnconfirmedBlock(FromBytes::read_le(&mut cursor)?)
-            }
+            10 => Self::UnconfirmedBlock(FromBytes::from_bytes_le(&data)?),
             11 => Self::UnconfirmedTransaction(FromBytes::from_bytes_le(&data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };

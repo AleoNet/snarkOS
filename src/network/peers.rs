@@ -492,16 +492,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             }
                             // Process the message.
                             trace!("Received '{}' from {}", message.name(), peer_ip);
-                            match &message {
+                            match message {
                                 Message::BlockRequest(start_block_height, end_block_height) => {
                                     // Route the `BlockRequest` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockRequest(peer_ip, *start_block_height, *end_block_height)).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockRequest(peer_ip, start_block_height, end_block_height)).await {
                                         warn!("[BlockRequest] {}", error);
                                     }
                                 },
                                 Message::BlockResponse(block) => {
                                     // Route the `BlockResponse` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block.clone())).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block)).await {
                                         warn!("[BlockResponse] {}", error);
                                     }
                                 }
@@ -518,20 +518,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 }
                                 Message::PeerResponse(peer_ips) => {
                                     // Adds the given peer IPs to the list of candidate peers.
-                                    if let Err(error) = peers_router.send(PeersRequest::ReceivePeerResponse(peer_ips.to_vec())).await {
+                                    if let Err(error) = peers_router.send(PeersRequest::ReceivePeerResponse(peer_ips)).await {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
                                 Message::Ping(version) => {
                                     // Ensure the message protocol version is not outdated.
-                                    if *version < E::MESSAGE_VERSION {
+                                    if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
                                     // Process the `Ping` request.
                                     else {
                                         // Update the version of the peer.
-                                        peer.version = *version;
+                                        peer.version = version;
                                         // Send a `Pong` message to the peer.
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, Message::Pong)).await {
                                             warn!("[Pong] {}", error);
@@ -555,19 +555,19 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 },
                                 Message::SyncResponse(block_locators) => {
                                     // Route the `SyncResponse` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::SyncResponse(peer_ip, block_locators.clone())).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::SyncResponse(peer_ip, block_locators)).await {
                                         warn!("[SyncResponse] {}", error);
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
                                     // Route the `UnconfirmedBlock` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block.clone())).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
                                         warn!("[UnconfirmedBlock] {}", error);
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
                                     // Route the `UnconfirmedTransaction` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction.clone())).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
                                         warn!("[UnconfirmedTransaction] {}", error);
                                     }
                                 }
