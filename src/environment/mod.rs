@@ -74,7 +74,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks tha can be requested in one request.
-    const MAXIMUM_BLOCK_REQUEST: u32 = 48;
+    const MAXIMUM_BLOCK_REQUEST: u32 = 50;
     /// The maximum number of unconfirmed blocks that can be held by the ledger.
     const MAXIMUM_UNCONFIRMED_BLOCKS: usize = 1024;
 

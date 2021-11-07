@@ -224,6 +224,11 @@ impl<N: Network> Ledger<N> {
         self.canon.get_block_hash(block_height)
     }
 
+    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
+    pub fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
+        self.canon.get_block_hashes(start_block_height, end_block_height)
+    }
+
     /// Returns the previous block hash for the given block height.
     pub fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         self.canon.get_previous_block_hash(block_height)
@@ -252,11 +257,6 @@ impl<N: Network> Ledger<N> {
     /// Returns the ledger root and ledger inclusion proof for a given record commitment.
     pub fn get_ledger_inclusion_proof(&self, record_commitment: &N::Commitment) -> Result<LedgerProof<N>> {
         self.canon.get_ledger_inclusion_proof(*record_commitment)
-    }
-
-    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
-    pub fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
-        self.canon.get_block_hashes(start_block_height, end_block_height)
     }
 
     /// Returns the ledger root in the block header of the given block height.

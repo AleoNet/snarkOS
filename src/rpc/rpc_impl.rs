@@ -37,8 +37,6 @@ use snarkvm::utilities::ToBytes;
 use std::{cmp::max, ops::Deref, sync::Arc};
 use tokio::sync::RwLock;
 
-pub const MAX_RESPONSE_BLOCKS: u32 = 50;
-
 #[derive(Debug, Error)]
 pub enum RpcError {
     #[error("{}", _0)]
@@ -131,13 +129,9 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.read().await.get_block(block_height)?)
     }
 
-    /// Returns up to `MAX_RESPONSE_BLOCKS` blocks from the given `start_block_height` to `end_block_height`.
+    /// Returns up to `MAXIMUM_BLOCK_REQUEST` blocks from the given `start_block_height` to `end_block_height` (inclusive).
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
-        if end_block_height < start_block_height {
-            return Err(anyhow!("Invalid start/end block heights: {}, {}", start_block_height, end_block_height).into());
-        }
-        // Ensure we don't get more than MAX_RESPONSE_BLOCKS blocks
-        let safe_start_height = max(start_block_height, end_block_height.saturating_sub(MAX_RESPONSE_BLOCKS - 1));
+        let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
         Ok(self.ledger.read().await.get_blocks(safe_start_height, end_block_height)?)
     }
 
@@ -150,6 +144,22 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns the block hash for the given block height, if it exists in the canonical chain.
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError> {
         Ok(self.ledger.read().await.get_block_hash(block_height)?)
+    }
+
+    /// Returns up to `MAXIMUM_BLOCK_REQUEST` blocks from the given `start_block_height` to `end_block_height` (inclusive).
+    async fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>, RpcError> {
+        let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
+        Ok(self.ledger.read().await.get_block_hashes(safe_start_height, end_block_height)?)
+    }
+
+    /// Returns the block header for the given the block height.
+    async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError> {
+        Ok(self.ledger.read().await.get_block_header(block_height)?)
+    }
+
+    /// Returns the transactions from the block of the given block height.
+    async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError> {
+        Ok(self.ledger.read().await.get_block_transactions(block_height)?)
     }
 
     /// Returns a transaction with metadata given the transaction ID.

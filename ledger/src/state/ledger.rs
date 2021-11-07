@@ -248,6 +248,11 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_block_hash(block_height)
     }
 
+    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
+    pub fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
+        self.blocks.get_block_hashes(start_block_height, end_block_height)
+    }
+
     /// Returns the previous block hash for the given block height.
     pub fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         self.blocks.get_previous_block_hash(block_height)
@@ -271,11 +276,6 @@ impl<N: Network> LedgerState<N> {
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
         self.blocks.get_blocks(start_block_height, end_block_height)
-    }
-
-    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
-    pub fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
-        self.blocks.get_block_hashes(start_block_height, end_block_height)
     }
 
     /// Returns the ledger root in the block header of the given block height.
@@ -685,6 +685,19 @@ impl<N: Network> BlockState<N> {
         self.get_previous_block_hash(block_height + 1)
     }
 
+    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
+    fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
+        // Ensure the starting block height is less than the ending block height.
+        if start_block_height > end_block_height {
+            return Err(anyhow!("Invalid starting and ending block heights"));
+        }
+
+        (start_block_height..=end_block_height)
+            .into_iter()
+            .map(|height| self.get_block_hash(height))
+            .collect()
+    }
+
     /// Returns the previous block hash for the given block height.
     fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         match block_height == 0 {
@@ -752,14 +765,6 @@ impl<N: Network> BlockState<N> {
         (start_block_height..=end_block_height)
             .into_iter()
             .map(|height| self.get_block(height))
-            .collect()
-    }
-
-    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
-    fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
-        (start_block_height..=end_block_height)
-            .into_iter()
-            .map(|height| self.get_block_hash(height))
             .collect()
     }
 
