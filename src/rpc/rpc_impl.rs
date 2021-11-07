@@ -19,10 +19,8 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{
-    network::{
-        rpc::{rpc::*, rpc_trait::RpcFunctions},
-        Ledger,
-    },
+    network::Ledger,
+    rpc::{rpc::*, rpc_trait::RpcFunctions},
     Environment,
     LedgerRequest,
     LedgerRouter,

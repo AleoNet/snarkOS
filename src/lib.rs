@@ -32,3 +32,5 @@ pub(crate) use network::*;
 
 pub mod node;
 pub use node::*;
+
+pub(crate) mod rpc;

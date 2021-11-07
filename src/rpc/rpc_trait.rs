@@ -16,7 +16,7 @@
 
 //! Definition of the public and private RPC endpoints.
 
-use crate::network::rpc::rpc_impl::RpcError;
+use crate::rpc::rpc_impl::RpcError;
 use snarkvm::dpc::{Block, Network, RecordCiphertext, Transition};
 
 /// Definition of public RPC endpoints.

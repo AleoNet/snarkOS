@@ -23,7 +23,5 @@ pub(crate) use message::*;
 pub(crate) mod peers;
 pub(crate) use peers::*;
 
-pub(crate) mod rpc;
-
 pub(crate) mod server;
 pub(crate) use server::Server;
