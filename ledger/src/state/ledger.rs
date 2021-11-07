@@ -668,7 +668,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Returns the transaction metadata for a given transaction ID.
-    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+    fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
         self.transactions.get_transaction_metadata(transaction_id)
     }
 
@@ -854,7 +854,7 @@ struct TransactionState<N: Network> {
     serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
     commitments: DataMap<N::Commitment, N::TransitionID>,
     ciphertext_ids: DataMap<N::CiphertextID, N::TransitionID>,
-    // events: DataMap<N::TransactionID, Vec<Event<N>>>,
+    events: DataMap<N::TransactionID, Vec<Event<N>>>,
 }
 
 impl<N: Network> TransactionState<N> {
@@ -866,7 +866,7 @@ impl<N: Network> TransactionState<N> {
             serial_numbers: storage.open_map("serial_numbers")?,
             commitments: storage.open_map("commitments")?,
             ciphertext_ids: storage.open_map("ciphertext_ids")?,
-            // events: storage.open_map("events")?,
+            events: storage.open_map("events")?,
         })
     }
 
@@ -881,17 +881,17 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Returns `true` if the given commitment exists in storage.
-    pub(crate) fn contains_commitment(&self, commitment: &N::Commitment) -> Result<bool> {
+    fn contains_commitment(&self, commitment: &N::Commitment) -> Result<bool> {
         self.commitments.contains_key(commitment)
     }
 
     /// Returns `true` if the given ciphertext ID exists in storage.
-    pub(crate) fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
+    fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
         self.ciphertext_ids.contains_key(ciphertext_id)
     }
 
     /// Returns the record ciphertext for a given ciphertext ID.
-    pub(crate) fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
+    fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
         // Retrieve the transition ID.
         let transition_id = match self.ciphertext_ids.get(ciphertext_id)? {
             Some(transition_id) => transition_id,
@@ -915,7 +915,7 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Returns the transition for a given transition ID.
-    pub(crate) fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
+    fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
         match self.transitions.get(transition_id)? {
             Some((_, _, transition)) => Ok(transition),
             None => return Err(anyhow!("Transition {} does not exist in storage", transition_id)),
@@ -923,7 +923,7 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Returns the transaction for a given transaction ID.
-    pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
+    fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         // Retrieve the transition IDs.
         let (ledger_root, transition_ids) = match self.transactions.get(transaction_id)? {
             Some((ledger_root, transition_ids, _)) => (ledger_root, transition_ids),
@@ -943,7 +943,7 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Returns the transaction metadata for a given transaction ID.
-    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+    fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
         // Retrieve the metadata from the transactions map.
         match self.transactions.get(transaction_id)? {
             Some((_, _, metadata)) => Ok(metadata),
@@ -952,7 +952,7 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Adds the given transaction to storage.
-    pub(crate) fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>) -> Result<()> {
+    fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>) -> Result<()> {
         // Ensure the transaction does not exist.
         let transaction_id = transaction.transaction_id();
         if self.transactions.contains_key(&transaction_id)? {
@@ -987,12 +987,15 @@ impl<N: Network> TransactionState<N> {
                 }
             }
 
+            // Insert the transaction events.
+            self.events.insert(&transaction_id, transaction.events())?;
+
             Ok(())
         }
     }
 
     /// Removes the given transaction ID from storage.
-    pub(crate) fn remove_transaction(&self, transaction_id: &N::TransactionID) -> Result<()> {
+    fn remove_transaction(&self, transaction_id: &N::TransactionID) -> Result<()> {
         // Ensure the transaction exists.
         if !self.transactions.contains_key(&transaction_id)? {
             Err(anyhow!("Transaction {} does not exist in storage", transaction_id))
@@ -1029,6 +1032,9 @@ impl<N: Network> TransactionState<N> {
                     self.ciphertext_ids.remove(&*ciphertext_id?)?;
                 }
             }
+
+            // Remove the transaction events.
+            self.events.remove(&transaction_id)?;
 
             Ok(())
         }
