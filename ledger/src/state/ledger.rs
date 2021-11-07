@@ -18,6 +18,7 @@ use crate::storage::{DataMap, Map, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
     path::Path,
@@ -149,7 +150,7 @@ impl<N: Network> LedgerState<N> {
 
     /// Returns the latest block hash.
     pub fn latest_block_hash(&self) -> N::BlockHash {
-        self.latest_block.block_hash()
+        self.latest_block.hash()
     }
 
     /// Returns the latest block timestamp.
@@ -375,7 +376,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Ensure the previous block hash matches.
-        if block.previous_block_hash() != current_block.block_hash() {
+        if block.previous_block_hash() != current_block.hash() {
             return Err(anyhow!(
                 "Block {} has an incorrect previous block hash in the canon chain",
                 block_height
@@ -413,7 +414,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Ensure the block hash does not already exist.
-        if self.contains_block_hash(&block.block_hash())? {
+        if self.contains_block_hash(&block.hash())? {
             return Err(anyhow!("Block {} has a repeat block hash in the canon chain", block_height));
         }
 
@@ -423,14 +424,14 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Ensure the canon chain does not already contain the given serial numbers.
-        for serial_number in &block.serial_numbers() {
+        for serial_number in block.serial_numbers() {
             if self.contains_serial_number(serial_number)? {
                 return Err(anyhow!("Serial number {} already exists in the ledger", serial_number));
             }
         }
 
         // Ensure the canon chain does not already contain the given commitments.
-        for commitment in &block.commitments() {
+        for commitment in block.commitments() {
             if self.contains_commitment(commitment)? {
                 return Err(anyhow!("Commitment {} already exists in the ledger", commitment));
             }
@@ -459,7 +460,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         self.blocks.add_block(block)?;
-        self.ledger_tree.lock().unwrap().add(&block.block_hash())?;
+        self.ledger_tree.lock().unwrap().add(&block.hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
         self.latest_block_locators = self.get_block_locators(block.height())?;
         self.latest_block = block.clone();
@@ -555,7 +556,7 @@ impl<N: Network> LedgerState<N> {
         };
 
         // Compute the block header inclusion proof.
-        let transactions_root = transactions.to_transactions_root()?;
+        let transactions_root = transactions.transactions_root();
         let block_header_inclusion_proof = block_header.to_header_inclusion_proof(1, transactions_root)?;
         let block_header_root = block_header.to_header_root()?;
 
@@ -738,7 +739,7 @@ impl<N: Network> BlockState<N> {
         // Retrieve the block transactions.
         let transactions = self.get_block_transactions(block_height)?;
 
-        Block::from(previous_block_hash, block_header, transactions)
+        Ok(Block::from(previous_block_hash, block_header, transactions)?)
     }
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
@@ -777,7 +778,7 @@ impl<N: Network> BlockState<N> {
         if self.block_heights.contains_key(&block_height)? {
             Err(anyhow!("Block {} already exists in storage", block_height))
         } else {
-            let block_hash = block.block_hash();
+            let block_hash = block.hash();
             let block_header = block.header();
             let transactions = block.transactions();
             let transaction_ids = transactions.transaction_ids().collect::<Vec<_>>();
@@ -904,9 +905,9 @@ impl<N: Network> TransactionState<N> {
         };
 
         // Retrieve the ciphertext.
-        for (i, candidate_ciphertext_id) in transition.to_ciphertext_ids().enumerate() {
+        for (candidate_ciphertext_id, candidate_ciphertext) in transition.to_ciphertext_ids().zip_eq(transition.ciphertexts()) {
             if candidate_ciphertext_id? == *ciphertext_id {
-                return Ok(transition.ciphertexts()[i].clone());
+                return Ok(candidate_ciphertext.clone());
             }
         }
 
@@ -957,7 +958,7 @@ impl<N: Network> TransactionState<N> {
         if self.transactions.contains_key(&transaction_id)? {
             Err(anyhow!("Transaction {} already exists in storage", transaction_id))
         } else {
-            let transition_ids = transaction.transition_ids();
+            let transition_ids = transaction.transition_ids().collect();
             let transitions = transaction.transitions();
             let ledger_root = transaction.ledger_root();
 

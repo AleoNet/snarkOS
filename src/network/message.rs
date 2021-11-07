@@ -98,7 +98,7 @@ impl<N: Network, E: Environment> Message<N, E> {
     pub fn data(&self) -> Result<Vec<u8>> {
         match self {
             Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
-            Self::BlockResponse(block) => Ok(block.to_bytes_le()?),
+            Self::BlockResponse(block) => block.to_bytes_le(),
             Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
             Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
             Self::PeerRequest => Ok(vec![]),
@@ -107,7 +107,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong => Ok(vec![]),
             Self::SyncRequest => Ok(vec![]),
             Self::SyncResponse(block_locators) => Ok(to_bytes_le![block_locators.len() as u32, block_locators]?),
-            Self::UnconfirmedBlock(block) => Ok(block.to_bytes_le()?),
+            Self::UnconfirmedBlock(block) => block.to_bytes_le(),
             Self::UnconfirmedTransaction(transaction) => transaction.to_bytes_le(),
             Self::Unused(_) => Ok(vec![]),
         }
@@ -135,7 +135,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
             1 => Self::BlockResponse(FromBytes::from_bytes_le(&data)?),
             2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..])?),
-            3 => Self::ChallengeResponse(bincode::deserialize(data)?),
+            3 => Self::ChallengeResponse(FromBytes::from_bytes_le(&data)?),
             4 => match data.len() == 0 {
                 true => Self::PeerRequest,
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),

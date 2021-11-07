@@ -269,11 +269,6 @@ impl<N: Network> Ledger<N> {
         self.canon.get_block_locators(block_height)
     }
 
-    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
-    pub fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
-        self.canon.remove_last_blocks(num_blocks)
-    }
-
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -351,13 +346,13 @@ impl<N: Network> Ledger<N> {
                 // Check for candidate blocks to fast forward the ledger.
                 let mut block = self.latest_block();
                 let unconfirmed_blocks = self.unconfirmed_blocks.clone();
-                while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.block_hash()) {
+                while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.hash()) {
                     // Update the block iterator.
                     block = unconfirmed_block;
                     // Attempt to add the unconfirmed block.
                     self.add_block::<E>(block)?;
                     // Upon success, remove the unconfirmed block, as it is now confirmed.
-                    self.unconfirmed_blocks.remove(&block.block_hash());
+                    self.unconfirmed_blocks.remove(&block.hash());
                 }
 
                 // Send a sync request to each connected peer.
@@ -635,7 +630,7 @@ impl<N: Network> Ledger<N> {
     ///
     fn add_block<E: Environment>(&mut self, block: &Block<N>) -> Result<()> {
         // Ensure the given block is new.
-        if self.contains_block_hash(&block.block_hash())? {
+        if self.contains_block_hash(&block.hash())? {
             let error = format!("Canon chain already contains block {}", block.height());
             trace!("{}", error);
             Err(anyhow!("{}", error))
@@ -647,7 +642,7 @@ impl<N: Network> Ledger<N> {
                     let transactions = block.transactions();
                     self.memory_pool.remove_transactions(transactions);
 
-                    let block_hash = block.block_hash();
+                    let block_hash = block.hash();
                     if self.memory_pool.contains_block_hash(&block_hash) {
                         self.memory_pool.remove_block(&block_hash);
                     }
@@ -688,6 +683,11 @@ impl<N: Network> Ledger<N> {
                 }
             }
         }
+    }
+
+    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
+    fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
+        self.canon.remove_last_blocks(num_blocks)
     }
 
     ///

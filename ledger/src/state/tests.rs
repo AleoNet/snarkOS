@@ -81,16 +81,16 @@ fn test_genesis() {
 
     // Initialize a new ledger tree.
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
-    ledger_tree.add(&genesis.block_hash()).expect("Failed to add hash to ledger tree");
+    ledger_tree.add(&genesis.hash()).expect("Failed to add hash to ledger tree");
 
     // Ensure the ledger is at the genesis block.
     assert_eq!(0, ledger.latest_block_height());
     assert_eq!(genesis.height(), ledger.latest_block_height());
-    assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
+    assert_eq!(genesis.hash(), ledger.latest_block_hash());
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
     assert_eq!(genesis, ledger.latest_block());
-    assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
+    assert_eq!(&vec![(genesis.height(), genesis.hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
 
@@ -103,7 +103,7 @@ fn test_add_next_block() {
     // Initialize a new ledger tree.
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
     ledger_tree
-        .add(&Testnet2::genesis_block().block_hash())
+        .add(&Testnet2::genesis_block().hash())
         .expect("Failed to add hash to ledger tree");
 
     // Initialize a new account.
@@ -112,12 +112,12 @@ fn test_add_next_block() {
     // Mine the next block.
     let block = mine_next_block(&ledger, account.address()).expect("Failed to mine a block");
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
-    ledger_tree.add(&block.block_hash()).expect("Failed to add hash to ledger tree");
+    ledger_tree.add(&block.hash()).expect("Failed to add hash to ledger tree");
 
     // Ensure the ledger is at block 1.
     assert_eq!(1, ledger.latest_block_height());
     assert_eq!(block.height(), ledger.latest_block_height());
-    assert_eq!(block.block_hash(), ledger.latest_block_hash());
+    assert_eq!(block.hash(), ledger.latest_block_hash());
     assert_eq!(block.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(block.difficulty_target(), ledger.latest_block_difficulty_target());
     assert_eq!(block, ledger.latest_block().clone());
@@ -129,8 +129,8 @@ fn test_add_next_block() {
     // Ensure the block locators are correct.
     let block_locators = ledger.latest_block_locators();
     assert_eq!(2, block_locators.len());
-    assert_eq!((block.height(), block.block_hash()), block_locators[0]);
-    assert_eq!((genesis.height(), genesis.block_hash()), block_locators[1]);
+    assert_eq!((block.height(), block.hash()), block_locators[0]);
+    assert_eq!((genesis.height(), genesis.hash()), block_locators[1]);
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn test_remove_last_block() {
     // Initialize a new ledger tree.
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
     ledger_tree
-        .add(&Testnet2::genesis_block().block_hash())
+        .add(&Testnet2::genesis_block().hash())
         .expect("Failed to add hash to ledger tree");
 
     // Initialize a new account.
@@ -163,11 +163,11 @@ fn test_remove_last_block() {
     // Ensure the ledger is back at the genesis block.
     assert_eq!(0, ledger.latest_block_height());
     assert_eq!(genesis.height(), ledger.latest_block_height());
-    assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
+    assert_eq!(genesis.hash(), ledger.latest_block_hash());
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
     assert_eq!(genesis, ledger.latest_block());
-    assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
+    assert_eq!(&vec![(genesis.height(), genesis.hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
 
@@ -180,7 +180,7 @@ fn test_remove_last_2_blocks() {
     // Initialize a new ledger tree.
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
     ledger_tree
-        .add(&Testnet2::genesis_block().block_hash())
+        .add(&Testnet2::genesis_block().hash())
         .expect("Failed to add hash to ledger tree");
 
     // Initialize a new account.
@@ -206,10 +206,10 @@ fn test_remove_last_2_blocks() {
     // Ensure the ledger is back at the genesis block.
     assert_eq!(0, ledger.latest_block_height());
     assert_eq!(genesis.height(), ledger.latest_block_height());
-    assert_eq!(genesis.block_hash(), ledger.latest_block_hash());
+    assert_eq!(genesis.hash(), ledger.latest_block_hash());
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
     assert_eq!(genesis, ledger.latest_block());
-    assert_eq!(&vec![(genesis.height(), genesis.block_hash())], ledger.latest_block_locators());
+    assert_eq!(&vec![(genesis.height(), genesis.hash())], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
