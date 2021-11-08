@@ -29,7 +29,6 @@ use std::{
         atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
-    time::Duration,
 };
 use tokio::{sync::mpsc, task};
 
@@ -404,6 +403,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
             LedgerRequest::Pong(peer_ip, block_locators) => {
+                // Ensure the peer has been initialized in the ledger.
+                self.initialize_peer(peer_ip);
                 // Ensure the list of block locators is not empty.
                 if block_locators.len() == 0 {
                     self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
@@ -481,8 +482,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip);
-                // Process the unconfirmed block.
-                self.add_unconfirmed_block(peer_ip, block, peers_router.clone()).await
+                // Ensure the given block is new.
+                if let Ok(true) = self.contains_block_hash(&block.hash()) {
+                    trace!("Canon chain already contains block {}", block.height());
+                } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
+                    trace!("Memory pool already contains unconfirmed block {}", block.height());
+                } else {
+                    // Process the unconfirmed block.
+                    self.add_block(&block);
+                    // Propagate the unconfirmed block to the connected peers.
+                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block));
+                    if let Err(error) = peers_router.send(request).await {
+                        warn!("[UnconfirmedBlock] {}", error);
+                    }
+                }
             }
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
                 // Ensure the peer has been initialized in the ledger.
@@ -635,34 +648,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
-    /// Adds the given unconfirmed block:
-    ///     1) as the next block in the ledger if the block height increments by one, or
-    ///     2) to the memory pool for later use.
-    ///
-    async fn add_unconfirmed_block(&mut self, peer_ip: SocketAddr, block: Block<N>, peers_router: PeersRouter<N, E>) {
-        trace!("Received unconfirmed block {} from {}", block.height(), peer_ip);
-        // Ensure the given block is new.
-        if let Ok(true) = self.contains_block_hash(&block.hash()) {
-            trace!("Canon chain already contains block {}", block.height());
-        } else {
-            // Process the unconfirmed block.
-            self.add_block(&block);
-            // Propagate the unconfirmed block to the connected peers.
-            let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block));
-            if let Err(error) = peers_router.send(request).await {
-                warn!("[UnconfirmedBlock] {}", error);
-            }
-        }
-    }
-
-    ///
-    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
-    ///
-    fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
-        self.canon.remove_last_blocks(num_blocks)
-    }
-
-    ///
     /// Adds the given unconfirmed transaction to the memory pool.
     ///
     async fn add_unconfirmed_transaction(&mut self, peer_ip: SocketAddr, transaction: Transaction<N>, peers_router: PeersRouter<N, E>) {
@@ -683,6 +668,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 Err(error) => error!("{}", error),
             }
         }
+    }
+
+    ///
+    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
+    ///
+    fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
+        self.canon.remove_last_blocks(num_blocks)
     }
 
     ///
@@ -730,7 +722,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn update_block_requests(&mut self, peers_router: PeersRouter<N, E>) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
-        if self.number_of_block_requests() > (E::MAXIMUM_BLOCK_REQUEST / 2) as usize {
+        if self.number_of_block_requests() > 0 {
             return;
         }
 

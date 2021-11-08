@@ -19,7 +19,7 @@ use snarkvm::prelude::*;
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{anyhow, Result};
-use std::{io::Cursor, marker::PhantomData, net::SocketAddr};
+use std::{marker::PhantomData, net::SocketAddr};
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Clone, Debug)]
