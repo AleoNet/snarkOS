@@ -161,6 +161,19 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.read().await.get_block_transactions(block_height)?)
     }
 
+    /// Returns the ciphertext given the ciphertext ID.
+    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError> {
+        let ciphertext_id: N::CiphertextID = serde_json::from_value(ciphertext_id)?;
+        Ok(self.ledger.read().await.get_ciphertext(&ciphertext_id)?)
+    }
+
+    /// Returns the ledger proof for a given record commitment.
+    async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError> {
+        let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
+        let ledger_proof = self.ledger.read().await.get_ledger_inclusion_proof(&record_commitment)?;
+        Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
+    }
+
     /// Returns a transaction with metadata given the transaction ID.
     async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Value, RpcError> {
         let transaction_id: N::TransactionID = serde_json::from_value(transaction_id)?;
@@ -175,12 +188,6 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.read().await.get_transition(&transition_id)?)
     }
 
-    /// Returns the ciphertext given the ciphertext ID.
-    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError> {
-        let ciphertext_id: N::CiphertextID = serde_json::from_value(ciphertext_id)?;
-        Ok(self.ledger.read().await.get_ciphertext(&ciphertext_id)?)
-    }
-
     /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
     async fn send_transaction(&self, transaction_hex: String) -> Result<N::TransactionID, RpcError> {
         let transaction: Transaction<N> = FromBytes::from_bytes_le(&hex::decode(transaction_hex)?)?;
@@ -190,13 +197,6 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             warn!("[UnconfirmedTransaction] {}", error);
         }
         Ok(transaction.transaction_id())
-    }
-
-    /// Returns the ledger proof for a given record commitment.
-    async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError> {
-        let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
-        let ledger_proof = self.ledger.read().await.get_ledger_inclusion_proof(&record_commitment)?;
-        Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
     }
 
     // /// Validate and return if the transaction is valid.

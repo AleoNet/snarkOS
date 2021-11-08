@@ -63,6 +63,12 @@ pub trait RpcFunctions<N: Network> {
     // #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError>;
 
+    #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
+    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError>;
+
+    #[doc = include_str!("./documentation/public_endpoints/getledgerproof.md")]
+    async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError>;
+
     // TODO (howardwu): @collin fix the return type to include metadata now.
     // #[doc = include_str!("./documentation/public_endpoints/gettransaction.md")]
     async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<serde_json::Value, RpcError>;
@@ -70,14 +76,8 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
     async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError>;
 
-    #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
-    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError>;
-
     #[doc = include_str!("./documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
-
-    #[doc = include_str!("./documentation/public_endpoints/getledgerproof.md")]
-    async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/validaterawtransaction.md")]
     // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError>;
