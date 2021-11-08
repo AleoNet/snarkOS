@@ -69,7 +69,7 @@ impl Node {
             (NodeType::Miner, Some(address)) => {
                 let miner_address = Address::<N>::from_str(address)?;
                 println!("{}", crate::display::welcome_message());
-                println!("Your Aleo address is {}.\n\n", miner_address);
+                println!("Your Aleo address is {}.\n", miner_address);
                 println!("Starting a mining node on {}.\n", N::NETWORK_NAME);
                 Some(miner_address)
             }

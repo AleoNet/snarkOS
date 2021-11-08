@@ -21,7 +21,7 @@ use snarkvm::dpc::prelude::*;
 use anyhow::Result;
 use rand::thread_rng;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
     net::SocketAddr,
     path::Path,
@@ -97,7 +97,7 @@ pub struct Ledger<N: Network, E: Environment> {
     terminator: Arc<AtomicBool>,
 
     /// The map of each peer to their ledger state := (is_fork, common_ancestor, latest_block_height).
-    ledger_state: HashMap<SocketAddr, Option<(bool, u32, u32)>>,
+    peers_state: HashMap<SocketAddr, Option<(bool, u32, u32)>>,
     /// The map of each peer to their block requests.
     block_requests: HashMap<SocketAddr, HashSet<u32>>,
     /// The latest block height requested from a peer.
@@ -119,7 +119,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             memory_pool: MemoryPool::new(),
             terminator: Arc::new(AtomicBool::new(false)),
 
-            ledger_state: Default::default(),
+            peers_state: Default::default(),
             block_requests: Default::default(),
             latest_block_request,
             failures: Default::default(),
@@ -409,7 +409,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 if block_locators.len() == 0 {
                     self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
                 }
-                // Process the sync response.
+                // Process the pong.
                 else {
                     // Determine the common ancestor block height between this ledger and the peer.
                     let mut common_ancestor = 0;
@@ -417,10 +417,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     let mut latest_block_height_of_peer = 0;
 
                     // Verify the integrity of the block hashes sent by the peer.
-                    for (block_height, block_hash) in block_locators {
+                    for (block_height, block_hash) in &block_locators {
                         // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                        if let Ok(expected_block_height) = self.get_block_height(&block_hash) {
-                            if expected_block_height != block_height {
+                        if let Ok(expected_block_height) = self.get_block_height(block_hash) {
+                            if expected_block_height != *block_height {
                                 let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
                                 trace!("{}", error);
                                 self.add_failure(peer_ip, error);
@@ -434,8 +434,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         }
 
                         // Update the latest block height of the peer.
-                        if block_height > latest_block_height_of_peer {
-                            latest_block_height_of_peer = block_height;
+                        if *block_height > latest_block_height_of_peer {
+                            latest_block_height_of_peer = *block_height;
                         }
                     }
 
@@ -445,20 +445,67 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     //     return Ok(());
                     // }
 
-                    // TODO (howardwu): If the distance of (latest_block_height_of_peer - common_ancestor) is less than 10,
-                    //  manually check the fork status 1 by 1, as a slow response from the peer could make it look like a fork, based on this simple logic.
                     // Determine if the peer is a fork.
-                    let is_fork = common_ancestor < self.latest_block_height() && latest_block_height_of_peer > self.latest_block_height();
+                    let is_fork = {
+                        // Sort the block locators into a map.
+                        let block_locators: BTreeMap<u32, N::BlockHash> = block_locators.iter().cloned().collect();
 
-                    // // Construct a HashMap of the block locators.
-                    // let block_locators: HashMap<u32, N::BlockHash> = block_locators.iter().cloned().collect();
-                    // let (start_block_height, end_block_height) = match (block_locators.keys().min(), block_locators.keys().max()) {
-                    //     (Some(min), Some(max)) => (*min, *max),
-                    //     _ => {
-                    //         error!("Failed to find the starting and ending block height in a sync response");
-                    //         return;
-                    //     }
-                    // };
+                        // If the peer has a common ancestor that is at least more than 10 blocks from its own latest block height,
+                        // use the relative block heights of the two ledgers to determine whether the peer is on a fork.
+                        if common_ancestor + 10 < latest_block_height_of_peer {
+                            let mut is_fork = false;
+                            let mut crossed = false;
+                            for (block_height_interval, _) in block_locators {
+                                if crossed {
+                                    // TODO (howardwu): This logic only loosely holds. It requires changing block locator design to properly work.
+                                    if block_height_interval >= self.latest_block_height() {
+                                        is_fork = true;
+                                    }
+                                    break;
+                                }
+                                if block_height_interval >= common_ancestor {
+                                    crossed = true;
+                                }
+                            }
+                            is_fork
+                        }
+                        // If the peer has a common ancestor that is within 10 blocks of its own latest block height,
+                        // this ledger can determine with high confidence whether the peer is on a fork.
+                        else if common_ancestor < latest_block_height_of_peer {
+                            // If any block hash does not match between the common ancestor and
+                            // the latest block height of this ledger, the peer is on a fork.
+                            let mut is_fork = false;
+
+                            // Iterate through up to 10 block locators to determine if it is on a fork.
+                            let end_block_height = std::cmp::min(latest_block_height_of_peer, self.latest_block_height());
+                            for block_height in common_ancestor..=end_block_height {
+                                // Ensure the block hash for the given block height exists.
+                                if let Some(block_hash) = block_locators.get(&block_height) {
+                                    // Ensure the block hash between the two nodes match.
+                                    if let Ok(expected_block_hash) = self.get_block_hash(block_height) {
+                                        if expected_block_hash != *block_hash {
+                                            info!("Found a fork at block {} from {}", block_height, peer_ip);
+                                            is_fork = true;
+                                            break;
+                                        }
+                                    } else {
+                                        error!("This ledger is missing the block hash for block {}", block_height);
+                                        break;
+                                    }
+                                } else {
+                                    self.add_failure(peer_ip, format!("Malformed block locator {}", block_height));
+                                    break;
+                                }
+                            }
+
+                            is_fork
+                        }
+                        // As the common ancestor is at least at the latest block height of this ledger,
+                        // and as its latest block height is greater than this ledger, the peer is not on a fork.
+                        else {
+                            false
+                        }
+                    };
 
                     trace!(
                         "{} is at block {} (common_ancestor = {})",
@@ -467,6 +514,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         common_ancestor,
                     );
 
+                    // trace!("STATUS {:?} {}", self.status(), self.number_of_block_requests());
                     // trace!(
                     //     "{} is at block {} (is_fork = {}, common_ancestor = {})",
                     //     peer_ip,
@@ -519,7 +567,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
         // If there is an insufficient number of connected peers, set the status to `Peering`.
-        else if self.ledger_state.len() < E::MINIMUM_NUMBER_OF_PEERS {
+        else if self.peers_state.len() < E::MINIMUM_NUMBER_OF_PEERS {
             status = Status::Peering;
         }
         // If the ledger is out of date, set the status to `Syncing`.
@@ -533,7 +581,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Retrieve the latest block height of this node.
             let latest_block_height = self.latest_block_height();
             // Iterate through the connected peers, to determine if the ledger state is out of date.
-            for (_, ledger_state) in self.ledger_state.iter() {
+            for (_, ledger_state) in self.peers_state.iter() {
                 if let Some((_, _, block_height)) = ledger_state {
                     if *block_height > latest_block_height {
                         // Sync if this ledger has fallen behind by 3 or more blocks.
@@ -681,8 +729,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Adds an entry for the given peer IP to every data structure in `State`.
     ///
     fn initialize_peer(&mut self, peer_ip: SocketAddr) {
-        if !self.ledger_state.contains_key(&peer_ip) {
-            self.ledger_state.insert(peer_ip, None);
+        if !self.peers_state.contains_key(&peer_ip) {
+            self.peers_state.insert(peer_ip, None);
         }
         if !self.block_requests.contains_key(&peer_ip) {
             self.block_requests.insert(peer_ip, Default::default());
@@ -696,8 +744,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Removes the entry for the given peer IP from every data structure in `State`.
     ///
     fn remove_peer(&mut self, peer_ip: &SocketAddr) {
-        if self.ledger_state.contains_key(peer_ip) {
-            self.ledger_state.remove(peer_ip);
+        if self.peers_state.contains_key(peer_ip) {
+            self.peers_state.remove(peer_ip);
         }
         if self.block_requests.contains_key(peer_ip) {
             self.block_requests.remove(peer_ip);
@@ -711,7 +759,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Updates the ledger state of the given peer.
     ///
     fn update_ledger_state(&mut self, peer_ip: SocketAddr, ledger_state: (bool, u32, u32)) {
-        match self.ledger_state.get_mut(&peer_ip) {
+        match self.peers_state.get_mut(&peer_ip) {
             Some(status) => *status = Some(ledger_state),
             None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)),
         };
@@ -731,7 +779,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut maximal_peer_is_fork = false;
         let mut maximum_common_ancestor = 0;
         let mut maximum_block_height = self.latest_block_request;
-        for (peer_ip, ledger_state) in self.ledger_state.iter() {
+        for (peer_ip, ledger_state) in self.peers_state.iter() {
             if let Some((is_fork, common_ancestor, block_height)) = ledger_state {
                 if *block_height > maximum_block_height {
                     maximal_peer = Some(*peer_ip);
@@ -833,76 +881,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             None => error!("Missing failure entry for {}", peer_ip),
         };
     }
-
-    // ///
-    // /// Processes a fork request, which contains a sequence of block hashes that
-    // /// gives a insight to the ledger state of the peer.
-    // ///
-    // async fn process_sync_request<E: Environment>(
-    //     &mut self,
-    //     peer_ip: SocketAddr,
-    //     block_hashes: Vec<(u32, N::BlockHash)>,
-    //     peers_router: PeersRouter<N, E>,
-    // ) -> Result<()> {
-    //     // debug!("Handling fork request from peer {}", peer_ip);
-    //     // if block_hashes.len() > 0 {
-    //     //     // Find the last common block between this ledger and the peer, before forking.
-    //     //     let mut fork_point_block_height = 0;
-    //     //     // Find the latest block height of the peer.
-    //     //     let mut latest_block_height_of_peer = 0;
-    //     //
-    //     //     // Verify the integrity of the block hashes sent by the peer.
-    //     //     for (candidate_block_height, block_hash) in block_hashes {
-    //     //         // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-    //     //         if let Ok(expected_block_height) = self.canon.get_block_height(&block_hash) {
-    //     //             if expected_block_height != candidate_block_height {
-    //     //                 let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
-    //     //                 trace!("{}", error);
-    //     //                 return Err(anyhow!(error));
-    //     //             } else {
-    //     //                 // Update the fork point block height, as this block hash exists in this ledger.
-    //     //                 if expected_block_height > fork_point_block_height {
-    //     //                     fork_point_block_height = expected_block_height
-    //     //                 }
-    //     //             }
-    //     //         }
-    //     //
-    //     //         // Update the latest block height of the peer.
-    //     //         if candidate_block_height > latest_block_height_of_peer {
-    //     //             latest_block_height_of_peer = candidate_block_height
-    //     //         }
-    //     //     }
-    //     //
-    //     //     // TODO (raychu86): FORK - Consider if we just want to make this 1 directional. i.e. don't request blocks,
-    //     //     //   just send if it's relevant.
-    //     //
-    //     //     // The peer is ahead of you.
-    //     //     if latest_block_height_of_peer > self.latest_block_height() {
-    //     //         debug!(
-    //     //             "Peer {} is ahead of you. Current block height: {}. Peer block height: {}",
-    //     //             peer_ip,
-    //     //             self.latest_block_height(),
-    //     //             latest_block_height_of_peer
-    //     //         );
-    //     //
-    //     //         // Request new blocks from peer.
-    //     //     } else if latest_block_height_of_peer < self.latest_block_height() {
-    //     //         // You are ahead of your peer.
-    //     //         debug!(
-    //     //             "Sending fork response to peer {} for block heights between {} and {}",
-    //     //             peer_ip,
-    //     //             fork_point_block_height,
-    //     //             self.latest_block_height()
-    //     //         );
-    //     //
-    //     //         let request =
-    //     //             PeersRequest::MessageSend(peer_ip, Message::SyncResponse(fork_point_block_height, self.latest_block_height()));
-    //     //         peers_router.send(request).await?;
-    //     //     }
-    //     // }
-    //     //
-    //     // Ok(())
-    // }
 
     // ///
     // /// Handles the fork request.
