@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::CircularMap, Environment, Message, PeersRequest, PeersRouter};
+use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, PeersRouter};
 use snarkos_ledger::{storage::Storage, LedgerState, Metadata};
 use snarkvm::dpc::prelude::*;
 
@@ -25,7 +25,7 @@ use std::{
     net::SocketAddr,
     path::Path,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
 };
@@ -61,11 +61,28 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     UnconfirmedTransaction(SocketAddr, Transaction<N>),
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum Status {
+    /// The ledger is ready to handle requests.
+    Ready = 0,
+    /// The ledger is mining the next block.
+    Mining,
+    /// The ledger is connecting to the minimum number of required peers.
+    Peering,
+    /// The ledger is syncing blocks with a connected peer.
+    Syncing,
+    /// The ledger is terminating and shutting down.
+    ShuttingDown,
+}
+
 ///
 /// A ledger for a specific network on the node server.
 ///
 #[derive(Clone, Debug)]
 pub struct Ledger<N: Network> {
+    /// The status of the ledger.
+    status: Arc<AtomicU8>,
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
     /// A map of previous block hashes to unconfirmed blocks.
@@ -74,8 +91,6 @@ pub struct Ledger<N: Network> {
     memory_pool: MemoryPool<N>,
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
-    /// A status bit for the miner.
-    is_mining: Arc<AtomicBool>,
 
     /// The map of each peer to their ledger state := (is_fork, common_ancestor, latest_block_height).
     ledger_state: HashMap<SocketAddr, Option<(bool, u32, u32)>>,
@@ -83,35 +98,49 @@ pub struct Ledger<N: Network> {
     block_requests: HashMap<SocketAddr, HashSet<u32>>,
     /// The map of each peer to their failure messages.
     failures: HashMap<SocketAddr, Vec<String>>,
-    /// A boolean that is `true` when syncing.
-    is_syncing: Arc<AtomicBool>,
 }
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(Self {
+            status: Arc::new(AtomicU8::new(0)),
             canon: LedgerState::open::<S, P>(path)?,
             unconfirmed_blocks: Default::default(),
             memory_pool: MemoryPool::new(),
             terminator: Arc::new(AtomicBool::new(false)),
-            is_mining: Arc::new(AtomicBool::new(false)),
 
             ledger_state: Default::default(),
             block_requests: Default::default(),
             failures: Default::default(),
-            is_syncing: Arc::new(AtomicBool::new(false)),
         })
+    }
+
+    /// Returns the status of the ledger.
+    pub fn status(&self) -> Status {
+        match self.status.load(Ordering::SeqCst) {
+            0 => Status::Ready,
+            1 => Status::Mining,
+            2 => Status::Peering,
+            3 => Status::Syncing,
+            4 => Status::ShuttingDown,
+            _ => unreachable!("Invalid status code"),
+        }
     }
 
     /// Returns `true` if the ledger is currently mining.
     pub fn is_mining(&self) -> bool {
-        self.is_mining.load(Ordering::SeqCst)
+        self.status() == Status::Mining
+    }
+
+    /// Returns `true` if the ledger is currently peering.
+    pub fn is_peering(&self) -> bool {
+        self.status() == Status::Peering
     }
 
     /// Returns `true` if the ledger is currently syncing.
     pub fn is_syncing(&self) -> bool {
-        self.is_syncing.load(Ordering::SeqCst)
+        self.status() == Status::Syncing
     }
 
     /// Returns the latest block.
@@ -324,7 +353,6 @@ impl<N: Network> Ledger<N> {
                         if let Some(requests) = self.block_requests.get(&peer_ip) {
                             if requests.is_empty() {
                                 trace!("All block requests with {} have been processed", peer_ip);
-                                self.is_syncing.store(false, Ordering::SeqCst);
                             }
                         }
                     }
@@ -355,6 +383,12 @@ impl<N: Network> Ledger<N> {
                     self.unconfirmed_blocks.remove(&block.hash());
                 }
 
+                // Update the status of the ledger.
+                self.update_status::<E>();
+
+                info!("STATUS 1 {:?}", self.status());
+                info!("STATUS 2 {:?}", self.number_of_block_requests());
+
                 // Send a sync request to each connected peer.
                 let request = PeersRequest::MessageBroadcast(Message::SyncRequest);
                 // Send a `SyncRequest` message to the peer.
@@ -362,8 +396,8 @@ impl<N: Network> Ledger<N> {
                     warn!("[SyncRequest] {}", error);
                 }
 
-                // Ensure the state manager is not already syncing.
-                if self.is_syncing() {
+                // Ensure the ledger is not awaiting responses from outstanding block requests.
+                if self.number_of_block_requests() > 0 {
                     return Ok(());
                 }
 
@@ -407,7 +441,6 @@ impl<N: Network> Ledger<N> {
                             "Preparing to request blocks {} to {} from {}",
                             start_block_height, end_block_height, peer_ip
                         );
-                        self.is_syncing.store(true, Ordering::SeqCst);
 
                         // Add block requests for each block height up to the maximum block height.
                         for block_height in start_block_height..=end_block_height {
@@ -428,26 +461,20 @@ impl<N: Network> Ledger<N> {
                 Ok(())
             }
             LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
-                if let Err(error) = self.mine_next_block(local_ip, recipient, ledger_router) {
-                    error!("Failed to mine the next block: {}", error)
-                }
+                self.mine_next_block(local_ip, recipient, ledger_router);
                 Ok(())
             }
             LedgerRequest::SyncRequest(peer_ip) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip);
-                // Skip the sync request if this node is already syncing.
-                if self.is_syncing() {
-                    return Ok(());
-                }
                 // Process the sync request.
-                else {
-                    // Send a sync response to the peer.
-                    let block_locators = self.latest_block_locators().clone();
-                    let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
-                    peers_router.send(request).await?;
-                    Ok(())
+                let block_locators = self.latest_block_locators().clone();
+                // Send a `SyncResponse` message to the peer.
+                let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
+                if let Err(error) = peers_router.send(request).await {
+                    warn!("[SyncResponse] {}", error);
                 }
+                Ok(())
             }
             LedgerRequest::SyncResponse(peer_ip, block_locators) => {
                 // Ensure the list of block locators is not empty.
@@ -542,85 +569,138 @@ impl<N: Network> Ledger<N> {
         }
     }
 
-    /// Mines a new block and adds it to the canon blocks.
-    fn mine_next_block<E: Environment>(
-        &self,
-        local_ip: SocketAddr,
-        recipient: Address<N>,
-        ledger_router: LedgerRouter<N, E>,
-    ) -> Result<()> {
-        // Ensure the ledger is not already mining.
-        match self.is_mining.load(Ordering::SeqCst) {
-            true => return Ok(()),
-            false => self.is_mining.store(true, Ordering::SeqCst),
+    /// Updates the status of the ledger.
+    fn update_status<E: Environment>(&mut self) {
+        // Retrieve the status variable.
+        let mut status = self.status();
+
+        // If the node is shutting down, skip the update.
+        if status == Status::ShuttingDown {
+            trace!("Ledger is shutting down");
+            // Set the terminator bit to `true` to ensure it stops mining.
+            self.terminator.store(true, Ordering::SeqCst);
+            return;
         }
 
-        // Prepare the new block.
-        let previous_block_hash = self.latest_block_hash();
-        let block_height = self.latest_block_height() + 1;
-
-        // Compute the block difficulty target.
-        let previous_timestamp = self.latest_block_timestamp();
-        let previous_difficulty_target = self.latest_block_difficulty_target();
-        let block_timestamp = chrono::Utc::now().timestamp();
-        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
-
-        // Construct the ledger root and unconfirmed transactions.
-        let ledger_root = self.canon.latest_ledger_root();
-        let unconfirmed_transactions = self.memory_pool.transactions();
-        let terminator = self.terminator.clone();
-        let is_mining = self.is_mining.clone();
-
-        task::spawn(async move {
-            // Craft a coinbase transaction.
-            let amount = Block::<N>::block_reward(block_height);
-            let coinbase_transaction = match Transaction::<N>::new_coinbase(recipient, amount, &mut thread_rng()) {
-                Ok(coinbase) => coinbase,
-                Err(error) => {
-                    error!("{}", error);
-                    return;
-                }
+        // If there is an insufficient number of connected peers, set the status to `Peering`.
+        if self.ledger_state.len() < E::MINIMUM_NUMBER_OF_PEERS {
+            status = Status::Peering;
+        } else {
+            // Update the status to `Ready` or `Mining`.
+            status = match status {
+                Status::Mining => Status::Mining,
+                _ => Status::Ready,
             };
 
-            // Construct the new block transactions.
-            let transactions = match Transactions::from(&[vec![coinbase_transaction], unconfirmed_transactions].concat()) {
-                Ok(transactions) => transactions,
-                Err(error) => {
-                    error!("{}", error);
-                    return;
-                }
-            };
+            // Retrieve the latest block height of this node.
+            let latest_block_height = self.latest_block_height();
 
-            // Mine the next block.
-            let block = match Block::mine(
-                previous_block_hash,
-                block_height,
-                block_timestamp,
-                difficulty_target,
-                ledger_root,
-                transactions,
-                &terminator,
-                &mut thread_rng(),
-            ) {
-                Ok(block) => {
-                    // Set the mining status to off.
-                    is_mining.store(false, Ordering::SeqCst);
-                    block
+            // Iterate through the connected peers, to determine if the ledger state is out of date.
+            for (_, ledger_state) in self.ledger_state.iter() {
+                if let Some((_, _, block_height)) = ledger_state {
+                    if *block_height > latest_block_height {
+                        // Sync if this ledger has fallen behind by 3 or more blocks.
+                        if block_height - latest_block_height > 2 {
+                            // Set the status to `Syncing`.
+                            status = Status::Syncing;
+                        }
+                    }
                 }
-                Err(error) => {
-                    error!("Failed to mine the next block: {}", error);
-                    return;
-                }
-            };
-
-            // Broadcast the next block.
-            let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
-            if let Err(error) = ledger_router.send(request).await {
-                error!("Failed to broadcast mined block: {}", error);
             }
-        });
+        }
 
-        Ok(())
+        // If the node is `Peering` or `Syncing`, it should not be mining (yet).
+        if status == Status::Peering || status == Status::Syncing {
+            // Set the terminator bit to `true` to ensure it does not mine.
+            self.terminator.store(true, Ordering::SeqCst);
+        }
+
+        // Update the ledger to the determined status.
+        self.status.store(status as u8, Ordering::SeqCst);
+    }
+
+    /// Mines a new block and adds it to the canon blocks.
+    fn mine_next_block<E: Environment>(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>) {
+        // Ensure the miner is permitted to operate.
+        // If the node type is not a miner, it should not be mining.
+        if E::NODE_TYPE != NodeType::Miner {
+            return;
+        }
+        // Ensure the miner is permitted to operate.
+        // If `terminator` is `true`, it should not be mining.
+        else if self.terminator.load(Ordering::SeqCst) {
+            return;
+        }
+        // Ensure the miner is permitted to operate.
+        // If the status is not `Ready`, it is either already mining or should not be mining.
+        else if self.status() != Status::Ready {
+            return;
+        }
+        // Mine the next block.
+        else {
+            // Set the status to mining.
+            self.status.store(Status::Mining as u8, Ordering::SeqCst);
+
+            // Prepare the new block.
+            let previous_block_hash = self.latest_block_hash();
+            let block_height = self.latest_block_height() + 1;
+
+            // Compute the block difficulty target.
+            let previous_timestamp = self.latest_block_timestamp();
+            let previous_difficulty_target = self.latest_block_difficulty_target();
+            let block_timestamp = chrono::Utc::now().timestamp();
+            let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+
+            // Construct the ledger root and unconfirmed transactions.
+            let ledger_root = self.canon.latest_ledger_root();
+            let unconfirmed_transactions = self.memory_pool.transactions();
+            let terminator = self.terminator.clone();
+
+            task::spawn(async move {
+                // Craft a coinbase transaction.
+                let amount = Block::<N>::block_reward(block_height);
+                let coinbase_transaction = match Transaction::<N>::new_coinbase(recipient, amount, &mut thread_rng()) {
+                    Ok(coinbase) => coinbase,
+                    Err(error) => {
+                        error!("{}", error);
+                        return;
+                    }
+                };
+
+                // Construct the new block transactions.
+                let transactions = match Transactions::from(&[vec![coinbase_transaction], unconfirmed_transactions].concat()) {
+                    Ok(transactions) => transactions,
+                    Err(error) => {
+                        error!("{}", error);
+                        return;
+                    }
+                };
+
+                // Mine the next block.
+                let block = match Block::mine(
+                    previous_block_hash,
+                    block_height,
+                    block_timestamp,
+                    difficulty_target,
+                    ledger_root,
+                    transactions,
+                    &terminator,
+                    &mut thread_rng(),
+                ) {
+                    Ok(block) => block,
+                    Err(error) => {
+                        error!("Failed to mine the next block: {}", error);
+                        return;
+                    }
+                };
+
+                // Broadcast the next block.
+                let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
+                if let Err(error) = ledger_router.send(request).await {
+                    error!("Failed to broadcast mined block: {}", error);
+                }
+            });
+        }
     }
 
     ///
@@ -780,6 +860,13 @@ impl<N: Network> Ledger<N> {
             Some(status) => *status = Some(ledger_state),
             None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)),
         };
+    }
+
+    ///
+    /// Returns the number of outstanding block requests.
+    ///
+    fn number_of_block_requests(&self) -> usize {
+        self.block_requests.values().map(|r| r.len()).fold(0usize, |a, b| a + b)
     }
 
     ///

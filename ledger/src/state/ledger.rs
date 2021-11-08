@@ -469,8 +469,7 @@ impl<N: Network> LedgerState<N> {
 
     /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
     pub fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
-        // TODO (howardwu): Add a proper safety check that `num_blocks` is within the MAXIMUM_FORK_DEPTH.
-        if num_blocks == 0 || num_blocks > 1024 {
+        if num_blocks == 0 || num_blocks > N::ALEO_MAXIMUM_FORK_DEPTH {
             return Err(anyhow!("Attempted to remove {} blocks, which is invalid", num_blocks));
         }
 

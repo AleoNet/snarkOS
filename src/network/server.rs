@@ -84,7 +84,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         tokio::time::sleep(Duration::from_secs(4)).await;
 
         // Initialize a new instance of the miner.
-        Self::initialize_miner(&mut tasks, local_ip, miner, peers.clone(), ledger.clone(), ledger_router.clone());
+        Self::initialize_miner(&mut tasks, local_ip, miner, ledger_router.clone());
 
         // Initialize a new instance of the RPC server.
         let rpc_ip = format!("0.0.0.0:{}", rpc_port).parse()?;
@@ -234,8 +234,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         miner: Option<Address<N>>,
-        peers: Arc<RwLock<Peers<N, E>>>,
-        ledger: Arc<RwLock<Ledger<N>>>,
         ledger_router: LedgerRouter<N, E>,
     ) {
         if E::NODE_TYPE == NodeType::Miner {
@@ -243,20 +241,10 @@ impl<N: Network, E: Environment> Server<N, E> {
                 let ledger_router = ledger_router.clone();
                 tasks.append(task::spawn(async move {
                     loop {
-                        // Skip if the ledger is syncing.
-                        if ledger.read().await.is_syncing() {
-                            continue;
-                        }
-                        // Skip if the node server is not connected to the minimum number of peers.
-                        if peers.read().await.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
-                            continue;
-                        }
                         // Start the mining process.
-                        else {
-                            let request = LedgerRequest::Mine(local_ip, recipient, ledger_router.clone());
-                            if let Err(error) = ledger_router.send(request).await {
-                                error!("Failed to send request to ledger: {}", error);
-                            }
+                        let request = LedgerRequest::Mine(local_ip, recipient, ledger_router.clone());
+                        if let Err(error) = ledger_router.send(request).await {
+                            error!("Failed to send request to ledger: {}", error);
                         }
                         // Sleep for 2 seconds.
                         tokio::time::sleep(Duration::from_secs(2)).await;

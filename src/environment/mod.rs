@@ -80,8 +80,6 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
 
     const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
     const FAILURE_THRESHOLD: usize = 5;
-
-    const MAXIMUM_FORK_DEPTH: u32 = 1024;
 }
 
 #[derive(Clone, Debug, Default)]
