@@ -67,7 +67,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
     "gettransition",
     "getciphertext",
     "sendtransaction",
-    "ledgerproof",
+    "getledgerproof",
     // "validaterawtransaction",
     // // private
     // "createrawtransaction",
@@ -287,8 +287,8 @@ async fn handle_rpc<N: Network, E: Environment>(
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
-        "ledgerproof" => {
-            let result = rpc.ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
+        "getledgerproof" => {
+            let result = rpc.get_ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         // "decoderawtransaction" => {

@@ -193,7 +193,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the ledger proof for a given record commitment.
-    async fn ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError> {
+    async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError> {
         let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
         let ledger_proof = self.ledger.read().await.get_ledger_inclusion_proof(&record_commitment)?;
         Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
