@@ -340,20 +340,14 @@ impl<N: Network> Ledger<N> {
                 else {
                     // Remove the block request from the state manager.
                     self.remove_block_request(peer_ip, block.height());
-                    // Ensure the block height corresponds to the requested block.
-                    if block.height() != block.height() {
-                        self.add_failure(peer_ip, "Block height does not match".to_string());
-                    }
                     // Process the block response.
-                    else {
-                        if let Err(error) = self.add_block::<E>(&block) {
-                            warn!("Failed to add a block to the ledger: {}", error);
-                        }
-                        // Check if syncing with this peer is complete.
-                        if let Some(requests) = self.block_requests.get(&peer_ip) {
-                            if requests.is_empty() {
-                                trace!("All block requests with {} have been processed", peer_ip);
-                            }
+                    if let Err(error) = self.add_block::<E>(&block) {
+                        warn!("Failed to add a block to the ledger: {}", error);
+                    }
+                    // Check if syncing with this peer is complete.
+                    if let Some(requests) = self.block_requests.get(&peer_ip) {
+                        if requests.is_empty() {
+                            trace!("All block requests with {} have been processed", peer_ip);
                         }
                     }
                 }
@@ -383,18 +377,16 @@ impl<N: Network> Ledger<N> {
                     self.unconfirmed_blocks.remove(&block.hash());
                 }
 
-                // Update the status of the ledger.
-                self.update_status::<E>();
-
-                info!("STATUS 1 {:?}", self.status());
-                info!("STATUS 2 {:?}", self.number_of_block_requests());
-
                 // Send a sync request to each connected peer.
                 let request = PeersRequest::MessageBroadcast(Message::SyncRequest);
                 // Send a `SyncRequest` message to the peer.
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[SyncRequest] {}", error);
                 }
+
+                // Update the status of the ledger.
+                self.update_status::<E>();
+                debug!("STATUS {:?} {}", self.status(), self.number_of_block_requests());
 
                 // Ensure the ledger is not awaiting responses from outstanding block requests.
                 if self.number_of_block_requests() > 0 {
@@ -594,7 +586,6 @@ impl<N: Network> Ledger<N> {
 
             // Retrieve the latest block height of this node.
             let latest_block_height = self.latest_block_height();
-
             // Iterate through the connected peers, to determine if the ledger state is out of date.
             for (_, ledger_state) in self.ledger_state.iter() {
                 if let Some((_, _, block_height)) = ledger_state {
@@ -613,6 +604,9 @@ impl<N: Network> Ledger<N> {
         if status == Status::Peering || status == Status::Syncing {
             // Set the terminator bit to `true` to ensure it does not mine.
             self.terminator.store(true, Ordering::SeqCst);
+        } else {
+            // Set the terminator bit to `false` to ensure it is allowed to mine.
+            self.terminator.store(false, Ordering::SeqCst);
         }
 
         // Update the ledger to the determined status.
