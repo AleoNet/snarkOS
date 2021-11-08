@@ -262,7 +262,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
     async fn send(&mut self, peer: SocketAddr, message: &Message<N, E>) {
         match self.connected_peers.get(&peer) {
             Some(outbound) => {
-                // trace!("Sending '{}' to {}", message.name(), peer);
                 if let Err(error) = outbound.send(message.clone()).await {
                     trace!("Outbound channel failed: {}", error);
                     self.connected_peers.remove(&peer);
