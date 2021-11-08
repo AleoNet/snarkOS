@@ -100,6 +100,8 @@ pub struct Ledger<N: Network, E: Environment> {
     ledger_state: HashMap<SocketAddr, Option<(bool, u32, u32)>>,
     /// The map of each peer to their block requests.
     block_requests: HashMap<SocketAddr, HashSet<u32>>,
+    /// The latest block height requested from a peer.
+    latest_block_request: u32,
     /// The map of each peer to their failure messages.
     failures: HashMap<SocketAddr, Vec<String>>,
     _phantom: PhantomData<E>,
@@ -108,15 +110,18 @@ pub struct Ledger<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+        let canon = LedgerState::open::<S, P>(path)?;
+        let latest_block_request = canon.latest_block_height();
         Ok(Self {
             status: Arc::new(AtomicU8::new(0)),
-            canon: LedgerState::open::<S, P>(path)?,
+            canon,
             unconfirmed_blocks: Default::default(),
             memory_pool: MemoryPool::new(),
             terminator: Arc::new(AtomicBool::new(false)),
 
             ledger_state: Default::default(),
             block_requests: Default::default(),
+            latest_block_request,
             failures: Default::default(),
             _phantom: PhantomData,
         })
@@ -738,7 +743,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut maximal_peer = None;
         let mut maximal_peer_is_fork = false;
         let mut maximum_common_ancestor = 0;
-        let mut maximum_block_height = 0;
+        let mut maximum_block_height = self.latest_block_request;
         for (peer_ip, ledger_state) in self.ledger_state.iter() {
             if let Some((is_fork, common_ancestor, block_height)) = ledger_state {
                 if *block_height > maximum_block_height {
@@ -752,43 +757,38 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // Proceed to add block requests if the maximum block height is higher than the latest.
         if let Some(peer_ip) = maximal_peer {
-            // Retrieve the latest block height of the ledger.
-            let latest_block_height = self.latest_block_height();
-            if maximum_block_height > latest_block_height {
-                // // If the peer is on a fork, start by removing blocks until the common ancestor is reached.
-                // if maximal_peer_is_fork {
-                //     let num_blocks = latest_block_height - maximum_common_ancestor;
-                //     if num_blocks <= E::MAXIMUM_FORK_DEPTH {
-                //         if let Err(error) = ledger.write().await.remove_last_blocks(num_blocks) {
-                //             error!("Failed to roll ledger back: {}", error);
-                //         }
-                //     }
-                // }
+            // // If the peer is on a fork, start by removing blocks until the common ancestor is reached.
+            // if maximal_peer_is_fork {
+            //     let num_blocks = self.latest_block_request - maximum_common_ancestor;
+            //     if num_blocks <= E::MAXIMUM_FORK_DEPTH {
+            //         if let Err(error) = ledger.write().await.remove_last_blocks(num_blocks) {
+            //             error!("Failed to roll ledger back: {}", error);
+            //         }
+            //     }
+            // }
 
-                // Determine the specific blocks to sync with the peer.
-                let num_blocks = std::cmp::min(maximum_block_height - latest_block_height, E::MAXIMUM_BLOCK_REQUEST);
-                let start_block_height = latest_block_height + 1;
-                let end_block_height = start_block_height + num_blocks - 1;
+            // Determine the specific blocks to sync with the peer.
+            let num_blocks = std::cmp::min(maximum_block_height - self.latest_block_request, E::MAXIMUM_BLOCK_REQUEST);
+            let start_block_height = self.latest_block_request + 1;
+            let end_block_height = start_block_height + num_blocks - 1;
+            debug!("Request blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
 
-                debug!(
-                    "Preparing to request blocks {} to {} from {}",
-                    start_block_height, end_block_height, peer_ip
-                );
+            // Send a `BlockRequest` message to the peer.
+            let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
+            if let Err(error) = peers_router.send(request).await {
+                warn!("[BlockRequest] {}", error);
+                return;
+            }
 
-                // Add block requests for each block height up to the maximum block height.
-                for block_height in start_block_height..=end_block_height {
-                    if !self.contains_block_request(peer_ip, block_height) {
-                        // Add the block request to the state manager.
-                        self.add_block_request(peer_ip, block_height);
-                    }
-                }
-                // Request the blocks from the peer.
-                let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
-                // Send a `BlockRequest` message to the peer.
-                if let Err(error) = peers_router.send(request).await {
-                    warn!("[BlockRequest] {}", error);
+            // Log each block request to ensure the peer responds with all requested blocks.
+            for block_height in start_block_height..=end_block_height {
+                if !self.contains_block_request(peer_ip, block_height) {
+                    // Add the block request to the ledger.
+                    self.add_block_request(peer_ip, block_height);
                 }
             }
+            // Update the latest block height requested from a peer.
+            self.latest_block_request = end_block_height;
         }
     }
 
