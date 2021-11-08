@@ -320,7 +320,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
     async fn new(stream: TcpStream, local_ip: SocketAddr, peers_handler: PeersRouter<N, E>) -> Result<Self> {
         // Construct the socket.
-        let mut outbound_socket = Framed::new(stream, Message::<N, E>::Pong);
+        let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
         let peer_ip = Peer::handshake(&mut outbound_socket, local_ip).await?;
@@ -527,35 +527,24 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
-                                    // Process the `Ping` request.
-                                    else {
-                                        // Update the version of the peer.
-                                        peer.version = version;
-                                        // Send a `Pong` message to the peer.
-                                        if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, Message::Pong)).await {
-                                            warn!("[Pong] {}", error);
-                                        }
+                                    // Update the version of the peer.
+                                    peer.version = version;
+                                    // Route the `Ping` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::Ping(peer_ip)).await {
+                                        warn!("[Ping] {}", error);
                                     }
                                 },
-                                Message::Pong => {
+                                Message::Pong(block_locators) => {
+                                    // Route the `Pong` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, block_locators)).await {
+                                        warn!("[Pong] {}", error);
+                                    }
                                     // Sleep for the preset time before sending a `Ping` request.
                                     tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
                                     // Send a `Ping` request to the peer.
                                     let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION));
                                     if let Err(error) = peers_router.send(request).await {
                                         warn!("[Ping] {}", error);
-                                    }
-                                },
-                                Message::SyncRequest => {
-                                    // Route the `SyncRequest` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::SyncRequest(peer_ip)).await {
-                                        warn!("[SyncRequest] {}", error);
-                                    }
-                                },
-                                Message::SyncResponse(block_locators) => {
-                                    // Route the `SyncResponse` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::SyncResponse(peer_ip, block_locators)).await {
-                                        warn!("[SyncResponse] {}", error);
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {

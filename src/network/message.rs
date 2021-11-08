@@ -38,12 +38,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerResponse(Vec<SocketAddr>),
     /// Ping := (version)
     Ping(u32),
-    /// Pong := ()
-    Pong,
-    /// SyncRequest := ()
-    SyncRequest,
-    /// SyncResponse := (\[(block height, block_hash)\])
-    SyncResponse(Vec<(u32, N::BlockHash)>),
+    /// Pong := (\[(block_height, block_hash)\])
+    Pong(Vec<(u32, N::BlockHash)>),
     /// UnconfirmedBlock := (block)
     UnconfirmedBlock(Block<N>),
     /// UnconfirmedTransaction := (transaction)
@@ -64,9 +60,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerRequest => "PeerRequest",
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
-            Self::Pong => "Pong",
-            Self::SyncRequest => "SyncRequest",
-            Self::SyncResponse(..) => "SyncResponse",
+            Self::Pong(..) => "Pong",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
             Self::Unused(..) => "Unused",
@@ -84,12 +78,10 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerRequest => 4,
             Self::PeerResponse(..) => 5,
             Self::Ping(..) => 6,
-            Self::Pong => 7,
-            Self::SyncRequest => 8,
-            Self::SyncResponse(..) => 9,
-            Self::UnconfirmedBlock(..) => 10,
-            Self::UnconfirmedTransaction(..) => 11,
-            Self::Unused(..) => 12,
+            Self::Pong(..) => 7,
+            Self::UnconfirmedBlock(..) => 8,
+            Self::UnconfirmedTransaction(..) => 9,
+            Self::Unused(..) => 10,
         }
     }
 
@@ -98,17 +90,15 @@ impl<N: Network, E: Environment> Message<N, E> {
     pub fn data(&self) -> Result<Vec<u8>> {
         match self {
             Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
-            Self::BlockResponse(block) => block.to_bytes_le(),
+            Self::BlockResponse(block) => Ok(bincode::serialize(block)?),
             Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
-            Self::ChallengeResponse(block_header) => block_header.to_bytes_le(),
+            Self::ChallengeResponse(block_header) => Ok(bincode::serialize(block_header)?),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version) => Ok(version.to_le_bytes().to_vec()),
-            Self::Pong => Ok(vec![]),
-            Self::SyncRequest => Ok(vec![]),
-            Self::SyncResponse(block_locators) => Ok(to_bytes_le![block_locators.len() as u32, block_locators]?),
-            Self::UnconfirmedBlock(block) => block.to_bytes_le(),
-            Self::UnconfirmedTransaction(transaction) => transaction.to_bytes_le(),
+            Self::Ping(version) => Ok(bincode::serialize(version)?),
+            Self::Pong(block_locators) => Ok(bincode::serialize(block_locators)?),
+            Self::UnconfirmedBlock(block) => Ok(bincode::serialize(block)?),
+            Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
             Self::Unused(_) => Ok(vec![]),
         }
     }
@@ -133,34 +123,18 @@ impl<N: Network, E: Environment> Message<N, E> {
         // Deserialize the data field.
         let message = match id {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
-            1 => Self::BlockResponse(FromBytes::from_bytes_le(&data)?),
-            2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..])?),
-            3 => Self::ChallengeResponse(FromBytes::from_bytes_le(&data)?),
+            1 => Self::BlockResponse(bincode::deserialize(data)?),
+            2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..6])?),
+            3 => Self::ChallengeResponse(bincode::deserialize(data)?),
             4 => match data.len() == 0 {
                 true => Self::PeerRequest,
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
             5 => Self::PeerResponse(bincode::deserialize(data)?),
             6 => Self::Ping(bincode::deserialize(&data[0..4])?),
-            7 => match data.len() == 0 {
-                true => Self::Pong,
-                false => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
-            },
-            8 => match data.len() == 0 {
-                true => Self::SyncRequest,
-                false => return Err(anyhow!("Invalid 'SyncRequest' message: {:?} {:?}", buffer, data)),
-            },
-            9 => {
-                let mut cursor = Cursor::new(data);
-                let block_locators_length: u32 = FromBytes::read_le(&mut cursor)?;
-                let mut block_locators = Vec::with_capacity(block_locators_length as usize);
-                for _ in 0..block_locators_length {
-                    block_locators.push(FromBytes::read_le(&mut cursor)?);
-                }
-                Self::SyncResponse(block_locators)
-            }
-            10 => Self::UnconfirmedBlock(FromBytes::from_bytes_le(&data)?),
-            11 => Self::UnconfirmedTransaction(FromBytes::from_bytes_le(&data)?),
+            7 => Self::Pong(bincode::deserialize(data)?),
+            8 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
+            9 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 

@@ -29,6 +29,7 @@ use std::{
         atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
+    time::Duration,
 };
 use tokio::{sync::mpsc, task};
 
@@ -55,10 +56,10 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat,
     /// Mine := (local_ip, miner_address, ledger_router)
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
-    /// SyncRequest := (peer_ip)
-    SyncRequest(SocketAddr),
-    /// SyncResponse := (peer_ip, \[(block height, block_hash)\])
-    SyncResponse(SocketAddr, Vec<(u32, N::BlockHash)>),
+    /// Ping := (peer_ip)
+    Ping(SocketAddr),
+    /// Pong := (peer_ip, \[(block_height, block_hash)\])
+    Pong(SocketAddr, Vec<(u32, N::BlockHash)>),
     /// UnconfirmedBlock := (peer_ip, block)
     UnconfirmedBlock(SocketAddr, Block<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
@@ -384,14 +385,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Upon success, remove the unconfirmed block, as it is now confirmed.
                     self.unconfirmed_blocks.remove(&block.hash());
                 }
-
-                // Broadcast a `SyncRequest` message to each connected peer.
-                let request = PeersRequest::MessageBroadcast(Message::SyncRequest);
-                if let Err(error) = peers_router.send(request).await {
-                    warn!("[SyncRequest] {}", error);
-                }
-                // debug!("STATUS {:?} {}", self.status(), self.number_of_block_requests());
-
                 // Update the status of the ledger.
                 self.update_status();
                 // Update the block requests.
@@ -400,18 +393,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
                 self.mine_next_block(local_ip, recipient, ledger_router);
             }
-            LedgerRequest::SyncRequest(peer_ip) => {
+            LedgerRequest::Ping(peer_ip) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip);
-                // Process the sync request.
-                let block_locators = self.latest_block_locators().clone();
-                // Send a `SyncResponse` message to the peer.
-                let request = PeersRequest::MessageSend(peer_ip, Message::SyncResponse(block_locators));
+                // Send a `Pong` message to the peer.
+                let message = Message::Pong(self.latest_block_locators().clone());
+                let request = PeersRequest::MessageSend(peer_ip, message);
                 if let Err(error) = peers_router.send(request).await {
-                    warn!("[SyncResponse] {}", error);
+                    warn!("[Pong] {}", error);
                 }
             }
-            LedgerRequest::SyncResponse(peer_ip, block_locators) => {
+            LedgerRequest::Pong(peer_ip, block_locators) => {
                 // Ensure the list of block locators is not empty.
                 if block_locators.len() == 0 {
                     self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
