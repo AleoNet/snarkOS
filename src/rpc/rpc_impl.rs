@@ -31,7 +31,6 @@ use snarkvm::{
     utilities::FromBytes,
 };
 
-use anyhow::anyhow;
 use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
 use std::{cmp::max, ops::Deref, sync::Arc};
@@ -63,7 +62,7 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
-    ledger: Arc<RwLock<Ledger<N>>>,
+    ledger: Arc<RwLock<Ledger<N, E>>>,
     ledger_router: LedgerRouter<N, E>,
     /// RPC credentials for accessing guarded endpoints
     pub(crate) credentials: Option<RpcCredentials>,
@@ -83,7 +82,7 @@ impl<N: Network, E: Environment> Deref for RpcImpl<N, E> {
 
 impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(credentials: Option<RpcCredentials>, ledger: Arc<RwLock<Ledger<N>>>, ledger_router: LedgerRouter<N, E>) -> Self {
+    pub fn new(credentials: Option<RpcCredentials>, ledger: Arc<RwLock<Ledger<N, E>>>, ledger_router: LedgerRouter<N, E>) -> Self {
         Self(Arc::new(RpcInner {
             ledger,
             credentials,

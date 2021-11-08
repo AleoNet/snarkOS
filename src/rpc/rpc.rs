@@ -85,7 +85,7 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: Option<String>,
     password: Option<String>,
-    ledger: Arc<RwLock<Ledger<N>>>,
+    ledger: Arc<RwLock<Ledger<N, E>>>,
     ledger_router: LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = match (username, password) {

@@ -75,8 +75,6 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks tha can be requested in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
-    /// The maximum number of unconfirmed blocks that can be held by the ledger.
-    const MAXIMUM_UNCONFIRMED_BLOCKS: usize = 1024;
 
     const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
     const FAILURE_THRESHOLD: usize = 5;

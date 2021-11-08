@@ -40,7 +40,7 @@ pub(crate) struct Server<N: Network, E: Environment> {
     /// The list of peers for the node.
     peers: Arc<RwLock<Peers<N, E>>>,
     /// The ledger state of the node.
-    ledger: Arc<RwLock<Ledger<N>>>,
+    ledger: Arc<RwLock<Ledger<N, E>>>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
 }
@@ -146,9 +146,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_id: u8,
         peers_router: PeersRouter<N, E>,
-    ) -> Result<(Arc<RwLock<Ledger<N>>>, LedgerRouter<N, E>)> {
+    ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
-        let ledger = Ledger::<N>::open::<RocksDB, _>(&format!(".ledger-{}", storage_id))?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&format!(".ledger-{}", storage_id))?;
         let ledger = Arc::new(RwLock::new(ledger));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
@@ -160,9 +160,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             // Asynchronously wait for a ledger request.
             while let Some(request) = ledger_handler.recv().await {
                 // Hold the ledger write lock briefly, to update the state of the ledger.
-                if let Err(error) = ledger_clone.write().await.update::<E>(request, peers_router.clone()).await {
-                    trace!("{}", error);
-                }
+                ledger_clone.write().await.update(request, peers_router.clone()).await;
             }
         }));
 
