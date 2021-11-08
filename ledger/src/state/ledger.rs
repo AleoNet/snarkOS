@@ -97,8 +97,8 @@ impl<N: Network> LedgerState<N> {
 
         // Retrieve each block from genesis to validate state.
         for block_height in 0..=latest_block_height {
-            // Validate the ledger root every 200 blocks.
-            if block_height % 200 == 0 || block_height == latest_block_height {
+            // Validate the ledger root every 250 blocks.
+            if block_height % 250 == 0 || block_height == latest_block_height {
                 trace!("Validating the ledger root up to block {}", block_height);
 
                 // Ensure the ledger roots match their expected block heights.
