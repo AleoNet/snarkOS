@@ -63,11 +63,11 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
     "getblockhashes",
     "getblockheader",
     "getblocktransactions",
+    "getciphertext",
+    "getledgerproof",
     "gettransaction",
     "gettransition",
-    "getciphertext",
     "sendtransaction",
-    "ledgerproof",
     // "validaterawtransaction",
     // // private
     // "createrawtransaction",
@@ -268,6 +268,14 @@ async fn handle_rpc<N: Network, E: Environment>(
                 jrt::Response::error(jrt::Version::V2, err, req.id.clone())
             }
         },
+        "getciphertext" => {
+            let result = rpc.get_ciphertext(params.remove(0)).await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "getledgerproof" => {
+            let result = rpc.get_ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "gettransaction" => {
             let result = rpc.get_transaction(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
@@ -276,19 +284,11 @@ async fn handle_rpc<N: Network, E: Environment>(
             let result = rpc.get_transition(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
-        "getciphertext" => {
-            let result = rpc.get_ciphertext(params.remove(0)).await.map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
         "sendtransaction" => {
             let result = rpc
                 .send_transaction(params[0].as_str().unwrap_or("").into())
                 .await
                 .map_err(convert_crate_err);
-            result_to_response(&req, result)
-        }
-        "ledgerproof" => {
-            let result = rpc.ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         // "decoderawtransaction" => {
