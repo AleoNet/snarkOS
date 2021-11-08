@@ -316,28 +316,30 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     pub(super) async fn update(&mut self, request: LedgerRequest<N, E>, peers_router: PeersRouter<N, E>) {
         match request {
             LedgerRequest::BlockRequest(peer_ip, start_block_height, end_block_height) => {
-                // Ensure the request is within the tolerated limit.
-                let number_of_blocks = end_block_height - start_block_height;
-                match number_of_blocks <= E::MAXIMUM_BLOCK_REQUEST {
-                    true => match self.get_blocks(start_block_height, end_block_height) {
-                        Ok(blocks) => {
-                            for block in blocks {
-                                let request = PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block));
-                                if let Err(error) = peers_router.send(request).await {
-                                    warn!("[BlockResponse] {}", error);
-                                }
-                            }
-                        }
+                // Ensure the request is within the accepted limits.
+                let number_of_blocks = end_block_height.saturating_sub(start_block_height);
+                if number_of_blocks == 0 || number_of_blocks > E::MAXIMUM_BLOCK_REQUEST {
+                    let failure = format!("Attempted to request {} blocks", number_of_blocks);
+                    warn!("{}", failure);
+                    self.add_failure(peer_ip, failure);
+                }
+                // Process the block request.
+                else {
+                    // Retrieve the requested blocks.
+                    let blocks = match self.get_blocks(start_block_height, end_block_height) {
+                        Ok(blocks) => blocks,
                         Err(error) => {
                             error!("{}", error);
                             self.add_failure(peer_ip, format!("{}", error));
+                            return;
                         }
-                    },
-                    false => {
-                        // Record the failed request from the peer.
-                        let failure = format!("Attempted to request {} blocks", number_of_blocks);
-                        warn!("{}", failure);
-                        self.add_failure(peer_ip, failure);
+                    };
+                    // Send a `BlockResponse` message for each block to the peer.
+                    for block in blocks {
+                        let request = PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block));
+                        if let Err(error) = peers_router.send(request).await {
+                            warn!("[BlockResponse] {}", error);
+                        }
                     }
                 }
             }
