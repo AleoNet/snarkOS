@@ -356,6 +356,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if let Some(requests) = self.block_requests.get(&peer_ip) {
                         if requests.is_empty() {
                             trace!("All block requests with {} have been processed", peer_ip);
+                            self.update_block_requests(peers_router.clone()).await;
                         }
                     }
                 }
@@ -735,7 +736,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn update_block_requests(&mut self, peers_router: PeersRouter<N, E>) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
-        if self.number_of_block_requests() > 0 {
+        if self.number_of_block_requests() > (E::MAXIMUM_BLOCK_REQUEST / 2) as usize {
             return;
         }
 

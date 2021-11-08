@@ -218,8 +218,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                 if let Err(error) = ledger_router_clone.send(request).await {
                     error!("Failed to send request to ledger: {}", error)
                 }
-                // Sleep for 15 seconds.
-                tokio::time::sleep(Duration::from_secs(15)).await;
+                // Sleep for 10 seconds.
+                tokio::time::sleep(Duration::from_secs(10)).await;
             }
         }));
     }

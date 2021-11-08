@@ -73,7 +73,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
 
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
-    /// The maximum number of blocks tha can be requested in one request.
+    /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
 
     const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
@@ -87,6 +87,7 @@ pub struct Client<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for Client<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 2;
 }
 
 #[derive(Clone, Debug, Default)]
