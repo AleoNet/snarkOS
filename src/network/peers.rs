@@ -247,10 +247,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
         // Ensure the combined number of peers does not surpass the threshold.
         if self.candidate_peers.len() + peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
             // Proceed to insert each new candidate peer IP.
-            for ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
-                // Ensure the peer is a new candidate.
-                if *ip != self.local_ip() && !self.connected_peers.contains_key(ip) && !self.candidate_peers.contains(ip) {
-                    self.candidate_peers.insert(*ip);
+            for peer_ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
+                // Ensure the peer is not self and is a new candidate peer.
+                let is_self = *peer_ip == self.local_ip
+                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
+                if !is_self && !self.connected_peers.contains_key(peer_ip) && !self.candidate_peers.contains(peer_ip) {
+                    self.candidate_peers.insert(*peer_ip);
                 }
             }
         }
