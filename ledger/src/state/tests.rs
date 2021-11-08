@@ -20,7 +20,6 @@ use crate::{
 };
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
-use anyhow::{anyhow, Result};
 use rand::thread_rng;
 use std::sync::atomic::AtomicBool;
 
@@ -33,44 +32,6 @@ fn new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
     LedgerState::open::<S, _>(temp_dir()).expect("Failed to initialize ledger")
 }
 
-/// Mines a new block using the latest state of the given ledger.
-fn mine_next_block<N: Network>(ledger: &LedgerState<N>, recipient: Address<N>) -> Result<Block<N>> {
-    // Prepare the new block.
-    let previous_block_hash = ledger.latest_block_hash();
-    let block_height = ledger.latest_block_height() + 1;
-
-    // Compute the block difficulty target.
-    let previous_timestamp = ledger.latest_block_timestamp();
-    let previous_difficulty_target = ledger.latest_block_difficulty_target();
-    let block_timestamp = chrono::Utc::now().timestamp();
-    let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
-
-    // Construct the ledger root.
-    let ledger_root = ledger.latest_ledger_root();
-
-    // Craft a coinbase transaction.
-    let amount = Block::<N>::block_reward(block_height);
-    let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, &mut thread_rng())?;
-
-    // Construct the new block transactions.
-    let transactions = Transactions::from(&[coinbase_transaction])?;
-
-    // Mine the next block.
-    match Block::mine(
-        previous_block_hash,
-        block_height,
-        block_timestamp,
-        difficulty_target,
-        ledger_root,
-        transactions,
-        &AtomicBool::new(false),
-        &mut thread_rng(),
-    ) {
-        Ok(block) => Ok(block),
-        Err(error) => Err(anyhow!("Failed to mine the next block: {}", error)),
-    }
-}
-
 #[test]
 fn test_genesis() {
     // Initialize a new ledger.
@@ -81,7 +42,7 @@ fn test_genesis() {
 
     // Initialize a new ledger tree.
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
-    ledger_tree.add(&genesis.hash()).expect("Failed to add hash to ledger tree");
+    ledger_tree.add(&genesis.hash()).expect("Failed to add to ledger tree");
 
     // Ensure the ledger is at the genesis block.
     assert_eq!(0, ledger.latest_block_height());
@@ -96,6 +57,9 @@ fn test_genesis() {
 
 #[test]
 fn test_add_next_block() {
+    let rng = &mut thread_rng();
+    let terminator = AtomicBool::new(false);
+
     // Initialize a new ledger.
     let mut ledger = new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
@@ -104,13 +68,14 @@ fn test_add_next_block() {
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
     ledger_tree
         .add(&Testnet2::genesis_block().hash())
-        .expect("Failed to add hash to ledger tree");
+        .expect("Failed to add to ledger tree");
 
     // Initialize a new account.
     let account = Account::<Testnet2>::new(&mut thread_rng());
+    let address = account.address();
 
     // Mine the next block.
-    let block = mine_next_block(&ledger, account.address()).expect("Failed to mine a block");
+    let block = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
     ledger_tree.add(&block.hash()).expect("Failed to add hash to ledger tree");
 
@@ -135,6 +100,9 @@ fn test_add_next_block() {
 
 #[test]
 fn test_remove_last_block() {
+    let rng = &mut thread_rng();
+    let terminator = AtomicBool::new(false);
+
     // Initialize a new ledger.
     let mut ledger = new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
@@ -143,13 +111,14 @@ fn test_remove_last_block() {
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
     ledger_tree
         .add(&Testnet2::genesis_block().hash())
-        .expect("Failed to add hash to ledger tree");
+        .expect("Failed to add to ledger tree");
 
     // Initialize a new account.
     let account = Account::<Testnet2>::new(&mut thread_rng());
+    let address = account.address();
 
     // Mine the next block.
-    let block = mine_next_block(&ledger, account.address()).expect("Failed to mine a block");
+    let block = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
     assert_eq!(1, ledger.latest_block_height());
 
@@ -173,6 +142,9 @@ fn test_remove_last_block() {
 
 #[test]
 fn test_remove_last_2_blocks() {
+    let rng = &mut thread_rng();
+    let terminator = AtomicBool::new(false);
+
     // Initialize a new ledger.
     let mut ledger = new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
@@ -181,18 +153,19 @@ fn test_remove_last_2_blocks() {
     let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
     ledger_tree
         .add(&Testnet2::genesis_block().hash())
-        .expect("Failed to add hash to ledger tree");
+        .expect("Failed to add to ledger tree");
 
     // Initialize a new account.
     let account = Account::<Testnet2>::new(&mut thread_rng());
+    let address = account.address();
 
     // Mine the next block.
-    let block_1 = mine_next_block(&ledger, account.address()).expect("Failed to mine a block");
+    let block_1 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
     ledger.add_next_block(&block_1).expect("Failed to add next block to ledger");
     assert_eq!(1, ledger.latest_block_height());
 
     // Mine the next block.
-    let block_2 = mine_next_block(&ledger, account.address()).expect("Failed to mine a block");
+    let block_2 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
     ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
     assert_eq!(2, ledger.latest_block_height());
 

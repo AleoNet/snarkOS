@@ -19,11 +19,9 @@ use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
+use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::{path::Path, sync::atomic::AtomicBool};
 
 const TWO_HOURS_UNIX: i64 = 7200;
 
@@ -60,7 +58,7 @@ pub struct LedgerState<N: Network> {
     /// The block locators from the latest block of the ledger.
     latest_block_locators: Vec<(u32, N::BlockHash)>,
     /// The current ledger tree of block hashes.
-    ledger_tree: Arc<Mutex<LedgerTree<N>>>,
+    ledger_tree: LedgerTree<N>,
     /// The ledger root corresponding to each block height.
     ledger_roots: DataMap<N::LedgerRoot, u32>,
     /// The blocks of the ledger in storage.
@@ -80,7 +78,7 @@ impl<N: Network> LedgerState<N> {
         let mut ledger = Self {
             latest_block: genesis.clone(),
             latest_block_locators: Default::default(),
-            ledger_tree: Arc::new(Mutex::new(LedgerTree::<N>::new()?)),
+            ledger_tree: LedgerTree::<N>::new()?,
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
         };
@@ -115,13 +113,13 @@ impl<N: Network> LedgerState<N> {
                 }
 
                 // Ensure the ledger tree matches the state of ledger roots.
-                if expected_ledger_root != ledger.ledger_tree.lock().unwrap().root() {
+                if expected_ledger_root != ledger.ledger_tree.root() {
                     return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", block_height));
                 }
             }
 
             // Add the block hash to the ledger tree.
-            ledger.ledger_tree.lock().unwrap().add(&ledger.get_block_hash(block_height)?)?;
+            ledger.ledger_tree.add(&ledger.get_block_hash(block_height)?)?;
         }
 
         // Update the latest state.
@@ -180,7 +178,7 @@ impl<N: Network> LedgerState<N> {
 
     /// Returns the latest ledger root.
     pub fn latest_ledger_root(&self) -> N::LedgerRoot {
-        self.ledger_tree.lock().unwrap().root()
+        self.ledger_tree.root()
     }
 
     /// Returns `true` if the given ledger root exists in storage.
@@ -355,6 +353,50 @@ impl<N: Network> LedgerState<N> {
         Ok(block_locators)
     }
 
+    /// Mines a new block using the latest state of the given ledger.
+    pub fn mine_next_block<R: Rng + CryptoRng>(
+        &self,
+        recipient: Address<N>,
+        transactions: &[Transaction<N>],
+        terminator: &AtomicBool,
+        rng: &mut R,
+    ) -> Result<Block<N>> {
+        // Prepare the new block.
+        let previous_block_hash = self.latest_block_hash();
+        let block_height = self.latest_block_height() + 1;
+
+        // Compute the block difficulty target.
+        let previous_timestamp = self.latest_block_timestamp();
+        let previous_difficulty_target = self.latest_block_difficulty_target();
+        let block_timestamp = chrono::Utc::now().timestamp();
+        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+
+        // Construct the ledger root.
+        let ledger_root = self.latest_ledger_root();
+
+        // Craft a coinbase transaction.
+        let amount = Block::<N>::block_reward(block_height);
+        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
+
+        // Construct the new block transactions.
+        let transactions = Transactions::from(&[&[coinbase_transaction], transactions].concat())?;
+
+        // Mine the next block.
+        match Block::mine(
+            previous_block_hash,
+            block_height,
+            block_timestamp,
+            difficulty_target,
+            ledger_root,
+            transactions,
+            terminator,
+            rng,
+        ) {
+            Ok(block) => Ok(block),
+            Err(error) => Err(anyhow!("Failed to mine the next block: {}", error)),
+        }
+    }
+
     /// Adds the given block as the next block in the ledger to storage.
     pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
         // Ensure the block itself is valid.
@@ -460,7 +502,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         self.blocks.add_block(block)?;
-        self.ledger_tree.lock().unwrap().add(&block.hash())?;
+        self.ledger_tree.add(&block.hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
         self.latest_block_locators = self.get_block_locators(block.height())?;
         self.latest_block = block.clone();
@@ -574,9 +616,8 @@ impl<N: Network> LedgerState<N> {
         )?;
 
         // Generate the ledger root inclusion proof.
-        let guard = self.ledger_tree.lock().unwrap();
-        let ledger_root = guard.root();
-        let ledger_root_inclusion_proof = guard.to_ledger_inclusion_proof(&block_hash)?;
+        let ledger_root = self.ledger_tree.root();
+        let ledger_root_inclusion_proof = self.ledger_tree.to_ledger_inclusion_proof(&block_hash)?;
 
         LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
     }
@@ -595,8 +636,7 @@ impl<N: Network> LedgerState<N> {
         new_ledger_tree.add_all(&block_hashes)?;
 
         // Update the current ledger tree with the current state.
-        let mut ledger_tree = self.ledger_tree.lock().unwrap();
-        *ledger_tree = new_ledger_tree;
+        self.ledger_tree = new_ledger_tree;
 
         Ok(())
     }

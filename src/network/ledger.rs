@@ -387,7 +387,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                 // Update the status of the ledger.
                 self.update_status();
-                debug!("STATUS {:?} {}", self.status(), self.number_of_block_requests());
+                // debug!("STATUS {:?} {}", self.status(), self.number_of_block_requests());
 
                 // Ensure the ledger is not awaiting responses from outstanding block requests.
                 if self.number_of_block_requests() > 0 {
@@ -611,83 +611,42 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
     /// Mines a new block and adds it to the canon blocks.
     fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>) {
-        // Ensure the miner is permitted to operate.
         // If the node type is not a miner, it should not be mining.
         if E::NODE_TYPE != NodeType::Miner {
             return;
         }
-        // Ensure the miner is permitted to operate.
         // If `terminator` is `true`, it should not be mining.
         else if self.terminator.load(Ordering::SeqCst) {
             return;
         }
-        // Ensure the miner is permitted to operate.
-        // If the status is not `Ready`, it is either already mining or should not be mining.
-        else if self.status() != Status::Ready {
-            return;
-        }
-        // Mine the next block.
-        else {
-            // Set the status to mining.
+        // If the status is `Ready`, mine the next block.
+        else if self.status() == Status::Ready {
+            // Set the status to `Mining`.
             self.status.store(Status::Mining as u8, Ordering::SeqCst);
 
-            // Prepare the new block.
-            let previous_block_hash = self.latest_block_hash();
-            let block_height = self.latest_block_height() + 1;
-
-            // Compute the block difficulty target.
-            let previous_timestamp = self.latest_block_timestamp();
-            let previous_difficulty_target = self.latest_block_difficulty_target();
-            let block_timestamp = chrono::Utc::now().timestamp();
-            let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
-
-            // Construct the ledger root and unconfirmed transactions.
-            let ledger_root = self.canon.latest_ledger_root();
+            // Prepare the unconfirmed transactions, terminator, and status.
+            let canon = self.canon.clone(); // This is safe as we only *read* LedgerState.
             let unconfirmed_transactions = self.memory_pool.transactions();
             let terminator = self.terminator.clone();
+            let status = self.status.clone();
 
             task::spawn(async move {
-                // Craft a coinbase transaction.
-                let amount = Block::<N>::block_reward(block_height);
-                let coinbase_transaction = match Transaction::<N>::new_coinbase(recipient, amount, &mut thread_rng()) {
-                    Ok(coinbase) => coinbase,
-                    Err(error) => {
-                        error!("{}", error);
-                        return;
-                    }
-                };
-
-                // Construct the new block transactions.
-                let transactions = match Transactions::from(&[vec![coinbase_transaction], unconfirmed_transactions].concat()) {
-                    Ok(transactions) => transactions,
-                    Err(error) => {
-                        error!("{}", error);
-                        return;
-                    }
-                };
-
                 // Mine the next block.
-                let block = match Block::mine(
-                    previous_block_hash,
-                    block_height,
-                    block_timestamp,
-                    difficulty_target,
-                    ledger_root,
-                    transactions,
-                    &terminator,
-                    &mut thread_rng(),
-                ) {
-                    Ok(block) => block,
-                    Err(error) => {
-                        error!("Failed to mine the next block: {}", error);
-                        return;
-                    }
-                };
+                let result = canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng());
 
-                // Broadcast the next block.
-                let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
-                if let Err(error) = ledger_router.send(request).await {
-                    error!("Failed to broadcast mined block: {}", error);
+                // Set the status to `Ready`.
+                status.store(Status::Ready as u8, Ordering::SeqCst);
+
+                match result {
+                    Ok(block) => {
+                        trace!("Miner has found the next block");
+                        // Broadcast the next block.
+                        let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
+                        if let Err(error) = ledger_router.send(request).await {
+                            error!("Failed to broadcast mined block: {}", error);
+                        }
+                    }
+                    Err(error) => error!("Failed to mine the next block: {}", error),
                 }
             });
         }
