@@ -31,13 +31,13 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/latestblockhash.md")]
     async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/latestblockheader.md")]
+    #[doc = include_str!("./documentation/public_endpoints/latestblockheader.md")]
     async fn latest_block_header(&self) -> Result<BlockHeader<N>, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/latestblocktransactions.md")]
+    #[doc = include_str!("./documentation/public_endpoints/latestblocktransactions.md")]
     async fn latest_block_transactions(&self) -> Result<Transactions<N>, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/latestledgerroot.md")]
+    #[doc = include_str!("./documentation/public_endpoints/latestledgerroot.md")]
     async fn latest_ledger_root(&self) -> Result<N::LedgerRoot, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getblock.md")]
@@ -48,19 +48,19 @@ pub trait RpcFunctions<N: Network> {
 
     // TODO (howardwu): @collin I noticed the documentation says the `block_hash` is a number, maybe call it a bech32m locator or similar.
     //  We can talk through this one live before making the change, to ensure it is consistent with the rest of the MD docs.
-    // #[doc = include_str!("./documentation/public_endpoints/getblockheight.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getblockheight.md")]
     async fn get_block_height(&self, block_hash: serde_json::Value) -> Result<u32, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getblockhash.md")]
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/getblockhashes.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getblockhashes.md")]
     async fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/getblockheader.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getblockheader.md")]
     async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
@@ -69,8 +69,7 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getledgerproof.md")]
     async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError>;
 
-    // TODO (howardwu): @collin fix the return type to include metadata now.
-    // #[doc = include_str!("./documentation/public_endpoints/gettransaction.md")]
+    #[doc = include_str!("./documentation/public_endpoints/gettransaction.md")]
     async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<serde_json::Value, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]

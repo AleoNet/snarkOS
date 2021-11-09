@@ -43,7 +43,7 @@ USAGE:
 
 FLAGS:
     -h, --help         Prints help information
-    -n, --nodisplay    If the flag is set, the node will only output logs
+        --nodisplay    If the flag is set, the node will only output logs
     -V, --version      Prints version information
 
 OPTIONS:

@@ -50,7 +50,7 @@ pub struct Node {
     #[structopt(default_value = "3", long = "verbosity")]
     pub verbosity: u8,
     /// If the flag is set, the node will only output logs.
-    #[structopt(short, long)]
+    #[structopt(long)]
     pub nodisplay: bool,
 }
 
