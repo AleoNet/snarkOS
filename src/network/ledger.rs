@@ -384,11 +384,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_block_requests(peers_router.clone()).await;
             }
             LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
+                // Process the request to mine the next block.
                 self.mine_next_block(local_ip, recipient, ledger_router);
             }
             LedgerRequest::Ping(peer_ip) => {
-                // Ensure the peer has been initialized in the ledger.
-                self.initialize_peer(peer_ip);
                 // Send a `Pong` message to the peer.
                 let message = Message::Pong(self.latest_block_locators().clone());
                 let request = PeersRequest::MessageSend(peer_ip, message);
