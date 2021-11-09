@@ -73,10 +73,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
 
         if node_port != 4135 {
-            let message = PeersRequest::Connect("144.126.223.138:4135".parse().unwrap(), peers_router.clone(), ledger_router.clone());
+            let message = PeersRequest::Connect("144.126.223.138:4135".parse().unwrap(), ledger_router.clone());
             peers_router.send(message).await?;
 
-            let message = PeersRequest::Connect("0.0.0.0:4135".parse().unwrap(), peers_router.clone(), ledger_router.clone());
+            let message = PeersRequest::Connect("0.0.0.0:4135".parse().unwrap(), ledger_router.clone());
             peers_router.send(message).await?;
         }
 
@@ -115,6 +115,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the peers router process.
         let peers_clone = peers.clone();
+        let peers_router_clone = peers_router.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a peers request.
             loop {
@@ -122,7 +123,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     // Channel is routing a request to peers.
                     Some(request) = peers_handler.recv() => {
                         // Hold the peers write lock briefly, to update the state of the peers.
-                        peers_clone.write().await.update(request).await;
+                        peers_clone.write().await.update(request, &peers_router_clone).await;
                     }
                 }
             }
@@ -181,7 +182,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                 match listener.accept().await {
                     // Process the inbound connection request.
                     Ok((stream, peer_ip)) => {
-                        let request = PeersRequest::PeerConnecting(stream, peer_ip, peers_router.clone(), ledger_router.clone());
+                        let request = PeersRequest::PeerConnecting(stream, peer_ip, ledger_router.clone());
                         if let Err(error) = peers_router.send(request).await {
                             error!("Failed to send request to peers: {}", error)
                         }
@@ -204,7 +205,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks.append(task::spawn(async move {
             loop {
                 // Transmit a heartbeat request to the peers.
-                let request = PeersRequest::Heartbeat(peers_router.clone(), ledger_router.clone());
+                let request = PeersRequest::Heartbeat(ledger_router.clone());
                 if let Err(error) = peers_router.send(request).await {
                     error!("Failed to send request to peers: {}", error)
                 }

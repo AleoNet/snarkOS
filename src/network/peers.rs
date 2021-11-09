@@ -43,18 +43,18 @@ type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, peers_router, ledger_router)
-    Connect(SocketAddr, PeersRouter<N, E>, LedgerRouter<N, E>),
-    /// Heartbeat := (peers_router, ledger_router)
-    Heartbeat(PeersRouter<N, E>, LedgerRouter<N, E>),
+    /// Connect := (peer_ip, ledger_router)
+    Connect(SocketAddr, LedgerRouter<N, E>),
+    /// Heartbeat := (ledger_router)
+    Heartbeat(LedgerRouter<N, E>),
     /// MessageBroadcast := (message)
     MessageBroadcast(Message<N, E>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, peers_router, ledger_router)
-    PeerConnecting(TcpStream, SocketAddr, PeersRouter<N, E>, LedgerRouter<N, E>),
+    /// PeerConnecting := (stream, peer_ip, ledger_router)
+    PeerConnecting(TcpStream, SocketAddr, LedgerRouter<N, E>),
     /// PeerConnected := (peer_ip, outbound_router)
     PeerConnected(SocketAddr, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -135,9 +135,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&mut self, request: PeersRequest<N, E>) {
+    pub(super) async fn update(&mut self, request: PeersRequest<N, E>, peers_router: &PeersRouter<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, peers_router, ledger_router) => {
+            PeersRequest::Connect(peer_ip, ledger_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -170,7 +170,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     };
                 }
             }
-            PeersRequest::Heartbeat(peers_router, ledger_router) => {
+            PeersRequest::Heartbeat(ledger_router) => {
                 // Skip if the number of connected peers is above the minimum threshold.
                 match self.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
                     true => trace!("Sending request for more peer connections"),
@@ -179,7 +179,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
                     trace!("Attempting connection to {}...", peer_ip);
-                    let request = PeersRequest::Connect(*peer_ip, peers_router.clone(), ledger_router.clone());
+                    let request = PeersRequest::Connect(*peer_ip, ledger_router.clone());
                     if let Err(error) = peers_router.send(request).await {
                         error!("Failed to transmit the request: '{}'", error);
                     }
@@ -196,7 +196,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, &message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, peers_router, ledger_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip, ledger_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -320,7 +320,7 @@ struct Peer<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
-    async fn new(stream: TcpStream, local_ip: SocketAddr, peers_handler: PeersRouter<N, E>) -> Result<Self> {
+    async fn new(stream: TcpStream, local_ip: SocketAddr, peers_router: &PeersRouter<N, E>) -> Result<Self> {
         // Construct the socket.
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
@@ -331,7 +331,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let (outbound_router, outbound_handler) = mpsc::channel(1024);
 
         // Add an entry for this `Peer` in the connected peers.
-        peers_handler.send(PeersRequest::PeerConnected(peer_ip, outbound_router)).await?;
+        peers_router.send(PeersRequest::PeerConnected(peer_ip, outbound_router)).await?;
 
         Ok(Peer {
             listener_ip: peer_ip,
@@ -445,10 +445,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
-    async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_router: PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
+    async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_router: &PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
+        let peers_router = peers_router.clone();
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, peers_router.clone()).await {
+            let mut peer = match Peer::new(stream, local_ip, &peers_router).await {
                 Ok(peer) => peer,
                 Err(error) => {
                     trace!("{}", error);
