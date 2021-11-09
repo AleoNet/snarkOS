@@ -650,6 +650,25 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         if block_locators.len() == 0 {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
         } else {
+            // Sort the block locators into a map.
+            let block_locators: BTreeMap<u32, N::BlockHash> = block_locators.iter().cloned().collect();
+
+            // Ensure the peer provided the genesis block locator, and that the genesis block hash is correct.
+            match block_locators.get(&0) {
+                Some(genesis_block_hash) => {
+                    if *genesis_block_hash != N::genesis_block().hash() {
+                        warn!("Incorrect genesis block locator from {}", peer_ip);
+                        self.add_failure(peer_ip, "Incorrect genesis block locator".to_string());
+                        return;
+                    }
+                }
+                None => {
+                    warn!("Missing genesis block locator from {}", peer_ip);
+                    self.add_failure(peer_ip, "Missing genesis block locator".to_string());
+                    return;
+                }
+            };
+
             // Determine the common ancestor block height between this ledger and the peer.
             let mut common_ancestor = 0;
             // Determine the latest block height of the peer.
@@ -686,9 +705,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Determine if the peer is a fork.
             let is_fork = {
-                // Sort the block locators into a map.
-                let block_locators: BTreeMap<u32, N::BlockHash> = block_locators.iter().cloned().collect();
-
                 // If the peer has a common ancestor that is at least more than 10 blocks from its own latest block height,
                 // use the relative block heights of the two ledgers to determine whether the peer is on a fork.
                 if common_ancestor + 10 < latest_block_height_of_peer {
@@ -747,7 +763,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             };
 
             trace!(
-                "{} is at block {} (common_ancestor = {})",
+                "Peer {} is at block {} (common_ancestor = {})",
                 peer_ip,
                 latest_block_height_of_peer,
                 common_ancestor,
