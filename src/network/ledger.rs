@@ -528,8 +528,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
-                // Ensure the peer has been initialized in the ledger.
-                self.initialize_peer(peer_ip);
                 // Ensure the given block is new.
                 if let Ok(true) = self.contains_block_hash(&block.hash()) {
                     trace!("Canon chain already contains block {}", block.height());
@@ -546,8 +544,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
-                // Ensure the peer has been initialized in the ledger.
-                self.initialize_peer(peer_ip);
                 // Process the unconfirmed transaction.
                 self.add_unconfirmed_transaction(peer_ip, transaction, peers_router.clone()).await
             }
@@ -604,6 +600,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.terminator.store(false, Ordering::SeqCst);
         }
 
+        // debug!("STATUS IS {:?} {:?}", status, self.peers_state);
+
         // Update the ledger to the determined status.
         self.status.store(status as u8, Ordering::SeqCst);
     }
@@ -612,6 +610,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>) {
         // If the node type is not a miner, it should not be mining.
         if E::NODE_TYPE != NodeType::Miner {
+            return;
+        }
+        // If there is an insufficient number of connected peers, it should not be mining.
+        else if self.peers_state.len() < E::MINIMUM_NUMBER_OF_PEERS {
             return;
         }
         // If `terminator` is `true`, it should not be mining.
