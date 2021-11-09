@@ -14,5 +14,5 @@ Returns the ledger root and ledger inclusion proof for a given block hash.
 
 ### Example
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "ledgerproof", "params": ["cm1f2813d13ec6ca2b97fe3d3089ae8fbe2f2813d13ec6ca2b97fe3d3089a"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getledgerproof", "params": ["cm1f2813d13ec6ca2b97fe3d3089ae8fbe2f2813d13ec6ca2b97fe3d3089a"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
