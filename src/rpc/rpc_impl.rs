@@ -65,7 +65,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     ledger: Arc<RwLock<Ledger<N, E>>>,
     ledger_router: LedgerRouter<N, E>,
     /// RPC credentials for accessing guarded endpoints
-    pub(crate) credentials: Option<RpcCredentials>,
+    pub(crate) credentials: RpcCredentials,
 }
 
 /// Implements RPC HTTP endpoint functions for a node.
@@ -82,7 +82,7 @@ impl<N: Network, E: Environment> Deref for RpcImpl<N, E> {
 
 impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(credentials: Option<RpcCredentials>, ledger: Arc<RwLock<Ledger<N, E>>>, ledger_router: LedgerRouter<N, E>) -> Self {
+    pub fn new(credentials: RpcCredentials, ledger: Arc<RwLock<Ledger<N, E>>>, ledger_router: LedgerRouter<N, E>) -> Self {
         Self(Arc::new(RpcInner {
             ledger,
             credentials,

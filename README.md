@@ -47,9 +47,11 @@ FLAGS:
     -V, --version      Prints version information
 
 OPTIONS:
-        --miner <miner>            Specify this as a mining node, with the given miner address
-    -n, --network <network>        Specify the network of this node [default: 2]
-        --node <node>              Specify the port for the node server
-        --rpc <rpc>                Specify the port for the RPC server
-        --verbosity <verbosity>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 3]
+        --miner <miner>              Specify this as a mining node, with the given miner address
+    -n, --network <network>          Specify the network of this node [default: 2]
+        --node <node>                Specify the port for the node server
+        --rpc <rpc>                  Specify the port for the RPC server
+        --username <rpc-username>    Specify the username for the RPC server [default: root]
+        --password <rpc-password>    Specify the password for the RPC server [default: pass]
+        --verbosity <verbosity>      Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 3]
 ```

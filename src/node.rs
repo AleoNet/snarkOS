@@ -40,6 +40,12 @@ pub struct Node {
     /// Specify the port for the RPC server.
     #[structopt(long = "rpc")]
     pub rpc: Option<u16>,
+    /// Specify the username for the RPC server.
+    #[structopt(default_value = "root", long = "username")]
+    pub rpc_username: String,
+    /// Specify the password for the RPC server.
+    #[structopt(default_value = "pass", long = "password")]
+    pub rpc_password: String,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "3", long = "verbosity")]
     pub verbosity: u8,
@@ -82,12 +88,14 @@ impl Node {
 
         if self.nodisplay {
             self.initialize_logger();
-            let _server = Server::<N, E>::initialize(node_port, rpc_port, (node_port as u16 - 4130) as u8, miner).await?;
+            let _server =
+                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
             std::future::pending::<()>().await;
             Ok(())
         } else {
             println!("\nThe snarkOS console is initializing...\n");
-            let server = Server::<N, E>::initialize(node_port, rpc_port, (node_port as u16 - 4130) as u8, miner).await?;
+            let server =
+                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
             let _display = Display::<N, E>::start(server)?;
             Ok(())
         }

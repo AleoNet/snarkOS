@@ -83,16 +83,12 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
 /// RPC failures do not affect the rest of the node.
 pub fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
-    username: Option<String>,
-    password: Option<String>,
+    username: String,
+    password: String,
     ledger: Arc<RwLock<Ledger<N, E>>>,
     ledger_router: LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
-    let credentials = match (username, password) {
-        (Some(username), Some(password)) => Some(RpcCredentials { username, password }),
-        _ => None,
-    };
-
+    let credentials = RpcCredentials { username, password };
     let rpc_impl = RpcImpl::new(credentials, ledger, ledger_router);
 
     let service = make_service_fn(move |_conn| {

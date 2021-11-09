@@ -50,12 +50,21 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Starts the connection listener for peers.
     ///
     #[inline]
-    pub(crate) async fn initialize(node_port: u16, rpc_port: u16, storage_id: u8, miner: Option<Address<N>>) -> Result<Self> {
+    pub(crate) async fn initialize(
+        node_port: u16,
+        rpc_port: u16,
+        username: String,
+        password: String,
+        miner: Option<Address<N>>,
+    ) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", node_port)).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
+
+        // Initialize the ledger storage path.
+        let storage_path = format!(".ledger-{}", (node_port as u16 - 4130) as u8);
 
         // Initialize the tasks handler.
         let mut tasks = Tasks::new();
@@ -63,7 +72,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, storage_id, &peers_router)?;
+        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, &storage_path, &peers_router)?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_router);
@@ -81,7 +90,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         }
 
         // Initialize a new instance of the RPC server.
-        let (username, password) = (None, None);
         tasks.append(initialize_rpc_server::<N, E>(
             format!("0.0.0.0:{}", rpc_port).parse()?,
             username,
@@ -138,11 +146,11 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[inline]
     fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
-        storage_id: u8,
+        storage_path: &str,
         peers_router: &PeersRouter<N, E>,
     ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&format!(".ledger-{}", storage_id))?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(storage_path)?;
         let ledger = Arc::new(RwLock::new(ledger));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
