@@ -313,7 +313,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&mut self, request: LedgerRequest<N, E>, peers_router: PeersRouter<N, E>) {
+    pub(super) async fn update(&mut self, request: LedgerRequest<N, E>, peers_router: &PeersRouter<N, E>) {
         match request {
             LedgerRequest::BlockRequest(peer_ip, start_block_height, end_block_height) => {
                 // Ensure the request is within the accepted limits.
@@ -350,7 +350,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if let Some(requests) = self.block_requests.get(&peer_ip) {
                         if requests.is_empty() {
                             trace!("All block requests with {} have been processed", peer_ip);
-                            self.update_block_requests(&peers_router).await;
+                            self.update_block_requests(peers_router).await;
                         }
                     }
                 }
@@ -372,7 +372,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Update the status of the ledger.
                 self.update_status();
                 // Update the block requests.
-                self.update_block_requests(&peers_router).await;
+                self.update_block_requests(peers_router).await;
             }
             LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
                 // Process the request to mine the next block.
@@ -409,7 +409,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
                 // Process the unconfirmed transaction.
-                self.add_unconfirmed_transaction(peer_ip, transaction, &peers_router).await
+                self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
             }
         }
     }

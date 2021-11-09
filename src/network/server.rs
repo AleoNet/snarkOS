@@ -154,7 +154,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             // Asynchronously wait for a ledger request.
             while let Some(request) = ledger_handler.recv().await {
                 // Hold the ledger write lock briefly, to update the state of the ledger.
-                ledger_clone.write().await.update(request, peers_router.clone()).await;
+                ledger_clone.write().await.update(request, &peers_router).await;
             }
         }));
 
