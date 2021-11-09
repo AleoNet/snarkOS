@@ -113,7 +113,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let canon = LedgerState::open::<S, P>(path)?;
         let latest_block_request = canon.latest_block_height();
         Ok(Self {
-            status: Arc::new(AtomicU8::new(0)),
+            status: Arc::new(AtomicU8::new(Status::Peering as u8)),
             canon,
             unconfirmed_blocks: Default::default(),
             memory_pool: MemoryPool::new(),
@@ -318,28 +318,26 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             LedgerRequest::BlockRequest(peer_ip, start_block_height, end_block_height) => {
                 // Ensure the request is within the accepted limits.
                 let number_of_blocks = end_block_height.saturating_sub(start_block_height);
-                if number_of_blocks == 0 || number_of_blocks > E::MAXIMUM_BLOCK_REQUEST {
+                if number_of_blocks > E::MAXIMUM_BLOCK_REQUEST {
                     let failure = format!("Attempted to request {} blocks", number_of_blocks);
                     warn!("{}", failure);
                     self.add_failure(peer_ip, failure);
+                    return;
                 }
-                // Process the block request.
-                else {
-                    // Retrieve the requested blocks.
-                    let blocks = match self.get_blocks(start_block_height, end_block_height) {
-                        Ok(blocks) => blocks,
-                        Err(error) => {
-                            error!("{}", error);
-                            self.add_failure(peer_ip, format!("{}", error));
-                            return;
-                        }
-                    };
-                    // Send a `BlockResponse` message for each block to the peer.
-                    for block in blocks {
-                        let request = PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block));
-                        if let Err(error) = peers_router.send(request).await {
-                            warn!("[BlockResponse] {}", error);
-                        }
+                // Retrieve the requested blocks.
+                let blocks = match self.get_blocks(start_block_height, end_block_height) {
+                    Ok(blocks) => blocks,
+                    Err(error) => {
+                        error!("{}", error);
+                        self.add_failure(peer_ip, format!("{}", error));
+                        return;
+                    }
+                };
+                // Send a `BlockResponse` message for each block to the peer.
+                for block in blocks {
+                    let request = PeersRequest::MessageSend(peer_ip, Message::BlockResponse(block));
+                    if let Err(error) = peers_router.send(request).await {
+                        warn!("[BlockResponse] {}", error);
                     }
                 }
             }
@@ -848,7 +846,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         match self.block_requests.get_mut(&peer_ip) {
             Some(requests) => match requests.insert(block_height) {
                 true => debug!("Requesting block {} from {}", block_height, peer_ip),
-                false => self.add_failure(peer_ip, format!("Duplicate block request from {}", peer_ip)),
+                false => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)),
             },
             None => self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)),
         };

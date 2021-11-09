@@ -62,15 +62,15 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
-
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, storage_id, peers_router.clone())?;
+        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, storage_id, &peers_router)?;
 
         // Initialize the connection listener for new peers.
-        Self::initialize_listener(&mut tasks, local_ip, listener, peers_router.clone(), ledger_router.clone());
-
+        Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_router);
         // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(&mut tasks, peers_router.clone(), ledger_router.clone());
+        Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_router);
+        // Initialize a new instance of the miner.
+        Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
 
         if node_port != 4135 {
             let message = PeersRequest::Connect("144.126.223.138:4135".parse().unwrap(), peers_router.clone(), ledger_router.clone());
@@ -80,17 +80,10 @@ impl<N: Network, E: Environment> Server<N, E> {
             peers_router.send(message).await?;
         }
 
-        // Sleep for 4 seconds.
-        tokio::time::sleep(Duration::from_secs(4)).await;
-
-        // Initialize a new instance of the miner.
-        Self::initialize_miner(&mut tasks, local_ip, miner, ledger_router.clone());
-
         // Initialize a new instance of the RPC server.
-        let rpc_ip = format!("0.0.0.0:{}", rpc_port).parse()?;
         let (username, password) = (None, None);
         tasks.append(initialize_rpc_server::<N, E>(
-            rpc_ip,
+            format!("0.0.0.0:{}", rpc_port).parse()?,
             username,
             password,
             ledger.clone(),
@@ -145,7 +138,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_id: u8,
-        peers_router: PeersRouter<N, E>,
+        peers_router: &PeersRouter<N, E>,
     ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
         let ledger = Ledger::<N, E>::open::<RocksDB, _>(&format!(".ledger-{}", storage_id))?;
@@ -155,6 +148,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
 
         // Initialize the ledger router process.
+        let peers_router = peers_router.clone();
         let ledger_clone = ledger.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a ledger request.
@@ -175,9 +169,11 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         listener: TcpListener,
-        peers_router: PeersRouter<N, E>,
-        ledger_router: LedgerRouter<N, E>,
+        peers_router: &PeersRouter<N, E>,
+        ledger_router: &LedgerRouter<N, E>,
     ) {
+        let peers_router = peers_router.clone();
+        let ledger_router = ledger_router.clone();
         tasks.append(task::spawn(async move {
             info!("Listening for peers at {}", local_ip);
             loop {
@@ -202,20 +198,19 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance of the heartbeat.
     ///
     #[inline]
-    fn initialize_heartbeat(tasks: &mut Tasks<task::JoinHandle<()>>, peers_router: PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
-        // Initialize a process to maintain an adequate number of peers.
-        let peers_router_clone = peers_router.clone();
-        let ledger_router_clone = ledger_router.clone();
+    fn initialize_heartbeat(tasks: &mut Tasks<task::JoinHandle<()>>, peers_router: &PeersRouter<N, E>, ledger_router: &LedgerRouter<N, E>) {
+        let peers_router = peers_router.clone();
+        let ledger_router = ledger_router.clone();
         tasks.append(task::spawn(async move {
             loop {
                 // Transmit a heartbeat request to the peers.
                 let request = PeersRequest::Heartbeat(peers_router.clone(), ledger_router.clone());
-                if let Err(error) = peers_router_clone.send(request).await {
+                if let Err(error) = peers_router.send(request).await {
                     error!("Failed to send request to peers: {}", error)
                 }
                 // Transmit a heartbeat request to the ledger.
                 let request = LedgerRequest::Heartbeat;
-                if let Err(error) = ledger_router_clone.send(request).await {
+                if let Err(error) = ledger_router.send(request).await {
                     error!("Failed to send request to ledger: {}", error)
                 }
                 // Sleep for 5 seconds.
@@ -232,7 +227,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         miner: Option<Address<N>>,
-        ledger_router: LedgerRouter<N, E>,
+        ledger_router: &LedgerRouter<N, E>,
     ) {
         if E::NODE_TYPE == NodeType::Miner {
             if let Some(recipient) = miner {
