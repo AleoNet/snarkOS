@@ -344,15 +344,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
             LedgerRequest::BlockResponse(peer_ip, block) => {
-                // Ensure the block height corresponds to the requested block.
-                if !self.contains_block_request(peer_ip, block.height()) {
-                    self.add_failure(peer_ip, "Received block response for an unrequested block".to_string());
-                }
-                // Process the block response.
-                else {
-                    // Remove the block request from the ledger.
-                    self.remove_block_request(peer_ip, block.height());
-                    // Process the block response.
+                // Remove the block request from the ledger.
+                if self.remove_block_request(peer_ip, block.height()) {
+                    // On success, process the block response.
                     self.add_block(&block);
                     // Check if syncing with this peer is complete.
                     if let Some(requests) = self.block_requests.get(&peer_ip) {
@@ -524,7 +518,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // );
 
                     // Update the ledger state of the peer.
-                    self.update_ledger_state(peer_ip, (is_fork, common_ancestor, latest_block_height_of_peer));
+                    self.update_peer_state(peer_ip, (is_fork, common_ancestor, latest_block_height_of_peer));
                 }
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
@@ -760,7 +754,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Updates the ledger state of the given peer.
     ///
-    fn update_ledger_state(&mut self, peer_ip: SocketAddr, ledger_state: (bool, u32, u32)) {
+    fn update_peer_state(&mut self, peer_ip: SocketAddr, ledger_state: (bool, u32, u32)) {
         match self.peers_state.get_mut(&peer_ip) {
             Some(status) => *status = Some(ledger_state),
             None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)),
@@ -861,16 +855,22 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
     ///
     /// Removes a block request for the given block height to the specified peer.
+    /// On success, returns `true`, otherwise returns `false`.
     ///
-    fn remove_block_request(&mut self, peer_ip: SocketAddr, block_height: u32) {
-        match self.block_requests.get_mut(&peer_ip) {
-            Some(requests) => {
-                if !requests.remove(&block_height) {
-                    self.add_failure(peer_ip, format!("Non-existent block request from {}", peer_ip))
+    fn remove_block_request(&mut self, peer_ip: SocketAddr, block_height: u32) -> bool {
+        // Ensure the block height corresponds to a requested block.
+        if !self.contains_block_request(peer_ip, block_height) {
+            self.add_failure(peer_ip, "Received an invalid block response".to_string());
+            false
+        } else {
+            if let Some(requests) = self.block_requests.get_mut(&peer_ip) {
+                match requests.remove(&block_height) {
+                    true => return true,
+                    false => self.add_failure(peer_ip, format!("Non-existent block request from {}", peer_ip)),
                 }
             }
-            None => self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)),
-        };
+            false
+        }
     }
 
     ///
