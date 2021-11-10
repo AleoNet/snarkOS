@@ -29,6 +29,10 @@ const TWO_HOURS_UNIX: i64 = 7200;
 
 /// The maximum number of linear block locators.
 const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 256;
+/// The maximum number of quadratic block locators.
+const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
+/// The total maximum number of block locators.
+const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
 ///
 /// A helper struct containing transaction metadata.
@@ -298,9 +302,6 @@ impl<N: Network> LedgerState<N> {
 
     /// Returns the block locators of the current ledger, from the given block height.
     pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>> {
-        // Determine the number of block locators to obtain (with the genesis block as one block locator).
-        const MAXIMUM_BLOCK_HASHES: u32 = 64;
-
         // Initialize the current block height that a block locator is obtained from.
         let mut block_locator_height = block_height;
 
@@ -319,7 +320,7 @@ impl<N: Network> LedgerState<N> {
         block_locator_height -= num_block_headers;
 
         // Determine the number of latest block hashes to include as block locators (power of two).
-        let num_block_hashes = std::cmp::min(MAXIMUM_BLOCK_HASHES, block_locator_height);
+        let num_block_hashes = std::cmp::min(MAXIMUM_QUADRATIC_BLOCK_LOCATORS, block_locator_height);
 
         // Initialize list of block locator hashes.
         let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
@@ -349,11 +350,8 @@ impl<N: Network> LedgerState<N> {
 
     /// Check that the block locators are well formed.
     pub fn check_block_locators(&self, block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>) -> Result<bool> {
-        const MAXIMUM_BLOCK_HASHES: usize = 64;
-        const MAXIMUM_BLOCK_LOCATORS: usize = MAXIMUM_LINEAR_BLOCK_LOCATORS as usize + MAXIMUM_BLOCK_HASHES;
-
         // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
-        if block_locators.len() > MAXIMUM_BLOCK_LOCATORS {
+        if block_locators.len() > MAXIMUM_BLOCK_LOCATORS as usize {
             return Ok(false);
         }
 
