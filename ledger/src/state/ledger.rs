@@ -319,6 +319,11 @@ impl<N: Network> LedgerState<N> {
         // Decrement the block locator height by the number of block headers.
         block_locator_height -= num_block_headers;
 
+        // Return the block locators if the locator has run out of blocks.
+        if block_locator_height == 0 {
+            return Ok(block_locator_headers.collect());
+        }
+
         // Determine the number of latest block hashes to include as block locators (power of two).
         let num_block_hashes = std::cmp::min(MAXIMUM_QUADRATIC_BLOCK_LOCATORS, block_locator_height);
 
