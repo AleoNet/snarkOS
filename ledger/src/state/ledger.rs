@@ -333,6 +333,70 @@ impl<N: Network> LedgerState<N> {
         Ok(block_locators)
     }
 
+    /// Check that the block locators are well formed.
+    pub fn check_block_locators(&self, block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>) -> Result<bool> {
+        const MAXIMUM_BLOCK_HEADERS: usize = 256;
+        const MAXIMUM_BLOCK_HASHES: usize = 64;
+        const MAXIMUM_BLOCK_LOCATORS: usize = MAXIMUM_BLOCK_HEADERS + MAXIMUM_BLOCK_HASHES;
+
+        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
+        if block_locators.len() > MAXIMUM_BLOCK_LOCATORS {
+            return Ok(false);
+        }
+
+        // Check that the last block locator is the genesis locator.
+        let (expected_height, expected_genesis_block_hash, expected_genesis_header) = &block_locators[block_locators.len() - 1];
+        if *expected_height != 0 || expected_genesis_block_hash != &self.get_block_hash(0)? || expected_genesis_header.is_some() {
+            return Ok(false);
+        }
+
+        // Get the remaining block locators (excluding the genesis block).
+        let remaining_block_locators = &block_locators[..block_locators.len() - 1];
+        let num_block_headers = std::cmp::min(MAXIMUM_BLOCK_HEADERS, remaining_block_locators.len());
+
+        // Check that the block headers are formed correctly (linear).
+        for (block_height, block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
+            // Check that the block header is present.
+            let block_header = match block_header {
+                Some(header) => header,
+                None => {
+                    return Ok(false);
+                }
+            };
+
+            // Check that the expected block hash and block headers are correct.
+            if &self.get_block_hash(*block_height)? != block_hash || &self.get_block_header(*block_height)? != block_header {
+                return Ok(false);
+            }
+        }
+
+        // Check that the block hashes are formed correctly (power of two).
+        if block_locators.len() > MAXIMUM_BLOCK_HEADERS {
+            let mut previous_block_height = u32::MAX;
+
+            for (block_height, block_hash, block_header) in &block_locators[num_block_headers..] {
+                // Check that the block heights increment by a power of two.
+                if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
+                    return Ok(false);
+                }
+
+                // Check that there is no block header.
+                if block_header.is_some() {
+                    return Ok(false);
+                }
+
+                // Check that the expected block hash is correct.
+                if &self.get_block_hash(*block_height)? != block_hash {
+                    return Ok(false);
+                }
+
+                previous_block_height = *block_height;
+            }
+        }
+
+        return Ok(true);
+    }
+
     /// Mines a new block using the latest state of the given ledger.
     pub fn mine_next_block<R: Rng + CryptoRng>(
         &self,
