@@ -349,9 +349,8 @@ impl<N: Network> LedgerState<N> {
 
     /// Check that the block locators are well formed.
     pub fn check_block_locators(&self, block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>) -> Result<bool> {
-        const MAXIMUM_BLOCK_HEADERS: usize = 256;
         const MAXIMUM_BLOCK_HASHES: usize = 64;
-        const MAXIMUM_BLOCK_LOCATORS: usize = MAXIMUM_BLOCK_HEADERS + MAXIMUM_BLOCK_HASHES;
+        const MAXIMUM_BLOCK_LOCATORS: usize = MAXIMUM_LINEAR_BLOCK_LOCATORS as usize + MAXIMUM_BLOCK_HASHES;
 
         // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
         if block_locators.len() > MAXIMUM_BLOCK_LOCATORS {
@@ -366,16 +365,14 @@ impl<N: Network> LedgerState<N> {
 
         // Get the remaining block locators (excluding the genesis block).
         let remaining_block_locators = &block_locators[..block_locators.len() - 1];
-        let num_block_headers = std::cmp::min(MAXIMUM_BLOCK_HEADERS, remaining_block_locators.len());
+        let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, remaining_block_locators.len());
 
         // Check that the block headers are formed correctly (linear).
         for (block_height, block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
             // Check that the block header is present.
             let block_header = match block_header {
                 Some(header) => header,
-                None => {
-                    return Ok(false);
-                }
+                None => return Ok(false),
             };
 
             // Check that the expected block hash and block headers are correct.
@@ -385,7 +382,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Check that the block hashes are formed correctly (power of two).
-        if block_locators.len() > MAXIMUM_BLOCK_HEADERS {
+        if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
             let mut previous_block_height = u32::MAX;
 
             for (block_height, block_hash, block_header) in &block_locators[num_block_headers..] {
