@@ -32,6 +32,8 @@ pub enum Message<N: Network, E: Environment> {
     ChallengeRequest(u16, u32),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(BlockHeader<N>),
+    /// Disconnect := ()
+    Disconnect,
     /// PeerRequest := ()
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
@@ -57,6 +59,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::BlockResponse(..) => "BlockResponse",
             Self::ChallengeRequest(..) => "ChallengeRequest",
             Self::ChallengeResponse(..) => "ChallengeResponse",
+            Self::Disconnect => "Disconnect",
             Self::PeerRequest => "PeerRequest",
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
@@ -75,13 +78,14 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::BlockResponse(..) => 1,
             Self::ChallengeRequest(..) => 2,
             Self::ChallengeResponse(..) => 3,
-            Self::PeerRequest => 4,
-            Self::PeerResponse(..) => 5,
-            Self::Ping(..) => 6,
-            Self::Pong(..) => 7,
-            Self::UnconfirmedBlock(..) => 8,
-            Self::UnconfirmedTransaction(..) => 9,
-            Self::Unused(..) => 10,
+            Self::Disconnect => 4,
+            Self::PeerRequest => 5,
+            Self::PeerResponse(..) => 6,
+            Self::Ping(..) => 7,
+            Self::Pong(..) => 8,
+            Self::UnconfirmedBlock(..) => 9,
+            Self::UnconfirmedTransaction(..) => 10,
+            Self::Unused(..) => 11,
         }
     }
 
@@ -93,6 +97,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::BlockResponse(block) => Ok(bincode::serialize(block)?),
             Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
             Self::ChallengeResponse(block_header) => Ok(bincode::serialize(block_header)?),
+            Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(version) => Ok(bincode::serialize(version)?),
@@ -127,14 +132,18 @@ impl<N: Network, E: Environment> Message<N, E> {
             2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..6])?),
             3 => Self::ChallengeResponse(bincode::deserialize(data)?),
             4 => match data.len() == 0 {
+                true => Self::Disconnect,
+                false => return Err(anyhow!("Invalid 'Disconnect' message: {:?} {:?}", buffer, data)),
+            },
+            5 => match data.len() == 0 {
                 true => Self::PeerRequest,
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
-            5 => Self::PeerResponse(bincode::deserialize(data)?),
-            6 => Self::Ping(bincode::deserialize(&data[0..4])?),
-            7 => Self::Pong(bincode::deserialize(data)?),
-            8 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
-            9 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
+            6 => Self::PeerResponse(bincode::deserialize(data)?),
+            7 => Self::Ping(bincode::deserialize(&data[0..4])?),
+            8 => Self::Pong(bincode::deserialize(data)?),
+            9 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
+            10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 

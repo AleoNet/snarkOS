@@ -512,6 +512,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     warn!("Peer {} is not following the protocol", peer_ip);
                                     break;
                                 },
+                                Message::Disconnect => {
+                                    // Route the `Disconnect` to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::Disconnect(peer_ip)).await {
+                                        warn!("[Disconnect] {}", error);
+                                    }
+                                    break;
+                                }
                                 Message::PeerRequest => {
                                     // Send a `PeerResponse` message.
                                     if let Err(error) = peers_router.send(PeersRequest::SendPeerResponse(peer_ip)).await {

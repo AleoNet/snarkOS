@@ -28,11 +28,11 @@ use std::{path::Path, sync::atomic::AtomicBool};
 const TWO_HOURS_UNIX: i64 = 7200;
 
 /// The maximum number of linear block locators.
-const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 256;
+pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 256;
 /// The maximum number of quadratic block locators.
-const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
+pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
 /// The total maximum number of block locators.
-const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
+pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
 ///
 /// A helper struct containing transaction metadata.
@@ -99,9 +99,13 @@ impl<N: Network> LedgerState<N> {
         };
 
         // Determine the latest block height.
-        let latest_block_height = match ledger.ledger_roots.values().max() {
-            Some(latest_block_height) => latest_block_height,
-            None => 0u32,
+        let latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
+            (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
+                true => latest_block_height_0,
+                false => return Err(anyhow!("Ledger storage state is incorrect")),
+            },
+            (None, None) => 0u32,
+            _ => return Err(anyhow!("Ledger storage state is inconsistent")),
         };
 
         // If this is new storage, initialize it with the genesis block.
@@ -140,6 +144,12 @@ impl<N: Network> LedgerState<N> {
         // Update the latest ledger state.
         ledger.latest_block = ledger.get_block(latest_block_height)?;
         ledger.regenerate_latest_ledger_state()?;
+
+        // Validate the ledger root one final time.
+        let latest_ledger_root = ledger.ledger_tree.root();
+        ledger.regenerate_ledger_tree()?;
+        assert_eq!(ledger.ledger_tree.root(), latest_ledger_root);
+
         trace!("Loaded ledger from block {}", ledger.latest_block_height());
 
         // let value = storage.export()?;
@@ -712,15 +722,21 @@ impl<N: Network> LedgerState<N> {
     // TODO (raychu86): Make this more efficient.
     /// Updates the ledger tree.
     fn regenerate_ledger_tree(&mut self) -> Result<()> {
-        // Retrieve all of the block hashes.
-        let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
-        for height in 0..=self.latest_block_height() {
-            block_hashes.push(self.get_block_hash(height)?);
-        }
+        // // Retrieve all of the block hashes.
+        // let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
+        // for height in 0..=self.latest_block_height() {
+        //     block_hashes.push(self.get_block_hash(height)?);
+        // }
+        //
+        // // Add the block hashes to create the new ledger tree.
+        // let mut new_ledger_tree = LedgerTree::<N>::new()?;
+        // new_ledger_tree.add_all(&block_hashes)?;
 
         // Add the block hashes to create the new ledger tree.
         let mut new_ledger_tree = LedgerTree::<N>::new()?;
-        new_ledger_tree.add_all(&block_hashes)?;
+        for height in 0..=self.latest_block_height() {
+            new_ledger_tree.add(&self.get_block_hash(height)?)?;
+        }
 
         // Update the current ledger tree with the current state.
         self.ledger_tree = new_ledger_tree;
