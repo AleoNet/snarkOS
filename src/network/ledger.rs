@@ -99,7 +99,7 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The map of each peer to their ledger state := (is_fork, common_ancestor, latest_block_height).
     peers_state: HashMap<SocketAddr, Option<(bool, u32, u32)>>,
     /// The map of each peer to their block requests.
-    block_requests: HashMap<SocketAddr, HashSet<u32>>,
+    block_requests: HashMap<SocketAddr, HashSet<(u32, Option<N::BlockHash>)>>,
     /// The latest block height requested from a peer.
     latest_block_request: u32,
     /// The map of each peer to their failure messages.
@@ -343,7 +343,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::BlockResponse(peer_ip, block) => {
                 // Remove the block request from the ledger.
-                if self.remove_block_request(peer_ip, block.height()) {
+                if self.remove_block_request(peer_ip, block.height(), block.hash()) {
                     // On success, process the block response.
                     self.add_block(block);
                     // Check if syncing with this peer is complete.
@@ -880,10 +880,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Log each block request to ensure the peer responds with all requested blocks.
             for block_height in start_block_height..=end_block_height {
-                if !self.contains_block_request(peer_ip, block_height) {
-                    // Add the block request to the ledger.
-                    self.add_block_request(peer_ip, block_height);
-                }
+                // Add the block request to the ledger.
+                self.add_block_request(peer_ip, block_height, None);
             }
             // Update the latest block height requested from a peer.
             self.latest_block_request = end_block_height;
@@ -900,22 +898,25 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Adds a block request for the given block height to the specified peer.
     ///
-    fn add_block_request(&mut self, peer_ip: SocketAddr, block_height: u32) {
-        match self.block_requests.get_mut(&peer_ip) {
-            Some(requests) => match requests.insert(block_height) {
-                true => debug!("Requesting block {} from {}", block_height, peer_ip),
-                false => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)),
-            },
-            None => self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)),
-        };
+    fn add_block_request(&mut self, peer_ip: SocketAddr, block_height: u32, block_hash: Option<N::BlockHash>) {
+        // Ensure the block request does not already exist.
+        if !self.contains_block_request(peer_ip, block_height, block_hash) {
+            match self.block_requests.get_mut(&peer_ip) {
+                Some(requests) => match requests.insert((block_height, block_hash)) {
+                    true => debug!("Requesting block {} from {}", block_height, peer_ip),
+                    false => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)),
+                },
+                None => self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)),
+            };
+        }
     }
 
     ///
     /// Returns `true` if the block request for the given block height to the specified peer exists.
     ///
-    fn contains_block_request(&self, peer_ip: SocketAddr, block_height: u32) -> bool {
+    fn contains_block_request(&self, peer_ip: SocketAddr, block_height: u32, block_hash: Option<N::BlockHash>) -> bool {
         match self.block_requests.get(&peer_ip) {
-            Some(requests) => requests.contains(&block_height),
+            Some(requests) => requests.contains(&(block_height, block_hash)) || requests.contains(&(block_height, None)),
             None => false,
         }
     }
@@ -924,14 +925,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Removes a block request for the given block height to the specified peer.
     /// On success, returns `true`, otherwise returns `false`.
     ///
-    fn remove_block_request(&mut self, peer_ip: SocketAddr, block_height: u32) -> bool {
+    fn remove_block_request(&mut self, peer_ip: SocketAddr, block_height: u32, block_hash: N::BlockHash) -> bool {
         // Ensure the block height corresponds to a requested block.
-        if !self.contains_block_request(peer_ip, block_height) {
+        if !self.contains_block_request(peer_ip, block_height, Some(block_hash)) {
             self.add_failure(peer_ip, "Received an invalid block response".to_string());
             false
         } else {
             if let Some(requests) = self.block_requests.get_mut(&peer_ip) {
-                match requests.remove(&block_height) {
+                let is_success = requests.remove(&(block_height, Some(block_hash))) || requests.remove(&(block_height, None));
+                match is_success {
                     true => return true,
                     false => self.add_failure(peer_ip, format!("Non-existent block request from {}", peer_ip)),
                 }
