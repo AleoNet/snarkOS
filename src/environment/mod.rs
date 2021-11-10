@@ -39,7 +39,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const NODE_TYPE: NodeType;
 
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 1;
+    const MESSAGE_VERSION: u32 = 2;
 
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
