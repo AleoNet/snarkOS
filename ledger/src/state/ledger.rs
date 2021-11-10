@@ -18,12 +18,17 @@ use crate::storage::{DataMap, Map, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
+use circular_queue::CircularQueue;
 use itertools::Itertools;
 use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::atomic::AtomicBool};
 
+/// The number of seconds in two hours.
 const TWO_HOURS_UNIX: i64 = 7200;
+
+/// The maximum number of linear block locators.
+const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 256;
 
 ///
 /// A helper struct containing transaction metadata.
@@ -55,6 +60,10 @@ impl<N: Network> Metadata<N> {
 pub struct LedgerState<N: Network> {
     /// The latest block of the ledger.
     latest_block: Block<N>,
+    /// The latest block hashes of the ledger.
+    latest_block_hashes: CircularQueue<N::BlockHash>,
+    /// The latest block headers of the ledger.
+    latest_block_headers: CircularQueue<BlockHeader<N>>,
     /// The block locators from the latest block of the ledger.
     latest_block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>,
     /// The current ledger tree of block hashes.
@@ -77,6 +86,8 @@ impl<N: Network> LedgerState<N> {
         // Initialize the ledger.
         let mut ledger = Self {
             latest_block: genesis.clone(),
+            latest_block_hashes: CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize),
+            latest_block_headers: CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize),
             latest_block_locators: Default::default(),
             ledger_tree: LedgerTree::<N>::new()?,
             ledger_roots: storage.open_map("ledger_roots")?,
@@ -122,11 +133,10 @@ impl<N: Network> LedgerState<N> {
             ledger.ledger_tree.add(&ledger.get_block_hash(block_height)?)?;
         }
 
-        // Update the latest state.
-        let block = ledger.get_block(latest_block_height)?;
-        ledger.latest_block = block.clone();
-        ledger.latest_block_locators = ledger.get_block_locators(block.height())?;
-        trace!("Loaded ledger from block {}", block.height());
+        // Update the latest ledger state.
+        ledger.latest_block = ledger.get_block(latest_block_height)?;
+        ledger.regenerate_latest_ledger_state()?;
+        trace!("Loaded ledger from block {}", ledger.latest_block_height());
 
         // let value = storage.export()?;
         // println!("{}", value);
@@ -172,8 +182,8 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Returns the latest block locators.
-    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
-        &self.latest_block_locators
+    pub fn latest_block_locators(&self) -> Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
+        self.latest_block_locators.clone()
     }
 
     /// Returns the latest ledger root.
@@ -261,6 +271,11 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_block_header(block_height)
     }
 
+    /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
+    pub fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
+        self.blocks.get_block_headers(start_block_height, end_block_height)
+    }
+
     /// Returns the transactions from the block of the given block height.
     pub fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
         self.blocks.get_block_transactions(block_height)
@@ -284,25 +299,24 @@ impl<N: Network> LedgerState<N> {
     /// Returns the block locators of the current ledger, from the given block height.
     pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>> {
         // Determine the number of block locators to obtain (with the genesis block as one block locator).
-        const MAXIMUM_BLOCK_HEADERS: u32 = 256;
         const MAXIMUM_BLOCK_HASHES: u32 = 64;
 
         // Initialize the current block height that a block locator is obtained from.
         let mut block_locator_height = block_height;
 
         // Determine the number of latest block headers to include as block locators (linear).
-        let num_block_headers = std::cmp::min(MAXIMUM_BLOCK_HEADERS, block_locator_height);
+        let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
 
-        // Initialize list of block locator headers.
-        let mut block_locator_headers = Vec::with_capacity(num_block_headers as usize);
-        // Add the latest block locators.
-        for _ in 0..num_block_headers {
-            let block_hash = self.get_block_hash(block_locator_height)?;
-            let block_header = self.get_block_header(block_locator_height)?;
+        // Construct the list of block locator headers.
+        let block_hashes = self.latest_block_hashes.iter().cloned();
+        let block_headers = self.latest_block_headers.iter().cloned();
+        let block_locator_headers = block_hashes
+            .zip_eq(block_headers)
+            .take(num_block_headers as usize)
+            .map(|(hash, header)| (header.height(), hash, Some(header)));
 
-            block_locator_headers.push((block_locator_height, block_hash, Some(block_header)));
-            block_locator_height -= 1; // safe; num_latest_blocks is never higher than the height
-        }
+        // Decrement the block locator height by the number of block headers.
+        block_locator_height -= num_block_headers;
 
         // Determine the number of latest block hashes to include as block locators (power of two).
         let num_block_hashes = std::cmp::min(MAXIMUM_BLOCK_HASHES, block_locator_height);
@@ -484,6 +498,8 @@ impl<N: Network> LedgerState<N> {
         self.blocks.add_block(block)?;
         self.ledger_tree.add(&block.hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
+        self.latest_block_hashes.push(block.hash());
+        self.latest_block_headers.push(block.header().clone());
         self.latest_block_locators = self.get_block_locators(block.height())?;
         self.latest_block = block.clone();
         Ok(())
@@ -505,7 +521,6 @@ impl<N: Network> LedgerState<N> {
             // Update the internal state of the ledger, except for the ledger tree.
             self.blocks.remove_block(self.latest_block.height())?;
             self.ledger_roots.remove(&self.latest_block.previous_ledger_root())?;
-            self.latest_block_locators = self.get_block_locators(self.latest_block.height() - 1)?;
 
             // Append this block to the final output.
             blocks.push(self.latest_block.clone());
@@ -519,6 +534,8 @@ impl<N: Network> LedgerState<N> {
             remaining_blocks -= 1;
         }
 
+        // Regenerate the latest ledger state.
+        self.regenerate_latest_ledger_state()?;
         // Regenerate the ledger tree.
         self.regenerate_ledger_tree()?;
 
@@ -602,8 +619,34 @@ impl<N: Network> LedgerState<N> {
         LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
     }
 
+    /// Updates the latest block hashes and block headers.
+    fn regenerate_latest_ledger_state(&mut self) -> Result<()> {
+        // Compute the start block height and end block height (inclusive).
+        let end_block_height = self.latest_block_height();
+        let start_block_height = end_block_height.saturating_sub(MAXIMUM_LINEAR_BLOCK_LOCATORS - 1);
+
+        // Retrieve the latest block hashes and block headers.
+        let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
+        let block_headers = self.get_block_headers(start_block_height, end_block_height)?;
+        assert_eq!(block_hashes.len(), block_headers.len());
+
+        // Upon success, clear the latest ledger state.
+        self.latest_block_hashes.clear();
+        self.latest_block_headers.clear();
+
+        // Add the latest block hashes and block headers.
+        for (block_hash, block_header) in block_hashes.into_iter().zip_eq(block_headers) {
+            self.latest_block_hashes.push(block_hash);
+            self.latest_block_headers.push(block_header);
+        }
+
+        self.latest_block_locators = self.get_block_locators(end_block_height)?;
+
+        Ok(())
+    }
+
     // TODO (raychu86): Make this more efficient.
-    /// Update the ledger tree.
+    /// Updates the ledger tree.
     fn regenerate_ledger_tree(&mut self) -> Result<()> {
         // Retrieve all of the block hashes.
         let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
@@ -737,6 +780,19 @@ impl<N: Network> BlockState<N> {
             Some(block_header) => Ok(block_header),
             None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
         }
+    }
+
+    /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
+    fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
+        // Ensure the starting block height is less than the ending block height.
+        if start_block_height > end_block_height {
+            return Err(anyhow!("Invalid starting and ending block heights"));
+        }
+
+        (start_block_height..=end_block_height)
+            .into_iter()
+            .map(|height| self.get_block_header(height))
+            .collect()
     }
 
     /// Returns the transactions from the block of the given block height.

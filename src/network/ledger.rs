@@ -190,7 +190,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     /// Returns the latest block locators.
-    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
+    pub fn latest_block_locators(&self) -> Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
         self.canon.latest_block_locators()
     }
 
@@ -277,6 +277,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns the block header for the given block height.
     pub fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
         self.canon.get_block_header(block_height)
+    }
+
+    /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
+    pub fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
+        self.canon.get_block_headers(start_block_height, end_block_height)
     }
 
     /// Returns the transactions from the block of the given block height.
@@ -375,7 +380,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::Ping(peer_ip) => {
                 // Send a `Pong` message to the peer.
-                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(self.latest_block_locators().clone()));
+                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(self.latest_block_locators()));
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Pong] {}", error);
                 }

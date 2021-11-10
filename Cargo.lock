@@ -1513,6 +1513,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "chrono",
+ "circular-queue",
  "itertools",
  "rand",
  "rocksdb",

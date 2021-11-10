@@ -32,6 +32,9 @@ version = "0.4"
 default-features = false
 features = [ "clock", "serde" ]
 
+[dependencies.circular-queue]
+version = "0.2"
+
 [dependencies.itertools]
 version = "0.10"
 
