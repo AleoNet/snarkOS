@@ -20,9 +20,10 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, marker::PhantomData, time::Duration};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum NodeType {
     /// A client node is a full node, capable of sending and receiving blocks.
-    Client,
+    Client = 0,
     /// A mining node is a full node, capable of producing new blocks.
     Miner,
     /// A peer node is a discovery node, capable of sharing peers of the network.

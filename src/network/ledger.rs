@@ -65,7 +65,7 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     UnconfirmedTransaction(SocketAddr, Transaction<N>),
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Status {
     /// The ledger is ready to handle requests.
@@ -795,7 +795,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
 
-        // Iterate through the peers to check if this node needs to catch up.
+        // Iterate through the peers to check if this node needs to catch up, and determine a peer to sync with.
         let mut maximal_peer = None;
         let mut maximal_peer_is_fork = false;
         let mut maximum_common_ancestor = 0;
@@ -813,23 +813,64 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // Proceed to add block requests if the maximum block height is higher than the latest.
         if let Some(peer_ip) = maximal_peer {
-            // // If the peer is on a fork, start by removing blocks until the common ancestor is reached.
-            // if maximal_peer_is_fork {
-            //     let num_blocks = self.latest_block_request - maximum_common_ancestor;
-            //     if num_blocks <= E::MAXIMUM_FORK_DEPTH {
-            //         if let Err(error) = ledger.write().await.remove_last_blocks(num_blocks) {
-            //             error!("Failed to roll ledger back: {}", error);
+            // // Determine the most frequently reported block height.
+            // let mut counts = HashMap::new();
+            // let network_block_height = match self
+            //     .peers_state
+            //     .iter()
+            //     .flat_map(|(_, state)| state.and_then(|(_, _, height)| Some(height)))
+            //     .max_by_key(|&n| {
+            //         let count = counts.entry(n).or_insert(0);
+            //         *count += 1;
+            //         *count
+            //     }) {
+            //     // If the network block height is known, it represents the expected block height of the network.
+            //     Some(network_block_height) => network_block_height,
+            //     // If the network block height is not known, it means this node has no connected peers.
+            //     None => return,
+            // };
+            //
+            // debug!("NETWORK BLOCK HEIGHT IS {} {} {}", network_block_height, peer_ip, self.is_on_fork_requests);
+            //
+            // // If the latest block height requested is below the fork range, it means this node is syncing.
+            // let (start_block_height, end_block_height) =
+            //     if self.latest_block_request + N::ALEO_MAXIMUM_FORK_DEPTH + E::MAXIMUM_BLOCK_REQUEST < network_block_height {
+            //         trace!("Preparing to sync with {}", peer_ip);
+            //
+            //         // Determine the specific blocks to sync with the peer.
+            //         let start_block_height = self.latest_block_request + 1;
+            //         let end_block_height = start_block_height + E::MAXIMUM_BLOCK_REQUEST;
+            //         (start_block_height, end_block_height)
+            //     } else {
+            //         trace!("Preparing to sync (in fork range) with {}", peer_ip);
+            //
+            //         // If the peer is on a fork, start by removing blocks until the common ancestor is reached.
+            //         if maximal_peer_is_fork && !self.is_on_fork_requests {
+            //             let num_blocks = self.latest_block_request - maximum_common_ancestor;
+            //             if num_blocks <= N::ALEO_MAXIMUM_FORK_DEPTH {
+            //                 if let Err(error) = self.remove_last_blocks(num_blocks) {
+            //                     error!("Failed to roll ledger back: {}", error);
+            //                 } else {
+            //                     self.latest_block_request = maximum_common_ancestor;
+            //                     self.is_on_fork_requests = true;
+            //                 }
+            //             }
             //         }
-            //     }
-            // }
+            //
+            //         // Determine the specific blocks to sync with the peer.
+            //         let num_blocks = std::cmp::min(maximum_block_height - self.latest_block_request, E::MAXIMUM_BLOCK_REQUEST);
+            //         let start_block_height = self.latest_block_request + 1;
+            //         let end_block_height = start_block_height + num_blocks - 1;
+            //         (start_block_height, end_block_height)
+            //     };
 
             // Determine the specific blocks to sync with the peer.
             let num_blocks = std::cmp::min(maximum_block_height - self.latest_block_request, E::MAXIMUM_BLOCK_REQUEST);
             let start_block_height = self.latest_block_request + 1;
             let end_block_height = start_block_height + num_blocks - 1;
-            debug!("Request blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
 
             // Send a `BlockRequest` message to the peer.
+            debug!("Request blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
             let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
             if let Err(error) = peers_router.send(request).await {
                 warn!("[BlockRequest] {}", error);
