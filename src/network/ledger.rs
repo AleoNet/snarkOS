@@ -314,6 +314,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.canon.get_previous_ledger_root(block_height)
     }
 
+    pub fn calculate_weight_from_height(&self, block_height: u32) -> Result<u128> {
+        Ok(self
+            .get_block_headers(block_height, self.latest_block_height())?
+            .iter()
+            .fold(0u128, |acc, header| acc + header.difficulty_target() as u128))
+    }
+
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -819,15 +826,36 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                 // If this ledger is within the fork range of the peer,
                 // and the common ancestor is within the fork range,
-                // and the peer has a higher block height, proceed to switch to the fork.
+                // and the peer has a heavier chain, proceed to switch to the fork.
                 let latest_block_height = self.latest_block_height();
-                if maximum_block_height.saturating_sub(latest_block_height) > 0
+                let canon_weight = match self.calculate_weight_from_height(maximum_common_ancestor) {
+                    Ok(weight) => weight,
+                    Err(error) => {
+                        error!("Failed to calculate canon chain weight: {}", error);
+                        return;
+                    }
+                };
+
+                let maximum_weight = {
+                    let mut maximum_weight = 0u128;
+                    for (block_height, _, block_header) in &maximum_block_locators {
+                        if *block_height >= maximum_common_ancestor {
+                            if let Some(header) = block_header {
+                                maximum_weight += header.difficulty_target() as u128;
+                            }
+                        }
+                    }
+
+                    maximum_weight
+                };
+
+                if maximum_weight > canon_weight
                     && maximum_block_height.saturating_sub(latest_block_height) <= MAXIMUM_LINEAR_BLOCK_LOCATORS
                     && maximum_block_height.saturating_sub(maximum_common_ancestor) > 0
                     && maximum_block_height.saturating_sub(maximum_common_ancestor) <= MAXIMUM_LINEAR_BLOCK_LOCATORS
                     && latest_block_height.saturating_sub(maximum_common_ancestor) > 0
                 {
-                    info!("Found a longer fork, rolling ledger back to block {}", maximum_common_ancestor);
+                    info!("Found a heavier fork, rolling ledger back to block {}", maximum_common_ancestor);
 
                     // Set the terminator bit to `true` to ensure it does not mine.
                     self.terminator.store(true, Ordering::SeqCst);
