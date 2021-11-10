@@ -56,7 +56,7 @@ pub struct LedgerState<N: Network> {
     /// The latest block of the ledger.
     latest_block: Block<N>,
     /// The block locators from the latest block of the ledger.
-    latest_block_locators: Vec<(u32, N::BlockHash)>,
+    latest_block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>,
     /// The current ledger tree of block hashes.
     ledger_tree: LedgerTree<N>,
     /// The ledger root corresponding to each block height.
@@ -172,7 +172,7 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Returns the latest block locators.
-    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash)> {
+    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
         &self.latest_block_locators
     }
 
@@ -282,73 +282,53 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Returns the block locators of the current ledger, from the given block height.
-    pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash)>> {
-        const MAXIMUM_BLOCK_LOCATORS: u32 = 64;
-
+    pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>> {
         // Determine the number of block locators to obtain (with the genesis block as one block locator).
-        let mut num_block_locators = std::cmp::min(MAXIMUM_BLOCK_LOCATORS - 1, block_height);
-        // Determine the number of latest blocks to include as block locators (linear).
-        let num_latest_blocks = std::cmp::min(10, num_block_locators);
+        const MAXIMUM_BLOCK_HEADERS: u32 = 256;
+        const MAXIMUM_BLOCK_HASHES: u32 = 64;
 
-        // Initialize the list of block locators.
-        let mut block_locators = Vec::with_capacity(num_block_locators as usize);
         // Initialize the current block height that a block locator is obtained from.
         let mut block_locator_height = block_height;
 
+        // Determine the number of latest block headers to include as block locators (linear).
+        let num_block_headers = std::cmp::min(MAXIMUM_BLOCK_HEADERS, block_locator_height);
+
+        // Initialize list of block locator headers.
+        let mut block_locator_headers = Vec::with_capacity(num_block_headers as usize);
         // Add the latest block locators.
-        for _ in 0..num_latest_blocks {
-            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
+        for _ in 0..num_block_headers {
+            let block_hash = self.get_block_hash(block_locator_height)?;
+            let block_header = self.get_block_header(block_locator_height)?;
+
+            block_locator_headers.push((block_locator_height, block_hash, Some(block_header)));
             block_locator_height -= 1; // safe; num_latest_blocks is never higher than the height
         }
 
-        // Return if the number of block locators has been satisfied.
-        num_block_locators -= num_latest_blocks;
-        if num_block_locators == 0 {
-            block_locators.push((0, self.get_block_hash(0)?));
-            return Ok(block_locators);
+        // Determine the number of latest block hashes to include as block locators (power of two).
+        let num_block_hashes = std::cmp::min(MAXIMUM_BLOCK_HASHES, block_locator_height);
+
+        // Initialize list of block locator hashes.
+        let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
+        // Add the block locator hashes.
+        while block_locator_height > 0 && block_locator_hashes.len() < num_block_hashes as usize {
+            let block_hash = self.get_block_hash(block_locator_height)?;
+            block_locator_hashes.push((block_locator_height, block_hash, None));
+
+            // Decrement the block locator height by a power of two.
+            block_locator_height /= 2;
         }
 
-        // Determine the proportional step for the next round of block locators, which are spread apart.
-        // This is calculated as the average distance between block hashes based on the desired number of block locators.
-        let mut proportional_step = block_locator_height / num_block_locators;
+        // Determine the number of latest block headers and block hashes to include as block locators.
+        let num_block_locators = num_block_headers + num_block_hashes + 1;
 
-        // Provide hashes of blocks with indices descending quadratically while the quadratic step distance is
-        // lower or close to the proportional step distance.
-        let num_quadratic_steps = (proportional_step as f32).log2() as u32;
-
-        // The remaining block hashes should have a proportional distance in block height between them.
-        let num_proportional_steps = num_block_locators - num_quadratic_steps;
-
-        // Obtain a few hashes increasing the distance quadratically.
-        let mut quadratic_step = 2; // the size of the first quadratic step
-        for _ in 0..num_quadratic_steps {
-            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
-            block_locator_height = block_locator_height.saturating_sub(quadratic_step);
-            quadratic_step *= 2;
-        }
-
-        // Update the size of the proportional step so that the hashes of the remaining blocks have the same distance
-        // between one another.
-        proportional_step = block_locator_height / num_proportional_steps;
-
-        // Tweak: in order to avoid "jumping" by too many indices with the last step,
-        // increase the value of each step by 1 if the last step is too large. This
-        // can result in the final number of locator hashes being a bit lower, but
-        // it's preferable to having a large gap between values.
-        if block_locator_height - proportional_step * num_proportional_steps > 2 * proportional_step {
-            proportional_step += 1;
-        }
-
-        // Obtain the rest of hashes with a proportional distance between them.
-        for _ in 0..num_proportional_steps {
-            block_locators.push((block_locator_height, self.get_block_hash(block_locator_height)?));
-            if block_locator_height == 0 {
-                return Ok(block_locators);
-            }
-            block_locator_height = block_locator_height.saturating_sub(proportional_step);
-        }
-
-        block_locators.push((0, self.get_block_hash(0)?));
+        // Initialize the list of block locators.
+        let mut block_locators = Vec::with_capacity(num_block_locators as usize);
+        // Add the list of block locator headers.
+        block_locators.extend(block_locator_headers);
+        // Add the list of block locator hashes.
+        block_locators.extend(block_locator_hashes);
+        // Add the genesis locator.
+        block_locators.push((0, self.get_block_hash(0)?, None));
 
         Ok(block_locators)
     }

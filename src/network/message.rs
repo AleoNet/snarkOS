@@ -38,8 +38,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerResponse(Vec<SocketAddr>),
     /// Ping := (version)
     Ping(u32),
-    /// Pong := (\[(block_height, block_hash)\])
-    Pong(Vec<(u32, N::BlockHash)>),
+    /// Pong := (\[(block_height, block_hash, block_header)\])
+    Pong(Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>),
     /// UnconfirmedBlock := (block)
     UnconfirmedBlock(Block<N>),
     /// UnconfirmedTransaction := (transaction)

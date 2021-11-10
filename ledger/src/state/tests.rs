@@ -51,7 +51,7 @@ fn test_genesis() {
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
     assert_eq!(genesis, ledger.latest_block());
-    assert_eq!(&vec![(genesis.height(), genesis.hash())], ledger.latest_block_locators());
+    assert_eq!(&vec![(genesis.height(), genesis.hash(), None)], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
 
@@ -94,8 +94,8 @@ fn test_add_next_block() {
     // Ensure the block locators are correct.
     let block_locators = ledger.latest_block_locators();
     assert_eq!(2, block_locators.len());
-    assert_eq!((block.height(), block.hash()), block_locators[0]);
-    assert_eq!((genesis.height(), genesis.hash()), block_locators[1]);
+    assert_eq!((block.height(), block.hash(), Some(block.header().clone())), block_locators[0]);
+    assert_eq!((genesis.height(), genesis.hash(), None), block_locators[1]);
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn test_remove_last_block() {
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
     assert_eq!(genesis, ledger.latest_block());
-    assert_eq!(&vec![(genesis.height(), genesis.hash())], ledger.latest_block_locators());
+    assert_eq!(&vec![(genesis.height(), genesis.hash(), None)], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
 
@@ -183,6 +183,6 @@ fn test_remove_last_2_blocks() {
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
     assert_eq!(genesis, ledger.latest_block());
-    assert_eq!(&vec![(genesis.height(), genesis.hash())], ledger.latest_block_locators());
+    assert_eq!(&vec![(genesis.height(), genesis.hash(), None)], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }

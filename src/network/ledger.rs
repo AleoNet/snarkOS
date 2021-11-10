@@ -57,8 +57,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
     /// Ping := (peer_ip)
     Ping(SocketAddr),
-    /// Pong := (peer_ip, \[(block_height, block_hash)\])
-    Pong(SocketAddr, Vec<(u32, N::BlockHash)>),
+    /// Pong := (peer_ip, \[(block_height, block_hash, block_header)\])
+    Pong(SocketAddr, Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>),
     /// UnconfirmedBlock := (peer_ip, block)
     UnconfirmedBlock(SocketAddr, Block<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
@@ -190,7 +190,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     /// Returns the latest block locators.
-    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash)> {
+    pub fn latest_block_locators(&self) -> &Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
         self.canon.latest_block_locators()
     }
 
@@ -302,11 +302,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns the ledger root in the block header of the given block height.
     pub fn get_previous_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
         self.canon.get_previous_ledger_root(block_height)
-    }
-
-    /// Returns the block locators of the current ledger, from the given block height.
-    pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash)>> {
-        self.canon.get_block_locators(block_height)
     }
 
     ///
@@ -645,17 +640,18 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Updates the state of the given peer.
     ///
-    fn update_peer(&mut self, peer_ip: SocketAddr, block_locators: Vec<(u32, N::BlockHash)>) {
+    fn update_peer(&mut self, peer_ip: SocketAddr, block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>) {
         // Ensure the list of block locators is not empty.
         if block_locators.len() == 0 {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
         } else {
             // Sort the block locators into a map.
-            let block_locators: BTreeMap<u32, N::BlockHash> = block_locators.iter().cloned().collect();
+            let block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
+                block_locators.iter().cloned().map(|(a, b, c)| (a, (b, c))).collect();
 
             // Ensure the peer provided the genesis block locator, and that the genesis block hash is correct.
             match block_locators.get(&0) {
-                Some(genesis_block_hash) => {
+                Some((genesis_block_hash, _)) => {
                     if *genesis_block_hash != N::genesis_block().hash() {
                         warn!("Incorrect genesis block locator from {}", peer_ip);
                         self.add_failure(peer_ip, "Incorrect genesis block locator".to_string());
@@ -675,7 +671,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let mut latest_block_height_of_peer = 0;
 
             // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, block_hash) in &block_locators {
+            for (block_height, (block_hash, _)) in &block_locators {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
                 if let Ok(expected_block_height) = self.get_block_height(block_hash) {
                     if expected_block_height != *block_height {
@@ -705,9 +701,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Determine if the peer is a fork.
             let is_fork = {
-                // If the peer has a common ancestor that is at least more than 10 blocks from its own latest block height,
+                // If the peer has a common ancestor that is at least more than 256 blocks from its own latest block height,
                 // use the relative block heights of the two ledgers to determine whether the peer is on a fork.
-                if common_ancestor + 10 < latest_block_height_of_peer {
+                if common_ancestor + 256 < latest_block_height_of_peer {
                     let mut is_fork = false;
                     let mut crossed = false;
                     for (block_height_interval, _) in block_locators {
@@ -724,18 +720,18 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     }
                     is_fork
                 }
-                // If the peer has a common ancestor that is within 10 blocks of its own latest block height,
+                // If the peer has a common ancestor that is within 256 blocks of its own latest block height,
                 // this ledger can determine with high confidence whether the peer is on a fork.
                 else if common_ancestor < latest_block_height_of_peer {
                     // If any block hash does not match between the common ancestor and
                     // the latest block height of this ledger, the peer is on a fork.
                     let mut is_fork = false;
 
-                    // Iterate through up to 10 block locators to determine if it is on a fork.
+                    // Iterate through up to 256 block locators to determine if it is on a fork.
                     let end_block_height = std::cmp::min(latest_block_height_of_peer, self.latest_block_height());
                     for block_height in common_ancestor..=end_block_height {
                         // Ensure the block hash for the given block height exists.
-                        if let Some(block_hash) = block_locators.get(&block_height) {
+                        if let Some((block_hash, _)) = block_locators.get(&block_height) {
                             // Ensure the block hash between the two nodes match.
                             if let Ok(expected_block_hash) = self.get_block_hash(block_height) {
                                 if expected_block_hash != *block_hash {
