@@ -18,7 +18,7 @@ Documentation for bech32m encoded locators in Aleo.
 | record randomizer              | `rr1` | rr1xd6a06ntwe3mmy3s5xfdfq3fgk9vx5wlttdjykqlj2ctlcj3gspsaa99lv                          | Locator for the record randomizer (output of record encryption) |
 | serial number                  | `sn1` | sn1ggmtd08rmrx92d2s0yx6md9q2k48vh2l4u4kn86m2h0srsu78ursjkgh06                          | Locator for the root of a record serial number                  |
 
-# Locators
+# Objects
 Documentation for bech32m encoded objects in Aleo.
 
 |         Name        | Prefix  |                              Example                         |                Description              |
