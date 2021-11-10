@@ -186,3 +186,56 @@ fn test_remove_last_2_blocks() {
     assert_eq!(vec![(genesis.height(), genesis.hash(), None)], ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
+
+#[test]
+fn test_get_block_locators() {
+    let rng = &mut thread_rng();
+    let terminator = AtomicBool::new(false);
+
+    // Initialize a new ledger.
+    let mut ledger = new_ledger::<Testnet2, RocksDB>();
+    assert_eq!(0, ledger.latest_block_height());
+
+    // Initialize a new ledger tree.
+    let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+    ledger_tree
+        .add(&Testnet2::genesis_block().hash())
+        .expect("Failed to add to ledger tree");
+
+    // Initialize a new account.
+    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let address = account.address();
+
+    // Mine the next block.
+    let block_1 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    ledger.add_next_block(&block_1).expect("Failed to add next block to ledger");
+    assert_eq!(1, ledger.latest_block_height());
+
+    // Check the block locators.
+    let block_locators = ledger
+        .get_block_locators(ledger.latest_block_height())
+        .expect("Failed to get block locators");
+    assert!(ledger.check_block_locators(block_locators).expect("Failed to check block locators"));
+
+    // Mine the next block.
+    let block_2 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
+    assert_eq!(2, ledger.latest_block_height());
+
+    // Check the block locators.
+    let block_locators = ledger
+        .get_block_locators(ledger.latest_block_height())
+        .expect("Failed to get block locators");
+    assert!(ledger.check_block_locators(block_locators).expect("Failed to check block locators"));
+
+    // Mine the next block.
+    let block_3 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    ledger.add_next_block(&block_3).expect("Failed to add next block to ledger");
+    assert_eq!(3, ledger.latest_block_height());
+
+    // Check the block locators.
+    let block_locators = ledger
+        .get_block_locators(ledger.latest_block_height())
+        .expect("Failed to get block locators");
+    assert!(ledger.check_block_locators(block_locators).expect("Failed to check block locators"));
+}
