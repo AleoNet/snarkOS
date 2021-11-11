@@ -31,6 +31,7 @@ use std::path::PathBuf;
 /// The database will just store coinbase transactions under random IDs, as we
 /// don't really currently need to index them with anything, and the only operations
 /// we perform are storing single records, or fetching the entire list.
+#[derive(Clone, Debug)]
 pub struct Wallet<N: Network> {
     /// The address associated with this wallet.
     address: String,

@@ -39,3 +39,4 @@ pub use node::*;
 pub(crate) mod rpc;
 
 pub(crate) mod wallet;
+pub(crate) use wallet::*;

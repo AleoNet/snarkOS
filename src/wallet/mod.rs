@@ -15,3 +15,4 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub(crate) mod wallet;
+pub(crate) use wallet::Wallet;

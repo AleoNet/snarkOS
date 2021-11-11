@@ -19,8 +19,8 @@ use crate::{
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     rpc::initialize_rpc_server,
-    Environment,
-    NodeType,
+    wallet::Wallet,
+    Environment, NodeType,
 };
 use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
@@ -283,11 +283,13 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         if E::NODE_TYPE == NodeType::Miner {
             if let Some(recipient) = miner {
+                // TODO: add data_path as a constant string when #20 is merged.
+                let wallet = Wallet::new(recipient.to_string(), ".aleo".to_string()).expect("Should be able to open wallet database");
                 let ledger_router = ledger_router.clone();
                 tasks.append(task::spawn(async move {
                     loop {
                         // Start the mining process.
-                        let request = LedgerRequest::Mine(local_ip, recipient, ledger_router.clone());
+                        let request = LedgerRequest::Mine(local_ip, recipient, ledger_router.clone(), wallet.clone());
                         if let Err(error) = ledger_router.send(request).await {
                             error!("Failed to send request to ledger: {}", error);
                         }
