@@ -786,6 +786,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     }
                 }
 
+                /////////////////
+                // Linear case //
+                /////////////////
+
                 // If this ledger is within the fork range of the peer,
                 // and the common ancestor is within the fork range,
                 // and the peer has a higher block height, proceed to switch to the fork.
