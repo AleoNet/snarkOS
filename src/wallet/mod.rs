@@ -14,28 +14,4 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![allow(clippy::module_inception)]
-#![allow(clippy::suspicious_else_formatting)]
-
-#[macro_use]
-extern crate thiserror;
-#[macro_use]
-extern crate tracing;
-
-pub(crate) mod display;
-pub(crate) use display::*;
-
-pub mod environment;
-pub use environment::*;
-
-pub mod helpers;
-
-pub mod network;
-pub use network::*;
-
-pub mod node;
-pub use node::*;
-
-pub(crate) mod rpc;
-
 pub(crate) mod wallet;
