@@ -20,6 +20,7 @@ use super::*;
 pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
     pub(super) rocksdb: Arc<rocksdb::DB>,
     pub(super) context: Vec<u8>,
+    pub(super) is_read_only: bool,
     pub(super) _phantom: PhantomData<(K, V)>,
 }
 
@@ -47,6 +48,10 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
+        if self.is_read_only {
+            self.rocksdb.try_catch_up_with_primary()?;
+        }
+
         let mut key_buf = self.context.clone();
         key_buf.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut key_buf, &key)?;

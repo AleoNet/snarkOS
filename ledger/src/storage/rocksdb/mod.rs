@@ -48,6 +48,7 @@ use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
 pub struct RocksDB {
     rocksdb: Arc<rocksdb::DB>,
     context: Vec<u8>,
+    is_read_only: bool,
 }
 
 impl Storage for RocksDB {
@@ -60,13 +61,22 @@ impl Storage for RocksDB {
         context_bytes.extend_from_slice(&context);
 
         let rocksdb = match is_read_only {
-            true => Arc::new(rocksdb::DB::open_for_read_only(&rocksdb::Options::default(), path, false)?),
+            true => {
+                // Construct the directory paths.
+                let primary = path.as_ref().to_path_buf();
+                let reader = path.as_ref().join("reader").to_path_buf();
+                // Open a secondary reader for the primary rocksdb.
+                let rocksdb = rocksdb::DB::open_as_secondary(&rocksdb::Options::default(), primary, reader)?;
+                rocksdb.try_catch_up_with_primary()?;
+                Arc::new(rocksdb)
+            }
             false => Arc::new(rocksdb::DB::open_default(path)?),
         };
 
         Ok(RocksDB {
             rocksdb,
             context: context_bytes,
+            is_read_only,
         })
     }
 
@@ -85,6 +95,7 @@ impl Storage for RocksDB {
         Ok(DataMap {
             rocksdb: self.rocksdb.clone(),
             context: context_bytes,
+            is_read_only: self.is_read_only,
             _phantom: PhantomData,
         })
     }
