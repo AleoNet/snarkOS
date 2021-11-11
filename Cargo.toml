@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["ledger"]
+members = ["ledger", "wallet"]
 
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
