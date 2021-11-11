@@ -314,11 +314,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.canon.get_previous_ledger_root(block_height)
     }
 
-    pub fn calculate_weight_from_height(&self, block_height: u32) -> Result<u128> {
+    pub fn calculate_weight_from_height(&self, block_height: u32) -> Result<f64> {
         Ok(self
             .get_block_headers(block_height, self.latest_block_height())?
             .iter()
-            .fold(0u128, |acc, header| acc + header.difficulty_target() as u128))
+            .fold(0f64, |acc, header| acc + 1f64 / (header.difficulty_target() as f64)))
     }
 
     ///
@@ -837,11 +837,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 };
 
                 let maximum_weight = {
-                    let mut maximum_weight = 0u128;
-                    for (block_height, _, block_header) in &maximum_block_locators {
+                    let mut maximum_weight = 0f64;
+                    for (block_height, _, block_header) in maximum_block_locators.iter() {
                         if *block_height >= maximum_common_ancestor {
                             if let Some(header) = block_header {
-                                maximum_weight += header.difficulty_target() as u128;
+                                maximum_weight += 1f64 / (header.difficulty_target() as f64);
                             }
                         }
                     }
