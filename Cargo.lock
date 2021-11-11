@@ -541,6 +541,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "dialoguer"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61579ada4ec0c6031cfac3f86fdba0d195a7ebeb5e36693bd53cb5999a25beeb"
+dependencies = [
+ "console",
+ "lazy_static",
+ "tempfile",
+ "zeroize",
+]
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1914,6 +1926,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-wallet"
+version = "2.0.0"
+dependencies = [
+ "dialoguer",
+ "snarkvm",
+ "structopt",
+]
+
+[[package]]
 name = "snarkvm"
 version = "0.7.5"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=040825e#040825e77c78d88fffe4078b5c0f2c9d86f587a6"
@@ -2675,3 +2696,9 @@ name = "wyz"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
+
+[[package]]
+name = "zeroize"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68d9dcec5f9b43a30d38c49f91dfedfaac384cb8f085faca366c26207dd1619"
