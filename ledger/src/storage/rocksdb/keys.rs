@@ -17,14 +17,14 @@
 use super::*;
 
 /// An iterator over the keys of a prefix.
-pub struct Keys<K> {
-    db_iter: rocksdb::DBRawIterator,
+pub struct Keys<'a, K> {
+    db_iter: rocksdb::DBRawIterator<'a>,
     prefix: Vec<u8>,
     _phantom: PhantomData<K>,
 }
 
-impl<K: DeserializeOwned> Keys<K> {
-    pub(crate) fn new(db_iter: rocksdb::DBRawIterator, prefix: Vec<u8>) -> Self {
+impl<'a, K: DeserializeOwned> Keys<'a, K> {
+    pub(crate) fn new(db_iter: rocksdb::DBRawIterator<'a>, prefix: Vec<u8>) -> Self {
         Self {
             db_iter,
             prefix,
@@ -33,7 +33,7 @@ impl<K: DeserializeOwned> Keys<K> {
     }
 }
 
-impl<K: DeserializeOwned> Iterator for Keys<K> {
+impl<'a, K: DeserializeOwned> Iterator for Keys<'a, K> {
     type Item = K;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -17,14 +17,14 @@
 use super::*;
 
 /// An iterator over all key-value pairs in a data map.
-pub struct Iter<K, V> {
-    db_iter: rocksdb::DBRawIterator,
+pub struct Iter<'a, K, V> {
+    db_iter: rocksdb::DBRawIterator<'a>,
     prefix: Vec<u8>,
     _phantom: PhantomData<(K, V)>,
 }
 
-impl<K: DeserializeOwned, V: DeserializeOwned> Iter<K, V> {
-    pub(super) fn new(db_iter: rocksdb::DBRawIterator, prefix: Vec<u8>) -> Self {
+impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iter<'a, K, V> {
+    pub(super) fn new(db_iter: rocksdb::DBRawIterator<'a>, prefix: Vec<u8>) -> Self {
         Self {
             db_iter,
             prefix,
@@ -33,7 +33,7 @@ impl<K: DeserializeOwned, V: DeserializeOwned> Iter<K, V> {
     }
 }
 
-impl<K: DeserializeOwned, V: DeserializeOwned> Iterator for Iter<K, V> {
+impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iterator for Iter<'a, K, V> {
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {

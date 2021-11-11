@@ -17,14 +17,14 @@
 use super::*;
 
 /// An iterator over the values of a prefix.
-pub struct Values<V> {
-    db_iter: rocksdb::DBRawIterator,
+pub struct Values<'a, V> {
+    db_iter: rocksdb::DBRawIterator<'a>,
     prefix: Vec<u8>,
     _phantom: PhantomData<V>,
 }
 
-impl<V: DeserializeOwned> Values<V> {
-    pub(crate) fn new(db_iter: rocksdb::DBRawIterator, prefix: Vec<u8>) -> Self {
+impl<'a, V: DeserializeOwned> Values<'a, V> {
+    pub(crate) fn new(db_iter: rocksdb::DBRawIterator<'a>, prefix: Vec<u8>) -> Self {
         Self {
             db_iter,
             prefix,
@@ -33,7 +33,7 @@ impl<V: DeserializeOwned> Values<V> {
     }
 }
 
-impl<V: DeserializeOwned> Iterator for Values<V> {
+impl<'a, V: DeserializeOwned> Iterator for Values<'a, V> {
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -23,10 +23,10 @@ pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOw
     pub(super) _phantom: PhantomData<(K, V)>,
 }
 
-impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<K, V> for DataMap<K, V> {
-    type Iterator = Iter<K, V>;
-    type Keys = Keys<K>;
-    type Values = Values<V>;
+impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'a, K, V> for DataMap<K, V> {
+    type Iterator = Iter<'a, K, V>;
+    type Keys = Keys<'a, K>;
+    type Values = Values<'a, V>;
 
     ///
     /// Returns `true` if the given key exists in the map.
@@ -92,7 +92,7 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<K, V>
     ///
     /// Returns an iterator visiting each key-value pair in the map.
     ///
-    fn iter(&self) -> Self::Iterator {
+    fn iter(&'a self) -> Self::Iterator {
         let mut db_iter = self.rocksdb.raw_iterator();
         db_iter.seek(&self.context);
 
@@ -102,7 +102,7 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<K, V>
     ///
     /// Returns an iterator over each key in the map.
     ///
-    fn keys(&self) -> Self::Keys {
+    fn keys(&'a self) -> Self::Keys {
         let mut db_iter = self.rocksdb.raw_iterator();
         db_iter.seek(&self.context);
 
@@ -112,7 +112,7 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<K, V>
     ///
     /// Returns an iterator over each value in the map.
     ///
-    fn values(&self) -> Self::Values {
+    fn values(&'a self) -> Self::Values {
         let mut db_iter = self.rocksdb.raw_iterator();
         db_iter.seek(&self.context);
 

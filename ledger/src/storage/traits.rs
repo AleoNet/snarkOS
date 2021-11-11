@@ -44,7 +44,7 @@ pub trait Storage: Serialize {
     fn export(&self) -> Result<serde_json::Value>;
 }
 
-pub trait Map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
+pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
     type Iterator: Iterator<Item = (K, V)>;
     type Keys: Iterator<Item = K>;
     type Values: Iterator<Item = V>;
@@ -84,15 +84,15 @@ pub trait Map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> 
     ///
     /// Returns an iterator visiting each key-value pair in the map.
     ///
-    fn iter(&self) -> Self::Iterator;
+    fn iter(&'a self) -> Self::Iterator;
 
     ///
     /// Returns an iterator over each key in the map.
     ///
-    fn keys(&self) -> Self::Keys;
+    fn keys(&'a self) -> Self::Keys;
 
     ///
     /// Returns an iterator over each value in the map.
     ///
-    fn values(&self) -> Self::Values;
+    fn values(&'a self) -> Self::Values;
 }
