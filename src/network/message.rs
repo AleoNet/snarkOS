@@ -142,12 +142,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             },
             6 => Self::PeerResponse(bincode::deserialize(data)?),
             7 => Self::Ping(bincode::deserialize(&data[0..4])?),
-            8 => {
-                let timer = std::time::Instant::now();
-                let msg = Self::Pong(bincode::deserialize(data)?);
-                println!("PONG TIME TOOK: {} ms", timer.elapsed().as_millis());
-                msg
-            }
+            8 => Self::Pong(bincode::deserialize(data)?),
             9 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),

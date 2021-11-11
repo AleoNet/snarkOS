@@ -29,6 +29,7 @@ use std::{
         atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
+    time::{Duration, Instant},
 };
 use tokio::{sync::mpsc, task};
 
@@ -102,6 +103,8 @@ pub struct Ledger<N: Network, E: Environment> {
     block_requests: HashMap<SocketAddr, HashSet<(u32, Option<N::BlockHash>)>>,
     /// The latest block height requested from a peer.
     latest_block_request: u32,
+    /// The timestamp of the last successful block increment.
+    last_block_increment_timestamp: Instant,
     /// The map of each peer to their failure messages.
     failures: HashMap<SocketAddr, Vec<String>>,
     _phantom: PhantomData<E>,
@@ -112,6 +115,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         let canon = LedgerState::open::<S, P>(path, false)?;
         let latest_block_request = canon.latest_block_height();
+        let last_block_increment_timestamp = Instant::now();
         Ok(Self {
             status: Arc::new(AtomicU8::new(Status::Peering as u8)),
             canon,
@@ -122,6 +126,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             peers_state: Default::default(),
             block_requests: Default::default(),
             latest_block_request,
+            last_block_increment_timestamp,
             failures: Default::default(),
             _phantom: PhantomData,
         })
@@ -429,6 +434,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Upon success, remove the unconfirmed block, as it is now confirmed.
             self.unconfirmed_blocks.remove(&block.hash());
         }
+
+        // If the timestamp of the last block increment has surpassed the preset limit,
+        // the ledger is likely syncing from invalid state, and should rollback by one block.
+        if self.is_syncing() && self.last_block_increment_timestamp.elapsed() > Duration::from_secs(E::MAXIMUM_RADIO_SILENCE_IN_SECS) {
+            trace!("Ledger state has become stale, clearing queue and rolling back");
+            self.unconfirmed_blocks = Default::default();
+            self.memory_pool = MemoryPool::new();
+            self.block_requests = Default::default();
+            self.remove_last_blocks(1);
+            self.last_block_increment_timestamp = Instant::now();
+        }
     }
 
     ///
@@ -549,6 +565,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             match self.canon.add_next_block(&block) {
                 Ok(()) => {
                     info!("Ledger advanced to block {}", self.latest_block_height());
+
+                    // Set the terminator bit to `true` to ensure the miner updates state.
+                    self.terminator.store(true, Ordering::SeqCst);
+
+                    // Update the timestamp of the last block increment.
+                    self.last_block_increment_timestamp = Instant::now();
+
                     // On success, filter the memory pool of its transactions and the block if it exists.
                     let transactions = block.transactions();
                     self.memory_pool.remove_transactions(transactions);
@@ -557,7 +580,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if self.memory_pool.contains_block_hash(&block_hash) {
                         self.memory_pool.remove_block(&block_hash);
                     }
-                    // TODO (howardwu) - Set the terminator bit to true.
                 }
                 Err(error) => {
                     debug!("Setting latest block request to block {}", self.latest_block_height());
@@ -572,6 +594,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Ensure the unconfirmed block does not already exist in the memory pool.
                     match !self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                         true => {
+                            // Set the terminator bit to `true` to ensure the miner updates state.
+                            self.terminator.store(true, Ordering::SeqCst);
+
                             // Add the block to the unconfirmed blocks.
                             trace!("Adding unconfirmed block {} to memory pool", block.height());
                             self.unconfirmed_blocks.insert(block.previous_block_hash(), block);
@@ -608,10 +633,21 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
-    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
+    /// Removes the latest `num_blocks` from storage, returning the successfully removed blocks.
     ///
-    fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
-        self.canon.remove_last_blocks(num_blocks)
+    fn remove_last_blocks(&mut self, num_blocks: u32) -> Vec<Block<N>> {
+        match self.canon.remove_last_blocks(num_blocks) {
+            Ok(removed_blocks) => {
+                let latest_block_height = self.latest_block_height();
+                info!("Ledger rolled back to block {}", latest_block_height);
+                self.latest_block_request = latest_block_height;
+                removed_blocks
+            }
+            Err(error) => {
+                error!("Failed to roll ledger back: {}", error);
+                vec![]
+            }
+        }
     }
 
     ///
@@ -792,13 +828,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     && latest_block_height.saturating_sub(maximum_common_ancestor) > 0
                 {
                     info!("Found a longer fork, rolling ledger back to block {}", maximum_common_ancestor);
+
+                    // Set the terminator bit to `true` to ensure it does not mine.
+                    self.terminator.store(true, Ordering::SeqCst);
+
                     // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
                     let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
-                    if let Err(error) = self.remove_last_blocks(num_blocks) {
-                        error!("Failed to roll ledger back: {}", error);
-                    } else {
-                        self.latest_block_request = self.latest_block_height();
-                    }
+                    self.remove_last_blocks(num_blocks);
                 }
             }
 
@@ -889,54 +925,4 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             None => error!("Missing failure entry for {}", peer_ip),
         };
     }
-
-    // ///
-    // /// Handles the fork request.
-    // /// A fork request contains a sequence of block hashes that gives a insight to the
-    // /// peers block state.
-    // ///
-    // async fn process_fork_response<E: Environment>(
-    //     &mut self,
-    //     peer_ip: SocketAddr,
-    //     fork_point_block_height: u32,
-    //     target_block_height: u32,
-    // ) -> Result<()> {
-    //     debug!("Handling fork response from peer {}", peer_ip);
-    //
-    //     if target_block_height > self.latest_block_height() {
-    //         if target_block_height - fork_point_block_height <= E::FORK_THRESHOLD as u32 {
-    //             // Remove latest blocks until the fork_point_block_height.
-    //             while self.latest_block_height() > fork_point_block_height {
-    //                 if let Err(error) = self.canon.remove_last_block() {
-    //                     trace!("{}", error);
-    //                     return Err(anyhow!("{}", error));
-    //                 }
-    //             }
-    //
-    //             // Regenerate the ledger tree.
-    //             if let Err(error) = self.canon.regenerate_ledger_tree() {
-    //                 trace!("{}", error);
-    //                 return Err(anyhow!("{}", error));
-    //             }
-    //         } else {
-    //             let error = format!(
-    //                 "Fork size {} larger than fork threshold {}",
-    //                 target_block_height - fork_point_block_height,
-    //                 E::FORK_THRESHOLD
-    //             );
-    //             trace!("{}", error);
-    //             return Err(anyhow!("{}", error));
-    //         }
-    //     } else {
-    //         let error = format!(
-    //             "Fork target height {} is not greater than current block height {}",
-    //             target_block_height,
-    //             self.latest_block_height()
-    //         );
-    //         trace!("{}", error);
-    //         return Err(anyhow!("{}", error));
-    //     }
-    //
-    //     Ok(())
-    // }
 }

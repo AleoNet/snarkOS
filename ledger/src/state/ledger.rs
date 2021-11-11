@@ -121,7 +121,7 @@ impl<N: Network> LedgerState<N> {
         for block_height in 0..=latest_block_height {
             // Validate the ledger root every 250 blocks.
             if block_height % 250 == 0 || block_height == latest_block_height {
-                trace!("Validating the ledger root up to block {}", block_height);
+                debug!("Validating the ledger root up to block {}", block_height);
 
                 // Ensure the ledger roots match their expected block heights.
                 let expected_ledger_root = ledger.get_previous_ledger_root(block_height)?;
@@ -153,7 +153,7 @@ impl<N: Network> LedgerState<N> {
         ledger.regenerate_ledger_tree()?;
         assert_eq!(ledger.ledger_tree.root(), latest_ledger_root);
 
-        trace!("Loaded ledger from block {}", ledger.latest_block_height());
+        debug!("Loaded ledger from block {}", ledger.latest_block_height());
 
         // let value = storage.export()?;
         // println!("{}", value);
