@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, PeersRouter};
+use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, PeersRouter, Wallet};
 use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
 
@@ -55,8 +55,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Disconnect(SocketAddr),
     /// Heartbeat := ()
     Heartbeat,
-    /// Mine := (local_ip, miner_address, ledger_router)
-    Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
+    /// Mine := (local_ip, miner_address, ledger_router, wallet)
+    Mine(SocketAddr, Address<N>, LedgerRouter<N, E>, Wallet<N>),
     /// Ping := (peer_ip)
     Ping(SocketAddr),
     /// Pong := (peer_ip, block_locators)
@@ -230,9 +230,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Update the block requests.
                 self.update_block_requests(peers_router).await;
             }
-            LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
+            LedgerRequest::Mine(local_ip, recipient, ledger_router, wallet) => {
                 // Process the request to mine the next block.
-                self.mine_next_block(local_ip, recipient, ledger_router);
+                self.mine_next_block(local_ip, recipient, ledger_router, wallet);
             }
             LedgerRequest::Ping(peer_ip) => {
                 // Send a `Pong` message to the peer.
@@ -357,7 +357,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Mines a new block and adds it to the canon blocks.
     ///
-    fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>) {
+    fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>, wallet: Wallet<N>) {
         // If the node type is not a miner, it should not be mining.
         if E::NODE_TYPE != NodeType::Miner {
             return;
@@ -391,6 +391,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 match result {
                     Ok(block) => {
                         trace!("Miner has found the next block");
+
+                        // Store coinbase record
+                        wallet.push_record(&block.to_coinbase_transaction().expect("Block should have 1 coinbase transaction"));
+
                         // Broadcast the next block.
                         let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
                         if let Err(error) = ledger_router.send(request).await {
