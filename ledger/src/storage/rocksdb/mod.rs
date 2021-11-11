@@ -54,13 +54,18 @@ impl Storage for RocksDB {
     ///
     /// Opens storage at the given `path` and `context`.
     ///
-    fn open<P: AsRef<Path>>(path: P, context: u16) -> Result<Self> {
+    fn open<P: AsRef<Path>>(path: P, context: u16, is_read_only: bool) -> Result<Self> {
         let context = context.to_le_bytes();
         let mut context_bytes = bincode::serialize(&(context.len() as u32)).unwrap();
         context_bytes.extend_from_slice(&context);
 
+        let rocksdb = match is_read_only {
+            true => Arc::new(rocksdb::DB::open_for_read_only(&rocksdb::Options::default(), path, false)?),
+            false => Arc::new(rocksdb::DB::open_default(path)?),
+        };
+
         Ok(RocksDB {
-            rocksdb: Arc::new(rocksdb::DB::open_default(path)?),
+            rocksdb,
             context: context_bytes,
         })
     }

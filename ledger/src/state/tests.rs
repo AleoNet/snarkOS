@@ -29,7 +29,7 @@ fn temp_dir() -> std::path::PathBuf {
 
 /// Initializes a new instance of the ledger.
 fn new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
-    LedgerState::open::<S, _>(temp_dir()).expect("Failed to initialize ledger")
+    LedgerState::open::<S, _>(temp_dir(), false).expect("Failed to initialize ledger")
 }
 
 #[test]

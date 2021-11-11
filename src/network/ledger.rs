@@ -110,7 +110,7 @@ pub struct Ledger<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
-        let canon = LedgerState::open::<S, P>(path)?;
+        let canon = LedgerState::open::<S, P>(path, false)?;
         let latest_block_request = canon.latest_block_height();
         Ok(Self {
             status: Arc::new(AtomicU8::new(Status::Peering as u8)),

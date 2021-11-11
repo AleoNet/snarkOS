@@ -24,7 +24,7 @@ pub trait Storage: Serialize {
     ///
     /// Opens storage at the given `path` and `context`.
     ///
-    fn open<P: AsRef<Path>>(path: P, context: u16) -> Result<Self>
+    fn open<P: AsRef<Path>>(path: P, context: u16, is_read_only: bool) -> Result<Self>
     where
         Self: Sized;
 

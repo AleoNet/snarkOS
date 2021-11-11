@@ -80,10 +80,10 @@ pub struct LedgerState<N: Network> {
 
 impl<N: Network> LedgerState<N> {
     /// Initializes a new instance of `LedgerState`.
-    pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<S: Storage, P: AsRef<Path>>(path: P, is_read_only: bool) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
-        let storage = S::open(path, context)?;
+        let storage = S::open(path, context, is_read_only)?;
 
         // Retrieve the genesis block.
         let genesis = N::genesis_block();
