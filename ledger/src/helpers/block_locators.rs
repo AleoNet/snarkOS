@@ -165,3 +165,48 @@ impl<N: Network> Deref for BlockLocators<N> {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkvm::dpc::testnet2::Testnet2;
+
+    #[test]
+    fn test_block_locators_serde_json() {
+        let expected_block_height = Testnet2::genesis_block().height();
+        let expected_block_hash = Testnet2::genesis_block().hash();
+        let expected_block_header = Testnet2::genesis_block().header().clone();
+        let expected_block_locators =
+            BlockLocators::<Testnet2>::from(vec![(expected_block_height, expected_block_hash, Some(expected_block_header))]);
+
+        // Serialize
+        let expected_string = expected_block_locators.to_string();
+        let candidate_string = serde_json::to_string(&expected_block_locators).unwrap();
+        assert_eq!(1682, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(expected_string, candidate_string);
+
+        // Deserialize
+        assert_eq!(expected_block_locators, BlockLocators::from_str(&candidate_string).unwrap());
+        assert_eq!(expected_block_locators, serde_json::from_str(&candidate_string).unwrap());
+    }
+
+    #[test]
+    fn test_block_locators_bincode() {
+        let expected_block_height = Testnet2::genesis_block().height();
+        let expected_block_hash = Testnet2::genesis_block().hash();
+        let expected_block_header = Testnet2::genesis_block().header().clone();
+        let expected_block_locators =
+            BlockLocators::<Testnet2>::from(vec![(expected_block_height, expected_block_hash, Some(expected_block_header))]);
+
+        // Serialize
+        let expected_bytes = expected_block_locators.to_bytes_le().unwrap();
+        let candidate_bytes = bincode::serialize(&expected_block_locators).unwrap();
+        assert_eq!(928, expected_bytes.len(), "Update me if serialization has changed");
+        // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
+        assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
+
+        // Deserialize
+        assert_eq!(expected_block_locators, BlockLocators::read_le(&expected_bytes[..]).unwrap());
+        assert_eq!(expected_block_locators, bincode::deserialize(&candidate_bytes[..]).unwrap());
+    }
+}

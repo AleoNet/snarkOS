@@ -334,7 +334,14 @@ impl<N: Network> LedgerState<N> {
 
         // Return the block locators if the locator has run out of blocks.
         if block_locator_height == 0 {
-            return Ok(BlockLocators::<N>::from(block_locator_headers.collect()));
+            // Initialize the list of block locators.
+            let mut block_locators = Vec::with_capacity((num_block_headers + 1) as usize);
+            // Add the list of block locator headers.
+            block_locators.extend(block_locator_headers);
+            // Add the genesis locator.
+            block_locators.push((0, self.get_block_hash(0)?, None));
+
+            return Ok(BlockLocators::<N>::from(block_locators));
         }
 
         // Determine the number of latest block hashes to include as block locators (power of two).
@@ -366,7 +373,9 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Check that the block locators are well formed.
-    pub fn check_block_locators(&self, block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>) -> Result<bool> {
+    pub fn check_block_locators(&self, block_locators: BlockLocators<N>) -> Result<bool> {
+        let block_locators = &*block_locators;
+
         // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
         if block_locators.len() > MAXIMUM_BLOCK_LOCATORS as usize {
             return Ok(false);
