@@ -1,0 +1,19 @@
+[package]
+name = "snarkos-wallet"
+version = "2.0.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A wallet for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+    "aleo",
+    "cryptography",
+    "blockchain",
+    "decentralized",
+    "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies]
