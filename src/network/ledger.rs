@@ -393,7 +393,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         trace!("Miner has found the next block");
 
                         // Store coinbase record
-                        wallet.push_record(&block.to_coinbase_transaction().expect("Block should have 1 coinbase transaction"));
+                        wallet
+                            .push_record(
+                                &block.hash(),
+                                &block.to_coinbase_transaction().expect("Block should have 1 coinbase transaction"),
+                            )
+                            .expect("Should be able to push a coinbase record to wallet db");
 
                         // Broadcast the next block.
                         let request = LedgerRequest::UnconfirmedBlock(local_ip, block);

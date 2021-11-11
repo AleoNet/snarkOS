@@ -17,7 +17,6 @@
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
-use rand::Rng;
 use snarkos_ledger::storage::{rocksdb::RocksDB, DataMap, Map, Storage};
 use std::path::PathBuf;
 
@@ -25,12 +24,11 @@ use std::path::PathBuf;
 /// coinbases ever mined to this wallet, regardless of whether they are valid
 /// or not on the current chain.
 ///
-/// The path leading to the file containing all records will be structured as
+/// The path leading to the database containing all records will be structured as
 /// {data_path}/{address}/.
 ///
-/// The database will just store coinbase transactions under random IDs, as we
-/// don't really currently need to index them with anything, and the only operations
-/// we perform are storing single records, or fetching the entire list.
+/// The database will just store coinbase transactions under the block hash that
+/// they belong to.
 #[derive(Clone, Debug)]
 pub struct Wallet<N: Network> {
     /// The address associated with this wallet.
@@ -38,19 +36,18 @@ pub struct Wallet<N: Network> {
     /// A path to a directory containing all coinbase records.
     data_path: String,
     /// The RocksDB containing all records for the given address.
-    db: DataMap<u64, Transaction<N>>,
+    db: DataMap<N::BlockHash, Transaction<N>>,
 }
 
 impl<N: Network> Wallet<N> {
-    /// Creates a new [`Wallet`], and initializes a text file in the resulting
-    /// path, if it doesn't yet exist.
-    pub fn new(address: String, data_path: String) -> Result<Self> {
+    /// Creates a new [`Wallet`].
+    pub fn new(address: String, data_path: String, read_only: bool) -> Result<Self> {
         let path = PathBuf::from(format!("{}/{}/", data_path, address));
 
         Ok(Self {
-            address,
+            address: address.clone(),
             data_path,
-            db: RocksDB::open(path, 0, false)?.open_map(&"wallet")?,
+            db: RocksDB::open(path, 0, read_only)?.open_map(&address)?,
         })
     }
 
@@ -66,8 +63,7 @@ impl<N: Network> Wallet<N> {
     }
 
     /// Push a record to the database.
-    pub fn push_record(&self, t: &Transaction<N>) -> Result<()> {
-        let id = rand::thread_rng().gen::<u64>();
-        self.db.insert(&id, t)
+    pub fn push_record(&self, hash: &N::BlockHash, tx: &Transaction<N>) -> Result<()> {
+        self.db.insert(hash, tx)
     }
 }
