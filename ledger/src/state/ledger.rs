@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{DataMap, Map, Storage};
+use crate::{
+    helpers::BlockLocators,
+    storage::{DataMap, Map, Storage},
+};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -69,7 +72,7 @@ pub struct LedgerState<N: Network> {
     /// The latest block headers of the ledger.
     latest_block_headers: CircularQueue<BlockHeader<N>>,
     /// The block locators from the latest block of the ledger.
-    latest_block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>,
+    latest_block_locators: BlockLocators<N>,
     /// The current ledger tree of block hashes.
     ledger_tree: LedgerTree<N>,
     /// The ledger root corresponding to each block height.
@@ -196,7 +199,7 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Returns the latest block locators.
-    pub fn latest_block_locators(&self) -> Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
+    pub fn latest_block_locators(&self) -> BlockLocators<N> {
         self.latest_block_locators.clone()
     }
 
@@ -311,7 +314,7 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Returns the block locators of the current ledger, from the given block height.
-    pub fn get_block_locators(&self, block_height: u32) -> Result<Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>> {
+    pub fn get_block_locators(&self, block_height: u32) -> Result<BlockLocators<N>> {
         // Initialize the current block height that a block locator is obtained from.
         let mut block_locator_height = block_height;
 
@@ -331,7 +334,7 @@ impl<N: Network> LedgerState<N> {
 
         // Return the block locators if the locator has run out of blocks.
         if block_locator_height == 0 {
-            return Ok(block_locator_headers.collect());
+            return Ok(BlockLocators::<N>::from(block_locator_headers.collect()));
         }
 
         // Determine the number of latest block hashes to include as block locators (power of two).
@@ -341,8 +344,7 @@ impl<N: Network> LedgerState<N> {
         let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
         // Add the block locator hashes.
         while block_locator_height > 0 && block_locator_hashes.len() < num_block_hashes as usize {
-            let block_hash = self.get_block_hash(block_locator_height)?;
-            block_locator_hashes.push((block_locator_height, block_hash, None));
+            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?, None));
 
             // Decrement the block locator height by a power of two.
             block_locator_height /= 2;
@@ -360,7 +362,7 @@ impl<N: Network> LedgerState<N> {
         // Add the genesis locator.
         block_locators.push((0, self.get_block_hash(0)?, None));
 
-        Ok(block_locators)
+        Ok(BlockLocators::<N>::from(block_locators))
     }
 
     /// Check that the block locators are well formed.

@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Environment;
+use snarkos_ledger::BlockLocators;
 use snarkvm::prelude::*;
 
 use ::bytes::{Buf, BytesMut};
@@ -40,8 +41,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerResponse(Vec<SocketAddr>),
     /// Ping := (version)
     Ping(u32),
-    /// Pong := (\[(block_height, block_hash, block_header)\])
-    Pong(Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>),
+    /// Pong := (block_locators)
+    Pong(BlockLocators<N>),
     /// UnconfirmedBlock := (block)
     UnconfirmedBlock(Block<N>),
     /// UnconfirmedTransaction := (transaction)
@@ -141,7 +142,12 @@ impl<N: Network, E: Environment> Message<N, E> {
             },
             6 => Self::PeerResponse(bincode::deserialize(data)?),
             7 => Self::Ping(bincode::deserialize(&data[0..4])?),
-            8 => Self::Pong(bincode::deserialize(data)?),
+            8 => {
+                let timer = std::time::Instant::now();
+                let msg = Self::Pong(bincode::deserialize(data)?);
+                println!("PONG TIME TOOK: {} ms", timer.elapsed().as_millis());
+                msg
+            }
             9 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),

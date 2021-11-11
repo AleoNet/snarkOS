@@ -17,8 +17,8 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "13d0b84", features = ["algorithms"] }
-#snarkvm = { path = "../../snarkVM" }
+#snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "13d0b84", features = ["algorithms"] }
+snarkvm = { path = "../../snarkVM" }
 
 [dependencies.anyhow]
 version = "1"
@@ -40,6 +40,9 @@ version = "0.10"
 
 [dependencies.rand]
 version = "0.8"
+
+[dependencies.rayon]
+version = "1"
 
 [dependencies.rocksdb]
 version = "0.17"

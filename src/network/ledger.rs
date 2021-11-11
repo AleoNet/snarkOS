@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, PeersRouter};
-use snarkos_ledger::{storage::Storage, LedgerState, Metadata, MAXIMUM_LINEAR_BLOCK_LOCATORS};
+use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState, Metadata, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -57,8 +57,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
     /// Ping := (peer_ip)
     Ping(SocketAddr),
-    /// Pong := (peer_ip, \[(block_height, block_hash, block_header)\])
-    Pong(SocketAddr, Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>),
+    /// Pong := (peer_ip, block_locators)
+    Pong(SocketAddr, BlockLocators<N>),
     /// UnconfirmedBlock := (peer_ip, block)
     UnconfirmedBlock(SocketAddr, Block<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
@@ -97,7 +97,7 @@ pub struct Ledger<N: Network, E: Environment> {
     terminator: Arc<AtomicBool>,
 
     /// The map of each peer to their ledger state := (common_ancestor, latest_block_height, block_locators).
-    peers_state: HashMap<SocketAddr, Option<(u32, u32, Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>)>>,
+    peers_state: HashMap<SocketAddr, Option<(u32, u32, BlockLocators<N>)>>,
     /// The map of each peer to their block requests.
     block_requests: HashMap<SocketAddr, HashSet<(u32, Option<N::BlockHash>)>>,
     /// The latest block height requested from a peer.
@@ -190,7 +190,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     /// Returns the latest block locators.
-    pub fn latest_block_locators(&self) -> Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)> {
+    pub fn latest_block_locators(&self) -> BlockLocators<N> {
         self.canon.latest_block_locators()
     }
 
@@ -647,12 +647,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Updates the state of the given peer.
     ///
-    async fn update_peer(
-        &mut self,
-        peer_ip: SocketAddr,
-        block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>,
-        peers_router: &PeersRouter<N, E>,
-    ) {
+    async fn update_peer(&mut self, peer_ip: SocketAddr, block_locators: BlockLocators<N>, peers_router: &PeersRouter<N, E>) {
         // Ensure the list of block locators is not empty.
         if block_locators.len() == 0 {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
@@ -750,7 +745,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut maximal_peer = None;
         let mut maximum_common_ancestor = 0;
         let mut maximum_block_height = self.latest_block_request;
-        let mut maximum_block_locators = vec![];
+        let mut maximum_block_locators = Default::default();
         for (peer_ip, ledger_state) in self.peers_state.iter() {
             if let Some((common_ancestor, block_height, block_locators)) = ledger_state {
                 if *block_height > maximum_block_height {
@@ -769,7 +764,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Determine the common ancestor block height between this ledger and the peer.
                 let mut maximum_common_ancestor = maximum_common_ancestor;
                 // Verify the integrity of the block hashes sent by the peer.
-                for (block_height, block_hash, _) in &maximum_block_locators {
+                for (block_height, block_hash, _) in &*maximum_block_locators {
                     // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
                     if let Ok(expected_block_height) = self.get_block_height(block_hash) {
                         if expected_block_height != *block_height {
@@ -785,10 +780,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         }
                     }
                 }
-
-                /////////////////
-                // Linear case //
-                /////////////////
 
                 // If this ledger is within the fork range of the peer,
                 // and the common ancestor is within the fork range,

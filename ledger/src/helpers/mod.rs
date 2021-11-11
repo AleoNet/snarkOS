@@ -14,13 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate tracing;
-
-mod helpers;
-pub use helpers::BlockLocators;
-
-pub(crate) mod state;
-pub use state::{LedgerState, Metadata, MAXIMUM_BLOCK_LOCATORS, MAXIMUM_LINEAR_BLOCK_LOCATORS, MAXIMUM_QUADRATIC_BLOCK_LOCATORS};
-
-pub mod storage;
+pub mod block_locators;
+pub use block_locators::*;
