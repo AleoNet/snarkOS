@@ -22,6 +22,7 @@ use crate::{
     Environment,
     LedgerRouter,
 };
+use snarkos_ledger::LedgerState;
 use snarkvm::dpc::Network;
 
 use hyper::{
@@ -85,11 +86,11 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,
     password: String,
-    ledger: Arc<RwLock<Ledger<N, E>>>,
+    canon: LedgerState<N>,
     ledger_router: LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, ledger, ledger_router);
+    let rpc_impl = RpcImpl::new(credentials, canon, ledger_router);
 
     let service = make_service_fn(move |_conn| {
         let rpc = rpc_impl.clone();

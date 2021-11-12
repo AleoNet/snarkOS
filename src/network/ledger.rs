@@ -34,7 +34,7 @@ use std::{
 use tokio::{sync::mpsc, task};
 
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
-const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 1024;
+const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 50;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub(crate) type LedgerRouter<N, E> = mpsc::Sender<LedgerRequest<N, E>>;
@@ -160,7 +160,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     /// Returns the latest block.
-    pub fn latest_block(&self) -> &Block<N> {
+    pub fn latest_block(&self) -> Block<N> {
         self.canon.latest_block()
     }
 
@@ -185,12 +185,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     /// Returns the latest block header.
-    pub fn latest_block_header(&self) -> &BlockHeader<N> {
+    pub fn latest_block_header(&self) -> BlockHeader<N> {
         self.canon.latest_block_header()
     }
 
     /// Returns the transactions from the latest block.
-    pub fn latest_block_transactions(&self) -> &Transactions<N> {
+    pub fn latest_block_transactions(&self) -> Transactions<N> {
         self.canon.latest_block_transactions()
     }
 
@@ -424,7 +424,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     fn update_ledger(&mut self) {
         // Check for candidate blocks to fast forward the ledger.
-        let mut block = self.latest_block();
+        let mut block = &self.latest_block();
         let unconfirmed_blocks = self.unconfirmed_blocks.clone();
         while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.hash()) {
             // Update the block iterator.
@@ -577,8 +577,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     self.memory_pool.remove_transactions(transactions);
 
                     let block_hash = block.hash();
-                    if self.memory_pool.contains_block_hash(&block_hash) {
-                        self.memory_pool.remove_block(&block_hash);
+                    if self.unconfirmed_blocks.contains_key(&block_hash) {
+                        self.unconfirmed_blocks.remove(&block_hash);
                     }
                 }
                 Err(error) => {
@@ -827,7 +827,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     && maximum_block_height.saturating_sub(maximum_common_ancestor) <= MAXIMUM_LINEAR_BLOCK_LOCATORS
                     && latest_block_height.saturating_sub(maximum_common_ancestor) > 0
                 {
-                    info!("Found a longer fork, rolling ledger back to block {}", maximum_common_ancestor);
+                    info!("Found a longer chain, rolling ledger back to block {}", maximum_common_ancestor);
 
                     // Set the terminator bit to `true` to ensure it does not mine.
                     self.terminator.store(true, Ordering::SeqCst);

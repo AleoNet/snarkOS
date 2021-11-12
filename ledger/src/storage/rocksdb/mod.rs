@@ -67,7 +67,6 @@ impl Storage for RocksDB {
                 let reader = path.as_ref().join("reader").to_path_buf();
                 // Open a secondary reader for the primary rocksdb.
                 let rocksdb = rocksdb::DB::open_as_secondary(&rocksdb::Options::default(), primary, reader)?;
-                rocksdb.try_catch_up_with_primary()?;
                 Arc::new(rocksdb)
             }
             false => Arc::new(rocksdb::DB::open_default(path)?),

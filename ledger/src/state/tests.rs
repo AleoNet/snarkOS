@@ -50,7 +50,7 @@ fn test_genesis() {
     assert_eq!(genesis.hash(), ledger.latest_block_hash());
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
-    assert_eq!(genesis, ledger.latest_block());
+    assert_eq!(genesis, &ledger.latest_block());
     assert_eq!(vec![(genesis.height(), genesis.hash(), None)], *ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
@@ -85,7 +85,7 @@ fn test_add_next_block() {
     assert_eq!(block.hash(), ledger.latest_block_hash());
     assert_eq!(block.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(block.difficulty_target(), ledger.latest_block_difficulty_target());
-    assert_eq!(block, ledger.latest_block().clone());
+    assert_eq!(block, ledger.latest_block());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 
     // Retrieve the genesis block.
@@ -135,7 +135,7 @@ fn test_remove_last_block() {
     assert_eq!(genesis.hash(), ledger.latest_block_hash());
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
-    assert_eq!(genesis, ledger.latest_block());
+    assert_eq!(genesis, &ledger.latest_block());
     assert_eq!(vec![(genesis.height(), genesis.hash(), None)], *ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }
@@ -182,7 +182,7 @@ fn test_remove_last_2_blocks() {
     assert_eq!(genesis.hash(), ledger.latest_block_hash());
     assert_eq!(genesis.timestamp(), ledger.latest_block_timestamp());
     assert_eq!(genesis.difficulty_target(), ledger.latest_block_difficulty_target());
-    assert_eq!(genesis, ledger.latest_block());
+    assert_eq!(genesis, &ledger.latest_block());
     assert_eq!(vec![(genesis.height(), genesis.hash(), None)], *ledger.latest_block_locators());
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 }

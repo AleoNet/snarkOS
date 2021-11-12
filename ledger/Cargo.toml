@@ -38,6 +38,9 @@ version = "0.2"
 [dependencies.itertools]
 version = "0.10"
 
+[dependencies.parking_lot]
+version = "0.11"
+
 [dependencies.rand]
 version = "0.8"
 

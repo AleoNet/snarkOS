@@ -22,7 +22,7 @@ use crate::{
     Environment,
     NodeType,
 };
-use snarkos_ledger::storage::rocksdb::RocksDB;
+use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
@@ -89,12 +89,14 @@ impl<N: Network, E: Environment> Server<N, E> {
             peers_router.send(message).await?;
         }
 
+        tokio::time::sleep(Duration::from_secs(3)).await;
+
         // Initialize a new instance of the RPC server.
         tasks.append(initialize_rpc_server::<N, E>(
             format!("0.0.0.0:{}", rpc_port).parse()?,
             username,
             password,
-            ledger.clone(),
+            LedgerState::open::<RocksDB, _>(&storage_path, true)?,
             ledger_router,
         ));
 

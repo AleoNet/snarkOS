@@ -48,6 +48,7 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
+        // If the storage is in read-only mode, catch it up to its writable storage.
         if self.is_read_only {
             self.rocksdb.try_catch_up_with_primary()?;
         }

@@ -37,17 +37,19 @@ use std::ops::Deref;
 /// The current format of block locators is \[(block_height, block_hash, block_header)\].
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BlockLocators<N: Network>(Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>);
+pub struct BlockLocators<N: Network> {
+    block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>,
+}
 
 impl<N: Network> BlockLocators<N> {
     #[inline]
     pub fn from(block_locators: Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>) -> Self {
-        Self(block_locators)
+        Self { block_locators }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.block_locators.len()
     }
 }
 
@@ -87,16 +89,16 @@ impl<N: Network> FromBytes for BlockLocators<N> {
             }
         }
 
-        Ok(Self(block_locators))
+        Ok(Self::from(block_locators))
     }
 }
 
 impl<N: Network> ToBytes for BlockLocators<N> {
     #[inline]
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        (self.0.len() as u32).write_le(&mut writer)?;
+        (self.block_locators.len() as u32).write_le(&mut writer)?;
 
-        for (height, hash, header) in &self.0 {
+        for (height, hash, header) in &self.block_locators {
             height.write_le(&mut writer)?;
             hash.write_le(&mut writer)?;
             match header {
@@ -130,7 +132,7 @@ impl<N: Network> Serialize for BlockLocators<N> {
         match serializer.is_human_readable() {
             true => {
                 let mut block_locators = serializer.serialize_struct("BlockLocators", 1)?;
-                block_locators.serialize_field("block_locators", &self.0)?;
+                block_locators.serialize_field("block_locators", &self.block_locators)?;
                 block_locators.end()
             }
             false => ToBytesSerializer::serialize_with_size_encoding(self, serializer),
@@ -154,7 +156,7 @@ impl<'de, N: Network> Deserialize<'de> for BlockLocators<N> {
 impl<N: Network> Default for BlockLocators<N> {
     #[inline]
     fn default() -> Self {
-        Self(vec![])
+        Self::from(vec![])
     }
 }
 
@@ -162,7 +164,7 @@ impl<N: Network> Deref for BlockLocators<N> {
     type Target = Vec<(u32, N::BlockHash, Option<BlockHeader<N>>)>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.block_locators
     }
 }
 
