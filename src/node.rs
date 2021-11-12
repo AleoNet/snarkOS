@@ -112,7 +112,9 @@ impl Node {
         // Filter out undesirable logs.
         let filter = EnvFilter::from_default_env()
             .add_directive("mio=off".parse().unwrap())
-            .add_directive("tokio_util=off".parse().unwrap());
+            .add_directive("tokio_util=off".parse().unwrap())
+            .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
+            .add_directive("hyper::proto::h1::io=off".parse().unwrap());
 
         // Initialize tracing.
         tracing_subscriber::fmt()
