@@ -176,6 +176,15 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     true => trace!("Sending request for more peer connections"),
                     false => return,
                 };
+
+                // Add the sync nodes to the list of candidate peers.
+                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+                self.add_candidate_peers(&sync_nodes);
+
+                // Add the peer nodes to the list of candidate peers.
+                let peer_nodes: Vec<SocketAddr> = E::PEER_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+                self.add_candidate_peers(&peer_nodes);
+
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
                     trace!("Attempting connection to {}...", peer_ip);
