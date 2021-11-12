@@ -19,7 +19,7 @@ do
   git pull
 
   echo "Running the node..."
-  $COMMAND & sleep 3600; kill $!
+  $COMMAND & sleep 1800; kill $!
 
   sleep 2;
 done
