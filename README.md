@@ -2,178 +2,21 @@
     <img alt="snarkOS" width="1412" src="https://cdn.aleo.org/snarkos/banner.png">
 </p>
 
-<p align="center">
-    <a href="https://circleci.com/gh/AleoHQ/snarkOS"><img src="https://circleci.com/gh/AleoHQ/snarkOS.svg?style=svg&circle-token=6e9ad6d39d95350544f352d34e0e5c62ef54db26"></a>
-    <a href="https://codecov.io/gh/AleoHQ/snarkOS"><img src="https://codecov.io/gh/AleoHQ/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
-    <a href="https://discord.gg/5v2ynrw2ds"><img src="https://img.shields.io/discord/700454073459015690?logo=discord"/></a>
-</p>
+## Development Guide
 
-## <a name='TableofContents'></a>Table of Contents
-
-* [1. Overview](#1-overview)
-* [2. Quick Start](#2-quick-start)
-    * [Option 1 - Download snarkOS](#option-1---download-snarkos)
-    * [Option 2 - Install from Crates.io](#option-2---install-from-cratesio)
-    * [Option 3 - Build from Source Code](#option-3---build-from-source-code)
-    * [Option 4 - Build from Source Code and run on a Docker container](#option-4---build-from-source-code-and-run-ib-a-Docker-container)
-* [3. Usage Guide](#3-usage-guide)
-    * [3.1 Connecting to the Aleo Network](#31-connecting-to-the-aleo-network)
-    * [3.2 Command Line Interface](#32-command-line-interface)
-    * [3.3 Configuration File](#33-configuration-file)
-* [4. JSON-RPC Interface](#4-json-rpc-interface)
-* [5. Additional Information](#5-additional-information)
-* [6. License](#6-license)
-
-## 1. Overview
-
-__snarkOS__ is a decentralized operating system for private applications. It forms the backbone of [Aleo](https://aleo.org/) and
-enables applications to verify and store state in a publicly verifiable manner.
-
-## 2. Quick Start
-
-### Option 1 - Download snarkOS
-
-#### Step 1. Download the executable
-
-| [![[]][mac_logo]][mac_dl]    | [![[]][linux_logo]][linux_dl]   | ![[]][windows_logo]   |
-|:----------------------------:|:-------------------------------:|:---------------------:|
-| [![[]][mac_badge]][mac_dl]   | [![[]][linux_badge]][linux_dl]  | ![[]][windows_badge]  |
-
-[mac_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/mac-pass-sm.png
-[mac_badge]: https://img.shields.io/badge/download-testnet1_for_mac-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[0].name&style=for-the-badge
-[mac_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.14/aleo-testnet1-v1.3.14-x86_64-apple-darwin.zip
-
-[linux_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/linux-pass-sm.png
-[linux_badge]: https://img.shields.io/badge/download-testnet1_for_linux-blue?url=https%3A%2F%2Fapi.github.com%2Frepos%2Faleohq%2Fsnarkos%2Freleases%2Flatest&query=%24.assets[1].name&style=for-the-badge
-[linux_dl]: https://github.com/AleoHQ/snarkOS/releases/download/v1.3.14/aleo-testnet1-v1.3.14-x86_64-unknown-linux-gnu.zip
-
-[windows_logo]: https://raw.githubusercontent.com/wiki/ryanoasis/nerd-fonts/screenshots/v1.0.x/windows-pass-sm.png
-[windows_badge]: https://img.shields.io/badge/download-coming_soon-orange?style=for-the-badge
-
-#### Step 2. Install the executable
-
-##### macOS or Linux
-
-Unzip the package and in terminal, `cd` into the unzipped folder and run:
+In one terminal, start the first node by running:
 ```
-mv snarkos /usr/local/bin
+cargo run --release -- --node 4135 --rpc 3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
 ```
 
-##### Windows
-
+After the first node starts, in a second terminal, run:
 ```
-Coming Soon
-```
-
-#### Step 3. Start snarkOS
-
-To start a snarkOS client node, run:
-```bash
-snarkos
+cargo run --release
 ```
 
-### Option 2 - Install from Crates.io
+## Usage Guide
 
-#### Prerequisite
-
-For **Ubuntu** users, start by installing the following dependencies. 
-```
-$sudo apt-get install -y pkg-config clang libssl-dev
-```
-
-#### Step 1. Install Rust
-
-We recommend installing Rust using [rustup](https://www.rustup.rs/). You can install `rustup` as follows:
-
-##### macOS or Linux
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-##### Windows
-
-Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
-and follow the on-screen instructions.
-
-#### Step 2. Install from Crates.io
-
-In your terminal, run:
-
-```bash
-cargo install snarkos
-```
-
-#### Step 3. Start snarkOS
-
-To start a snarkOS client node, run:
-```bash
-snarkos
-```
-
-### Option 3 - Build from Source Code
-
-#### Step 1. Install Rust
-
-We recommend installing Rust using [rustup](https://www.rustup.rs/). You can install `rustup` as follows:
-
-##### macOS or Linux
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-##### Windows
-
-Download the [Windows 64-bit executable](https://win.rustup.rs/x86_64) or [Windows 32-bit executable](https://win.rustup.rs/i686)
-and follow the on-screen instructions.
-
-#### Step 2. Build from Source Code
-
-Start by cloning this repository:
-```bash
-git clone https://github.com/AleoHQ/snarkOS --depth 1
-```
-
-Next, compile and install snarkOS:
-```bash
-cargo install --path . --locked
-```
-
-#### Step 3. Start snarkOS
-
-To start a snarkOS client node, run:
-```bash
-snarkos
-```
-
-### Option 4 - Build from Source Code and run on a Docker container
-
-
-Start by cloning this repository:
-```bash
-git clone https://github.com/AleoHQ/snarkOS --depth 1
-```
-
-Then install Docker and build the container:
-
-#### Docker build
-```bash
-docker build --rm -t aleohq/snarkos:latest .
-```
-
-#### Docker run
-``` bash
-docker run -d -p 4131:4131 --name snarkos aleohq/snarkos:latest
-```
-
-#### Devnet (local) 
-
-```bash
-docker-compose -p snarkos up -d
-```
-
-## 3. Usage Guide
-
-### 3.1 Connecting to Aleo Testnet I
+### Connecting to Aleo Testnet II
 
 To start a client node, run:
 ```
@@ -182,69 +25,33 @@ snarkos
 
 To start a mining node, run:
 ```
-snarkos --is-miner --miner-address {ALEO_ADDRESS}
+snarkos --miner {ALEO_ADDRESS}
 ```
 
 To run a node with custom settings, refer to the full list of options and flags available in the CLI.
 
-### 3.2 Command Line Interface
+### Command Line Interface
 
 Full list of CLI flags and options can be viewed with `snarkos --help`:
 
 ```
-snarkOS <version>
-Run an Aleo node (include -h for more options)
+snarkos
+The Aleo Team <hello@aleo.org>
 
 USAGE:
     snarkos [FLAGS] [OPTIONS]
 
 FLAGS:
-    -h, --help           Prints help information
-        --is-miner       Start mining blocks from this node
-        --no-jsonrpc     Run the node without running the json rpc server
+        --display    If the flag is set, the node will render a read-only display
+    -h, --help       Prints help information
+    -V, --version    Prints version information
 
 OPTIONS:
-        --connect <ip>                           Specify one or more node ip addresses to connect to on startup
-    -i, --ip <ip>                                Specify the ip of your node
-        --max-peers <max-peers>                  Specify the maximum number of peers the node can connect to
-        --mempool-interval <mempool-interval>    Specify the frequency in seconds the node should fetch a sync node's mempool
-        --min-peers <min-peers>                  Specify the minimum number of peers the node should connect to
-        --miner-address <miner-address>          Specify the address that will receive miner rewards
-        --network <network-id>                   Specify the network id (default = 1) of the node
-    -d, --path <path>                            Specify the node's storage path
-    -p, --port <port>                            Specify the port the node is run on
-        --rpc-password <rpc-password>            Specify a password for rpc authentication
-        --rpc-port <rpc-port>                    Specify the port the json rpc server is run on
-        --rpc-username <rpc-username>            Specify a username for rpc authentication
-        --verbose <verbose>                      Specify the verbosity (default = 1) of the node [possible values: 0, 1, 2, 3]
+        --miner <miner>              Specify this as a mining node, with the given miner address
+    -n, --network <network>          Specify the network of this node [default: 2]
+        --node <node>                Specify the port for the node server
+        --rpc <rpc>                  Specify the port for the RPC server
+        --username <rpc-username>    Specify the username for the RPC server [default: root]
+        --password <rpc-password>    Specify the password for the RPC server [default: pass]
+        --verbosity <verbosity>      Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 3]
 ```
-
-#### Examples
-
-##### Guard RPC endpoints
-```
-snarkos --rpc-username <Username> --rpc-password <Password>
-```
-
-##### Manually connect to a peer on the network
-```
-snarkos --connect "<IP ADDRESS>"
-```
-
-### 3.3 Configuration File
-
-A `config.toml` file is generated in the `~/.snarkOS/` directory when the node is initialized for the time.
-Updating this `config.toml` file allows node operators to specify default settings for the node without
-having to specify additional information in the CLI.
-
-## 4. JSON-RPC Interface
-
-By default, snarkOS launches a JSON-RPC server to allow external interfacing with the Aleo network. Documentation of the RPC endpoints can be found [here](rpc/README.md)
-
-## 5. Additional Information
-
-For additional information, please refer to the official [Aleo documentation page](https://developer.aleo.org/aleo/getting_started/overview/).
-
-## 6. License
-
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)

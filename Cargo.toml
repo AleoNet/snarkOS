@@ -1,162 +1,121 @@
 [package]
 name = "snarkos"
-version = "1.3.16"
+version = "2.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
-  "aleo",
-  "cryptography",
-  "blockchain",
-  "decentralized",
-  "zero-knowledge"
+    "aleo",
+    "cryptography",
+    "blockchain",
+    "decentralized",
+    "zero-knowledge"
 ]
-categories = [ "cryptography::cryptocurrencies", "operating-systems" ]
-include = [
-  "Cargo.toml",
-  "snarkos",
-  "README.md",
-  "LICENSE.md",
-  "build.rs",
-  "bin/"
-]
+categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
-default-run = "snarkos"
 
 [workspace]
-members = [
-  "benchmarks",
-  "consensus",
-  "metrics",
-  "network",
-  "profiler",
-  "rpc",
-  "storage",
-  "testing"
-]
+members = ["ledger"]
 
-[lib]
-path = "snarkos/lib.rs"
+[dependencies]
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
+#snarkvm = { path = "../snarkVM", features = ["parameters"] }
 
-[[bin]]
-name = "snarkos"
-path = "bin/snarkos.rs"
+futures = { version = "0.3.0", features = ["thread-pool"]}
+bytes = "1.0.0"
 
-[[bin]]
-name = "crawler"
-path = "bin/crawler.rs"
+crossterm = { version = "0.22" }
+tui = { version = "0.16.0", features = ["crossterm"] }
 
-[[bin]]
-name = "beacon"
-path = "bin/beacon.rs"
-
-[[bin]]
-name = "sync_provider"
-path = "bin/sync_provider.rs"
-
-[dependencies.snarkvm-algorithms]
-version = "=0.7.9"
-default-features = false
-
-[dependencies.snarkvm-dpc]
-version = "=0.7.9"
-
-[dependencies.snarkvm-posw]
-version = "=0.7.9"
-
-[dependencies.snarkvm-utilities]
-version = "=0.7.9"
-
-[dependencies.snarkvm-parameters]
-version = "=0.7.9"
-
-[dependencies.snarkos-consensus]
-path = "./consensus"
-version = "1.3.16"
-
-[dependencies.snarkos-network]
-path = "./network"
-version = "1.3.16"
-
-[dependencies.snarkos-rpc]
-path = "./rpc"
-version = "1.3.16"
-
-[dependencies.snarkos-storage]
-path = "./storage"
-features = [ "rocksdb_storage" ]
-version = "1.3.16"
+[dependencies.snarkos-ledger]
+path = "./ledger"
+version = "2.0.0"
 
 [dependencies.anyhow]
+version = "1"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.bincode]
 version = "1.0"
 
-[dependencies.rayon]
-version = "1.5"
+[dependencies.chrono]
+version = "0.4"
+default-features = false
+features = [ "clock", "serde" ]
 
-[dependencies.clap]
-version = "2.33.3"
+[dependencies.circular-queue]
+version = "0.2"
 
 [dependencies.colored]
 version = "2.0"
 
-[dependencies.dirs]
-version = "4.0"
-
 [dependencies.hex]
-version = "0.4.1"
+version = "0.4"
 
-[dependencies.num_cpus]
+[dependencies.hyper]
+version = "0.14"
+features = [ "http1", "runtime", "server", "tcp" ]
+
+[dependencies.json-rpc-types]
+version = "1.0.1"
+
+[dependencies.jsonrpc-core]
+version = "18"
+
+[dependencies.once_cell]
 version = "1"
 
 [dependencies.parking_lot]
-version = "0.11.1"
+version = "0.11"
 
 [dependencies.rand]
 version = "0.8"
 
-[dependencies.self_update]
-version = "0.27.0"
-features = [
-  "archive-zip",
-  "compression-zip-bzip2",
-  "compression-zip-deflate",
-  "compression-flate2"
-]
-
 [dependencies.serde]
-version = "1.0"
-features = [ "derive" ]
+version = "1"
+
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.structopt]
+version = "0.3"
 
 [dependencies.thiserror]
 version = "1.0"
 
 [dependencies.tokio]
 version = "1"
-features = [ "parking_lot", "rt-multi-thread", "macros", "net" ]
+features = [
+    "io-util",
+    "macros",
+    "net",
+    "rt-multi-thread",
+    "sync",
+    "time"
+]
 
-[dependencies.toml]
-version = "0.5.6"
+[dependencies.tokio-util]
+version = "=0.6.8"
+features = ["codec"]
+
+[dependencies.tokio-stream]
+version = "=0.1"
 
 [dependencies.tracing]
-default-features = false
-features = [ "log" ]
 version = "0.1"
 
 [dependencies.tracing-subscriber]
 version = "0.2"
 
-[build-dependencies.capnpc]
-version = "0.14"
-optional = true
+[dev-dependencies.rand_chacha]
+version = "0.3.1"
 
-[features]
-default = [ ]
-prometheus = [ "snarkos-network/prometheus" ]
-compile_capnp_schema = [ "capnpc" ]
-noconfig = [ ]
-cuda = [ "snarkvm-algorithms/cuda" ]
+[dev-dependencies.tempfile]
+version = "3.2"
 
 [profile.release]
 opt-level = 3
@@ -172,12 +131,13 @@ incremental = true
 debug-assertions = false
 
 [profile.dev]
-opt-level = 0
+opt-level = 3
+lto = "thin"
 incremental = true
 
 [profile.test]
 opt-level = 3
 lto = "thin"
 incremental = true
-debug-assertions = true
 debug = true
+debug-assertions = true
