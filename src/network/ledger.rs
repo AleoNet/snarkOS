@@ -441,7 +441,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             trace!("Ledger state has become stale, clearing queue and rolling back");
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
-            self.block_requests = Default::default();
+            self.block_requests.values_mut().for_each(|requests| *requests = Default::default());
             self.remove_last_blocks(1);
             self.last_block_increment_timestamp = Instant::now();
         }
