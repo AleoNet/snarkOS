@@ -39,7 +39,13 @@ use serde::{
     Serialize,
     Serializer,
 };
-use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
+use std::{
+    borrow::Borrow,
+    fmt,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 ///
 /// An instance of a RocksDB database.
@@ -47,6 +53,7 @@ use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
 #[derive(Clone)]
 pub struct RocksDB {
     rocksdb: Arc<rocksdb::DB>,
+    path: PathBuf,
     context: Vec<u8>,
     is_read_only: bool,
 }
@@ -60,20 +67,21 @@ impl Storage for RocksDB {
         let mut context_bytes = bincode::serialize(&(context.len() as u32)).unwrap();
         context_bytes.extend_from_slice(&context);
 
+        let primary = path.as_ref().to_path_buf();
         let rocksdb = match is_read_only {
             true => {
                 // Construct the directory paths.
-                let primary = path.as_ref().to_path_buf();
-                let reader = path.as_ref().join("reader").to_path_buf();
+                let reader = &path.as_ref().join("reader").to_path_buf();
                 // Open a secondary reader for the primary rocksdb.
-                let rocksdb = rocksdb::DB::open_as_secondary(&rocksdb::Options::default(), primary, reader)?;
+                let rocksdb = rocksdb::DB::open_as_secondary(&rocksdb::Options::default(), &primary, reader)?;
                 Arc::new(rocksdb)
             }
-            false => Arc::new(rocksdb::DB::open_default(path)?),
+            false => Arc::new(rocksdb::DB::open_default(&primary)?),
         };
 
         Ok(RocksDB {
             rocksdb,
+            path: primary,
             context: context_bytes,
             is_read_only,
         })

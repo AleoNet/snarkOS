@@ -171,35 +171,34 @@ impl<N: Network> LedgerState<N> {
             thread::spawn(move || {
                 let last_seen_block_height = ledger.read_only.1.clone();
                 loop {
-                    // This method ensures the genesis block exists, and catches up storage when using RocksDB.
-                    if let Ok(true) = ledger.contains_block_height(0) {
-                        // After catching up the reader, determine the latest block height.
-                        if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
-                            // If there is a mismatch in the block height, proceed to update latest state.
-                            let current_block_height = last_seen_block_height.load(Ordering::SeqCst);
-                            if current_block_height != latest_block_height {
-                                trace!(
-                                    "[Read-Only] Updating ledger state from block {} to {}",
-                                    current_block_height,
-                                    latest_block_height
-                                );
+                    // Refresh the ledger storage state.
+                    ledger.ledger_roots.refresh();
+                    // After catching up the reader, determine the latest block height.
+                    if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
+                        // If there is a mismatch in the block height, proceed to update latest state.
+                        let current_block_height = last_seen_block_height.load(Ordering::SeqCst);
+                        if current_block_height != latest_block_height {
+                            trace!(
+                                "[Read-Only] Updating ledger state from block {} to {}",
+                                current_block_height,
+                                latest_block_height
+                            );
 
-                                // Update the latest ledger state.
-                                match ledger.get_block(latest_block_height) {
-                                    Ok(block) => *ledger.latest_block.write() = block,
-                                    Err(error) => warn!("[Read-Only] {}", error),
-                                };
-                                // Regenerate the ledger tree.
-                                if let Err(error) = ledger.regenerate_ledger_tree() {
-                                    warn!("[Read-Only] {}", error);
-                                };
-                                // Regenerate the latest ledger state.
-                                if let Err(error) = ledger.regenerate_latest_ledger_state() {
-                                    warn!("[Read-Only] {}", error);
-                                };
-                                // Update the last seen block height.
-                                last_seen_block_height.store(latest_block_height, Ordering::SeqCst);
-                            }
+                            // Update the latest ledger state.
+                            match ledger.get_block(latest_block_height) {
+                                Ok(block) => *ledger.latest_block.write() = block,
+                                Err(error) => warn!("[Read-Only] {}", error),
+                            };
+                            // Regenerate the ledger tree.
+                            if let Err(error) = ledger.regenerate_ledger_tree() {
+                                warn!("[Read-Only] {}", error);
+                            };
+                            // Regenerate the latest ledger state.
+                            if let Err(error) = ledger.regenerate_latest_ledger_state() {
+                                warn!("[Read-Only] {}", error);
+                            };
+                            // Update the last seen block height.
+                            last_seen_block_height.store(latest_block_height, Ordering::SeqCst);
                         }
                     }
                     thread::sleep(std::time::Duration::from_secs(5));
@@ -435,13 +434,13 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Check that the block locators are well formed.
-    pub fn check_block_locators(&self, block_locators: BlockLocators<N>) -> Result<bool> {
-        let block_locators = &*block_locators;
-
+    pub fn check_block_locators(&self, block_locators: &BlockLocators<N>) -> Result<bool> {
         // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
         if block_locators.len() > MAXIMUM_BLOCK_LOCATORS as usize {
             return Ok(false);
         }
+
+        let block_locators = &**block_locators;
 
         // Check that the last block locator is the genesis locator.
         let (expected_height, expected_genesis_block_hash, expected_genesis_header) = &block_locators[block_locators.len() - 1];
@@ -453,18 +452,52 @@ impl<N: Network> LedgerState<N> {
         let remaining_block_locators = &block_locators[..block_locators.len() - 1];
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, remaining_block_locators.len());
 
+        {
+            // // Ensure the peer provided the genesis block locator, and that the genesis block hash is correct.
+            // match block_locators.get(&0) {
+            //     Some((genesis_block_hash, _)) => {
+            //         if *genesis_block_hash != N::genesis_block().hash() {
+            //             warn!("Incorrect genesis block locator from {}", peer_ip);
+            //             self.add_failure(peer_ip, "Incorrect genesis block locator".to_string());
+            //             return;
+            //         }
+            //     }
+            //     None => {
+            //         warn!("Missing genesis block locator from {}", peer_ip);
+            //         self.add_failure(peer_ip, "Missing genesis block locator".to_string());
+            //         return;
+            //     }
+            // };
+        }
+
         // Check that the block headers are formed correctly (linear).
+        // let mut last_block_height = remaining_block_locators[0].0 + 1;
         for (block_height, block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
+            // // Check that the block height is decrementing.
+            // match last_block_height == *block_height + 1 {
+            //     true => last_block_height = *block_height,
+            //     false => return Ok(false)
+            // }
+
             // Check that the block header is present.
             let block_header = match block_header {
                 Some(header) => header,
                 None => return Ok(false),
             };
 
-            // Check that the expected block hash and block headers are correct.
-            if &self.get_block_hash(*block_height)? != block_hash || &self.get_block_header(*block_height)? != block_header {
-                return Ok(false);
-            }
+            // // Check that the expected block hash is correct.
+            // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
+            //     if &expected_block_hash != block_hash {
+            //         return Ok(false);
+            //     }
+            // }
+            //
+            // // Check that the expected block headers is correct.
+            // if let Ok(expected_block_header) = self.get_block_header(*block_height) {
+            //     if &expected_block_header != block_header {
+            //         return Ok(false);
+            //     }
+            // }
         }
 
         // Check that the block hashes are formed correctly (power of two).
@@ -482,10 +515,12 @@ impl<N: Network> LedgerState<N> {
                     return Ok(false);
                 }
 
-                // Check that the expected block hash is correct.
-                if &self.get_block_hash(*block_height)? != block_hash {
-                    return Ok(false);
-                }
+                // // Check that the expected block hash is correct.
+                // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
+                //     if &expected_block_hash != block_hash {
+                //         return Ok(false);
+                //     }
+                // }
 
                 previous_block_height = *block_height;
             }

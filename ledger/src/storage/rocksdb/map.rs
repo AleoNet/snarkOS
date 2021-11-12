@@ -48,11 +48,6 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
-        // If the storage is in read-only mode, catch it up to its writable storage.
-        if self.is_read_only {
-            self.rocksdb.try_catch_up_with_primary()?;
-        }
-
         let mut key_buf = self.context.clone();
         key_buf.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut key_buf, &key)?;
@@ -123,5 +118,17 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         db_iter.seek(&self.context);
 
         Values::new(db_iter, self.context.clone())
+    }
+
+    ///
+    /// Performs a refresh operation for implementations of `Map` that perform periodic operations.
+    /// This method is implemented here for RocksDB to catch up a reader (secondary) database.
+    ///
+    fn refresh(&self) -> Result<()> {
+        // If the storage is in read-only mode, catch it up to its writable storage.
+        if self.is_read_only {
+            self.rocksdb.try_catch_up_with_primary()?;
+        }
+        Ok(())
     }
 }

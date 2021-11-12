@@ -688,26 +688,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         if block_locators.len() == 0 {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
         } else {
-            // Sort the block locators into a map.
-            // TODO (howardwu): Clean this up by unifying them into one design.
-            let original_locators = block_locators.clone();
-            let block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
-                block_locators.iter().cloned().map(|(a, b, c)| (a, (b, c))).collect();
-
-            // Ensure the peer provided the genesis block locator, and that the genesis block hash is correct.
-            match block_locators.get(&0) {
-                Some((genesis_block_hash, _)) => {
-                    if *genesis_block_hash != N::genesis_block().hash() {
-                        warn!("Incorrect genesis block locator from {}", peer_ip);
-                        self.add_failure(peer_ip, "Incorrect genesis block locator".to_string());
+            // Ensure the peer provided well-formed block locators.
+            match self.canon.check_block_locators(&block_locators) {
+                Ok(is_valid) => {
+                    if !is_valid {
+                        warn!("Invalid block locators from {}", peer_ip);
+                        self.add_failure(peer_ip, "Invalid block locators".to_string());
                         return;
                     }
                 }
-                None => {
-                    warn!("Missing genesis block locator from {}", peer_ip);
-                    self.add_failure(peer_ip, "Missing genesis block locator".to_string());
-                    return;
-                }
+                Err(error) => warn!("Error checking block locators: {}", error),
             };
 
             // Determine the common ancestor block height between this ledger and the peer.
@@ -716,7 +706,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let mut latest_block_height_of_peer = 0;
 
             // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, (block_hash, _)) in &block_locators {
+            for (block_height, block_hash, _) in block_locators.iter() {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
                 if let Ok(expected_block_height) = self.get_block_height(block_hash) {
                     if expected_block_height != *block_height {
@@ -761,7 +751,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             } else {
                 match self.peers_state.get_mut(&peer_ip) {
-                    Some(status) => *status = Some((common_ancestor, latest_block_height_of_peer, original_locators)),
+                    Some(status) => *status = Some((common_ancestor, latest_block_height_of_peer, block_locators)),
                     None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)),
                 };
             }

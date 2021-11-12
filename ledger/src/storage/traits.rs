@@ -95,4 +95,12 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
     /// Returns an iterator over each value in the map.
     ///
     fn values(&'a self) -> Self::Values;
+
+    ///
+    /// Performs a refresh operation for implementations of `Map` that perform periodic operations.
+    ///
+    fn refresh(&self) -> Result<()> {
+        // Currently, this method is implemented for RocksDB to catch up a reader (secondary) database.
+        Ok(())
+    }
 }
