@@ -80,7 +80,10 @@ impl Storage for RocksDB {
                 let rocksdb = rocksdb::DB::open_as_secondary(&options, &primary, reader)?;
                 Arc::new(rocksdb)
             }
-            false => Arc::new(rocksdb::DB::open(&options, &primary)?),
+            false => {
+                options.create_if_missing(true);
+                Arc::new(rocksdb::DB::open(&options, &primary)?)
+            }
         };
 
         Ok(RocksDB {
