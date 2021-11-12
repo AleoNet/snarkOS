@@ -115,6 +115,8 @@ async fn handle_rpc<N: Network, E: Environment>(
         .map(|h| h.to_str().unwrap_or("").to_owned());
     let meta = Meta { auth };
 
+    trace!("RPC {:?}", req.headers());
+
     // Ready the body of the request
     let mut body = req.into_body();
     let data = match body.data().await {
