@@ -450,24 +450,6 @@ impl<N: Network> LedgerState<N> {
         let remaining_block_locators = &block_locators[..block_locators.len() - 1];
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, remaining_block_locators.len());
 
-        {
-            // // Ensure the peer provided the genesis block locator, and that the genesis block hash is correct.
-            // match block_locators.get(&0) {
-            //     Some((genesis_block_hash, _)) => {
-            //         if *genesis_block_hash != N::genesis_block().hash() {
-            //             warn!("Incorrect genesis block locator from {}", peer_ip);
-            //             self.add_failure(peer_ip, "Incorrect genesis block locator".to_string());
-            //             return;
-            //         }
-            //     }
-            //     None => {
-            //         warn!("Missing genesis block locator from {}", peer_ip);
-            //         self.add_failure(peer_ip, "Missing genesis block locator".to_string());
-            //         return;
-            //     }
-            // };
-        }
-
         // Check that the block headers are formed correctly (linear).
         // let mut last_block_height = remaining_block_locators[0].0 + 1;
         for (_block_height, _block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
