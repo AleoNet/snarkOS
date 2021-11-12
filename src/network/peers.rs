@@ -272,7 +272,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     self.connected_peers.remove(&peer);
                 }
             }
-            None => error!("Attempted to send to a non-connected peer {}", peer),
+            None => warn!("Attempted to send to a non-connected peer {}", peer),
         }
     }
 
