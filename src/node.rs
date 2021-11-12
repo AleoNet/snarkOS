@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{network::Server, Client, Display, Environment, Miner, NodeType};
+use crate::{network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType};
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
     prelude::*,
@@ -62,9 +62,11 @@ pub struct Node {
 impl Node {
     /// Starts the node.
     pub async fn start(self) -> Result<()> {
-        match (self.network, self.miner.is_some()) {
-            (2, true) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
-            (2, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
+        match (self.network, self.miner.is_some(), self.trial) {
+            (2, true, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
+            (2, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
+            (2, true, true) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
+            (2, false, true) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
             _ => panic!("Unsupported node configuration"),
         }
     }
@@ -93,15 +95,8 @@ impl Node {
 
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            let server = Server::<N, E>::initialize(
-                node_port,
-                rpc_port,
-                self.rpc_username.clone(),
-                self.rpc_password.clone(),
-                miner,
-                self.trial,
-            )
-            .await?;
+            let server =
+                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
             if let Some(peer_ip) = &self.connect {
                 server.connect_to(peer_ip.parse().unwrap()).await?;
             }
@@ -109,15 +104,8 @@ impl Node {
             Ok(())
         } else {
             self.initialize_logger();
-            let server = Server::<N, E>::initialize(
-                node_port,
-                rpc_port,
-                self.rpc_username.clone(),
-                self.rpc_password.clone(),
-                miner,
-                self.trial,
-            )
-            .await?;
+            let server =
+                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
             if let Some(peer_ip) = &self.connect {
                 server.connect_to(peer_ip.parse().unwrap()).await?;
             }

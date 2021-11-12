@@ -60,7 +60,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         username: String,
         password: String,
         miner: Option<Address<N>>,
-        trial: bool,
     ) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", node_port)).await {
@@ -85,8 +84,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_router);
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
-        // Initialize the connection to the sync nodes.
-        Self::initialize_connection(trial, &peers_router, &ledger_router).await?;
 
         tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -273,24 +270,5 @@ impl<N: Network, E: Environment> Server<N, E> {
                 error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
         }
-    }
-
-    ///
-    /// Sends a connection request to the sync nodes.
-    ///
-    #[inline]
-    async fn initialize_connection(trial: bool, peers_router: &PeersRouter<N, E>, ledger_router: &LedgerRouter<N, E>) -> Result<()> {
-        // Connect to the sync nodes.
-        let sync_nodes = match trial {
-            true => vec!["144.126.219.193:4132", "165.232.145.194:4132"],
-            false => E::SYNC_NODES.to_vec(),
-        };
-        for peer_ip in sync_nodes {
-            let message = PeersRequest::Connect(peer_ip.to_string().parse().unwrap(), ledger_router.clone());
-            if let Err(error) = peers_router.send(message).await {
-                warn!("[Connect] Sync {}", error);
-            }
-        }
-        Ok(())
     }
 }

@@ -567,7 +567,7 @@ impl<N: Network> LedgerState<N> {
             rng,
         ) {
             Ok(block) => Ok(block),
-            Err(error) => Err(anyhow!("Failed to mine the next block: {}", error)),
+            Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }
     }
 

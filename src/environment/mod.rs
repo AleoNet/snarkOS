@@ -54,7 +54,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of peer nodes to bootstrap the node server with.
     const PEER_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: [&'static str; 1] = ["0.0.0.0:4135"];
+    const SYNC_NODES: [&'static str; 2] = ["0.0.0.0:4132", "0.0.0.0:4135"];
 
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
@@ -98,5 +98,27 @@ pub struct Miner<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for Miner<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
+    const COINBASE_IS_PUBLIC: bool = true;
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ClientTrial<N: Network>(PhantomData<N>);
+
+#[rustfmt::skip]
+impl<N: Network> Environment for ClientTrial<N> {
+    type Network = N;
+    const NODE_TYPE: NodeType = NodeType::Client;
+    const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
+    const MINIMUM_NUMBER_OF_PEERS: usize = 2;
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct MinerTrial<N: Network>(PhantomData<N>);
+
+#[rustfmt::skip]
+impl<N: Network> Environment for MinerTrial<N> {
+    type Network = N;
+    const NODE_TYPE: NodeType = NodeType::Miner;
+    const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
     const COINBASE_IS_PUBLIC: bool = true;
 }
