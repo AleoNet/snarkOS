@@ -172,12 +172,14 @@ impl<N: Network> LedgerState<N> {
                 let last_seen_block_height = ledger.read_only.1.clone();
                 loop {
                     // Refresh the ledger storage state.
-                    ledger.ledger_roots.refresh();
+                    let updated = ledger.ledger_roots.refresh();
                     // After catching up the reader, determine the latest block height.
                     if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
                         // If there is a mismatch in the block height, proceed to update latest state.
                         let current_block_height = last_seen_block_height.load(Ordering::SeqCst);
-                        if current_block_height != latest_block_height {
+
+                        // Update the read-only ledger state if the database was updated.
+                        if updated {
                             trace!(
                                 "[Read-Only] Updating ledger state from block {} to {}",
                                 current_block_height,
@@ -201,7 +203,7 @@ impl<N: Network> LedgerState<N> {
                             last_seen_block_height.store(latest_block_height, Ordering::SeqCst);
                         }
                     }
-                    thread::sleep(std::time::Duration::from_secs(5));
+                    thread::sleep(std::time::Duration::from_secs(8));
                 }
             });
         }
