@@ -114,7 +114,9 @@ impl Node {
             .add_directive("mio=off".parse().unwrap())
             .add_directive("tokio_util=off".parse().unwrap())
             .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::io=off".parse().unwrap());
+            .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
+            .add_directive("hyper::proto::h1::io=off".parse().unwrap())
+            .add_directive("hyper::proto::h1::role=off".parse().unwrap());
 
         // Initialize tracing.
         tracing_subscriber::fmt()

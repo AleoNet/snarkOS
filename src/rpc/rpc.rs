@@ -27,7 +27,7 @@ use snarkvm::dpc::Network;
 
 use hyper::{
     body::HttpBody,
-    server::Server,
+    server::{conn::AddrStream, Server},
     service::{make_service_fn, service_fn},
     Body,
 };
@@ -92,9 +92,10 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     let credentials = RpcCredentials { username, password };
     let rpc_impl = RpcImpl::new(credentials, canon, ledger_router);
 
-    let service = make_service_fn(move |_conn| {
+    let service = make_service_fn(move |conn: &AddrStream| {
+        let caller = conn.remote_addr();
         let rpc = rpc_impl.clone();
-        async move { Ok::<_, Infallible>(service_fn(move |req| handle_rpc::<N, E>(rpc.clone(), req))) }
+        async move { Ok::<_, Infallible>(service_fn(move |req| handle_rpc::<N, E>(caller, rpc.clone(), req))) }
     });
 
     let server = Server::bind(&rpc_addr).serve(service);
@@ -105,6 +106,7 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
 }
 
 async fn handle_rpc<N: Network, E: Environment>(
+    caller: SocketAddr,
     rpc: RpcImpl<N, E>,
     req: hyper::Request<Body>,
 ) -> Result<hyper::Response<Body>, Infallible> {
@@ -115,7 +117,8 @@ async fn handle_rpc<N: Network, E: Environment>(
         .map(|h| h.to_str().unwrap_or("").to_owned());
     let meta = Meta { auth };
 
-    trace!("RPC {:?}", req.headers());
+    // Save the headers.
+    let headers = req.headers().clone();
 
     // Ready the body of the request
     let mut body = req.into_body();
@@ -148,6 +151,8 @@ async fn handle_rpc<N: Network, E: Environment>(
             return Ok(hyper::Response::new(body.into()));
         }
     };
+
+    debug!("Received '{}' RPC request from {}: {:?}", &*req.method, caller, headers);
 
     // Read the request params.
     let mut params = match read_params(&req) {

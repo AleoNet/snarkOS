@@ -58,7 +58,7 @@ version = "0.4"
 
 [dependencies.hyper]
 version = "0.14"
-features = [ "http1", "runtime", "server" ]
+features = [ "http1", "runtime", "server", "tcp" ]
 
 [dependencies.json-rpc-types]
 version = "1.0.1"
