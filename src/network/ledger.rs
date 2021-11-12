@@ -772,13 +772,26 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut maximum_common_ancestor = 0;
         let mut maximum_block_height = self.latest_block_request;
         let mut maximum_block_locators = Default::default();
+
+        // Determine if the peers state has any sync nodes.
+        let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+        let mut peers_contains_sync_node = false;
+
+        for ip in self.peers_state.keys() {
+            peers_contains_sync_node |= sync_nodes.contains(ip);
+        }
+
         for (peer_ip, ledger_state) in self.peers_state.iter() {
-            if let Some((common_ancestor, block_height, block_locators)) = ledger_state {
-                if *block_height > maximum_block_height {
-                    maximal_peer = Some(*peer_ip);
-                    maximum_common_ancestor = *common_ancestor;
-                    maximum_block_height = *block_height;
-                    maximum_block_locators = block_locators.clone();
+            // Only update the maximal peer if there are no sync nodes or the peer is a sync node.
+            if !peers_contains_sync_node || sync_nodes.contains(peer_ip) {
+                if let Some((common_ancestor, block_height, block_locators)) = ledger_state {
+                    // Update the maximal peer state if the peer is ahead.
+                    if *block_height > maximum_block_height {
+                        maximal_peer = Some(*peer_ip);
+                        maximum_common_ancestor = *common_ancestor;
+                        maximum_block_height = *block_height;
+                        maximum_block_locators = block_locators.clone();
+                    }
                 }
             }
         }
