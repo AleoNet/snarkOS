@@ -49,9 +49,9 @@ pub struct Node {
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "3", long = "verbosity")]
     pub verbosity: u8,
-    /// If the flag is set, the node will only output logs.
+    /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
-    pub nodisplay: bool,
+    pub display: bool,
 }
 
 impl Node {
@@ -86,17 +86,17 @@ impl Node {
             }
         };
 
-        if self.nodisplay {
-            self.initialize_logger();
-            let _server =
-                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
-            std::future::pending::<()>().await;
-            Ok(())
-        } else {
+        if self.display {
             println!("\nThe snarkOS console is initializing...\n");
             let server =
                 Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
             let _display = Display::<N, E>::start(server)?;
+            Ok(())
+        } else {
+            self.initialize_logger();
+            let _server =
+                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
+            std::future::pending::<()>().await;
             Ok(())
         }
     }
