@@ -543,10 +543,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Broadcast the next block.
                         let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
                         if let Err(error) = ledger_router.send(request).await {
-                            error!("Failed to broadcast mined block: {}", error);
+                            warn!("Failed to broadcast mined block: {}", error);
                         }
                     }
-                    Err(error) => error!("Failed to mine the next block: {}", error),
+                    Err(error) => trace!("{}", error),
                 }
             });
         }
@@ -800,7 +800,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Proceed to add block requests if the maximum block height is higher than the latest.
         if let Some(peer_ip) = maximal_peer {
             {
-                // TODO (howardwu): Clean this up, by unifying the call with the same logic in `update_peer`.
                 // Determine the common ancestor block height between this ledger and the peer.
                 let mut maximum_common_ancestor = maximum_common_ancestor;
                 // Verify the integrity of the block hashes sent by the peer.

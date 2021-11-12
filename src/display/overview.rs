@@ -18,8 +18,6 @@ use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::Color,
-    // style::{Color, Modifier, Style},
-    // text::{Span, Spans},
     widgets::{canvas::Canvas, Block, Borders},
     Frame,
 };
