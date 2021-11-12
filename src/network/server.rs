@@ -89,6 +89,12 @@ impl<N: Network, E: Environment> Server<N, E> {
             peers_router.send(message).await?;
         }
 
+        // Attempt to connect to the sync nodes.
+        for sync_node_ip in E::SYNC_NODES {
+            let message = PeersRequest::Connect(sync_node_ip.parse().unwrap(), ledger_router.clone());
+            peers_router.send(message).await?;
+        }
+
         tokio::time::sleep(Duration::from_secs(3)).await;
 
         // Initialize a new instance of the RPC server.
