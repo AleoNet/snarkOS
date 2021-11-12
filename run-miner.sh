@@ -1,6 +1,6 @@
 #!/bin/bash
 
-COMMAND='cargo run --release -- --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah  --node 7777 --rpc 3100'
+COMMAND='cargo run --release -- --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah --trial'
 
 function exit_node()
 {
