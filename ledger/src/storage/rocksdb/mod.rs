@@ -69,7 +69,6 @@ impl Storage for RocksDB {
 
         // Customize database options.
         let mut options = rocksdb::Options::default();
-        options.increase_parallelism(2);
 
         let primary = path.as_ref().to_path_buf();
         let rocksdb = match is_read_only {
@@ -81,6 +80,7 @@ impl Storage for RocksDB {
                 Arc::new(rocksdb)
             }
             false => {
+                options.increase_parallelism(2);
                 options.create_if_missing(true);
                 Arc::new(rocksdb::DB::open(&options, &primary)?)
             }
