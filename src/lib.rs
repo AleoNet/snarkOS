@@ -25,7 +25,7 @@ pub(crate) use display::*;
 pub mod environment;
 pub use environment::*;
 
-mod helpers;
+pub mod helpers;
 
 pub(crate) mod network;
 pub(crate) use network::*;

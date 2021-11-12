@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, PeersRouter};
-use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState, Metadata, MAXIMUM_LINEAR_BLOCK_LOCATORS};
+use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -38,6 +38,7 @@ const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 50;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub(crate) type LedgerRouter<N, E> = mpsc::Sender<LedgerRequest<N, E>>;
+#[allow(unused)]
 /// Shorthand for the child half of the `Ledger` message channel.
 type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
 
@@ -86,17 +87,17 @@ pub enum Status {
 ///
 #[derive(Clone, Debug)]
 pub struct Ledger<N: Network, E: Environment> {
-    /// The status of the ledger.
-    status: Arc<AtomicU8>,
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
     /// A map of previous block hashes to unconfirmed blocks.
     unconfirmed_blocks: CircularMap<N::BlockHash, Block<N>, { MAXIMUM_UNCONFIRMED_BLOCKS }>,
     /// The pool of unconfirmed transactions.
     memory_pool: MemoryPool<N>,
+
+    /// The status of the ledger.
+    status: Arc<AtomicU8>,
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
-
     /// The map of each peer to their ledger state := (common_ancestor, latest_block_height, block_locators).
     peers_state: HashMap<SocketAddr, Option<(u32, u32, BlockLocators<N>)>>,
     /// The map of each peer to their block requests.
@@ -117,12 +118,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let latest_block_request = canon.latest_block_height();
         let last_block_increment_timestamp = Instant::now();
         Ok(Self {
-            status: Arc::new(AtomicU8::new(Status::Peering as u8)),
             canon,
             unconfirmed_blocks: Default::default(),
             memory_pool: MemoryPool::new(),
-            terminator: Arc::new(AtomicBool::new(false)),
 
+            status: Arc::new(AtomicU8::new(Status::Peering as u8)),
+            terminator: Arc::new(AtomicBool::new(false)),
             peers_state: Default::default(),
             block_requests: Default::default(),
             latest_block_request,
@@ -159,159 +160,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.status() == Status::Syncing
     }
 
-    /// Returns the latest block.
-    pub fn latest_block(&self) -> Block<N> {
-        self.canon.latest_block()
-    }
-
     /// Returns the latest block height.
     pub fn latest_block_height(&self) -> u32 {
         self.canon.latest_block_height()
-    }
-
-    /// Returns the latest block hash.
-    pub fn latest_block_hash(&self) -> N::BlockHash {
-        self.canon.latest_block_hash()
-    }
-
-    /// Returns the latest block timestamp.
-    pub fn latest_block_timestamp(&self) -> i64 {
-        self.canon.latest_block_timestamp()
-    }
-
-    /// Returns the latest block difficulty target.
-    pub fn latest_block_difficulty_target(&self) -> u64 {
-        self.canon.latest_block_difficulty_target()
-    }
-
-    /// Returns the latest block header.
-    pub fn latest_block_header(&self) -> BlockHeader<N> {
-        self.canon.latest_block_header()
-    }
-
-    /// Returns the transactions from the latest block.
-    pub fn latest_block_transactions(&self) -> Transactions<N> {
-        self.canon.latest_block_transactions()
-    }
-
-    /// Returns the latest block locators.
-    pub fn latest_block_locators(&self) -> BlockLocators<N> {
-        self.canon.latest_block_locators()
-    }
-
-    /// Returns the latest ledger root.
-    pub fn latest_ledger_root(&self) -> N::LedgerRoot {
-        self.canon.latest_ledger_root()
-    }
-
-    /// Returns `true` if the given ledger root exists in storage.
-    pub fn contains_ledger_root(&self, ledger_root: &N::LedgerRoot) -> Result<bool> {
-        self.canon.contains_ledger_root(ledger_root)
-    }
-
-    /// Returns `true` if the given block height exists in storage.
-    pub fn contains_block_height(&self, block_height: u32) -> Result<bool> {
-        self.canon.contains_block_height(block_height)
-    }
-
-    /// Returns `true` if the given block hash exists in storage.
-    pub fn contains_block_hash(&self, block_hash: &N::BlockHash) -> Result<bool> {
-        self.canon.contains_block_hash(block_hash)
-    }
-
-    /// Returns `true` if the given transaction ID exists in storage.
-    pub fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
-        self.canon.contains_transaction(transaction_id)
-    }
-
-    /// Returns `true` if the given serial number exists in storage.
-    pub fn contains_serial_number(&self, serial_number: &N::SerialNumber) -> Result<bool> {
-        self.canon.contains_serial_number(serial_number)
-    }
-
-    /// Returns `true` if the given commitment exists in storage.
-    pub fn contains_commitment(&self, commitment: &N::Commitment) -> Result<bool> {
-        self.canon.contains_commitment(commitment)
-    }
-
-    /// Returns `true` if the given ciphertext ID exists in storage.
-    pub fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
-        self.canon.contains_ciphertext_id(ciphertext_id)
-    }
-
-    /// Returns the record ciphertext for a given ciphertext ID.
-    pub fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
-        self.canon.get_ciphertext(ciphertext_id)
-    }
-
-    /// Returns the transition for a given transition ID.
-    pub fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
-        self.canon.get_transition(transition_id)
-    }
-
-    /// Returns the transaction for a given transaction ID.
-    pub fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
-        self.canon.get_transaction(transaction_id)
-    }
-
-    /// Returns the transaction metadata for a given transaction ID.
-    pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
-        self.canon.get_transaction_metadata(transaction_id)
-    }
-
-    /// Returns the block height for the given block hash.
-    pub fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
-        self.canon.get_block_height(block_hash)
-    }
-
-    /// Returns the block hash for the given block height.
-    pub fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
-        self.canon.get_block_hash(block_height)
-    }
-
-    /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
-    pub fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
-        self.canon.get_block_hashes(start_block_height, end_block_height)
-    }
-
-    /// Returns the previous block hash for the given block height.
-    pub fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
-        self.canon.get_previous_block_hash(block_height)
-    }
-
-    /// Returns the block header for the given block height.
-    pub fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
-        self.canon.get_block_header(block_height)
-    }
-
-    /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
-    pub fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
-        self.canon.get_block_headers(start_block_height, end_block_height)
-    }
-
-    /// Returns the transactions from the block of the given block height.
-    pub fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
-        self.canon.get_block_transactions(block_height)
-    }
-
-    /// Returns the block for a given block height.
-    pub fn get_block(&self, block_height: u32) -> Result<Block<N>> {
-        self.canon.get_block(block_height)
-    }
-
-    /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
-    pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
-        self.canon.get_blocks(start_block_height, end_block_height)
-    }
-
-    /// Returns the ledger root and ledger inclusion proof for a given record commitment.
-    pub fn get_ledger_inclusion_proof(&self, record_commitment: &N::Commitment) -> Result<LedgerProof<N>> {
-        self.canon.get_ledger_inclusion_proof(*record_commitment)
-    }
-
-    /// Returns the ledger root in the block header of the given block height.
-    pub fn get_previous_ledger_root(&self, block_height: u32) -> Result<N::LedgerRoot> {
-        self.canon.get_previous_ledger_root(block_height)
     }
 
     ///
@@ -330,7 +181,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     return;
                 }
                 // Retrieve the requested blocks.
-                let blocks = match self.get_blocks(start_block_height, end_block_height) {
+                let blocks = match self.canon.get_blocks(start_block_height, end_block_height) {
                     Ok(blocks) => blocks,
                     Err(error) => {
                         error!("{}", error);
@@ -385,7 +236,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::Ping(peer_ip) => {
                 // Send a `Pong` message to the peer.
-                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(self.latest_block_locators()));
+                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(self.canon.latest_block_locators()));
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Pong] {}", error);
                 }
@@ -398,7 +249,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
                 // Ensure the given block is new.
-                if let Ok(true) = self.contains_block_hash(&block.hash()) {
+                if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
                     trace!("Canon chain already contains block {}", block.height());
                 } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                     trace!("Memory pool already contains unconfirmed block {}", block.height());
@@ -424,7 +275,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     fn update_ledger(&mut self) {
         // Check for candidate blocks to fast forward the ledger.
-        let mut block = &self.latest_block();
+        let mut block = &self.canon.latest_block();
         let unconfirmed_blocks = self.unconfirmed_blocks.clone();
         while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.hash()) {
             // Update the block iterator.
@@ -559,9 +410,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     fn add_block(&mut self, block: Block<N>) {
         // Ensure the given block is new.
-        if let Ok(true) = self.contains_block_hash(&block.hash()) {
+        if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
             trace!("Canon chain already contains block {}", block.height());
-        } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.latest_block_hash() {
+        } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.canon.latest_block_hash() {
             match self.canon.add_next_block(&block) {
                 Ok(()) => {
                     info!("Ledger advanced to block {}", self.latest_block_height());
@@ -616,7 +467,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Process the unconfirmed transaction.
         trace!("Received unconfirmed transaction {} from {}", transaction.transaction_id(), peer_ip);
         // Ensure the unconfirmed transaction is new.
-        if let Ok(false) = self.contains_transaction(&transaction.transaction_id()) {
+        if let Ok(false) = self.canon.contains_transaction(&transaction.transaction_id()) {
             debug!("Adding unconfirmed transaction {} to memory pool", transaction.transaction_id());
             // Attempt to add the unconfirmed transaction to the memory pool.
             match self.memory_pool.add_transaction(&transaction) {
@@ -708,7 +559,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Verify the integrity of the block hashes sent by the peer.
             for (block_height, block_hash, _) in block_locators.iter() {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.get_block_height(block_hash) {
+                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
                     if expected_block_height != *block_height {
                         let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
                         trace!("{}", error);
@@ -805,7 +656,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Verify the integrity of the block hashes sent by the peer.
                 for (block_height, block_hash, _) in &*maximum_block_locators {
                     // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                    if let Ok(expected_block_height) = self.get_block_height(block_hash) {
+                    if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
                         if expected_block_height != *block_height {
                             let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
                             trace!("{}", error);

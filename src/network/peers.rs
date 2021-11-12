@@ -35,6 +35,7 @@ type OutboundHandler<N, E> = mpsc::Receiver<Message<N, E>>;
 
 /// Shorthand for the parent half of the `Peers` message channel.
 pub(crate) type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
+#[allow(unused)]
 /// Shorthand for the child half of the `Peers` message channel.
 type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 
@@ -87,13 +88,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
             connected_peers: HashMap::new(),
             candidate_peers: HashSet::new(),
         }
-    }
-
-    ///
-    /// Returns the local IP address of the node.
-    ///
-    pub(crate) fn local_ip(&self) -> SocketAddr {
-        self.local_ip
     }
 
     ///

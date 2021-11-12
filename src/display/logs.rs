@@ -33,7 +33,7 @@ impl Logs {
 
         let canvas = Canvas::default()
             .block(Block::default().borders(Borders::ALL).title("Logs"))
-            .paint(|ctx| {
+            .paint(|_ctx| {
                 // ctx.draw(&ball);
             });
         f.render_widget(canvas, chunks[0]);

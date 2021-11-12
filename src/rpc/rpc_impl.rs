@@ -63,6 +63,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     ledger: LedgerState<N>,
     ledger_router: LedgerRouter<N, E>,
     /// RPC credentials for accessing guarded endpoints
+    #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
 }
 

@@ -470,7 +470,7 @@ impl<N: Network> LedgerState<N> {
 
         // Check that the block headers are formed correctly (linear).
         // let mut last_block_height = remaining_block_locators[0].0 + 1;
-        for (block_height, block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
+        for (_block_height, _block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
             // // Check that the block height is decrementing.
             // match last_block_height == *block_height + 1 {
             //     true => last_block_height = *block_height,
@@ -478,7 +478,7 @@ impl<N: Network> LedgerState<N> {
             // }
 
             // Check that the block header is present.
-            let block_header = match block_header {
+            let _block_header = match block_header {
                 Some(header) => header,
                 None => return Ok(false),
             };
@@ -502,7 +502,7 @@ impl<N: Network> LedgerState<N> {
         if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
             let mut previous_block_height = u32::MAX;
 
-            for (block_height, block_hash, block_header) in &block_locators[num_block_headers..] {
+            for (block_height, _block_hash, block_header) in &block_locators[num_block_headers..] {
                 // Check that the block heights increment by a power of two.
                 if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
                     return Ok(false);

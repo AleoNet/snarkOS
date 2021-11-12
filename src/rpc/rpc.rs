@@ -113,7 +113,7 @@ async fn handle_rpc<N: Network, E: Environment>(
         .headers()
         .get(hyper::header::AUTHORIZATION)
         .map(|h| h.to_str().unwrap_or("").to_owned());
-    let meta = Meta { auth };
+    let _meta = Meta { auth };
 
     // Save the headers.
     let headers = req.headers().clone();
@@ -408,6 +408,7 @@ fn convert_crate_err(err: crate::rpc::rpc_impl::RpcError) -> jrt::Error<String> 
 }
 
 /// Converts the jsonrpc-core's Error into a jrt::RpcError
+#[allow(unused)]
 fn convert_core_err(err: jsonrpc_core::Error) -> jrt::Error<String> {
     let error = jrt::Error::with_custom_msg(jrt::ErrorCode::InternalError, "JSONRPC server error");
     error.set_data(err.to_string())
