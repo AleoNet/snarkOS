@@ -386,7 +386,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 };
                             // Error if the stream is not open.
                             if let Err(error) = stream {
-                                return Err(anyhow!("Failed to connect to '{}': '{:?}'", peer_ip, error));
+                                return Err(anyhow!("Unable to reach '{}': '{}'", peer_ip, error));
                             }
                         }
                         // Send the challenge response.
