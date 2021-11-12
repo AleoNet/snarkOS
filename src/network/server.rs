@@ -39,8 +39,12 @@ use tokio::{
 pub(crate) struct Server<N: Network, E: Environment> {
     /// The list of peers for the node.
     peers: Arc<RwLock<Peers<N, E>>>,
+    /// The peers router of the node.
+    peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger: Arc<RwLock<Ledger<N, E>>>,
+    /// The ledger router of the node.
+    ledger_router: LedgerRouter<N, E>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
 }
@@ -56,6 +60,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         username: String,
         password: String,
         miner: Option<Address<N>>,
+        trial: bool,
     ) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", node_port)).await {
@@ -80,14 +85,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_router);
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
-
-        if node_port != 4135 {
-            let message = PeersRequest::Connect("144.126.223.138:4135".parse().unwrap(), ledger_router.clone());
-            peers_router.send(message).await?;
-
-            let message = PeersRequest::Connect("0.0.0.0:4135".parse().unwrap(), ledger_router.clone());
-            peers_router.send(message).await?;
-        }
+        // Initialize the connection to the sync nodes.
+        Self::initialize_connection(trial, &peers_router, &ledger_router).await?;
 
         // Attempt to connect to the sync nodes.
         for sync_node_ip in E::SYNC_NODES {
@@ -95,7 +94,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             peers_router.send(message).await?;
         }
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         // Initialize a new instance of the RPC server.
         tasks.append(initialize_rpc_server::<N, E>(
@@ -103,10 +102,26 @@ impl<N: Network, E: Environment> Server<N, E> {
             username,
             password,
             LedgerState::open::<RocksDB, _>(&storage_path, true)?,
-            ledger_router,
+            &ledger_router,
         ));
 
-        Ok(Self { peers, ledger, tasks })
+        Ok(Self {
+            peers,
+            peers_router,
+            ledger,
+            ledger_router,
+            tasks,
+        })
+    }
+
+    ///
+    /// Sends a connection request to the given IP address.
+    ///
+    #[inline]
+    pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
+        let message = PeersRequest::Connect(peer_ip, self.ledger_router.clone());
+        self.peers_router.send(message).await?;
+        Ok(())
     }
 
     ///
@@ -264,5 +279,24 @@ impl<N: Network, E: Environment> Server<N, E> {
                 error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
         }
+    }
+
+    ///
+    /// Sends a connection request to the sync nodes.
+    ///
+    #[inline]
+    async fn initialize_connection(trial: bool, peers_router: &PeersRouter<N, E>, ledger_router: &LedgerRouter<N, E>) -> Result<()> {
+        // Connect to the sync nodes.
+        let sync_nodes = match trial {
+            true => vec!["144.126.219.193:4132", "165.232.145.194:4132"],
+            false => E::SYNC_NODES.to_vec(),
+        };
+        for peer_ip in sync_nodes {
+            let message = PeersRequest::Connect(peer_ip.to_string().parse().unwrap(), ledger_router.clone());
+            if let Err(error) = peers_router.send(message).await {
+                warn!("[Connect] Sync {}", error);
+            }
+        }
+        Ok(())
     }
 }

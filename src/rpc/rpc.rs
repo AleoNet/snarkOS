@@ -17,7 +17,6 @@
 //! Logic for instantiating the RPC server.
 
 use crate::{
-    network::Ledger,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
     LedgerRouter,
@@ -34,8 +33,7 @@ use hyper::{
 use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
+use std::{convert::Infallible, net::SocketAddr};
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -86,11 +84,11 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,
     password: String,
-    canon: LedgerState<N>,
-    ledger_router: LedgerRouter<N, E>,
+    ledger: LedgerState<N>,
+    ledger_router: &LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, canon, ledger_router);
+    let rpc_impl = RpcImpl::new(credentials, ledger, ledger_router.clone());
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();

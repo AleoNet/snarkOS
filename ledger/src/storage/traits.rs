@@ -98,9 +98,10 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
 
     ///
     /// Performs a refresh operation for implementations of `Map` that perform periodic operations.
+    /// Returns `true` if the database state has been updated.
     ///
-    fn refresh(&self) -> Result<()> {
+    fn refresh(&self) -> bool {
         // Currently, this method is implemented for RocksDB to catch up a reader (secondary) database.
-        Ok(())
+        true
     }
 }

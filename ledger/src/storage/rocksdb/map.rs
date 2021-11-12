@@ -123,12 +123,17 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     ///
     /// Performs a refresh operation for implementations of `Map` that perform periodic operations.
     /// This method is implemented here for RocksDB to catch up a reader (secondary) database.
+    /// Returns `true` if the sequence number of the database has increased.
     ///
-    fn refresh(&self) -> Result<()> {
+    fn refresh(&self) -> bool {
         // If the storage is in read-only mode, catch it up to its writable storage.
         if self.is_read_only {
-            self.rocksdb.try_catch_up_with_primary()?;
+            let original_sequence_number = self.rocksdb.latest_sequence_number();
+            if self.rocksdb.try_catch_up_with_primary().is_ok() {
+                let new_sequence_number = self.rocksdb.latest_sequence_number();
+                return new_sequence_number > original_sequence_number;
+            }
         }
-        Ok(())
+        false
     }
 }

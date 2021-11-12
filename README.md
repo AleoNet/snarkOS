@@ -6,12 +6,12 @@
 
 In one terminal, start the first node by running:
 ```
-cargo run --release -- --nodisplay --node 4135 --rpc 3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
+cargo run --release -- --node 4135 --rpc 3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
 ```
 
 After the first node starts, in a second terminal, run:
 ```
-cargo run --release -- --nodisplay --node 4132 --rpc 3032
+cargo run --release
 ```
 
 ## Usage Guide
@@ -42,9 +42,9 @@ USAGE:
     snarkos [FLAGS] [OPTIONS]
 
 FLAGS:
-    -h, --help         Prints help information
-        --nodisplay    If the flag is set, the node will only output logs
-    -V, --version      Prints version information
+        --display    If the flag is set, the node will render a read-only display
+    -h, --help       Prints help information
+    -V, --version    Prints version information
 
 OPTIONS:
         --miner <miner>              Specify this as a mining node, with the given miner address

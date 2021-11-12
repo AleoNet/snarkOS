@@ -19,7 +19,6 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{
-    network::Ledger,
     rpc::{rpc::*, rpc_trait::RpcFunctions},
     Environment,
     LedgerRequest,
@@ -34,7 +33,6 @@ use snarkvm::{
 use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
 use std::{cmp::max, ops::Deref, sync::Arc};
-use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
 pub enum RpcError {

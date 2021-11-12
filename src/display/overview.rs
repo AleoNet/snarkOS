@@ -17,8 +17,7 @@
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    style::Color,
     widgets::{canvas::Canvas, Block, Borders},
     Frame,
 };
@@ -43,21 +42,21 @@ impl Overview {
 
         let canvas = Canvas::default()
             .block(Block::default().borders(Borders::ALL).title("Status"))
-            .paint(|ctx| {
+            .paint(|_ctx| {
                 // ctx.draw(&ball);
             });
         f.render_widget(canvas, chunks[0]);
 
         let canvas = Canvas::default()
             .block(Block::default().borders(Borders::ALL).title("Peers"))
-            .paint(|ctx| {
+            .paint(|_ctx| {
                 // ctx.draw(&ball);
             });
         f.render_widget(canvas, chunks[1]);
 
         let canvas = Canvas::default()
             .block(Block::default().borders(Borders::ALL).title("Logs"))
-            .paint(|ctx| {
+            .paint(|_ctx| {
                 // ctx.draw(&ball);
             });
         f.render_widget(canvas, chunks[2]);
