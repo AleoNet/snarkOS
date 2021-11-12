@@ -688,7 +688,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                     // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
                     let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
-                    self.remove_last_blocks(num_blocks);
+                    let removed_blocks = self.remove_last_blocks(num_blocks);
+
+                    for removed_block in removed_blocks {
+                        if self.unconfirmed_blocks.contains_key(&removed_block.hash()) {
+                            self.unconfirmed_blocks.remove(&removed_block.hash());
+                        }
+                    }
                 }
             }
 

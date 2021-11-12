@@ -109,7 +109,7 @@ impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
     const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 2;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -120,5 +120,6 @@ impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
     const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
+    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
     const COINBASE_IS_PUBLIC: bool = true;
 }
