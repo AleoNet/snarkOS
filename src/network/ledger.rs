@@ -768,6 +768,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // Iterate through the peers to check if this node needs to catch up, and determine a peer to sync with.
+        // Prioritize the sync nodes before regular peers.
         let mut maximal_peer = None;
         let mut maximum_common_ancestor = 0;
         let mut maximum_block_height = self.latest_block_request;
