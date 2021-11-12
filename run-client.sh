@@ -1,14 +1,17 @@
 #!/bin/bash
 
-COMMAND='cargo run --release -- --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah  --trial'
+COMMAND='cargo run --release -- --trial'
 
 function exit_node()
 {
     echo "Exiting..."
-    exit 0
+    kill $!
+    exit
 }
 
 trap exit_node SIGINT
+
+echo "Running client node..."
 
 while :
 do
