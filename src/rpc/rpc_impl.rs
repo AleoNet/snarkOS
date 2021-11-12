@@ -20,19 +20,18 @@
 
 use crate::{
     rpc::{rpc::*, rpc_trait::RpcFunctions},
-    Environment,
-    LedgerRequest,
-    LedgerRouter,
+    Environment, LedgerRequest, LedgerRouter, Wallet,
 };
 use snarkos_ledger::{LedgerState, Metadata};
 use snarkvm::{
-    dpc::{Block, BlockHeader, Network, RecordCiphertext, Transaction, Transactions, Transition},
+    dpc::{Address, Block, BlockHeader, Network, RecordCiphertext, Transaction, Transactions, Transition},
     utilities::FromBytes,
 };
 
 use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
-use std::{cmp::max, ops::Deref, sync::Arc};
+use std::{cmp::max, collections::HashMap, fs, ops::Deref, path::PathBuf, str::FromStr, sync::Arc};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
@@ -153,6 +152,31 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns the block header for the given the block height.
     async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError> {
         Ok(self.ledger.get_block_header(block_height)?)
+    }
+
+    async fn get_blocks_mined(&self) -> Result<Value, RpcError> {
+        let mut records = HashMap::new();
+        let mut num_records = 0usize;
+
+        let data_path = ".aleo";
+        let dir = fs::read_dir(PathBuf::from(data_path))?;
+        for entry in dir {
+            let entry = entry?;
+            let path = entry.path();
+            let name = entry
+                .file_name()
+                .into_string()
+                .expect("Should be able to convert OsString into String");
+            if path.is_dir() && Address::<N>::from_str(&name).is_ok() {
+                let wallet = Wallet::<N>::new(name.clone(), data_path.to_string(), true)?;
+                let records_for_address = wallet.records()?;
+                num_records += records_for_address.len();
+                records.insert(name, records_for_address);
+            }
+        }
+
+        println!("{:?}", records);
+        Ok(serde_json::json!({"num_records": num_records, "records": records}))
     }
 
     /// Returns the transactions from the block of the given block height.
