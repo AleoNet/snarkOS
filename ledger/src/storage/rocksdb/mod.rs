@@ -67,16 +67,23 @@ impl Storage for RocksDB {
         let mut context_bytes = bincode::serialize(&(context.len() as u32)).unwrap();
         context_bytes.extend_from_slice(&context);
 
+        // Customize database options.
+        let mut options = rocksdb::Options::default();
+        options.increase_parallelism(2);
+
         let primary = path.as_ref().to_path_buf();
         let rocksdb = match is_read_only {
             true => {
                 // Construct the directory paths.
                 let reader = &path.as_ref().join("reader").to_path_buf();
                 // Open a secondary reader for the primary rocksdb.
-                let rocksdb = rocksdb::DB::open_as_secondary(&rocksdb::Options::default(), &primary, reader)?;
+                let rocksdb = rocksdb::DB::open_as_secondary(&options, &primary, reader)?;
                 Arc::new(rocksdb)
             }
-            false => Arc::new(rocksdb::DB::open_default(&primary)?),
+            false => {
+                options.create_if_missing(true);
+                Arc::new(rocksdb::DB::open(&options, &primary)?)
+            }
         };
 
         Ok(RocksDB {
