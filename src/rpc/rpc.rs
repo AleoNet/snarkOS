@@ -17,7 +17,6 @@
 //! Logic for instantiating the RPC server.
 
 use crate::{
-    network::Ledger,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
     LedgerRouter,

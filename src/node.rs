@@ -28,6 +28,9 @@ use tracing_subscriber::EnvFilter;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
 pub struct Node {
+    /// Specify the IP address of a peer to connect to.
+    #[structopt(long = "connect")]
+    pub connect: Option<String>,
     /// Specify this as a mining node, with the given miner address.
     #[structopt(long = "miner")]
     pub miner: Option<String>,
@@ -99,11 +102,14 @@ impl Node {
                 self.trial,
             )
             .await?;
+            if let Some(peer_ip) = &self.connect {
+                server.connect_to(peer_ip.parse().unwrap()).await?;
+            }
             let _display = Display::<N, E>::start(server)?;
             Ok(())
         } else {
             self.initialize_logger();
-            let _server = Server::<N, E>::initialize(
+            let server = Server::<N, E>::initialize(
                 node_port,
                 rpc_port,
                 self.rpc_username.clone(),
@@ -112,6 +118,9 @@ impl Node {
                 self.trial,
             )
             .await?;
+            if let Some(peer_ip) = &self.connect {
+                server.connect_to(peer_ip.parse().unwrap()).await?;
+            }
             std::future::pending::<()>().await;
             Ok(())
         }
