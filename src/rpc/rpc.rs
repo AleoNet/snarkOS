@@ -19,10 +19,7 @@
 use crate::{
     helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
-    Environment,
-    LedgerReader,
-    LedgerRouter,
-    Peers,
+    Environment, LedgerReader, LedgerRouter, Peers,
 };
 use snarkvm::dpc::Network;
 
@@ -56,7 +53,7 @@ pub struct Meta {
 
 impl Metadata for Meta {}
 
-const METHODS_EXPECTING_PARAMS: [&str; 12] = [
+const METHODS_EXPECTING_PARAMS: [&str; 13] = [
     // public
     "getblock",
     "getblocks",
@@ -65,6 +62,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
     "getblockhashes",
     "getblockheader",
     "getblocktransactions",
+    "getblocksmined",
     "getciphertext",
     "getledgerproof",
     "gettransaction",
@@ -275,6 +273,10 @@ async fn handle_rpc<N: Network, E: Environment>(
                 jrt::Response::error(jrt::Version::V2, err, req.id.clone())
             }
         },
+        "getblocksmined" => {
+            let result = rpc.get_blocks_mined().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "getciphertext" => {
             let result = rpc.get_ciphertext(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
@@ -949,14 +951,12 @@ mod tests {
         let actual: RecordCiphertext<Testnet2> = process_response(response).await;
 
         // Check the ciphertext.
-        assert!(
-            Testnet2::genesis_block()
-                .transactions()
-                .first()
-                .unwrap()
-                .ciphertexts()
-                .any(|expected| *expected == actual)
-        );
+        assert!(Testnet2::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .ciphertexts()
+            .any(|expected| *expected == actual));
     }
 
     #[tokio::test]
@@ -1095,15 +1095,13 @@ mod tests {
         let actual: Transition<Testnet2> = process_response(response).await;
 
         // Check the transition.
-        assert!(
-            Testnet2::genesis_block()
-                .transactions()
-                .first()
-                .unwrap()
-                .transitions()
-                .iter()
-                .any(|expected| *expected == actual)
-        );
+        assert!(Testnet2::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .transitions()
+            .iter()
+            .any(|expected| *expected == actual));
     }
 
     #[tokio::test]

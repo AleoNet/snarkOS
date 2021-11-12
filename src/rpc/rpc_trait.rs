@@ -17,7 +17,8 @@
 //! Definition of the public and private RPC endpoints.
 
 use crate::rpc::rpc_impl::RpcError;
-use snarkvm::dpc::{Block, BlockHeader, Network, RecordCiphertext, Transactions, Transition};
+use snarkvm::dpc::{Address, Block, BlockHeader, Network, RecordCiphertext, Transaction, Transactions, Transition};
+use std::{collections::HashMap, path::PathBuf};
 
 use std::net::SocketAddr;
 
@@ -59,6 +60,9 @@ pub trait RpcFunctions<N: Network> {
 
     #[doc = include_str!("./documentation/public_endpoints/getblockheader.md")]
     async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError>;
+
+    #[doc = include_str!("./documentation/public_endpoints/getblocksmined.md")]
+    async fn get_blocks_mined(&self) -> Result<serde_json::Value, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError>;
