@@ -21,7 +21,7 @@ use snarkvm::dpc::prelude::*;
 use anyhow::Result;
 use rand::thread_rng;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     net::SocketAddr,
     path::Path,

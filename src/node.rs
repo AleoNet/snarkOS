@@ -52,6 +52,8 @@ pub struct Node {
     /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
     pub display: bool,
+    #[structopt(hidden = true, long)]
+    pub trial: bool,
 }
 
 impl Node {
@@ -88,14 +90,28 @@ impl Node {
 
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            let server =
-                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
+            let server = Server::<N, E>::initialize(
+                node_port,
+                rpc_port,
+                self.rpc_username.clone(),
+                self.rpc_password.clone(),
+                miner,
+                self.trial,
+            )
+            .await?;
             let _display = Display::<N, E>::start(server)?;
             Ok(())
         } else {
             self.initialize_logger();
-            let _server =
-                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
+            let _server = Server::<N, E>::initialize(
+                node_port,
+                rpc_port,
+                self.rpc_username.clone(),
+                self.rpc_password.clone(),
+                miner,
+                self.trial,
+            )
+            .await?;
             std::future::pending::<()>().await;
             Ok(())
         }

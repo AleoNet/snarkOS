@@ -52,9 +52,9 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const DEFAULT_RPC_PORT: u16 = 3030 + Self::Network::NETWORK_ID;
 
     /// The list of peer nodes to bootstrap the node server with.
-    const PEER_NODES: Vec<&'static str> = vec![];
+    const PEER_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: Vec<&'static str> = vec![];
+    const SYNC_NODES: [&'static str; 1] = ["0.0.0.0:4135"];
 
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
