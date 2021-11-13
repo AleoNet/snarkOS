@@ -383,12 +383,21 @@ struct Peer<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
-    async fn new(stream: TcpStream, local_ip: SocketAddr, peers_router: &PeersRouter<N, E>) -> Result<Self> {
+    async fn new(
+        stream: TcpStream,
+        local_ip: SocketAddr,
+        peers_router: &PeersRouter<N, E>,
+        ledger_router: &LedgerRouter<N, E>,
+    ) -> Result<Self> {
         // Construct the socket.
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
         let peer_ip = Peer::handshake(&mut outbound_socket, local_ip).await?;
+
+        // Send the first ping sequence to the peer.
+        trace!("Sending Ping to {}", peer_ip);
+        ledger_router.send(LedgerRequest::SendPing(peer_ip)).await?;
 
         // Create a channel for this peer.
         let (outbound_router, outbound_handler) = mpsc::channel(1024);
@@ -481,13 +490,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     Message::ChallengeResponse(block_header) => {
                         match block_header.height() == CHALLENGE_HEIGHT && &block_header == genesis_block_header && block_header.is_valid()
                         {
-                            true => {
-                                // Send the first ping sequence.
-                                let message = Message::<N, E>::Ping(E::MESSAGE_VERSION);
-                                trace!("Sending '{}' to {}", message.name(), peer_ip);
-                                outbound_socket.send(message).await?;
-                                Ok(peer_ip)
-                            }
+                            true => Ok(peer_ip),
                             false => return Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
                     }
@@ -510,9 +513,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
     /// A handler to process an individual peer.
     async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_router: &PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
         let peers_router = peers_router.clone();
+        let ledger_router = ledger_router.clone();
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, &peers_router).await {
+            let mut peer = match Peer::new(stream, local_ip, &peers_router, &ledger_router).await {
                 Ok(peer) => peer,
                 Err(error) => {
                     trace!("{}", error);
