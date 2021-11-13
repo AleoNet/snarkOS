@@ -14,13 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType};
+use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType};
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
     prelude::*,
 };
 
-use crate::helpers::Updater;
 use anyhow::Result;
 use std::str::FromStr;
 use structopt::StructOpt;
