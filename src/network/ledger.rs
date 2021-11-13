@@ -57,8 +57,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat,
     /// Mine := (local_ip, miner_address, ledger_router)
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
-    /// Ping := (peer_ip)
-    Ping(SocketAddr),
+    /// Ping := (peer_ip, block_height, block_hash)
+    Ping(SocketAddr, u32, N::BlockHash),
     /// Pong := (peer_ip, block_locators)
     Pong(SocketAddr, BlockLocators<N>),
     /// UnconfirmedBlock := (peer_ip, block)
@@ -165,6 +165,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.canon.latest_block_height()
     }
 
+    /// Returns the latest block hash.
+    pub fn latest_block_hash(&self) -> N::BlockHash {
+        self.canon.latest_block_hash()
+    }
+
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -234,7 +239,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Process the request to mine the next block.
                 self.mine_next_block(local_ip, recipient, ledger_router);
             }
-            LedgerRequest::Ping(peer_ip) => {
+            LedgerRequest::Ping(peer_ip, block_height, block_hash) => {
+                // TODO (raychu86): Handle block_height and block_hash.
+
                 // Send a `Pong` message to the peer.
                 let request = PeersRequest::MessageSend(peer_ip, Message::Pong(self.canon.latest_block_locators()));
                 if let Err(error) = peers_router.send(request).await {
@@ -246,6 +253,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.initialize_peer(peer_ip);
                 // Process the pong.
                 self.update_peer(peer_ip, block_locators, peers_router).await;
+
+                let latest_block_height = self.latest_block_height();
+                let latest_block_hash = self.latest_block_hash();
+                // Sleep for the preset time before sending a `Ping` request.
+                tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
+                // Send a `Ping` request to the peer.
+                let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION, latest_block_height, latest_block_hash));
+                if let Err(error) = peers_router.send(request).await {
+                    warn!("[Ping] {}", error);
+                }
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
                 // Ensure the given block is new.
@@ -412,7 +429,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Ensure the given block is new.
         if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
             trace!("Canon chain already contains block {}", block.height());
-        } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.canon.latest_block_hash() {
+        } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.latest_block_hash() {
             match self.canon.add_next_block(&block) {
                 Ok(()) => {
                     info!("Ledger advanced to block {}", self.latest_block_height());

@@ -594,7 +594,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version) => {
+                                Message::Ping(version, block_height, block_hash) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
@@ -603,7 +603,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the version of the peer.
                                     peer.version = version;
                                     // Route the `Ping` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::Ping(peer_ip)).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::Ping(peer_ip, block_height, block_hash)).await {
                                         warn!("[Ping] {}", error);
                                     }
                                 },
@@ -611,13 +611,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Route the `Pong` to the ledger.
                                     if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, block_locators)).await {
                                         warn!("[Pong] {}", error);
-                                    }
-                                    // Sleep for the preset time before sending a `Ping` request.
-                                    tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
-                                    // Send a `Ping` request to the peer.
-                                    let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION));
-                                    if let Err(error) = peers_router.send(request).await {
-                                        warn!("[Ping] {}", error);
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
