@@ -79,7 +79,7 @@ pub(crate) struct Peers<N: Network, E: Environment> {
 
     /// The map of peers to a map of sent block hashes and when they were sent the related block.
     sent_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, i64>>,
-    /// The map of peers to a map of sent block hashes and when they were sent the related transaction.
+    /// The map of peers to a map of sent transaction ids and when they were sent the related transaction.
     sent_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, i64>>,
 }
 
@@ -237,6 +237,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.connected_peers.remove(&peer_ip);
                 self.candidate_peers.insert(peer_ip);
 
+                // Clear the cache for sent blocks/transactions.
                 self.sent_blocks.remove(&peer_ip);
                 self.sent_transactions.remove(&peer_ip);
             }
