@@ -102,7 +102,7 @@ features = [
 ]
 
 [dependencies.tokio-util]
-version = "=0.6.8"
+version = "=0.6"
 features = ["codec"]
 
 [dependencies.tokio-stream]
