@@ -39,8 +39,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>),
-    /// Ping := (version)
-    Ping(u32),
+    /// Ping := (version, block_height, block_hash)
+    Ping(u32, u32, N::BlockHash),
     /// Pong := (block_locators)
     Pong(BlockLocators<N>),
     /// UnconfirmedBlock := (block)
@@ -101,7 +101,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version) => Ok(bincode::serialize(version)?),
+            Self::Ping(version, block_height, block_hash) => Ok(to_bytes_le![version, block_height, block_hash]?),
             Self::Pong(block_locators) => Ok(bincode::serialize(block_locators)?),
             Self::UnconfirmedBlock(block) => Ok(bincode::serialize(block)?),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
@@ -141,7 +141,11 @@ impl<N: Network, E: Environment> Message<N, E> {
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
             6 => Self::PeerResponse(bincode::deserialize(data)?),
-            7 => Self::Ping(bincode::deserialize(&data[0..4])?),
+            7 => Self::Ping(
+                bincode::deserialize(&data[0..4])?,
+                bincode::deserialize(&data[4..8])?,
+                bincode::deserialize(&data[8..])?,
+            ),
             8 => Self::Pong(bincode::deserialize(data)?),
             9 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
