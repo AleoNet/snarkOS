@@ -266,7 +266,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let is_self = *peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
                 if !is_self && !self.connected_peers.contains_key(peer_ip) && !self.candidate_peers.contains(peer_ip) {
-                    println!("\ncandidate_peer: {:?}\n", peer_ip);
                     self.candidate_peers.insert(*peer_ip);
                 }
             }
