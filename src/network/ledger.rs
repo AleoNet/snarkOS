@@ -280,6 +280,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.hash()) {
             // Update the block iterator.
             block = unconfirmed_block;
+
+            for map in self.block_requests.values() {
+                // If the block was rolled back, then don't attempt to add it again.
+                if map.contains(&(block.height(), Some(block.hash()))) {
+                    self.unconfirmed_blocks.remove(&block.hash());
+                    continue;
+                }
+            }
+
             // Attempt to add the unconfirmed block.
             self.add_block(block.clone());
             // Upon success, remove the unconfirmed block, as it is now confirmed.
@@ -690,9 +699,18 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
                     let removed_blocks = self.remove_last_blocks(num_blocks);
 
-                    for removed_block in removed_blocks {
-                        if self.unconfirmed_blocks.contains_key(&removed_block.hash()) {
-                            self.unconfirmed_blocks.remove(&removed_block.hash());
+                    for removed_block in removed_blocks.iter() {
+                        let block_hash = removed_block.hash();
+
+                        // Remove the block from unconfirmed_blocks.
+                        if self.unconfirmed_blocks.contains_key(&block_hash) {
+                            self.unconfirmed_blocks.remove(&block_hash);
+                        }
+
+                        // Add the block hash to block_requests if the request exists.
+                        if let Some(requests) = self.block_requests.get_mut(&peer_ip) {
+                            requests.remove(&(removed_block.height(), None));
+                            requests.insert((removed_block.height(), Some(block_hash)));
                         }
                     }
                 }
