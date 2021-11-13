@@ -25,6 +25,7 @@ use anyhow::Result;
 use std::str::FromStr;
 use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
@@ -152,6 +153,8 @@ impl Node {
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
+    #[structopt(name = "clean", about = "Removes ledger storage files")]
+    Clean(Clean),
     #[structopt(name = "update", about = "Updates snarkOS to the latest version")]
     Update(Update),
 }
@@ -159,9 +162,49 @@ pub enum Command {
 impl Command {
     pub fn parse(self) -> Result<String> {
         match self {
+            Self::Clean(command) => command.parse(),
             Self::Update(command) => command.parse(),
         }
     }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct Clean {
+    // /// The path the remove ledger storage files from. todo (@collinc97): uncomment after implementing aleo path
+    // #[structopt(short = "p", long)]
+    // path: Option<String>,
+    /// The ledger storage number (.ledger-[number]) to remove. Removes all storage by default.
+    #[structopt(short, long)]
+    number: Option<u8>,
+}
+
+impl Clean {
+    pub fn parse(self) -> Result<String> {
+        // Remove ledger storage files from the current directory.
+        let walker = WalkDir::new(std::env::current_dir().unwrap()).min_depth(1).into_iter();
+        for entry in walker.filter_entry(|e| is_dev_ledger_storage_path(e, self.number)) {
+            let entry = entry.unwrap();
+            println!("Removing {}", entry.path().display());
+            fs::remove_dir_all(entry.into_path());
+        }
+
+        Ok(format!("Successfully removed ledger storage files"))
+    }
+}
+
+fn is_dev_ledger_storage_path(entry: &DirEntry, number: Option<u8>) -> bool {
+    // Get the specified ledger storage path or remove all ledger storage paths.
+    let ledger_storage_path = number
+        .map(|n| format!(".ledger-{}", n.to_string()))
+        .unwrap_or(".ledger-".to_string());
+
+    // Remove directories matching the ledger storage path.
+    entry.file_type().is_dir()
+        && entry
+            .file_name()
+            .to_str()
+            .map(|s| s.contains(&ledger_storage_path))
+            .unwrap_or(false)
 }
 
 #[derive(StructOpt, Debug)]

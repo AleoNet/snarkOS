@@ -120,6 +120,9 @@ version = "3.2"
 [dependencies.self_update]
 version = "0.27"
 
+[dependencies.walkdir]
+version = "2"
+
 [profile.release]
 opt-level = 3
 lto = "thin"
