@@ -1374,6 +1374,7 @@ dependencies = [
  "hyper",
  "json-rpc-types",
  "jsonrpc-core",
+ "num_cpus",
  "once_cell",
  "parking_lot",
  "rand",
