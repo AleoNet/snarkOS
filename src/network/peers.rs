@@ -78,10 +78,10 @@ pub(crate) struct Peers<N: Network, E: Environment> {
     candidate_peers: HashSet<SocketAddr>,
 
     /// The map of block hashes to a map of peers and when they were sent the related block.
-    sent_blocks: HashMap<N::BlockHash, HashMap<SocketAddr, i64>>,
-
-    /// The map of transactions ids to a map of peers and when they were sent the related transaction.
-    sent_transactions: HashMap<N::TransactionID, HashMap<SocketAddr, i64>>,
+    /// The map of peers to a map of sent block hashes and when they were sent the related block.
+    sent_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, i64>>,
+    /// The map of peers to a map of sent block hashes and when they were sent the related transaction.
+    sent_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, i64>>,
 }
 
 impl<N: Network, E: Environment> Peers<N, E> {
@@ -237,6 +237,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::PeerDisconnected(peer_ip) => {
                 self.connected_peers.remove(&peer_ip);
                 self.candidate_peers.insert(peer_ip);
+
+                self.sent_blocks.remove(&peer_ip);
+                self.sent_transactions.remove(&peer_ip);
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -263,6 +266,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let is_self = *peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
                 if !is_self && !self.connected_peers.contains_key(peer_ip) && !self.candidate_peers.contains(peer_ip) {
+                    println!("\ncandidate_peer: {:?}\n", peer_ip);
                     self.candidate_peers.insert(*peer_ip);
                 }
             }
@@ -310,9 +314,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     let block_hash = block.hash();
 
                     // Check the sent blocks log.
-                    match self.sent_blocks.get(&block_hash) {
-                        Some(peer_map) => {
-                            if let Some(last_sent) = peer_map.get(&peer) {
+                    match self.sent_blocks.get(&peer) {
+                        Some(sent_blocks_map) => {
+                            if let Some(last_sent) = sent_blocks_map.get(&block_hash) {
                                 // Check if the enough time has passed before needing to send the block.
                                 if last_sent - now < BLOCK_BROADCAST_INTERVAL {
                                     continue;
@@ -321,13 +325,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         }
                         None => {
                             // Initialize the map for the particular block hash.
-                            self.sent_blocks.insert(block_hash, HashMap::new());
+                            self.sent_blocks.insert(*peer, HashMap::new());
                         }
                     };
 
                     // Update the timestamp for the peer and sent block.
-                    if let Some(map) = self.sent_blocks.get_mut(&block_hash) {
-                        map.insert(*peer, now);
+                    if let Some(map) = self.sent_blocks.get_mut(&peer) {
+                        map.insert(block_hash, now);
                     }
                 }
                 Message::UnconfirmedTransaction(transaction) => {
@@ -335,9 +339,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     let transaction_id = transaction.transaction_id();
 
                     // Check the sent transactions log.
-                    match self.sent_transactions.get(&transaction_id) {
-                        Some(peer_map) => {
-                            if let Some(last_sent) = peer_map.get(&peer) {
+                    match self.sent_transactions.get(&peer) {
+                        Some(sent_transactions_map) => {
+                            if let Some(last_sent) = sent_transactions_map.get(&transaction_id) {
                                 // Check if the enough time has passed before needing to send the transaction.
                                 if last_sent - now < TRANSACTION_BROADCAST_INTERVAL {
                                     continue;
@@ -346,13 +350,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         }
                         None => {
                             // Initialize the map for the particular transaction id.
-                            self.sent_transactions.insert(transaction_id, HashMap::new());
+                            self.sent_transactions.insert(*peer, HashMap::new());
                         }
                     };
 
                     // Update the timestamp for the peer and sent block.
-                    if let Some(map) = self.sent_transactions.get_mut(&transaction_id) {
-                        map.insert(*peer, now);
+                    if let Some(map) = self.sent_transactions.get_mut(&peer) {
+                        map.insert(transaction_id, now);
                     }
                 }
                 _ => {}
