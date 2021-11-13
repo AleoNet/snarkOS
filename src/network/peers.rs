@@ -323,7 +323,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             }
                         }
                         None => {
-                            // Initialize the map for the particular block hash.
+                            // Initialize the map for the particular peer.
                             self.sent_blocks.insert(*peer, HashMap::new());
                         }
                     };
@@ -348,7 +348,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             }
                         }
                         None => {
-                            // Initialize the map for the particular transaction id.
+                            // Initialize the map for the particular peer.
                             self.sent_transactions.insert(*peer, HashMap::new());
                         }
                     };
