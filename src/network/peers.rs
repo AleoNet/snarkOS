@@ -323,7 +323,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         }
                         None => {
                             // Insert an entry for the peer.
-                            self.seen_blocks.insert(*peer, [(block.hash(), now)].into());
+                            self.seen_blocks.insert(*peer, vec![(block.hash(), now)].into_iter().collect());
                         }
                     };
                 }
@@ -342,7 +342,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         }
                         None => {
                             // Insert an entry for the peer.
-                            self.seen_transactions.insert(*peer, [(transaction.transaction_id(), now)].into());
+                            self.seen_transactions
+                                .insert(*peer, vec![(transaction.transaction_id(), now)].into_iter().collect());
                         }
                     };
                 }
