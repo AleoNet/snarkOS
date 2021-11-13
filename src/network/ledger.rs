@@ -709,7 +709,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                         // Add the block hash to block_requests if the request exists.
                         if let Some(requests) = self.block_requests.get_mut(&peer_ip) {
-                            requests.remove(&(removed_block.height(), None));
                             requests.insert((removed_block.height(), Some(block_hash)));
                         }
                     }
