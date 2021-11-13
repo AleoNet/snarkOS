@@ -66,6 +66,9 @@ version = "1.0.1"
 [dependencies.jsonrpc-core]
 version = "18"
 
+[dependencies.num_cpus]
+version = "1"
+
 [dependencies.once_cell]
 version = "1"
 

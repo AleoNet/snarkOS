@@ -215,7 +215,7 @@ fn test_get_block_locators() {
     let block_locators = ledger
         .get_block_locators(ledger.latest_block_height())
         .expect("Failed to get block locators");
-    assert!(ledger.check_block_locators(block_locators).expect("Failed to check block locators"));
+    assert!(ledger.check_block_locators(&block_locators).expect("Failed to check block locators"));
 
     // Mine the next block.
     let block_2 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
@@ -226,7 +226,7 @@ fn test_get_block_locators() {
     let block_locators = ledger
         .get_block_locators(ledger.latest_block_height())
         .expect("Failed to get block locators");
-    assert!(ledger.check_block_locators(block_locators).expect("Failed to check block locators"));
+    assert!(ledger.check_block_locators(&block_locators).expect("Failed to check block locators"));
 
     // Mine the next block.
     let block_3 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
@@ -237,5 +237,5 @@ fn test_get_block_locators() {
     let block_locators = ledger
         .get_block_locators(ledger.latest_block_height())
         .expect("Failed to get block locators");
-    assert!(ledger.check_block_locators(block_locators).expect("Failed to check block locators"));
+    assert!(ledger.check_block_locators(&block_locators).expect("Failed to check block locators"));
 }
