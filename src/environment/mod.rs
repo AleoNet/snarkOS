@@ -54,7 +54,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of peer nodes to bootstrap the node server with.
     const PEER_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: [&'static str; 2] = ["0.0.0.0:4132", "0.0.0.0:4135"];
+    const SYNC_NODES: [&'static str; 2] = ["127.0.0.1:4132", "127.0.0.1:4135"];
 
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.

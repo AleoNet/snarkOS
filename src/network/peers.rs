@@ -76,6 +76,11 @@ pub(crate) struct Peers<N: Network, E: Environment> {
     connected_peers: HashMap<SocketAddr, OutboundRouter<N, E>>,
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
+
+    /// The map of peers to a map of block hashes and when they've seen that block.
+    seen_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, i64>>,
+    /// The map of peers to a map of transaction ids and when they've seen that transaction.
+    seen_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, i64>>,
 }
 
 impl<N: Network, E: Environment> Peers<N, E> {
@@ -87,6 +92,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
             local_ip,
             connected_peers: HashMap::new(),
             candidate_peers: HashSet::new(),
+            seen_blocks: Default::default(),
+            seen_transactions: Default::default(),
         }
     }
 
@@ -229,6 +236,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::PeerDisconnected(peer_ip) => {
                 self.connected_peers.remove(&peer_ip);
                 self.candidate_peers.insert(peer_ip);
+
+                // Clear the peer's seen blocks/transactions.
+                self.seen_blocks.remove(&peer_ip);
+                self.seen_transactions.remove(&peer_ip);
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -289,10 +300,70 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Sends the given message to every connected peer, except for the sender.
     ///
     async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
-        for peer in self.connected_peers() {
-            trace!("Preparing to propagate '{}' to {}", message.name(), peer);
-            if peer != sender {
-                self.send(peer, message).await;
+        const BLOCK_BROADCAST_INTERVAL: i64 = 180; // 3 minutes.
+        const TRANSACTION_BROADCAST_INTERVAL: i64 = 180; // 3 minutes.
+
+        let now = chrono::Utc::now().timestamp();
+
+        // Iterate through all peers that are not the sender.
+        for peer in self.connected_peers().iter() {
+            match message {
+                Message::UnconfirmedBlock(block) => {
+                    // If the message is an UnconfirmedBlock, check which peers to send to.
+                    let block_hash = block.hash();
+
+                    // Check the sent blocks log.
+                    match self.seen_blocks.get(&peer) {
+                        Some(seen_blocks_map) => {
+                            if let Some(last_sent) = seen_blocks_map.get(&block_hash) {
+                                // Check if the enough time has passed before needing to send the block.
+                                if last_sent - now < BLOCK_BROADCAST_INTERVAL {
+                                    continue;
+                                }
+                            }
+                        }
+                        None => {
+                            // Initialize the map for the particular peer.
+                            self.seen_blocks.insert(*peer, HashMap::new());
+                        }
+                    };
+
+                    // Update the timestamp for the peer and sent block.
+                    if let Some(map) = self.seen_blocks.get_mut(&peer) {
+                        map.insert(block_hash, now);
+                    }
+                }
+                Message::UnconfirmedTransaction(transaction) => {
+                    // If the message is an UnconfirmedTransaction, check which peers to send to.
+                    let transaction_id = transaction.transaction_id();
+
+                    // Check the sent transactions log.
+                    match self.seen_transactions.get(&peer) {
+                        Some(seen_transactions_map) => {
+                            if let Some(last_sent) = seen_transactions_map.get(&transaction_id) {
+                                // Check if the enough time has passed before needing to send the transaction.
+                                if last_sent - now < TRANSACTION_BROADCAST_INTERVAL {
+                                    continue;
+                                }
+                            }
+                        }
+                        None => {
+                            // Initialize the map for the particular peer.
+                            self.seen_transactions.insert(*peer, HashMap::new());
+                        }
+                    };
+
+                    // Update the timestamp for the peer and sent transaction.
+                    if let Some(map) = self.seen_transactions.get_mut(&peer) {
+                        map.insert(transaction_id, now);
+                    }
+                }
+                _ => {}
+            }
+
+            if peer != &sender {
+                trace!("Preparing to propagate '{}' to {}", message.name(), peer);
+                self.send(*peer, message).await;
             }
         }
     }

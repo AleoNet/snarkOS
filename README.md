@@ -54,4 +54,8 @@ OPTIONS:
         --username <rpc-username>    Specify the username for the RPC server [default: root]
         --password <rpc-password>    Specify the password for the RPC server [default: pass]
         --verbosity <verbosity>      Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 3]
+
+SUBCOMMANDS:
+    help      Prints this message or the help of the given subcommand(s)
+    update    Updates snarkOS to the latest version
 ```
