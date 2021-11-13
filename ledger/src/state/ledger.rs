@@ -537,7 +537,7 @@ impl<N: Network> LedgerState<N> {
         // Construct the new block transactions.
         let transactions = Transactions::from(&[&[coinbase_transaction], transactions].concat())?;
 
-        debug!("Mining block {}", block_height);
+        trace!("Mining block {}", block_height);
 
         // Mine the next block.
         match Block::mine(
@@ -550,10 +550,7 @@ impl<N: Network> LedgerState<N> {
             terminator,
             rng,
         ) {
-            Ok(block) => {
-                debug!("Mined block {}", block_height);
-                Ok(block)
-            }
+            Ok(block) => Ok(block),
             Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }
     }
