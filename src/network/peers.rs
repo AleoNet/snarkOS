@@ -77,7 +77,6 @@ pub(crate) struct Peers<N: Network, E: Environment> {
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
 
-    /// The map of block hashes to a map of peers and when they were sent the related block.
     /// The map of peers to a map of sent block hashes and when they were sent the related block.
     sent_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, i64>>,
     /// The map of peers to a map of sent block hashes and when they were sent the related transaction.
