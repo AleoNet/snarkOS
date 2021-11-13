@@ -707,7 +707,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                             self.unconfirmed_blocks.remove(&block_hash);
                         }
 
-                        // Add the block hash to block_requests if the request exists.
+                        // Add the block hash to block_requests if the requests exists.
                         if let Some(requests) = self.block_requests.get_mut(&peer_ip) {
                             requests.insert((removed_block.height(), Some(block_hash)));
                         }
