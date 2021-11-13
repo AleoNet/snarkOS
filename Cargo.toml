@@ -117,6 +117,9 @@ version = "0.3.1"
 [dev-dependencies.tempfile]
 version = "3.2"
 
+[dependencies.self_update]
+version = "0.27"
+
 [profile.release]
 opt-level = 3
 lto = "thin"

@@ -20,6 +20,7 @@ use snarkvm::{
     prelude::*,
 };
 
+use crate::helpers::Updater;
 use anyhow::Result;
 use std::str::FromStr;
 use structopt::StructOpt;
@@ -57,17 +58,27 @@ pub struct Node {
     pub display: bool,
     #[structopt(hidden = true, long)]
     pub trial: bool,
+    /// Specify an optional subcommand.
+    #[structopt(subcommand)]
+    commands: Option<Command>,
 }
 
 impl Node {
     /// Starts the node.
     pub async fn start(self) -> Result<()> {
-        match (self.network, self.miner.is_some(), self.trial) {
-            (2, true, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
-            (2, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
-            (2, true, true) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
-            (2, false, true) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
-            _ => panic!("Unsupported node configuration"),
+        // Parse optional subcommands first.
+        match self.commands {
+            Some(command) => {
+                println!("{}", command.parse()?);
+                Ok(())
+            }
+            None => match (self.network, self.miner.is_some(), self.trial) {
+                (2, true, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
+                (2, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
+                (2, true, true) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
+                (2, false, true) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
+                _ => panic!("Unsupported node configuration"),
+            },
         }
     }
 
@@ -136,5 +147,60 @@ impl Node {
             .with_env_filter(filter)
             .with_target(self.verbosity == 3)
             .init();
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub enum Command {
+    #[structopt(name = "update", about = "Updates snarkOS to the latest version")]
+    Update(Update),
+}
+
+impl Command {
+    pub fn parse(self) -> Result<String> {
+        match self {
+            Self::Update(command) => command.parse(),
+        }
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct Update {
+    /// Lists all available versions of snarkOS
+    #[structopt(short = "l", long)]
+    list: bool,
+
+    /// Suppress outputs to terminal
+    #[structopt(short = "q", long)]
+    quiet: bool,
+}
+
+impl Update {
+    pub fn parse(self) -> Result<String> {
+        match self.list {
+            true => match Updater::show_available_releases() {
+                Ok(output) => Ok(output),
+                Err(error) => Ok(format!("Failed to list the available versions of snarkOS\n{}\n", error)),
+            },
+            false => {
+                let result = Updater::update_to_latest_release(!self.quiet);
+                if !self.quiet {
+                    match result {
+                        Ok(status) => {
+                            if status.uptodate() {
+                                Ok("\nsnarkOS is already on the latest version".to_string())
+                            } else if status.updated() {
+                                Ok(format!("\nsnarkOS has updated to version {}", status.version()))
+                            } else {
+                                Ok(format!(""))
+                            }
+                        }
+                        Err(e) => Ok(format!("\nFailed to update snarkOS to the latest version\n{}\n", e)),
+                    }
+                } else {
+                    Ok(format!(""))
+                }
+            }
+        }
     }
 }

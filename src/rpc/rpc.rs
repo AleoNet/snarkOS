@@ -430,19 +430,15 @@ fn result_to_response<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Client;
-    use crate::ledger::Ledger;
+    use crate::{ledger::Ledger, Client};
 
     use snarkos_ledger::{
         storage::{rocksdb::RocksDB, Storage},
         LedgerState,
     };
     use snarkvm::{
-        dpc::testnet2::Testnet2,
+        dpc::{testnet2::Testnet2, AccountScheme, AleoAmount, RecordCiphertext, Transaction, Transactions, Transition},
         prelude::{Account, Block, BlockHeader},
-    };
-    use snarkvm::{
-        dpc::{AccountScheme, AleoAmount, RecordCiphertext, Transaction, Transactions, Transition},
         utilities::ToBytes,
     };
 
@@ -526,7 +522,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block.
         let actual: Block<Testnet2> = process_response(response).await;
@@ -551,7 +549,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block height.
         let actual: u32 = process_response(response).await;
@@ -576,7 +576,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block hash.
         let actual: <Testnet2 as Network>::BlockHash = process_response(response).await;
@@ -601,7 +603,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block header.
         let actual: BlockHeader<Testnet2> = process_response(response).await;
@@ -626,7 +630,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into transactions.
         let actual: Transactions<Testnet2> = process_response(response).await;
@@ -652,7 +658,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a ledger root.
         let actual: <Testnet2 as Network>::LedgerRoot = process_response(response).await;
@@ -679,7 +687,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block.
         let actual: Block<Testnet2> = process_response(response).await;
@@ -742,7 +752,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into blocks.
         let actual: Vec<Block<Testnet2>> = process_response(response).await;
@@ -772,7 +784,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block height.
         let actual: u32 = process_response(response).await;
@@ -800,7 +814,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block hash.
         let actual: <Testnet2 as Network>::BlockHash = process_response(response).await;
@@ -863,7 +879,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into block hashes.
         let actual: Vec<<Testnet2 as Network>::BlockHash> = process_response(response).await;
@@ -893,7 +911,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a block header.
         let actual: BlockHeader<Testnet2> = process_response(response).await;
@@ -921,7 +941,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into transactions.
         let actual: Transactions<Testnet2> = process_response(response).await;
@@ -949,7 +971,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a ciphertext.
         let actual: RecordCiphertext<Testnet2> = process_response(response).await;
@@ -1027,7 +1051,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a ledger proof string.
         let actual: String = process_response(response).await;
@@ -1065,7 +1091,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a transaction and transaction metadata.
         let actual: GetTransactionResponse = process_response(response).await;
@@ -1101,7 +1129,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a transition.
         let actual: Transition<Testnet2> = process_response(response).await;
@@ -1147,7 +1177,9 @@ mod tests {
         ));
 
         // Send the request to the rpc.
-        let response = handle_rpc(caller(), rpc, request).await.expect("Test rpc failed to process request");
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test rpc failed to process request");
 
         // Process the response into a ciphertext.
         let actual: <Testnet2 as Network>::TransactionID = process_response(response).await;
