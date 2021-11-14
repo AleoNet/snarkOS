@@ -89,6 +89,7 @@ pub enum Status {
 /// A ledger for a specific network on the node server.
 ///
 #[derive(Clone, Debug)]
+#[allow(clippy::type_complexity)]
 pub struct Ledger<N: Network, E: Environment> {
     /// The canonical chain of block hashes.
     canon: LedgerState<N>,
@@ -396,15 +397,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
         // If there is an insufficient number of connected peers, it should not be mining.
-        else if self.peers_state.len() < E::MINIMUM_NUMBER_OF_PEERS {
+        if self.peers_state.len() < E::MINIMUM_NUMBER_OF_PEERS {
             return;
         }
         // If `terminator` is `true`, it should not be mining.
-        else if self.terminator.load(Ordering::SeqCst) {
+        if self.terminator.load(Ordering::SeqCst) {
             return;
         }
         // If the status is `Ready`, mine the next block.
-        else if self.status() == Status::Ready {
+        if self.status() == Status::Ready {
             // Set the status to `Mining`.
             self.status.store(Status::Mining as u8, Ordering::SeqCst);
 
@@ -538,15 +539,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Adds an entry for the given peer IP to every data structure in `State`.
     ///
     fn initialize_peer(&mut self, peer_ip: SocketAddr) {
-        if !self.peers_state.contains_key(&peer_ip) {
-            self.peers_state.insert(peer_ip, None);
-        }
-        if !self.block_requests.contains_key(&peer_ip) {
-            self.block_requests.insert(peer_ip, Default::default());
-        }
-        if !self.failures.contains_key(&peer_ip) {
-            self.failures.insert(peer_ip, Default::default());
-        }
+        self.peers_state.entry(peer_ip).or_insert(None);
+        self.block_requests.entry(peer_ip).or_insert_with(Default::default);
+        self.failures.entry(peer_ip).or_insert_with(Default::default);
     }
 
     ///
@@ -571,7 +566,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // TODO (raychu86): Handle is_fork.
 
         // Ensure the list of block locators is not empty.
-        if block_locators.len() == 0 {
+        if block_locators.is_empty() {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
         } else {
             // Ensure the peer provided well-formed block locators.
@@ -839,7 +834,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns the number of outstanding block requests.
     ///
     fn number_of_block_requests(&self) -> usize {
-        self.block_requests.values().map(|r| r.len()).fold(0usize, |a, b| a + b)
+        self.block_requests.values().map(|r| r.len()).sum()
     }
 
     ///

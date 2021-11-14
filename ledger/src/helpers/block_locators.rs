@@ -48,6 +48,11 @@ impl<N: Network> BlockLocators<N> {
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.block_locators.is_empty()
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.block_locators.len()
     }
@@ -77,7 +82,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
 
         let block_headers = block_headers_bytes
             .par_iter()
-            .flat_map(|(index, bytes)| match bytes.len() > 0 {
+            .flat_map(|(index, bytes)| match !bytes.is_empty() {
                 true => Some((index, BlockHeader::<N>::read_le(&bytes[..]).unwrap())),
                 false => None,
             })
@@ -117,7 +122,7 @@ impl<N: Network> FromStr for BlockLocators<N> {
     type Err = anyhow::Error;
 
     fn from_str(block_locators: &str) -> Result<Self, Self::Err> {
-        Ok(serde_json::from_str(&block_locators)?)
+        Ok(serde_json::from_str(block_locators)?)
     }
 }
 

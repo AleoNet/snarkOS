@@ -23,8 +23,8 @@ members = ["ledger"]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
 #snarkvm = { path = "../snarkVM", features = ["parameters"] }
 
-futures = { version = "0.3.0", features = ["thread-pool"]}
 bytes = "1.0.0"
+futures = { version = "0.3.0", features = ["thread-pool"]}
 
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", features = ["crossterm"] }
@@ -61,7 +61,7 @@ version = "0.14"
 features = [ "http1", "runtime", "server", "tcp" ]
 
 [dependencies.json-rpc-types]
-version = "1.0.1"
+version = "1.0"
 
 [dependencies.jsonrpc-core]
 version = "18"
@@ -77,6 +77,9 @@ version = "0.11"
 
 [dependencies.rand]
 version = "0.8"
+
+[dependencies.self_update]
+version = "0.27"
 
 [dependencies.serde]
 version = "1"
@@ -102,7 +105,7 @@ features = [
 ]
 
 [dependencies.tokio-util]
-version = "=0.6.8"
+version = "=0.6"
 features = ["codec"]
 
 [dependencies.tokio-stream]
@@ -112,16 +115,17 @@ version = "=0.1"
 version = "0.1"
 
 [dependencies.tracing-subscriber]
-version = "0.2"
+version = "0.3"
+features = ["env-filter"]
 
 [dev-dependencies.rand_chacha]
-version = "0.3.1"
+version = "0.3"
+
+[dev-dependencies.rusty-hook]
+version = "0.11"
 
 [dev-dependencies.tempfile]
 version = "3.2"
-
-[dependencies.self_update]
-version = "0.27"
 
 [profile.release]
 opt-level = 3
