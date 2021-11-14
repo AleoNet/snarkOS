@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #![allow(clippy::module_inception)]
+#![allow(clippy::suspicious_else_formatting)]
 
 #[macro_use]
 extern crate thiserror;
