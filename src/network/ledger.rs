@@ -107,8 +107,8 @@ pub struct Ledger<N: Network, E: Environment> {
     block_requests: HashMap<SocketAddr, HashSet<(u32, Option<N::BlockHash>)>>,
     /// The latest block height requested from a peer.
     latest_block_request: u32,
-    /// The timestamp of the last successful block increment.
-    last_block_increment_timestamp: Instant,
+    /// The timestamp of the last successful block update.
+    last_block_update_timestamp: Instant,
     /// The map of each peer to their failure messages.
     failures: HashMap<SocketAddr, Vec<String>>,
     _phantom: PhantomData<E>,
@@ -119,7 +119,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         let canon = LedgerState::open::<S, P>(path, false)?;
         let latest_block_request = canon.latest_block_height();
-        let last_block_increment_timestamp = Instant::now();
+        let last_block_update_timestamp = Instant::now();
         Ok(Self {
             canon,
             unconfirmed_blocks: Default::default(),
@@ -130,7 +130,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             peers_state: Default::default(),
             block_requests: Default::default(),
             latest_block_request,
-            last_block_increment_timestamp,
+            last_block_update_timestamp,
             failures: Default::default(),
             _phantom: PhantomData,
         })
@@ -318,13 +318,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // If the timestamp of the last block increment has surpassed the preset limit,
         // the ledger is likely syncing from invalid state, and should rollback by one block.
-        if self.is_syncing() && self.last_block_increment_timestamp.elapsed() > Duration::from_secs(E::MAXIMUM_RADIO_SILENCE_IN_SECS) {
+        if self.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::MAXIMUM_RADIO_SILENCE_IN_SECS) {
             trace!("Ledger state has become stale, clearing queue and rolling back");
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
             self.block_requests.values_mut().for_each(|requests| *requests = Default::default());
             self.remove_last_blocks(1);
-            self.last_block_increment_timestamp = Instant::now();
         }
     }
 
@@ -451,7 +450,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     self.terminator.store(true, Ordering::SeqCst);
 
                     // Update the timestamp of the last block increment.
-                    self.last_block_increment_timestamp = Instant::now();
+                    self.last_block_update_timestamp = Instant::now();
 
                     // On success, filter the memory pool of its transactions and the block if it exists.
                     let transactions = block.transactions();
@@ -514,15 +513,19 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
-    /// Removes the latest `num_blocks` from storage.
+    /// Removes the latest `num_blocks` from storage, returning `true` on success.
     ///
-    fn remove_last_blocks(&mut self, num_blocks: u32) {
+    fn remove_last_blocks(&mut self, num_blocks: u32) -> bool {
         match self.canon.remove_last_blocks(num_blocks) {
             Ok(removed_blocks) => {
-                let latest_block_height = self.latest_block_height();
+                info!("Ledger rolled back to block {}", self.latest_block_height());
 
-                info!("Ledger rolled back to block {}", latest_block_height);
-                self.latest_block_request = latest_block_height;
+                // Update latest block request to the latest block height.
+                self.latest_block_request = self.latest_block_height();
+                // Update the last block update timestamp.
+                self.last_block_update_timestamp = Instant::now();
+                // Set the terminator bit to `true` to ensure the miner resets state.
+                self.terminator.store(true, Ordering::SeqCst);
 
                 // Ensure the removed blocks are not in the unconfirmed blocks.
                 for removed_block in removed_blocks {
@@ -530,8 +533,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         self.unconfirmed_blocks.remove(&removed_block.hash());
                     }
                 }
+                true
             }
-            Err(error) => error!("Failed to roll ledger back: {}", error),
+            Err(error) => {
+                error!("Failed to roll ledger back: {}", error);
+
+                // Update latest block request to the latest block height.
+                self.latest_block_request = self.latest_block_height();
+                // Set the terminator bit to `true` to ensure the miner resets state.
+                self.terminator.store(true, Ordering::SeqCst);
+                // Reset the unconfirmed blocks.
+                self.unconfirmed_blocks = Default::default();
+
+                false
+            }
         }
     }
 
@@ -691,84 +706,75 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let (Some(peer_ip), Some(is_fork)) = (maximal_peer, maximal_peer_is_fork) {
-            // Determine the start and end block heights to request.
-            let (start_block_height, end_block_height) =
-                // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
-                if !is_fork {
-                    // Continue to sync from the latest block height of this ledger.
-                    let num_blocks = std::cmp::min(maximum_block_height - self.latest_block_request, E::MAXIMUM_BLOCK_REQUEST);
-                    let start_block_height = self.latest_block_request + 1;
-                    let end_block_height = start_block_height + num_blocks - 1;
-                    (start_block_height, end_block_height)
-                }
-                // Case 2(c) - This ledger is on a fork of the peer.
-                else {
-                    // Determine the common ancestor block height between this ledger and the peer.
-                    let mut maximum_common_ancestor = maximum_common_ancestor;
-                    // Determine the first locator (smallest height) that does not exist in this ledger.
-                    let mut first_deviating_locator = None;
+            // Determine the common ancestor block height between this ledger and the peer.
+            let mut maximum_common_ancestor = maximum_common_ancestor;
+            // Determine the first locator (smallest height) that does not exist in this ledger.
+            let mut first_deviating_locator = None;
 
-                    // Verify the integrity of the block hashes sent by the peer.
-                    for (block_height, block_hash, _) in &*maximum_block_locators {
-                        // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                        if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
-                            if expected_block_height != *block_height {
-                                let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
-                                trace!("{}", error);
-                                self.add_failure(peer_ip, error);
-                                return;
-                            } else {
-                                // Update the common ancestor, as this block hash exists in this ledger.
-                                if expected_block_height > maximum_common_ancestor {
-                                    maximum_common_ancestor = expected_block_height;
-                                }
-                            }
-                        } else {
-                            // Update the first deviating locator.
-                            match first_deviating_locator {
-                                None => first_deviating_locator = Some(block_height),
-                                Some(saved_height) => {
-                                    if block_height < saved_height {
-                                        first_deviating_locator = Some(block_height);
-                                    }
-                                }
+            // Verify the integrity of the block hashes sent by the peer.
+            for (block_height, block_hash, _) in &*maximum_block_locators {
+                // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
+                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
+                    if expected_block_height != *block_height {
+                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                        trace!("{}", error);
+                        self.add_failure(peer_ip, error);
+                        return;
+                    } else {
+                        // Update the common ancestor, as this block hash exists in this ledger.
+                        if expected_block_height > maximum_common_ancestor {
+                            maximum_common_ancestor = expected_block_height;
+                        }
+                    }
+                } else {
+                    // Update the first deviating locator.
+                    match first_deviating_locator {
+                        None => first_deviating_locator = Some(block_height),
+                        Some(saved_height) => {
+                            if block_height < saved_height {
+                                first_deviating_locator = Some(block_height);
                             }
                         }
                     }
+                }
+            }
 
+            // Determine the latest common ancestor.
+            let latest_common_ancestor =
+                // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
+                if !is_fork {
+                    // Continue to sync from the latest block height of this ledger, if the peer is honest.
+                    match first_deviating_locator.is_none() {
+                        true => maximum_common_ancestor,
+                        false => self.latest_block_request,
+                    }
+                }
+                // Case 2(c) - This ledger is on a fork of the peer.
+                else {
                     // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger,
                     // proceed to switch to the fork.
-                    if maximum_block_height.saturating_sub(maximum_common_ancestor) > 0
-                        && latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH
+                    if latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH
                     {
                         info!("Found a longer chain starting from block {}", maximum_common_ancestor);
-
-                        // Set the terminator bit to `true` to ensure it does not mine.
-                        self.terminator.store(true, Ordering::SeqCst);
-
                         // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
-                        let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
-                        self.remove_last_blocks(num_blocks);
-
-                        let num_blocks = std::cmp::min(maximum_block_height - maximum_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
-                        let start_block_height = maximum_common_ancestor + 1;
-                        let end_block_height = start_block_height + num_blocks - 1;
-
-                        (start_block_height, end_block_height)
+                        match self.remove_last_blocks(latest_block_height.saturating_sub(maximum_common_ancestor)) {
+                            true => maximum_common_ancestor,
+                            false => return
+                        }
                     }
                     // Case 2(c)(b) - If the common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
-                    else if maximum_block_height.saturating_sub(maximum_common_ancestor) > 0
+                    else
                     {
-                        // Sanity check that the first deviating locator exists.
+                        // Ensure that the first deviating locator exists.
                         let first_deviating_locator = match first_deviating_locator {
                             Some(locator) => locator,
                             None => return,
                         };
 
                         // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
+                        // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
                         if latest_block_height.saturating_sub(*first_deviating_locator) >= N::ALEO_MAXIMUM_FORK_DEPTH {
-                            // This peer is outside of the ledgers fork range, disconnect from the peer.
-
+                            debug!("Peer {} is outside of the fork range of this ledger, disconnecting", peer_ip);
                             // Send a `Disconnect` message to the peer.
                             let request = PeersRequest::MessageSend(peer_ip, Message::Disconnect);
                             if let Err(error) = peers_router.send(request).await {
@@ -779,28 +785,24 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`.
                         // Roll back to the common ancestor anyways.
                         else {
-                            info!("Found a potentially longer chain starting from block {}",maximum_common_ancestor);
-
-                            // Set the terminator bit to `true` to ensure it does not mine.
-                            self.terminator.store(true, Ordering::SeqCst);
-
+                            info!("Found a potentially longer chain starting from block {}", maximum_common_ancestor);
                             // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
-                            let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
-                            self.remove_last_blocks(num_blocks);
-
-                            let num_blocks = std::cmp::min(maximum_block_height - maximum_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
-                            let start_block_height = maximum_common_ancestor + 1;
-                            let end_block_height = start_block_height + num_blocks - 1;
-
-                            (start_block_height, end_block_height)
+                            match self.remove_last_blocks(latest_block_height.saturating_sub(maximum_common_ancestor)) {
+                                true => maximum_common_ancestor,
+                                false => return
+                            }
                         }
-                    } else {
-                        return;
                     }
                 };
 
-            // Send a `BlockRequest` message to the peer.
+            // TODO (howardwu): Ensure the start <= end.
+            // Determine the start and end block heights to request.
+            let number_of_block_requests = std::cmp::min(maximum_block_height - latest_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
+            let start_block_height = self.latest_block_request + 1;
+            let end_block_height = start_block_height + number_of_block_requests - 1;
             debug!("Request blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
+
+            // Send a `BlockRequest` message to the peer.
             let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
             if let Err(error) = peers_router.send(request).await {
                 warn!("[BlockRequest] {}", error);
