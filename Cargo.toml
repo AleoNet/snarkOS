@@ -78,6 +78,9 @@ version = "0.11"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.self_update]
+version = "0.27"
+
 [dependencies.serde]
 version = "1"
 
@@ -120,9 +123,6 @@ version = "0.3"
 
 [dev-dependencies.tempfile]
 version = "3.2"
-
-[dependencies.self_update]
-version = "0.27"
 
 [profile.release]
 opt-level = 3
