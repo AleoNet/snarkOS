@@ -799,7 +799,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // TODO (howardwu): Ensure the start <= end.
             // Determine the start and end block heights to request.
             let number_of_block_requests = std::cmp::min(maximum_block_height - latest_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
-            let start_block_height = self.latest_block_request + 1;
+            let start_block_height = latest_common_ancestor + 1;
             let end_block_height = start_block_height + number_of_block_requests - 1;
             debug!("Request blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
 
