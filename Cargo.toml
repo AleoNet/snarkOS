@@ -113,6 +113,7 @@ version = "0.1"
 
 [dependencies.tracing-subscriber]
 version = "0.3"
+features = ["env-filter"]
 
 [dev-dependencies.rand_chacha]
 version = "0.3"
