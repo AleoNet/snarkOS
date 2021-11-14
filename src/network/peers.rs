@@ -513,7 +513,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     /// A handler to process an individual peer.
     async fn handler(stream: TcpStream, local_ip: SocketAddr, peers_router: &PeersRouter<N, E>, ledger_router: LedgerRouter<N, E>) {
         let peers_router = peers_router.clone();
-        let ledger_router = ledger_router.clone();
+        let ledger_router = ledger_router;
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(stream, local_ip, &peers_router, &ledger_router).await {
