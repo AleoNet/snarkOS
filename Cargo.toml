@@ -61,7 +61,7 @@ version = "0.14"
 features = [ "http1", "runtime", "server", "tcp" ]
 
 [dependencies.json-rpc-types]
-version = "1.0.1"
+version = "1.0"
 
 [dependencies.jsonrpc-core]
 version = "18"
@@ -102,7 +102,7 @@ features = [
 ]
 
 [dependencies.tokio-util]
-version = "=0.6.8"
+version = "=0.6"
 features = ["codec"]
 
 [dependencies.tokio-stream]
@@ -112,10 +112,11 @@ version = "=0.1"
 version = "0.1"
 
 [dependencies.tracing-subscriber]
-version = "0.2"
+version = "0.3"
+features = ["env-filter"]
 
 [dev-dependencies.rand_chacha]
-version = "0.3.1"
+version = "0.3"
 
 [dev-dependencies.tempfile]
 version = "3.2"
