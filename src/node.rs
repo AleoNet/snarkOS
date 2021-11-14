@@ -14,13 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType};
+use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType};
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
     prelude::*,
 };
 
-use crate::helpers::Updater;
 use anyhow::Result;
 use std::str::FromStr;
 use structopt::StructOpt;
@@ -86,9 +85,10 @@ impl Node {
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
         let node_port = self.node.unwrap_or(E::DEFAULT_NODE_PORT);
         let rpc_port = self.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
-        if node_port < 4130 {
-            panic!("Until configuration files are established, the node port must be at least 4130 or greater");
-        }
+        assert!(
+            !(node_port < 4130),
+            "Until configuration files are established, the node port must be at least 4130 or greater"
+        );
 
         let miner = match (E::NODE_TYPE, &self.miner) {
             (NodeType::Miner, Some(address)) => {

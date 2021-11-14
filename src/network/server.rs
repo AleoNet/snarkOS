@@ -85,8 +85,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
-
         // Initialize a new instance of the RPC server.
         tasks.append(initialize_rpc_server::<N, E>(
             format!("0.0.0.0:{}", rpc_port).parse()?,
@@ -128,6 +126,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance for managing peers.
     ///
     #[inline]
+    #[allow(clippy::type_complexity)]
     fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
         let peers = Arc::new(RwLock::new(Peers::new(local_ip)));
@@ -158,6 +157,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance for managing the ledger.
     ///
     #[inline]
+    #[allow(clippy::type_complexity)]
     fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_path: &str,

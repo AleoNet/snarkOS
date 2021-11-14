@@ -506,7 +506,7 @@ impl<N: Network> LedgerState<N> {
             }
         }
 
-        return Ok(true);
+        Ok(true)
     }
 
     /// Mines a new block using the latest state of the given ledger.
@@ -1053,7 +1053,7 @@ impl<N: Network> BlockState<N> {
             // Insert the block height.
             self.block_heights.insert(&block_height, &block_hash)?;
             // Insert the block header.
-            self.block_headers.insert(&block_hash, &block_header)?;
+            self.block_headers.insert(&block_hash, block_header)?;
             // Insert the block transactions.
             self.block_transactions.insert(&block_hash, &transaction_ids)?;
             // Insert the transactions.
@@ -1115,6 +1115,7 @@ impl<N: Network> BlockState<N> {
 }
 
 #[derive(Clone, Debug)]
+#[allow(clippy::type_complexity)]
 struct TransactionState<N: Network> {
     transactions: DataMap<N::TransactionID, (N::LedgerRoot, Vec<N::TransitionID>, Metadata<N>)>,
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
@@ -1264,27 +1265,27 @@ impl<N: Network> TransactionState<N> {
     /// Removes the given transaction ID from storage.
     fn remove_transaction(&self, transaction_id: &N::TransactionID) -> Result<()> {
         // Ensure the transaction exists.
-        if !self.transactions.contains_key(&transaction_id)? {
+        if !self.transactions.contains_key(transaction_id)? {
             Err(anyhow!("Transaction {} does not exist in storage", transaction_id))
         } else {
             // Retrieve the transition IDs from the transaction.
-            let transition_ids = match self.transactions.get(&transaction_id)? {
+            let transition_ids = match self.transactions.get(transaction_id)? {
                 Some((_, transition_ids, _)) => transition_ids,
                 None => return Err(anyhow!("Transaction {} missing from transactions map", transaction_id)),
             };
 
             // Remove the transaction entry.
-            self.transactions.remove(&transaction_id)?;
+            self.transactions.remove(transaction_id)?;
 
             for (_, transition_id) in transition_ids.iter().enumerate() {
                 // Retrieve the transition from the transition ID.
-                let transition = match self.transitions.get(&transition_id)? {
+                let transition = match self.transitions.get(transition_id)? {
                     Some((_, _, transition)) => transition,
                     None => return Err(anyhow!("Transition {} missing from transitions map", transition_id)),
                 };
 
                 // Remove the transition.
-                self.transitions.remove(&transition_id)?;
+                self.transitions.remove(transition_id)?;
 
                 // Remove the serial numbers.
                 for serial_number in transition.serial_numbers() {
@@ -1301,7 +1302,7 @@ impl<N: Network> TransactionState<N> {
             }
 
             // Remove the transaction events.
-            self.events.remove(&transaction_id)?;
+            self.events.remove(transaction_id)?;
 
             Ok(())
         }

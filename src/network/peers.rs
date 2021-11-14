@@ -76,6 +76,11 @@ pub(crate) struct Peers<N: Network, E: Environment> {
     connected_peers: HashMap<SocketAddr, OutboundRouter<N, E>>,
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
+
+    /// The map of peers to a map of block hashes and when they've seen that block.
+    seen_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, i64>>,
+    /// The map of peers to a map of transaction ids and when they've seen that transaction.
+    seen_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, i64>>,
 }
 
 impl<N: Network, E: Environment> Peers<N, E> {
@@ -87,6 +92,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
             local_ip,
             connected_peers: HashMap::new(),
             candidate_peers: HashSet::new(),
+            seen_blocks: Default::default(),
+            seen_transactions: Default::default(),
         }
     }
 
@@ -181,10 +188,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
-                    trace!("Attempting connection to {}...", peer_ip);
-                    let request = PeersRequest::Connect(*peer_ip, ledger_router.clone());
-                    if let Err(error) = peers_router.send(request).await {
-                        error!("Failed to transmit the request: '{}'", error);
+                    if !self.is_connected_to(*peer_ip) {
+                        trace!("Attempting connection to {}...", peer_ip);
+                        let request = PeersRequest::Connect(*peer_ip, ledger_router.clone());
+                        if let Err(error) = peers_router.send(request).await {
+                            error!("Failed to transmit the request: '{}'", error);
+                        }
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
@@ -229,6 +238,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::PeerDisconnected(peer_ip) => {
                 self.connected_peers.remove(&peer_ip);
                 self.candidate_peers.insert(peer_ip);
+
+                // Clear the peer's seen blocks/transactions.
+                self.seen_blocks.remove(&peer_ip);
+                self.seen_transactions.remove(&peer_ip);
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -254,7 +267,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Ensure the peer is not self and is a new candidate peer.
                 let is_self = *peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
-                if !is_self && !self.connected_peers.contains_key(peer_ip) && !self.candidate_peers.contains(peer_ip) {
+                if !is_self && !self.is_connected_to(*peer_ip) && !self.candidate_peers.contains(peer_ip) {
                     self.candidate_peers.insert(*peer_ip);
                 }
             }
@@ -289,10 +302,58 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Sends the given message to every connected peer, except for the sender.
     ///
     async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
-        for peer in self.connected_peers() {
-            trace!("Preparing to propagate '{}' to {}", message.name(), peer);
-            if peer != sender {
-                self.send(peer, message).await;
+        const BLOCK_BROADCAST_INTERVAL: i64 = 180; // 3 minutes.
+        const TRANSACTION_BROADCAST_INTERVAL: i64 = 180; // 3 minutes.
+
+        let now = chrono::Utc::now().timestamp();
+
+        // Iterate through all peers that are not the sender.
+        for peer in self.connected_peers().iter() {
+            match message {
+                Message::UnconfirmedBlock(block) => {
+                    // Retrieve the map for the peer.
+                    match self.seen_blocks.get_mut(peer) {
+                        Some(seen_blocks) => {
+                            if let Some(last_seen) = seen_blocks.get(&block.hash()) {
+                                // Ensure sufficient time has passed before needing to send the block.
+                                if now.saturating_sub(*last_seen) < BLOCK_BROADCAST_INTERVAL {
+                                    continue;
+                                }
+                            }
+                            // Update the timestamp for the peer and sent block.
+                            seen_blocks.insert(block.hash(), now);
+                        }
+                        None => {
+                            // Insert an entry for the peer.
+                            self.seen_blocks.insert(*peer, [(block.hash(), now)].into());
+                        }
+                    };
+                }
+                Message::UnconfirmedTransaction(transaction) => {
+                    // Retrieve the map for the particular peer.
+                    match self.seen_transactions.get_mut(peer) {
+                        Some(seen_transactions) => {
+                            if let Some(last_seen) = seen_transactions.get(&transaction.transaction_id()) {
+                                // Ensure sufficient time has passed before needing to send the transaction.
+                                if now.saturating_sub(*last_seen) < TRANSACTION_BROADCAST_INTERVAL {
+                                    continue;
+                                }
+                            }
+                            // Update the timestamp for the peer and sent transaction.
+                            seen_transactions.insert(transaction.transaction_id(), now);
+                        }
+                        None => {
+                            // Insert an entry for the peer.
+                            self.seen_transactions.insert(*peer, [(transaction.transaction_id(), now)].into());
+                        }
+                    };
+                }
+                _ => {}
+            }
+
+            if peer != &sender {
+                trace!("Preparing to propagate '{}' to {}", message.name(), peer);
+                self.send(*peer, message).await;
             }
         }
     }
@@ -323,12 +384,20 @@ struct Peer<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
-    async fn new(stream: TcpStream, local_ip: SocketAddr, peers_router: &PeersRouter<N, E>) -> Result<Self> {
+    async fn new(
+        stream: TcpStream,
+        local_ip: SocketAddr,
+        peers_router: &PeersRouter<N, E>,
+        ledger_router: &LedgerRouter<N, E>,
+    ) -> Result<Self> {
         // Construct the socket.
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
         let peer_ip = Peer::handshake(&mut outbound_socket, local_ip).await?;
+
+        // Send the first ping sequence to the peer.
+        ledger_router.send(LedgerRequest::SendPing(peer_ip)).await?;
 
         // Create a channel for this peer.
         let (outbound_router, outbound_handler) = mpsc::channel(1024);
@@ -421,13 +490,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     Message::ChallengeResponse(block_header) => {
                         match block_header.height() == CHALLENGE_HEIGHT && &block_header == genesis_block_header && block_header.is_valid()
                         {
-                            true => {
-                                // Send the first ping sequence.
-                                let message = Message::<N, E>::Ping(E::MESSAGE_VERSION);
-                                trace!("Sending '{}' to {}", message.name(), peer_ip);
-                                outbound_socket.send(message).await?;
-                                Ok(peer_ip)
-                            }
+                            true => Ok(peer_ip),
                             false => return Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
                     }
@@ -452,7 +515,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let peers_router = peers_router.clone();
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, &peers_router).await {
+            let mut peer = match Peer::new(stream, local_ip, &peers_router, &ledger_router).await {
                 Ok(peer) => peer,
                 Err(error) => {
                     trace!("{}", error);
@@ -534,7 +597,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version) => {
+                                Message::Ping(version, block_height, block_hash) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
@@ -543,21 +606,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the version of the peer.
                                     peer.version = version;
                                     // Route the `Ping` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::Ping(peer_ip)).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::Ping(peer_ip, block_height, block_hash)).await {
                                         warn!("[Ping] {}", error);
                                     }
                                 },
-                                Message::Pong(block_locators) => {
+                                Message::Pong(is_fork, block_locators) => {
                                     // Route the `Pong` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, block_locators)).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, is_fork, block_locators)).await {
                                         warn!("[Pong] {}", error);
-                                    }
-                                    // Sleep for the preset time before sending a `Ping` request.
-                                    tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
-                                    // Send a `Ping` request to the peer.
-                                    let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION));
-                                    if let Err(error) = peers_router.send(request).await {
-                                        warn!("[Ping] {}", error);
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {

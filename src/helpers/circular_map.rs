@@ -39,6 +39,13 @@ impl<K: Clone + PartialEq, V: Clone, const N: u32> CircularMap<K, V, N> {
     }
 
     ///
+    /// Returns `true` if the circular map is empty.
+    ///
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    ///
     /// Returns the number of key-value pairs in the circular map.
     ///
     pub fn len(&self) -> usize {
@@ -63,7 +70,7 @@ impl<K: Clone + PartialEq, V: Clone, const N: u32> CircularMap<K, V, N> {
     /// Returns the value for the given key from the map, if it exists.
     ///
     pub fn get(&self, key: &K) -> Option<&V> {
-        match self.queue.iter().filter(|(k, _)| k == key).next() {
+        match self.queue.iter().find(|(k, _)| k == key) {
             Some((_, value)) => Some(value),
             None => None,
         }
@@ -83,8 +90,10 @@ impl<K: Clone + PartialEq, V: Clone, const N: u32> CircularMap<K, V, N> {
     ///
     pub fn remove(&mut self, key: &K) {
         let mut queue = CircularQueue::with_capacity(N as usize);
-        for element in self.queue.iter().filter(|(k, _)| k != key) {
-            queue.push(element.clone());
+        for (k, v) in self.queue.iter() {
+            if key != k {
+                queue.push((k.clone(), v.clone()));
+            }
         }
         self.queue = queue;
     }

@@ -1,0 +1,123 @@
+version: 2.1
+commands:
+  setup_environment:
+    description: "Setup testing environment"
+    parameters:
+      cache_key:
+        type: string
+        default: snarkos-stable-cache
+    steps:
+      - run: set -e
+      - setup_remote_docker
+      - run:
+          name: Prepare environment and install dependencies
+          command: |
+            export SCCACHE_CACHE_SIZE=200M
+            export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
+            export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
+            mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
+            wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+            tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+            mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
+            export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
+            export RUSTC_WRAPPER="sccache"
+            rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
+            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
+      - restore_cache:
+          keys:
+            - << parameters.cache_key >>
+  clear_environment:
+    description: "Clear environment"
+    parameters:
+      cache_key:
+        type: string
+        default: snarkos-stable-cache
+    steps:
+      - run: (sccache -s||true)
+      - run: set +e
+      - save_cache:
+          key: << parameters.cache_key >>
+          paths:
+            - .cache/sccache
+            - .cargo
+  install_rust_nightly:
+    description: "Install Rust nightly toolchain"
+    steps:
+      - run:
+          command: |
+            rustup toolchain install nightly-x86_64-unknown-linux-gnu
+
+jobs:
+  tests:
+    docker:
+      - image: cimg/rust:1.56.1
+    resource_class: 2xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-stable-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: RUST_MIN_STACK=8388608 cargo test --workspace
+      - clear_environment:
+          cache_key: snarkos-stable-cache
+
+
+  # codecov:
+  #   machine:
+  #     image: ubuntu-1604:202004-01
+  #     docker_layer_caching: true
+  #   resource_class: 2xlarge
+  #   steps:
+  #     - attach_workspace:
+  #         at: /home/circleci/project/
+  #     - run:
+  #         name: Run kcov
+  #         command: >
+  #           cd ~/project/project/ &&
+  #           docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
+  #           howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
+  #     - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
+
+  fmt:
+    docker:
+      - image: cimg/rust:1.56.1
+    resource_class: 2xlarge
+    steps:
+      - checkout
+      - install_rust_nightly
+      - setup_environment:
+          cache_key: snarkos-fmt-cache
+      - run:
+          name: Check style
+          no_output_timeout: 35m
+          command: cargo +nightly fmt --all -- --check
+      - clear_environment:
+          cache_key: snarkos-fmt-cache
+
+  clippy:
+    docker:
+      - image: cimg/rust:1.56.1
+    resource_class: 2xlarge
+    steps:
+      - checkout
+      - install_rust_nightly
+      - setup_environment:
+          cache_key: snarkos-clippy-cache
+      - run:
+          name: Check style
+          no_output_timeout: 35m
+          command: cargo +nightly clippy --workspace --all-targets
+      - clear_environment:
+          cache_key: snarkos-clippy-cache
+
+workflows:
+  main-workflow:
+    jobs:
+      - tests
+      # - codecov:
+      #     requires:
+      #       - rust-stable
+      - fmt
+      - clippy
