@@ -656,11 +656,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///                  - Roll back to common ancestor, and send block requests to sync.
     ///             Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`:
     ///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
-    ///                      - Do not roll back or sync.
-    ///                      - Remove this peer from peers_state. Call `update_block_requests` again.
+    ///                      - Disconnect from peer.
     ///                  Case 2(c)(b)(b) - You don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`:
-    ///                      - Roll back to most common ancestor and attempt to sync.
-    ///                      - This means we aren't entirely enforcing `ALEO_MAXIMUM_FORK_DEPTH` precisely.
+    ///                      - Roll back to most common ancestor and send block requests to sync.
     ///
     async fn update_block_requests(&mut self, peers_router: &PeersRouter<N, E>) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
