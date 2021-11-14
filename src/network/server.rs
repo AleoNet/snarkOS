@@ -179,9 +179,13 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Hold the ledger write lock briefly, to update the state of the ledger.
                 let peers_router = peers_router.clone();
                 let ledger_clone = ledger_clone.clone();
-                task::spawn(async move {
+                if let Err(error) = task::spawn(async move {
                     ledger_clone.write().await.update(request, &peers_router).await;
-                });
+                })
+                .await
+                {
+                    error!("Failed to process ledger request: {}", error)
+                }
             }
         }));
 
