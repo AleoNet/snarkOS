@@ -188,10 +188,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 for peer_ip in self.candidate_peers().iter().take(E::MINIMUM_NUMBER_OF_PEERS) {
-                    trace!("Attempting connection to {}...", peer_ip);
-                    let request = PeersRequest::Connect(*peer_ip, ledger_router.clone());
-                    if let Err(error) = peers_router.send(request).await {
-                        error!("Failed to transmit the request: '{}'", error);
+                    if !self.is_connected_to(*peer_ip) {
+                        trace!("Attempting connection to {}...", peer_ip);
+                        let request = PeersRequest::Connect(*peer_ip, ledger_router.clone());
+                        if let Err(error) = peers_router.send(request).await {
+                            error!("Failed to transmit the request: '{}'", error);
+                        }
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
@@ -265,7 +267,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Ensure the peer is not self and is a new candidate peer.
                 let is_self = *peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
-                if !is_self && !self.connected_peers.contains_key(peer_ip) && !self.candidate_peers.contains(peer_ip) {
+                if !is_self && !self.is_connected_to(*peer_ip) && !self.candidate_peers.contains(peer_ip) {
                     self.candidate_peers.insert(*peer_ip);
                 }
             }

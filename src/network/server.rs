@@ -85,8 +85,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
-
         // Initialize a new instance of the RPC server.
         tasks.append(initialize_rpc_server::<N, E>(
             format!("0.0.0.0:{}", rpc_port).parse()?,

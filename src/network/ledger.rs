@@ -18,7 +18,6 @@ use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, 
 use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
-use crate::NodeType::Peer;
 use anyhow::Result;
 use rand::thread_rng;
 use std::{
@@ -249,7 +248,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
                     Err(_) => None,
                 };
-
                 // Send a `Pong` message to the peer.
                 let request = PeersRequest::MessageSend(peer_ip, Message::Pong(is_fork, self.canon.latest_block_locators()));
                 if let Err(error) = peers_router.send(request).await {
@@ -265,18 +263,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Sleep for the preset time before sending a `Ping` request.
                 tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
                 // Send a `Ping` request to the peer.
-                let latest_block_height = self.latest_block_height();
-                let latest_block_hash = self.latest_block_hash();
-                let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION, latest_block_height, latest_block_hash));
+                let message = Message::Ping(E::MESSAGE_VERSION, self.latest_block_height(), self.latest_block_hash());
+                let request = PeersRequest::MessageSend(peer_ip, message);
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Ping] {}", error);
                 }
             }
             LedgerRequest::SendPing(peer_ip) => {
                 // Send a `Ping` request to the peer.
-                let latest_block_height = self.latest_block_height();
-                let latest_block_hash = self.latest_block_hash();
-                let request = PeersRequest::MessageSend(peer_ip, Message::Ping(E::MESSAGE_VERSION, latest_block_height, latest_block_hash));
+                let message = Message::Ping(E::MESSAGE_VERSION, self.latest_block_height(), self.latest_block_hash());
+                let request = PeersRequest::MessageSend(peer_ip, message);
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Ping] {}", error);
                 }
@@ -563,8 +559,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Updates the state of the given peer.
     ///
     async fn update_peer(&mut self, peer_ip: SocketAddr, is_fork: Option<bool>, block_locators: BlockLocators<N>) {
-        // TODO (raychu86): Handle is_fork.
-
         // Ensure the list of block locators is not empty.
         if block_locators.is_empty() {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
