@@ -103,7 +103,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(version, block_height, block_hash) => Ok(to_bytes_le![version, block_height, block_hash]?),
             Self::Pong(is_fork, block_locators) => {
-                let serialized_is_fork = match is_fork {
+                let serialized_is_fork: u8 = match is_fork {
                     None => 0,
                     Some(fork) => match fork {
                         true => 1,
