@@ -75,7 +75,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.56.1-nightly
     resource_class: 2xlarge
     steps:
       - checkout
@@ -84,13 +84,13 @@ jobs:
       - run:
           name: Check style
           no_output_timeout: 35m
-          command: cargo +nightly fmt --all -- --check
+          command: cargo fmt --all -- --check
       - clear_environment:
           cache_key: snarkos-fmt-cache
 
   clippy:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.56.1-nightly
     resource_class: 2xlarge
     steps:
       - checkout
@@ -99,7 +99,7 @@ jobs:
       - run:
           name: Check style
           no_output_timeout: 35m
-          command: cargo +nightly clippy --workspace --all-targets
+          command: cargo clippy --workspace --all-targets
       - clear_environment:
           cache_key: snarkos-clippy-cache
 
