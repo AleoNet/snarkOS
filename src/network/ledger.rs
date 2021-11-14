@@ -105,7 +105,7 @@ pub struct Ledger<N: Network, E: Environment> {
     terminator: Arc<AtomicBool>,
     /// The map of each peer to their ledger state := (is_fork, common_ancestor, latest_block_height, block_locators).
     peers_state: HashMap<SocketAddr, Option<(Option<bool>, u32, u32, BlockLocators<N>)>>,
-    /// The map of each peer to their block requests := HashMap<(block_height, block_hash), num_heartbeats>
+    /// The map of each peer to their block requests := HashMap<(block_height, block_hash), timestamp>
     block_requests: HashMap<SocketAddr, HashMap<(u32, Option<N::BlockHash>), i64>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
     /// In this context, `add_block` and `update_block_requests` must be mutually-exclusive.
@@ -237,7 +237,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_ledger();
                 // Update the status of the ledger.
                 self.update_status();
-                // Remove expired block requests
+                // Remove expired block requests.
                 self.remove_expired_block_requests();
                 // Update the block requests.
                 self.update_block_requests(peers_router).await;
@@ -643,7 +643,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     fn remove_expired_block_requests(&mut self) {
         let now = Utc::now().timestamp();
 
-        // // Clear the expired block requests that have lived longer than `E::BLOCK_REQUEST_TIMEOUT_IN_SECS`
+        // Clear the expired block requests that have lived longer than `E::BLOCK_REQUEST_TIMEOUT_IN_SECS`.
         self.block_requests.iter_mut().for_each(|(_peer, block_requests)| {
             block_requests.retain(|_key, time_of_request| *time_of_request - now < E::BLOCK_REQUEST_TIMEOUT_IN_SECS as i64)
         });
