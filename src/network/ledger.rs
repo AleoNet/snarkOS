@@ -59,8 +59,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
     /// Ping := (peer_ip, block_height, block_hash)
     Ping(SocketAddr, u32, N::BlockHash),
-    /// Pong := (peer_ip, block_locators)
-    Pong(SocketAddr, BlockLocators<N>),
+    /// Pong := (peer_ip, is_fork, block_locators)
+    Pong(SocketAddr, Option<bool>, BlockLocators<N>),
     /// SendPing := (peer_ip)
     SendPing(SocketAddr),
     /// UnconfirmedBlock := (peer_ip, block)
@@ -242,19 +242,23 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.mine_next_block(local_ip, recipient, ledger_router);
             }
             LedgerRequest::Ping(peer_ip, block_height, block_hash) => {
-                // TODO (raychu86): Handle block_height and block_hash.
+                // Determine if the peer is on a fork (or unknown).
+                let is_fork: Option<bool> = match self.canon.get_block_hash(block_height) {
+                    Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
+                    Err(_) => None,
+                };
 
                 // Send a `Pong` message to the peer.
-                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(self.canon.latest_block_locators()));
+                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(is_fork, self.canon.latest_block_locators()));
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Pong] {}", error);
                 }
             }
-            LedgerRequest::Pong(peer_ip, block_locators) => {
+            LedgerRequest::Pong(peer_ip, is_fork, block_locators) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip);
                 // Process the pong.
-                self.update_peer(peer_ip, block_locators, peers_router).await;
+                self.update_peer(peer_ip, is_fork, block_locators, peers_router).await;
 
                 // Sleep for the preset time before sending a `Ping` request.
                 tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
@@ -562,7 +566,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Updates the state of the given peer.
     ///
-    async fn update_peer(&mut self, peer_ip: SocketAddr, block_locators: BlockLocators<N>, peers_router: &PeersRouter<N, E>) {
+    async fn update_peer(
+        &mut self,
+        peer_ip: SocketAddr,
+        is_fork: Option<bool>,
+        block_locators: BlockLocators<N>,
+        peers_router: &PeersRouter<N, E>,
+    ) {
+        // TODO (raychu86): Handle is_fork.
+
         // Ensure the list of block locators is not empty.
         if block_locators.len() == 0 {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
