@@ -611,9 +611,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[Ping] {}", error);
                                     }
                                 },
-                                Message::Pong(block_locators) => {
+                                Message::Pong(is_fork, block_locators) => {
                                     // Route the `Pong` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, block_locators)).await {
+                                    if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, is_fork, block_locators)).await {
                                         warn!("[Pong] {}", error);
                                     }
                                 }
