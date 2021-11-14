@@ -42,7 +42,7 @@ impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iterator for Iter<'a, K, V> {
                 .db_iter
                 .key()
                 .and_then(|k| {
-                    if &k[0..self.prefix.len()] == &self.prefix[..] {
+                    if k[0..self.prefix.len()] == self.prefix[..] {
                         Some(k)
                     } else {
                         None
@@ -53,7 +53,7 @@ impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iterator for Iter<'a, K, V> {
                 Some(key) => key,
                 None => None,
             };
-            let value = match self.db_iter.value().map(|v| bincode::deserialize(&v).ok()) {
+            let value = match self.db_iter.value().map(|v| bincode::deserialize(v).ok()) {
                 Some(value) => value,
                 None => None,
             };

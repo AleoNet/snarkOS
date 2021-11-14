@@ -132,11 +132,11 @@ impl<N: Network, E: Environment> Message<N, E> {
             1 => Self::BlockResponse(bincode::deserialize(data)?),
             2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..6])?),
             3 => Self::ChallengeResponse(bincode::deserialize(data)?),
-            4 => match data.len() == 0 {
+            4 => match data.is_empty() {
                 true => Self::Disconnect,
                 false => return Err(anyhow!("Invalid 'Disconnect' message: {:?} {:?}", buffer, data)),
             },
-            5 => match data.len() == 0 {
+            5 => match data.is_empty() {
                 true => Self::PeerRequest,
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },

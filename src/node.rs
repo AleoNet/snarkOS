@@ -84,9 +84,10 @@ impl Node {
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
         let node_port = self.node.unwrap_or(E::DEFAULT_NODE_PORT);
         let rpc_port = self.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
-        if node_port < 4130 {
-            panic!("Until configuration files are established, the node port must be at least 4130 or greater");
-        }
+        assert!(
+            !(node_port < 4130),
+            "Until configuration files are established, the node port must be at least 4130 or greater"
+        );
 
         let miner = match (E::NODE_TYPE, &self.miner) {
             (NodeType::Miner, Some(address)) => {
