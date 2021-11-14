@@ -41,9 +41,9 @@ commands:
             - .cache/sccache
             - .cargo
 jobs:
-  rust-stable:
+  tests:
     docker:
-      - image: cimg/rust:1.54.0
+      - image: cimg/rust:1.56.1
     resource_class: 2xlarge
     steps:
       - checkout
@@ -51,14 +51,11 @@ jobs:
           cache_key: snarkos-stable-cache
       - run:
           name: Build and run tests
-          no_output_timeout: 60m
-          command: >
-            RUST_MIN_STACK=8388608 cargo test --workspace --no-run
-      - persist_to_workspace:
-          root: ~/
-          paths: project/
+          no_output_timeout: 35m
+          command: RUST_MIN_STACK=8388608 cargo test --workspace
       - clear_environment:
           cache_key: snarkos-stable-cache
+
 
   # codecov:
   #   machine:
@@ -76,25 +73,10 @@ jobs:
   #           howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
   #     - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
 
-  snarkos:
-    docker:
-      - image: cimg/rust:1.54.0
-    resource_class: xlarge
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-rpc-cache
-      - run:
-          name: Build and run tests
-          no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test --release
-      - clear_environment:
-          cache_key: snarkos-rpc-cache
-
   fmt:
     docker:
       - image: howardwu/snarkos-ci:2021-03-25
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - checkout
       - setup_environment:
@@ -110,9 +92,8 @@ workflows:
   version: 2
   main-workflow:
     jobs:
-      - rust-stable
+      - tests
       # - codecov:
       #     requires:
       #       - rust-stable
-      - snarkos
       - fmt
