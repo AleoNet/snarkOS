@@ -514,20 +514,24 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
-    /// Removes the latest `num_blocks` from storage, returning the successfully removed blocks.
+    /// Removes the latest `num_blocks` from storage.
     ///
-    fn remove_last_blocks(&mut self, num_blocks: u32) -> Vec<Block<N>> {
+    fn remove_last_blocks(&mut self, num_blocks: u32) {
         match self.canon.remove_last_blocks(num_blocks) {
             Ok(removed_blocks) => {
                 let latest_block_height = self.latest_block_height();
+
                 info!("Ledger rolled back to block {}", latest_block_height);
                 self.latest_block_request = latest_block_height;
-                removed_blocks
+
+                // Ensure the removed blocks are not in the unconfirmed blocks.
+                for removed_block in removed_blocks {
+                    if self.unconfirmed_blocks.contains_key(&removed_block.hash()) {
+                        self.unconfirmed_blocks.remove(&removed_block.hash());
+                    }
+                }
             }
-            Err(error) => {
-                error!("Failed to roll ledger back: {}", error);
-                vec![]
-            }
+            Err(error) => error!("Failed to roll ledger back: {}", error),
         }
     }
 
@@ -627,25 +631,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
 
-        // Case 1 - You are ahead of your peer:
-        //     - Do nothing
-        // Case 2 - You are behind your peer:
-        //     Case 2(a) - `is_fork` is `None`:
-        //         - Peer is being malicious or thinks you are ahead. Both are issues,
-        //           pick a different peer to sync with.
-        //     Case 2(b) - `is_fork` is `Some(false)`:
-        //         - Request blocks from your latest state
-        //     Case 2(c) - `is_fork` is `Some(true)`:
-        //             Case 2(c)(a) - Common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                  - Roll back to common ancestor, and send block requests to sync.
-        //             Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                  Case 2(c)(b)(a) - You can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                      - Do not roll back or sync.
-        //                      - Remove this peer from peers_state. Call `update_block_requests` again.
-        //                  Case 2(c)(b)(b) - You don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                      - Roll back to most common ancestor and attempt to sync.
-        //                      - This means we aren't entirely enforcing `ALEO_MAXIMUM_FORK_DEPTH` precisely.
-
         // Iterate through the peers to check if this node needs to catch up, and determine a peer to sync with.
         // Prioritize the sync nodes before regular peers.
         let mut maximal_peer = None;
@@ -679,123 +664,91 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
         }
 
-        // Sanity check that your peer has a higher block height than you.
+        // Case 1 - You are ahead of your peer:
+        //     - Do nothing
+        // Case 2 - You are behind your peer:
+        //     Case 2(a) - `is_fork` is `None`:
+        //         - Peer is being malicious or thinks you are ahead. Both are issues,
+        //           pick a different peer to sync with.
+        //     Case 2(b) - `is_fork` is `Some(false)`:
+        //         - Request blocks from your latest state
+        //     Case 2(c) - `is_fork` is `Some(true)`:
+        //             Case 2(c)(a) - Common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`:
+        //                  - Roll back to common ancestor, and send block requests to sync.
+        //             Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`:
+        //                  Case 2(c)(b)(a) - You can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
+        //                      - Do not roll back or sync.
+        //                      - Remove this peer from peers_state. Call `update_block_requests` again.
+        //                  Case 2(c)(b)(b) - You don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`:
+        //                      - Roll back to most common ancestor and attempt to sync.
+        //                      - This means we aren't entirely enforcing `ALEO_MAXIMUM_FORK_DEPTH` precisely.
+
+        // Case 1 - Ensure the peer has a higher block height than this ledger.
         let latest_block_height = self.latest_block_height();
         if latest_block_height >= maximum_block_height {
             return;
         }
 
-        // Proceed add block requests if your peer is ahead of you. (Case 2)
+        // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let (Some(peer_ip), Some(is_fork)) = (maximal_peer, maximal_peer_is_fork) {
-            // Determine the common ancestor block height between this ledger and the peer.
-            let mut maximum_common_ancestor = maximum_common_ancestor;
+            // Determine the start and end block heights to request.
+            let (start_block_height, end_block_height) =
+                // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
+                if !is_fork {
+                    // Continue to sync from the latest block height of this ledger.
+                    let num_blocks = std::cmp::min(maximum_block_height - self.latest_block_request, E::MAXIMUM_BLOCK_REQUEST);
+                    let start_block_height = self.latest_block_request + 1;
+                    let end_block_height = start_block_height + num_blocks - 1;
+                    (start_block_height, end_block_height)
+                }
+                // Case 2(c) - This ledger is on a fork of the peer.
+                else {
+                    // Determine the common ancestor block height between this ledger and the peer.
+                    let mut maximum_common_ancestor = maximum_common_ancestor;
+                    // Determine the first locator (smallest height) that does not exist in this ledger.
+                    let mut first_deviating_locator = None;
 
-            // This is the first locator (smallest height) that does not match the ledger's internal state.
-            let mut first_deviating_locator = None;
-
-            // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, block_hash, _) in &*maximum_block_locators {
-                // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
-                    if expected_block_height != *block_height {
-                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
-                        trace!("{}", error);
-                        self.add_failure(peer_ip, error);
-                        return;
-                    } else {
-                        // Update the common ancestor, as this block hash exists in this ledger.
-                        if expected_block_height > maximum_common_ancestor {
-                            maximum_common_ancestor = expected_block_height;
-                        }
-                    }
-                } else {
-                    // Set the first deviating locator.
-                    match first_deviating_locator {
-                        None => first_deviating_locator = Some(block_height),
-                        Some(height) => {
-                            if height > block_height {
-                                first_deviating_locator = Some(block_height);
+                    // Verify the integrity of the block hashes sent by the peer.
+                    for (block_height, block_hash, _) in &*maximum_block_locators {
+                        // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
+                        if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
+                            if expected_block_height != *block_height {
+                                let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                                trace!("{}", error);
+                                self.add_failure(peer_ip, error);
+                                return;
+                            } else {
+                                // Update the common ancestor, as this block hash exists in this ledger.
+                                if expected_block_height > maximum_common_ancestor {
+                                    maximum_common_ancestor = expected_block_height;
+                                }
+                            }
+                        } else {
+                            // Update the first deviating locator.
+                            match first_deviating_locator {
+                                None => first_deviating_locator = Some(block_height),
+                                Some(saved_height) => {
+                                    if block_height < saved_height {
+                                        first_deviating_locator = Some(block_height);
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }
 
-            // Fetch the start and end block heights to request.
-            let (start_block_height, end_block_height) = if !is_fork {
-                // You are not a fork of your peer. (Case 2(b))
-                // Continue to sync from your latest block.
-
-                let num_blocks = std::cmp::min(maximum_block_height - self.latest_block_request, E::MAXIMUM_BLOCK_REQUEST);
-                let start_block_height = self.latest_block_request + 1;
-                let end_block_height = start_block_height + num_blocks - 1;
-
-                (start_block_height, end_block_height)
-            } else {
-                // You are on a fork of your peer. (Case 2(c))
-
-                // If the common ancestor is within the fork range,
-                // and the peer has a higher block height, proceed to switch to the fork. (Case 2(c)(a))
-                if maximum_block_height.saturating_sub(latest_block_height) > 0
-                    && maximum_block_height.saturating_sub(maximum_common_ancestor) > 0
-                    && latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH
-                {
-                    info!("Found a longer chain, rolling ledger back to block {}", maximum_common_ancestor);
-
-                    // Set the terminator bit to `true` to ensure it does not mine.
-                    self.terminator.store(true, Ordering::SeqCst);
-
-                    // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
-                    let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
-                    let removed_blocks = self.remove_last_blocks(num_blocks);
-
-                    for removed_block in removed_blocks {
-                        if self.unconfirmed_blocks.contains_key(&removed_block.hash()) {
-                            self.unconfirmed_blocks.remove(&removed_block.hash());
-                        }
-                    }
-
-                    let num_blocks = std::cmp::min(maximum_block_height - maximum_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
-                    let start_block_height = maximum_common_ancestor + 1;
-                    let end_block_height = start_block_height + num_blocks - 1;
-
-                    (start_block_height, end_block_height)
-                } else {
-                    // If the declared common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH` (Case 2(c)(b))
-
-                    // Sanity check that the first deviating locator exists.
-                    let first_deviating_locator = match first_deviating_locator {
-                        None => return,
-                        Some(locator) => locator,
-                    };
-
-                    // Check if the real common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH` (Case 2(c)(b)(a))
-                    if latest_block_height.saturating_sub(*first_deviating_locator) >= N::ALEO_MAXIMUM_FORK_DEPTH {
-                        // This Peer is outside of the ledgers fork range. Try another peer to sync to.
-                        self.peers_state.remove(&peer_ip);
-                        self.update_block_requests(peers_router);
-                        return;
-                    } else {
-                        // You don't know if your real common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH` (Case 2(c)(b)(b))
-
-                        // Roll back to the common ancestor anyways. See
-                        info!(
-                            "Potentially found a longer chain, rolling ledger back to block {}",
-                            maximum_common_ancestor
-                        );
+                    // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger,
+                    // proceed to switch to the fork.
+                    if maximum_block_height.saturating_sub(maximum_common_ancestor) > 0
+                        && latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH
+                    {
+                        info!("Found a longer chain starting from block {}", maximum_common_ancestor);
 
                         // Set the terminator bit to `true` to ensure it does not mine.
                         self.terminator.store(true, Ordering::SeqCst);
 
                         // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
                         let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
-                        let removed_blocks = self.remove_last_blocks(num_blocks);
-
-                        for removed_block in removed_blocks {
-                            if self.unconfirmed_blocks.contains_key(&removed_block.hash()) {
-                                self.unconfirmed_blocks.remove(&removed_block.hash());
-                            }
-                        }
+                        self.remove_last_blocks(num_blocks);
 
                         let num_blocks = std::cmp::min(maximum_block_height - maximum_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
                         let start_block_height = maximum_common_ancestor + 1;
@@ -803,8 +756,44 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                         (start_block_height, end_block_height)
                     }
-                }
-            };
+                    // Case 2(c)(b) - If the common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
+                    else if maximum_block_height.saturating_sub(maximum_common_ancestor) > 0
+                    {
+                        // Sanity check that the first deviating locator exists.
+                        let first_deviating_locator = match first_deviating_locator {
+                            Some(locator) => locator,
+                            None => return,
+                        };
+
+                        // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
+                        if latest_block_height.saturating_sub(*first_deviating_locator) >= N::ALEO_MAXIMUM_FORK_DEPTH {
+                            // This Peer is outside of the ledgers fork range. Try another peer to sync to.
+                            self.peers_state.remove(&peer_ip);
+                            self.update_block_requests(peers_router);
+                            return;
+                        }
+                        // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`.
+                        // Roll back to the common ancestor anyways.
+                        else {
+                            info!("Found a potentially longer chain starting from block {}",maximum_common_ancestor);
+
+                            // Set the terminator bit to `true` to ensure it does not mine.
+                            self.terminator.store(true, Ordering::SeqCst);
+
+                            // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
+                            let num_blocks = latest_block_height.saturating_sub(maximum_common_ancestor);
+                            self.remove_last_blocks(num_blocks);
+
+                            let num_blocks = std::cmp::min(maximum_block_height - maximum_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
+                            let start_block_height = maximum_common_ancestor + 1;
+                            let end_block_height = start_block_height + num_blocks - 1;
+
+                            (start_block_height, end_block_height)
+                        }
+                    } else {
+                        return;
+                    }
+                };
 
             // Send a `BlockRequest` message to the peer.
             debug!("Request blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
