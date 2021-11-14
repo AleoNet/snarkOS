@@ -39,13 +39,7 @@ use serde::{
     Serialize,
     Serializer,
 };
-use std::{
-    borrow::Borrow,
-    fmt,
-    marker::PhantomData,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
 
 ///
 /// An instance of a RocksDB database.
@@ -53,7 +47,6 @@ use std::{
 #[derive(Clone)]
 pub struct RocksDB {
     rocksdb: Arc<rocksdb::DB>,
-    path: PathBuf,
     context: Vec<u8>,
     is_read_only: bool,
 }
@@ -74,9 +67,9 @@ impl Storage for RocksDB {
         let rocksdb = match is_read_only {
             true => {
                 // Construct the directory paths.
-                let reader = &path.as_ref().join("reader").to_path_buf();
+                let reader = path.as_ref().join("reader");
                 // Open a secondary reader for the primary rocksdb.
-                let rocksdb = rocksdb::DB::open_as_secondary(&options, &primary, reader)?;
+                let rocksdb = rocksdb::DB::open_as_secondary(&options, &primary, &reader)?;
                 Arc::new(rocksdb)
             }
             false => {
@@ -88,7 +81,6 @@ impl Storage for RocksDB {
 
         Ok(RocksDB {
             rocksdb,
-            path: primary,
             context: context_bytes,
             is_read_only,
         })
@@ -104,7 +96,7 @@ impl Storage for RocksDB {
         // Combine contexts to create a new scope.
         let mut context_bytes = self.context.clone();
         bincode::serialize_into(&mut context_bytes, &(new_context.len() as u32))?;
-        context_bytes.extend_from_slice(&new_context);
+        context_bytes.extend_from_slice(new_context);
 
         Ok(DataMap {
             rocksdb: self.rocksdb.clone(),
@@ -131,7 +123,7 @@ impl Storage for RocksDB {
 
             fn visit_seq<A: de::SeqAccess<'de>>(self, mut map: A) -> std::result::Result<(), A::Error> {
                 while let Some((key, value)) = map.next_element::<(Vec<_>, Vec<_>)>()? {
-                    self.rocksdb.rocksdb.put(&key, &value).map_err(|e| serde::de::Error::custom(e))?;
+                    self.rocksdb.rocksdb.put(&key, &value).map_err(serde::de::Error::custom)?;
                 }
 
                 Ok(())

@@ -42,13 +42,13 @@ impl<'a, V: DeserializeOwned> Iterator for Values<'a, V> {
                 .db_iter
                 .key()
                 .and_then(|k| {
-                    if &k[0..self.prefix.len()] == &self.prefix[..] {
+                    if k[0..self.prefix.len()] == self.prefix[..] {
                         Some(k)
                     } else {
                         None
                     }
                 })
-                .and_then(|_| match self.db_iter.value().map(|v| bincode::deserialize(&v).ok()) {
+                .and_then(|_| match self.db_iter.value().map(|v| bincode::deserialize(v).ok()) {
                     Some(value) => value,
                     None => None,
                 });

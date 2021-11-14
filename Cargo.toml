@@ -23,8 +23,8 @@ members = ["ledger"]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
 #snarkvm = { path = "../snarkVM", features = ["parameters"] }
 
-futures = { version = "0.3.0", features = ["thread-pool"]}
 bytes = "1.0.0"
+futures = { version = "0.3.0", features = ["thread-pool"]}
 
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", features = ["crossterm"] }
@@ -78,6 +78,9 @@ version = "0.11"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.self_update]
+version = "0.27"
+
 [dependencies.serde]
 version = "1"
 
@@ -118,11 +121,11 @@ features = ["env-filter"]
 [dev-dependencies.rand_chacha]
 version = "0.3"
 
+[dev-dependencies.rusty-hook]
+version = "0.11"
+
 [dev-dependencies.tempfile]
 version = "3.2"
-
-[dependencies.self_update]
-version = "0.27"
 
 [profile.release]
 opt-level = 3

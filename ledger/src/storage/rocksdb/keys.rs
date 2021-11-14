@@ -42,7 +42,7 @@ impl<'a, K: DeserializeOwned> Iterator for Keys<'a, K> {
                 .db_iter
                 .key()
                 .and_then(|k| {
-                    if &k[0..self.prefix.len()] == &self.prefix[..] {
+                    if k[0..self.prefix.len()] == self.prefix[..] {
                         Some(k)
                     } else {
                         None

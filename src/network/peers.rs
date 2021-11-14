@@ -310,7 +310,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             match message {
                 Message::UnconfirmedBlock(block) => {
                     // Retrieve the map for the peer.
-                    match self.seen_blocks.get_mut(&peer) {
+                    match self.seen_blocks.get_mut(peer) {
                         Some(seen_blocks) => {
                             if let Some(last_seen) = seen_blocks.get(&block.hash()) {
                                 // Ensure sufficient time has passed before needing to send the block.
@@ -329,7 +329,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
                 Message::UnconfirmedTransaction(transaction) => {
                     // Retrieve the map for the particular peer.
-                    match self.seen_transactions.get_mut(&peer) {
+                    match self.seen_transactions.get_mut(peer) {
                         Some(seen_transactions) => {
                             if let Some(last_seen) = seen_transactions.get(&transaction.transaction_id()) {
                                 // Ensure sufficient time has passed before needing to send the transaction.
