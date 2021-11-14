@@ -75,7 +75,7 @@ jobs:
 
   fmt:
     docker:
-      - image: howardwu/snarkos-ci:2021-03-25
+      - image: cimg/rust:1.56.1
     resource_class: 2xlarge
     steps:
       - checkout
@@ -88,6 +88,21 @@ jobs:
       - clear_environment:
           cache_key: snarkos-fmt-cache
 
+  clippy:
+    docker:
+      - image: cimg/rust:1.56.1
+    resource_class: 2xlarge
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-clippy-cache
+      - run:
+          name: Check style
+          no_output_timeout: 35m
+          command: cargo clippy --workspace --all-targets
+      - clear_environment:
+          cache_key: snarkos-clippy-cache
+
 workflows:
   version: 2
   main-workflow:
@@ -97,3 +112,4 @@ workflows:
       #     requires:
       #       - rust-stable
       - fmt
+      - clippy
