@@ -41,8 +41,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerResponse(Vec<SocketAddr>),
     /// Ping := (version, block_height, block_hash)
     Ping(u32, u32, N::BlockHash),
-    /// Pong := (block_locators)
-    Pong(BlockLocators<N>),
+    /// Pong := (is_fork, block_locators)
+    Pong(Option<bool>, BlockLocators<N>),
     /// UnconfirmedBlock := (block)
     UnconfirmedBlock(Block<N>),
     /// UnconfirmedTransaction := (transaction)
@@ -102,7 +102,17 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
             Self::Ping(version, block_height, block_hash) => Ok(to_bytes_le![version, block_height, block_hash]?),
-            Self::Pong(block_locators) => Ok(bincode::serialize(block_locators)?),
+            Self::Pong(is_fork, block_locators) => {
+                let serialized_is_fork = match is_fork {
+                    None => 0,
+                    Some(fork) => match fork {
+                        true => 1,
+                        false => 2,
+                    },
+                };
+
+                Ok([vec![serialized_is_fork], bincode::serialize(block_locators)?].concat())
+            }
             Self::UnconfirmedBlock(block) => Ok(bincode::serialize(block)?),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
             Self::Unused(_) => Ok(vec![]),
@@ -146,7 +156,16 @@ impl<N: Network, E: Environment> Message<N, E> {
                 bincode::deserialize(&data[4..8])?,
                 bincode::deserialize(&data[8..])?,
             ),
-            8 => Self::Pong(bincode::deserialize(data)?),
+            8 => {
+                let is_fork = match data[0] {
+                    0 => None,
+                    1 => Some(true),
+                    2 => Some(false),
+                    _ => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
+                };
+
+                Self::Pong(is_fork, bincode::deserialize(data)?)
+            }
             9 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
