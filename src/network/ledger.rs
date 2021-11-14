@@ -19,6 +19,7 @@ use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
+use parking_lot::Mutex;
 use rand::thread_rng;
 use std::{
     collections::{HashMap, HashSet},
@@ -105,8 +106,9 @@ pub struct Ledger<N: Network, E: Environment> {
     peers_state: HashMap<SocketAddr, Option<(Option<bool>, u32, u32, BlockLocators<N>)>>,
     /// The map of each peer to their block requests.
     block_requests: HashMap<SocketAddr, HashSet<(u32, Option<N::BlockHash>)>>,
-    /// The latest block height requested from a peer.
-    latest_block_request: u32,
+    /// A lock to ensure methods that need to be mutually-exclusive are enforced.
+    /// In this context, `add_block` and `update_block_requests` must be mutually-exclusive.
+    block_requests_lock: Arc<Mutex<bool>>,
     /// The timestamp of the last successful block update.
     last_block_update_timestamp: Instant,
     /// The map of each peer to their failure messages.
@@ -118,7 +120,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         let canon = LedgerState::open::<S, P>(path, false)?;
-        let latest_block_request = canon.latest_block_height();
         let last_block_update_timestamp = Instant::now();
         Ok(Self {
             canon,
@@ -129,7 +130,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             terminator: Arc::new(AtomicBool::new(false)),
             peers_state: Default::default(),
             block_requests: Default::default(),
-            latest_block_request,
+            block_requests_lock: Arc::new(Mutex::new(true)),
             last_block_update_timestamp,
             failures: Default::default(),
             _phantom: PhantomData,
@@ -442,6 +443,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
     fn add_block(&mut self, block: Block<N>) -> bool {
+        // Acquire the lock for block requests.
+        let _ = self.block_requests_lock.lock();
+
         // Ensure the given block is new.
         if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
             trace!("Canon chain already contains block {}", block.height());
@@ -463,11 +467,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                     return true;
                 }
-                Err(error) => {
-                    debug!("Setting latest block request to block {}", self.latest_block_height());
-                    self.latest_block_request = self.latest_block_height();
-                    warn!("{}", error);
-                }
+                Err(error) => warn!("{}", error),
             }
         } else {
             // Ensure the unconfirmed block is well-formed.
@@ -523,8 +523,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             Ok(removed_blocks) => {
                 info!("Ledger rolled back to block {}", self.latest_block_height());
 
-                // Update latest block request to the latest block height.
-                self.latest_block_request = self.latest_block_height();
                 // Update the last block update timestamp.
                 self.last_block_update_timestamp = Instant::now();
                 // Set the terminator bit to `true` to ensure the miner resets state.
@@ -541,8 +539,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             Err(error) => {
                 error!("Failed to roll ledger back: {}", error);
 
-                // Update latest block request to the latest block height.
-                self.latest_block_request = self.latest_block_height();
                 // Set the terminator bit to `true` to ensure the miner resets state.
                 self.terminator.store(true, Ordering::SeqCst);
                 // Reset the unconfirmed blocks.
@@ -666,12 +662,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
 
+        // Acquire the lock for block requests.
+        let _ = self.block_requests_lock.lock();
+
         // Iterate through the peers to check if this node needs to catch up, and determine a peer to sync with.
         // Prioritize the sync nodes before regular peers.
         let mut maximal_peer = None;
         let mut maximal_peer_is_fork = None;
         let mut maximum_common_ancestor = 0;
-        let mut maximum_block_height = self.latest_block_request;
+        let mut maximum_block_height = self.latest_block_height();
         let mut maximum_block_locators = Default::default();
 
         // Determine if the peers state has any sync nodes.
@@ -747,7 +746,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Continue to sync from the latest block height of this ledger, if the peer is honest.
                     match first_deviating_locator.is_none() {
                         true => maximum_common_ancestor,
-                        false => self.latest_block_request,
+                        false => latest_block_height,
                     }
                 }
                 // Case 2(c) - This ledger is on a fork of the peer.
@@ -815,8 +814,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Add the block request to the ledger.
                 self.add_block_request(peer_ip, block_height, None);
             }
-            // Update the latest block height requested from a peer.
-            self.latest_block_request = end_block_height;
         }
     }
 
