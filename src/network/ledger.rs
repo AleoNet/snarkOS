@@ -311,9 +311,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Update the block iterator.
             block = unconfirmed_block;
             // Attempt to add the unconfirmed block.
-            self.add_block(block.clone());
-            // Upon success, remove the unconfirmed block, as it is now confirmed.
-            self.unconfirmed_blocks.remove(&block.hash());
+            match self.add_block(block.clone()) {
+                // Upon success, remove the unconfirmed block, as it is now confirmed.
+                true => self.unconfirmed_blocks.remove(&block.hash()),
+                false => break,
+            }
         }
 
         // If the timestamp of the last block increment has surpassed the preset limit,
@@ -437,7 +439,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///     1) as the next block in the ledger if the block height increments by one, or
     ///     2) to the memory pool for later use.
     ///
-    fn add_block(&mut self, block: Block<N>) {
+    /// Returns `true` if the given block is successfully added to the *canon* chain.
+    ///
+    fn add_block(&mut self, block: Block<N>) -> bool {
         // Ensure the given block is new.
         if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
             trace!("Canon chain already contains block {}", block.height());
@@ -446,20 +450,18 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 Ok(()) => {
                     info!("Ledger advanced to block {}", self.latest_block_height());
 
-                    // Set the terminator bit to `true` to ensure the miner updates state.
-                    self.terminator.store(true, Ordering::SeqCst);
-
                     // Update the timestamp of the last block increment.
                     self.last_block_update_timestamp = Instant::now();
-
-                    // On success, filter the memory pool of its transactions and the block if it exists.
-                    let transactions = block.transactions();
-                    self.memory_pool.remove_transactions(transactions);
-
-                    let block_hash = block.hash();
-                    if self.unconfirmed_blocks.contains_key(&block_hash) {
-                        self.unconfirmed_blocks.remove(&block_hash);
+                    // Set the terminator bit to `true` to ensure the miner updates state.
+                    self.terminator.store(true, Ordering::SeqCst);
+                    // On success, filter the memory pool of its transactions, if they exist.
+                    self.memory_pool.remove_transactions(block.transactions());
+                    // On success, filter the unconfirmed blocks of this block, if it exists.
+                    if self.unconfirmed_blocks.contains_key(&block.hash()) {
+                        self.unconfirmed_blocks.remove(&block.hash());
                     }
+
+                    return true;
                 }
                 Err(error) => {
                     debug!("Setting latest block request to block {}", self.latest_block_height());
@@ -474,11 +476,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Ensure the unconfirmed block does not already exist in the memory pool.
                     match !self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                         true => {
+                            trace!("Adding unconfirmed block {} to memory pool", block.height());
+
                             // Set the terminator bit to `true` to ensure the miner updates state.
                             self.terminator.store(true, Ordering::SeqCst);
-
                             // Add the block to the unconfirmed blocks.
-                            trace!("Adding unconfirmed block {} to memory pool", block.height());
                             self.unconfirmed_blocks.insert(block.previous_block_hash(), block);
                         }
                         false => trace!("Unconfirmed block {} already exists in the memory pool", block.height()),
@@ -487,6 +489,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 false => warn!("Unconfirmed block {} is invalid", block.height()),
             }
         }
+        false
     }
 
     ///
@@ -640,6 +643,25 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
     ///
+    /// Case 1 - You are ahead of your peer:
+    ///     - Do nothing
+    /// Case 2 - You are behind your peer:
+    ///     Case 2(a) - `is_fork` is `None`:
+    ///         - Peer is being malicious or thinks you are ahead. Both are issues,
+    ///           pick a different peer to sync with.
+    ///     Case 2(b) - `is_fork` is `Some(false)`:
+    ///         - Request blocks from your latest state
+    ///     Case 2(c) - `is_fork` is `Some(true)`:
+    ///             Case 2(c)(a) - Common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`:
+    ///                  - Roll back to common ancestor, and send block requests to sync.
+    ///             Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`:
+    ///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
+    ///                      - Do not roll back or sync.
+    ///                      - Remove this peer from peers_state. Call `update_block_requests` again.
+    ///                  Case 2(c)(b)(b) - You don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`:
+    ///                      - Roll back to most common ancestor and attempt to sync.
+    ///                      - This means we aren't entirely enforcing `ALEO_MAXIMUM_FORK_DEPTH` precisely.
+    ///
     async fn update_block_requests(&mut self, peers_router: &PeersRouter<N, E>) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
         if self.number_of_block_requests() > 0 {
@@ -678,25 +700,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
         }
-
-        // Case 1 - You are ahead of your peer:
-        //     - Do nothing
-        // Case 2 - You are behind your peer:
-        //     Case 2(a) - `is_fork` is `None`:
-        //         - Peer is being malicious or thinks you are ahead. Both are issues,
-        //           pick a different peer to sync with.
-        //     Case 2(b) - `is_fork` is `Some(false)`:
-        //         - Request blocks from your latest state
-        //     Case 2(c) - `is_fork` is `Some(true)`:
-        //             Case 2(c)(a) - Common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                  - Roll back to common ancestor, and send block requests to sync.
-        //             Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                  Case 2(c)(b)(a) - You can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                      - Do not roll back or sync.
-        //                      - Remove this peer from peers_state. Call `update_block_requests` again.
-        //                  Case 2(c)(b)(b) - You don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`:
-        //                      - Roll back to most common ancestor and attempt to sync.
-        //                      - This means we aren't entirely enforcing `ALEO_MAXIMUM_FORK_DEPTH` precisely.
 
         // Case 1 - Ensure the peer has a higher block height than this ledger.
         let latest_block_height = self.latest_block_height();
