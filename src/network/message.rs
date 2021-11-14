@@ -164,7 +164,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                     _ => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
                 };
 
-                Self::Pong(is_fork, bincode::deserialize(data)?)
+                Self::Pong(is_fork, bincode::deserialize(&data[1..])?)
             }
             9 => Self::UnconfirmedBlock(bincode::deserialize(data)?),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
