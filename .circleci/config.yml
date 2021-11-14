@@ -84,7 +84,7 @@ jobs:
       - run:
           name: Check style
           no_output_timeout: 35m
-          command: cargo fmt --all -- --check
+          command: cargo +nightly fmt --all -- --check
       - clear_environment:
           cache_key: snarkos-fmt-cache
 
@@ -99,12 +99,11 @@ jobs:
       - run:
           name: Check style
           no_output_timeout: 35m
-          command: cargo clippy --workspace --all-targets
+          command: cargo +nightly clippy --workspace --all-targets
       - clear_environment:
           cache_key: snarkos-clippy-cache
 
 workflows:
-  version: 2
   main-workflow:
     jobs:
       - tests
