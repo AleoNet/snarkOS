@@ -40,6 +40,13 @@ commands:
           paths:
             - .cache/sccache
             - .cargo
+  install_rust_nightly:
+    steps:
+      - run:
+          name: "Install nightly toolchain"
+          command: |
+            rustup toolchain install nightly-x86_64-unknown-linux-gnu
+
 jobs:
   tests:
     docker:
@@ -75,10 +82,11 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.56.1-nightly
+      - image: cimg/rust:1.56.1
     resource_class: 2xlarge
     steps:
       - checkout
+      - install_rust_nightly
       - setup_environment:
           cache_key: snarkos-fmt-cache
       - run:
@@ -90,10 +98,11 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.56.1-nightly
+      - image: cimg/rust:1.56.1
     resource_class: 2xlarge
     steps:
       - checkout
+      - install_rust_nightly
       - setup_environment:
           cache_key: snarkos-clippy-cache
       - run:
