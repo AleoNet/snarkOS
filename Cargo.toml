@@ -121,6 +121,9 @@ features = ["env-filter"]
 [dev-dependencies.rand_chacha]
 version = "0.3"
 
+[dev-dependencies.rusty-hook]
+version = "0.11.2"
+
 [dev-dependencies.tempfile]
 version = "3.2"
 
