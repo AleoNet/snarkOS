@@ -767,9 +767,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                         // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
                         if latest_block_height.saturating_sub(*first_deviating_locator) >= N::ALEO_MAXIMUM_FORK_DEPTH {
-                            // This Peer is outside of the ledgers fork range. Try another peer to sync to.
-                            self.peers_state.remove(&peer_ip);
-                            self.update_block_requests(peers_router);
+                            // This peer is outside of the ledgers fork range, disconnect from the peer.
+
+                            // Send a `Disconnect` message to the peer.
+                            let request = PeersRequest::MessageSend(peer_ip, Message::Disconnect);
+                            if let Err(error) = peers_router.send(request).await {
+                                warn!("[Disconnect] {}", error);
+                            }
                             return;
                         }
                         // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`.
