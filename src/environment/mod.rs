@@ -82,7 +82,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
 
     /// The duration in seconds after which a block request is considered expired
     /// if no block has been received in the meantime.
-    const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 50;
+    const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 90; // 1 minute 30 seconds
 
     const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
     const FAILURE_THRESHOLD: usize = 5;
