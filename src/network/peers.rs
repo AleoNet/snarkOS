@@ -395,7 +395,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let peer_ip = Peer::handshake(&mut outbound_socket, local_ip).await?;
 
         // Send the first ping sequence to the peer.
-        trace!("Sending Ping to {}", peer_ip);
         ledger_router.send(LedgerRequest::SendPing(peer_ip)).await?;
 
         // Create a channel for this peer.
