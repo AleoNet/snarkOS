@@ -236,7 +236,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                 if let Err(error) = ledger_router.send(request).await {
                     error!("Failed to send request to ledger: {}", error)
                 }
-                // Sleep for 5 seconds.
+                // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
             }
         }));
