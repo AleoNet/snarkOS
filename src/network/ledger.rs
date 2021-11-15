@@ -322,7 +322,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Ensure the block height is not part of a block request in a fork.
             let mut is_forked_block = false;
             for requests in self.block_requests.values() {
-                for ((block_height, block_hash), _) in requests {
+                for (block_height, block_hash) in requests.keys() {
                     // If the block is part of a fork, then don't attempt to add it again.
                     if block_height == &block.height() && block_hash.is_some() {
                         is_forked_block = true;
