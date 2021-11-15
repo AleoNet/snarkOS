@@ -21,7 +21,7 @@ members = ["ledger"]
 
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
-#snarkvm = { path = "../snarkVM", features = ["parameters"] }
+#snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
 futures = { version = "0.3.0", features = ["thread-pool"]}
@@ -144,6 +144,7 @@ debug-assertions = false
 opt-level = 3
 lto = "thin"
 incremental = true
+debug-assertions = false
 
 [profile.test]
 opt-level = 3

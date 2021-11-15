@@ -674,26 +674,24 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
-    /// Updates the ledger state back to the given block height, returning the removed blocks on success.
-    pub fn return_to_block_height(&mut self, block_height: u32) -> Result<Vec<Block<N>>> {
+    /// Reverts the ledger state back to the given block height, returning the removed blocks on success.
+    pub fn revert_to_block_height(&mut self, block_height: u32) -> Result<Vec<Block<N>>> {
         // If the storage is in read-only mode, this method cannot be called.
         if self.is_read_only() {
             return Err(anyhow!("Ledger is in read-only mode"));
         }
 
+        // Determine the number of blocks to remove.
         let latest_block_height = self.latest_block_height();
+        let number_of_blocks = latest_block_height.saturating_sub(block_height);
 
-        // Ensure the number of blocks to remove is within a permitted range.
-        if block_height >= latest_block_height
-            || self.get_block_hash(block_height).is_err()
-            || latest_block_height.saturating_sub(block_height) > N::ALEO_MAXIMUM_FORK_DEPTH
-        {
+        // Ensure the reverted block height is within a permitted range and well-formed.
+        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
         // Initialize a list of the removed blocks.
-        let mut blocks = Vec::with_capacity(latest_block_height.saturating_sub(block_height) as usize);
-
+        let mut blocks = Vec::with_capacity(number_of_blocks as usize);
         {
             // Acquire the write lock on the latest block.
             let mut latest_block = self.latest_block.write();
@@ -708,7 +706,7 @@ impl<N: Network> LedgerState<N> {
 
                 *latest_block = match latest_block.height() == 0 {
                     true => N::genesis_block().clone(),
-                    false => self.get_block(latest_block.height() - 1)?,
+                    false => self.get_block(latest_block.height().saturating_sub(1))?,
                 };
             }
         }
