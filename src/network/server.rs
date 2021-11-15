@@ -130,7 +130,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[allow(clippy::type_complexity)]
     fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
-        let peers = Arc::new(RwLock::new(Peers::new(local_ip)));
+        let peers = Arc::new(RwLock::new(Peers::new(local_ip, None)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);

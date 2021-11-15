@@ -329,7 +329,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
             self.block_requests.values_mut().for_each(|requests| *requests = Default::default());
-            self.revert_to_block_height(self.latest_block_height() - 1);
+            self.revert_to_block_height(self.latest_block_height().saturating_sub(1));
         }
     }
 
@@ -776,10 +776,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH
                     {
                         info!("Found a longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
-                        match self.revert_to_block_height(maximum_common_ancestor) {
-                            true => maximum_common_ancestor,
-                            false => return
+                        // If the latest block is the same as the maximum common ancestor, do not revert.
+                        if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor) {
+                            return;
                         }
+                        maximum_common_ancestor
                     }
                     // Case 2(c)(b) - If the common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
                     else
