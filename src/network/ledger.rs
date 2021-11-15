@@ -318,11 +318,31 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.hash()) {
             // Update the block iterator.
             block = unconfirmed_block;
+
+            // Ensure the block height is not part of a block request in a fork.
+            let mut is_forked_block = false;
+            for requests in self.block_requests.values() {
+                for (block_height, block_hash) in requests.keys() {
+                    // If the block is part of a fork, then don't attempt to add it again.
+                    if block_height == &block.height() && block_hash.is_some() {
+                        is_forked_block = true;
+                        break;
+                    }
+                }
+            }
+
+            // If the block is on a fork, remove the unconfirmed block, and break the loop.
+            if is_forked_block {
+                self.unconfirmed_blocks.remove(&block.hash());
+                break;
+            }
             // Attempt to add the unconfirmed block.
-            match self.add_block(block.clone()) {
-                // Upon success, remove the unconfirmed block, as it is now confirmed.
-                true => self.unconfirmed_blocks.remove(&block.hash()),
-                false => break,
+            else {
+                match self.add_block(block.clone()) {
+                    // Upon success, remove the unconfirmed block, as it is now confirmed.
+                    true => self.unconfirmed_blocks.remove(&block.hash()),
+                    false => break,
+                }
             }
         }
 
@@ -485,8 +505,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         true => {
                             trace!("Adding unconfirmed block {} to memory pool", block.height());
 
-                            // Set the terminator bit to `true` to ensure the miner updates state.
-                            self.terminator.store(true, Ordering::SeqCst);
                             // Add the block to the unconfirmed blocks.
                             self.unconfirmed_blocks.insert(block.previous_block_hash(), block);
                         }
@@ -606,7 +624,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let mut latest_block_height_of_peer = 0;
 
             // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, block_hash, _) in block_locators.iter() {
+            for (block_height, (block_hash, _)) in block_locators.iter() {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
                 if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
                     if expected_block_height != *block_height {
@@ -715,7 +733,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let mut first_deviating_locator = None;
 
             // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, block_hash, _) in &*maximum_block_locators {
+            for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
                 if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
                     if expected_block_height != *block_height {
@@ -746,20 +764,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let latest_block_height = self.latest_block_height();
             if latest_block_height < maximum_common_ancestor {
                 warn!(
-                    "The maximum common ancestor {} can't be greater than the latest block {}",
+                    "The common ancestor {} cannot be greater than the latest block {}",
                     maximum_common_ancestor, latest_block_height
                 );
                 return;
             }
 
             // Determine the latest common ancestor.
-            let latest_common_ancestor =
+            let (latest_common_ancestor, ledger_reverted) =
                 // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
                 if !is_fork {
                     // Continue to sync from the latest block height of this ledger, if the peer is honest.
                     match first_deviating_locator.is_none() {
-                        true => maximum_common_ancestor,
-                        false => latest_block_height,
+                        true => (maximum_common_ancestor, false),
+                        false => (latest_block_height, false),
                     }
                 }
                 // Case 2(c) - This ledger is on a fork of the peer.
@@ -773,7 +791,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor) {
                             return;
                         }
-                        maximum_common_ancestor
+                        (maximum_common_ancestor, true)
                     }
                     // Case 2(c)(b) - If the common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
                     else
@@ -800,7 +818,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         else {
                             info!("Found a potentially longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
                             match self.revert_to_block_height(maximum_common_ancestor) {
-                                true => maximum_common_ancestor,
+                                true => (maximum_common_ancestor, true),
                                 false => return
                             }
                         }
@@ -823,8 +841,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Log each block request to ensure the peer responds with all requested blocks.
             for block_height in start_block_height..=end_block_height {
-                // Add the block request to the ledger.
-                self.add_block_request(peer_ip, block_height, None);
+                // If the ledger was reverted, include the expected new block hash for the fork.
+                match ledger_reverted {
+                    true => self.add_block_request(peer_ip, block_height, maximum_block_locators.get_block_hash(block_height)),
+                    false => self.add_block_request(peer_ip, block_height, None),
+                };
             }
         }
     }
