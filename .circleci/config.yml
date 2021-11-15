@@ -144,6 +144,36 @@ jobs:
           paths:
             - docker_tag_arm
 
+  build-and-publish-docker-amd:
+    machine:
+      image: ubuntu-2004:202101-01
+      docker_layer_caching: true
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run: mkdir -p my_workspace
+      - run:
+          name: "Build snarkos Docker Image AMD"
+          no_output_timeout: 2h
+          command: |
+            VERSION=$(git rev-parse --short HEAD)
+            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64 .
+      - run:
+          name: "Push snarkos Docker Image AMD"
+          command: |
+            VERSION=$(git rev-parse --short HEAD)
+            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64
+      - run:
+          name: "Save amd64 image tag"
+          command: |
+            VERSION=$(git rev-parse --short HEAD)
+            echo "$CIRCLE_BRANCH-$VERSION-amd64" > my_workspace/docker_tag_amd
+      - persist_to_workspace:
+          root: my_workspace
+          paths:
+            - docker_tag_amd
+  
   publish_snarkos_manifest:
     machine:
       image: ubuntu-2004:202101-01
