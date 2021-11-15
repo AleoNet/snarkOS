@@ -19,10 +19,11 @@ use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
+use chrono::Utc;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     marker::PhantomData,
     net::SocketAddr,
     path::Path,
@@ -104,8 +105,8 @@ pub struct Ledger<N: Network, E: Environment> {
     terminator: Arc<AtomicBool>,
     /// The map of each peer to their ledger state := (is_fork, common_ancestor, latest_block_height, block_locators).
     peers_state: HashMap<SocketAddr, Option<(Option<bool>, u32, u32, BlockLocators<N>)>>,
-    /// The map of each peer to their block requests.
-    block_requests: HashMap<SocketAddr, HashSet<(u32, Option<N::BlockHash>)>>,
+    /// The map of each peer to their block requests := HashMap<(block_height, block_hash), timestamp>
+    block_requests: HashMap<SocketAddr, HashMap<(u32, Option<N::BlockHash>), i64>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
     /// In this context, `add_block` and `update_block_requests` must be mutually-exclusive.
     block_requests_lock: Arc<Mutex<bool>>,
@@ -236,6 +237,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_ledger();
                 // Update the status of the ledger.
                 self.update_status();
+                // Remove expired block requests.
+                self.remove_expired_block_requests();
                 // Update the block requests.
                 self.update_block_requests(peers_router).await;
             }
@@ -636,6 +639,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
     }
 
+    /// Removes block requests that have expired.
+    fn remove_expired_block_requests(&mut self) {
+        let now = Utc::now().timestamp();
+
+        // Clear the expired block requests that have lived longer than `E::BLOCK_REQUEST_TIMEOUT_IN_SECS`.
+        self.block_requests.iter_mut().for_each(|(_peer, block_requests)| {
+            block_requests.retain(|_key, time_of_request| *time_of_request - now < E::BLOCK_REQUEST_TIMEOUT_IN_SECS as i64)
+        });
+    }
+
     ///
     /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
     ///
@@ -831,9 +844,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Ensure the block request does not already exist.
         if !self.contains_block_request(peer_ip, block_height, block_hash) {
             match self.block_requests.get_mut(&peer_ip) {
-                Some(requests) => match requests.insert((block_height, block_hash)) {
-                    true => debug!("Requesting block {} from {}", block_height, peer_ip),
-                    false => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)),
+                Some(requests) => match requests.insert((block_height, block_hash), Utc::now().timestamp()) {
+                    None => debug!("Requesting block {} from {}", block_height, peer_ip),
+                    Some(_old_request) => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)),
                 },
                 None => self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)),
             };
@@ -845,7 +858,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     fn contains_block_request(&self, peer_ip: SocketAddr, block_height: u32, block_hash: Option<N::BlockHash>) -> bool {
         match self.block_requests.get(&peer_ip) {
-            Some(requests) => requests.contains(&(block_height, block_hash)) || requests.contains(&(block_height, None)),
+            Some(requests) => requests.contains_key(&(block_height, block_hash)) || requests.contains_key(&(block_height, None)),
             None => false,
         }
     }
@@ -861,7 +874,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             false
         } else {
             if let Some(requests) = self.block_requests.get_mut(&peer_ip) {
-                let is_success = requests.remove(&(block_height, Some(block_hash))) || requests.remove(&(block_height, None));
+                let is_success =
+                    requests.remove(&(block_height, Some(block_hash))).is_some() || requests.remove(&(block_height, None)).is_some();
                 match is_success {
                     true => return true,
                     false => self.add_failure(peer_ip, format!("Non-existent block request from {}", peer_ip)),

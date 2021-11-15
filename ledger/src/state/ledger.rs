@@ -377,8 +377,8 @@ impl<N: Network> LedgerState<N> {
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
 
         // Acquire the read lock for the latest block hashes and block headers.
-        let latest_block_hashes = self.latest_block_hashes.write();
-        let latest_block_headers = self.latest_block_headers.write();
+        let latest_block_hashes = self.latest_block_hashes.read();
+        let latest_block_headers = self.latest_block_headers.read();
 
         // Construct the list of block locator headers.
         let block_hashes = latest_block_hashes.iter().cloned();

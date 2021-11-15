@@ -1001,8 +1001,7 @@ mod tests {
                 .first()
                 .unwrap()
                 .ciphertexts()
-                .find(|expected| **expected == actual)
-                .is_some()
+                .any(|expected| *expected == actual)
         );
     }
 
@@ -1031,7 +1030,7 @@ mod tests {
 
         // Get the record commitment.
         let decrypted_records = block_1.transactions().first().unwrap().to_decrypted_records(account.view_key());
-        assert!(decrypted_records.len() > 0);
+        assert!(!decrypted_records.is_empty());
         let record_commitment = decrypted_records[0].commitment();
 
         // Get the ledger proof.
@@ -1161,9 +1160,8 @@ mod tests {
                 .first()
                 .unwrap()
                 .transitions()
-                .into_iter()
-                .find(|expected| **expected == actual)
-                .is_some()
+                .iter()
+                .any(|expected| *expected == actual)
         );
     }
 
