@@ -587,12 +587,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
         let peers_router = peers_router.clone();
         task::spawn(async move {
-            // Verify that the peer doesn't have the same nonce as this node.
-            if nonce == peer.nonce {
-                trace!("Can't connect to a peer with the same nonce {}", nonce);
-                return;
-            }
-
             // Retrieve the peer IP.
             let peer_ip = peer.peer_ip();
             info!("Connected to {}", peer_ip);
