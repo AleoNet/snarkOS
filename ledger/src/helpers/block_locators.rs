@@ -59,7 +59,7 @@ impl<N: Network> BlockLocators<N> {
 
     #[inline]
     pub fn get_block_hash(&self, block_height: u32) -> Option<N::BlockHash> {
-        self.block_locators.get(&block_height).and_then(|(block_hash, _)| Some(*block_hash))
+        self.block_locators.get(&block_height).map(|(block_hash, _)| *block_hash)
     }
 }
 
