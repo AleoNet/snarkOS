@@ -132,7 +132,9 @@ impl<N: Network> LedgerState<N> {
         for block_height in 0..=latest_block_height {
             // Validate the ledger root every 250 blocks.
             if block_height % 250 == 0 || block_height == latest_block_height {
-                debug!("Validating the ledger root up to block {}", block_height);
+                if !ledger.is_read_only() {
+                    debug!("Validating the ledger root up to block {}", block_height);
+                }
 
                 // Ensure the ledger roots match their expected block heights.
                 let expected_ledger_root = ledger.get_previous_ledger_root(block_height)?;
