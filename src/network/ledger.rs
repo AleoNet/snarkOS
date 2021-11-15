@@ -56,7 +56,7 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     /// Disconnect := (peer_ip)
     Disconnect(SocketAddr),
     /// Heartbeat := ()
-    Heartbeat,
+    Heartbeat(LedgerRouter<N, E>),
     /// Mine := (local_ip, miner_address, ledger_router)
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
     /// Ping := (peer_ip, block_height, block_hash)
@@ -112,8 +112,8 @@ pub struct Ledger<N: Network, E: Environment> {
     block_requests_lock: Arc<Mutex<bool>>,
     /// The timestamp of the last successful block update.
     last_block_update_timestamp: Instant,
-    /// The map of each peer to their failure messages.
-    failures: HashMap<SocketAddr, Vec<String>>,
+    /// The map of each peer to their failure messages := (failure_message, timestamp).
+    failures: HashMap<SocketAddr, Vec<(String, i64)>>,
     _phantom: PhantomData<E>,
 }
 
@@ -232,13 +232,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     warn!("[Disconnect] {}", error);
                 }
             }
-            LedgerRequest::Heartbeat => {
+            LedgerRequest::Heartbeat(ledger_router) => {
                 // Update the ledger.
                 self.update_ledger();
                 // Update the status of the ledger.
                 self.update_status();
                 // Remove expired block requests.
                 self.remove_expired_block_requests();
+                // Remove expired failures.
+                self.remove_expired_failures();
+                // Disconnect from peers with more than E::FAILURE_THRESHOLD failures.
+                self.disconnect_from_failing_peers(&ledger_router).await;
                 // Update the block requests.
                 self.update_block_requests(peers_router).await;
             }
@@ -649,6 +653,31 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         });
     }
 
+    /// Removes failures that have expired.
+    fn remove_expired_failures(&mut self) {
+        let now = Utc::now().timestamp();
+
+        // Clear the expired failures that have lived longer than `E::FAILURE_EXPIRY_TIME`.
+        self.failures
+            .iter_mut()
+            .for_each(|(_, failures)| failures.retain(|(_, timestamp)| now - timestamp > E::FAILURE_EXPIRY_TIME.as_secs() as i64));
+    }
+
+    /// Disconnects from peers with more than E::FAILURE_THRESHOLD peers
+    async fn disconnect_from_failing_peers(&self, ledger_router: &LedgerRouter<N, E>) {
+        let peers_to_disconnect = self
+            .failures
+            .iter()
+            .filter(|(_, failures)| failures.len() > E::FAILURE_THRESHOLD)
+            .map(|(peer_ip, _)| peer_ip);
+        for peer_ip in peers_to_disconnect {
+            let request = LedgerRequest::Disconnect(*peer_ip);
+            if let Err(error) = ledger_router.send(request).await {
+                warn!("Failed to send disconnect message to failing peer {}: {}", peer_ip, error);
+            }
+        }
+    }
+
     ///
     /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
     ///
@@ -897,7 +926,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     fn add_failure(&mut self, peer_ip: SocketAddr, failure: String) {
         trace!("Adding failure for {}: {}", peer_ip, failure);
         match self.failures.get_mut(&peer_ip) {
-            Some(failures) => failures.push(failure),
+            Some(failures) => failures.push((failure, Utc::now().timestamp())),
             None => error!("Missing failure entry for {}", peer_ip),
         };
     }
