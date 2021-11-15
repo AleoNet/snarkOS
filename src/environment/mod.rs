@@ -65,7 +65,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const PING_SLEEP_IN_SECS: u64 = 15;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 120; // 2 minutes
 
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize = 1;
@@ -80,8 +80,6 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
-
-    const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
 }
 
 #[derive(Clone, Debug, Default)]
