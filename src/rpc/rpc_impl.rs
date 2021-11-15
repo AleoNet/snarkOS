@@ -23,6 +23,7 @@ use crate::{
     Environment,
     LedgerRequest,
     LedgerRouter,
+    Peers,
 };
 use snarkos_ledger::{LedgerState, Metadata};
 use snarkvm::{
@@ -32,7 +33,8 @@ use snarkvm::{
 
 use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
-use std::{cmp::max, ops::Deref, sync::Arc};
+use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
@@ -60,6 +62,7 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
+    peers: Arc<RwLock<Peers<N, E>>>,
     ledger: LedgerState<N>,
     ledger_router: LedgerRouter<N, E>,
     /// RPC credentials for accessing guarded endpoints
@@ -81,11 +84,17 @@ impl<N: Network, E: Environment> Deref for RpcImpl<N, E> {
 
 impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(credentials: RpcCredentials, canon: LedgerState<N>, ledger_router: LedgerRouter<N, E>) -> Self {
+    pub fn new(
+        credentials: RpcCredentials,
+        peers: Arc<RwLock<Peers<N, E>>>,
+        ledger: LedgerState<N>,
+        ledger_router: LedgerRouter<N, E>,
+    ) -> Self {
         Self(Arc::new(RpcInner {
-            ledger: canon,
-            credentials,
+            peers,
+            ledger,
             ledger_router,
+            credentials,
         }))
     }
 }
@@ -185,6 +194,10 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError> {
         let transition_id: N::TransitionID = serde_json::from_value(transition_id)?;
         Ok(self.ledger.get_transition(&transition_id)?)
+    }
+
+    async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError> {
+        Ok(self.peers.read().await.connected_peers())
     }
 
     /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.

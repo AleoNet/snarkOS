@@ -19,6 +19,8 @@
 use crate::rpc::rpc_impl::RpcError;
 use snarkvm::dpc::{Block, BlockHeader, Network, RecordCiphertext, Transactions, Transition};
 
+use std::net::SocketAddr;
+
 /// Definition of public RPC endpoints.
 #[async_trait::async_trait]
 pub trait RpcFunctions<N: Network> {
@@ -74,6 +76,9 @@ pub trait RpcFunctions<N: Network> {
 
     #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
     async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError>;
+
+    #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
+    async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
