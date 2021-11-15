@@ -213,18 +213,26 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
             }
             PeersRequest::Heartbeat(ledger_router) => {
+                // Ensure the number of connected peers is below the maximum threshold.
                 if self.num_connected_peers() > E::MAXIMUM_NUMBER_OF_PEERS {
+                    debug!("Exceeded maximum number of connected peers");
+
+                    // Determine the peers to disconnect from.
                     let num_excess_peers = self.num_connected_peers() - E::MAXIMUM_NUMBER_OF_PEERS;
                     let peer_ips_to_disconnect = self
                         .connected_peers
                         .iter()
-                        .filter(|(&addr, _)| {
-                            !E::SYNC_NODES.contains(&addr.to_string().as_str()) && !E::PEER_NODES.contains(&addr.to_string().as_str())
+                        .filter(|(&peer_ip, _)| {
+                            let peer_str = peer_ip.to_string();
+                            !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::PEER_NODES.contains(&peer_str.as_str())
                         })
                         .take(num_excess_peers)
-                        .map(|(&addr, _)| addr)
+                        .map(|(&peer_ip, _)| peer_ip)
                         .collect::<Vec<SocketAddr>>();
+
+                    // Proceed to send disconnect requests to these peers.
                     for peer_ip in peer_ips_to_disconnect {
+                        info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
                         self.send(peer_ip, &Message::Disconnect).await;
                     }
                 }
