@@ -115,17 +115,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
-    /// Returns a list of nonces associated with connected peers.
-    ///
-    pub(crate) fn known_peer_nonces(&self) -> Vec<u64> {
-        self.connected_peers.values().map(|(peer_nonce, _)| *peer_nonce).collect()
-    }
-
-    ///
     /// Returns the list of connected peers.
     ///
     pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.keys().cloned().collect()
+    }
+
+    ///
+    /// Returns the list of nonces for the connected peers.
+    ///
+    pub(crate) fn connected_nonces(&self) -> impl Iterator<Item = &u64> + '_ {
+        self.connected_peers.values().map(|(peer_nonce, _)| peer_nonce)
     }
 
     ///
@@ -182,7 +182,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                     self.nonce,
                                     peers_router,
                                     ledger_router,
-                                    self.known_peer_nonces(),
+                                    &mut self.connected_nonces(),
                                 )
                                 .await
                             }
@@ -259,7 +259,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         self.nonce,
                         peers_router,
                         ledger_router,
-                        self.known_peer_nonces(),
+                        &mut self.connected_nonces(),
                     )
                     .await;
                 }
@@ -421,29 +421,19 @@ struct Peer<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
-    async fn new(
+    async fn new<'a, T: Iterator<Item = &'a u64> + Send>(
         stream: TcpStream,
         local_ip: SocketAddr,
         nonce: u64,
         peers_router: &PeersRouter<N, E>,
         ledger_router: &LedgerRouter<N, E>,
-        known_peer_nonces: Vec<u64>,
+        connected_nonces: &mut T,
     ) -> Result<Self> {
         // Construct the socket.
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
-        let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, nonce).await?;
-
-        // Do not connect to peers with the same nonce as this node.
-        if nonce == peer_nonce {
-            return Err(anyhow!("Can't connect to a peer with same nonce as this node {}", peer_nonce));
-        }
-
-        // If the node has as peer with this nonce, do not connect.
-        if known_peer_nonces.contains(&peer_nonce) {
-            return Err(anyhow!("Already connected to a peer with nonce {}", peer_nonce));
-        }
+        let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, nonce, connected_nonces).await?;
 
         // Send the first ping sequence to the peer.
         ledger_router.send(LedgerRequest::SendPing(peer_ip)).await?;
@@ -479,10 +469,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// Performs the handshake protocol, returning the listener IP and nonce of the peer upon success.
-    async fn handshake(
+    async fn handshake<'a, T: Iterator<Item = &'a u64> + Send>(
         outbound_socket: &mut Framed<TcpStream, Message<N, E>>,
         local_ip: SocketAddr,
         nonce: u64,
+        connected_nonces: &mut T,
     ) -> Result<(SocketAddr, u64)> {
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
@@ -516,6 +507,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             if let Err(error) = stream {
                                 return Err(anyhow!("Unable to reach '{}': '{}'", peer_ip, error));
                             }
+                        }
+                        // Ensure the peer is not this node.
+                        if nonce == peer_nonce {
+                            return Err(anyhow!("Attempted to connect to self (nonce = {})", peer_nonce));
+                        }
+                        // Ensure the peer is not already connected to this node.
+                        if Iterator::any(connected_nonces, |nonce| nonce == &peer_nonce) {
+                            return Err(anyhow!("Already connected to a peer with nonce {}", peer_nonce));
                         }
                         // Send the challenge response.
                         let message = Message::ChallengeResponse(genesis_block_header.clone());
@@ -569,25 +568,25 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
-    async fn handler(
+    async fn handler<'a, T: Iterator<Item = &'a u64> + Send>(
         stream: TcpStream,
         local_ip: SocketAddr,
         nonce: u64,
         peers_router: &PeersRouter<N, E>,
         ledger_router: LedgerRouter<N, E>,
-        known_peer_nonces: Vec<u64>,
+        connected_nonces: &mut T,
     ) {
+        // Register our peer with state which internally sets up some channels.
+        let mut peer = match Peer::new(stream, local_ip, nonce, &peers_router, &ledger_router, connected_nonces).await {
+            Ok(peer) => peer,
+            Err(error) => {
+                trace!("{}", error);
+                return;
+            }
+        };
+
         let peers_router = peers_router.clone();
         task::spawn(async move {
-            // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, nonce, &peers_router, &ledger_router, known_peer_nonces).await {
-                Ok(peer) => peer,
-                Err(error) => {
-                    trace!("{}", error);
-                    return;
-                }
-            };
-
             // Verify that the peer doesn't have the same nonce as this node.
             if nonce == peer.nonce {
                 trace!("Can't connect to a peer with the same nonce {}", nonce);
