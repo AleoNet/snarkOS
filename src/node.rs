@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType};
+use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType, SyncNode};
 use snarkvm::{
     dpc::{prelude::*, testnet2::Testnet2},
     prelude::*,
@@ -57,6 +57,8 @@ pub struct Node {
     pub display: bool,
     #[structopt(hidden = true, long)]
     pub trial: bool,
+    #[structopt(hidden = true, long)]
+    pub sync: bool,
     /// Specify an optional subcommand.
     #[structopt(subcommand)]
     commands: Option<Command>,
@@ -71,11 +73,12 @@ impl Node {
                 println!("{}", command.parse()?);
                 Ok(())
             }
-            None => match (self.network, self.miner.is_some(), self.trial) {
-                (2, true, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
-                (2, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
-                (2, true, true) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
-                (2, false, true) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
+            None => match (self.network, self.miner.is_some(), self.trial, self.sync) {
+                (2, _, _, true) => self.start_server::<Testnet2, SyncNode<Testnet2>>().await,
+                (2, true, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
+                (2, false, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
+                (2, true, true, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
+                (2, false, true, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
