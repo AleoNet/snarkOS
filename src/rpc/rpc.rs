@@ -476,7 +476,7 @@ mod tests {
 
     /// Initializes a new instance of the Peers.
     fn new_peers<N: Network, E: Environment>() -> Arc<RwLock<Peers<N, E>>> {
-        Arc::new(RwLock::new(Peers::new("0.0.0.0:4130".parse().unwrap())))
+        Arc::new(RwLock::new(Peers::new("0.0.0.0:4130".parse().unwrap(), None)))
     }
 
     /// Initializes a new instance of the rpc.

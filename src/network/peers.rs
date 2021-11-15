@@ -15,10 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Environment, LedgerRequest, LedgerRouter, Message};
-use snarkvm::prelude::*;
+use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
 use futures::SinkExt;
+use rand::{thread_rng, Rng};
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -72,6 +73,10 @@ pub enum PeersRequest<N: Network, E: Environment> {
 pub struct Peers<N: Network, E: Environment> {
     /// The local address of this node.
     local_ip: SocketAddr,
+
+    /// Randomly generated nonce for this node instance.
+    nonce: u64,
+
     /// The set of connected peer IPs.
     connected_peers: HashMap<SocketAddr, OutboundRouter<N, E>>,
     /// The set of candidate peer IPs.
@@ -87,9 +92,15 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers`.
     ///
-    pub(crate) fn new(local_ip: SocketAddr) -> Self {
+    pub(crate) fn new(local_ip: SocketAddr, nonce: Option<u64>) -> Self {
+        let nonce = match nonce {
+            Some(nonce) => nonce,
+            None => thread_rng().gen(),
+        };
+
         Self {
             local_ip,
+            nonce,
             connected_peers: HashMap::new(),
             candidate_peers: HashSet::new(),
             seen_blocks: Default::default(),
