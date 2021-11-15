@@ -90,9 +90,9 @@ impl<N: Network, E: Environment> Server<N, E> {
             format!("0.0.0.0:{}", rpc_port).parse()?,
             username,
             password,
+            &peers,
             LedgerState::open::<RocksDB, _>(&storage_path, true)?,
             &ledger_router,
-            peers.clone(),
         ));
 
         Ok(Self {

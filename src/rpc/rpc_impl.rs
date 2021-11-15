@@ -62,9 +62,9 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
+    peers: Arc<RwLock<Peers<N, E>>>,
     ledger: LedgerState<N>,
     ledger_router: LedgerRouter<N, E>,
-    peers: Arc<RwLock<Peers<N, E>>>,
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
@@ -86,15 +86,15 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(
         credentials: RpcCredentials,
-        canon: LedgerState<N>,
-        ledger_router: LedgerRouter<N, E>,
         peers: Arc<RwLock<Peers<N, E>>>,
+        ledger: LedgerState<N>,
+        ledger_router: LedgerRouter<N, E>,
     ) -> Self {
         Self(Arc::new(RpcInner {
-            ledger: canon,
-            credentials,
-            ledger_router,
             peers,
+            ledger,
+            ledger_router,
+            credentials,
         }))
     }
 }

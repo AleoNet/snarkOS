@@ -18,6 +18,7 @@
 
 use crate::rpc::rpc_impl::RpcError;
 use snarkvm::dpc::{Block, BlockHeader, Network, RecordCiphertext, Transactions, Transition};
+
 use std::net::SocketAddr;
 
 /// Definition of public RPC endpoints.

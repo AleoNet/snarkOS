@@ -86,12 +86,12 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,
     password: String,
+    peers: &Arc<RwLock<Peers<N, E>>>,
     ledger: LedgerState<N>,
     ledger_router: &LedgerRouter<N, E>,
-    peers: Arc<RwLock<Peers<N, E>>>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, ledger, ledger_router.clone(), peers);
+    let rpc_impl = RpcImpl::new(credentials, peers.clone(), ledger, ledger_router.clone());
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -485,13 +485,13 @@ mod tests {
             username: "root".to_string(),
             password: "pass".to_string(),
         };
-        let ledger = new_ledger_state::<N, S>();
         let peers = new_peers::<N, E>();
+        let ledger = new_ledger_state::<N, S>();
 
         // Create a dummy mpsc channel for Ledger requests. todo (@collinc97): only get requests will work until this is changed
         let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
-        RpcImpl::<N, E>::new(credentials, ledger, ledger_router, peers)
+        RpcImpl::<N, E>::new(credentials, peers, ledger, ledger_router)
     }
 
     /// Deserializes a rpc response into the given type.
@@ -750,7 +750,7 @@ mod tests {
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
             let peers = new_peers();
 
-            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, ledger, ledger_router, peers)
+            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
         };
 
         // Initialize a new request that calls the `getblocks` endpoint.
@@ -872,14 +872,13 @@ mod tests {
                 username: "root".to_string(),
                 password: "pass".to_string(),
             };
+            let peers = new_peers();
 
             // Open a ledger at the temporary directory.
             let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
-            let peers = new_peers();
-
-            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, ledger, ledger_router, peers)
+            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
         };
 
         // Initialize a new request that calls the `getblockhashes` endpoint.
@@ -1045,14 +1044,13 @@ mod tests {
                 username: "root".to_string(),
                 password: "pass".to_string(),
             };
+            let peers = new_peers();
 
             // Open a ledger at the temporary directory.
             let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
-            let peers = new_peers();
-
-            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, ledger, ledger_router, peers)
+            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
         };
 
         // Initialize a new request that calls the `getledgerproof` endpoint.
