@@ -505,8 +505,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         true => {
                             trace!("Adding unconfirmed block {} to memory pool", block.height());
 
-                            // Set the terminator bit to `true` to ensure the miner updates state.
-                            self.terminator.store(true, Ordering::SeqCst);
                             // Add the block to the unconfirmed blocks.
                             self.unconfirmed_blocks.insert(block.previous_block_hash(), block);
                         }
