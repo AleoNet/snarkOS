@@ -217,6 +217,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.add_candidate_peers(&peer_nodes);
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
+                // Select the peers randomly from the list of candidate peers.
                 for peer_ip in self
                     .candidate_peers()
                     .iter()
