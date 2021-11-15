@@ -103,8 +103,8 @@ pub struct Ledger<N: Network, E: Environment> {
     status: Arc<AtomicU8>,
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
-    /// The map of each peer to their ledger state := (is_fork, common_ancestor, latest_block_height, block_locators).
-    peers_state: HashMap<SocketAddr, Option<(Option<bool>, u32, u32, BlockLocators<N>)>>,
+    /// The map of each peer to their ledger state := (is_fork, latest_block_height, block_locators).
+    peers_state: HashMap<SocketAddr, Option<(Option<bool>, u32, BlockLocators<N>)>>,
     /// The map of each peer to their block requests := HashMap<(block_height, block_hash), timestamp>
     block_requests: HashMap<SocketAddr, HashMap<(u32, Option<N::BlockHash>), i64>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
@@ -363,7 +363,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let latest_block_height = self.latest_block_height();
             // Iterate through the connected peers, to determine if the ledger state is out of date.
             for (_, ledger_state) in self.peers_state.iter() {
-                if let Some((_, _, block_height, _)) = ledger_state {
+                if let Some((_, block_height, _)) = ledger_state {
                     if *block_height > latest_block_height {
                         // Sync if this ledger has fallen behind by 3 or more blocks.
                         if block_height - latest_block_height > 2 {
@@ -633,7 +633,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             );
 
             match self.peers_state.get_mut(&peer_ip) {
-                Some(status) => *status = Some((is_fork, common_ancestor, latest_block_height_of_peer, block_locators)),
+                Some(status) => *status = Some((is_fork, latest_block_height_of_peer, block_locators)),
                 None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)),
             };
         }
@@ -682,7 +682,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Prioritize the sync nodes before regular peers.
         let mut maximal_peer = None;
         let mut maximal_peer_is_fork = None;
-        let mut maximum_common_ancestor = 0;
         let mut maximum_block_height = self.latest_block_height();
         let mut maximum_block_locators = Default::default();
 
@@ -697,13 +696,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         for (peer_ip, ledger_state) in self.peers_state.iter() {
             // Only update the maximal peer if there are no sync nodes or the peer is a sync node.
             if !peers_contains_sync_node || sync_nodes.contains(peer_ip) {
-                if let Some((is_fork, common_ancestor, block_height, block_locators)) = ledger_state {
+                if let Some((is_fork, block_height, block_locators)) = ledger_state {
                     // Update the maximal peer state if the peer is ahead and the peer knows if you are a fork or not.
                     // This accounts for (Case 1 and Case 2(a))
                     if *block_height > maximum_block_height && is_fork.is_some() {
                         maximal_peer = Some(*peer_ip);
                         maximal_peer_is_fork = *is_fork;
-                        maximum_common_ancestor = *common_ancestor;
                         maximum_block_height = *block_height;
                         maximum_block_locators = block_locators.clone();
                     }
@@ -720,7 +718,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let (Some(peer_ip), Some(is_fork)) = (maximal_peer, maximal_peer_is_fork) {
             // Determine the common ancestor block height between this ledger and the peer.
-            let mut maximum_common_ancestor = maximum_common_ancestor;
+            let mut maximum_common_ancestor = 0;
             // Determine the first locator (smallest height) that does not exist in this ledger.
             let mut first_deviating_locator = None;
 
@@ -752,10 +750,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
 
-            // Ensure the latest_common_ancestor is not greater than the latest_block_height.
+            // Ensure the latest common ancestor is not greater than the latest block request.
             let latest_block_height = self.latest_block_height();
             if latest_block_height < maximum_common_ancestor {
-                info!("Found a longer chain starting from block {}", maximum_common_ancestor);
+                warn!(
+                    "The maximum common ancestor {} can't be greater than the latest block {}",
+                    maximum_common_ancestor, latest_block_height
+                );
                 return;
             }
 
