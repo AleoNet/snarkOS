@@ -323,13 +323,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // If the timestamp of the last block increment has surpassed the preset limit,
-        // the ledger is likely syncing from invalid state, and should rollback by one block.
+        // the ledger is likely syncing from invalid state, and should revert by one block.
         if self.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::MAXIMUM_RADIO_SILENCE_IN_SECS) {
-            trace!("Ledger state has become stale, clearing queue and rolling back");
+            trace!("Ledger state has become stale, clearing queue and reverting by one block");
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
             self.block_requests.values_mut().for_each(|requests| *requests = Default::default());
-            self.remove_last_blocks(1);
+            self.revert_to_block_height(self.latest_block_height() - 1);
         }
     }
 
@@ -519,12 +519,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
-    /// Removes the latest `num_blocks` from storage, returning `true` on success.
+    /// Reverts the ledger state back to height `block_height`, returning `true` on success.
     ///
-    fn remove_last_blocks(&mut self, num_blocks: u32) -> bool {
-        match self.canon.remove_last_blocks(num_blocks) {
+    fn revert_to_block_height(&mut self, block_height: u32) -> bool {
+        match self.canon.revert_to_block_height(block_height) {
             Ok(removed_blocks) => {
-                info!("Ledger rolled back to block {}", self.latest_block_height());
+                info!("Ledger successfully reverted to block {}", self.latest_block_height());
 
                 // Update the last block update timestamp.
                 self.last_block_update_timestamp = Instant::now();
@@ -540,7 +540,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 true
             }
             Err(error) => {
-                error!("Failed to roll ledger back: {}", error);
+                error!("Failed to revert the ledger to block {}: {}", block_height, error);
 
                 // Set the terminator bit to `true` to ensure the miner resets state.
                 self.terminator.store(true, Ordering::SeqCst);
@@ -662,12 +662,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///         - Request blocks from your latest state
     ///     Case 2(c) - `is_fork` is `Some(true)`:
     ///             Case 2(c)(a) - Common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`:
-    ///                  - Roll back to common ancestor, and send block requests to sync.
+    ///                  - Revert to common ancestor, and send block requests to sync.
     ///             Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`:
     ///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
     ///                      - Disconnect from peer.
     ///                  Case 2(c)(b)(b) - You don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`:
-    ///                      - Roll back to most common ancestor and send block requests to sync.
+    ///                      - Revert to most common ancestor and send block requests to sync.
     ///
     async fn update_block_requests(&mut self, peers_router: &PeersRouter<N, E>) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
@@ -752,6 +752,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
 
+            // Ensure the latest_common_ancestor is not greater than the latest_block_height.
+            let latest_block_height = self.latest_block_height();
+            if latest_block_height < maximum_common_ancestor {
+                info!("Found a longer chain starting from block {}", maximum_common_ancestor);
+                return;
+            }
+
             // Determine the latest common ancestor.
             let latest_common_ancestor =
                 // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
@@ -768,9 +775,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // proceed to switch to the fork.
                     if latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH
                     {
-                        info!("Found a longer chain starting from block {}", maximum_common_ancestor);
-                        // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
-                        match self.remove_last_blocks(latest_block_height.saturating_sub(maximum_common_ancestor)) {
+                        info!("Found a longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
+                        match self.revert_to_block_height(maximum_common_ancestor) {
                             true => maximum_common_ancestor,
                             false => return
                         }
@@ -796,11 +802,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                             return;
                         }
                         // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`.
-                        // Roll back to the common ancestor anyways.
+                        // Revert to the common ancestor anyways.
                         else {
-                            info!("Found a potentially longer chain starting from block {}", maximum_common_ancestor);
-                            // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
-                            match self.remove_last_blocks(latest_block_height.saturating_sub(maximum_common_ancestor)) {
+                            info!("Found a potentially longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
+                            match self.revert_to_block_height(maximum_common_ancestor) {
                                 true => maximum_common_ancestor,
                                 false => return
                             }

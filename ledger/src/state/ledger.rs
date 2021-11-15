@@ -170,6 +170,8 @@ impl<N: Network> LedgerState<N> {
             let mut ledger = ledger.clone();
             thread::spawn(move || {
                 let last_seen_block_height = ledger.read_only.1.clone();
+                ledger.read_only.1.store(latest_block_height, Ordering::SeqCst);
+
                 loop {
                     // Refresh the ledger storage state.
                     if ledger.ledger_roots.refresh() {
@@ -672,29 +674,29 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
-    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
-    pub fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
+    /// Reverts the ledger state back to the given block height, returning the removed blocks on success.
+    pub fn revert_to_block_height(&mut self, block_height: u32) -> Result<Vec<Block<N>>> {
         // If the storage is in read-only mode, this method cannot be called.
         if self.is_read_only() {
             return Err(anyhow!("Ledger is in read-only mode"));
         }
 
-        // Ensure the number of blocks to remove is within a permitted range.
-        if num_blocks == 0 || num_blocks > N::ALEO_MAXIMUM_FORK_DEPTH {
-            return Err(anyhow!("Attempted to remove {} blocks, which is invalid", num_blocks));
+        // Determine the number of blocks to remove.
+        let latest_block_height = self.latest_block_height();
+        let number_of_blocks = latest_block_height.saturating_sub(block_height);
+
+        // Ensure the reverted block height is within a permitted range and well-formed.
+        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+            return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
         // Initialize a list of the removed blocks.
-        let mut blocks = Vec::with_capacity(num_blocks as usize);
-
+        let mut blocks = Vec::with_capacity(number_of_blocks as usize);
         {
             // Acquire the write lock on the latest block.
             let mut latest_block = self.latest_block.write();
 
-            // Initialize the block to remove.
-            let mut remaining_blocks = num_blocks;
-
-            while latest_block.height() > 0 && remaining_blocks > 0 {
+            while latest_block.height() > block_height {
                 // Update the internal state of the ledger, except for the ledger tree.
                 self.blocks.remove_block(latest_block.height())?;
                 self.ledger_roots.remove(&latest_block.previous_ledger_root())?;
@@ -704,11 +706,8 @@ impl<N: Network> LedgerState<N> {
 
                 *latest_block = match latest_block.height() == 0 {
                     true => N::genesis_block().clone(),
-                    false => self.get_block(latest_block.height() - 1)?,
+                    false => self.get_block(latest_block.height().saturating_sub(1))?,
                 };
-
-                // Decrement the remaining blocks by 1.
-                remaining_blocks -= 1;
             }
         }
 

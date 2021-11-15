@@ -209,7 +209,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     Err(error) => error!("Failed to accept a connection: {}", error),
                 }
                 // Add a small delay to prevent overloading the network from handshakes.
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(150)).await;
             }
         }));
     }
