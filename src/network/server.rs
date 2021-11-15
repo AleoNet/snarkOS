@@ -139,14 +139,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         let peers_router_clone = peers_router.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a peers request.
-            loop {
-                tokio::select! {
-                    // Channel is routing a request to peers.
-                    Some(request) = peers_handler.recv() => {
-                        // Hold the peers write lock briefly, to update the state of the peers.
-                        peers_clone.write().await.update(request, &peers_router_clone).await;
-                    }
-                }
+            // Channel is routing a request to peers.
+            while let Some(request) = peers_handler.recv().await {
+                // Hold the peers write lock briefly, to update the state of the peers.
+                peers_clone.write().await.update(request, &peers_router_clone).await;
             }
         }));
 
