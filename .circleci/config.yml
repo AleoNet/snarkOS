@@ -331,10 +331,7 @@ workflows:
   build-snarkos-docker-images:
     when:
       or:
-        - equal: [ master, << pipeline.git.branch >> ]
-        - equal: [ staging, << pipeline.git.branch >> ]
-        - equal: [ groth16, << pipeline.git.branch >> ]
-        - equal: [ docker-automation, << pipeline.git.branch >> ]
+        - equal: [ testnet2, << pipeline.git.branch >> ]
     jobs:
       - build-and-publish-docker-arm
       - build-and-publish-docker-amd
