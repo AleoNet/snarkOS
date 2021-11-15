@@ -130,7 +130,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[allow(clippy::type_complexity)]
     fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
-        let peers = Arc::new(RwLock::new(Peers::new(local_ip)));
+        let peers = Arc::new(RwLock::new(Peers::new(local_ip, None)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
@@ -226,12 +226,12 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Transmit a heartbeat request to the peers.
                 let request = PeersRequest::Heartbeat(ledger_router.clone());
                 if let Err(error) = peers_router.send(request).await {
-                    error!("Failed to send request to peers: {}", error)
+                    error!("Failed to send heartbeat to peers: {}", error)
                 }
                 // Transmit a heartbeat request to the ledger.
                 let request = LedgerRequest::Heartbeat;
                 if let Err(error) = ledger_router.send(request).await {
-                    error!("Failed to send request to ledger: {}", error)
+                    error!("Failed to send heartbeat to ledger: {}", error)
                 }
                 // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
