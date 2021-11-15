@@ -81,8 +81,8 @@ pub struct Peers<N: Network, E: Environment> {
     candidate_peers: HashSet<SocketAddr>,
     /// The map of peers to a map of block hashes and when they've seen that block.
     seen_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, i64>>,
-    /// The map of peers to the timestamp of their last inbound connection request.
-    seen_inbounds: HashMap<SocketAddr, SystemTime>,
+    /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
+    seen_inbounds: HashMap<SocketAddr, ((u16, u32), SystemTime)>,
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbounds: HashMap<SocketAddr, SystemTime>,
     /// The map of peers to a map of transaction ids and when they've seen that transaction.
@@ -273,15 +273,38 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
                 // Spawn a handler to be run asynchronously.
                 else {
-                    // Ensure the connecting peer has not surpassed the connection frequency limit.
-                    let last_seen = self.seen_inbounds.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
+                    // Sanitize the port from the peer, if it is a remote IP address.
+                    let (peer_ip, peer_port) = match peer_ip.ip().is_loopback() {
+                        // Loopback case - Do not sanitize, merely pass through.
+                        true => (peer_ip, peer_ip.port()),
+                        // Remote case - Sanitize, storing u16::MAX for the peer IP address, passing the port through.
+                        false => (SocketAddr::new(peer_ip.ip(), u16::MAX), peer_ip.port()),
+                    };
+
+                    // Fetch the inbound tracker entry for this peer.
+                    let ((initial_port, num_attempts), last_seen) = self
+                        .seen_inbounds
+                        .entry(peer_ip)
+                        .or_insert(((peer_port, 0), SystemTime::UNIX_EPOCH));
                     let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
-                    if elapsed < E::RADIO_SILENCE_IN_SECS {
+
+                    // Reset the inbound tracker entry for this peer, if the predefined elapsed time has passed.
+                    if elapsed > E::RADIO_SILENCE_IN_SECS {
+                        // Reset the initial port for this peer.
+                        *initial_port = peer_port;
+                        // Reset the number of attempts for this peer.
+                        *num_attempts = 0;
+                        // Reset the last seen timestamp for this peer.
+                        *last_seen = SystemTime::now();
+                    }
+
+                    // Ensure the connecting peer has not surpassed the connection attempt limit.
+                    if *initial_port < peer_port && *num_attempts > 5 {
                         trace!("Dropping connection request from {} (tried {} secs ago)", peer_ip, elapsed);
                     } else {
                         debug!("Received a connection request from {}", peer_ip);
-                        // Update the last seen timestamp for this peer.
-                        *last_seen = SystemTime::now();
+                        // Update the number of attempts for this peer.
+                        *num_attempts += 1;
                         // Initialize the peer handler.
                         Peer::handler(
                             stream,
