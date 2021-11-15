@@ -205,10 +205,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     false => return,
                 };
 
-                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-
                 // If the current node is not a sync node, add the sync nodes to the list of candidate peers.
                 if E::NODE_TYPE != NodeType::Sync {
+                    let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                     self.add_candidate_peers(&sync_nodes);
                 }
 
