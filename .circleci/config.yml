@@ -143,7 +143,42 @@ jobs:
           root: my_workspace
           paths:
             - docker_tag_arm
-            
+
+  publish_snarkos_manifest:
+    machine:
+      image: ubuntu-2004:202101-01
+      docker_layer_caching: true
+    resource_class: medium
+    steps:
+      - checkout
+      - attach_workspace:
+          at: my_workspace
+      - run:
+          name: "Pull ARM docker image"
+          command: |
+            ARM_TAG=$(cat my_workspace/docker_tag_arm)
+            echo $ARM_TAG
+            docker pull $DOCKER_REPO:$ARM_TAG
+      - run:
+          name: "Pull AMD docker image"
+          command: |
+            AMD_TAG=$(cat my_workspace/docker_tag_amd)
+            echo $AMD_TAG
+            docker pull $DOCKER_REPO:$AMD_TAG  
+      - run:
+          name: "Create and push docker multi arch manifest"
+          command: |
+            ARM_TAG=$(cat my_workspace/docker_tag_arm)
+            AMD_TAG=$(cat my_workspace/docker_tag_amd)
+            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            echo $DOCKER_REPO
+            echo $CIRCLE_BRANCH
+            echo $ARM_TAG
+            echo $AMD_TAG
+            docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $IDOCKER_REPO:${AMD_TAG}
+            docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
+            docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
+
 workflows:
   main-workflow:
     jobs:
