@@ -217,7 +217,7 @@ workflows:
       #       - rust-stable
       - fmt
       - clippy
-  build-snarkos-docker-images:
+  build-snarkos-docker-images: # docker images
     when:
       or:
         - equal: [ testnet2, << pipeline.git.branch >> ]
