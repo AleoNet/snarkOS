@@ -17,7 +17,7 @@
 use snarkvm::dpc::Network;
 
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, marker::PhantomData, time::Duration};
+use std::{fmt::Debug, marker::PhantomData};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -84,8 +84,10 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// if no block has been received in the meantime.
     const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 90; // 1 minute 30 seconds
 
-    const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
-    const FAILURE_THRESHOLD: usize = 5;
+    /// The duration in seconds after which to expire a failure from a peer
+    const FAILURE_EXPIRY_TIME: u64 = 120 * 60;
+    /// The failure count threshold which determines when to disconnect a peer
+    const FAILURE_THRESHOLD: usize = 2400;
 }
 
 #[derive(Clone, Debug, Default)]

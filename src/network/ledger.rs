@@ -660,7 +660,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Clear the expired failures that have lived longer than `E::FAILURE_EXPIRY_TIME`.
         self.failures
             .iter_mut()
-            .for_each(|(_, failures)| failures.retain(|(_, timestamp)| now - timestamp > E::FAILURE_EXPIRY_TIME.as_secs() as i64));
+            .for_each(|(_, failures)| failures.retain(|(_, timestamp)| now - timestamp > E::FAILURE_EXPIRY_TIME as i64));
     }
 
     /// Disconnects from peers with more than E::FAILURE_THRESHOLD peers
