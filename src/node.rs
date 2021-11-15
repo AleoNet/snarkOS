@@ -15,12 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType, SyncNode};
-use snarkvm::{
-    dpc::{prelude::*, testnet2::Testnet2},
-    prelude::*,
-};
+use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;
+use colored::*;
 use std::str::FromStr;
 use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
@@ -157,12 +155,15 @@ impl Node {
 pub enum Command {
     #[structopt(name = "update", about = "Updates snarkOS to the latest version")]
     Update(Update),
+    #[structopt(name = "experimental", about = "Experimental features")]
+    Experimental(Experimental),
 }
 
 impl Command {
     pub fn parse(self) -> Result<String> {
         match self {
             Self::Update(command) => command.parse(),
+            Self::Experimental(command) => command.parse(),
         }
     }
 }
@@ -205,5 +206,46 @@ impl Update {
                 }
             }
         }
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct Experimental {
+    #[structopt(subcommand)]
+    commands: ExperimentalCommands,
+}
+
+impl Experimental {
+    pub fn parse(self) -> Result<String> {
+        match self.commands {
+            ExperimentalCommands::NewAccount(command) => command.parse(),
+        }
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub enum ExperimentalCommands {
+    #[structopt(name = "new_account", about = "Generate a new Aleo Account.")]
+    NewAccount(NewAccount),
+}
+
+#[derive(StructOpt, Debug)]
+pub struct NewAccount {}
+
+impl NewAccount {
+    pub fn parse(self) -> Result<String> {
+        let account = Account::<Testnet2>::new(&mut rand::thread_rng());
+
+        // Print the new Aleo account.
+        let mut output = "".to_string();
+        output += &format!("\n {:>12}  {}\n", "Private Key".cyan().bold(), account.private_key());
+        output += &format!(" {:>12}  {}\n", "View Key".cyan().bold(), account.view_key());
+        output += &format!(" {:>12}  {}\n", "Address".cyan().bold(), account.address());
+        output += &format!(
+            " {:>12}\n\n",
+            "Attention - Remember to store this account private key and view key.".red().bold()
+        );
+
+        Ok(output)
     }
 }

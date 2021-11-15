@@ -1,6 +1,14 @@
 #!/bin/bash
 
-COMMAND='cargo run --release -- --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah --trial'
+echo "Enter your miner address:";
+read MINER_ADDRESS
+
+if [ "${MINER_ADDRESS}" == "" ]
+then
+  MINER_ADDRESS="aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah"
+fi
+
+COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial"
 
 function exit_node()
 {
