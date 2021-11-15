@@ -218,3 +218,14 @@ workflows:
       #       - rust-stable
       - fmt
       - clippy
+  build-snarkos-docker-images:
+    when:
+      or:
+        - equal: [ testnet2, << pipeline.git.branch >> ]
+    jobs:
+      - build-and-publish-docker-arm
+      - build-and-publish-docker-amd
+      - publish_snarkos_manifest:
+          requires:
+            - build-and-publish-docker-arm
+            - build-and-publish-docker-amd
