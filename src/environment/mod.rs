@@ -81,13 +81,9 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
 
-    /// The duration in seconds after which a block request is considered expired
-    /// if no block has been received in the meantime.
-    const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 90; // 1 minute 30 seconds
-
-    /// The duration in seconds after which to expire a failure from a peer
-    const FAILURE_EXPIRY_TIME: u64 = 120 * 60;
-    /// The failure count threshold which determines when to disconnect a peer
+    /// The duration in seconds after which to expire a failure from a peer.
+    const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 120 * 60;
+    /// The failure count threshold which determines when to disconnect from a peer.
     const FAILURE_THRESHOLD: usize = 2400;
 }
 

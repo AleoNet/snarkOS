@@ -241,7 +241,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.remove_expired_block_requests();
                 // Remove expired failures.
                 self.remove_expired_failures();
-                // Disconnect from peers with more than E::FAILURE_THRESHOLD failures.
+                // Disconnect from peers with frequent failures.
                 self.disconnect_from_failing_peers(&ledger_router).await;
                 // Update the block requests.
                 self.update_block_requests(peers_router).await;
@@ -643,41 +643,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
     }
 
-    /// Removes block requests that have expired.
-    fn remove_expired_block_requests(&mut self) {
-        let now = Utc::now().timestamp();
-
-        // Clear the expired block requests that have lived longer than `E::RADIO_SILENCE_IN_SECS`.
-        self.block_requests.iter_mut().for_each(|(_peer, block_requests)| {
-            block_requests.retain(|_key, time_of_request| *time_of_request - now < E::RADIO_SILENCE_IN_SECS as i64)
-        });
-    }
-
-    /// Removes failures that have expired.
-    fn remove_expired_failures(&mut self) {
-        let now = Utc::now().timestamp();
-
-        // Clear the expired failures that have lived longer than `E::FAILURE_EXPIRY_TIME`.
-        self.failures
-            .iter_mut()
-            .for_each(|(_, failures)| failures.retain(|(_, timestamp)| now - timestamp > E::FAILURE_EXPIRY_TIME as i64));
-    }
-
-    /// Disconnects from peers with more than E::FAILURE_THRESHOLD peers
-    async fn disconnect_from_failing_peers(&self, ledger_router: &LedgerRouter<N, E>) {
-        let peers_to_disconnect = self
-            .failures
-            .iter()
-            .filter(|(_, failures)| failures.len() > E::FAILURE_THRESHOLD)
-            .map(|(peer_ip, _)| peer_ip);
-        for peer_ip in peers_to_disconnect {
-            let request = LedgerRequest::Disconnect(*peer_ip);
-            if let Err(error) = ledger_router.send(request).await {
-                warn!("Failed to send disconnect message to failing peer {}: {}", peer_ip, error);
-            }
-        }
-    }
-
     ///
     /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
     ///
@@ -922,6 +887,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
+    /// Removes block requests that have expired.
+    ///
+    fn remove_expired_block_requests(&mut self) {
+        // Clear all block requests that have lived longer than `E::RADIO_SILENCE_IN_SECS`.
+        let now = Utc::now().timestamp();
+        self.block_requests.iter_mut().for_each(|(_peer, block_requests)| {
+            block_requests.retain(|_, time_of_request| now.saturating_sub(*time_of_request) < E::RADIO_SILENCE_IN_SECS as i64)
+        });
+    }
+
+    ///
     /// Adds the given failure message to the specified peer IP.
     ///
     fn add_failure(&mut self, peer_ip: SocketAddr, failure: String) {
@@ -930,5 +906,32 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             Some(failures) => failures.push((failure, Utc::now().timestamp())),
             None => error!("Missing failure entry for {}", peer_ip),
         };
+    }
+
+    ///
+    /// Removes failures that have expired.
+    ///
+    fn remove_expired_failures(&mut self) {
+        // Clear all failures that have lived longer than `E::FAILURE_EXPIRY_TIME_IN_SECS`.
+        let now = Utc::now().timestamp();
+        self.failures.iter_mut().for_each(|(_, failures)| {
+            failures.retain(|(_, time_of_fail)| now.saturating_sub(*time_of_fail) < E::FAILURE_EXPIRY_TIME_IN_SECS as i64)
+        });
+    }
+
+    ///
+    /// Disconnects from connected peers who exhibit frequent failures.
+    ///
+    async fn disconnect_from_failing_peers(&self, ledger_router: &LedgerRouter<N, E>) {
+        let peers_to_disconnect = self
+            .failures
+            .iter()
+            .filter(|(_, failures)| failures.len() > E::FAILURE_THRESHOLD)
+            .map(|(peer_ip, _)| peer_ip);
+        for peer_ip in peers_to_disconnect {
+            if let Err(error) = ledger_router.send(LedgerRequest::Disconnect(*peer_ip)).await {
+                warn!("Failed to send disconnect message to failing peer {}: {}", peer_ip, error);
+            }
+        }
     }
 }
