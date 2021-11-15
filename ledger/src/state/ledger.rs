@@ -27,6 +27,7 @@ use parking_lot::RwLock;
 use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     path::Path,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -390,7 +391,7 @@ impl<N: Network> LedgerState<N> {
         let block_locator_headers = block_hashes
             .zip_eq(block_headers)
             .take(num_block_headers as usize)
-            .map(|(hash, header)| (header.height(), hash, Some(header)));
+            .map(|(hash, header)| (header.height(), (hash, Some(header))));
 
         // Decrement the block locator height by the number of block headers.
         block_locator_height -= num_block_headers;
@@ -398,11 +399,9 @@ impl<N: Network> LedgerState<N> {
         // Return the block locators if the locator has run out of blocks.
         if block_locator_height == 0 {
             // Initialize the list of block locators.
-            let mut block_locators = Vec::with_capacity((num_block_headers + 1) as usize);
-            // Add the list of block locator headers.
-            block_locators.extend(block_locator_headers);
+            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.collect();
             // Add the genesis locator.
-            block_locators.push((0, self.get_block_hash(0)?, None));
+            block_locators.insert(0, (self.get_block_hash(0)?, None));
 
             return Ok(BlockLocators::<N>::from(block_locators));
         }
@@ -414,23 +413,17 @@ impl<N: Network> LedgerState<N> {
         let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
         // Add the block locator hashes.
         while block_locator_height > 0 && block_locator_hashes.len() < num_block_hashes as usize {
-            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?, None));
+            block_locator_hashes.push((block_locator_height, (self.get_block_hash(block_locator_height)?, None)));
 
             // Decrement the block locator height by a power of two.
             block_locator_height /= 2;
         }
 
-        // Determine the number of latest block headers and block hashes to include as block locators.
-        let num_block_locators = num_block_headers + num_block_hashes + 1;
-
         // Initialize the list of block locators.
-        let mut block_locators = Vec::with_capacity(num_block_locators as usize);
-        // Add the list of block locator headers.
-        block_locators.extend(block_locator_headers);
-        // Add the list of block locator hashes.
-        block_locators.extend(block_locator_hashes);
+        let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
+            block_locator_headers.chain(block_locator_hashes).collect();
         // Add the genesis locator.
-        block_locators.push((0, self.get_block_hash(0)?, None));
+        block_locators.insert(0, (self.get_block_hash(0)?, None));
 
         Ok(BlockLocators::<N>::from(block_locators))
     }
@@ -444,71 +437,74 @@ impl<N: Network> LedgerState<N> {
 
         let block_locators = &**block_locators;
 
-        // Check that the last block locator is the genesis locator.
-        let (expected_height, expected_genesis_block_hash, expected_genesis_header) = &block_locators[block_locators.len() - 1];
-        if *expected_height != 0 || expected_genesis_block_hash != &self.get_block_hash(0)? || expected_genesis_header.is_some() {
+        // Ensure the genesis block locator exists and is well-formed.
+        let (expected_genesis_block_hash, expected_genesis_header) = match block_locators.get(&0) {
+            Some((expected_genesis_block_hash, expected_genesis_header)) => (expected_genesis_block_hash, expected_genesis_header),
+            None => return Ok(false),
+        };
+        if expected_genesis_block_hash != &N::genesis_block().hash() || expected_genesis_header.is_some() {
             return Ok(false);
         }
 
-        // Get the remaining block locators (excluding the genesis block).
-        let remaining_block_locators = &block_locators[..block_locators.len() - 1];
-        let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, remaining_block_locators.len());
+        // // Get the remaining block locators (excluding the genesis block).
+        // let remaining_block_locators = &block_locators[..block_locators.len() - 1];
+        // let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, remaining_block_locators.len());
+        //
+        // // Check that the block headers are formed correctly (linear).
+        // // let mut last_block_height = remaining_block_locators[0].0 + 1;
+        // for (_block_height, _block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
+        //     // // Check that the block height is decrementing.
+        //     // match last_block_height == *block_height + 1 {
+        //     //     true => last_block_height = *block_height,
+        //     //     false => return Ok(false)
+        //     // }
+        //
+        //     // Check that the block header is present.
+        //     let _block_header = match block_header {
+        //         Some(header) => header,
+        //         None => return Ok(false),
+        //     };
+        //
+        //     // // Check that the expected block hash is correct.
+        //     // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
+        //     //     if &expected_block_hash != block_hash {
+        //     //         return Ok(false);
+        //     //     }
+        //     // }
+        //     //
+        //     // // Check that the expected block headers is correct.
+        //     // if let Ok(expected_block_header) = self.get_block_header(*block_height) {
+        //     //     if &expected_block_header != block_header {
+        //     //         return Ok(false);
+        //     //     }
+        //     // }
+        // }
 
-        // Check that the block headers are formed correctly (linear).
-        // let mut last_block_height = remaining_block_locators[0].0 + 1;
-        for (_block_height, _block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
-            // // Check that the block height is decrementing.
-            // match last_block_height == *block_height + 1 {
-            //     true => last_block_height = *block_height,
-            //     false => return Ok(false)
-            // }
-
-            // Check that the block header is present.
-            let _block_header = match block_header {
-                Some(header) => header,
-                None => return Ok(false),
-            };
-
-            // // Check that the expected block hash is correct.
-            // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
-            //     if &expected_block_hash != block_hash {
-            //         return Ok(false);
-            //     }
-            // }
-            //
-            // // Check that the expected block headers is correct.
-            // if let Ok(expected_block_header) = self.get_block_header(*block_height) {
-            //     if &expected_block_header != block_header {
-            //         return Ok(false);
-            //     }
-            // }
-        }
-
-        // Check that the block hashes are formed correctly (power of two).
-        if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
-            let mut previous_block_height = u32::MAX;
-
-            for (block_height, _block_hash, block_header) in &block_locators[num_block_headers..] {
-                // Check that the block heights increment by a power of two.
-                if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
-                    return Ok(false);
-                }
-
-                // Check that there is no block header.
-                if block_header.is_some() {
-                    return Ok(false);
-                }
-
-                // // Check that the expected block hash is correct.
-                // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
-                //     if &expected_block_hash != block_hash {
-                //         return Ok(false);
-                //     }
-                // }
-
-                previous_block_height = *block_height;
-            }
-        }
+        // // Check that the block hashes are formed correctly (power of two).
+        // if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
+        //     let mut previous_block_height = u32::MAX;
+        //
+        //     for (block_height, _block_hash, block_header) in &block_locators[num_block_headers..] {
+        //         // Check that the block heights increment by a power of two.
+        //         if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
+        //             return Ok(false);
+        //         }
+        //
+        //         // Check that there is no block header.
+        //         if block_header.is_some() {
+        //             return Ok(false);
+        //         }
+        //
+        //         // // Check that the expected block hash is correct.
+        //         // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
+        //         //     if &expected_block_hash != block_hash {
+        //         //         return Ok(false);
+        //         //     }
+        //         // }
+        //
+        //         previous_block_height = *block_height;
+        //     }
+        // }
 
         Ok(true)
     }
