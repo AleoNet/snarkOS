@@ -29,8 +29,8 @@ pub enum Message<N: Network, E: Environment> {
     BlockRequest(u32, u32),
     /// BlockResponse := (block)
     BlockResponse(Block<N>),
-    /// ChallengeRequest := (listener_port, block_height)
-    ChallengeRequest(u16, u32),
+    /// ChallengeRequest := (listener_port, nonce, block_height)
+    ChallengeRequest(u16, u64, u32),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(BlockHeader<N>),
     /// Disconnect := ()
@@ -96,7 +96,7 @@ impl<N: Network, E: Environment> Message<N, E> {
         match self {
             Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
             Self::BlockResponse(block) => Ok(bincode::serialize(block)?),
-            Self::ChallengeRequest(listener_port, block_height) => Ok(to_bytes_le![listener_port, block_height]?),
+            Self::ChallengeRequest(listener_port, nonce, block_height) => Ok(to_bytes_le![listener_port, nonce, block_height]?),
             Self::ChallengeResponse(block_header) => Ok(bincode::serialize(block_header)?),
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
@@ -140,7 +140,11 @@ impl<N: Network, E: Environment> Message<N, E> {
         let message = match id {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
             1 => Self::BlockResponse(bincode::deserialize(data)?),
-            2 => Self::ChallengeRequest(bincode::deserialize(&data[0..2])?, bincode::deserialize(&data[2..6])?),
+            2 => Self::ChallengeRequest(
+                bincode::deserialize(&data[0..2])?,
+                bincode::deserialize(&data[2..10])?,
+                bincode::deserialize(&data[10..14])?,
+            ),
             3 => Self::ChallengeResponse(bincode::deserialize(data)?),
             4 => match data.is_empty() {
                 true => Self::Disconnect,
