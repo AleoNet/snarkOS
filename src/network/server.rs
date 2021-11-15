@@ -92,6 +92,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             password,
             LedgerState::open::<RocksDB, _>(&storage_path, true)?,
             &ledger_router,
+            peers.clone(),
         ));
 
         Ok(Self {
