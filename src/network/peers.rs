@@ -577,7 +577,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         connected_nonces: &mut T,
     ) {
         // Register our peer with state which internally sets up some channels.
-        let mut peer = match Peer::new(stream, local_ip, nonce, &peers_router, &ledger_router, connected_nonces).await {
+        let mut peer = match Peer::new(stream, local_ip, nonce, peers_router, &ledger_router, connected_nonces).await {
             Ok(peer) => peer,
             Err(error) => {
                 trace!("{}", error);
