@@ -482,7 +482,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let genesis_block_header = N::genesis_block().header();
 
         // Send a challenge request to the peer.
-        let message = Message::<N, E>::ChallengeRequest(local_ip.port(), nonce, CHALLENGE_HEIGHT);
+        let message = Message::<N, E>::ChallengeRequest(E::MESSAGE_VERSION, local_ip.port(), nonce, CHALLENGE_HEIGHT);
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
 
@@ -492,7 +492,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 // Process the message.
                 trace!("Received '{}-B' from {}", message.name(), peer_ip);
                 match message {
-                    Message::ChallengeRequest(listener_port, peer_nonce, _block_height) => {
+                    Message::ChallengeRequest(version, listener_port, peer_nonce, _block_height) => {
+                        // Ensure the message protocol version is not outdated.
+                        if version < E::MESSAGE_VERSION {
+                            warn!("Dropping {} on version {} (outdated)", peer_ip, version);
+                            return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
+                        }
                         // Verify the listener port.
                         if peer_ip.port() != listener_port {
                             // Update the peer IP to the listener port.
