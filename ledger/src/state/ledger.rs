@@ -170,6 +170,8 @@ impl<N: Network> LedgerState<N> {
             let mut ledger = ledger.clone();
             thread::spawn(move || {
                 let last_seen_block_height = ledger.read_only.1.clone();
+                ledger.read_only.1.store(latest_block_height, Ordering::SeqCst);
+
                 loop {
                     // Refresh the ledger storage state.
                     if ledger.ledger_roots.refresh() {
