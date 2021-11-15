@@ -220,8 +220,6 @@ jobs:
       image: ubuntu-2004:202101-01
       docker_layer_caching: true
     resource_class: arm.large
-    environment:
-      IMAGE_NAME: aleohq/snarkos
     steps:
       - checkout
       - run: mkdir -p my_workspace
@@ -230,14 +228,14 @@ jobs:
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64 .
+            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64 .
       - run:
           name: "Push snarkos Docker Image ARM V8"
           command: |
             VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
-            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-arm64
+            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64
       - run:
           name: "Save arm64 image tag"
           command: |
@@ -253,8 +251,6 @@ jobs:
       image: ubuntu-2004:202101-01
       docker_layer_caching: true
     resource_class: xlarge
-    environment:
-      IMAGE_NAME: aleohq/snarkos
     steps:
       - checkout
       - run: mkdir -p my_workspace
@@ -263,13 +259,13 @@ jobs:
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile -t $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64 .
+            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64 .
       - run:
           name: "Push snarkos Docker Image AMD"
           command: |
             VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push $IMAGE_NAME:$CIRCLE_BRANCH-$VERSION-amd64
+            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64
       - run:
           name: "Save amd64 image tag"
           command: |
@@ -285,8 +281,6 @@ jobs:
       image: ubuntu-2004:202101-01
       docker_layer_caching: true
     resource_class: medium
-    environment:
-      IMAGE_NAME: aleohq/snarkos
     steps:
       - checkout
       - attach_workspace:
@@ -296,26 +290,26 @@ jobs:
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
             echo $ARM_TAG
-            docker pull $IMAGE_NAME:$ARM_TAG
+            docker pull $DOCKER_REPO:$ARM_TAG
       - run:
           name: "Pull AMD docker image"
           command: |
             AMD_TAG=$(cat my_workspace/docker_tag_amd)
             echo $AMD_TAG
-            docker pull $IMAGE_NAME:$AMD_TAG  
+            docker pull $DOCKER_REPO:$AMD_TAG  
       - run:
           name: "Create and push docker multi arch manifest"
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
             AMD_TAG=$(cat my_workspace/docker_tag_amd)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            echo $IMAGE_NAME
+            echo $DOCKER_REPO
             echo $CIRCLE_BRANCH
             echo $ARM_TAG
             echo $AMD_TAG
-            docker manifest create $IMAGE_NAME:${CIRCLE_BRANCH}-latest --amend $IMAGE_NAME:${ARM_TAG} --amend $IMAGE_NAME:${AMD_TAG}
-            docker manifest inspect $IMAGE_NAME:${CIRCLE_BRANCH}-latest
-            docker manifest push $IMAGE_NAME:${CIRCLE_BRANCH}-latest
+            docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $IDOCKER_REPO:${AMD_TAG}
+            docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
+            docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
 
 workflows:
   version: 2
