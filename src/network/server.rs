@@ -226,12 +226,12 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Transmit a heartbeat request to the peers.
                 let request = PeersRequest::Heartbeat(ledger_router.clone());
                 if let Err(error) = peers_router.send(request).await {
-                    error!("Failed to send request to peers: {}", error)
+                    error!("Failed to send heartbeat to peers: {}", error)
                 }
                 // Transmit a heartbeat request to the ledger.
                 let request = LedgerRequest::Heartbeat;
                 if let Err(error) = ledger_router.send(request).await {
-                    error!("Failed to send request to ledger: {}", error)
+                    error!("Failed to send heartbeat to ledger: {}", error)
                 }
                 // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
