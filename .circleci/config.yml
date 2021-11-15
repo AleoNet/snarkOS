@@ -112,6 +112,38 @@ jobs:
       - clear_environment:
           cache_key: snarkos-clippy-cache
 
+
+  build-and-publish-docker-arm:
+    machine:
+      image: ubuntu-2004:202101-01
+      docker_layer_caching: true
+    resource_class: arm.large
+    steps:
+      - checkout
+      - run: mkdir -p my_workspace
+      - run:
+          name: "Build snarkos Docker Image ARM V8"
+          no_output_timeout: 2h
+          command: |
+            VERSION=$(git rev-parse --short HEAD)
+            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64 .
+      - run:
+          name: "Push snarkos Docker Image ARM V8"
+          command: |
+            VERSION=$(git rev-parse --short HEAD)
+            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
+            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64
+      - run:
+          name: "Save arm64 image tag"
+          command: |
+            VERSION=$(git rev-parse --short HEAD)
+            echo "$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
+      - persist_to_workspace:
+          root: my_workspace
+          paths:
+            - docker_tag_arm
+            
 workflows:
   main-workflow:
     jobs:
