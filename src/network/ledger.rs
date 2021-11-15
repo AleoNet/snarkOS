@@ -324,7 +324,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // If the timestamp of the last block increment has surpassed the preset limit,
         // the ledger is likely syncing from invalid state, and should revert by one block.
-        if self.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::MAXIMUM_RADIO_SILENCE_IN_SECS) {
+        if self.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
             trace!("Ledger state has become stale, clearing queue and reverting by one block");
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
@@ -643,9 +643,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     fn remove_expired_block_requests(&mut self) {
         let now = Utc::now().timestamp();
 
-        // Clear the expired block requests that have lived longer than `E::BLOCK_REQUEST_TIMEOUT_IN_SECS`.
+        // Clear the expired block requests that have lived longer than `E::RADIO_SILENCE_IN_SECS`.
         self.block_requests.iter_mut().for_each(|(_peer, block_requests)| {
-            block_requests.retain(|_key, time_of_request| *time_of_request - now < E::BLOCK_REQUEST_TIMEOUT_IN_SECS as i64)
+            block_requests.retain(|_key, time_of_request| *time_of_request - now < E::RADIO_SILENCE_IN_SECS as i64)
         });
     }
 

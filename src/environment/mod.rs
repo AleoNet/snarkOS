@@ -56,9 +56,8 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of sync nodes to bootstrap the node server with.
     const SYNC_NODES: [&'static str; 2] = ["127.0.0.1:4132", "127.0.0.1:4135"];
 
-    /// The duration in seconds to wait before heartbeat executions.
+    /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 5;
-    
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 3;
@@ -66,12 +65,14 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const PING_SLEEP_IN_SECS: u64 = 15;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const MAXIMUM_RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
 
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize = 1;
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
+    /// The maximum number of connection failures permitted by an inbound connecting peer.
+    const MAXIMUM_CONNECTION_FAILURES: u32 = 5;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
 
@@ -80,12 +81,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
 
-    /// The duration in seconds after which a block request is considered expired
-    /// if no block has been received in the meantime.
-    const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 90; // 1 minute 30 seconds
-
     const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
-    const FAILURE_THRESHOLD: usize = 5;
 }
 
 #[derive(Clone, Debug, Default)]
