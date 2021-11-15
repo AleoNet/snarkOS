@@ -277,7 +277,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     let (peer_ip, peer_port) = match peer_ip.ip().is_loopback() {
                         // Loopback case - Do not sanitize, merely pass through.
                         true => (peer_ip, peer_ip.port()),
-                        // Remote case - Sanitize, storing u16::MAX for the peer IP address, passing the port through.
+                        // Remote case - Sanitize, storing u16::MAX for the peer IP address to dedup the peer next time.
                         false => (SocketAddr::new(peer_ip.ip(), u16::MAX), peer_ip.port()),
                     };
 
