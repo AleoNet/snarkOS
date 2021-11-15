@@ -329,7 +329,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
             self.block_requests.values_mut().for_each(|requests| *requests = Default::default());
-            self.revert_to_block_height(self.latest_block_height() - 1);
+            self.revert_to_block_height(self.latest_block_height().saturating_sub(1));
         }
     }
 
