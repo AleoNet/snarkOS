@@ -109,6 +109,15 @@ impl<N: Network> Environment for Miner<N> {
 }
 
 #[derive(Clone, Debug, Default)]
+pub struct SyncNode<N: Network>(PhantomData<N>);
+
+#[rustfmt::skip]
+impl<N: Network> Environment for SyncNode<N> {
+    type Network = N;
+    const NODE_TYPE: NodeType = NodeType::Sync;
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct ClientTrial<N: Network>(PhantomData<N>);
 
 #[rustfmt::skip]
