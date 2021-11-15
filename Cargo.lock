@@ -1759,7 +1759,6 @@ version = "2.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bincode",
  "bytes",
  "chrono",
  "circular-queue",
@@ -1780,6 +1779,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snarkos-ledger",
+ "snarkos-network",
  "snarkvm",
  "structopt",
  "tempfile",
@@ -1810,6 +1810,19 @@ dependencies = [
  "snarkvm",
  "tempfile",
  "tracing",
+]
+
+[[package]]
+name = "snarkos-network"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bytes",
+ "serde",
+ "snarkos-ledger",
+ "snarkvm",
+ "tokio-util",
 ]
 
 [[package]]
