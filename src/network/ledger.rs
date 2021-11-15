@@ -326,7 +326,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
             self.block_requests.values_mut().for_each(|requests| *requests = Default::default());
-            self.remove_last_blocks(1);
+            self.return_to_block_height(self.latest_block_height() - 1);
         }
     }
 
@@ -516,10 +516,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
-    /// Removes the latest `num_blocks` from storage, returning `true` on success.
+    /// Updates the ledger state back to height `block_height`, returning `true` on success.
     ///
-    fn remove_last_blocks(&mut self, num_blocks: u32) -> bool {
-        match self.canon.remove_last_blocks(num_blocks) {
+    fn return_to_block_height(&mut self, block_height: u32) -> bool {
+        match self.canon.return_to_block_height(block_height) {
             Ok(removed_blocks) => {
                 info!("Ledger rolled back to block {}", self.latest_block_height());
 
@@ -739,6 +739,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
 
+            // Ensure the latest_common_ancestor is not greater than the latest_block_height.
+            let latest_block_height = self.latest_block_height();
+            if latest_block_height < maximum_common_ancestor {
+                info!("Found a longer chain starting from block {}", maximum_common_ancestor);
+                return;
+            }
+
             // Determine the latest common ancestor.
             let latest_common_ancestor =
                 // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
@@ -756,8 +763,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH
                     {
                         info!("Found a longer chain starting from block {}", maximum_common_ancestor);
-                        // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
-                        match self.remove_last_blocks(latest_block_height.saturating_sub(maximum_common_ancestor)) {
+                        match self.return_to_block_height(maximum_common_ancestor) {
                             true => maximum_common_ancestor,
                             false => return
                         }
@@ -786,8 +792,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Roll back to the common ancestor anyways.
                         else {
                             info!("Found a potentially longer chain starting from block {}", maximum_common_ancestor);
-                            // TODO (howardwu): Change the remove_last_blocks method to take the target block height, instead of the length.
-                            match self.remove_last_blocks(latest_block_height.saturating_sub(maximum_common_ancestor)) {
+                            match self.return_to_block_height(maximum_common_ancestor) {
                                 true => maximum_common_ancestor,
                                 false => return
                             }
