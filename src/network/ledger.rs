@@ -720,7 +720,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let (Some(peer_ip), Some(is_fork)) = (maximal_peer, maximal_peer_is_fork) {
             // Determine the common ancestor block height between this ledger and the peer.
-            let mut maximum_common_ancestor = maximum_common_ancestor;
+            let mut maximum_common_ancestor = 0;
             // Determine the first locator (smallest height) that does not exist in this ledger.
             let mut first_deviating_locator = None;
 
@@ -752,10 +752,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
 
-            // Ensure the latest_common_ancestor is not greater than the latest_block_height.
+            // Ensure the latest common ancestor is not greater than the latest block request.
             let latest_block_height = self.latest_block_height();
             if latest_block_height < maximum_common_ancestor {
-                info!("Found a longer chain starting from block {}", maximum_common_ancestor);
+                warn!(
+                    "The maximum common ancestor {} can't be greater than the latest block {}",
+                    maximum_common_ancestor, latest_block_height
+                );
                 return;
             }
 
