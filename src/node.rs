@@ -238,13 +238,13 @@ impl NewAccount {
 
         // Print the new Aleo account.
         let mut output = "".to_string();
+        output += &format!(
+            "\n {:>12}\n",
+            "Attention - Remember to store this account private key and view key.".red().bold()
+        );
         output += &format!("\n {:>12}  {}\n", "Private Key".cyan().bold(), account.private_key());
         output += &format!(" {:>12}  {}\n", "View Key".cyan().bold(), account.view_key());
         output += &format!(" {:>12}  {}\n", "Address".cyan().bold(), account.address());
-        output += &format!(
-            " {:>12}\n\n",
-            "Attention - Remember to store this account private key and view key.".red().bold()
-        );
 
         Ok(output)
     }
