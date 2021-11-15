@@ -69,7 +69,7 @@ pub enum PeersRequest<N: Network, E: Environment> {
 ///
 /// A list of peers connected to the node server.
 ///
-pub(crate) struct Peers<N: Network, E: Environment> {
+pub struct Peers<N: Network, E: Environment> {
     /// The local address of this node.
     local_ip: SocketAddr,
     /// The set of connected peer IPs.

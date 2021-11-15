@@ -56,6 +56,9 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of sync nodes to bootstrap the node server with.
     const SYNC_NODES: [&'static str; 2] = ["127.0.0.1:4132", "127.0.0.1:4135"];
 
+    /// The duration in seconds to wait before heartbeat executions.
+    const HEARTBEAT_IN_SECS: u64 = 5;
+    
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 3;
@@ -76,6 +79,10 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
+
+    /// The duration in seconds after which a block request is considered expired
+    /// if no block has been received in the meantime.
+    const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 90; // 1 minute 30 seconds
 
     const FAILURE_EXPIRY_TIME: Duration = Duration::from_secs(15 * 60);
     const FAILURE_THRESHOLD: usize = 5;
