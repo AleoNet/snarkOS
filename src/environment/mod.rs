@@ -17,7 +17,7 @@
 use snarkvm::dpc::Network;
 
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, marker::PhantomData, time::Duration};
+use std::{fmt::Debug, marker::PhantomData};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
