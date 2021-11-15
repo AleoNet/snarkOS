@@ -926,7 +926,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let peers_to_disconnect = self
             .failures
             .iter()
-            .filter(|(_, failures)| failures.len() > E::FAILURE_THRESHOLD)
+            .filter(|(_, failures)| failures.len() > E::MAXIMUM_NUMBER_OF_FAILURES)
             .map(|(peer_ip, _)| peer_ip);
         for peer_ip in peers_to_disconnect {
             if let Err(error) = ledger_router.send(LedgerRequest::Disconnect(*peer_ip)).await {

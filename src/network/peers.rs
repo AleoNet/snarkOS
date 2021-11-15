@@ -323,7 +323,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
 
                     // Ensure the connecting peer has not surpassed the connection attempt limit.
-                    if *initial_port < peer_port && *num_attempts > 5 {
+                    if *initial_port < peer_port && *num_attempts > E::MAXIMUM_CONNECTION_FAILURES {
                         trace!("Dropping connection request from {} (tried {} secs ago)", peer_ip, elapsed);
                     } else {
                         debug!("Received a connection request from {}", peer_ip);

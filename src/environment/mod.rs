@@ -35,9 +35,8 @@ pub enum NodeType {
 #[rustfmt::skip]
 pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     type Network: Network;
-
+    /// The specified type of node.
     const NODE_TYPE: NodeType;
-
     /// The version of the network protocol; it can be incremented in order to force users to update.
     const MESSAGE_VERSION: u32 = 4;
 
@@ -62,13 +61,15 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 3;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 15;
+    const PING_SLEEP_IN_SECS: u64 = 12;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 120; // 2 minutes
+    /// The duration in seconds after which to expire a failure from a peer.
+    const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
 
     /// The minimum number of peers required to maintain connections with.
-    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
+    const MINIMUM_NUMBER_OF_PEERS: usize;
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
@@ -80,11 +81,8 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
-
-    /// The duration in seconds after which to expire a failure from a peer.
-    const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 120 * 60;
-    /// The failure count threshold which determines when to disconnect from a peer.
-    const FAILURE_THRESHOLD: usize = 2400;
+    /// The maximum number of failures tolerated before disconnecting from a peer.
+    const MAXIMUM_NUMBER_OF_FAILURES: usize = 2400;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -105,6 +103,7 @@ impl<N: Network> Environment for Miner<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
     const COINBASE_IS_PUBLIC: bool = true;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -114,6 +113,8 @@ pub struct SyncNode<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 1024;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -124,7 +125,7 @@ impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
     const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 5;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -135,6 +136,6 @@ impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
     const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 5;
     const COINBASE_IS_PUBLIC: bool = true;
 }
