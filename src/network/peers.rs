@@ -274,7 +274,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Spawn a handler to be run asynchronously.
                 else {
                     // Sanitize the port from the peer, if it is a remote IP address.
-                    let (peer_ip, peer_port) = match peer_ip.ip().is_loopback() {
+                    let (peer_lookup, peer_port) = match peer_ip.ip().is_loopback() {
                         // Loopback case - Do not sanitize, merely pass through.
                         true => (peer_ip, peer_ip.port()),
                         // Remote case - Sanitize, storing u16::MAX for the peer IP address to dedup the peer next time.
@@ -284,7 +284,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     // Fetch the inbound tracker entry for this peer.
                     let ((initial_port, num_attempts), last_seen) = self
                         .seen_inbounds
-                        .entry(peer_ip)
+                        .entry(peer_lookup)
                         .or_insert(((peer_port, 0), SystemTime::UNIX_EPOCH));
                     let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
 
