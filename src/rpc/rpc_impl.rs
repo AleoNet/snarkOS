@@ -20,12 +20,12 @@
 
 use crate::{
     rpc::{rpc::*, rpc_trait::RpcFunctions},
-    Environment,
     LedgerRequest,
     LedgerRouter,
     Peers,
 };
 use snarkos_ledger::{LedgerState, Metadata};
+use snarkos_network::Environment;
 use snarkvm::{
     dpc::{Block, BlockHeader, Network, RecordCiphertext, Transaction, Transactions, Transition},
     utilities::FromBytes,

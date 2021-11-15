@@ -18,11 +18,11 @@
 
 use crate::{
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
-    Environment,
     LedgerRouter,
     Peers,
 };
 use snarkos_ledger::LedgerState;
+use snarkos_network::Environment;
 use snarkvm::dpc::Network;
 
 use hyper::{
@@ -437,12 +437,13 @@ fn result_to_response<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ledger::Ledger, Client};
+    use crate::ledger::Ledger;
 
     use snarkos_ledger::{
         storage::{rocksdb::RocksDB, Storage},
         LedgerState,
     };
+    use snarkos_network::Client;
     use snarkvm::{
         dpc::{testnet2::Testnet2, AccountScheme, AleoAmount, RecordCiphertext, Transaction, Transactions, Transition},
         prelude::{Account, Block, BlockHeader},

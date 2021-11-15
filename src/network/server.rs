@@ -19,10 +19,9 @@ use crate::{
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     rpc::initialize_rpc_server,
-    Environment,
-    NodeType,
 };
 use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_network::{Environment, NodeType};
 use snarkvm::prelude::*;
 
 use anyhow::Result;

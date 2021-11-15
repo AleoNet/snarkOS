@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["ledger"]
+members = ["ledger", "network"]
 
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
@@ -33,14 +33,15 @@ tui = { version = "0.16.0", features = ["crossterm"] }
 path = "./ledger"
 version = "2.0.0"
 
+[dependencies.snarkos-network]
+path = "./network"
+version = "2.0.0"
+
 [dependencies.anyhow]
 version = "1"
 
 [dependencies.async-trait]
 version = "0.1"
-
-[dependencies.bincode]
-version = "1.0"
 
 [dependencies.chrono]
 version = "0.4"

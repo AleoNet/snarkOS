@@ -1,0 +1,40 @@
+[package]
+name = "snarkos-network"
+version = "2.0.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+    "aleo",
+    "cryptography",
+    "blockchain",
+    "decentralized",
+    "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies]
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
+#snarkvm = { path = "../snarkVM" }
+
+bytes = "1.0.0"
+
+[dependencies.snarkos-ledger]
+path = "../ledger"
+version = "2.0.0"
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.tokio-util]
+version = "=0.6"
+features = ["codec"]

@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType, SyncNode};
+use crate::{helpers::Updater, network::Server, Display};
+use snarkos_network::{Client, ClientTrial, Environment, Miner, MinerTrial, NodeType, SyncNode};
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;

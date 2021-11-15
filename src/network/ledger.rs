@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, PeersRouter};
+use crate::{helpers::CircularMap, PeersRequest, PeersRouter};
 use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState};
+use snarkos_network::{Environment, Message, NodeType};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;

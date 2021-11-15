@@ -17,9 +17,6 @@
 pub(crate) mod ledger;
 pub(crate) use ledger::{LedgerRequest, LedgerRouter};
 
-pub(crate) mod message;
-pub(crate) use message::*;
-
 pub(crate) mod peers;
 pub(crate) use peers::*;
 
