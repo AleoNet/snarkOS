@@ -93,7 +93,7 @@ version = "1.0"
 features = [ "derive" ]
 
 [dependencies.serde_json]
-version = "1.0.65"
+version = "1.0.70"
 
 [dependencies.thiserror]
 version = "1.0"
