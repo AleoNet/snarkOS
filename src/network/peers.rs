@@ -73,7 +73,6 @@ pub enum PeersRequest<N: Network, E: Environment> {
 pub struct Peers<N: Network, E: Environment> {
     /// The local address of this node.
     local_ip: SocketAddr,
-
     /// Nonce for the current node session.
     nonce: u64,
 
