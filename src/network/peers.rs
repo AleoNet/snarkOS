@@ -174,18 +174,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::Heartbeat(ledger_router) => {
                 if self.num_connected_peers() > E::MAXIMUM_NUMBER_OF_PEERS {
                     let num_excess_peers = self.num_connected_peers() - E::MAXIMUM_NUMBER_OF_PEERS;
-                    let peer_routers_to_disconnect = self
+                    let peer_ips_to_disconnect = self
                         .connected_peers
                         .iter()
                         .filter(|(&addr, _)| {
                             !E::SYNC_NODES.contains(&addr.to_string().as_str()) && !E::PEER_NODES.contains(&addr.to_string().as_str())
                         })
                         .take(num_excess_peers)
-                        .map(|(_, peer_router)| peer_router);
-                    for peer_router in peer_routers_to_disconnect {
-                        if let Err(error) = peer_router.send(Message::Disconnect).await {
-                            error!("Failed to transmit the request: '{}'", error);
-                        }
+                        .map(|(&addr, _)| addr)
+                        .collect::<Vec<SocketAddr>>();
+                    for peer_ip in peer_ips_to_disconnect {
+                        self.send(peer_ip, &Message::Disconnect).await;
                     }
                 }
 
