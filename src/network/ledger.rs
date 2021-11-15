@@ -777,10 +777,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     {
                         info!("Found a longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
 
-                        // if the latest block is the same as the maximum common ancestor, do not revert.
+                        // If the latest block is the same as the maximum common ancestor, do not revert.
                         if latest_block_height == maximum_common_ancestor {
                             maximum_common_ancestor
                         } else {
+                            // Revert block state back to the `maximum_common_ancestor`.
                             match self.revert_to_block_height(maximum_common_ancestor) {
                                 true => maximum_common_ancestor,
                                 false => return
