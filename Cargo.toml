@@ -151,4 +151,4 @@ opt-level = 3
 lto = "thin"
 incremental = true
 debug = true
-debug-assertions = false
+debug-assertions = true
