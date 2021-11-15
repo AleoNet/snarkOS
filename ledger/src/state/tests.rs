@@ -123,7 +123,9 @@ fn test_remove_last_block() {
     assert_eq!(1, ledger.latest_block_height());
 
     // Remove the last block.
-    let blocks = ledger.remove_last_blocks(1).expect("Failed to remove the last block");
+    let blocks = ledger
+        .revert_to_block_height(ledger.latest_block_height() - 1)
+        .expect("Failed to remove the last block");
     assert_eq!(vec![block], blocks);
 
     // Retrieve the genesis block.
@@ -170,7 +172,9 @@ fn test_remove_last_2_blocks() {
     assert_eq!(2, ledger.latest_block_height());
 
     // Remove the last block.
-    let blocks = ledger.remove_last_blocks(2).expect("Failed to remove the last block");
+    let blocks = ledger
+        .revert_to_block_height(ledger.latest_block_height() - 2)
+        .expect("Failed to remove the last two blocks");
     assert_eq!(vec![block_1, block_2], blocks);
 
     // Retrieve the genesis block.
