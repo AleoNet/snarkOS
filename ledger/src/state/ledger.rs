@@ -27,6 +27,7 @@ use parking_lot::RwLock;
 use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     path::Path,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -132,7 +133,9 @@ impl<N: Network> LedgerState<N> {
         for block_height in 0..=latest_block_height {
             // Validate the ledger root every 250 blocks.
             if block_height % 250 == 0 || block_height == latest_block_height {
-                debug!("Validating the ledger root up to block {}", block_height);
+                if !ledger.is_read_only() {
+                    debug!("Validating the ledger root up to block {}", block_height);
+                }
 
                 // Ensure the ledger roots match their expected block heights.
                 let expected_ledger_root = ledger.get_previous_ledger_root(block_height)?;
@@ -170,6 +173,8 @@ impl<N: Network> LedgerState<N> {
             let mut ledger = ledger.clone();
             thread::spawn(move || {
                 let last_seen_block_height = ledger.read_only.1.clone();
+                ledger.read_only.1.store(latest_block_height, Ordering::SeqCst);
+
                 loop {
                     // Refresh the ledger storage state.
                     if ledger.ledger_roots.refresh() {
@@ -377,8 +382,8 @@ impl<N: Network> LedgerState<N> {
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
 
         // Acquire the read lock for the latest block hashes and block headers.
-        let latest_block_hashes = self.latest_block_hashes.write();
-        let latest_block_headers = self.latest_block_headers.write();
+        let latest_block_hashes = self.latest_block_hashes.read();
+        let latest_block_headers = self.latest_block_headers.read();
 
         // Construct the list of block locator headers.
         let block_hashes = latest_block_hashes.iter().cloned();
@@ -386,7 +391,7 @@ impl<N: Network> LedgerState<N> {
         let block_locator_headers = block_hashes
             .zip_eq(block_headers)
             .take(num_block_headers as usize)
-            .map(|(hash, header)| (header.height(), hash, Some(header)));
+            .map(|(hash, header)| (header.height(), (hash, Some(header))));
 
         // Decrement the block locator height by the number of block headers.
         block_locator_height -= num_block_headers;
@@ -394,11 +399,9 @@ impl<N: Network> LedgerState<N> {
         // Return the block locators if the locator has run out of blocks.
         if block_locator_height == 0 {
             // Initialize the list of block locators.
-            let mut block_locators = Vec::with_capacity((num_block_headers + 1) as usize);
-            // Add the list of block locator headers.
-            block_locators.extend(block_locator_headers);
+            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.collect();
             // Add the genesis locator.
-            block_locators.push((0, self.get_block_hash(0)?, None));
+            block_locators.insert(0, (self.get_block_hash(0)?, None));
 
             return Ok(BlockLocators::<N>::from(block_locators));
         }
@@ -410,23 +413,17 @@ impl<N: Network> LedgerState<N> {
         let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
         // Add the block locator hashes.
         while block_locator_height > 0 && block_locator_hashes.len() < num_block_hashes as usize {
-            block_locator_hashes.push((block_locator_height, self.get_block_hash(block_locator_height)?, None));
+            block_locator_hashes.push((block_locator_height, (self.get_block_hash(block_locator_height)?, None)));
 
             // Decrement the block locator height by a power of two.
             block_locator_height /= 2;
         }
 
-        // Determine the number of latest block headers and block hashes to include as block locators.
-        let num_block_locators = num_block_headers + num_block_hashes + 1;
-
         // Initialize the list of block locators.
-        let mut block_locators = Vec::with_capacity(num_block_locators as usize);
-        // Add the list of block locator headers.
-        block_locators.extend(block_locator_headers);
-        // Add the list of block locator hashes.
-        block_locators.extend(block_locator_hashes);
+        let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
+            block_locator_headers.chain(block_locator_hashes).collect();
         // Add the genesis locator.
-        block_locators.push((0, self.get_block_hash(0)?, None));
+        block_locators.insert(0, (self.get_block_hash(0)?, None));
 
         Ok(BlockLocators::<N>::from(block_locators))
     }
@@ -440,51 +437,49 @@ impl<N: Network> LedgerState<N> {
 
         let block_locators = &**block_locators;
 
-        // Check that the last block locator is the genesis locator.
-        let (expected_height, expected_genesis_block_hash, expected_genesis_header) = &block_locators[block_locators.len() - 1];
-        if *expected_height != 0 || expected_genesis_block_hash != &self.get_block_hash(0)? || expected_genesis_header.is_some() {
+        // Ensure the genesis block locator exists and is well-formed.
+        let (expected_genesis_block_hash, expected_genesis_header) = match block_locators.get(&0) {
+            Some((expected_genesis_block_hash, expected_genesis_header)) => (expected_genesis_block_hash, expected_genesis_header),
+            None => return Ok(false),
+        };
+        if expected_genesis_block_hash != &N::genesis_block().hash() || expected_genesis_header.is_some() {
             return Ok(false);
         }
 
-        // Get the remaining block locators (excluding the genesis block).
-        let remaining_block_locators = &block_locators[..block_locators.len() - 1];
-        let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, remaining_block_locators.len());
+        let num_linear_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, block_locators.len() - 1);
+        let num_quadratic_block_headers = block_locators.len().saturating_sub(num_linear_block_headers + 1);
 
         // Check that the block headers are formed correctly (linear).
-        // let mut last_block_height = remaining_block_locators[0].0 + 1;
-        for (_block_height, _block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
-            // // Check that the block height is decrementing.
-            // match last_block_height == *block_height + 1 {
-            //     true => last_block_height = *block_height,
-            //     false => return Ok(false)
-            // }
+        let mut last_block_height = match block_locators.keys().max() {
+            Some(height) => *height,
+            None => return Ok(false),
+        };
+
+        for (block_height, (_block_hash, block_header)) in block_locators.iter().skip(num_linear_block_headers).rev() {
+            // Check that the block height is decrementing.
+            match last_block_height == *block_height {
+                true => last_block_height = block_height.saturating_sub(1),
+                false => return Ok(false),
+            }
 
             // Check that the block header is present.
-            let _block_header = match block_header {
+            let block_header = match block_header {
                 Some(header) => header,
                 None => return Ok(false),
             };
 
-            // // Check that the expected block hash is correct.
-            // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
-            //     if &expected_block_hash != block_hash {
-            //         return Ok(false);
-            //     }
-            // }
-            //
-            // // Check that the expected block headers is correct.
-            // if let Ok(expected_block_header) = self.get_block_header(*block_height) {
-            //     if &expected_block_header != block_header {
-            //         return Ok(false);
-            //     }
-            // }
+            // Check the block height matches in the block header.
+            if block_height != &block_header.height() {
+                return Ok(false);
+            }
         }
 
-        // Check that the block hashes are formed correctly (power of two).
+        // Check that the remaining block hashes are formed correctly (power of two).
         if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
             let mut previous_block_height = u32::MAX;
 
-            for (block_height, _block_hash, block_header) in &block_locators[num_block_headers..] {
+            // Iterate through all the quadratic ranged block locators excluding the genesis locator.
+            for (block_height, (_block_hash, block_header)) in block_locators.iter().skip(1).take(num_quadratic_block_headers - 1).rev() {
                 // Check that the block heights increment by a power of two.
                 if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
                     return Ok(false);
@@ -494,13 +489,6 @@ impl<N: Network> LedgerState<N> {
                 if block_header.is_some() {
                     return Ok(false);
                 }
-
-                // // Check that the expected block hash is correct.
-                // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
-                //     if &expected_block_hash != block_hash {
-                //         return Ok(false);
-                //     }
-                // }
 
                 previous_block_height = *block_height;
             }
@@ -672,29 +660,29 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
-    /// Removes the latest `num_blocks` from storage, returning the removed blocks on success.
-    pub fn remove_last_blocks(&mut self, num_blocks: u32) -> Result<Vec<Block<N>>> {
+    /// Reverts the ledger state back to the given block height, returning the removed blocks on success.
+    pub fn revert_to_block_height(&mut self, block_height: u32) -> Result<Vec<Block<N>>> {
         // If the storage is in read-only mode, this method cannot be called.
         if self.is_read_only() {
             return Err(anyhow!("Ledger is in read-only mode"));
         }
 
-        // Ensure the number of blocks to remove is within a permitted range.
-        if num_blocks == 0 || num_blocks > N::ALEO_MAXIMUM_FORK_DEPTH {
-            return Err(anyhow!("Attempted to remove {} blocks, which is invalid", num_blocks));
+        // Determine the number of blocks to remove.
+        let latest_block_height = self.latest_block_height();
+        let number_of_blocks = latest_block_height.saturating_sub(block_height);
+
+        // Ensure the reverted block height is within a permitted range and well-formed.
+        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+            return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
         // Initialize a list of the removed blocks.
-        let mut blocks = Vec::with_capacity(num_blocks as usize);
-
+        let mut blocks = Vec::with_capacity(number_of_blocks as usize);
         {
             // Acquire the write lock on the latest block.
             let mut latest_block = self.latest_block.write();
 
-            // Initialize the block to remove.
-            let mut remaining_blocks = num_blocks;
-
-            while latest_block.height() > 0 && remaining_blocks > 0 {
+            while latest_block.height() > block_height {
                 // Update the internal state of the ledger, except for the ledger tree.
                 self.blocks.remove_block(latest_block.height())?;
                 self.ledger_roots.remove(&latest_block.previous_ledger_root())?;
@@ -704,11 +692,8 @@ impl<N: Network> LedgerState<N> {
 
                 *latest_block = match latest_block.height() == 0 {
                     true => N::genesis_block().clone(),
-                    false => self.get_block(latest_block.height() - 1)?,
+                    false => self.get_block(latest_block.height().saturating_sub(1))?,
                 };
-
-                // Decrement the remaining blocks by 1.
-                remaining_blocks -= 1;
             }
         }
 

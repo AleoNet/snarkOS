@@ -26,7 +26,7 @@ use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, RwLock},
@@ -68,7 +68,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         };
 
         // Initialize the ledger storage path.
-        let storage_path = format!(".ledger-{}", (node_port as u16 - 4130) as u8);
+        let mut storage_path = aleo_std::aleo_dir();
+        storage_path.push(N::NETWORK_NAME);
+        storage_path.push(format!("ledger-{}", (node_port as u16 - 4130) as u8));
 
         // Initialize the tasks handler.
         let mut tasks = Tasks::new();
@@ -90,6 +92,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             format!("0.0.0.0:{}", rpc_port).parse()?,
             username,
             password,
+            &peers,
             LedgerState::open::<RocksDB, _>(&storage_path, true)?,
             &ledger_router,
         ));
@@ -129,7 +132,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[allow(clippy::type_complexity)]
     fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
-        let peers = Arc::new(RwLock::new(Peers::new(local_ip)));
+        let peers = Arc::new(RwLock::new(Peers::new(local_ip, None)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
@@ -139,14 +142,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         let peers_router_clone = peers_router.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a peers request.
-            loop {
-                tokio::select! {
-                    // Channel is routing a request to peers.
-                    Some(request) = peers_handler.recv() => {
-                        // Hold the peers write lock briefly, to update the state of the peers.
-                        peers_clone.write().await.update(request, &peers_router_clone).await;
-                    }
-                }
+            // Channel is routing a request to peers.
+            while let Some(request) = peers_handler.recv().await {
+                // Hold the peers write lock briefly, to update the state of the peers.
+                peers_clone.write().await.update(request, &peers_router_clone).await;
             }
         }));
 
@@ -158,9 +157,9 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     #[allow(clippy::type_complexity)]
-    fn initialize_ledger(
+    fn initialize_ledger<P: AsRef<Path>>(
         tasks: &mut Tasks<task::JoinHandle<()>>,
-        storage_path: &str,
+        storage_path: P,
         peers_router: &PeersRouter<N, E>,
     ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
@@ -212,7 +211,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     Err(error) => error!("Failed to accept a connection: {}", error),
                 }
                 // Add a small delay to prevent overloading the network from handshakes.
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(150)).await;
             }
         }));
     }
@@ -229,15 +228,15 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Transmit a heartbeat request to the peers.
                 let request = PeersRequest::Heartbeat(ledger_router.clone());
                 if let Err(error) = peers_router.send(request).await {
-                    error!("Failed to send request to peers: {}", error)
+                    error!("Failed to send heartbeat to peers: {}", error)
                 }
                 // Transmit a heartbeat request to the ledger.
-                let request = LedgerRequest::Heartbeat;
+                let request = LedgerRequest::Heartbeat(ledger_router.clone());
                 if let Err(error) = ledger_router.send(request).await {
-                    error!("Failed to send request to ledger: {}", error)
+                    error!("Failed to send heartbeat to ledger: {}", error)
                 }
-                // Sleep for 5 seconds.
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
+                tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
             }
         }));
     }
