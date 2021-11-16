@@ -77,14 +77,14 @@ pub struct Peers<N: Network, E: Environment> {
     connected_peers: HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>,
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
-    /// The map of peers to a map of block hashes and when they've seen that block.
-    seen_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, SystemTime>>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
-    seen_inbounds: HashMap<SocketAddr, ((u16, u32), SystemTime)>,
+    seen_inbound_connections: HashMap<SocketAddr, ((u16, u32), SystemTime)>,
+    /// The map of peers to a map of block hashes to their last seen timestamp.
+    seen_outbound_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, SystemTime>>,
     /// The map of peers to the timestamp of their last outbound connection request.
-    seen_outbounds: HashMap<SocketAddr, SystemTime>,
-    /// The map of peers to a map of transaction ids and when they've seen that transaction.
-    seen_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, SystemTime>>,
+    seen_outbound_connections: HashMap<SocketAddr, SystemTime>,
+    /// The map of peers to a map of transaction IDs to their last seen timestamp.
+    seen_outbound_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, SystemTime>>,
 }
 
 impl<N: Network, E: Environment> Peers<N, E> {
@@ -102,10 +102,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
             local_nonce,
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
-            seen_blocks: Default::default(),
-            seen_inbounds: Default::default(),
-            seen_outbounds: Default::default(),
-            seen_transactions: Default::default(),
+            seen_outbound_blocks: Default::default(),
+            seen_inbound_connections: Default::default(),
+            seen_outbound_connections: Default::default(),
+            seen_outbound_transactions: Default::default(),
         }
     }
 
@@ -175,7 +175,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Attempt to open a TCP stream.
                 else {
                     // Ensure the node respects the connection frequency limit.
-                    let last_seen = self.seen_outbounds.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
+                    let last_seen = self.seen_outbound_connections.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
                     let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
                     if elapsed < E::RADIO_SILENCE_IN_SECS {
                         trace!("Skipping connection request to {} (tried {} secs ago)", peer_ip, elapsed);
@@ -302,7 +302,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                     // Fetch the inbound tracker entry for this peer.
                     let ((initial_port, num_attempts), last_seen) = self
-                        .seen_inbounds
+                        .seen_inbound_connections
                         .entry(peer_lookup)
                         .or_insert(((peer_port, 0), SystemTime::UNIX_EPOCH));
                     let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
@@ -348,8 +348,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.candidate_peers.insert(peer_ip);
 
                 // Clear the peer's seen blocks/transactions.
-                self.seen_blocks.remove(&peer_ip);
-                self.seen_transactions.remove(&peer_ip);
+                self.seen_outbound_blocks.remove(&peer_ip);
+                self.seen_outbound_transactions.remove(&peer_ip);
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -392,7 +392,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let is_ready_to_send = match message {
                     Message::UnconfirmedBlock(block) => {
                         // Retrieve the last seen timestamp of this block for this peer.
-                        let seen_blocks = self.seen_blocks.entry(peer).or_insert_with(Default::default);
+                        let seen_blocks = self.seen_outbound_blocks.entry(peer).or_insert_with(Default::default);
                         let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
                         let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
@@ -406,7 +406,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                     Message::UnconfirmedTransaction(transaction) => {
                         // Retrieve the last seen timestamp of this transaction for this peer.
-                        let seen_transactions = self.seen_transactions.entry(peer).or_insert_with(Default::default);
+                        let seen_transactions = self.seen_outbound_transactions.entry(peer).or_insert_with(Default::default);
                         let last_seen = seen_transactions
                             .entry(transaction.transaction_id())
                             .or_insert(SystemTime::UNIX_EPOCH);
@@ -474,6 +474,10 @@ struct Peer<N: Network, E: Environment> {
     /// The `outbound_handler` half of the MPSC message channel, used to receive messages from peers.
     /// When a message is received on this `OutboundHandler`, it will be written to the socket.
     outbound_handler: OutboundHandler<N, E>,
+    /// The map of block hashes to their last seen timestamp.
+    seen_inbound_blocks: HashMap<N::BlockHash, SystemTime>,
+    /// The map of transaction IDs to their last seen timestamp.
+    seen_inbound_transactions: HashMap<N::TransactionID, SystemTime>,
 }
 
 impl<N: Network, E: Environment> Peer<N, E> {
@@ -509,6 +513,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
+            seen_inbound_blocks: Default::default(),
+            seen_inbound_transactions: Default::default(),
         })
     }
 
@@ -743,9 +749,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
+                                    // Retrieve the last seen timestamp of the received block.
+                                    let last_seen = peer.seen_inbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                                    // Update the timestamp for the received block.
+                                    peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
                                     // Route the `UnconfirmedBlock` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
-                                        warn!("[UnconfirmedBlock] {}", error);
+                                    if is_ready_to_route {
+                                        if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
+                                            warn!("[UnconfirmedBlock] {}", error);
+                                        }
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
