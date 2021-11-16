@@ -59,6 +59,8 @@ pub enum PeersRequest<N: Network, E: Environment> {
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
     PeerDisconnected(SocketAddr),
+    /// PeerRestricted := (peer_ip)
+    PeerRestricted(SocketAddr),
     /// SendPeerResponse := (peer_ip)
     SendPeerResponse(SocketAddr),
     /// ReceivePeerResponse := (\[peer_ip\])
@@ -77,6 +79,8 @@ pub struct Peers<N: Network, E: Environment> {
     connected_peers: HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>,
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
+    /// The set of restricted peer IPs.
+    restricted_peers: HashMap<SocketAddr, Instant>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
     seen_inbound_connections: HashMap<SocketAddr, ((u16, u32), SystemTime)>,
     /// The map of peers to a map of block hashes to their last seen timestamp.
@@ -102,6 +106,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             local_nonce,
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
+            restricted_peers: Default::default(),
             seen_outbound_blocks: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
@@ -114,6 +119,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(crate) fn is_connected_to(&self, ip: SocketAddr) -> bool {
         self.connected_peers.contains_key(&ip)
+    }
+
+    ///
+    /// Returns `true` if the given IP is restricted.
+    ///
+    pub(crate) fn is_restricted(&self, ip: SocketAddr) -> bool {
+        match self.restricted_peers.get(&ip) {
+            Some(timestamp) => timestamp.elapsed().as_secs() < E::RADIO_SILENCE_IN_SECS,
+            None => false,
+        }
     }
 
     ///
@@ -171,6 +186,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Ensure the peer is a new connection.
                 else if self.is_connected_to(peer_ip) {
                     debug!("Skipping connection request to {} (already connected)", peer_ip);
+                }
+                // Ensure the peer is not restricted.
+                else if self.is_restricted(peer_ip) {
+                    debug!("Skipping connection request to {} (restricted)", peer_ip);
                 }
                 // Attempt to open a TCP stream.
                 else {
@@ -290,6 +309,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 else if self.is_connected_to(peer_ip) {
                     debug!("Dropping connection request from {} (already connected)", peer_ip);
                 }
+                // Ensure the peer is not restricted.
+                else if self.is_restricted(peer_ip) {
+                    debug!("Dropping connection request from {} (restricted)", peer_ip);
+                }
                 // Spawn a handler to be run asynchronously.
                 else {
                     // Sanitize the port from the peer, if it is a remote IP address.
@@ -344,12 +367,18 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.candidate_peers.remove(&peer_ip);
             }
             PeersRequest::PeerDisconnected(peer_ip) => {
+                // Remove an entry for this `Peer` in the connected peers, if it exists.
                 self.connected_peers.remove(&peer_ip);
+                // Add an entry for this `Peer` in the candidate peers.
                 self.candidate_peers.insert(peer_ip);
 
                 // Clear the peer's seen blocks/transactions.
                 self.seen_outbound_blocks.remove(&peer_ip);
                 self.seen_outbound_transactions.remove(&peer_ip);
+            }
+            PeersRequest::PeerRestricted(peer_ip) => {
+                // Add an entry for this `Peer` in the restricted peers.
+                self.restricted_peers.insert(peer_ip, Instant::now());
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -753,6 +782,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 5 {
                                         warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
+                                        // Send a `PeerRestricted` message.
+                                        if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+                                            warn!("[PeerRestricted] {}", error);
+                                        }
                                         break;
                                     }
 
@@ -775,6 +808,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 500 {
                                         warn!("Dropping {} for spamming unconfirmed transactions (frequency = {})", peer_ip, frequency);
+                                        // Send a `PeerRestricted` message.
+                                        if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+                                            warn!("[PeerRestricted] {}", error);
+                                        }
                                         break;
                                     }
 
