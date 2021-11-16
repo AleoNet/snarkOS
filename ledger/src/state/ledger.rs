@@ -446,65 +446,53 @@ impl<N: Network> LedgerState<N> {
             return Ok(false);
         }
 
-        // // Get the remaining block locators (excluding the genesis block).
-        // let remaining_block_locators = &block_locators[..block_locators.len() - 1];
-        // let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, remaining_block_locators.len());
-        //
-        // // Check that the block headers are formed correctly (linear).
-        // // let mut last_block_height = remaining_block_locators[0].0 + 1;
-        // for (_block_height, _block_hash, block_header) in &remaining_block_locators[..num_block_headers] {
-        //     // // Check that the block height is decrementing.
-        //     // match last_block_height == *block_height + 1 {
-        //     //     true => last_block_height = *block_height,
-        //     //     false => return Ok(false)
-        //     // }
-        //
-        //     // Check that the block header is present.
-        //     let _block_header = match block_header {
-        //         Some(header) => header,
-        //         None => return Ok(false),
-        //     };
-        //
-        //     // // Check that the expected block hash is correct.
-        //     // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
-        //     //     if &expected_block_hash != block_hash {
-        //     //         return Ok(false);
-        //     //     }
-        //     // }
-        //     //
-        //     // // Check that the expected block headers is correct.
-        //     // if let Ok(expected_block_header) = self.get_block_header(*block_height) {
-        //     //     if &expected_block_header != block_header {
-        //     //         return Ok(false);
-        //     //     }
-        //     // }
-        // }
+        let num_linear_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize, block_locators.len() - 1);
+        let num_quadratic_block_headers = block_locators.len().saturating_sub(num_linear_block_headers + 1);
 
-        // // Check that the block hashes are formed correctly (power of two).
-        // if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
-        //     let mut previous_block_height = u32::MAX;
-        //
-        //     for (block_height, _block_hash, block_header) in &block_locators[num_block_headers..] {
-        //         // Check that the block heights increment by a power of two.
-        //         if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
-        //             return Ok(false);
-        //         }
-        //
-        //         // Check that there is no block header.
-        //         if block_header.is_some() {
-        //             return Ok(false);
-        //         }
-        //
-        //         // // Check that the expected block hash is correct.
-        //         // if let Ok(expected_block_hash) = self.get_block_hash(*block_height) {
-        //         //     if &expected_block_hash != block_hash {
-        //         //         return Ok(false);
-        //         //     }
-        //         // }
-        //
-        //         previous_block_height = *block_height;
-        //     }
-        // }
+        // Check that the block headers are formed correctly (linear).
+        let mut last_block_height = match block_locators.keys().max() {
+            Some(height) => *height,
+            None => return Ok(false),
+        };
+
+        for (block_height, (_block_hash, block_header)) in block_locators.iter().skip(num_linear_block_headers).rev() {
+            // Check that the block height is decrementing.
+            match last_block_height == *block_height {
+                true => last_block_height = block_height.saturating_sub(1),
+                false => return Ok(false),
+            }
+
+            // Check that the block header is present.
+            let block_header = match block_header {
+                Some(header) => header,
+                None => return Ok(false),
+            };
+
+            // Check the block height matches in the block header.
+            if block_height != &block_header.height() {
+                return Ok(false);
+            }
+        }
+
+        // Check that the remaining block hashes are formed correctly (power of two).
+        if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
+            let mut previous_block_height = u32::MAX;
+
+            // Iterate through all the quadratic ranged block locators excluding the genesis locator.
+            for (block_height, (_block_hash, block_header)) in block_locators.iter().skip(1).take(num_quadratic_block_headers - 1).rev() {
+                // Check that the block heights increment by a power of two.
+                if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
+                    return Ok(false);
+                }
+
+                // Check that there is no block header.
+                if block_header.is_some() {
+                    return Ok(false);
+                }
+
+                previous_block_height = *block_height;
+            }
+        }
 
         Ok(true)
     }
