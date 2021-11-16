@@ -71,7 +71,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
         let mut block_locators = BTreeMap::new();
         let mut block_headers_bytes = Vec::with_capacity(num_locators as usize);
 
-        for index in 0..num_locators {
+        for _ in 0..num_locators {
             let height: u32 = FromBytes::read_le(&mut reader)?;
             let hash: N::BlockHash = FromBytes::read_le(&mut reader)?;
             let header_exists: bool = FromBytes::read_le(&mut reader)?;
@@ -79,7 +79,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
             if header_exists {
                 let mut buffer = vec![0u8; N::HEADER_SIZE_IN_BYTES];
                 reader.read_exact(&mut buffer)?;
-                block_headers_bytes.push((index, buffer));
+                block_headers_bytes.push((height, buffer));
             };
 
             block_locators.insert(height, (hash, None));
@@ -87,14 +87,14 @@ impl<N: Network> FromBytes for BlockLocators<N> {
 
         let block_headers = block_headers_bytes
             .par_iter()
-            .flat_map(|(index, bytes)| match !bytes.is_empty() {
-                true => Some((index, BlockHeader::<N>::read_le(&bytes[..]).unwrap())),
+            .flat_map(|(height, bytes)| match !bytes.is_empty() {
+                true => Some((height, BlockHeader::<N>::read_le(&bytes[..]).unwrap())),
                 false => None,
             })
             .collect::<Vec<_>>();
 
-        for (index, block_header) in block_headers.into_iter() {
-            if let Some((_, header)) = block_locators.get_mut(index) {
+        for (height, block_header) in block_headers.into_iter() {
+            if let Some((_, header)) = block_locators.get_mut(height) {
                 *header = Some(block_header);
             }
         }
