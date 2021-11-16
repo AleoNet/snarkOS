@@ -29,6 +29,12 @@ fn main() -> Result<()> {
         .max_blocking_threads(num_cpus::get().saturating_sub(1).max(1)) // Don't use 100% of the cores
         .build()?;
 
+    // don't use 100% of the cores for mining
+    rayon::ThreadPoolBuilder::new()
+        .num_threads((num_cpus::get() / 4 * 3).max(1))
+        .build_global()
+        .unwrap();
+
     runtime.block_on(Node::from_args().start())?;
 
     Ok(())

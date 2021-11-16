@@ -78,6 +78,9 @@ version = "0.11"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.self_update]
 version = "0.27"
 
