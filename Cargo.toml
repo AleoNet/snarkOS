@@ -117,9 +117,6 @@ version = "=0.1"
 [dependencies.tracing]
 version = "0.1"
 
-[dependencies.walkdir]
-version = "2"
-
 [dependencies.tracing-subscriber]
 version = "0.3"
 features = ["env-filter"]
