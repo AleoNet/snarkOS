@@ -49,8 +49,6 @@ pub enum PeersRequest<N: Network, E: Environment> {
     Connect(SocketAddr, LedgerRouter<N, E>),
     /// Heartbeat := (ledger_router)
     Heartbeat(LedgerRouter<N, E>),
-    /// MessageBroadcast := (message)
-    MessageBroadcast(Message<N, E>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
@@ -61,6 +59,8 @@ pub enum PeersRequest<N: Network, E: Environment> {
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
     PeerDisconnected(SocketAddr),
+    /// PeerRestricted := (peer_ip)
+    PeerRestricted(SocketAddr),
     /// SendPeerResponse := (peer_ip)
     SendPeerResponse(SocketAddr),
     /// ReceivePeerResponse := (\[peer_ip\])
@@ -79,14 +79,16 @@ pub struct Peers<N: Network, E: Environment> {
     connected_peers: HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>,
     /// The set of candidate peer IPs.
     candidate_peers: HashSet<SocketAddr>,
-    /// The map of peers to a map of block hashes and when they've seen that block.
-    seen_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, i64>>,
+    /// The set of restricted peer IPs.
+    restricted_peers: HashMap<SocketAddr, Instant>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
-    seen_inbounds: HashMap<SocketAddr, ((u16, u32), SystemTime)>,
+    seen_inbound_connections: HashMap<SocketAddr, ((u16, u32), SystemTime)>,
+    /// The map of peers to a map of block hashes to their last seen timestamp.
+    seen_outbound_blocks: HashMap<SocketAddr, HashMap<N::BlockHash, SystemTime>>,
     /// The map of peers to the timestamp of their last outbound connection request.
-    seen_outbounds: HashMap<SocketAddr, SystemTime>,
-    /// The map of peers to a map of transaction ids and when they've seen that transaction.
-    seen_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, i64>>,
+    seen_outbound_connections: HashMap<SocketAddr, SystemTime>,
+    /// The map of peers to a map of transaction IDs to their last seen timestamp.
+    seen_outbound_transactions: HashMap<SocketAddr, HashMap<N::TransactionID, SystemTime>>,
 }
 
 impl<N: Network, E: Environment> Peers<N, E> {
@@ -104,10 +106,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
             local_nonce,
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
-            seen_blocks: Default::default(),
-            seen_inbounds: Default::default(),
-            seen_outbounds: Default::default(),
-            seen_transactions: Default::default(),
+            restricted_peers: Default::default(),
+            seen_outbound_blocks: Default::default(),
+            seen_inbound_connections: Default::default(),
+            seen_outbound_connections: Default::default(),
+            seen_outbound_transactions: Default::default(),
         }
     }
 
@@ -116,6 +119,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(crate) fn is_connected_to(&self, ip: SocketAddr) -> bool {
         self.connected_peers.contains_key(&ip)
+    }
+
+    ///
+    /// Returns `true` if the given IP is restricted.
+    ///
+    pub(crate) fn is_restricted(&self, ip: SocketAddr) -> bool {
+        match self.restricted_peers.get(&ip) {
+            Some(timestamp) => timestamp.elapsed().as_secs() < E::RADIO_SILENCE_IN_SECS,
+            None => false,
+        }
     }
 
     ///
@@ -174,10 +187,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 else if self.is_connected_to(peer_ip) {
                     debug!("Skipping connection request to {} (already connected)", peer_ip);
                 }
+                // Ensure the peer is not restricted.
+                else if self.is_restricted(peer_ip) {
+                    debug!("Skipping connection request to {} (restricted)", peer_ip);
+                }
                 // Attempt to open a TCP stream.
                 else {
                     // Ensure the node respects the connection frequency limit.
-                    let last_seen = self.seen_outbounds.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
+                    let last_seen = self.seen_outbound_connections.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
                     let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
                     if elapsed < E::RADIO_SILENCE_IN_SECS {
                         trace!("Skipping connection request to {} (tried {} secs ago)", peer_ip, elapsed);
@@ -269,10 +286,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
-                self.broadcast(&Message::PeerRequest).await;
-            }
-            PeersRequest::MessageBroadcast(message) => {
-                self.broadcast(&message).await;
+                self.propagate(self.local_ip, &Message::PeerRequest).await;
             }
             PeersRequest::MessagePropagate(sender, message) => {
                 self.propagate(sender, &message).await;
@@ -295,6 +309,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 else if self.is_connected_to(peer_ip) {
                     debug!("Dropping connection request from {} (already connected)", peer_ip);
                 }
+                // Ensure the peer is not restricted.
+                else if self.is_restricted(peer_ip) {
+                    debug!("Dropping connection request from {} (restricted)", peer_ip);
+                }
                 // Spawn a handler to be run asynchronously.
                 else {
                     // Sanitize the port from the peer, if it is a remote IP address.
@@ -307,7 +325,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                     // Fetch the inbound tracker entry for this peer.
                     let ((initial_port, num_attempts), last_seen) = self
-                        .seen_inbounds
+                        .seen_inbound_connections
                         .entry(peer_lookup)
                         .or_insert(((peer_port, 0), SystemTime::UNIX_EPOCH));
                     let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
@@ -349,12 +367,18 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.candidate_peers.remove(&peer_ip);
             }
             PeersRequest::PeerDisconnected(peer_ip) => {
+                // Remove an entry for this `Peer` in the connected peers, if it exists.
                 self.connected_peers.remove(&peer_ip);
+                // Add an entry for this `Peer` in the candidate peers.
                 self.candidate_peers.insert(peer_ip);
 
                 // Clear the peer's seen blocks/transactions.
-                self.seen_blocks.remove(&peer_ip);
-                self.seen_transactions.remove(&peer_ip);
+                self.seen_outbound_blocks.remove(&peer_ip);
+                self.seen_outbound_transactions.remove(&peer_ip);
+            }
+            PeersRequest::PeerRestricted(peer_ip) => {
+                // Add an entry for this `Peer` in the restricted peers.
+                self.restricted_peers.insert(peer_ip, Instant::now());
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -393,9 +417,51 @@ impl<N: Network, E: Environment> Peers<N, E> {
     async fn send(&mut self, peer: SocketAddr, message: &Message<N, E>) {
         match self.connected_peers.get(&peer) {
             Some((_, outbound)) => {
-                if let Err(error) = outbound.send(message.clone()).await {
-                    trace!("Outbound channel failed: {}", error);
-                    self.connected_peers.remove(&peer);
+                // Ensure sufficient time has passed before needing to send the message.
+                let is_ready_to_send = match message {
+                    Message::UnconfirmedBlock(block) => {
+                        // Retrieve the last seen timestamp of this block for this peer.
+                        let seen_blocks = self.seen_outbound_blocks.entry(peer).or_insert_with(Default::default);
+                        let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                        // Update the timestamp for the peer and sent block.
+                        seen_blocks.insert(block.hash(), SystemTime::now());
+                        // Report the unconfirmed block height.
+                        if is_ready_to_send {
+                            trace!("Preparing to send '{} {}' to {}", message.name(), block.height(), peer);
+                        }
+                        is_ready_to_send
+                    }
+                    Message::UnconfirmedTransaction(transaction) => {
+                        // Retrieve the last seen timestamp of this transaction for this peer.
+                        let seen_transactions = self.seen_outbound_transactions.entry(peer).or_insert_with(Default::default);
+                        let last_seen = seen_transactions
+                            .entry(transaction.transaction_id())
+                            .or_insert(SystemTime::UNIX_EPOCH);
+                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                        // Update the timestamp for the peer and sent transaction.
+                        seen_transactions.insert(transaction.transaction_id(), SystemTime::now());
+                        // Report the unconfirmed block height.
+                        if is_ready_to_send {
+                            trace!(
+                                "Preparing to send '{} {}' to {}",
+                                message.name(),
+                                transaction.transaction_id(),
+                                peer
+                            );
+                        }
+                        is_ready_to_send
+                    }
+                    _ => true,
+                };
+                // Send the message if it is ready.
+                if is_ready_to_send {
+                    if let Err(error) = outbound.send(message.clone()).await {
+                        trace!("Outbound channel failed: {}", error);
+                        self.connected_peers.remove(&peer);
+                    }
                 }
             }
             None => warn!("Attempted to send to a non-connected peer {}", peer),
@@ -403,69 +469,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
-    /// Sends the given message to every connected peer.
-    ///
-    async fn broadcast(&mut self, message: &Message<N, E>) {
-        for peer in self.connected_peers() {
-            self.send(peer, message).await;
-        }
-    }
-
-    ///
-    /// Sends the given message to every connected peer, except for the sender.
+    /// Sends the given message to every connected peer, excluding the sender.
     ///
     async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
-        const BLOCK_BROADCAST_INTERVAL: i64 = 180; // 3 minutes.
-        const TRANSACTION_BROADCAST_INTERVAL: i64 = 180; // 3 minutes.
-
-        let now = chrono::Utc::now().timestamp();
-
         // Iterate through all peers that are not the sender.
         for peer in self.connected_peers().iter() {
-            match message {
-                Message::UnconfirmedBlock(block) => {
-                    // Retrieve the map for the peer.
-                    match self.seen_blocks.get_mut(peer) {
-                        Some(seen_blocks) => {
-                            if let Some(last_seen) = seen_blocks.get(&block.hash()) {
-                                // Ensure sufficient time has passed before needing to send the block.
-                                if now.saturating_sub(*last_seen) < BLOCK_BROADCAST_INTERVAL {
-                                    continue;
-                                }
-                            }
-                            // Update the timestamp for the peer and sent block.
-                            seen_blocks.insert(block.hash(), now);
-                        }
-                        None => {
-                            // Insert an entry for the peer.
-                            self.seen_blocks.insert(*peer, [(block.hash(), now)].into());
-                        }
-                    };
-                }
-                Message::UnconfirmedTransaction(transaction) => {
-                    // Retrieve the map for the particular peer.
-                    match self.seen_transactions.get_mut(peer) {
-                        Some(seen_transactions) => {
-                            if let Some(last_seen) = seen_transactions.get(&transaction.transaction_id()) {
-                                // Ensure sufficient time has passed before needing to send the transaction.
-                                if now.saturating_sub(*last_seen) < TRANSACTION_BROADCAST_INTERVAL {
-                                    continue;
-                                }
-                            }
-                            // Update the timestamp for the peer and sent transaction.
-                            seen_transactions.insert(transaction.transaction_id(), now);
-                        }
-                        None => {
-                            // Insert an entry for the peer.
-                            self.seen_transactions.insert(*peer, [(transaction.transaction_id(), now)].into());
-                        }
-                    };
-                }
-                _ => {}
-            }
-
+            // Ensure the sender is not this peer.
             if peer != &sender {
-                trace!("Preparing to propagate '{}' to {}", message.name(), peer);
                 self.send(*peer, message).await;
             }
         }
@@ -486,8 +496,6 @@ struct Peer<N: Network, E: Environment> {
     listener_ip: SocketAddr,
     /// The message version of the peer.
     version: u32,
-    /// The nonce for the peer's session.
-    nonce: u64,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -495,6 +503,10 @@ struct Peer<N: Network, E: Environment> {
     /// The `outbound_handler` half of the MPSC message channel, used to receive messages from peers.
     /// When a message is received on this `OutboundHandler`, it will be written to the socket.
     outbound_handler: OutboundHandler<N, E>,
+    /// The map of block hashes to their last seen timestamp.
+    seen_inbound_blocks: HashMap<N::BlockHash, SystemTime>,
+    /// The map of transaction IDs to their last seen timestamp.
+    seen_inbound_transactions: HashMap<N::TransactionID, SystemTime>,
 }
 
 impl<N: Network, E: Environment> Peer<N, E> {
@@ -526,11 +538,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
         Ok(Peer {
             listener_ip: peer_ip,
-            nonce: peer_nonce,
             version: 0,
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
+            seen_inbound_blocks: Default::default(),
+            seen_inbound_transactions: Default::default(),
         })
     }
 
@@ -765,15 +778,55 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
+                                    // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
+                                    let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+                                    if frequency >= 5 {
+                                        warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
+                                        // Send a `PeerRestricted` message.
+                                        if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+                                            warn!("[PeerRestricted] {}", error);
+                                        }
+                                        break;
+                                    }
+
+                                    // Retrieve the last seen timestamp of the received block.
+                                    let last_seen = peer.seen_inbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                                    // Update the timestamp for the received block.
+                                    peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
                                     // Route the `UnconfirmedBlock` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
-                                        warn!("[UnconfirmedBlock] {}", error);
+                                    match is_ready_to_route {
+                                        true => if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
+                                            warn!("[UnconfirmedBlock] {}", error);
+                                        },
+                                        false => trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
+                                    // Drop the peer, if they have sent more than 500 unconfirmed transactions in the last 5 seconds.
+                                    let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+                                    if frequency >= 500 {
+                                        warn!("Dropping {} for spamming unconfirmed transactions (frequency = {})", peer_ip, frequency);
+                                        // Send a `PeerRestricted` message.
+                                        if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+                                            warn!("[PeerRestricted] {}", error);
+                                        }
+                                        break;
+                                    }
+
+                                    // Retrieve the last seen timestamp of the received transaction.
+                                    let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                                    // Update the timestamp for the received transaction.
+                                    peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
                                     // Route the `UnconfirmedTransaction` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
-                                        warn!("[UnconfirmedTransaction] {}", error);
+                                    match is_ready_to_route {
+                                        true => if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
+                                            warn!("[UnconfirmedTransaction] {}", error);
+                                        },
+                                        false => trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip)
                                     }
                                 }
                                 Message::Unused(_) => break, // Peer is not following the protocol.
