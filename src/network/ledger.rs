@@ -292,12 +292,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                     trace!("Memory pool already contains unconfirmed block {}", block.height());
                 } else {
-                    // Process the unconfirmed block.
-                    self.add_block(block.clone());
-                    // Propagate the unconfirmed block to the connected peers.
-                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block));
-                    if let Err(error) = peers_router.send(request).await {
-                        warn!("[UnconfirmedBlock] {}", error);
+                    // Ensure the unconfirmed block is at least within 10 blocks of the latest block height.
+                    if block.height() + 10 > self.latest_block_height() {
+                        // Process the unconfirmed block.
+                        self.add_block(block.clone());
+                        // Propagate the unconfirmed block to the connected peers.
+                        let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block));
+                        if let Err(error) = peers_router.send(request).await {
+                            warn!("[UnconfirmedBlock] {}", error);
+                        }
                     }
                 }
             }

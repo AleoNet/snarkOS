@@ -49,8 +49,6 @@ pub enum PeersRequest<N: Network, E: Environment> {
     Connect(SocketAddr, LedgerRouter<N, E>),
     /// Heartbeat := (ledger_router)
     Heartbeat(LedgerRouter<N, E>),
-    /// MessageBroadcast := (message)
-    MessageBroadcast(Message<N, E>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
@@ -269,10 +267,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
-                self.broadcast(&Message::PeerRequest).await;
-            }
-            PeersRequest::MessageBroadcast(message) => {
-                self.broadcast(&message).await;
+                self.propagate(self.local_ip, &Message::PeerRequest).await;
             }
             PeersRequest::MessagePropagate(sender, message) => {
                 self.propagate(sender, &message).await;
@@ -393,47 +388,25 @@ impl<N: Network, E: Environment> Peers<N, E> {
     async fn send(&mut self, peer: SocketAddr, message: &Message<N, E>) {
         match self.connected_peers.get(&peer) {
             Some((_, outbound)) => {
-                if let Err(error) = outbound.send(message.clone()).await {
-                    trace!("Outbound channel failed: {}", error);
-                    self.connected_peers.remove(&peer);
-                }
-            }
-            None => warn!("Attempted to send to a non-connected peer {}", peer),
-        }
-    }
-
-    ///
-    /// Sends the given message to every connected peer.
-    ///
-    async fn broadcast(&mut self, message: &Message<N, E>) {
-        for peer in self.connected_peers() {
-            self.send(peer, message).await;
-        }
-    }
-
-    ///
-    /// Sends the given message to every connected peer, except for the sender.
-    ///
-    async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
-        // Iterate through all peers that are not the sender.
-        for peer in self.connected_peers().iter() {
-            // Ensure the sender is not this peer.
-            if peer != &sender {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
                     Message::UnconfirmedBlock(block) => {
                         // Retrieve the last seen timestamp of this block for this peer.
-                        let seen_blocks = self.seen_blocks.entry(*peer).or_insert_with(Default::default);
+                        let seen_blocks = self.seen_blocks.entry(peer).or_insert_with(Default::default);
                         let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
                         let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                         // Update the timestamp for the peer and sent block.
                         seen_blocks.insert(block.hash(), SystemTime::now());
+                        // Report the unconfirmed block height.
+                        if is_ready_to_send {
+                            trace!("Preparing to send '{} {}' to {}", message.name(), block.height(), peer);
+                        }
                         is_ready_to_send
                     }
                     Message::UnconfirmedTransaction(transaction) => {
                         // Retrieve the last seen timestamp of this transaction for this peer.
-                        let seen_transactions = self.seen_transactions.entry(*peer).or_insert_with(Default::default);
+                        let seen_transactions = self.seen_transactions.entry(peer).or_insert_with(Default::default);
                         let last_seen = seen_transactions
                             .entry(transaction.transaction_id())
                             .or_insert(SystemTime::UNIX_EPOCH);
@@ -441,15 +414,40 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Update the timestamp for the peer and sent transaction.
                         seen_transactions.insert(transaction.transaction_id(), SystemTime::now());
+                        // Report the unconfirmed block height.
+                        if is_ready_to_send {
+                            trace!(
+                                "Preparing to send '{} {}' to {}",
+                                message.name(),
+                                transaction.transaction_id(),
+                                peer
+                            );
+                        }
                         is_ready_to_send
                     }
                     _ => true,
                 };
                 // Send the message if it is ready.
                 if is_ready_to_send {
-                    trace!("Preparing to propagate '{}' to {}", message.name(), peer);
-                    self.send(*peer, message).await;
+                    if let Err(error) = outbound.send(message.clone()).await {
+                        trace!("Outbound channel failed: {}", error);
+                        self.connected_peers.remove(&peer);
+                    }
                 }
+            }
+            None => warn!("Attempted to send to a non-connected peer {}", peer),
+        }
+    }
+
+    ///
+    /// Sends the given message to every connected peer, excluding the sender.
+    ///
+    async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
+        // Iterate through all peers that are not the sender.
+        for peer in self.connected_peers().iter() {
+            // Ensure the sender is not this peer.
+            if peer != &sender {
+                self.send(*peer, message).await;
             }
         }
     }
@@ -469,8 +467,6 @@ struct Peer<N: Network, E: Environment> {
     listener_ip: SocketAddr,
     /// The message version of the peer.
     version: u32,
-    /// The nonce for the peer's session.
-    nonce: u64,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -509,7 +505,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
         Ok(Peer {
             listener_ip: peer_ip,
-            nonce: peer_nonce,
             version: 0,
             last_seen: Instant::now(),
             outbound_socket,
