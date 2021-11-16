@@ -425,7 +425,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         // Retrieve the last seen timestamp of this block for this peer.
                         let seen_blocks = self.seen_blocks.entry(*peer).or_insert_with(Default::default);
                         let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
-                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() < E::RADIO_SILENCE_IN_SECS;
+                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                         // Update the timestamp for the peer and sent block.
                         seen_blocks.insert(block.hash(), SystemTime::now());
@@ -437,7 +437,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         let last_seen = seen_transactions
                             .entry(transaction.transaction_id())
                             .or_insert(SystemTime::UNIX_EPOCH);
-                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() < E::RADIO_SILENCE_IN_SECS;
+                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                         // Update the timestamp for the peer and sent transaction.
                         seen_transactions.insert(transaction.transaction_id(), SystemTime::now());
