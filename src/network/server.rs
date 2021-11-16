@@ -26,7 +26,7 @@ use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, RwLock},
@@ -68,7 +68,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         };
 
         // Initialize the ledger storage path.
-        let storage_path = format!(".ledger-{}", (node_port as u16 - 4130) as u8);
+        let mut storage_path = aleo_std::aleo_dir();
+        storage_path.push(N::NETWORK_NAME);
+        storage_path.push(format!("ledger-{}", (node_port as u16 - 4130) as u8));
 
         // Initialize the tasks handler.
         let mut tasks = Tasks::new();
@@ -155,9 +157,9 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     #[allow(clippy::type_complexity)]
-    fn initialize_ledger(
+    fn initialize_ledger<P: AsRef<Path>>(
         tasks: &mut Tasks<task::JoinHandle<()>>,
-        storage_path: &str,
+        storage_path: P,
         peers_router: &PeersRouter<N, E>,
     ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.

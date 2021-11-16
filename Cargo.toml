@@ -29,6 +29,9 @@ futures = { version = "0.3.0", features = ["thread-pool"]}
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", features = ["crossterm"] }
 
+[dependencies.aleo-std]
+version = "0.1.0"
+
 [dependencies.snarkos-ledger]
 path = "./ledger"
 version = "2.0.0"
