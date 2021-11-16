@@ -455,8 +455,6 @@ struct Peer<N: Network, E: Environment> {
     listener_ip: SocketAddr,
     /// The message version of the peer.
     version: u32,
-    /// The nonce for the peer's session.
-    nonce: u64,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -495,7 +493,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
         Ok(Peer {
             listener_ip: peer_ip,
-            nonce: peer_nonce,
             version: 0,
             last_seen: Instant::now(),
             outbound_socket,
