@@ -749,6 +749,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
+                                    // Drop the peer, if they have sent more than 20 unconfirmed blocks in the last 20 seconds.
+                                    let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 20).count();
+                                    if frequency >= 20 {
+                                        warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
+                                        break;
+                                    }
+
                                     // Retrieve the last seen timestamp of the received block.
                                     let last_seen = peer.seen_inbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
                                     let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
@@ -764,6 +771,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
+                                    // Drop the peer, if they have sent more than 20 unconfirmed transactions in the last 20 seconds.
+                                    let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 20).count();
+                                    if frequency >= 20 {
+                                        warn!("Dropping {} for spamming unconfirmed transactions (frequency = {})", peer_ip, frequency);
+                                        break;
+                                    }
+
                                     // Retrieve the last seen timestamp of the received transaction.
                                     let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
                                     let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
