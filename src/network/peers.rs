@@ -388,9 +388,51 @@ impl<N: Network, E: Environment> Peers<N, E> {
     async fn send(&mut self, peer: SocketAddr, message: &Message<N, E>) {
         match self.connected_peers.get(&peer) {
             Some((_, outbound)) => {
-                if let Err(error) = outbound.send(message.clone()).await {
-                    trace!("Outbound channel failed: {}", error);
-                    self.connected_peers.remove(&peer);
+                // Ensure sufficient time has passed before needing to send the message.
+                let is_ready_to_send = match message {
+                    Message::UnconfirmedBlock(block) => {
+                        // Retrieve the last seen timestamp of this block for this peer.
+                        let seen_blocks = self.seen_blocks.entry(peer).or_insert_with(Default::default);
+                        let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                        // Update the timestamp for the peer and sent block.
+                        seen_blocks.insert(block.hash(), SystemTime::now());
+                        // Report the unconfirmed block height.
+                        if is_ready_to_send {
+                            trace!("Preparing to send '{} {}' to {}", message.name(), block.height(), peer);
+                        }
+                        is_ready_to_send
+                    }
+                    Message::UnconfirmedTransaction(transaction) => {
+                        // Retrieve the last seen timestamp of this transaction for this peer.
+                        let seen_transactions = self.seen_transactions.entry(peer).or_insert_with(Default::default);
+                        let last_seen = seen_transactions
+                            .entry(transaction.transaction_id())
+                            .or_insert(SystemTime::UNIX_EPOCH);
+                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                        // Update the timestamp for the peer and sent transaction.
+                        seen_transactions.insert(transaction.transaction_id(), SystemTime::now());
+                        // Report the unconfirmed block height.
+                        if is_ready_to_send {
+                            trace!(
+                                "Preparing to send '{} {}' to {}",
+                                message.name(),
+                                transaction.transaction_id(),
+                                peer
+                            );
+                        }
+                        is_ready_to_send
+                    }
+                    _ => true,
+                };
+                // Send the message if it is ready.
+                if is_ready_to_send {
+                    if let Err(error) = outbound.send(message.clone()).await {
+                        trace!("Outbound channel failed: {}", error);
+                        self.connected_peers.remove(&peer);
+                    }
                 }
             }
             None => warn!("Attempted to send to a non-connected peer {}", peer),
@@ -405,37 +447,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
         for peer in self.connected_peers().iter() {
             // Ensure the sender is not this peer.
             if peer != &sender {
-                // Ensure sufficient time has passed before needing to send the message.
-                let is_ready_to_send = match message {
-                    Message::UnconfirmedBlock(block) => {
-                        // Retrieve the last seen timestamp of this block for this peer.
-                        let seen_blocks = self.seen_blocks.entry(*peer).or_insert_with(Default::default);
-                        let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
-                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
-
-                        // Update the timestamp for the peer and sent block.
-                        seen_blocks.insert(block.hash(), SystemTime::now());
-                        is_ready_to_send
-                    }
-                    Message::UnconfirmedTransaction(transaction) => {
-                        // Retrieve the last seen timestamp of this transaction for this peer.
-                        let seen_transactions = self.seen_transactions.entry(*peer).or_insert_with(Default::default);
-                        let last_seen = seen_transactions
-                            .entry(transaction.transaction_id())
-                            .or_insert(SystemTime::UNIX_EPOCH);
-                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
-
-                        // Update the timestamp for the peer and sent transaction.
-                        seen_transactions.insert(transaction.transaction_id(), SystemTime::now());
-                        is_ready_to_send
-                    }
-                    _ => true,
-                };
-                // Send the message if it is ready.
-                if is_ready_to_send {
-                    trace!("Preparing to propagate '{}' to {}", message.name(), peer);
-                    self.send(*peer, message).await;
-                }
+                self.send(*peer, message).await;
             }
         }
     }
