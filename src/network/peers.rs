@@ -49,8 +49,6 @@ pub enum PeersRequest<N: Network, E: Environment> {
     Connect(SocketAddr, LedgerRouter<N, E>),
     /// Heartbeat := (ledger_router)
     Heartbeat(LedgerRouter<N, E>),
-    /// MessageBroadcast := (message)
-    MessageBroadcast(Message<N, E>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
@@ -269,10 +267,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
-                self.broadcast(&Message::PeerRequest).await;
-            }
-            PeersRequest::MessageBroadcast(message) => {
-                self.broadcast(&message).await;
+                self.propagate(self.local_ip, &Message::PeerRequest).await;
             }
             PeersRequest::MessagePropagate(sender, message) => {
                 self.propagate(sender, &message).await;
@@ -403,16 +398,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
-    /// Sends the given message to every connected peer.
-    ///
-    async fn broadcast(&mut self, message: &Message<N, E>) {
-        for peer in self.connected_peers() {
-            self.send(peer, message).await;
-        }
-    }
-
-    ///
-    /// Sends the given message to every connected peer, except for the sender.
+    /// Sends the given message to every connected peer, excluding the sender.
     ///
     async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
         // Iterate through all peers that are not the sender.
