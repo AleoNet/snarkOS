@@ -458,15 +458,20 @@ impl<N: Network> LedgerState<N> {
         for (block_height, (_block_hash, block_header)) in block_locators.iter().skip(num_linear_block_headers).rev() {
             // Check that the block height is decrementing.
             match last_block_height == *block_height {
-                true => last_block_height = block_height - 1,
+                true => last_block_height = block_height.saturating_sub(1),
                 false => return Ok(false),
             }
 
             // Check that the block header is present.
-            let _block_header = match block_header {
+            let block_header = match block_header {
                 Some(header) => header,
                 None => return Ok(false),
             };
+
+            // Check the block height matches in the block header.
+            if block_height != &block_header.height() {
+                return Ok(false);
+            }
         }
 
         // Check that the remaining block hashes are formed correctly (power of two).
