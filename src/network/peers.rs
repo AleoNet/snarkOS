@@ -749,9 +749,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
-                                    // Drop the peer, if they have sent more than 20 unconfirmed blocks in the last 10 seconds.
-                                    let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 10).count();
-                                    if frequency >= 10 {
+                                    // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
+                                    let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+                                    if frequency >= 5 {
                                         warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
                                         break;
                                     }
@@ -771,9 +771,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
-                                    // Drop the peer, if they have sent more than 20 unconfirmed transactions in the last 10 seconds.
-                                    let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 10).count();
-                                    if frequency >= 50 {
+                                    // Drop the peer, if they have sent more than 500 unconfirmed transactions in the last 5 seconds.
+                                    let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+                                    if frequency >= 500 {
                                         warn!("Dropping {} for spamming unconfirmed transactions (frequency = {})", peer_ip, frequency);
                                         break;
                                     }
