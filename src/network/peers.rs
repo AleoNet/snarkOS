@@ -763,9 +763,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
+                                    // Retrieve the last seen timestamp of the received transaction.
+                                    let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                                    // Update the timestamp for the received transaction.
+                                    peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
                                     // Route the `UnconfirmedTransaction` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
-                                        warn!("[UnconfirmedTransaction] {}", error);
+                                    if is_ready_to_route {
+                                        if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
+                                            warn!("[UnconfirmedTransaction] {}", error);
+                                        }
                                     }
                                 }
                                 Message::Unused(_) => break, // Peer is not following the protocol.
