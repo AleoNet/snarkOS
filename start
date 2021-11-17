@@ -1,0 +1,8 @@
+#!/bin/bash
+mkdir -p /aleo/data/ledger && \
+mkdir -p /aleo/data/params/git/checkouts/snarkvm-f1160780ffe17de8/e7266f9/parameters/src/testnet2/resources && \
+mkdir -p /aleo/data/params/registry/src/github.com-1ecc6299db9ec823/snarkvm-parameters-0.7.9/src/testnet2/resources && \
+ln -s /aleo/data/ledger /.ledger-2 && \
+ln -s /aleo/data/params/git /usr/local/cargo/git && \
+ln -s /aleo/data/params/registry /usr/local/cargo/registry && \
+/aleo/bin/snarkos --node 4132 --rpc 3032 --verbosity 3 --trial
