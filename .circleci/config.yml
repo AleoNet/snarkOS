@@ -134,6 +134,7 @@ jobs:
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
             docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64
+            echo "Pushed $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64"
       - run:
           name: "Save arm64 image tag"
           command: |
@@ -164,6 +165,7 @@ jobs:
             VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64
+            echo "Pushed "$DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64"
       - run:
           name: "Save amd64 image tag"
           command: |
@@ -188,6 +190,7 @@ jobs:
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
             echo $ARM_TAG
+            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             docker pull $DOCKER_REPO:$ARM_TAG
       - run:
           name: "Pull AMD docker image"
@@ -208,6 +211,7 @@ jobs:
             docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $IDOCKER_REPO:${AMD_TAG}
             docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
+            echo "Pushed "$DOCKER_REPO:${CIRCLE_BRANCH}-latest"
 
 workflows:
   main-workflow:
