@@ -40,7 +40,7 @@ async fn spawn_inert_node_at_port() {
         ..Default::default()
     };
 
-    let test_node = TestNode::new(Pea2PeaNode::new(Some(config)).await.unwrap());
+    let test_node = TestNode::new(Pea2PeaNode::new(Some(config)).await.unwrap(), Default::default());
     test_node.enable_handshake();
     test_node.enable_reading();
     test_node.enable_writing();

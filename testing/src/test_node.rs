@@ -49,7 +49,7 @@ const DESIRED_CONNECTIONS: usize = 10;
 const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
 
 type SnarkosMessage = Message<Testnet2, Client<Testnet2>>;
-type SnarkosNonce = u64;
+pub type SnarkosNonce = u64;
 
 /// The test node; it consists of a `Node` that handles networking and `State`
 /// that can be extended freely based on test requirements.
@@ -60,7 +60,7 @@ pub struct TestNode {
 }
 
 /// Represents a connected snarkOS peer.
-struct SnarkosPeer {
+pub struct SnarkosPeer {
     connected_addr: SocketAddr,
     listening_addr: SocketAddr,
     nonce: SnarkosNonce,
@@ -68,13 +68,13 @@ struct SnarkosPeer {
 
 /// snarkOS state required for test purposes.
 #[derive(Clone)]
-struct State {
-    local_nonce: SnarkosNonce,
+pub struct State {
+    pub local_nonce: SnarkosNonce,
     /// The list of known peers; `Pea2Pea` already has its own internal peer handling, but
     /// snarkOS nodes expect to learn each other's listening address, and expect their connection
     /// nonces to be unique; this collection facilitates the snarkOS peering experience during
     /// tests and aligns it with snarkOS logic.
-    peers: Arc<Mutex<Vec<SnarkosPeer>>>,
+    pub peers: Arc<Mutex<Vec<SnarkosPeer>>>,
 }
 
 impl Default for State {
@@ -100,7 +100,9 @@ impl TestNode {
             ..Default::default()
         };
 
-        let node = Self::new(Pea2PeaNode::new(Some(config)).await.unwrap());
+        let pea2pea_node = Pea2PeaNode::new(Some(config)).await.unwrap();
+        let snarkos_state = Default::default();
+        let node = Self::new(pea2pea_node, snarkos_state);
 
         node.enable_disconnect();
         node.enable_handshake();
@@ -111,11 +113,8 @@ impl TestNode {
     }
 
     /// Creates a test node using the given `Pea2Pea` node.
-    pub fn new(node: Pea2PeaNode) -> Self {
-        Self {
-            node,
-            state: Default::default(),
-        }
+    pub fn new(node: Pea2PeaNode, state: State) -> Self {
+        Self { node, state }
     }
 
     /// Spawns a task dedicated to broadcasting Ping messages.

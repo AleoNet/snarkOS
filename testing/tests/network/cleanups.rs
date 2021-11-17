@@ -19,7 +19,7 @@ use peak_alloc::PeakAlloc;
 use snarkos_testing::{SnarkosNode, TestNode};
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "this test is currently non-deterministic; needs more tinkering"]
+#[ignore = "FIXME: this test is currently non-deterministic; needs more tinkering"]
 async fn inbound_connect_and_disconnect_doesnt_leak() {
     // Configure a custom allocator that will measure memory use.
     #[global_allocator]
@@ -73,5 +73,5 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "currently not possible to connect on demand"]
+#[ignore = "TODO: currently not possible to connect on demand"]
 async fn outbound_connect_and_disconnect_doesnt_leak() {}

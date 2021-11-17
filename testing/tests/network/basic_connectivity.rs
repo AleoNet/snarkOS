@@ -14,8 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::{common::spawn_test_node_with_nonce, wait_until};
+
 use pea2pea::Pea2Pea;
 use snarkos_testing::{SnarkosNode, TestNode};
+use tokio::task;
+
+use std::sync::{
+    atomic::{AtomicU8, Ordering::*},
+    Arc,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_nodes_can_connect_to_each_other() {
@@ -57,4 +65,47 @@ async fn handshake_as_responder_works() {
 
     // The test node should be able to connect to the snarkOS node.
     assert!(test_node.node().connect(snarkos_node.addr).await.is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "TODO: currently not possible to connect on demand"]
+async fn node_cant_connect_to_itself() {}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "TODO: currently not possible to connect on demand"]
+async fn node_cant_connect_to_another_twice() {}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn concurrent_duplicate_connection_attempts_fail() {
+    // The number of concurrent connection attempts.
+    const NUM_CONCURRENT_ATTEMPTS: u8 = 5;
+
+    // Start the test nodes, all with the same handshake nonce.
+    let mut test_nodes = Vec::with_capacity(NUM_CONCURRENT_ATTEMPTS as usize);
+    for _ in 0..NUM_CONCURRENT_ATTEMPTS {
+        test_nodes.push(spawn_test_node_with_nonce(0).await);
+    }
+
+    // Start a snarkOS node.
+    let snarkos_node = SnarkosNode::default().await;
+
+    // Register the snarkOS node address and prepare a connection error counter.
+    let snarkos_node_addr = snarkos_node.addr;
+    let error_count = Arc::new(AtomicU8::new(0));
+
+    // Concurrently connect to the snarkOS node, attempting to bypass the nonce uniqueness rule.
+    for test_node in &test_nodes {
+        let test_node = test_node.clone();
+        let error_count = error_count.clone();
+
+        task::spawn(async move {
+            if test_node.node().connect(snarkos_node_addr).await.is_err() {
+                error_count.fetch_add(1, Relaxed);
+            }
+        });
+    }
+
+    // Ensure that only a single connection was successful.
+    // note: counting errors instead of a single success ensures that all the attempts were concluded.
+    wait_until!(5, error_count.load(Relaxed) == NUM_CONCURRENT_ATTEMPTS - 1);
 }

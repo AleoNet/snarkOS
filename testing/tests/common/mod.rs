@@ -14,7 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_testing::test_node::{SnarkosNonce, State, TestNode};
+
+use pea2pea::{protocols::*, Config};
 use tracing_subscriber::filter::EnvFilter;
+
+use std::net::{IpAddr, Ipv4Addr};
 
 /// Starts a logger if a test node needs to be inspected in greater detail.
 // note: snarkOS node currently starts it by default, so it's not needed
@@ -24,6 +29,28 @@ pub fn start_logger() {
         _ => EnvFilter::default().add_directive("mio=off".parse().unwrap()),
     };
     tracing_subscriber::fmt().with_env_filter(filter).with_target(false).init();
+}
+
+/// Spawns a `TestNode` with the given handshake nonce.
+pub async fn spawn_test_node_with_nonce(local_nonce: SnarkosNonce) -> TestNode {
+    let config = Config {
+        listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        ..Default::default()
+    };
+
+    let pea2pea_node = pea2pea::Node::new(Some(config)).await.unwrap();
+    let snarkos_state = State {
+        local_nonce,
+        ..Default::default()
+    };
+
+    let node = TestNode::new(pea2pea_node, snarkos_state);
+
+    node.enable_handshake();
+    node.enable_reading();
+    node.enable_writing();
+
+    node
 }
 
 #[macro_export]
