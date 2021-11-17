@@ -233,4 +233,4 @@ workflows:
       - publish_snarkos_manifest:
           requires:
             - build-and-publish-docker-arm
-            - build-and-publish-docker-amd 
+            - build-and-publish-docker-amd
