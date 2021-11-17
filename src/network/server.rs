@@ -69,7 +69,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         );
 
         // Initialize a new TCP listener at the given IP.
-        let (local_ip, listener) = match TcpListener::bind(&format!("{}:{}", node_ip, node_port)).await {
+        let (local_ip, listener) = match TcpListener::bind(SocketAddr::from((node_ip, node_port))).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
@@ -98,7 +98,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         if !node.disable_rpc {
             // Initialize a new instance of the RPC server.
             tasks.append(initialize_rpc_server::<N, E>(
-                format!("{}:{}", rpc_ip, rpc_port).parse()?,
+                SocketAddr::from((rpc_ip, rpc_port)),
                 node.rpc_username.clone(),
                 node.rpc_password.clone(),
                 &peers,
