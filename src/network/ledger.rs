@@ -20,7 +20,7 @@ use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
 use chrono::Utc;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use rand::thread_rng;
 use std::{
     collections::HashMap,
@@ -120,7 +120,7 @@ pub struct Ledger<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
     pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
-        let canon = LedgerState::open::<S, P>(path, false)?;
+        let canon = LedgerState::open::<S, P>(path, false, None)?;
         let last_block_update_timestamp = Instant::now();
         Ok(Self {
             canon,
@@ -163,6 +163,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns `true` if the ledger is currently syncing.
     pub fn is_syncing(&self) -> bool {
         self.status() == Status::Syncing
+    }
+
+    /// Returns the latest block object.
+    pub fn latest_block(&self) -> Arc<RwLock<Block<N>>> {
+        self.canon.latest_block_object()
     }
 
     /// Returns the latest block height.

@@ -26,6 +26,7 @@ use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
+use parking_lot::RwLock as ParkingLotRwLock;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
@@ -76,7 +77,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, &storage_path, &peers_router)?;
+        let (ledger, ledger_router, latest_block) = Self::initialize_ledger(&mut tasks, &storage_path, &peers_router)?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_router);
@@ -91,7 +92,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             username,
             password,
             &peers,
-            LedgerState::open::<RocksDB, _>(&storage_path, true)?,
+            LedgerState::open::<RocksDB, _>(&storage_path, true, Some(latest_block))?,
             &ledger_router,
         ));
 
@@ -159,9 +160,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_path: &str,
         peers_router: &PeersRouter<N, E>,
-    ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>)> {
+    ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>, Arc<ParkingLotRwLock<Block<N>>>)> {
         // Open the ledger from storage.
         let ledger = Ledger::<N, E>::open::<RocksDB, _>(storage_path)?;
+        let latest_block = ledger.latest_block();
         let ledger = Arc::new(RwLock::new(ledger));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
@@ -178,7 +180,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             }
         }));
 
-        Ok((ledger, ledger_router))
+        Ok((ledger, ledger_router, latest_block))
     }
 
     ///

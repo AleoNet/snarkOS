@@ -175,7 +175,6 @@ impl<N: Network> LedgerState<N> {
         if ledger.is_read_only() {
             debug!("Loading ledger in read-only mode");
             let mut ledger = ledger.clone();
-            let primary_latest_block = primary_latest_block.clone();
             thread::spawn(move || {
                 let last_seen_block_height = ledger.read_only.1.clone();
                 ledger.read_only.1.store(latest_block_height, Ordering::SeqCst);
