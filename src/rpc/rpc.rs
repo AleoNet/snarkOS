@@ -466,7 +466,7 @@ mod tests {
 
     /// Initializes a new instance of the ledger state.
     fn new_ledger_state<N: Network, S: Storage>() -> LedgerState<N> {
-        LedgerState::<N>::open::<S, _>(temp_dir(), false).expect("Failed to initialize ledger")
+        LedgerState::<N>::open::<S, _>(temp_dir(), false, None).expect("Failed to initialize ledger")
     }
 
     /// Initializes a new instance of the ledger.
@@ -721,7 +721,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = LedgerState::open::<RocksDB, _>(directory.clone(), false).expect("Failed to initialize ledger");
+        let mut ledger_state = LedgerState::open::<RocksDB, _>(directory.clone(), false, None).expect("Failed to initialize ledger");
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -746,7 +746,7 @@ mod tests {
             };
 
             // Open a ledger at the temporary directory.
-            let ledger = LedgerState::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
+            let ledger = LedgerState::open::<RocksDB, _>(directory, false, None).expect("Failed to initialize ledger");
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
             let peers = new_peers();
 
@@ -849,7 +849,8 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = LedgerState::<Testnet2>::open::<RocksDB, _>(directory.clone(), false).expect("Failed to initialize ledger");
+        let mut ledger_state =
+            LedgerState::<Testnet2>::open::<RocksDB, _>(directory.clone(), false, None).expect("Failed to initialize ledger");
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -875,7 +876,7 @@ mod tests {
             let peers = new_peers();
 
             // Open a ledger at the temporary directory.
-            let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
+            let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false, None).expect("Failed to initialize ledger");
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
             RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
@@ -1013,7 +1014,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = LedgerState::open::<RocksDB, _>(directory.clone(), false).expect("Failed to initialize ledger");
+        let mut ledger_state = LedgerState::open::<RocksDB, _>(directory.clone(), false, None).expect("Failed to initialize ledger");
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -1047,7 +1048,7 @@ mod tests {
             let peers = new_peers();
 
             // Open a ledger at the temporary directory.
-            let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
+            let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false, None).expect("Failed to initialize ledger");
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
             RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
