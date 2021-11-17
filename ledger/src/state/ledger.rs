@@ -94,7 +94,11 @@ pub struct LedgerState<N: Network> {
 
 impl<N: Network> LedgerState<N> {
     /// Initializes a new instance of `LedgerState`.
-    pub fn open<S: Storage, P: AsRef<Path>>(path: P, is_read_only: bool) -> Result<Self> {
+    pub fn open<S: Storage, P: AsRef<Path>>(
+        path: P,
+        is_read_only: bool,
+        primary_latest_block: Option<Arc<RwLock<Block<N>>>>,
+    ) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
         let storage = S::open(path, context, is_read_only)?;
@@ -171,13 +175,20 @@ impl<N: Network> LedgerState<N> {
         if ledger.is_read_only() {
             debug!("Loading ledger in read-only mode");
             let mut ledger = ledger.clone();
+            let primary_latest_block = primary_latest_block.clone();
             thread::spawn(move || {
                 let last_seen_block_height = ledger.read_only.1.clone();
                 ledger.read_only.1.store(latest_block_height, Ordering::SeqCst);
 
                 loop {
+                    // Check if the secondary database should refresh.
+                    let should_refresh = match &primary_latest_block {
+                        Some(primary_latest_block) => primary_latest_block.read().height() > last_seen_block_height.load(Ordering::SeqCst),
+                        None => true,
+                    };
+
                     // Refresh the ledger storage state.
-                    if ledger.ledger_roots.refresh() {
+                    if should_refresh && ledger.ledger_roots.refresh() {
                         // After catching up the reader, determine the latest block height.
                         if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
                             let current_block_height = last_seen_block_height.load(Ordering::SeqCst);
@@ -221,6 +232,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns `true` if the ledger is in read-only mode.
     pub fn is_read_only(&self) -> bool {
         self.read_only.0
+    }
+
+    /// Returns the latest block object.
+    pub fn latest_block_object(&self) -> Arc<RwLock<Block<N>>> {
+        self.latest_block.clone()
     }
 
     /// Returns the latest block.
