@@ -20,8 +20,7 @@ use tokio::net::TcpListener;
 use std::{fs, net::SocketAddr};
 
 /// A facade for a snarkOS node.
-// FIXME: there's not much room for introspection right now; it should be implemented
-// in the existing API.
+// FIXME: there's not much room for introspection right now; it should be implemented in the existing API.
 pub struct SnarkosNode {
     pub addr: SocketAddr,
 }
@@ -29,6 +28,9 @@ pub struct SnarkosNode {
 impl SnarkosNode {
     pub async fn default() -> Self {
         // Procure a free port number for the snarkOS node.
+        // FIXME: due to there being a delay between the port's discovery and its binding by the node, this
+        // method can cause an `AddrInUse` error to occur when multiple tests are run at the same time; only
+        // introspection of a ready node can fully avoid this.
         let free_port = {
             let temp_socket = TcpListener::bind("127.0.0.1:0").await.unwrap();
             temp_socket.local_addr().unwrap().port()

@@ -17,7 +17,7 @@
 use crate::{common::spawn_test_node_with_nonce, wait_until};
 
 use pea2pea::Pea2Pea;
-use snarkos_testing::{SnarkosNode, TestNode};
+use snarkos_testing::{SnarkosNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
 use tokio::task;
 
 use std::sync::{
@@ -108,4 +108,30 @@ async fn concurrent_duplicate_connection_attempts_fail() {
     // Ensure that only a single connection was successful.
     // note: counting errors instead of a single success ensures that all the attempts were concluded.
     wait_until!(5, error_count.load(Relaxed) == NUM_CONCURRENT_ATTEMPTS - 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn connection_limits_are_obeyed() {
+    // Start a snarkOS node.
+    let snarkos_node = SnarkosNode::default().await;
+    let snarkos_node_addr = snarkos_node.addr;
+
+    // Start more test nodes than the snarkOS node is permitted to connect to at once.
+    let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS + 1);
+    for _ in 0..MAXIMUM_NUMBER_OF_PEERS + 1 {
+        test_nodes.push(TestNode::default().await);
+    }
+
+    // Attempt to connect all the test nodes to the snarkOS node.
+    let mut failures = 0usize;
+    for test_node in &test_nodes {
+        if test_node.node().connect(snarkos_node.addr).await.is_err() {
+            failures += 1;
+        }
+    }
+
+    // Assert that exactly one test node failed to connect.
+    assert_eq!(failures, 1);
+
+    // TODO: add an outgoing connection attempt once it's possible.
 }

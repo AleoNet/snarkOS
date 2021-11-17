@@ -45,8 +45,10 @@ const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
 const CHALLENGE_HEIGHT: u32 = 0;
 const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
-const DESIRED_CONNECTIONS: usize = 10;
+const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;
 const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
+
+pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 
 type SnarkosMessage = Message<Testnet2, Client<Testnet2>>;
 pub type SnarkosNonce = u64;
@@ -97,6 +99,7 @@ impl TestNode {
     pub async fn default() -> Self {
         let config = Config {
             listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
             ..Default::default()
         };
 
