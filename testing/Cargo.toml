@@ -36,6 +36,9 @@ version = "1.0"
 [dependencies.pea2pea]
 version = "0.28"
 
+[dependencies.peak_alloc]
+version = "0.1"
+
 [dependencies.rand]
 version = "0.8"
 

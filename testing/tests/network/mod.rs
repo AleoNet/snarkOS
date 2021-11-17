@@ -15,4 +15,5 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod basic_connectivity;
+mod cleanups;
 mod manual_testing;
