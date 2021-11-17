@@ -20,6 +20,7 @@ use crate::{
     peers::{Peers, PeersRequest, PeersRouter},
     rpc::initialize_rpc_server,
     Environment,
+    Node,
     NodeType,
 };
 use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
@@ -36,6 +37,7 @@ use tokio::{
 ///
 /// A set of operations to initialize the node server for a specific network.
 ///
+#[derive(Clone)]
 pub(crate) struct Server<N: Network, E: Environment> {
     /// The list of peers for the node.
     peers: Arc<RwLock<Peers<N, E>>>,
@@ -54,29 +56,35 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Starts the connection listener for peers.
     ///
     #[inline]
-    pub(crate) async fn initialize(
-        node_port: u16,
-        rpc_port: u16,
-        username: String,
-        password: String,
-        miner: Option<Address<N>>,
-    ) -> Result<Self> {
+    pub(crate) async fn initialize(node: &Node, miner: Option<Address<N>>, mut tasks: Tasks<task::JoinHandle<()>>) -> Result<Self> {
+        let node_ip = node.ip.clone();
+        let node_port = node.node.unwrap_or(E::DEFAULT_NODE_PORT);
+        let rpc_ip = node.rpc_ip.clone();
+        let rpc_port = node.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
+
+        #[cfg(not(feature = "test"))]
+        assert!(
+            !(node_port < 4130),
+            "Until configuration files are established, the node port must be at least 4130 or greater"
+        );
+
         // Initialize a new TCP listener at the given IP.
-        let (local_ip, listener) = match TcpListener::bind(&format!("0.0.0.0:{}", node_port)).await {
+        let (local_ip, listener) = match TcpListener::bind(&format!("{}:{}", node_ip, node_port)).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
 
         // Initialize the ledger storage path.
-        let storage_path = format!(".ledger-{}", (node_port as u16 - 4130) as u8);
-
-        // Initialize the tasks handler.
-        let mut tasks = Tasks::new();
+        #[cfg(not(feature = "test"))]
+        let storage_path = format!(".ledger-{}", (node_port - 4130));
+        #[cfg(feature = "test")]
+        let storage_path = format!(".ledger-{}", node_port);
 
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, &storage_path, &peers_router)?;
+        let path = storage_path.clone();
+        let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, path, &peers_router).await?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_router);
@@ -85,15 +93,20 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
 
-        // Initialize a new instance of the RPC server.
-        tasks.append(initialize_rpc_server::<N, E>(
-            format!("0.0.0.0:{}", rpc_port).parse()?,
-            username,
-            password,
-            &peers,
-            LedgerState::open::<RocksDB, _>(&storage_path, true)?,
-            &ledger_router,
-        ));
+        if !node.disable_rpc {
+            // Initialize a new instance of the RPC server.
+            tasks.append(initialize_rpc_server::<N, E>(
+                format!("{}:{}", rpc_ip, rpc_port).parse()?,
+                node.rpc_username.clone(),
+                node.rpc_password.clone(),
+                &peers,
+                LedgerState::open::<RocksDB, _>(&storage_path, true)?,
+                &ledger_router,
+            ));
+        }
+
+        // A small delay to allow all the tasks to get spawned.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         Ok(Self {
             peers,
@@ -138,14 +151,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the peers router process.
         let peers_clone = peers.clone();
         let peers_router_clone = peers_router.clone();
-        tasks.append(task::spawn(async move {
+
+        let task_handle = task::spawn(async move {
             // Asynchronously wait for a peers request.
             // Channel is routing a request to peers.
             while let Some(request) = peers_handler.recv().await {
                 // Hold the peers write lock briefly, to update the state of the peers.
                 peers_clone.write().await.update(request, &peers_router_clone).await;
             }
-        }));
+        });
+        tasks.append(task_handle);
 
         (peers, peers_router)
     }
@@ -155,13 +170,13 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     #[allow(clippy::type_complexity)]
-    fn initialize_ledger(
+    async fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
-        storage_path: &str,
+        storage_path: String,
         peers_router: &PeersRouter<N, E>,
     ) -> Result<(Arc<RwLock<Ledger<N, E>>>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(storage_path)?;
+        let ledger = tokio::task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&storage_path)).await??;
         let ledger = Arc::new(RwLock::new(ledger));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
@@ -170,13 +185,15 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the ledger router process.
         let peers_router = peers_router.clone();
         let ledger_clone = ledger.clone();
-        tasks.append(task::spawn(async move {
+
+        let task_handle = task::spawn(async move {
             // Asynchronously wait for a ledger request.
             while let Some(request) = ledger_handler.recv().await {
                 // Hold the ledger write lock briefly, to update the state of the ledger.
                 ledger_clone.write().await.update(request, &peers_router).await;
             }
-        }));
+        });
+        tasks.append(task_handle);
 
         Ok((ledger, ledger_router))
     }
@@ -194,7 +211,8 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         let peers_router = peers_router.clone();
         let ledger_router = ledger_router.clone();
-        tasks.append(task::spawn(async move {
+
+        let task_handle = task::spawn(async move {
             info!("Listening for peers at {}", local_ip);
             loop {
                 // Asynchronously wait for an inbound TcpStream.
@@ -211,7 +229,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Add a small delay to prevent overloading the network from handshakes.
                 tokio::time::sleep(Duration::from_millis(150)).await;
             }
-        }));
+        });
+        tasks.append(task_handle);
     }
 
     ///

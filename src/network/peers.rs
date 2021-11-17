@@ -674,7 +674,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
     ) {
         let connected_nonces = connected_nonces.cloned().collect::<Vec<u64>>();
         let peers_router = peers_router.clone();
-        task::spawn(async move {
+
+        let task_handle = task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(stream, local_ip, local_nonce, &peers_router, &ledger_router, &connected_nonces).await {
                 Ok(peer) => peer,
