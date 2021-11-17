@@ -208,7 +208,7 @@ jobs:
             echo $CIRCLE_BRANCH
             echo $ARM_TAG
             echo $AMD_TAG
-            docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $IDOCKER_REPO:${AMD_TAG}
+            docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $DOCKER_REPO:${AMD_TAG}
             docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
