@@ -115,7 +115,7 @@ jobs:
 
   build-and-publish-docker-arm:
     machine:
-      image: ubuntu-2004:202107-02
+      image: ubuntu-2004:202101-01
       docker_layer_caching: true
     resource_class: arm.large
     steps:
@@ -146,7 +146,7 @@ jobs:
 
   build-and-publish-docker-amd:
     machine:
-      image: ubuntu-2004:202107-02
+      image: ubuntu-2004:202101-01
       docker_layer_caching: true
     resource_class: xlarge
     steps:
@@ -176,7 +176,7 @@ jobs:
   
   publish_snarkos_manifest:
     machine:
-      image: ubuntu-2004:202107-02
+      image: ubuntu-2004:202101-01
       docker_layer_caching: true
     resource_class: medium
     steps:
