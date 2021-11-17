@@ -32,14 +32,14 @@ async fn test_nodes_can_connect_to_each_other() {
     let test_node1 = TestNode::default().await;
 
     // Ensure that the nodes have no active connections.
-    crate::wait_until!(1, test_node0.node().num_connected() == 0 && test_node1.node().num_connected() == 0);
+    wait_until!(1, test_node0.node().num_connected() == 0 && test_node1.node().num_connected() == 0);
 
     // Connect one to the other, performing the snarkOS handshake.
     let test_node0_addr = test_node0.node().listening_addr().unwrap();
     assert!(test_node1.node().connect(test_node0_addr).await.is_ok());
 
     // Ensure that both nodes have an active connection now.
-    crate::wait_until!(1, test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
+    wait_until!(1, test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -52,7 +52,7 @@ async fn handshake_as_initiator_works() {
     SnarkosNode::with_args(&["--node", "0", "--connect", &test_node_addr.to_string()]).await;
 
     // The snarkOS node should have connected to the test node.
-    crate::wait_until!(5, test_node.node().num_connected() != 0);
+    wait_until!(5, test_node.node().num_connected() != 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -114,7 +114,6 @@ async fn concurrent_duplicate_connection_attempts_fail() {
 async fn connection_limits_are_obeyed() {
     // Start a snarkOS node.
     let snarkos_node = SnarkosNode::default().await;
-    let snarkos_node_addr = snarkos_node.addr;
 
     // Start more test nodes than the snarkOS node is permitted to connect to at once.
     let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS + 1);

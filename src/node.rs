@@ -30,7 +30,7 @@ use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;
 use colored::*;
-use std::str::FromStr;
+use std::{net::IpAddr, str::FromStr};
 use structopt::StructOpt;
 use tokio::task;
 use tracing_subscriber::EnvFilter;
@@ -49,7 +49,7 @@ pub struct Node {
     pub network: u16,
     /// The listener IP of the node.
     #[structopt(default_value = "0:0:0:0", long = "ip")]
-    pub ip: String,
+    pub ip: IpAddr,
     /// Specify the port for the node server.
     #[structopt(long = "node")]
     pub node: Option<u16>,
@@ -57,8 +57,8 @@ pub struct Node {
     #[structopt(long = "disable-rpc")]
     pub disable_rpc: bool,
     /// The IP address of the RPC server.
-    #[structopt(default_value = "0:0:0:0", long = "rpc-ip")]
-    pub rpc_ip: String,
+    #[structopt(default_value = "0.0.0.0", long = "rpc-ip")]
+    pub rpc_ip: IpAddr,
     /// Specify the port for the RPC server.
     #[structopt(long = "rpc")]
     pub rpc: Option<u16>,

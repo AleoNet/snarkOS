@@ -57,9 +57,9 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     pub(crate) async fn initialize(node: &Node, miner: Option<Address<N>>, mut tasks: Tasks<task::JoinHandle<()>>) -> Result<Self> {
-        let node_ip = node.ip.clone();
+        let node_ip = node.ip;
         let node_port = node.node.unwrap_or(E::DEFAULT_NODE_PORT);
-        let rpc_ip = node.rpc_ip.clone();
+        let rpc_ip = node.rpc_ip;
         let rpc_port = node.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
 
         #[cfg(not(feature = "test"))]
@@ -77,6 +77,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the ledger storage path.
         #[cfg(not(feature = "test"))]
         let storage_path = format!(".ledger-{}", (node_port - 4130));
+        // Tests can use any available ports, and they remove the storage artifacts afterwards, so there
+        // is no need to adhere to a specific number assignment logic.
         #[cfg(feature = "test")]
         let storage_path = format!(".ledger-{}", node_port);
 

@@ -26,6 +26,8 @@ pub struct SnarkosNode {
 }
 
 impl SnarkosNode {
+    /// Starts a snarkOS node with all the default characteristics from `SnarkosNode::with_args` plus any
+    /// available port number picked for the listening address.
     pub async fn default() -> Self {
         // Procure a free port number for the snarkOS node.
         // FIXME: due to there being a delay between the port's discovery and its binding by the node, this
@@ -40,6 +42,8 @@ impl SnarkosNode {
         SnarkosNode::with_args(&["--node", &free_port.to_string()]).await
     }
 
+    /// Starts a snarkOS node with a local address and the RPC server disabled; extra arguments can be passed
+    /// via `extra_args`.
     pub async fn with_args(extra_args: &[&str]) -> Self {
         let permanent_args = &["snarkos", "--disable-rpc", "--ip", "127.0.0.1"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
