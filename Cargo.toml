@@ -17,7 +17,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["ledger"]
+members = ["ledger", "testing"]
+
+[features]
+default = []
+test = []
 
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "040825e" }
@@ -31,6 +35,10 @@ tui = { version = "0.16.0", features = ["crossterm"] }
 
 [dependencies.snarkos-ledger]
 path = "./ledger"
+version = "2.0.0"
+
+[dev-dependencies.snarkos-testing]
+path = "./testing"
 version = "2.0.0"
 
 [dependencies.anyhow]
@@ -119,7 +127,7 @@ version = "0.1"
 
 [dependencies.tracing-subscriber]
 version = "0.3"
-features = ["env-filter"]
+features = ["env-filter", "parking_lot"]
 
 [dev-dependencies.rand_chacha]
 version = "0.3"

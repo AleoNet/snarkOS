@@ -14,13 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType, SyncNode};
+use crate::{
+    helpers::{Tasks, Updater},
+    network::Server,
+    Client,
+    ClientTrial,
+    Display,
+    Environment,
+    Miner,
+    MinerTrial,
+    NodeType,
+    SyncNode,
+};
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;
 use colored::*;
-use std::str::FromStr;
+use std::{net::IpAddr, str::FromStr};
 use structopt::StructOpt;
+use tokio::task;
 use tracing_subscriber::EnvFilter;
 
 #[derive(StructOpt, Debug)]
@@ -35,9 +47,18 @@ pub struct Node {
     /// Specify the network of this node.
     #[structopt(default_value = "2", short = "n", long = "network")]
     pub network: u16,
+    /// The listener IP of the node.
+    #[structopt(parse(try_from_str), default_value = "0.0.0.0", long = "ip")]
+    pub ip: IpAddr,
     /// Specify the port for the node server.
     #[structopt(long = "node")]
     pub node: Option<u16>,
+    /// Disable the RPC server.
+    #[structopt(long = "disable-rpc")]
+    pub disable_rpc: bool,
+    /// The IP address of the RPC server.
+    #[structopt(parse(try_from_str), default_value = "0.0.0.0", long = "rpc-ip")]
+    pub rpc_ip: IpAddr,
     /// Specify the port for the RPC server.
     #[structopt(long = "rpc")]
     pub rpc: Option<u16>,
@@ -83,13 +104,6 @@ impl Node {
     }
 
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
-        let node_port = self.node.unwrap_or(E::DEFAULT_NODE_PORT);
-        let rpc_port = self.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
-        assert!(
-            !(node_port < 4130),
-            "Until configuration files are established, the node port must be at least 4130 or greater"
-        );
-
         let miner = match (E::NODE_TYPE, &self.miner) {
             (NodeType::Miner, Some(address)) => {
                 let miner_address = Address::<N>::from_str(address)?;
@@ -105,37 +119,32 @@ impl Node {
             }
         };
 
+        // Initialize the tasks handler.
+        let tasks = Tasks::new();
+        let tasks_clone = tasks.clone();
+
+        let server = Server::<N, E>::initialize(self, miner, tasks_clone).await?;
+
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            match Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await {
-                Ok(server) => {
-                    if let Some(peer_ip) = &self.connect {
-                        server.connect_to(peer_ip.parse().unwrap()).await?;
-                    }
-                    let _display = Display::<N, E>::start(server)?;
-                    Ok(())
-                }
-                Err(error) => {
-                    error!("{}", error);
-                    Err(error)
-                }
-            }
+
+            let server_clone = server.clone();
+            let _display = Display::<N, E>::start(server_clone)?;
         } else {
             self.initialize_logger();
-            match Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await {
-                Ok(server) => {
-                    if let Some(peer_ip) = &self.connect {
-                        server.connect_to(peer_ip.parse().unwrap()).await?;
-                    }
-                    std::future::pending::<()>().await;
-                    Ok(())
-                }
-                Err(error) => {
-                    error!("{}", error);
-                    Err(error)
-                }
-            }
         }
+
+        if let Some(peer_ip) = &self.connect {
+            let _ = server.connect_to(peer_ip.parse().unwrap()).await;
+        }
+
+        let server_task = task::spawn(async move {
+            let _server = server;
+            std::future::pending::<()>().await
+        });
+        tasks.append(server_task);
+
+        Ok(())
     }
 
     fn initialize_logger(&self) {
@@ -156,10 +165,10 @@ impl Node {
             .add_directive("hyper::proto::h1::role=off".parse().unwrap());
 
         // Initialize tracing.
-        tracing_subscriber::fmt()
+        let _ = tracing_subscriber::fmt()
             .with_env_filter(filter)
             .with_target(self.verbosity == 3)
-            .init();
+            .try_init();
     }
 }
 

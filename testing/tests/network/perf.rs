@@ -14,14 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod ledger;
-pub(crate) use ledger::{LedgerRequest, LedgerRouter};
+use snarkos_testing::SnarkosNode;
 
-pub mod message;
-pub use message::*;
+use std::time::Instant;
 
-pub(crate) mod peers;
-pub(crate) use peers::*;
+#[tokio::test]
+#[ignore = "this test is purely informational; latest result: ~675ms"]
+async fn measure_node_startup() {
+    let now = Instant::now();
 
-pub mod server;
-pub use server::{LedgerReader, Server};
+    // Start a snarkOS node.
+    let _snarkos_node = SnarkosNode::default().await;
+
+    // Display the result.
+    println!("snarkOS start-up time: {}ms", now.elapsed().as_millis());
+}

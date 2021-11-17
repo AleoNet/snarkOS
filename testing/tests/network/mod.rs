@@ -14,14 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod ledger;
-pub(crate) use ledger::{LedgerRequest, LedgerRouter};
-
-pub mod message;
-pub use message::*;
-
-pub(crate) mod peers;
-pub(crate) use peers::*;
-
-pub mod server;
-pub use server::{LedgerReader, Server};
+mod basic_connectivity;
+mod cleanups;
+mod manual_testing;
+mod perf;
