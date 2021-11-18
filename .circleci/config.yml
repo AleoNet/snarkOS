@@ -217,9 +217,9 @@ workflows:
   main-workflow:
     jobs:
       - tests
-      #- codecov:
-      #    requires:
-      #      - rust-stable
+      - codecov:
+          requires:
+            - rust-stable
       - fmt
       - clippy
   build-snarkos-docker-images:
