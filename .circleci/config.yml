@@ -217,7 +217,7 @@ workflows:
   main-workflow:
     jobs:
       - tests
-      - codecov:
+      - codecov
       - fmt
       - clippy
   build-snarkos-docker-images:
