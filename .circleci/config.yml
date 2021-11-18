@@ -64,21 +64,21 @@ jobs:
           cache_key: snarkos-stable-cache
 
 
-  # codecov:
-  #   machine:
-  #     image: ubuntu-1604:202004-01
-  #     docker_layer_caching: true
-  #   resource_class: 2xlarge
-  #   steps:
-  #     - attach_workspace:
-  #         at: /home/circleci/project/
-  #     - run:
-  #         name: Run kcov
-  #         command: >
-  #           cd ~/project/project/ &&
-  #           docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-  #           howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
-  #     - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
+  codecov:
+    machine:
+      image: ubuntu-1604:202004-01
+      docker_layer_caching: true
+    resource_class: 2xlarge
+    steps:
+      - attach_workspace:
+          at: /home/circleci/project/
+      - run:
+          name: Run kcov
+          command: >
+            cd ~/project/project/ &&
+            docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
+            howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
+      - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
 
   fmt:
     docker:
@@ -217,9 +217,9 @@ workflows:
   main-workflow:
     jobs:
       - tests
-      # - codecov:
-      #     requires:
-      #       - rust-stable
+      #- codecov:
+      #    requires:
+      #      - rust-stable
       - fmt
       - clippy
   build-snarkos-docker-images:
