@@ -134,7 +134,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the list of connected peers.
     ///
-    pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
+    pub fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.keys().cloned().collect()
     }
 

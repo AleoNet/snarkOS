@@ -23,5 +23,5 @@ pub use message::*;
 pub(crate) mod peers;
 pub(crate) use peers::*;
 
-pub(crate) mod server;
-pub(crate) use server::Server;
+pub mod server;
+pub use server::Server;

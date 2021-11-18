@@ -38,17 +38,19 @@ use tokio::{
 /// A set of operations to initialize the node server for a specific network.
 ///
 #[derive(Clone)]
-pub(crate) struct Server<N: Network, E: Environment> {
+pub struct Server<N: Network, E: Environment> {
     /// The list of peers for the node.
-    peers: Arc<RwLock<Peers<N, E>>>,
+    pub peers: Arc<RwLock<Peers<N, E>>>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
-    ledger: Arc<RwLock<Ledger<N, E>>>,
+    pub ledger: Arc<RwLock<Ledger<N, E>>>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N, E>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
+    /// The node's local listening address.
+    pub local_addr: SocketAddr,
 }
 
 impl<N: Network, E: Environment> Server<N, E> {
@@ -56,7 +58,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Starts the connection listener for peers.
     ///
     #[inline]
-    pub(crate) async fn initialize(node: &Node, miner: Option<Address<N>>, mut tasks: Tasks<task::JoinHandle<()>>) -> Result<Self> {
+    pub async fn initialize(node: &Node, miner: Option<Address<N>>, mut tasks: Tasks<task::JoinHandle<()>>) -> Result<Self> {
         let node_ip = node.ip;
         let node_port = node.node.unwrap_or(E::DEFAULT_NODE_PORT);
         let rpc_ip = node.rpc_ip;
@@ -69,7 +71,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         );
 
         // Initialize a new TCP listener at the given IP.
-        let (local_ip, listener) = match TcpListener::bind(SocketAddr::from((node_ip, node_port))).await {
+        let (local_addr, listener) = match TcpListener::bind(SocketAddr::from((node_ip, node_port))).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
@@ -80,20 +82,20 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Tests can use any available ports, and they remove the storage artifacts afterwards, so there
         // is no need to adhere to a specific number assignment logic.
         #[cfg(feature = "test")]
-        let storage_path = format!(".ledger-{}", node_port);
+        let storage_path = format!(".ledger-{}", local_addr.port());
 
         // Initialize a new instance for managing peers.
-        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
+        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_addr);
         // Initialize a new instance for managing the ledger.
         let path = storage_path.clone();
         let (ledger, ledger_router) = Self::initialize_ledger(&mut tasks, path, &peers_router).await?;
 
         // Initialize the connection listener for new peers.
-        Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_router);
+        Self::initialize_listener(&mut tasks, local_addr, listener, &peers_router, &ledger_router);
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_router);
         // Initialize a new instance of the miner.
-        Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router);
+        Self::initialize_miner(&mut tasks, local_addr, miner, &ledger_router);
 
         if !node.disable_rpc {
             // Initialize a new instance of the RPC server.
@@ -116,6 +118,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             ledger,
             ledger_router,
             tasks,
+            local_addr,
         })
     }
 

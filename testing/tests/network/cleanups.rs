@@ -46,10 +46,10 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
     );
 
     // Connect the test node to the snarkOS node (inbound for snarkOS).
-    test_node.node().connect(snarkos_node.addr).await.unwrap();
+    test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
 
     // Disconnect the test node from the snarkOS node.
-    assert!(test_node.node().disconnect(snarkos_node.addr).await);
+    assert!(test_node.node().disconnect(snarkos_node.local_addr()).await);
 
     // Measure memory use after the 1st connect and disconnect.
     let first_conn_mem = PEAK_ALLOC.current_usage();
@@ -60,8 +60,8 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
 
     // Perform a connect and disconnect a few more times.
     for _ in 0..5 {
-        test_node.node().connect(snarkos_node.addr).await.unwrap();
-        assert!(test_node.node().disconnect(snarkos_node.addr).await);
+        test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
+        assert!(test_node.node().disconnect(snarkos_node.local_addr()).await);
     }
 
     // Measure memory use after the repeated connections.
@@ -73,5 +73,5 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: currently not possible to connect on demand"]
+#[ignore = "TODO: the call to Server::connect_to doesn't return the result of the connection"]
 async fn outbound_connect_and_disconnect_doesnt_leak() {}

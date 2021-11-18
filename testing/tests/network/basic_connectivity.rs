@@ -26,6 +26,23 @@ use std::sync::{
 };
 
 #[tokio::test(flavor = "multi_thread")]
+async fn snarkos_nodes_can_connect_to_each_other() {
+    // Start 2 snarkOS nodes.
+    let snarkos_node1 = SnarkosNode::default().await;
+    let snarkos_node2 = SnarkosNode::default().await;
+
+    // Connect one to the other.
+    snarkos_node1.server.connect_to(snarkos_node2.local_addr()).await.unwrap();
+
+    // TODO: the result of Server::connect_to only indicates whether the request was
+    // delivered correctly, instead of returning the actual result of the connection.
+    wait_until!(
+        5,
+        snarkos_node1.connected_peers().await.len() == 1 && snarkos_node2.connected_peers().await.len() == 1
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_nodes_can_connect_to_each_other() {
     // Start 2 test nodes.
     let test_node0 = TestNode::default().await;
@@ -36,7 +53,7 @@ async fn test_nodes_can_connect_to_each_other() {
 
     // Connect one to the other, performing the snarkOS handshake.
     let test_node0_addr = test_node0.node().listening_addr().unwrap();
-    assert!(test_node1.node().connect(test_node0_addr).await.is_ok());
+    test_node1.node().connect(test_node0_addr).await.unwrap();
 
     // Ensure that both nodes have an active connection now.
     wait_until!(1, test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
@@ -46,10 +63,13 @@ async fn test_nodes_can_connect_to_each_other() {
 async fn handshake_as_initiator_works() {
     // Start a test node.
     let test_node = TestNode::default().await;
+    let test_node_addr = test_node.node().listening_addr().unwrap();
 
     // Start a snarkOS node.
-    let test_node_addr = test_node.node().listening_addr().unwrap();
-    SnarkosNode::with_args(&["--node", "0", "--connect", &test_node_addr.to_string()]).await;
+    let snarkos_node = SnarkosNode::default().await;
+
+    // Connect the snarkOS node to the test node.
+    snarkos_node.server.connect_to(test_node_addr).await.unwrap();
 
     // The snarkOS node should have connected to the test node.
     wait_until!(5, test_node.node().num_connected() != 0);
@@ -64,15 +84,21 @@ async fn handshake_as_responder_works() {
     let snarkos_node = SnarkosNode::default().await;
 
     // The test node should be able to connect to the snarkOS node.
-    assert!(test_node.node().connect(snarkos_node.addr).await.is_ok());
+    test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: currently not possible to connect on demand"]
-async fn node_cant_connect_to_itself() {}
+#[ignore = "TODO: the call to Server::connect_to doesn't return the result of the connection"]
+async fn node_cant_connect_to_itself() {
+    // Start a snarkOS node.
+    let snarkos_node = SnarkosNode::default().await;
+
+    // Ensure it can't connect to itself
+    snarkos_node.server.connect_to(snarkos_node.local_addr()).await.unwrap();
+}
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: currently not possible to connect on demand"]
+#[ignore = "TODO: the call to Server::connect_to doesn't return the result of the connection"]
 async fn node_cant_connect_to_another_twice() {}
 
 #[tokio::test(flavor = "multi_thread")]
@@ -90,7 +116,7 @@ async fn concurrent_duplicate_connection_attempts_fail() {
     let snarkos_node = SnarkosNode::default().await;
 
     // Register the snarkOS node address and prepare a connection error counter.
-    let snarkos_node_addr = snarkos_node.addr;
+    let snarkos_node_addr = snarkos_node.local_addr();
     let error_count = Arc::new(AtomicU8::new(0));
 
     // Concurrently connect to the snarkOS node, attempting to bypass the nonce uniqueness rule.
@@ -124,7 +150,7 @@ async fn connection_limits_are_obeyed() {
     // Attempt to connect all the test nodes to the snarkOS node.
     let mut failures = 0usize;
     for test_node in &test_nodes {
-        if test_node.node().connect(snarkos_node.addr).await.is_err() {
+        if test_node.node().connect(snarkos_node.local_addr()).await.is_err() {
             failures += 1;
         }
     }
