@@ -25,7 +25,12 @@ use std::{
     net::SocketAddr,
     time::{Duration, Instant, SystemTime},
 };
-use tokio::{net::TcpStream, sync::mpsc, task, time::timeout};
+use tokio::{
+    net::TcpStream,
+    sync::{mpsc, oneshot},
+    task,
+    time::timeout,
+};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -45,8 +50,8 @@ type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_router)
-    Connect(SocketAddr, LedgerRouter<N, E>),
+    /// Connect := (peer_ip, ledger_router, result_notifier)
+    Connect(SocketAddr, LedgerRouter<N, E>, oneshot::Sender<bool>),
     /// Heartbeat := (ledger_router)
     Heartbeat(LedgerRouter<N, E>),
     /// MessagePropagate := (peer_ip, message)
@@ -172,7 +177,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&mut self, request: PeersRequest<N, E>, peers_router: &PeersRouter<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_router) => {
+            PeersRequest::Connect(peer_ip, ledger_router, result_notifier) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -213,6 +218,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         peers_router,
                                         ledger_router,
                                         &mut self.connected_nonces(),
+                                        Some(result_notifier),
                                     )
                                     .await
                                 }
@@ -275,14 +281,23 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 for peer_ip in self
                     .candidate_peers()
                     .iter()
+                    .copied()
                     .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
                 {
-                    if !self.is_connected_to(*peer_ip) {
+                    if !self.is_connected_to(peer_ip) {
                         trace!("Attempting connection to {}...", peer_ip);
-                        let request = PeersRequest::Connect(*peer_ip, ledger_router.clone());
+                        let (tx, rx) = oneshot::channel();
+                        let request = PeersRequest::Connect(peer_ip, ledger_router.clone(), tx);
                         if let Err(error) = peers_router.send(request).await {
                             error!("Failed to transmit the request: '{}'", error);
                         }
+
+                        // Don't wait for the result of each connection.
+                        task::spawn(async move {
+                            if let Err(error) = rx.await {
+                                error!("Failed to transmit the request: '{}'", error);
+                            }
+                        });
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
@@ -355,6 +370,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             peers_router,
                             ledger_router,
                             &mut self.connected_nonces(),
+                            None,
                         )
                         .await;
                     }
@@ -671,6 +687,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         peers_router: &PeersRouter<N, E>,
         ledger_router: LedgerRouter<N, E>,
         connected_nonces: &mut T,
+        conn_result_notifier: Option<oneshot::Sender<bool>>,
     ) {
         let connected_nonces = connected_nonces.cloned().collect::<Vec<u64>>();
         let peers_router = peers_router.clone();
@@ -680,10 +697,23 @@ impl<N: Network, E: Environment> Peer<N, E> {
             let mut peer = match Peer::new(stream, local_ip, local_nonce, &peers_router, &ledger_router, &connected_nonces).await {
                 Ok(peer) => peer,
                 Err(error) => {
+                    // If there was an outbound connection call, notify the caller of its failure.
+                    if let Some(tx) = conn_result_notifier {
+                        if tx.send(false).is_err() {
+                            error!("Couldn't deliver the notification with a connection result!");
+                        }
+                    }
                     trace!("{}", error);
                     return;
                 }
             };
+
+            // If there was an outbound connection call, notify the caller of its success.
+            if let Some(tx) = conn_result_notifier {
+                if tx.send(true).is_err() {
+                    error!("Couldn't deliver the notification with a connection result!");
+                }
+            }
 
             // Retrieve the peer IP.
             let peer_ip = peer.peer_ip();

@@ -30,7 +30,7 @@ use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, RwLock},
+    sync::{mpsc, oneshot, RwLock},
     task,
 };
 
@@ -127,9 +127,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
-        let message = PeersRequest::Connect(peer_ip, self.ledger_router.clone());
+        let (tx, rx) = oneshot::channel();
+        let message = PeersRequest::Connect(peer_ip, self.ledger_router.clone(), tx);
         self.peers_router.send(message).await?;
-        Ok(())
+        rx.await.map(|_| ()).map_err(|e| e.into())
     }
 
     ///

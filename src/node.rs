@@ -135,7 +135,7 @@ impl Node {
         }
 
         if let Some(peer_ip) = &self.connect {
-            server.connect_to(peer_ip.parse().unwrap()).await?;
+            let _ = server.connect_to(peer_ip.parse().unwrap()).await;
         }
 
         let server_task = task::spawn(async move {
