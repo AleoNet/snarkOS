@@ -496,6 +496,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
             }
         }
     }
+
+    ///
+    /// Removes the addresses of all known peers.
+    ///
+    #[cfg(feature = "test")]
+    pub fn reset_known_peers(&mut self) {
+        self.candidate_peers.clear();
+        self.restricted_peers.clear();
+        self.seen_inbound_connections.clear();
+        self.seen_outbound_connections.clear();
+    }
 }
 
 // TODO (howardwu): Consider changing this to a random challenge height.

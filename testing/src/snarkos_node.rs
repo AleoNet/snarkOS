@@ -36,6 +36,12 @@ impl SnarkosNode {
         self.server.peers.read().await.connected_peers()
     }
 
+    /// Resets the node's known peers. This is practical, as it makes the node not reconnect
+    /// to known peers in test cases where it's undesirable.
+    pub async fn reset_known_peers(&self) {
+        self.server.peers.write().await.reset_known_peers()
+    }
+
     /// Starts a snarkOS node with all the default characteristics from `SnarkosNode::with_args` and with
     /// any available port (as opposed to the default snarkOS network port).
     pub async fn default() -> Self {

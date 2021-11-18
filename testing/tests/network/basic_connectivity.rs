@@ -177,17 +177,15 @@ async fn peer_accounting_works() {
     // Start a snarkOS node.
     let snarkos_node = SnarkosNode::default().await;
 
+    // Start a test node.
+    let test_node = TestNode::default().await;
+    let test_node_addr = test_node.node().listening_addr().unwrap();
+
     // Double-check that the initial list of peers is empty.
     assert!(snarkos_node.connected_peers().await.is_empty());
 
     // Perform the connect+disconnect routine a few fimes.
     for _ in 0..3 {
-        // Start a test node.
-        // note: the test node is not reused, so that the snarkOS node doesn't
-        // try to re-connect to it immediately after it is disconnected,
-        let test_node = TestNode::default().await;
-        let test_node_addr = test_node.node().listening_addr().unwrap();
-
         // Connect the snarkOS node to the test node.
         snarkos_node.server.connect_to(test_node_addr).await.unwrap();
 
@@ -199,7 +197,10 @@ async fn peer_accounting_works() {
         let snarkos_node_addr = test_node.node().connected_addrs()[0];
         assert!(test_node.node().disconnect(snarkos_node_addr).await);
 
-        // That list of peers should be empty again.
+        // The list of snarkOS peers should be empty again.
         wait_until!(1, snarkos_node.connected_peers().await.is_empty());
+
+        // The snarkOS node should not attempt to connect on its own.
+        snarkos_node.reset_known_peers().await;
     }
 }
