@@ -218,8 +218,6 @@ workflows:
     jobs:
       - tests
       - codecov:
-          requires:
-            - rust-stable
       - fmt
       - clippy
   build-snarkos-docker-images:
