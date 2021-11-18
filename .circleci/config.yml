@@ -60,25 +60,15 @@ jobs:
           name: Build and run tests
           no_output_timeout: 35m
           command: RUST_MIN_STACK=8388608 cargo test --workspace
+      - run:
+          name: "Kcov"
+          command: |
+            apt install -y kcov
+            curl -Os https://uploader.codecov.io/latest/linux/codecov && chmod +x codecov
+            kcov /tmp/out ./target/debug/snarkOS
+            ./codecov -f /tmp/out/snarkOS/*.xml
       - clear_environment:
           cache_key: snarkos-stable-cache
-
-
-  codecov:
-    machine:
-      image: ubuntu-1604:202004-01
-      docker_layer_caching: true
-    resource_class: 2xlarge
-    steps:
-      - attach_workspace:
-          at: /home/circleci/project/
-      - run:
-          name: Run kcov
-          command: >
-            cd ~/project/project/ &&
-            docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-            howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
-      - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
 
   fmt:
     docker:
@@ -217,7 +207,6 @@ workflows:
   main-workflow:
     jobs:
       - tests
-      - codecov
       - fmt
       - clippy
   build-snarkos-docker-images:
