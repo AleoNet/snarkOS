@@ -25,7 +25,7 @@ use std::sync::{
     Arc,
 };
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn snarkos_nodes_can_connect_to_each_other() {
     // Start 2 snarkOS nodes.
     let snarkos_node1 = SnarkosNode::default().await;
@@ -33,33 +33,26 @@ async fn snarkos_nodes_can_connect_to_each_other() {
 
     // Connect one to the other.
     snarkos_node1.server.connect_to(snarkos_node2.local_addr()).await.unwrap();
-
-    // TODO: the result of Server::connect_to only indicates whether the request was
-    // delivered correctly, instead of returning the actual result of the connection.
-    wait_until!(
-        5,
-        snarkos_node1.connected_peers().await.len() == 1 && snarkos_node2.connected_peers().await.len() == 1
-    );
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_nodes_can_connect_to_each_other() {
     // Start 2 test nodes.
     let test_node0 = TestNode::default().await;
     let test_node1 = TestNode::default().await;
 
     // Ensure that the nodes have no active connections.
-    wait_until!(1, test_node0.node().num_connected() == 0 && test_node1.node().num_connected() == 0);
+    assert!(test_node0.node().num_connected() == 0 && test_node1.node().num_connected() == 0);
 
     // Connect one to the other, performing the snarkOS handshake.
     let test_node0_addr = test_node0.node().listening_addr().unwrap();
     test_node1.node().connect(test_node0_addr).await.unwrap();
 
     // Ensure that both nodes have an active connection now.
-    wait_until!(1, test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
+    assert!(test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handshake_as_initiator_works() {
     // Start a test node.
     let test_node = TestNode::default().await;
@@ -71,11 +64,13 @@ async fn handshake_as_initiator_works() {
     // Connect the snarkOS node to the test node.
     snarkos_node.server.connect_to(test_node_addr).await.unwrap();
 
-    // The snarkOS node should have connected to the test node.
-    wait_until!(5, test_node.node().num_connected() != 0);
+    // Double-check with the test node.
+    // note: the small wait is due to the handshake responder (test node) finishing
+    // the connection process a bit later than the initiator (snarkOs node).
+    wait_until!(1, test_node.node().num_connected() == 1);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handshake_as_responder_works() {
     // Start a test node.
     let test_node = TestNode::default().await;
@@ -85,21 +80,35 @@ async fn handshake_as_responder_works() {
 
     // The test node should be able to connect to the snarkOS node.
     test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
+
+    // Double-check with the snarkOS node.
+    assert!(snarkos_node.connected_peers().await.len() == 1)
 }
 
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: the call to Server::connect_to doesn't return the result of the connection"]
+#[tokio::test]
 async fn node_cant_connect_to_itself() {
     // Start a snarkOS node.
     let snarkos_node = SnarkosNode::default().await;
 
     // Ensure it can't connect to itself
-    snarkos_node.server.connect_to(snarkos_node.local_addr()).await.unwrap();
+    assert!(snarkos_node.server.connect_to(snarkos_node.local_addr()).await.is_err());
 }
 
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: the call to Server::connect_to doesn't return the result of the connection"]
-async fn node_cant_connect_to_another_twice() {}
+#[tokio::test]
+async fn node_cant_connect_to_another_twice() {
+    // Start a test node.
+    let test_node = TestNode::default().await;
+    let test_node_addr = test_node.node().listening_addr().unwrap();
+
+    // Start a snarkOS node.
+    let snarkos_node = SnarkosNode::default().await;
+
+    // Connect the snarkOS node to the test node.
+    snarkos_node.server.connect_to(test_node_addr).await.unwrap();
+
+    // The second connection attempt should fail.
+    assert!(snarkos_node.server.connect_to(test_node_addr).await.is_err());
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn concurrent_duplicate_connection_attempts_fail() {
@@ -136,27 +145,61 @@ async fn concurrent_duplicate_connection_attempts_fail() {
     wait_until!(5, error_count.load(Relaxed) == NUM_CONCURRENT_ATTEMPTS - 1);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn connection_limits_are_obeyed() {
     // Start a snarkOS node.
     let snarkos_node = SnarkosNode::default().await;
 
-    // Start more test nodes than the snarkOS node is permitted to connect to at once.
-    let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS + 1);
-    for _ in 0..MAXIMUM_NUMBER_OF_PEERS + 1 {
+    // Start the maximum number of test nodes the snarkOS node is permitted to connect to at once.
+    let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS);
+    for _ in 0..MAXIMUM_NUMBER_OF_PEERS {
         test_nodes.push(TestNode::default().await);
     }
 
-    // Attempt to connect all the test nodes to the snarkOS node.
-    let mut failures = 0usize;
+    // All the test nodes should be able to connect to the snarkOS node.
     for test_node in &test_nodes {
-        if test_node.node().connect(snarkos_node.local_addr()).await.is_err() {
-            failures += 1;
-        }
+        test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
     }
 
-    // Assert that exactly one test node failed to connect.
-    assert_eq!(failures, 1);
+    // Create one additional test node.
+    let extra_test_node = TestNode::default().await;
+    let extra_test_node_addr = extra_test_node.node().listening_addr().unwrap();
 
-    // TODO: add an outgoing connection attempt once it's possible.
+    // Assert that snarkOS can't connect to it.
+    assert!(snarkos_node.server.connect_to(extra_test_node_addr).await.is_err());
+
+    // Assert that the test node can't connect to the snarkOS node either.
+    assert!(extra_test_node.node().connect(snarkos_node.local_addr()).await.is_err());
+}
+
+#[tokio::test]
+async fn peer_accounting_works() {
+    // Start a snarkOS node.
+    let snarkos_node = SnarkosNode::default().await;
+
+    // Double-check that the initial list of peers is empty.
+    assert!(snarkos_node.connected_peers().await.is_empty());
+
+    // Perform the connect+disconnect routine a few fimes.
+    for _ in 0..3 {
+        // Start a test node.
+        // note: the test node is not reused, so that the snarkOS node doesn't
+        // try to re-connect to it immediately after it is disconnected,
+        let test_node = TestNode::default().await;
+        let test_node_addr = test_node.node().listening_addr().unwrap();
+
+        // Connect the snarkOS node to the test node.
+        snarkos_node.server.connect_to(test_node_addr).await.unwrap();
+
+        // Verify that the list of peers is not empty anymore.
+        assert!(snarkos_node.connected_peers().await.len() == 1);
+
+        // The test node disconnects from the snarkOS node.
+        wait_until!(1, test_node.node().num_connected() == 1);
+        let snarkos_node_addr = test_node.node().connected_addrs()[0];
+        assert!(test_node.node().disconnect(snarkos_node_addr).await);
+
+        // That list of peers should be empty again.
+        wait_until!(1, snarkos_node.connected_peers().await.is_empty());
+    }
 }

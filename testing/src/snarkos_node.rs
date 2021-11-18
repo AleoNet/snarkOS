@@ -62,8 +62,10 @@ impl Drop for SnarkosNode {
     fn drop(&mut self) {
         let db_path = format!("{}/.ledger-{}", env!("CARGO_MANIFEST_DIR"), self.server.local_addr.port());
 
-        if fs::remove_dir_all(&db_path).is_err() {
-            panic!("Storage cleanup failed! The expected path \"{}\" doesn't exist", db_path);
-        }
+        assert!(
+            fs::remove_dir_all(&db_path).is_ok(),
+            "Storage cleanup failed! The expected path \"{}\" doesn't exist",
+            db_path
+        );
     }
 }
