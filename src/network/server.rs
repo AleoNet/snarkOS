@@ -20,7 +20,8 @@ use crate::{
     peers::{Peers, PeersRequest, PeersRouter},
     rpc::initialize_rpc_server,
     wallet::Wallet,
-    Environment, NodeType,
+    Environment,
+    NodeType,
 };
 use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
