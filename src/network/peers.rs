@@ -50,7 +50,7 @@ type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_router, result_notifier)
+    /// Connect := (peer_addr, ledger_router, result_notifier)
     Connect(SocketAddr, LedgerRouter<N, E>, oneshot::Sender<bool>),
     /// Heartbeat := (ledger_router)
     Heartbeat(LedgerRouter<N, E>),
