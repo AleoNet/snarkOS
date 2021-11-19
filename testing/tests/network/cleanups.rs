@@ -115,7 +115,7 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
     let mut first_conn_mem = None;
     for i in 0..10 {
         // Connect the snarkOS node to the test node (outbound for snarkOS).
-        snarkos_node.server.connect_to(test_node_addr).await.unwrap();
+        snarkos_node.connect(test_node_addr).await.unwrap();
 
         // Disconnect the test node from the snarkOS node.
         wait_until!(1, test_node.node().num_connected() == 1);

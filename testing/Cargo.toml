@@ -27,11 +27,14 @@ features = ["test"]
 [dependencies.snarkos-ledger]
 path = "../ledger"
 
+[dependencies.anyhow]
+version = "1"
+
 [dependencies.async-trait]
 version = "0.1"
 
 [dependencies.bincode]
-version = "1.0"
+version = "1"
 
 [dependencies.pea2pea]
 version = "0.28"
@@ -43,7 +46,7 @@ version = "0.1"
 version = "0.8"
 
 [dependencies.tokio]
-version = "1.0"
+version = "1"
 features = ["macros", "rt-multi-thread", "time"]
 
 [dependencies.structopt]

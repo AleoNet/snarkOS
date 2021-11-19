@@ -42,6 +42,11 @@ impl SnarkosNode {
         self.server.peers.write().await.reset_known_peers()
     }
 
+    /// Attempts to connect the node to the given address.
+    pub async fn connect(&self, addr: SocketAddr) -> anyhow::Result<()> {
+        self.server.connect_to(addr).await
+    }
+
     /// Starts a snarkOS node with all the default characteristics from `SnarkosNode::with_args` and with
     /// any available port (as opposed to the default snarkOS network port).
     pub async fn default() -> Self {
