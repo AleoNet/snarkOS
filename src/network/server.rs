@@ -82,7 +82,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Tests can use any available ports, and they remove the storage artifacts afterwards, so there
         // is no need to adhere to a specific number assignment logic.
         #[cfg(feature = "test")]
-        let storage_path = format!(".ledger-{}", local_addr.port());
+        let storage_path = format!("/tmp/snarkos-test-ledger-{}", local_addr.port());
 
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_addr);

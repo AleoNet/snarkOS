@@ -66,7 +66,7 @@ impl SnarkosNode {
 // Remove the storage artifacts after each test.
 impl Drop for SnarkosNode {
     fn drop(&mut self) {
-        let db_path = format!("{}/.ledger-{}", env!("CARGO_MANIFEST_DIR"), self.server.local_addr.port());
+        let db_path = format!("/tmp/snarkos-test-ledger-{}", self.server.local_addr.port());
 
         assert!(
             fs::remove_dir_all(&db_path).is_ok(),
