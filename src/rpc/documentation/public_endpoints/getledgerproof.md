@@ -5,7 +5,7 @@ Returns the ledger proof for the given commitment with the current ledger root.
 
 | Parameter           | Type   | Required | Description                                                        |
 |---------------------|--------|----------|--------------------------------------------------------------------|
-| `record_commitment` | number | Yes      | The record commitment to generate a ledger proof of inclusion for. |
+| `record_commitment` | string | Yes      | The record commitment to generate a ledger proof of inclusion for. |
 
 ### Response
 
