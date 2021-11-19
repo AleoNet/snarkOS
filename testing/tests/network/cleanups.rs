@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::wait_until;
+use crate::{common::display_bytes, wait_until};
 
 use pea2pea::Pea2Pea;
 use peak_alloc::PeakAlloc;
@@ -23,23 +23,6 @@ use snarkos_testing::{SnarkosNode, TestNode};
 // Configure a custom allocator that will measure memory use.
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
-
-// A helper function making memory use more human-readable.
-fn display_bytes(bytes: f64) -> String {
-    const GB: f64 = 1_000_000_000.0;
-    const MB: f64 = 1_000_000.0;
-    const KB: f64 = 1_000.0;
-
-    if bytes >= GB {
-        format!("{:.2} GB", bytes / GB)
-    } else if bytes >= MB {
-        format!("{:.2} MB", bytes / MB)
-    } else if bytes >= KB {
-        format!("{:.2} KB", bytes / KB)
-    } else {
-        format!("{:.2} B", bytes)
-    }
-}
 
 #[tokio::test]
 #[ignore = "this test is purely informational; latest result: 159.81 MB"]

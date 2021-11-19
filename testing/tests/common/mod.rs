@@ -53,6 +53,23 @@ pub async fn spawn_test_node_with_nonce(local_nonce: SnarkosNonce) -> TestNode {
     node
 }
 
+/// A helper function making memory use values more human-readable.
+pub fn display_bytes(bytes: f64) -> String {
+    const GB: f64 = 1_000_000_000.0;
+    const MB: f64 = 1_000_000.0;
+    const KB: f64 = 1_000.0;
+
+    if bytes >= GB {
+        format!("{:.2} GB", bytes / GB)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes / MB)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes / KB)
+    } else {
+        format!("{:.2} B", bytes)
+    }
+}
+
 #[macro_export]
 macro_rules! wait_until {
     ($limit_secs: expr, $condition: expr) => {
