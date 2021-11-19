@@ -19,7 +19,7 @@ use snarkos_testing::SnarkosNode;
 use std::time::Instant;
 
 #[tokio::test]
-#[ignore = "this test is purely informational; latest result: ~770ms"]
+#[ignore = "this test is purely informational; latest result: ~675ms"]
 async fn measure_node_startup() {
     let now = Instant::now();
 
