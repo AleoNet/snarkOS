@@ -1839,6 +1839,7 @@ dependencies = [
 name = "snarkos-testing"
 version = "2.0.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bincode",
  "pea2pea",
