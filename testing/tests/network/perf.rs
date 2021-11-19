@@ -14,7 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod basic_connectivity;
-mod cleanups;
-mod manual_testing;
-mod perf;
+use snarkos_testing::SnarkosNode;
+
+use std::time::Instant;
+
+#[tokio::test]
+#[ignore = "this test is purely informational; latest result: ~770ms"]
+async fn measure_node_startup() {
+    let now = Instant::now();
+
+    // Start a snarkOS node.
+    let _snarkos_node = SnarkosNode::default().await;
+
+    // Display the result.
+    println!("snarkOS start-up time: {}ms", now.elapsed().as_millis());
+}
