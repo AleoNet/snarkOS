@@ -134,7 +134,8 @@ impl<N: Network> LedgerState<N> {
             // Validate the ledger root every 500 blocks.
             if block_height % 500 == 0 || block_height == latest_block_height {
                 if !ledger.is_read_only() {
-                    debug!("Validating the ledger root up to block {}", block_height);
+                    let progress = (block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+                    debug!("Validating the ledger root up to block {} ({}%)", block_height, progress);
                 }
 
                 // Ensure the ledger roots match their expected block heights.

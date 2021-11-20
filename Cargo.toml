@@ -20,7 +20,7 @@ edition = "2018"
 members = ["ledger"]
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e7266f9" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "040825e" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
