@@ -55,6 +55,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     BlockResponse(SocketAddr, Block<N>),
     /// Disconnect := (peer_ip)
     Disconnect(SocketAddr),
+    /// Failure := (peer_ip, failure)
+    Failure(SocketAddr, String),
     /// Heartbeat := ()
     Heartbeat(LedgerRouter<N, E>),
     /// Mine := (local_ip, miner_address, ledger_router)
@@ -221,6 +223,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 if let Err(error) = peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
                     warn!("[Disconnect] {}", error);
                 }
+            }
+            LedgerRequest::Failure(peer_ip, failure) => {
+                self.add_failure(peer_ip, failure);
             }
             LedgerRequest::Heartbeat(ledger_router) => {
                 // Update the ledger.
@@ -458,7 +463,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                 match result {
                     Ok(Ok(block)) => {
-                        trace!("Miner has found the next block");
+                        debug!("Miner has found the next block");
                         // Broadcast the next block.
                         let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
                         if let Err(error) = ledger_router.send(request).await {
