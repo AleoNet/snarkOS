@@ -452,7 +452,11 @@ mod tests {
     use hyper::Request;
     use rand::{thread_rng, SeedableRng};
     use rand_chacha::ChaChaRng;
-    use std::{str::FromStr, sync::atomic::AtomicBool};
+    use std::{
+        path::{Path, PathBuf},
+        str::FromStr,
+        sync::atomic::AtomicBool,
+    };
     use tokio::sync::mpsc;
 
     fn temp_dir() -> std::path::PathBuf {
@@ -465,8 +469,11 @@ mod tests {
     }
 
     /// Initializes a new instance of the ledger state.
-    fn new_ledger_state<N: Network, S: Storage>() -> LedgerState<N> {
-        LedgerState::<N>::open::<S, _>(temp_dir(), false).expect("Failed to initialize ledger")
+    fn new_ledger_state<N: Network, S: Storage, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N> {
+        match path {
+            Some(path) => LedgerState::<N>::open::<S, _>(path, false).expect("Failed to initialize ledger"),
+            None => LedgerState::<N>::open::<S, _>(temp_dir(), false).expect("Failed to initialize ledger"),
+        }
     }
 
     /// Initializes a new instance of the ledger.
@@ -486,7 +493,7 @@ mod tests {
             password: "pass".to_string(),
         };
         let peers = new_peers::<N, E>();
-        let ledger = new_ledger_state::<N, S>();
+        let ledger = new_ledger_state::<N, S, PathBuf>(None);
 
         // Create a dummy mpsc channel for Ledger requests. todo (@collinc97): only get requests will work until this is changed
         let (ledger_router, _ledger_handler) = mpsc::channel(1024);
@@ -721,7 +728,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = LedgerState::open::<RocksDB, _>(directory.clone(), false).expect("Failed to initialize ledger");
+        let mut ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -746,7 +753,7 @@ mod tests {
             };
 
             // Open a ledger at the temporary directory.
-            let ledger = LedgerState::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
+            let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
             let peers = new_peers();
 
@@ -849,7 +856,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = LedgerState::<Testnet2>::open::<RocksDB, _>(directory.clone(), false).expect("Failed to initialize ledger");
+        let mut ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -875,7 +882,7 @@ mod tests {
             let peers = new_peers();
 
             // Open a ledger at the temporary directory.
-            let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
+            let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
             RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
@@ -1013,7 +1020,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = LedgerState::open::<RocksDB, _>(directory.clone(), false).expect("Failed to initialize ledger");
+        let mut ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -1047,7 +1054,7 @@ mod tests {
             let peers = new_peers();
 
             // Open a ledger at the temporary directory.
-            let ledger = LedgerState::<Testnet2>::open::<RocksDB, _>(directory, false).expect("Failed to initialize ledger");
+            let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
             let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
             RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
@@ -1088,7 +1095,7 @@ mod tests {
         }
 
         // Initialize a new ledger.
-        let ledger = new_ledger_state::<Testnet2, RocksDB>();
+        let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(None);
 
         // Initialize a new rpc.
         let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
