@@ -268,18 +268,23 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Process the pong.
                 self.update_peer(peer_ip, is_fork, block_locators).await;
 
-                // Sleep for the preset time before sending a `Ping` request.
-                tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
-                // Send a `Ping` request to the peer.
-                let message = Message::Ping(E::MESSAGE_VERSION, self.latest_block_height(), self.latest_block_hash());
-                let request = PeersRequest::MessageSend(peer_ip, message);
-                if let Err(error) = peers_router.send(request).await {
-                    warn!("[Ping] {}", error);
-                }
+                // Spawn an asynchronous task for the `Ping` request, after sleeping.
+                let canon = self.canon.clone(); // This is safe as we only *read* LedgerState.
+                let peers_router = peers_router.clone();
+                task::spawn(async move {
+                    // Sleep for the preset time before sending a `Ping` request.
+                    tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
+                    // Send a `Ping` request to the peer.
+                    let message = Message::Ping(E::MESSAGE_VERSION, canon.latest_block_height(), canon.latest_block_hash());
+                    let request = PeersRequest::MessageSend(peer_ip, message);
+                    if let Err(error) = peers_router.send(request).await {
+                        warn!("[Ping] {}", error);
+                    }
+                });
             }
             LedgerRequest::SendPing(peer_ip) => {
                 // Send a `Ping` request to the peer.
-                let message = Message::Ping(E::MESSAGE_VERSION, self.latest_block_height(), self.latest_block_hash());
+                let message = Message::Ping(E::MESSAGE_VERSION, self.canon.latest_block_height(), self.canon.latest_block_hash());
                 let request = PeersRequest::MessageSend(peer_ip, message);
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Ping] {}", error);
