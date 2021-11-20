@@ -248,7 +248,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
                 // Process the request to mine the next block.
-                self.mine_next_block(local_ip, recipient, ledger_router);
+                self.mine_next_block(local_ip, recipient, ledger_router).await;
             }
             LedgerRequest::Ping(peer_ip, block_height, block_hash) => {
                 // Determine if the peer is on a fork (or unknown).
@@ -419,7 +419,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Mines a new block and adds it to the canon blocks.
     ///
-    fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>) {
+    async fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>) {
         // If the node type is not a miner, it should not be mining.
         if E::NODE_TYPE != NodeType::Miner {
             return;
@@ -445,13 +445,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             task::spawn(async move {
                 // Mine the next block.
-                let result = canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng());
+                let result = task::spawn_blocking(move || {
+                    canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng())
+                })
+                .await
+                .map_err(|e| e.into());
 
                 // Set the status to `Ready`.
                 status.store(Status::Ready as u8, Ordering::SeqCst);
 
                 match result {
-                    Ok(block) => {
+                    Ok(Ok(block)) => {
                         trace!("Miner has found the next block");
                         // Broadcast the next block.
                         let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
@@ -459,7 +463,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                             warn!("Failed to broadcast mined block: {}", error);
                         }
                     }
-                    Err(error) => trace!("{}", error),
+                    Ok(Err(error)) | Err(error) => trace!("{}", error),
                 }
             });
         }
