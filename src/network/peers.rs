@@ -778,6 +778,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
+                                    // If this node is a peer or sync node, skip this message.
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync {
+                                        continue;
+                                    }
+
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 5 {
@@ -804,6 +809,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
+                                    // If this node is a peer or sync node, skip this message.
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync {
+                                        continue;
+                                    }
+
                                     // Drop the peer, if they have sent more than 500 unconfirmed transactions in the last 5 seconds.
                                     let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 500 {
