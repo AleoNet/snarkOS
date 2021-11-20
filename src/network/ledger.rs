@@ -291,7 +291,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     trace!("Canon chain already contains block {}", block.height());
                 } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                     trace!("Memory pool already contains unconfirmed block {}", block.height());
-                } else {
+                } else if !(self.is_peering() || self.is_syncing()) {
                     // Ensure the unconfirmed block is at least within 3 blocks of the latest block height.
                     if block.height() + 3 > self.latest_block_height() {
                         // Process the unconfirmed block.
