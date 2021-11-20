@@ -305,8 +305,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
-                // Process the unconfirmed transaction.
-                self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
+                // Ensure the ledger is not peering or syncing.
+                if !(self.is_peering() || self.is_syncing()) {
+                    // Process the unconfirmed transaction.
+                    self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
+                }
             }
         }
     }
