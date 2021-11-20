@@ -93,7 +93,8 @@ pub enum Status {
 #[allow(clippy::type_complexity)]
 pub struct Ledger<N: Network, E: Environment> {
     /// The canonical chain of block hashes.
-    canon: LedgerState<N>,
+    canon_writer: LedgerState<N>,
+    canon_reader: LedgerState<N>,
     /// A map of previous block hashes to unconfirmed blocks.
     unconfirmed_blocks: CircularMap<N::BlockHash, Block<N>, { MAXIMUM_UNCONFIRMED_BLOCKS }>,
     /// The pool of unconfirmed transactions.
@@ -119,11 +120,10 @@ pub struct Ledger<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub fn open<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
-        let canon = LedgerState::open_writer::<S, P>(path)?;
-        let last_block_update_timestamp = Instant::now();
+    pub fn open<S: Storage, P: AsRef<Path> + Copy>(path: P) -> Result<Self> {
         Ok(Self {
-            canon,
+            canon_writer: LedgerState::open_writer::<S, P>(path)?,
+            canon_reader: LedgerState::open_reader::<S, P>(path)?,
             unconfirmed_blocks: Default::default(),
             memory_pool: MemoryPool::new(),
 
@@ -132,7 +132,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             peers_state: Default::default(),
             block_requests: Default::default(),
             block_requests_lock: Arc::new(Mutex::new(true)),
-            last_block_update_timestamp,
+            last_block_update_timestamp: Instant::now(),
             failures: Default::default(),
             _phantom: PhantomData,
         })
@@ -165,16 +165,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.status() == Status::Syncing
     }
 
-    /// Returns the latest block height.
-    pub fn latest_block_height(&self) -> u32 {
-        self.canon.latest_block_height()
-    }
-
-    /// Returns the latest block hash.
-    pub fn latest_block_hash(&self) -> N::BlockHash {
-        self.canon.latest_block_hash()
-    }
-
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -191,7 +181,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     return;
                 }
                 // Retrieve the requested blocks.
-                let blocks = match self.canon.get_blocks(start_block_height, end_block_height) {
+                let blocks = match self.canon_reader.get_blocks(start_block_height, end_block_height) {
                     Ok(blocks) => blocks,
                     Err(error) => {
                         error!("{}", error);
@@ -252,12 +242,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::Ping(peer_ip, block_height, block_hash) => {
                 // Determine if the peer is on a fork (or unknown).
-                let is_fork: Option<bool> = match self.canon.get_block_hash(block_height) {
+                let is_fork: Option<bool> = match self.canon_reader.get_block_hash(block_height) {
                     Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
                     Err(_) => None,
                 };
                 // Send a `Pong` message to the peer.
-                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(is_fork, self.canon.latest_block_locators()));
+                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(is_fork, self.canon_reader.latest_block_locators()));
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Pong] {}", error);
                 }
@@ -269,7 +259,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_peer(peer_ip, is_fork, block_locators).await;
 
                 // Spawn an asynchronous task for the `Ping` request, after sleeping.
-                let canon = self.canon.clone(); // This is safe as we only *read* LedgerState.
+                let canon = self.canon_writer.clone(); // This is safe as we only *read* LedgerState.
                 let peers_router = peers_router.clone();
                 task::spawn(async move {
                     // Sleep for the preset time before sending a `Ping` request.
@@ -284,7 +274,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::SendPing(peer_ip) => {
                 // Send a `Ping` request to the peer.
-                let message = Message::Ping(E::MESSAGE_VERSION, self.canon.latest_block_height(), self.canon.latest_block_hash());
+                let message = Message::Ping(
+                    E::MESSAGE_VERSION,
+                    self.canon_reader.latest_block_height(),
+                    self.canon_reader.latest_block_hash(),
+                );
                 let request = PeersRequest::MessageSend(peer_ip, message);
                 if let Err(error) = peers_router.send(request).await {
                     warn!("[Ping] {}", error);
@@ -292,13 +286,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
                 // Ensure the given block is new.
-                if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
+                if let Ok(true) = self.canon_writer.contains_block_hash(&block.hash()) {
                     trace!("Canon chain already contains block {}", block.height());
                 } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                     trace!("Memory pool already contains unconfirmed block {}", block.height());
                 } else if !(self.is_peering() || self.is_syncing()) {
                     // Ensure the unconfirmed block is at least within 3 blocks of the latest block height.
-                    if block.height() + 3 > self.latest_block_height() {
+                    if block.height() + 3 > self.canon_writer.latest_block_height() {
                         // Process the unconfirmed block.
                         self.add_block(block.clone());
                         // Propagate the unconfirmed block to the connected peers.
@@ -324,7 +318,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     fn update_ledger(&mut self) {
         // Check for candidate blocks to fast forward the ledger.
-        let mut block = &self.canon.latest_block();
+        let mut block = &self.canon_writer.latest_block();
         let unconfirmed_blocks = self.unconfirmed_blocks.clone();
         while let Some(unconfirmed_block) = unconfirmed_blocks.get(&block.hash()) {
             // Update the block iterator.
@@ -364,7 +358,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
             self.block_requests.values_mut().for_each(|requests| *requests = Default::default());
-            self.revert_to_block_height(self.latest_block_height().saturating_sub(1));
+            self.revert_to_block_height(self.canon_writer.latest_block_height().saturating_sub(1));
         }
     }
 
@@ -395,7 +389,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             };
 
             // Retrieve the latest block height of this node.
-            let latest_block_height = self.latest_block_height();
+            let latest_block_height = self.canon_reader.latest_block_height();
             // Iterate through the connected peers, to determine if the ledger state is out of date.
             for (_, ledger_state) in self.peers_state.iter() {
                 if let Some((_, block_height, _)) = ledger_state {
@@ -446,7 +440,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.status.store(Status::Mining as u8, Ordering::SeqCst);
 
             // Prepare the unconfirmed transactions, terminator, and status.
-            let canon = self.canon.clone(); // This is safe as we only *read* LedgerState.
+            let canon = self.canon_writer.clone(); // This is safe as we only *read* LedgerState.
             let unconfirmed_transactions = self.memory_pool.transactions();
             let terminator = self.terminator.clone();
             let status = self.status.clone();
@@ -489,12 +483,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let _ = self.block_requests_lock.lock();
 
         // Ensure the given block is new.
-        if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
+        if let Ok(true) = self.canon_writer.contains_block_hash(&block.hash()) {
             trace!("Canon chain already contains block {}", block.height());
-        } else if block.height() == self.latest_block_height() + 1 && block.previous_block_hash() == self.latest_block_hash() {
-            match self.canon.add_next_block(&block) {
+        } else if block.height() == self.canon_writer.latest_block_height() + 1
+            && block.previous_block_hash() == self.canon_writer.latest_block_hash()
+        {
+            match self.canon_writer.add_next_block(&block) {
                 Ok(()) => {
-                    info!("Ledger advanced to block {}", self.latest_block_height());
+                    info!("Ledger advanced to block {}", self.canon_writer.latest_block_height());
 
                     // Update the timestamp of the last block increment.
                     self.last_block_update_timestamp = Instant::now();
@@ -539,7 +535,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Process the unconfirmed transaction.
         trace!("Received unconfirmed transaction {} from {}", transaction.transaction_id(), peer_ip);
         // Ensure the unconfirmed transaction is new.
-        if let Ok(false) = self.canon.contains_transaction(&transaction.transaction_id()) {
+        if let Ok(false) = self.canon_writer.contains_transaction(&transaction.transaction_id()) {
             debug!("Adding unconfirmed transaction {} to memory pool", transaction.transaction_id());
             // Attempt to add the unconfirmed transaction to the memory pool.
             match self.memory_pool.add_transaction(&transaction) {
@@ -559,9 +555,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Reverts the ledger state back to height `block_height`, returning `true` on success.
     ///
     fn revert_to_block_height(&mut self, block_height: u32) -> bool {
-        match self.canon.revert_to_block_height(block_height) {
+        match self.canon_writer.revert_to_block_height(block_height) {
             Ok(removed_blocks) => {
-                info!("Ledger successfully reverted to block {}", self.latest_block_height());
+                info!("Ledger successfully reverted to block {}", self.canon_writer.latest_block_height());
 
                 // Update the last block update timestamp.
                 self.last_block_update_timestamp = Instant::now();
@@ -622,7 +618,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
         } else {
             // Ensure the peer provided well-formed block locators.
-            match self.canon.check_block_locators(&block_locators) {
+            match self.canon_reader.check_block_locators(&block_locators) {
                 Ok(is_valid) => {
                     if !is_valid {
                         warn!("Invalid block locators from {}", peer_ip);
@@ -641,7 +637,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Verify the integrity of the block hashes sent by the peer.
             for (block_height, (block_hash, _)) in block_locators.iter() {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
+                if let Ok(expected_block_height) = self.canon_reader.get_block_height(block_hash) {
                     if expected_block_height != *block_height {
                         let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
                         trace!("{}", error);
@@ -707,7 +703,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Prioritize the sync nodes before regular peers.
         let mut maximal_peer = None;
         let mut maximal_peer_is_fork = None;
-        let mut maximum_block_height = self.latest_block_height();
+        let mut maximum_block_height = self.canon_writer.latest_block_height();
         let mut maximum_block_locators = Default::default();
 
         // Determine if the peers state has any sync nodes.
@@ -735,7 +731,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // Case 1 - Ensure the peer has a higher block height than this ledger.
-        let latest_block_height = self.latest_block_height();
+        let latest_block_height = self.canon_writer.latest_block_height();
         if latest_block_height >= maximum_block_height {
             return;
         }
@@ -750,7 +746,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Verify the integrity of the block hashes sent by the peer.
             for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
+                if let Ok(expected_block_height) = self.canon_writer.get_block_height(block_hash) {
                     if expected_block_height != *block_height {
                         let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
                         trace!("{}", error);
@@ -776,7 +772,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
 
             // Ensure the latest common ancestor is not greater than the latest block request.
-            let latest_block_height = self.latest_block_height();
+            let latest_block_height = self.canon_writer.latest_block_height();
             if latest_block_height < maximum_common_ancestor {
                 warn!(
                     "The common ancestor {} cannot be greater than the latest block {}",
