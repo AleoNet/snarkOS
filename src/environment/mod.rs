@@ -56,7 +56,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const SYNC_NODES: [&'static str; 2] = ["127.0.0.1:4132", "127.0.0.1:4135"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
-    const HEARTBEAT_IN_SECS: u64 = 5;
+    const HEARTBEAT_IN_SECS: u64 = 10;
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 3;
