@@ -93,7 +93,7 @@ pub struct LedgerState<N: Network> {
 }
 
 impl<N: Network> LedgerState<N> {
-    /// Initializes a new instance of `LedgerState`.
+    /// Opens a new instance of `LedgerState` from the given storage path.
     pub fn open<S: Storage, P: AsRef<Path>>(path: P, is_read_only: bool) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
@@ -215,7 +215,96 @@ impl<N: Network> LedgerState<N> {
         // let storage_2 = S::open(".ledger_2", context)?;
         // storage_2.import(value)?;
 
-        debug!("Loaded ledger from block {}", ledger.latest_block_height());
+        info!("Ledger successfully loaded at block {}", ledger.latest_block_height());
+        Ok(ledger)
+    }
+
+    /// Opens a read-only instance of `LedgerState` from the given storage path.
+    pub fn open_reader<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+        // Open storage.
+        let context = N::NETWORK_ID;
+        let is_read_only = true;
+        let storage = S::open(path, context, is_read_only)?;
+
+        // Retrieve the genesis block.
+        let genesis = N::genesis_block();
+        // Initialize the ledger.
+        let mut ledger = Self {
+            ledger_tree: Arc::new(RwLock::new(LedgerTree::<N>::new()?)),
+            latest_block: Arc::new(RwLock::new(genesis.clone())),
+            latest_block_hashes: Arc::new(RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize))),
+            latest_block_headers: Arc::new(RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize))),
+            latest_block_locators: Default::default(),
+            ledger_roots: storage.open_map("ledger_roots")?,
+            blocks: BlockState::open(storage)?,
+            read_only: (is_read_only, Arc::new(AtomicU32::new(genesis.height()))),
+        };
+
+        // Determine the latest block height.
+        let latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
+            (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
+                true => latest_block_height_0,
+                false => return Err(anyhow!("Ledger storage state is incorrect")),
+            },
+            (None, None) => 0u32,
+            _ => return Err(anyhow!("Ledger storage state is inconsistent")),
+        };
+
+        // If this is new storage, initialize it with the genesis block.
+        if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
+            ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
+            ledger.blocks.add_block(genesis)?;
+        }
+
+        // Update the latest ledger state.
+        *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
+        ledger.regenerate_latest_ledger_state()?;
+
+        // Update the ledger tree state
+        ledger.regenerate_ledger_tree()?;
+
+        // As the ledger is in read-only mode, proceed to start a process to keep the reader in sync.
+        {
+            let mut ledger = ledger.clone();
+            thread::spawn(move || {
+                let last_seen_block_height = ledger.read_only.1.clone();
+                ledger.read_only.1.store(latest_block_height, Ordering::SeqCst);
+
+                loop {
+                    // Refresh the ledger storage state.
+                    if ledger.ledger_roots.refresh() {
+                        // After catching up the reader, determine the latest block height.
+                        if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
+                            let current_block_height = last_seen_block_height.load(Ordering::SeqCst);
+                            trace!(
+                                "[Read-Only] Updating ledger state from block {} to {}",
+                                current_block_height,
+                                latest_block_height
+                            );
+
+                            // Update the latest block.
+                            match ledger.get_block(latest_block_height) {
+                                Ok(block) => *ledger.latest_block.write() = block,
+                                Err(error) => warn!("[Read-Only] {}", error),
+                            };
+                            // Regenerate the ledger tree.
+                            if let Err(error) = ledger.regenerate_ledger_tree() {
+                                warn!("[Read-Only] {}", error);
+                            };
+                            // Regenerate the latest ledger state.
+                            if let Err(error) = ledger.regenerate_latest_ledger_state() {
+                                warn!("[Read-Only] {}", error);
+                            };
+                            // Update the last seen block height.
+                            last_seen_block_height.store(latest_block_height, Ordering::SeqCst);
+                        }
+                    }
+                    thread::sleep(std::time::Duration::from_secs(8));
+                }
+            });
+        }
+
+        trace!("[Read-Only] Ledger successfully loaded at block {}", ledger.latest_block_height());
         Ok(ledger)
     }
 
