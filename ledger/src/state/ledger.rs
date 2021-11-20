@@ -93,10 +93,17 @@ pub struct LedgerState<N: Network> {
 }
 
 impl<N: Network> LedgerState<N> {
-    /// Opens a new instance of `LedgerState` from the given storage path.
-    pub fn open<S: Storage, P: AsRef<Path>>(path: P, is_read_only: bool) -> Result<Self> {
+    ///
+    /// Opens a new writable instance of `LedgerState` from the given storage path.
+    /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
+    ///
+    /// A writable instance of `LedgerState` possesses full functionality, whereas
+    /// a read-only instance of `LedgerState` may only call immutable methods.
+    ///
+    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
+        let is_read_only = false;
         let storage = S::open(path, context, is_read_only)?;
 
         // Retrieve the genesis block.
@@ -133,10 +140,9 @@ impl<N: Network> LedgerState<N> {
         for block_height in 0..=latest_block_height {
             // Validate the ledger root every 500 blocks.
             if block_height % 500 == 0 || block_height == latest_block_height {
-                if !ledger.is_read_only() {
-                    let progress = (block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-                    debug!("Validating the ledger root up to block {} ({}%)", block_height, progress);
-                }
+                // Log the progress of the ledger root validation procedure.
+                let progress = (block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+                debug!("Validating the ledger root up to block {} ({}%)", block_height, progress);
 
                 // Ensure the ledger roots match their expected block heights.
                 let expected_ledger_root = ledger.get_previous_ledger_root(block_height)?;
@@ -168,48 +174,6 @@ impl<N: Network> LedgerState<N> {
         ledger.regenerate_ledger_tree()?;
         assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
 
-        // If the ledger is in read-only mode, proceed to start a process to keep the reader in sync.
-        if ledger.is_read_only() {
-            debug!("Loading ledger in read-only mode");
-            let mut ledger = ledger.clone();
-            thread::spawn(move || {
-                let last_seen_block_height = ledger.read_only.1.clone();
-                ledger.read_only.1.store(latest_block_height, Ordering::SeqCst);
-
-                loop {
-                    // Refresh the ledger storage state.
-                    if ledger.ledger_roots.refresh() {
-                        // After catching up the reader, determine the latest block height.
-                        if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
-                            let current_block_height = last_seen_block_height.load(Ordering::SeqCst);
-                            trace!(
-                                "[Read-Only] Updating ledger state from block {} to {}",
-                                current_block_height,
-                                latest_block_height
-                            );
-
-                            // Update the latest block.
-                            match ledger.get_block(latest_block_height) {
-                                Ok(block) => *ledger.latest_block.write() = block,
-                                Err(error) => warn!("[Read-Only] {}", error),
-                            };
-                            // Regenerate the ledger tree.
-                            if let Err(error) = ledger.regenerate_ledger_tree() {
-                                warn!("[Read-Only] {}", error);
-                            };
-                            // Regenerate the latest ledger state.
-                            if let Err(error) = ledger.regenerate_latest_ledger_state() {
-                                warn!("[Read-Only] {}", error);
-                            };
-                            // Update the last seen block height.
-                            last_seen_block_height.store(latest_block_height, Ordering::SeqCst);
-                        }
-                    }
-                    thread::sleep(std::time::Duration::from_secs(8));
-                }
-            });
-        }
-
         // let value = storage.export()?;
         // println!("{}", value);
         // let storage_2 = S::open(".ledger_2", context)?;
@@ -219,7 +183,13 @@ impl<N: Network> LedgerState<N> {
         Ok(ledger)
     }
 
+    ///
     /// Opens a read-only instance of `LedgerState` from the given storage path.
+    /// For a writable instance of `LedgerState`, use `LedgerState::open_writer`.
+    ///
+    /// A writable instance of `LedgerState` possesses full functionality, whereas
+    /// a read-only instance of `LedgerState` may only call immutable methods.
+    ///
     pub fn open_reader<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;

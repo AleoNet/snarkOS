@@ -28,14 +28,14 @@ fn temp_dir() -> std::path::PathBuf {
 }
 
 /// Initializes a new instance of the ledger.
-fn new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
-    LedgerState::open::<S, _>(temp_dir(), false).expect("Failed to initialize ledger")
+fn create_new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
+    LedgerState::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger")
 }
 
 #[test]
 fn test_genesis() {
     // Initialize a new ledger.
-    let ledger = new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
 
     // Retrieve the genesis block.
     let genesis = Testnet2::genesis_block();
@@ -61,7 +61,7 @@ fn test_add_next_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = new_ledger::<Testnet2, RocksDB>();
+    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -107,7 +107,7 @@ fn test_remove_last_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = new_ledger::<Testnet2, RocksDB>();
+    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -151,7 +151,7 @@ fn test_remove_last_2_blocks() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = new_ledger::<Testnet2, RocksDB>();
+    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -200,7 +200,7 @@ fn test_get_block_locators() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = new_ledger::<Testnet2, RocksDB>();
+    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.

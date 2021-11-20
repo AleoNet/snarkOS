@@ -91,7 +91,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             username,
             password,
             &peers,
-            LedgerState::open::<RocksDB, _>(&storage_path, true)?,
+            LedgerState::open_reader::<RocksDB, _>(&storage_path)?,
             &ledger_router,
         ));
 
