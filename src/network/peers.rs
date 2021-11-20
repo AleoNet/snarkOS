@@ -778,11 +778,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedBlock(block) => {
-                                    // If this node is a peer or sync node, skip this message.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync {
-                                        continue;
-                                    }
-
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 5 {
@@ -800,20 +795,18 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     // Update the timestamp for the received block.
                                     peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
-                                    // Route the `UnconfirmedBlock` to the ledger.
-                                    match is_ready_to_route {
-                                        true => if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
+
+                                    // If this node is a peer or sync node, skip this message, after updating the timestamp.
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route {
+                                        trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
+                                    } else {
+                                        // Route the `UnconfirmedBlock` to the ledger.
+                                        if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
                                             warn!("[UnconfirmedBlock] {}", error);
-                                        },
-                                        false => trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
+                                        }
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
-                                    // If this node is a peer or sync node, skip this message.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync {
-                                        continue;
-                                    }
-
                                     // Drop the peer, if they have sent more than 500 unconfirmed transactions in the last 5 seconds.
                                     let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 500 {
@@ -831,12 +824,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     // Update the timestamp for the received transaction.
                                     peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
-                                    // Route the `UnconfirmedTransaction` to the ledger.
-                                    match is_ready_to_route {
-                                        true => if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
+
+                                    // If this node is a peer or sync node, skip this message, after updating the timestamp.
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route {
+                                        trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
+                                    } else {
+                                        // Route the `UnconfirmedTransaction` to the ledger.
+                                        if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
                                             warn!("[UnconfirmedTransaction] {}", error);
-                                        },
-                                        false => trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip)
+                                        }
                                     }
                                 }
                                 Message::Unused(_) => break, // Peer is not following the protocol.
