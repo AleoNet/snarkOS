@@ -437,7 +437,7 @@ fn result_to_response<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ledger::Ledger, Client};
+    use crate::Client;
 
     use snarkos_ledger::{
         storage::{rocksdb::RocksDB, Storage},
@@ -474,11 +474,6 @@ mod tests {
             Some(path) => LedgerState::<N>::open_writer::<S, _>(path).expect("Failed to initialize ledger"),
             None => LedgerState::<N>::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger"),
         }
-    }
-
-    /// Initializes a new instance of the ledger.
-    fn new_ledger<N: Network, E: Environment, S: Storage>() -> Ledger<N, E> {
-        Ledger::<N, E>::open::<S, _>(temp_dir()).expect("Failed to initialize ledger")
     }
 
     /// Initializes a new instance of the Peers.
