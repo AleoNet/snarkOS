@@ -790,7 +790,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let number_of_block_requests = std::cmp::min(maximum_block_height - latest_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
             let start_block_height = latest_common_ancestor + 1;
             let end_block_height = start_block_height + number_of_block_requests - 1;
-            debug!("Request blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
+            debug!("Requesting blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
 
             // Send a `BlockRequest` message to the peer.
             let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
