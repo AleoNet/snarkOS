@@ -71,7 +71,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize;
     /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 15;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
     const MAXIMUM_CONNECTION_FAILURES: u32 = 5;
     /// The maximum number of candidate peers permitted to be stored in the node.
