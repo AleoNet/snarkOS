@@ -141,6 +141,8 @@ After the first node starts, in a second terminal, run:
 cargo run --release
 ```
 
+We welcome all contributions to snarkOS. Please refer to the [license](#7-license) for the terms of contributions.
+
 ## 7. License
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
