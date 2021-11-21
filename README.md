@@ -25,14 +25,18 @@ cd snarkOS
 
 ## Run an Aleo Client Node
 
-To start a client node, from the snarkOS directory, run:
+Start by following the instructions in the [Build Guide](#build-guide).
+
+Next, to start a client node, from the snarkOS directory, run:
 ```
 ./run-client.sh
 ```
 
 ## Run an Aleo Mining Node
 
-To generate an Aleo miner address, run:
+Start by following the instructions in the [Build Guide](#build-guide).
+
+Next, to generate an Aleo miner address, run:
 ```
 snarkos experimental new_account
 ```
