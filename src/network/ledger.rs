@@ -389,7 +389,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.status.store(Status::Mining as u8, Ordering::SeqCst);
 
             // Prepare the unconfirmed transactions, terminator, and status.
-            let canon = self.canon_writer.clone(); // This is safe as we only *read* LedgerState.
+            let canon = self.canon_reader.clone();
             let unconfirmed_transactions = self.memory_pool.transactions();
             let terminator = self.terminator.clone();
             let status = self.status.clone();
