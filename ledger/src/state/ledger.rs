@@ -41,7 +41,7 @@ use std::{
 const TWO_HOURS_UNIX: i64 = 7200;
 
 /// The maximum number of linear block locators.
-pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 256;
+pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 128;
 /// The maximum number of quadratic block locators.
 pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
 /// The total maximum number of block locators.
