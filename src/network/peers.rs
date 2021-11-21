@@ -818,6 +818,25 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, is_fork, block_locators)).await {
                                         warn!("[Pong] {}", error);
                                     }
+                                    // Spawn an asynchronous task for the `Ping` request.
+                                    let ledger_reader = ledger_reader.clone();
+                                    let peers_router = peers_router.clone();
+                                    task::spawn(async move {
+                                        // Sleep for the preset time before sending a `Ping` request.
+                                        tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
+
+                                        // Retrieve the latest ledger state.
+                                        let ledger_reader = ledger_reader.read().await;
+                                        let latest_block_height = ledger_reader.latest_block_height();
+                                        let latest_block_hash = ledger_reader.latest_block_hash();
+
+                                        // Send a `Ping` request to the peer.
+                                        let message = Message::Ping(E::MESSAGE_VERSION, latest_block_height, latest_block_hash);
+                                        let request = PeersRequest::MessageSend(peer_ip, message);
+                                        if let Err(error) = peers_router.send(request).await {
+                                            warn!("[Ping] {}", error);
+                                        }
+                                    });
                                 }
                                 Message::UnconfirmedBlock(block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.

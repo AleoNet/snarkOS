@@ -218,20 +218,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.initialize_peer(peer_ip);
                 // Process the pong.
                 self.update_peer(peer_ip, is_fork, block_locators).await;
-
-                // Spawn an asynchronous task for the `Ping` request, after sleeping.
-                let canon = self.canon_reader.clone();
-                let peers_router = peers_router.clone();
-                task::spawn(async move {
-                    // Sleep for the preset time before sending a `Ping` request.
-                    tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
-                    // Send a `Ping` request to the peer.
-                    let message = Message::Ping(E::MESSAGE_VERSION, canon.latest_block_height(), canon.latest_block_hash());
-                    let request = PeersRequest::MessageSend(peer_ip, message);
-                    if let Err(error) = peers_router.send(request).await {
-                        warn!("[Ping] {}", error);
-                    }
-                });
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
                 // Ensure the given block is new.
