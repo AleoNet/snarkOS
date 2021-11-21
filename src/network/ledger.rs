@@ -96,7 +96,7 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The map of each peer to their block requests := HashMap<(block_height, block_hash), timestamp>
     block_requests: HashMap<SocketAddr, HashMap<(u32, Option<N::BlockHash>), i64>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
-    /// In this context, `add_block` and `update_block_requests` must be mutually-exclusive.
+    /// In this context, `update_ledger`, `add_block`, and `update_block_requests` must be mutually-exclusive.
     block_requests_lock: Arc<Mutex<bool>>,
     /// The timestamp of the last successful block update.
     last_block_update_timestamp: Instant,
@@ -249,6 +249,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // If the timestamp of the last block increment has surpassed the preset limit,
         // the ledger is likely syncing from invalid state, and should revert by one block.
         if self.status.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
+            // Acquire the lock for block requests.
+            let _ = self.block_requests_lock.lock();
+
             trace!("Ledger state has become stale, clearing queue and reverting by one block");
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
@@ -609,11 +612,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Acquire the lock for block requests.
         let _ = self.block_requests_lock.lock();
 
+        // Retrieve the latest block height of this ledger.
+        let latest_block_height = self.canon_writer.latest_block_height();
+
         // Iterate through the peers to check if this node needs to catch up, and determine a peer to sync with.
         // Prioritize the sync nodes before regular peers.
         let mut maximal_peer = None;
         let mut maximal_peer_is_fork = None;
-        let mut maximum_block_height = self.canon_writer.latest_block_height();
+        let mut maximum_block_height = latest_block_height;
         let mut maximum_block_locators = Default::default();
 
         // Determine if the peers state has any sync nodes.
@@ -641,7 +647,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // Case 1 - Ensure the peer has a higher block height than this ledger.
-        let latest_block_height = self.canon_writer.latest_block_height();
         if latest_block_height >= maximum_block_height {
             return;
         }
@@ -682,7 +687,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
 
             // Ensure the latest common ancestor is not greater than the latest block request.
-            let latest_block_height = self.canon_writer.latest_block_height();
             if latest_block_height < maximum_common_ancestor {
                 warn!(
                     "The common ancestor {} cannot be greater than the latest block {}",
