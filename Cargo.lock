@@ -1875,6 +1875,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "rand_chacha",
+ "rayon",
  "rusty-hook",
  "self_update",
  "serde",
