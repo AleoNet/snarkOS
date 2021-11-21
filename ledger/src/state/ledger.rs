@@ -47,6 +47,9 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
 /// The total maximum number of block locators.
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
+/// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
+const MAXIMUM_FORK_DEPTH: u32 = 4096;
+
 ///
 /// A helper struct containing transaction metadata.
 ///
@@ -739,7 +742,7 @@ impl<N: Network> LedgerState<N> {
         let number_of_blocks = latest_block_height.saturating_sub(block_height);
 
         // Ensure the reverted block height is within a permitted range and well-formed.
-        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+        if block_height >= latest_block_height || number_of_blocks > MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
