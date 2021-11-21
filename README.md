@@ -4,6 +4,8 @@
 
 ## Usage Guide
 
+Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust v1.56.1 can be found here.](https://www.rust-lang.org/tools/install)
+
 ### Installation
 
 Start by cloning the snarkOS Github repository:
@@ -58,6 +60,12 @@ When prompted, enter your Aleo miner address:
 Enter your Aleo miner address:
 {ALEO_ADDRESS}
 ```
+
+### Testnet2 FAQs
+
+1. The node is unable to connect to peers on the network.
+    - Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
+    - Ensure snarkOS is started using `run-client.sh` or `run-miner.sh`
 
 ### Command Line Interface
 
