@@ -35,11 +35,11 @@ Before beginning, please ensure your machine has `Rust v1.56+` installed. Instru
 
 ### 2.1 Requirements
 
-The following are the **minimum** requirements to run an Aleo node:
- - 8-core CPU (16-core preferred)
- - 16GB of RAM memory (32GB preferred)
- - 128GB of disk space
- - 50 Mbps of upload **and** download bandwidth
+The following are **minimum** requirements to run an Aleo node:
+ - **CPU**: 8-cores (16-cores preferred)
+ - **RAM**: 16GB of memory (32GB preferred)
+ - **Storage**: 128GB of disk space
+ - **Network**: 50 Mbps of upload **and** download bandwidth
 
 Please note to run an Aleo mining node that is **competitive**, the machine will require more than these requirements.
 
