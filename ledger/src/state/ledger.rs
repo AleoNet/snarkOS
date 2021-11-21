@@ -41,7 +41,7 @@ use std::{
 const TWO_HOURS_UNIX: i64 = 7200;
 
 /// The maximum number of linear block locators.
-pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 256;
+pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 128;
 /// The maximum number of quadratic block locators.
 pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
 /// The total maximum number of block locators.
@@ -516,7 +516,7 @@ impl<N: Network> LedgerState<N> {
             None => return Ok(false),
         };
 
-        for (block_height, (_block_hash, block_header)) in block_locators.iter().skip(num_linear_block_headers).rev() {
+        for (block_height, (_block_hash, block_header)) in block_locators.iter().rev().take(num_linear_block_headers) {
             // Check that the block height is decrementing.
             match last_block_height == *block_height {
                 true => last_block_height = block_height.saturating_sub(1),
@@ -537,11 +537,15 @@ impl<N: Network> LedgerState<N> {
 
         // Check that the remaining block hashes are formed correctly (power of two).
         if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
-            let mut previous_block_height = u32::MAX;
-
             // Iterate through all the quadratic ranged block locators excluding the genesis locator.
-            for (block_height, (_block_hash, block_header)) in block_locators.iter().skip(1).take(num_quadratic_block_headers - 1).rev() {
-                // Check that the block heights increment by a power of two.
+            let mut previous_block_height = u32::MAX;
+            for (block_height, (_block_hash, block_header)) in block_locators
+                .iter()
+                .rev()
+                .skip(num_linear_block_headers + 1)
+                .take(num_quadratic_block_headers - 1)
+            {
+                // Check that the block heights decrement by a power of two.
                 if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
                     return Ok(false);
                 }

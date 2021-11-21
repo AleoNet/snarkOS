@@ -38,7 +38,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The specified type of node.
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 5;
+    const MESSAGE_VERSION: u32 = 6;
 
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
@@ -71,7 +71,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize;
     /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 15;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 9;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
     const MAXIMUM_CONNECTION_FAILURES: u32 = 5;
     /// The maximum number of candidate peers permitted to be stored in the node.
@@ -114,7 +114,7 @@ impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
     const MINIMUM_NUMBER_OF_PEERS: usize = 5;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 1024;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 128;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -136,6 +136,6 @@ impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
     const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 5;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
     const COINBASE_IS_PUBLIC: bool = true;
 }

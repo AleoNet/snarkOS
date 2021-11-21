@@ -252,6 +252,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     for peer_ip in peer_ips_to_disconnect {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
                         self.send(peer_ip, &Message::Disconnect).await;
+                        // Add an entry for this `Peer` in the restricted peers.
+                        self.restricted_peers.insert(peer_ip, Instant::now());
                     }
                 }
 
@@ -496,6 +498,8 @@ struct Peer<N: Network, E: Environment> {
     listener_ip: SocketAddr,
     /// The message version of the peer.
     version: u32,
+    /// The node type of the peer.
+    node_type: NodeType,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -533,7 +537,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             let latest_block_hash = ledger_reader.latest_block_hash();
 
             // Send a `Ping` request to the peer.
-            let message = Message::Ping(E::MESSAGE_VERSION, latest_block_height, latest_block_hash);
+            let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, latest_block_height, latest_block_hash);
             trace!("Sending '{}' to {}", message.name(), peer_ip);
             outbound_socket.send(message).await?;
         }
@@ -549,6 +553,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         Ok(Peer {
             listener_ip: peer_ip,
             version: 0,
+            node_type: NodeType::Client,
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -792,7 +797,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version, block_height, block_hash) => {
+                                Message::Ping(version, node_type, block_height, block_hash) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
@@ -800,6 +805,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                     // Update the version of the peer.
                                     peer.version = version;
+                                    // Update the node type of the peer.
+                                    peer.node_type = node_type;
 
                                     // Determine if the peer is on a fork (or unknown).
                                     let ledger_reader = ledger_reader.read().await;
@@ -830,7 +837,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_hash = ledger_reader.latest_block_hash();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, latest_block_height, latest_block_hash);
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, latest_block_height, latest_block_hash);
                                         let request = PeersRequest::MessageSend(peer_ip, message);
                                         if let Err(error) = peers_router.send(request).await {
                                             warn!("[Ping] {}", error);
