@@ -4,7 +4,7 @@
 
 ## Usage Guide
 
-Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust v1.56.1 can be found here.](https://www.rust-lang.org/tools/install)
+Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
 ### Installation
 
