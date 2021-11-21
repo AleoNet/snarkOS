@@ -407,7 +407,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                 match result {
                     Ok(Ok(block)) => {
-                        debug!("Miner has found the next block");
+                        debug!("Miner has found an unconfirmed candidate for block {}", block.height());
                         // Broadcast the next block.
                         let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
                         if let Err(error) = ledger_router.send(request).await {
