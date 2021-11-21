@@ -32,7 +32,17 @@ enables applications to verify and store state in a publicly verifiable manner.
 
 Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
-### 2.1 Installation
+### 2.1 Requirements
+
+The following are the **minimum** requirements to run an Aleo node:
+ - 8-core CPU (16-core preferred)
+ - 16GB of RAM memory (32GB preferred)
+ - 128GB of disk space
+ - 50 Mbps of upload **and** download bandwidth
+
+Please note to run an Aleo mining node that is **competitive**, the machine will require more than these requirements.
+
+### 2.2 Installation
 
 Start by cloning the snarkOS Github repository:
 ```
