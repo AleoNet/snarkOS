@@ -48,7 +48,7 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
 /// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
-const MAXIMUM_FORK_DEPTH: u32 = 4096;
+const MAXIMUM_FORK_DEPTH: u32 = 8192;
 
 ///
 /// A helper struct containing transaction metadata.
