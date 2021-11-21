@@ -96,3 +96,9 @@ impl fmt::Display for Status {
         }
     }
 }
+
+impl Default for Status {
+    fn default() -> Self {
+        Self::new()
+    }
+}
