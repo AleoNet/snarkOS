@@ -858,8 +858,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the timestamp for the received block.
                                     peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
 
+                                    // Ensure the unconfirmed block is at least within 3 blocks of the latest block height.
+                                    // If it is stale, skip the routing of this unconfirmed block to the ledger.
+                                    let is_fresh = block.height() + 3 > ledger_reader.read().await.latest_block_height();
+
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route {
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route || !is_fresh {
                                         trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
                                     } else {
                                         // Route the `UnconfirmedBlock` to the ledger.

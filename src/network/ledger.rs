@@ -226,15 +226,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                     trace!("Memory pool already contains unconfirmed block {}", block.height());
                 } else if !(self.is_peering() || self.is_syncing()) {
-                    // Ensure the unconfirmed block is at least within 3 blocks of the latest block height.
-                    if block.height() + 3 > self.canon_writer.latest_block_height() {
-                        // Process the unconfirmed block.
-                        self.add_block(block.clone());
-                        // Propagate the unconfirmed block to the connected peers.
-                        let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block));
-                        if let Err(error) = peers_router.send(request).await {
-                            warn!("[UnconfirmedBlock] {}", error);
-                        }
+                    // Process the unconfirmed block.
+                    self.add_block(block.clone());
+                    // Propagate the unconfirmed block to the connected peers.
+                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block));
+                    if let Err(error) = peers_router.send(request).await {
+                        warn!("[UnconfirmedBlock] {}", error);
                     }
                 }
             }
@@ -425,7 +422,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         {
             match self.canon_writer.add_next_block(&block) {
                 Ok(()) => {
-                    info!("Ledger advanced to block {}", self.canon_writer.latest_block_height());
+                    info!("Ledger successfully advanced to block {}", self.canon_writer.latest_block_height());
 
                     // Update the timestamp of the last block increment.
                     self.last_block_update_timestamp = Instant::now();
