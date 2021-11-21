@@ -63,8 +63,6 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Ping(SocketAddr, u32, N::BlockHash),
     /// Pong := (peer_ip, is_fork, block_locators)
     Pong(SocketAddr, Option<bool>, BlockLocators<N>),
-    /// SendPing := (peer_ip)
-    SendPing(SocketAddr),
     /// UnconfirmedBlock := (peer_ip, block)
     UnconfirmedBlock(SocketAddr, Block<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
@@ -248,18 +246,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         warn!("[Ping] {}", error);
                     }
                 });
-            }
-            LedgerRequest::SendPing(peer_ip) => {
-                // Send a `Ping` request to the peer.
-                let message = Message::Ping(
-                    E::MESSAGE_VERSION,
-                    self.canon_reader.latest_block_height(),
-                    self.canon_reader.latest_block_hash(),
-                );
-                let request = PeersRequest::MessageSend(peer_ip, message);
-                if let Err(error) = peers_router.send(request).await {
-                    warn!("[Ping] {}", error);
-                }
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
                 // Ensure the given block is new.

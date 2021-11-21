@@ -518,7 +518,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         local_ip: SocketAddr,
         local_nonce: u64,
         peers_router: &PeersRouter<N, E>,
-        ledger_router: &LedgerRouter<N, E>,
+        ledger_reader: &LedgerReader<N>,
         connected_nonces: &[u64],
     ) -> Result<Self> {
         // Construct the socket.
@@ -527,8 +527,18 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Perform the handshake before proceeding.
         let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, local_nonce, connected_nonces).await?;
 
-        // Send the first ping sequence to the peer.
-        ledger_router.send(LedgerRequest::SendPing(peer_ip)).await?;
+        // Send the first `Ping` message to the peer.
+        {
+            // Retrieve the latest ledger state.
+            let ledger_reader = ledger_reader.read().await;
+            let latest_block_height = ledger_reader.latest_block_height();
+            let latest_block_hash = ledger_reader.latest_block_hash();
+
+            // Send a `Ping` request to the peer.
+            let message = Message::Ping(E::MESSAGE_VERSION, latest_block_height, latest_block_hash);
+            trace!("Sending '{}' to {}", message.name(), peer_ip);
+            outbound_socket.send(message).await?;
+        }
 
         // Create a channel for this peer.
         let (outbound_router, outbound_handler) = mpsc::channel(1024);
@@ -646,22 +656,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         match block_header.height() == CHALLENGE_HEIGHT && &block_header == genesis_block_header && block_header.is_valid()
                         {
                             true => Ok((peer_ip, peer_nonce)),
-                            false => return Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
+                            false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
                     }
-                    message => {
-                        return Err(anyhow!(
-                            "Expected challenge response, received '{}' from {}",
-                            message.name(),
-                            peer_ip
-                        ));
-                    }
+                    message => Err(anyhow!(
+                        "Expected challenge response, received '{}' from {}",
+                        message.name(),
+                        peer_ip
+                    )),
                 }
             }
             // An error occurred.
-            Some(Err(error)) => return Err(anyhow!("Failed to get challenge response from {}: {:?}", peer_ip, error)),
+            Some(Err(error)) => Err(anyhow!("Failed to get challenge response from {}: {:?}", peer_ip, error)),
             // Did not receive anything.
-            None => return Err(anyhow!("Failed to get challenge response from {}, peer has disconnected", peer_ip)),
+            None => Err(anyhow!("Failed to get challenge response from {}, peer has disconnected", peer_ip)),
         }
     }
 
@@ -679,7 +687,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let peers_router = peers_router.clone();
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, local_nonce, &peers_router, &ledger_router, &connected_nonces).await {
+            let mut peer = match Peer::new(stream, local_ip, local_nonce, &peers_router, &ledger_reader, &connected_nonces).await {
                 Ok(peer) => peer,
                 Err(error) => {
                     trace!("{}", error);
