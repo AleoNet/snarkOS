@@ -552,6 +552,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
 
+            // If the given fork status is None, check if it can be updated.
+            let is_fork = match is_fork {
+                Some(is_fork) => Some(is_fork),
+                None => match common_ancestor == latest_block_height_of_peer {
+                    // If the common ancestor matches the latest block height of the peer,
+                    // the peer is clearly on the same canonical chain as this node.
+                    true => Some(false),
+                    false => None,
+                },
+            };
+
             // trace!("STATUS {:?} {} {}", self.status(), self.latest_block_height(), self.number_of_block_requests());
             let fork_status = match is_fork {
                 Some(boolean) => format!("{}", boolean),
