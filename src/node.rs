@@ -48,7 +48,7 @@ pub struct Node {
     #[structopt(default_value = "pass", long = "password")]
     pub rpc_password: String,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
-    #[structopt(default_value = "3", long = "verbosity")]
+    #[structopt(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
     /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
