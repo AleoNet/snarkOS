@@ -48,17 +48,17 @@ This will output a new Aleo account in the terminal.
 
   Private Key  APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
      View Key  AViewKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
-      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Use Me For The Next Step
 ```
 
-To start a mining node, from the snarkOS directory, run:
+Next, to start a mining node, from the snarkOS directory, run:
 ```
 ./run-miner.sh
 ```
 When prompted, enter your Aleo miner address:
 ```
 Enter your Aleo miner address:
-{ALEO_ADDRESS}
+aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Testnet2 FAQs
