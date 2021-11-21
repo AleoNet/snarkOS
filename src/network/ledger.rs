@@ -59,8 +59,6 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat(LedgerRouter<N, E>),
     /// Mine := (local_ip, miner_address, ledger_router)
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
-    /// Ping := (peer_ip, block_height, block_hash)
-    Ping(SocketAddr, u32, N::BlockHash),
     /// Pong := (peer_ip, is_fork, block_locators)
     Pong(SocketAddr, Option<bool>, BlockLocators<N>),
     /// UnconfirmedBlock := (peer_ip, block)
@@ -215,18 +213,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Process the request to mine the next block.
                 self.mine_next_block(local_ip, recipient, ledger_router).await;
             }
-            LedgerRequest::Ping(peer_ip, block_height, block_hash) => {
-                // Determine if the peer is on a fork (or unknown).
-                let is_fork: Option<bool> = match self.canon_reader.get_block_hash(block_height) {
-                    Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
-                    Err(_) => None,
-                };
-                // Send a `Pong` message to the peer.
-                let request = PeersRequest::MessageSend(peer_ip, Message::Pong(is_fork, self.canon_reader.latest_block_locators()));
-                if let Err(error) = peers_router.send(request).await {
-                    warn!("[Pong] {}", error);
-                }
-            }
             LedgerRequest::Pong(peer_ip, is_fork, block_locators) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip);
@@ -234,7 +220,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_peer(peer_ip, is_fork, block_locators).await;
 
                 // Spawn an asynchronous task for the `Ping` request, after sleeping.
-                let canon = self.canon_writer.clone(); // This is safe as we only *read* LedgerState.
+                let canon = self.canon_reader.clone();
                 let peers_router = peers_router.clone();
                 task::spawn(async move {
                     // Sleep for the preset time before sending a `Ping` request.

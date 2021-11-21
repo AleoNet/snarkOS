@@ -801,9 +801,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                     // Update the version of the peer.
                                     peer.version = version;
-                                    // Route the `Ping` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::Ping(peer_ip, block_height, block_hash)).await {
-                                        warn!("[Ping] {}", error);
+
+                                    // Determine if the peer is on a fork (or unknown).
+                                    let ledger_reader = ledger_reader.read().await;
+                                    let is_fork = match ledger_reader.get_block_hash(block_height) {
+                                        Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
+                                        Err(_) => None,
+                                    };
+                                    // Send a `Pong` message to the peer.
+                                    if let Err(error) = peer.send(Message::Pong(is_fork, ledger_reader.latest_block_locators())).await {
+                                        warn!("[Pong] {}", error);
                                     }
                                 },
                                 Message::Pong(is_fork, block_locators) => {
