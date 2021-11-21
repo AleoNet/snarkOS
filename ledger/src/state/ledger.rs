@@ -128,7 +128,13 @@ impl<N: Network> LedgerState<N> {
         let latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
             (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
                 true => latest_block_height_0,
-                false => return Err(anyhow!("Ledger storage state is incorrect")),
+                false => {
+                    return Err(anyhow!(
+                        "Loaded a ledger with inconsistent state ({} != {})",
+                        latest_block_height_0,
+                        latest_block_height_1
+                    ));
+                }
             },
             (None, None) => 0u32,
             _ => return Err(anyhow!("Ledger storage state is inconsistent")),
