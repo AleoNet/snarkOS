@@ -23,14 +23,14 @@ cd snarkOS
 ./testnet2_ubuntu.sh
 ```
 
-### Run an Aleo Client Node
+## Run an Aleo Client Node
 
 To start a client node, from the snarkOS directory, run:
 ```
 ./run-client.sh
 ```
 
-### Run an Aleo Mining Node
+## Run an Aleo Mining Node
 
 To generate an Aleo miner address, run:
 ```
@@ -61,13 +61,13 @@ Enter your Aleo miner address:
 {ALEO_ADDRESS}
 ```
 
-### Testnet2 FAQs
+## Testnet2 FAQs
 
 1. The node is unable to connect to peers on the network.
     - Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
     - Ensure snarkOS is started using `run-client.sh` or `run-miner.sh`
 
-### Command Line Interface
+## Command Line Interface
 
 To run a node with custom settings, refer to the full list of options and flags available in the snarkOS CLI.
 
