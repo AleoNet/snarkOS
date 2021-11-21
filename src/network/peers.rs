@@ -760,6 +760,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         trace!("Sending 'BlockResponse {}' to {}", block.height(), peer_ip);
                                         if let Err(error) = peer.outbound_socket.send(Message::BlockResponse(block)).await {
                                             warn!("[BlockResponse] {}", error);
+                                            break;
                                         }
                                     }
                                 },

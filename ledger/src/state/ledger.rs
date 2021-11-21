@@ -269,7 +269,7 @@ impl<N: Network> LedgerState<N> {
                             last_seen_block_height.store(latest_block_height, Ordering::SeqCst);
                         }
                     }
-                    thread::sleep(std::time::Duration::from_secs(8));
+                    thread::sleep(std::time::Duration::from_secs(6));
                 }
             });
         }

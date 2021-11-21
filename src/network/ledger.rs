@@ -593,9 +593,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
 
             // trace!("STATUS {:?} {} {}", self.status(), self.latest_block_height(), self.number_of_block_requests());
+            let fork_status = match is_fork {
+                Some(boolean) => format!("{}", boolean),
+                None => format!("unknown"),
+            };
             debug!(
-                "Peer {} is at block {} (common_ancestor = {})",
-                peer_ip, latest_block_height_of_peer, common_ancestor,
+                "Peer {} is at block {} (is_fork = {}, common_ancestor = {})",
+                peer_ip, latest_block_height_of_peer, fork_status, common_ancestor,
             );
 
             match self.peers_state.get_mut(&peer_ip) {
