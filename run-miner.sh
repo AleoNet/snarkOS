@@ -8,7 +8,7 @@ then
   MINER_ADDRESS="aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah"
 fi
 
-COMMAND="cargo clean && cargo run --release -- --miner ${MINER_ADDRESS} --trial"
+COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial"
 
 function exit_node()
 {
@@ -27,6 +27,7 @@ do
   git pull
 
   echo "Running the node..."
+  cargo clean
   $COMMAND & sleep 1800; kill $!
 
   sleep 2;

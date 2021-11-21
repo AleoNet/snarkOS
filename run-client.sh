@@ -1,6 +1,6 @@
 #!/bin/bash
 
-COMMAND='cargo clean && cargo run --release -- --trial'
+COMMAND='cargo run --release -- --trial'
 
 function exit_node()
 {
@@ -19,6 +19,7 @@ do
   git pull
 
   echo "Running the node..."
+  cargo clean
   $COMMAND & sleep 1800; kill $!
 
   sleep 2;
