@@ -64,7 +64,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const PING_SLEEP_IN_SECS: u64 = 12;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 120; // 2 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
     /// The duration in seconds after which to expire a failure from a peer.
     const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
 
