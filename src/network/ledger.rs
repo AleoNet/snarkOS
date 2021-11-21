@@ -170,7 +170,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Update the block requests.
                 self.update_block_requests(peers_router).await;
 
-                trace!(
+                debug!(
                     "Status Report (status = {}, latest_block_height = {}, block_requests = {}, connected_peers = {})",
                     self.status,
                     self.canon.latest_block_height(),
