@@ -19,10 +19,10 @@
 use crate::{
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
+    LedgerReader,
     LedgerRouter,
     Peers,
 };
-use snarkos_ledger::LedgerState;
 use snarkvm::dpc::Network;
 
 use hyper::{
@@ -87,11 +87,11 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     username: String,
     password: String,
     peers: &Arc<RwLock<Peers<N, E>>>,
-    ledger: LedgerState<N>,
+    ledger: &LedgerReader<N>,
     ledger_router: &LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, peers.clone(), ledger, ledger_router.clone());
+    let rpc_impl = RpcImpl::new(credentials, peers.clone(), ledger.clone(), ledger_router.clone());
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -437,7 +437,7 @@ fn result_to_response<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ledger::Ledger, Client};
+    use crate::Client;
 
     use snarkos_ledger::{
         storage::{rocksdb::RocksDB, Storage},
@@ -468,37 +468,31 @@ mod tests {
         "0.0.0.0:3030".to_string().parse().unwrap()
     }
 
-    /// Initializes a new instance of the ledger state.
-    fn new_ledger_state<N: Network, S: Storage, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N> {
-        match path {
-            Some(path) => LedgerState::<N>::open::<S, _>(path, false).expect("Failed to initialize ledger"),
-            None => LedgerState::<N>::open::<S, _>(temp_dir(), false).expect("Failed to initialize ledger"),
-        }
-    }
-
-    /// Initializes a new instance of the ledger.
-    fn new_ledger<N: Network, E: Environment, S: Storage>() -> Ledger<N, E> {
-        Ledger::<N, E>::open::<S, _>(temp_dir()).expect("Failed to initialize ledger")
-    }
-
-    /// Initializes a new instance of the Peers.
-    fn new_peers<N: Network, E: Environment>() -> Arc<RwLock<Peers<N, E>>> {
+    /// Initializes a new instance of the `Peers` struct.
+    fn peers<N: Network, E: Environment>() -> Arc<RwLock<Peers<N, E>>> {
         Arc::new(RwLock::new(Peers::new("0.0.0.0:4130".parse().unwrap(), None)))
     }
 
+    /// Initializes a new instance of the ledger state.
+    fn new_ledger_state<N: Network, S: Storage, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N> {
+        match path {
+            Some(path) => LedgerState::<N>::open_writer::<S, _>(path).expect("Failed to initialize ledger"),
+            None => LedgerState::<N>::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger"),
+        }
+    }
+
     /// Initializes a new instance of the rpc.
-    fn new_rpc_impl<N: Network, E: Environment, S: Storage>() -> RpcImpl<N, E> {
+    fn new_rpc<N: Network, E: Environment, S: Storage, P: AsRef<Path>>(path: Option<P>) -> RpcImpl<N, E> {
         let credentials = RpcCredentials {
             username: "root".to_string(),
             password: "pass".to_string(),
         };
-        let peers = new_peers::<N, E>();
-        let ledger = new_ledger_state::<N, S, PathBuf>(None);
+        let ledger = Arc::new(RwLock::new(new_ledger_state::<N, S, P>(path)));
 
         // Create a dummy mpsc channel for Ledger requests. todo (@collinc97): only get requests will work until this is changed
         let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
-        RpcImpl::<N, E>::new(credentials, peers, ledger, ledger_router)
+        RpcImpl::<N, E>::new(credentials, peers::<N, E>(), ledger, ledger_router)
     }
 
     /// Deserializes a rpc response into the given type.
@@ -514,7 +508,7 @@ mod tests {
     #[tokio::test]
     async fn test_handle_rpc() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request with an empty body.
         let request = Request::new(Body::empty());
@@ -530,7 +524,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_block() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `latestblock` endpoint.
         let request = Request::new(Body::from(
@@ -557,7 +551,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_block_height() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `latestblockheight` endpoint.
         let request = Request::new(Body::from(
@@ -584,7 +578,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_block_hash() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `latestblockhash` endpoint.
         let request = Request::new(Body::from(
@@ -611,7 +605,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_block_header() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `latestblockheader` endpoint.
         let request = Request::new(Body::from(
@@ -638,7 +632,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_block_transactions() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `latestblocktransactions` endpoint.
         let request = Request::new(Body::from(
@@ -665,7 +659,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_ledger_root() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
         let expected = rpc.latest_ledger_root().await.unwrap();
 
         // Initialize a new request that calls the `latestledgerroot` endpoint.
@@ -692,7 +686,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `getblock` endpoint.
         let request = Request::new(Body::from(
@@ -746,19 +740,7 @@ mod tests {
         drop(ledger_state);
 
         // Initialize a new rpc with the ledger state containing the genesis block and block_1.
-        let rpc = {
-            let credentials = RpcCredentials {
-                username: "root".to_string(),
-                password: "pass".to_string(),
-            };
-
-            // Open a ledger at the temporary directory.
-            let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
-            let (ledger_router, _ledger_handler) = mpsc::channel(1024);
-            let peers = new_peers();
-
-            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
-        };
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(Some(directory.clone()));
 
         // Initialize a new request that calls the `getblocks` endpoint.
         let request = Request::new(Body::from(
@@ -790,7 +772,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_height() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `getblockheight` endpoint.
         let request = Request::new(Body::from(
@@ -820,7 +802,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_hash() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `getblockhash` endpoint.
         let request = Request::new(Body::from(
@@ -874,19 +856,7 @@ mod tests {
         drop(ledger_state);
 
         // Initialize a new rpc with the ledger state containing the genesis block and block_1.
-        let rpc = {
-            let credentials = RpcCredentials {
-                username: "root".to_string(),
-                password: "pass".to_string(),
-            };
-            let peers = new_peers();
-
-            // Open a ledger at the temporary directory.
-            let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
-            let (ledger_router, _ledger_handler) = mpsc::channel(1024);
-
-            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
-        };
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(Some(directory.clone()));
 
         // Initialize a new request that calls the `getblockhashes` endpoint.
         let request = Request::new(Body::from(
@@ -918,7 +888,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_header() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `getblockheader` endpoint.
         let request = Request::new(Body::from(
@@ -948,7 +918,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_transactions() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `getblocktransactions` endpoint.
         let request = Request::new(Body::from(
@@ -978,7 +948,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_ciphertext() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `getciphertext` endpoint.
         let request = Request::new(Body::from(
@@ -1046,19 +1016,7 @@ mod tests {
         drop(ledger_state);
 
         // Initialize a new rpc with the ledger state containing the genesis block and block_1.
-        let rpc = {
-            let credentials = RpcCredentials {
-                username: "root".to_string(),
-                password: "pass".to_string(),
-            };
-            let peers = new_peers();
-
-            // Open a ledger at the temporary directory.
-            let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
-            let (ledger_router, _ledger_handler) = mpsc::channel(1024);
-
-            RpcImpl::<Testnet2, Client<Testnet2>>::new(credentials, peers, ledger, ledger_router)
-        };
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(Some(directory.clone()));
 
         // Initialize a new request that calls the `getledgerproof` endpoint.
         let request = Request::new(Body::from(
@@ -1098,7 +1056,7 @@ mod tests {
         let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(None);
 
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `gettransaction` endpoint.
         let request = Request::new(Body::from(
@@ -1136,7 +1094,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_transition() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `gettransition` endpoint.
         let request = Request::new(Body::from(
@@ -1173,7 +1131,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_connected_peers() {
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `gettransition` endpoint.
         let request = Request::new(Body::from(
@@ -1210,7 +1168,7 @@ mod tests {
             Transaction::<Testnet2>::new_coinbase(address, AleoAmount(1234), &mut rng).expect("Failed to create a coinbase transaction");
 
         // Initialize a new rpc.
-        let rpc = new_rpc_impl::<Testnet2, Client<Testnet2>, RocksDB>();
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None);
 
         // Initialize a new request that calls the `sendtransaction` endpoint.
         let request = Request::new(Body::from(

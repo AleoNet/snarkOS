@@ -64,7 +64,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const PING_SLEEP_IN_SECS: u64 = 12;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 120; // 2 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
     /// The duration in seconds after which to expire a failure from a peer.
     const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
 
@@ -80,7 +80,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks that may be fetched in one request.
-    const MAXIMUM_BLOCK_REQUEST: u32 = 50;
+    const MAXIMUM_BLOCK_REQUEST: u32 = 100;
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 2400;
 }
