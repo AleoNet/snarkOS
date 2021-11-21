@@ -189,12 +189,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_peer(peer_ip, is_fork, block_locators).await;
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
-                // Ensure the given block is new.
-                if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
-                    trace!("Canon chain already contains block {}", block.height());
-                } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
-                    trace!("Memory pool already contains unconfirmed block {}", block.height());
-                } else if !(self.status.is_peering() || self.status.is_syncing()) {
+                // Ensure the ledger is not peering or syncing.
+                if !(self.status.is_peering() || self.status.is_syncing()) {
                     // Process the unconfirmed block.
                     self.add_block(block.clone());
                     // Propagate the unconfirmed block to the connected peers.
@@ -410,21 +406,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 Err(error) => warn!("{}", error),
             }
         } else {
-            // Ensure the unconfirmed block is well-formed.
-            match block.is_valid() {
+            // Ensure the unconfirmed block does not already exist in the memory pool.
+            match !self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                 true => {
-                    // Ensure the unconfirmed block does not already exist in the memory pool.
-                    match !self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
-                        true => {
-                            trace!("Adding unconfirmed block {} to memory pool", block.height());
-
-                            // Add the block to the unconfirmed blocks.
-                            self.unconfirmed_blocks.insert(block.previous_block_hash(), block);
-                        }
-                        false => trace!("Unconfirmed block {} already exists in the memory pool", block.height()),
-                    }
+                    // Add the block to the unconfirmed blocks.
+                    trace!("Adding unconfirmed block {} to memory pool", block.height());
+                    self.unconfirmed_blocks.insert(block.previous_block_hash(), block);
                 }
-                false => warn!("Unconfirmed block {} is invalid", block.height()),
+                false => trace!("Memory pool already contains unconfirmed block {}", block.height()),
             }
         }
         false
