@@ -152,12 +152,17 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the peers router process.
         let peers_clone = peers.clone();
         let peers_router_clone = peers_router.clone();
+        let tasks_clone = tasks.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a peers request.
             // Channel is routing a request to peers.
             while let Some(request) = peers_handler.recv().await {
-                // Hold the peers write lock briefly, to update the state of the peers.
-                peers_clone.write().await.update(request, &peers_router_clone).await;
+                let peers = peers_clone.clone();
+                let peers_router = peers_router_clone.clone();
+                tasks_clone.append(task::spawn(async move {
+                    // Hold the peers write lock briefly, to update the state of the peers.
+                    peers.write().await.update(request, &peers_router).await;
+                }));
             }
         }));
 
@@ -184,11 +189,16 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the ledger router process.
         let peers_router = peers_router.clone();
+        let tasks_clone = tasks.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a ledger request.
             while let Some(request) = ledger_handler.recv().await {
-                // Hold the ledger write lock briefly, to update the state of the ledger.
-                ledger.write().await.update(request, &peers_router).await;
+                let ledger = ledger.clone();
+                let peers_router = peers_router.clone();
+                tasks_clone.append(task::spawn(async move {
+                    // Hold the ledger write lock briefly, to update the state of the ledger.
+                    ledger.write().await.update(request, &peers_router).await;
+                }));
             }
         }));
 
