@@ -189,16 +189,13 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the ledger router process.
         let peers_router = peers_router.clone();
-        let tasks_clone = tasks.clone();
         tasks.append(task::spawn(async move {
             // Asynchronously wait for a ledger request.
             while let Some(request) = ledger_handler.recv().await {
-                let ledger = ledger.clone();
-                let peers_router = peers_router.clone();
-                tasks_clone.append(task::spawn(async move {
-                    // Hold the ledger write lock briefly, to update the state of the ledger.
-                    ledger.write().await.update(request, &peers_router).await;
-                }));
+                // Hold the ledger write lock briefly, to update the state of the ledger.
+                // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
+                // will end up being processed out of order.
+                ledger.write().await.update(request, &peers_router).await;
             }
         }));
 
