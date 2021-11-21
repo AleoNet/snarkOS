@@ -107,22 +107,34 @@ impl Node {
 
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            let server =
-                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
-            if let Some(peer_ip) = &self.connect {
-                server.connect_to(peer_ip.parse().unwrap()).await?;
+            match Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await {
+                Ok(server) => {
+                    if let Some(peer_ip) = &self.connect {
+                        server.connect_to(peer_ip.parse().unwrap()).await?;
+                    }
+                    let _display = Display::<N, E>::start(server)?;
+                    Ok(())
+                }
+                Err(error) => {
+                    error!("{}", error);
+                    Err(error)
+                }
             }
-            let _display = Display::<N, E>::start(server)?;
-            Ok(())
         } else {
             self.initialize_logger();
-            let server =
-                Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await?;
-            if let Some(peer_ip) = &self.connect {
-                server.connect_to(peer_ip.parse().unwrap()).await?;
+            match Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await {
+                Ok(server) => {
+                    if let Some(peer_ip) = &self.connect {
+                        server.connect_to(peer_ip.parse().unwrap()).await?;
+                    }
+                    std::future::pending::<()>().await;
+                    Ok(())
+                }
+                Err(error) => {
+                    error!("{}", error);
+                    Err(error)
+                }
             }
-            std::future::pending::<()>().await;
-            Ok(())
         }
     }
 
