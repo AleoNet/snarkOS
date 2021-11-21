@@ -93,7 +93,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             username,
             password,
             &peers,
-            &Arc::new(RwLock::new(LedgerState::<N>::open_reader::<RocksDB, _>(storage_path)?)),
+            &ledger_reader,
             &ledger_router,
         ));
 
