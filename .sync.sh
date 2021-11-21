@@ -18,6 +18,7 @@ do
   echo "Checking for updates..."
   git pull
 
+  cargo clean
   $COMMAND & sleep 1800; kill $!
 
   sleep 2;
