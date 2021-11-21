@@ -63,9 +63,10 @@ Enter your Aleo miner address:
 
 ## Testnet2 FAQs
 
-1. The node is unable to connect to peers on the network.
-    - Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
-    - Ensure snarkOS is started using `run-client.sh` or `run-miner.sh`
+### 1. The node is unable to connect to peers on the network.
+
+- Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
+- Ensure snarkOS is started using `run-client.sh` or `run-miner.sh`
 
 ## Command Line Interface
 
