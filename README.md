@@ -40,14 +40,14 @@ or
 ```
 cargo run --release -- experimental new_account
 ```
-This will output a new Aleo account in the terminal. **Please remember to save** the account private key and view key.
+This will output a new Aleo account in the terminal.
 
-The following is an example output:
+**Please remember to save the account private key and view key.** The following is an example output:
 ```
  Attention - Remember to store this account private key and view key.
 
-  Private Key  APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-     View Key  AViewKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  Private Key  APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
+     View Key  AViewKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
       Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
