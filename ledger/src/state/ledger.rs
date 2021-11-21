@@ -47,6 +47,9 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 64;
 /// The total maximum number of block locators.
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
+/// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
+const MAXIMUM_FORK_DEPTH: u32 = 8192;
+
 ///
 /// A helper struct containing transaction metadata.
 ///
@@ -472,12 +475,14 @@ impl<N: Network> LedgerState<N> {
 
         // Initialize list of block locator hashes.
         let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
+        let mut accumulator = 1;
         // Add the block locator hashes.
         while block_locator_height > 0 && block_locator_hashes.len() < num_block_hashes as usize {
             block_locator_hashes.push((block_locator_height, (self.get_block_hash(block_locator_height)?, None)));
 
             // Decrement the block locator height by a power of two.
-            block_locator_height /= 2;
+            block_locator_height = block_locator_height.saturating_sub(accumulator);
+            accumulator *= 2;
         }
 
         // Initialize the list of block locators.
@@ -545,10 +550,10 @@ impl<N: Network> LedgerState<N> {
                 .skip(num_linear_block_headers + 1)
                 .take(num_quadratic_block_headers - 1)
             {
-                // Check that the block heights decrement by a power of two.
-                if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
-                    return Ok(false);
-                }
+                // // Check that the block heights decrement by a power of two.
+                // if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
+                //     return Ok(false);
+                // }
 
                 // Check that there is no block header.
                 if block_header.is_some() {
@@ -737,7 +742,7 @@ impl<N: Network> LedgerState<N> {
         let number_of_blocks = latest_block_height.saturating_sub(block_height);
 
         // Ensure the reverted block height is within a permitted range and well-formed.
-        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+        if block_height >= latest_block_height || number_of_blocks > MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
