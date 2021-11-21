@@ -1,6 +1,6 @@
 #!/bin/bash
 
-COMMAND='cargo run --release -- --trial'
+COMMAND='cargo clean && cargo run --release -- --trial'
 
 function exit_node()
 {
