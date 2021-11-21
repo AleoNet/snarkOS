@@ -12,7 +12,8 @@
 
 * [1. Overview](#1-overview)
 * [2. Build Guide](#2-build-guide)
-    * [2.1 Installation](#21-installation)
+    * [2.1 Requirements](#21-requirements)
+    * [2.2 Installation](#22-installation)
 * [3a. Run an Aleo Client Node](#3a-run-an-aleo-client-node)
 * [3b. Run an Aleo Mining Node](#3a-run-an-aleo-mining-node)
 * [4. Testnet2 FAQs](#4-testnet2-faqs)
