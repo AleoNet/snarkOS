@@ -19,7 +19,10 @@
 use crate::{
     helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
-    Environment, LedgerReader, LedgerRouter, Peers,
+    Environment,
+    LedgerReader,
+    LedgerRouter,
+    Peers,
 };
 use snarkvm::dpc::Network;
 
@@ -951,12 +954,14 @@ mod tests {
         let actual: RecordCiphertext<Testnet2> = process_response(response).await;
 
         // Check the ciphertext.
-        assert!(Testnet2::genesis_block()
-            .transactions()
-            .first()
-            .unwrap()
-            .ciphertexts()
-            .any(|expected| *expected == actual));
+        assert!(
+            Testnet2::genesis_block()
+                .transactions()
+                .first()
+                .unwrap()
+                .ciphertexts()
+                .any(|expected| *expected == actual)
+        );
     }
 
     #[tokio::test]
@@ -1095,13 +1100,15 @@ mod tests {
         let actual: Transition<Testnet2> = process_response(response).await;
 
         // Check the transition.
-        assert!(Testnet2::genesis_block()
-            .transactions()
-            .first()
-            .unwrap()
-            .transitions()
-            .iter()
-            .any(|expected| *expected == actual));
+        assert!(
+            Testnet2::genesis_block()
+                .transactions()
+                .first()
+                .unwrap()
+                .transitions()
+                .iter()
+                .any(|expected| *expected == actual)
+        );
     }
 
     #[tokio::test]

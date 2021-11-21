@@ -21,7 +21,12 @@
 use crate::{
     helpers::Status,
     rpc::{rpc::*, rpc_trait::RpcFunctions},
-    Environment, LedgerReader, LedgerRequest, LedgerRouter, Peers, Wallet,
+    Environment,
+    LedgerReader,
+    LedgerRequest,
+    LedgerRouter,
+    Peers,
+    Wallet,
 };
 use snarkos_ledger::Metadata;
 use snarkvm::{
@@ -186,7 +191,17 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             }
         }
 
-        println!("{:?}", records);
+        let canon_records = records.iter().filter(|(_, rs)| {
+            let canon: Vec<&Transaction<N>> = rs
+                .iter()
+                .filter(|r| {
+                    self.ledger
+                        .contains_transaction(&r.transaction_id())
+                        .expect("Should be able to check if commitment exists")
+                })
+                .collect();
+            !canon.is_empty()
+        });
         Ok(serde_json::json!({"num_records": num_records, "records": records}))
     }
 
