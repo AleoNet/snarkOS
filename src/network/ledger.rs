@@ -464,7 +464,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 true
             }
             Err(error) => {
-                error!("Failed to revert the ledger to block {}: {}", block_height, error);
+                warn!("{}", error);
 
                 // Set the terminator bit to `true` to ensure the miner resets state.
                 self.terminator.store(true, Ordering::SeqCst);
