@@ -25,6 +25,7 @@ use circular_queue::CircularQueue;
 use itertools::Itertools;
 use parking_lot::RwLock;
 use rand::{CryptoRng, Rng};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -1022,7 +1023,7 @@ impl<N: Network> BlockState<N> {
         }
 
         (start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(|height| self.get_block_header(height))
             .collect()
     }
@@ -1070,7 +1071,7 @@ impl<N: Network> BlockState<N> {
         }
 
         (start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(|height| self.get_block(height))
             .collect()
     }
