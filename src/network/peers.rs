@@ -252,6 +252,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     for peer_ip in peer_ips_to_disconnect {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
                         self.send(peer_ip, &Message::Disconnect).await;
+                        // Add an entry for this `Peer` in the restricted peers.
+                        self.restricted_peers.insert(peer_ip, Instant::now());
                     }
                 }
 
