@@ -209,13 +209,14 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns the current state of this node.
     async fn get_node_state(&self) -> Result<Value, RpcError> {
         Ok(serde_json::json!({
+            "candidate_peers": self.peers.read().await.candidate_peers(),
+            "connected_peers": self.peers.read().await.connected_peers(),
+            "latest_block_height": self.ledger.read().await.latest_block_height(),
+            "number_of_candidate_peers": self.peers.read().await.number_of_candidate_peers(),
+            "number_of_connected_peers": self.peers.read().await.number_of_connected_peers(),
+            "status": self.status.to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,
-            "status": self.status.to_string(),
-            "number_of_connected_peers": self.peers.read().await.number_of_connected_peers(),
-            "number_of_candidate_peers": self.peers.read().await.number_of_candidate_peers(),
-            "connected_peers": self.peers.read().await.connected_peers(),
-            "candidate_peers": self.peers.read().await.candidate_peers(),
         }))
     }
 

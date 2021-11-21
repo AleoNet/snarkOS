@@ -256,7 +256,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // If the timestamp of the last block increment has surpassed the preset limit,
         // the ledger is likely syncing from invalid state, and should revert by one block.
-        if self.status.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
+        if self.status.is_syncing() && self.last_block_update_timestamp.elapsed() > 2 * Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
             // Acquire the lock for block requests.
             let _ = self.block_requests_lock.lock();
 
