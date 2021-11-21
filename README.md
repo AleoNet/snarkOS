@@ -36,7 +36,7 @@ To generate an Aleo miner address, run:
 ```
 snarkos experimental new_account
 ```
-or
+or from the snarkOS directory, run:
 ```
 cargo run --release -- experimental new_account
 ```
