@@ -48,6 +48,7 @@ pub enum Message<N: Network, E: Environment> {
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
     /// Unused
+    #[allow(unused)]
     Unused(PhantomData<E>),
 }
 
