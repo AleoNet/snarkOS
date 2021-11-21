@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Environment;
+use crate::{Environment, NodeType};
 use snarkos_ledger::BlockLocators;
 use snarkvm::prelude::*;
 
@@ -39,8 +39,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>),
-    /// Ping := (version, block_height, block_hash)
-    Ping(u32, u32, N::BlockHash),
+    /// Ping := (version, node_type, block_height, block_hash)
+    Ping(u32, NodeType, u32, N::BlockHash),
     /// Pong := (is_fork, block_locators)
     Pong(Option<bool>, BlockLocators<N>),
     /// UnconfirmedBlock := (block)
@@ -104,7 +104,9 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version, block_height, block_hash) => Ok(to_bytes_le![version, block_height, block_hash]?),
+            Self::Ping(version, node_type, block_height, block_hash) => {
+                Ok(bincode::serialize(&(version, node_type, block_height, block_hash))?)
+            }
             Self::Pong(is_fork, block_locators) => {
                 let serialized_is_fork: u8 = match is_fork {
                     None => 0,
@@ -159,11 +161,10 @@ impl<N: Network, E: Environment> Message<N, E> {
                 false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?} {:?}", buffer, data)),
             },
             6 => Self::PeerResponse(bincode::deserialize(data)?),
-            7 => Self::Ping(
-                bincode::deserialize(&data[0..4])?,
-                bincode::deserialize(&data[4..8])?,
-                bincode::deserialize(&data[8..])?,
-            ),
+            7 => {
+                let (version, node_type, block_height, block_hash) = bincode::deserialize(data)?;
+                Self::Ping(version, node_type, block_height, block_hash)
+            }
             8 => {
                 let is_fork = match data[0] {
                     0 => None,
