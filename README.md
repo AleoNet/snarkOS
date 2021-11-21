@@ -2,7 +2,7 @@
     <img alt="snarkOS" width="1412" src="https://cdn.aleo.org/snarkos/banner.png">
 </p>
 
-## Usage Guide
+## Build Guide
 
 Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
