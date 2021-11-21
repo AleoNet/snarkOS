@@ -19,6 +19,7 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{
+    helpers::Status,
     rpc::{rpc::*, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
@@ -63,6 +64,7 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
+    status: Status,
     peers: Arc<RwLock<Peers<N, E>>>,
     ledger: LedgerReader<N>,
     ledger_router: LedgerRouter<N, E>,
@@ -87,11 +89,13 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(
         credentials: RpcCredentials,
+        status: Status,
         peers: Arc<RwLock<Peers<N, E>>>,
         ledger: LedgerReader<N>,
         ledger_router: LedgerRouter<N, E>,
     ) -> Self {
         Self(Arc::new(RpcInner {
+            status,
             peers,
             ledger,
             ledger_router,
@@ -197,8 +201,20 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.read().await.get_transition(&transition_id)?)
     }
 
+    /// Returns the peers currently connected to this node.
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError> {
         Ok(self.peers.read().await.connected_peers())
+    }
+
+    /// Returns the current state of this node.
+    async fn get_node_state(&self) -> Result<Value, RpcError> {
+        Ok(serde_json::json!({
+            "status": self.status.to_string(),
+            "number_of_connected_peers": self.peers.read().await.number_of_connected_peers(),
+            "number_of_candidate_peers": self.peers.read().await.number_of_candidate_peers(),
+            "connected_peers": self.peers.read().await.connected_peers(),
+            "candidate_peers": self.peers.read().await.candidate_peers()
+        }))
     }
 
     /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
@@ -212,18 +228,6 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(transaction.transaction_id())
     }
 
-    // /// Validate and return if the transaction is valid.
-    // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
-    //     let transaction_bytes = hex::decode(transaction_bytes)?;
-    //     let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
-    //
-    //     Ok(self
-    //         .sync_handler()?
-    //         .consensus
-    //         .verify_transactions(vec![transaction.serialize()?])
-    //         .await)
-    // }
-    //
     // /// Returns the current mempool and sync information known by this node.
     // async fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
     //     let canon = self.storage.canon().await?;

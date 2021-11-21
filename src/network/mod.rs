@@ -24,4 +24,4 @@ pub(crate) mod peers;
 pub(crate) use peers::*;
 
 pub(crate) mod server;
-pub(crate) use server::{LedgerReader, Server};
+pub use server::{LedgerReader, Server};

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::Tasks,
+    helpers::{Status, Tasks},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     rpc::initialize_rpc_server,
@@ -38,7 +38,9 @@ pub type LedgerReader<N> = Arc<RwLock<LedgerState<N>>>;
 ///
 /// A set of operations to initialize the node server for a specific network.
 ///
-pub(crate) struct Server<N: Network, E: Environment> {
+pub struct Server<N: Network, E: Environment> {
+    /// The status of the node.
+    status: Status,
     /// The list of peers for the node.
     peers: Arc<RwLock<Peers<N, E>>>,
     /// The peers router of the node.
@@ -72,13 +74,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the ledger storage path.
         let storage_path = format!(".ledger-{}", (node_port as u16 - 4130) as u8);
 
+        // Initialize the status indicator.
+        let status = Status::new();
+
         // Initialize the tasks handler.
         let mut tasks = Tasks::new();
 
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
         // Initialize a new instance for managing the ledger.
-        let (ledger_reader, ledger_router) = Self::initialize_ledger(&mut tasks, &storage_path, &peers_router)?;
+        let (ledger_reader, ledger_router) = Self::initialize_ledger(&mut tasks, &storage_path, &status, &peers_router)?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_reader, &ledger_router);
@@ -92,18 +97,25 @@ impl<N: Network, E: Environment> Server<N, E> {
             format!("0.0.0.0:{}", rpc_port).parse()?,
             username,
             password,
+            &status,
             &peers,
             &ledger_reader,
             &ledger_router,
         ));
 
         Ok(Self {
+            status,
             peers,
             peers_router,
             ledger_reader,
             ledger_router,
             tasks,
         })
+    }
+
+    /// Returns the status of this node.
+    pub fn status(&self) -> Status {
+        self.status.clone()
     }
 
     ///
@@ -160,10 +172,11 @@ impl<N: Network, E: Environment> Server<N, E> {
     fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_path: &str,
+        status: &Status,
         peers_router: &PeersRouter<N, E>,
     ) -> Result<(LedgerReader<N>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
-        let ledger = Arc::new(RwLock::new(Ledger::<N, E>::open::<RocksDB, _>(storage_path)?));
+        let ledger = Arc::new(RwLock::new(Ledger::<N, E>::open::<RocksDB, _>(storage_path, status)?));
         let ledger_reader = Arc::new(RwLock::new(LedgerState::<N>::open_reader::<RocksDB, _>(storage_path)?));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.

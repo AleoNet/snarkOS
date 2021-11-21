@@ -155,14 +155,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the number of connected peers.
     ///
-    pub(crate) fn num_connected_peers(&self) -> usize {
+    pub(crate) fn number_of_connected_peers(&self) -> usize {
         self.connected_peers.len()
     }
 
     ///
     /// Returns the number of candidate peers.
     ///
-    pub(crate) fn num_candidate_peers(&self) -> usize {
+    pub(crate) fn number_of_candidate_peers(&self) -> usize {
         self.candidate_peers.len()
     }
 
@@ -180,7 +180,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
                 }
                 // Ensure the node does not surpass the maximum number of peer connections.
-                else if self.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
+                else if self.number_of_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Skipping connection request to {} (maximum peers reached)", peer_ip);
                 }
                 // Ensure the peer is a new connection.
@@ -232,11 +232,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
             }
             PeersRequest::Heartbeat(ledger_reader, ledger_router) => {
                 // Ensure the number of connected peers is below the maximum threshold.
-                if self.num_connected_peers() > E::MAXIMUM_NUMBER_OF_PEERS {
+                if self.number_of_connected_peers() > E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Exceeded maximum number of connected peers");
 
                     // Determine the peers to disconnect from.
-                    let num_excess_peers = self.num_connected_peers() - E::MAXIMUM_NUMBER_OF_PEERS;
+                    let num_excess_peers = self.number_of_connected_peers() - E::MAXIMUM_NUMBER_OF_PEERS;
                     let peer_ips_to_disconnect = self
                         .connected_peers
                         .iter()
@@ -256,7 +256,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
 
                 // Skip if the number of connected peers is above the minimum threshold.
-                match self.num_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
+                match self.number_of_connected_peers() < E::MINIMUM_NUMBER_OF_PEERS {
                     true => trace!("Sending request for more peer connections"),
                     false => return,
                 };
@@ -303,7 +303,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
                 }
                 // Ensure the node does not surpass the maximum number of peer connections.
-                else if self.num_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
+                else if self.number_of_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Dropping connection request from {} (maximum peers reached)", peer_ip);
                 }
                 // Ensure the node is not already connected to this peer.

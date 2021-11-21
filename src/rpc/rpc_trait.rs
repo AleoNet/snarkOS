@@ -48,8 +48,6 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getblocks.md")]
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError>;
 
-    // TODO (howardwu): @collin I noticed the documentation says the `block_hash` is a number, maybe call it a bech32m locator or similar.
-    //  We can talk through this one live before making the change, to ensure it is consistent with the rest of the MD docs.
     #[doc = include_str!("./documentation/public_endpoints/getblockheight.md")]
     async fn get_block_height(&self, block_hash: serde_json::Value) -> Result<u32, RpcError>;
 
@@ -80,22 +78,16 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError>;
 
+    // #[doc = include_str!("../documentation/public_endpoints/getnodestate.md")]
+    async fn get_node_state(&self) -> Result<serde_json::Value, RpcError>;
+
     #[doc = include_str!("./documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
-
-    // #[doc = include_str!("../documentation/public_endpoints/validaterawtransaction.md")]
-    // async fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError>;
-    //
-    // #[doc = include_str!("../documentation/public_endpoints/getconnectioncount.md")]
-    // async fn get_connection_count(&self) -> Result<usize, RpcError>;
 }
 
 // /// Definition of private RPC endpoints that require authentication.
 // #[async_trait::async_trait]
 // pub trait ProtectedRpcFunctions {
-//     #[doc = include_str!("../documentation/private_endpoints/createaccount.md")]
-//     async fn create_account(&self) -> Result<RpcAccount, RpcError>;
-//
 //     #[doc = include_str!("../documentation/private_endpoints/createrawtransaction.md")]
 //     async fn create_raw_transaction(
 //         &self,
@@ -118,14 +110,8 @@ pub trait RpcFunctions<N: Network> {
 //     #[doc = include_str!("../documentation/private_endpoints/getrawrecord.md")]
 //     async fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
 //
-//     #[doc = include_str!("../documentation/private_endpoints/decoderecord.md")]
-//     async fn decode_record(&self, record_bytes: String) -> Result<RecordInfo, RpcError>;
-//
 //     #[doc = include_str!("../documentation/private_endpoints/decryptrecord.md")]
 //     async fn decrypt_record(&self, decryption_input: DecryptRecordInput) -> Result<String, RpcError>;
-//
-//     #[doc = include_str!("../documentation/private_endpoints/disconnect.md")]
-//     async fn disconnect(&self, address: SocketAddr);
 //
 //     #[doc = include_str!("../documentation/private_endpoints/connect.md")]
 //     async fn connect(&self, addresses: Vec<SocketAddr>);

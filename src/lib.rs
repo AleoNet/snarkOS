@@ -30,8 +30,8 @@ pub use environment::*;
 
 pub mod helpers;
 
-pub(crate) mod network;
-pub(crate) use network::*;
+pub mod network;
+pub use network::*;
 
 pub mod node;
 pub use node::*;

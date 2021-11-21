@@ -20,5 +20,8 @@ pub use circular_map::*;
 pub(crate) mod tasks;
 pub(crate) use tasks::*;
 
+pub mod status;
+pub use status::*;
+
 pub mod updater;
 pub use updater::*;

@@ -14,7 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::CircularMap, Environment, Message, NodeType, PeersRequest, PeersRouter};
+use crate::{
+    helpers::{CircularMap, State, Status},
+    Environment,
+    Message,
+    NodeType,
+    PeersRequest,
+    PeersRouter,
+};
 use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
@@ -28,7 +35,7 @@ use std::{
     net::SocketAddr,
     path::Path,
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc,
     },
     time::{Duration, Instant},
@@ -67,27 +74,14 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     UnconfirmedTransaction(SocketAddr, Transaction<N>),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Status {
-    /// The ledger is ready to handle requests.
-    Ready = 0,
-    /// The ledger is mining the next block.
-    Mining,
-    /// The ledger is connecting to the minimum number of required peers.
-    Peering,
-    /// The ledger is syncing blocks with a connected peer.
-    Syncing,
-    /// The ledger is terminating and shutting down.
-    ShuttingDown,
-}
-
 ///
 /// A ledger for a specific network on the node server.
 ///
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
 pub struct Ledger<N: Network, E: Environment> {
+    /// The status of the node.
+    status: Status,
     /// The canonical chain of block hashes.
     canon_writer: LedgerState<N>,
     canon_reader: LedgerState<N>,
@@ -95,9 +89,6 @@ pub struct Ledger<N: Network, E: Environment> {
     unconfirmed_blocks: CircularMap<N::BlockHash, Block<N>, { MAXIMUM_UNCONFIRMED_BLOCKS }>,
     /// The pool of unconfirmed transactions.
     memory_pool: MemoryPool<N>,
-
-    /// The status of the ledger.
-    status: Arc<AtomicU8>,
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
     /// The map of each peer to their ledger state := (is_fork, latest_block_height, block_locators).
@@ -116,14 +107,13 @@ pub struct Ledger<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub fn open<S: Storage, P: AsRef<Path> + Copy>(path: P) -> Result<Self> {
+    pub fn open<S: Storage, P: AsRef<Path> + Copy>(path: P, status: &Status) -> Result<Self> {
         Ok(Self {
+            status: status.clone(),
             canon_writer: LedgerState::open_writer::<S, P>(path)?,
             canon_reader: LedgerState::open_reader::<S, P>(path)?,
             unconfirmed_blocks: Default::default(),
             memory_pool: MemoryPool::new(),
-
-            status: Arc::new(AtomicU8::new(Status::Peering as u8)),
             terminator: Arc::new(AtomicBool::new(false)),
             peers_state: Default::default(),
             block_requests: Default::default(),
@@ -132,33 +122,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             failures: Default::default(),
             _phantom: PhantomData,
         })
-    }
-
-    /// Returns the status of the ledger.
-    pub fn status(&self) -> Status {
-        match self.status.load(Ordering::SeqCst) {
-            0 => Status::Ready,
-            1 => Status::Mining,
-            2 => Status::Peering,
-            3 => Status::Syncing,
-            4 => Status::ShuttingDown,
-            _ => unreachable!("Invalid status code"),
-        }
-    }
-
-    /// Returns `true` if the ledger is currently mining.
-    pub fn is_mining(&self) -> bool {
-        self.status() == Status::Mining
-    }
-
-    /// Returns `true` if the ledger is currently peering.
-    pub fn is_peering(&self) -> bool {
-        self.status() == Status::Peering
-    }
-
-    /// Returns `true` if the ledger is currently syncing.
-    pub fn is_syncing(&self) -> bool {
-        self.status() == Status::Syncing
     }
 
     ///
@@ -225,7 +188,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     trace!("Canon chain already contains block {}", block.height());
                 } else if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
                     trace!("Memory pool already contains unconfirmed block {}", block.height());
-                } else if !(self.is_peering() || self.is_syncing()) {
+                } else if !(self.status.is_peering() || self.status.is_syncing()) {
                     // Process the unconfirmed block.
                     self.add_block(block.clone());
                     // Propagate the unconfirmed block to the connected peers.
@@ -237,7 +200,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
                 // Ensure the ledger is not peering or syncing.
-                if !(self.is_peering() || self.is_syncing()) {
+                if !(self.status.is_peering() || self.status.is_syncing()) {
                     // Process the unconfirmed transaction.
                     self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
                 }
@@ -285,7 +248,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // If the timestamp of the last block increment has surpassed the preset limit,
         // the ledger is likely syncing from invalid state, and should revert by one block.
-        if self.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
+        if self.status.is_syncing() && self.last_block_update_timestamp.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
             trace!("Ledger state has become stale, clearing queue and reverting by one block");
             self.unconfirmed_blocks = Default::default();
             self.memory_pool = MemoryPool::new();
@@ -299,10 +262,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     fn update_status(&mut self) {
         // Retrieve the status variable.
-        let mut status = self.status();
+        let mut status = self.status.get();
 
         // If the node is shutting down, skip the update.
-        if status == Status::ShuttingDown {
+        if status == State::ShuttingDown {
             trace!("Ledger is shutting down");
             // Set the terminator bit to `true` to ensure it stops mining.
             self.terminator.store(true, Ordering::SeqCst);
@@ -310,14 +273,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
         // If there is an insufficient number of connected peers, set the status to `Peering`.
         else if self.peers_state.len() < E::MINIMUM_NUMBER_OF_PEERS {
-            status = Status::Peering;
+            status = State::Peering;
         }
         // If the ledger is out of date, set the status to `Syncing`.
         else {
             // Update the status to `Ready` or `Mining`.
             status = match status {
-                Status::Mining => Status::Mining,
-                _ => Status::Ready,
+                State::Mining => State::Mining,
+                _ => State::Ready,
             };
 
             // Retrieve the latest block height of this node.
@@ -329,7 +292,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Sync if this ledger has fallen behind by 3 or more blocks.
                         if block_height - latest_block_height > 2 {
                             // Set the status to `Syncing`.
-                            status = Status::Syncing;
+                            status = State::Syncing;
                             break;
                         }
                     }
@@ -338,7 +301,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // If the node is `Peering` or `Syncing`, it should not be mining (yet).
-        if status == Status::Peering || status == Status::Syncing {
+        if status == State::Peering || status == State::Syncing {
             // Set the terminator bit to `true` to ensure it does not mine.
             self.terminator.store(true, Ordering::SeqCst);
         } else {
@@ -347,7 +310,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // Update the ledger to the determined status.
-        self.status.store(status as u8, Ordering::SeqCst);
+        self.status.update(status);
     }
 
     ///
@@ -367,9 +330,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
         // If the status is `Ready`, mine the next block.
-        if self.status() == Status::Ready {
+        if self.status.is_ready() {
             // Set the status to `Mining`.
-            self.status.store(Status::Mining as u8, Ordering::SeqCst);
+            self.status.update(State::Mining);
 
             // Prepare the unconfirmed transactions, terminator, and status.
             let canon = self.canon_reader.clone();
@@ -386,7 +349,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 .map_err(|e| e.into());
 
                 // Set the status to `Ready`.
-                status.store(Status::Ready as u8, Ordering::SeqCst);
+                status.update(State::Ready);
 
                 match result {
                     Ok(Ok(block)) => {

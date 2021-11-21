@@ -17,6 +17,7 @@
 //! Logic for instantiating the RPC server.
 
 use crate::{
+    helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
@@ -86,12 +87,13 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,
     password: String,
+    status: &Status,
     peers: &Arc<RwLock<Peers<N, E>>>,
     ledger: &LedgerReader<N>,
     ledger_router: &LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, peers.clone(), ledger.clone(), ledger_router.clone());
+    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger.clone(), ledger_router.clone());
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -293,6 +295,10 @@ async fn handle_rpc<N: Network, E: Environment>(
             let result = rpc.get_connected_peers().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
+        "getnodestate" => {
+            let result = rpc.get_node_state().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "sendtransaction" => {
             let result = rpc
                 .send_transaction(params[0].as_str().unwrap_or("").into())
@@ -300,20 +306,6 @@ async fn handle_rpc<N: Network, E: Environment>(
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
-        // "decoderawtransaction" => {
-        //     let result = rpc
-        //         .decode_raw_transaction(params[0].as_str().unwrap_or("").into())
-        //         .await
-        //         .map_err(convert_crate_err);
-        //     result_to_response(&req, result)
-        // }
-        // "validaterawtransaction" => {
-        //     let result = rpc
-        //         .validate_raw_transaction(params[0].as_str().unwrap_or("").into())
-        //         .await
-        //         .map_err(convert_crate_err);
-        //     result_to_response(&req, result)
-        // }
         // "getblocktemplate" => {
         //     let result = rpc.get_block_template().await.map_err(convert_crate_err);
         //     result_to_response(&req, result)
@@ -354,23 +346,9 @@ async fn handle_rpc<N: Network, E: Environment>(
         //         .map_err(convert_core_err);
         //     result_to_response(&req, result)
         // }
-        // "decoderecord" => {
-        //     let result = rpc
-        //         .decode_record_protected(Params::Array(params), meta)
-        //         .await
-        //         .map_err(convert_core_err);
-        //     result_to_response(&req, result)
-        // }
         // "decryptrecord" => {
         //     let result = rpc
         //         .decrypt_record_protected(Params::Array(params), meta)
-        //         .await
-        //         .map_err(convert_core_err);
-        //     result_to_response(&req, result)
-        // }
-        // "disconnect" => {
-        //     let result = rpc
-        //         .disconnect_protected(Params::Array(params), meta)
         //         .await
         //         .map_err(convert_core_err);
         //     result_to_response(&req, result)
@@ -492,7 +470,7 @@ mod tests {
         // Create a dummy mpsc channel for Ledger requests. todo (@collinc97): only get requests will work until this is changed
         let (ledger_router, _ledger_handler) = mpsc::channel(1024);
 
-        RpcImpl::<N, E>::new(credentials, peers::<N, E>(), ledger, ledger_router)
+        RpcImpl::<N, E>::new(credentials, Status::new(), peers::<N, E>(), ledger, ledger_router)
     }
 
     /// Deserializes a rpc response into the given type.
