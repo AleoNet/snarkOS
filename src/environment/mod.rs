@@ -53,7 +53,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of peer nodes to bootstrap the node server with.
     const PEER_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: [&'static str; 2] = ["127.0.0.1:4132", "127.0.0.1:4135"];
+    const SYNC_NODES: [&'static str; 3] = ["127.0.0.1:4132", "127.0.0.1:4133", "127.0.0.1:4135"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 8;
@@ -124,7 +124,7 @@ pub struct ClientTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
-    const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
+    const SYNC_NODES: [&'static str; 3] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 5;
 }
 
@@ -135,7 +135,7 @@ pub struct MinerTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
-    const SYNC_NODES: [&'static str; 2] = ["144.126.219.193:4132", "165.232.145.194:4132"];
+    const SYNC_NODES: [&'static str; 3] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 3;
     const COINBASE_IS_PUBLIC: bool = true;
 }
