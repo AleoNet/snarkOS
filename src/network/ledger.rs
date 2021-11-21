@@ -173,10 +173,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_block_requests(peers_router).await;
 
                 trace!(
-                    "Status Report (status = {}, latest_block_height = {}, number_of_block_requests = {})",
+                    "Status Report (status = {}, latest_block_height = {}, block_requests = {}, connected_peers = {})",
                     self.status,
                     self.canon_writer.latest_block_height(),
-                    self.number_of_block_requests()
+                    self.number_of_block_requests(),
+                    self.peers_state.len()
                 );
             }
             LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
