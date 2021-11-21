@@ -30,7 +30,7 @@ use chrono::Utc;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     net::SocketAddr,
     path::Path,
@@ -623,7 +623,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut maximum_block_locators = Default::default();
 
         // Determine if the peers state has any sync nodes.
-        let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
         let mut peers_contains_sync_node = false;
         for ip in self.peers_state.keys() {
             peers_contains_sync_node |= sync_nodes.contains(ip);

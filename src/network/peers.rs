@@ -261,11 +261,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     false => return,
                 };
 
-                // If the current node is not a sync node, add the sync nodes to the list of candidate peers.
-                if E::NODE_TYPE != NodeType::Sync {
-                    let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-                    self.add_candidate_peers(&sync_nodes);
-                }
+                // Add the sync nodes to the list of candidate peers.
+                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+                self.add_candidate_peers(&sync_nodes);
 
                 // Add the peer nodes to the list of candidate peers.
                 let peer_nodes: Vec<SocketAddr> = E::PEER_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
@@ -474,12 +472,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Sends the given message to every connected peer, excluding the sender.
     ///
     async fn propagate(&mut self, sender: SocketAddr, message: &Message<N, E>) {
-        // Iterate through all peers that are not the sender.
-        for peer in self.connected_peers().iter() {
-            // Ensure the sender is not this peer.
-            if peer != &sender {
-                self.send(*peer, message).await;
-            }
+        // Iterate through all peers that are not the sender, sync node, or peer node.
+        for peer in self.connected_peers().iter().filter(|peer_ip| {
+            let peer_str = peer_ip.to_string();
+            *peer_ip != &sender && !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::PEER_NODES.contains(&peer_str.as_str())
+        }) {
+            self.send(*peer, message).await;
         }
     }
 }
