@@ -171,6 +171,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.disconnect_from_failing_peers(&ledger_router).await;
                 // Update the block requests.
                 self.update_block_requests(peers_router).await;
+
+                trace!(
+                    "Status Report (status = {}, latest_block_height = {}, number_of_block_requests = {})",
+                    self.status,
+                    self.canon_writer.latest_block_height(),
+                    self.number_of_block_requests()
+                );
             }
             LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
                 // Process the request to mine the next block.
@@ -566,7 +573,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 },
             };
 
-            // trace!("STATUS {:?} {} {}", self.status(), self.latest_block_height(), self.number_of_block_requests());
             let fork_status = match is_fork {
                 Some(boolean) => format!("{}", boolean),
                 None => "undecided".to_string(),
