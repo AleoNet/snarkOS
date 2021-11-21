@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     sync::{
@@ -22,7 +23,7 @@ use std::{
     },
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum State {
     /// The ledger is ready to handle requests.
@@ -86,14 +87,7 @@ impl Status {
 
 impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0.load(Ordering::SeqCst) {
-            0 => write!(f, "Ready"),
-            1 => write!(f, "Mining"),
-            2 => write!(f, "Peering"),
-            3 => write!(f, "Syncing"),
-            4 => write!(f, "ShuttingDown"),
-            _ => unreachable!("Invalid status code"),
-        }
+        write!(f, "{:?}", self.get())
     }
 }
 
