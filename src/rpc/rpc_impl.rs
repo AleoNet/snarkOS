@@ -191,11 +191,12 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             }
         }
 
+        let read_ledger = self.ledger.read().await;
         let canon_records = records.iter().filter(|(_, rs)| {
             let canon: Vec<&Transaction<N>> = rs
                 .iter()
                 .filter(|r| {
-                    self.ledger
+                    read_ledger
                         .contains_transaction(&r.transaction_id())
                         .expect("Should be able to check if commitment exists")
                 })
