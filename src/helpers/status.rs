@@ -38,6 +38,12 @@ pub enum State {
     ShuttingDown,
 }
 
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Status(Arc<AtomicU8>);
 

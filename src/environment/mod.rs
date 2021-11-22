@@ -17,7 +17,10 @@
 use snarkvm::dpc::Network;
 
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, marker::PhantomData};
+use std::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -30,6 +33,12 @@ pub enum NodeType {
     Peer,
     /// A sync node is a discovery node, capable of syncing nodes for the network.
     Sync,
+}
+
+impl fmt::Display for NodeType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[rustfmt::skip]

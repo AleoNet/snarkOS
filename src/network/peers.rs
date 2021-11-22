@@ -860,7 +860,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 },
                                 Message::Pong(is_fork, block_locators) => {
                                     // Route the `Pong` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, is_fork, block_locators)).await {
+                                    let request = LedgerRequest::Pong(peer_ip, peer.node_type, peer.status, is_fork, block_locators);
+                                    if let Err(error) = ledger_router.send(request).await {
                                         warn!("[Pong] {}", error);
                                     }
                                     // Spawn an asynchronous task for the `Ping` request.
