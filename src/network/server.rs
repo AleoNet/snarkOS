@@ -285,8 +285,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         if E::NODE_TYPE == NodeType::Miner {
             if let Some(recipient) = miner {
                 // TODO: add data_path as a constant string when #20 is merged.
-                let wallet =
-                    Wallet::new(recipient.to_string(), ".aleo".to_string(), false).expect("Should be able to open wallet database");
+                let wallet = Wallet::new(&recipient.to_string(), &".aleo", false).expect("Should be able to open wallet database");
                 let ledger_router = ledger_router.clone();
                 tasks.append(task::spawn(async move {
                     loop {

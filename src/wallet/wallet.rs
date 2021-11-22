@@ -41,25 +41,19 @@ pub struct Wallet<N: Network> {
 
 impl<N: Network> Wallet<N> {
     /// Creates a new [`Wallet`].
-    pub fn new(address: String, data_path: String, read_only: bool) -> Result<Self> {
+    pub fn new(address: &str, data_path: &str, read_only: bool) -> Result<Self> {
         let path = PathBuf::from(format!("{}/{}/", data_path, address));
 
         Ok(Self {
-            address: address.clone(),
-            data_path,
+            address: address.to_string(),
+            data_path: data_path.to_string(),
             db: RocksDB::open(path, 0, read_only)?.open_map(&address)?,
         })
     }
 
     /// Fetch all records from the database.
     pub fn records(&self) -> Result<Vec<Transaction<N>>> {
-        let mut records = vec![];
-
-        for record in self.db.values() {
-            records.push(record);
-        }
-
-        Ok(records)
+        Ok(self.db.values().collect())
     }
 
     /// Push a record to the database.

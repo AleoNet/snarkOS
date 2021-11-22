@@ -184,7 +184,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
                 .into_string()
                 .expect("Should be able to convert OsString into String");
             if path.is_dir() && Address::<N>::from_str(&name).is_ok() {
-                let wallet = Wallet::<N>::new(name.clone(), data_path.to_string(), true)?;
+                let wallet = Wallet::<N>::new(&name, &data_path, true)?;
                 let records_for_address = wallet.records()?;
                 num_records += records_for_address.len();
                 records.insert(name, records_for_address);
