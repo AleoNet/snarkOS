@@ -103,6 +103,7 @@ features = [
     "macros",
     "net",
     "rt-multi-thread",
+    "signal",
     "sync",
     "time"
 ]

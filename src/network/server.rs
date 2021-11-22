@@ -29,6 +29,7 @@ use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
+    signal,
     sync::{mpsc, RwLock},
     task,
 };
@@ -102,6 +103,9 @@ impl<N: Network, E: Environment> Server<N, E> {
             &ledger_reader,
             &ledger_router,
         ));
+
+        // Initialize the shutdown handler.
+        Self::initialize_shutdown_handler(&tasks);
 
         Ok(Self {
             status,
@@ -299,5 +303,23 @@ impl<N: Network, E: Environment> Server<N, E> {
                 error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
         }
+    }
+
+    ///
+    /// Initialize shutdown handler.
+    ///
+    #[inline]
+    fn initialize_shutdown_handler(tasks: &Tasks<task::JoinHandle<()>>) {
+        let tasks_clone = tasks.clone();
+
+        // TODO (raychu86): Ensure all running tasks are completed.
+        task::spawn(async move {
+            signal::ctrl_c().await.unwrap();
+            info!("Shutting down...");
+
+            tasks_clone.flush();
+
+            std::process::exit(0x0100);
+        });
     }
 }
