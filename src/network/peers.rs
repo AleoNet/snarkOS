@@ -916,8 +916,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
                                     let is_fresh_state = block.height() + 3 > ledger_reader.read().await.latest_block_height();
 
-                                    // Ensure the node is not peering or syncing.
-                                    let is_node_ready = !(local_status.is_peering() || local_status.is_syncing());
+                                    // Ensure the node is not peering.
+                                    let is_node_ready = !local_status.is_peering();
 
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
                                     if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_fresh_state || !is_node_ready {
@@ -948,8 +948,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the timestamp for the received transaction.
                                     peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
 
-                                    // Ensure the node is not peering or syncing.
-                                    let is_node_ready = !(local_status.is_peering() || local_status.is_syncing());
+                                    // Ensure the node is not peering.
+                                    let is_node_ready = !local_status.is_peering();
 
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
                                     if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
