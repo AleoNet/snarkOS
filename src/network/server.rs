@@ -177,7 +177,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance for managing the ledger.
     ///
     #[inline]
-    #[allow(clippy::type_complexity)]
     fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_path: &str,

@@ -299,7 +299,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
-                self.propagate(self.local_ip, &Message::PeerRequest).await;
+                for peer_ip in self.connected_peers().iter().choose_multiple(&mut OsRng::default(), 1) {
+                    self.send(*peer_ip, &Message::PeerRequest).await;
+                }
             }
             PeersRequest::MessagePropagate(sender, message) => {
                 self.propagate(sender, &message).await;
@@ -700,6 +702,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
+    #[allow(clippy::type_complexity)]
     async fn handler<'a, T: Iterator<Item = &'a u64> + Send>(
         stream: TcpStream,
         local_ip: SocketAddr,
