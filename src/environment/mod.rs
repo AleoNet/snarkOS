@@ -61,7 +61,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 2;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 15;
+    const PING_SLEEP_IN_SECS: u64 = 20;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
@@ -82,7 +82,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 50;
     /// The maximum number of blocks that a fork can be.
-    const MAXIMUM_FORK_DEPTH: u32 = 8192;
+    const MAXIMUM_FORK_DEPTH: u32 = 4096;
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 2400;
 }
