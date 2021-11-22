@@ -711,36 +711,47 @@ impl<N: Network> LedgerState<N> {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
-        // Initialize a list of the removed blocks.
-        let mut blocks = Vec::with_capacity(number_of_blocks as usize);
-        {
-            // Acquire the write lock on the latest block.
-            let mut latest_block = self.latest_block.write();
+        // Fetch the blocks to be removed. This ensures the blocks to be removed exist in the ledger,
+        // and is used during the removal process to expedite the procedure.
+        let start_block_height = latest_block_height.saturating_sub(number_of_blocks);
+        let blocks: BTreeMap<u32, Block<N>> = self
+            .get_blocks(start_block_height, latest_block_height)?
+            .iter()
+            .map(|block| (block.height(), block.clone()))
+            .collect();
 
-            while latest_block.height() > block_height {
-                // Update the internal state of the ledger, except for the ledger tree.
-                self.blocks.remove_block(latest_block.height())?;
-                self.ledger_roots.remove(&latest_block.previous_ledger_root())?;
-
-                // Append this block to the final output.
-                blocks.push(latest_block.clone());
-
-                *latest_block = match latest_block.height() == 0 {
-                    true => N::genesis_block().clone(),
-                    false => self.get_block(latest_block.height().saturating_sub(1))?,
-                };
+        // Process the block removals.
+        let mut current_block_height = latest_block_height;
+        let mut current_block = blocks.get(&current_block_height);
+        while current_block_height > block_height {
+            match current_block {
+                Some(block) => {
+                    // Update the internal storage state of the ledger.
+                    self.blocks.remove_block(current_block_height)?;
+                    self.ledger_roots.remove(&block.previous_ledger_root())?;
+                    // Decrement the current block height, and update the current block.
+                    current_block_height = current_block_height.saturating_sub(1);
+                    current_block = blocks.get(&current_block_height);
+                }
+                None => match self.try_fixing_inconsistent_state() {
+                    Ok(block_height) => {
+                        current_block_height = block_height;
+                        break;
+                    }
+                    Err(error) => return Err(error),
+                },
             }
         }
 
+        // Update the latest block.
+        *self.latest_block.write() = self.get_block(current_block_height)?;
         // Regenerate the latest ledger state.
         self.regenerate_latest_ledger_state()?;
         // Regenerate the ledger tree.
         self.regenerate_ledger_tree()?;
 
-        // Reverse the order of the blocks, so they are in increasing order (i.e. 1, 2, 3...).
-        blocks.reverse();
-        // Return the removed blocks.
-        Ok(blocks)
+        // Return the removed blocks, in increasing order (i.e. 1, 2, 3...).
+        Ok(blocks.values().skip(1).cloned().collect())
     }
 
     ///
