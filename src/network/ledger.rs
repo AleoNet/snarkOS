@@ -583,7 +583,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             };
             debug!(
                 "Peer {} is at block {} (type = {}, status = {}, is_fork = {}, common_ancestor = {})",
-                peer_ip, node_type, status, latest_block_height_of_peer, fork_status, common_ancestor,
+                peer_ip, latest_block_height_of_peer, node_type, status, fork_status, common_ancestor,
             );
 
             match self.peers_state.get_mut(&peer_ip) {
