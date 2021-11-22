@@ -62,7 +62,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of peer nodes to bootstrap the node server with.
     const PEER_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: [&'static str; 3] = ["127.0.0.1:4132", "127.0.0.1:4133", "127.0.0.1:4135"];
+    const SYNC_NODES: [&'static str; 5] = ["127.0.0.1:4132", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 8;
@@ -124,7 +124,7 @@ pub struct SyncNode<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
-    const SYNC_NODES: [&'static str; 3] = ["159.223.117.248:4132", "206.189.97.241:4132", "128.199.11.231:4132"];
+    const SYNC_NODES: [&'static str; 5] = ["159.223.117.248:4132", "206.189.97.241:4132", "128.199.11.231:4132", "137.184.107.141:4132", "188.166.80.131:4132"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 7;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 128;
 }
@@ -136,7 +136,7 @@ pub struct ClientTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
-    const SYNC_NODES: [&'static str; 3] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132"];
+    const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 7;
 }
 
@@ -147,7 +147,7 @@ pub struct MinerTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
-    const SYNC_NODES: [&'static str; 3] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132"];
+    const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 7;
     const COINBASE_IS_PUBLIC: bool = true;
 }
