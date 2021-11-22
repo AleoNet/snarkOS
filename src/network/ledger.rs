@@ -235,14 +235,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // If the block is on a fork, remove the unconfirmed block, and break the loop.
             if is_forked_block {
-                self.unconfirmed_blocks.remove(&block.hash());
+                self.unconfirmed_blocks.remove(&block.previous_block_hash());
                 break;
             }
             // Attempt to add the unconfirmed block.
             else {
                 match self.add_block(block.clone()) {
                     // Upon success, remove the unconfirmed block, as it is now confirmed.
-                    true => self.unconfirmed_blocks.remove(&block.hash()),
+                    true => self.unconfirmed_blocks.remove(&block.previous_block_hash()),
                     false => break,
                 }
             }
@@ -397,8 +397,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // On success, filter the memory pool of its transactions, if they exist.
                     self.memory_pool.remove_transactions(block.transactions());
                     // On success, filter the unconfirmed blocks of this block, if it exists.
-                    if self.unconfirmed_blocks.contains_key(&block.hash()) {
-                        self.unconfirmed_blocks.remove(&block.hash());
+                    if self.unconfirmed_blocks.contains_key(&block.previous_block_hash()) {
+                        self.unconfirmed_blocks.remove(&block.previous_block_hash());
                     }
 
                     return true;
@@ -457,8 +457,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                 // Ensure the removed blocks are not in the unconfirmed blocks.
                 for removed_block in removed_blocks {
-                    if self.unconfirmed_blocks.contains_key(&removed_block.hash()) {
-                        self.unconfirmed_blocks.remove(&removed_block.hash());
+                    if self.unconfirmed_blocks.contains_key(&removed_block.previous_block_hash()) {
+                        self.unconfirmed_blocks.remove(&removed_block.previous_block_hash());
                     }
                 }
                 true
