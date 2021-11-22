@@ -189,7 +189,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_peer(peer_ip, is_fork, block_locators).await;
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
-                // Ensure the ledger is not peering or syncing.
+                // Ensure the node is not peering or syncing.
                 if !(self.status.is_peering() || self.status.is_syncing()) {
                     // Process the unconfirmed block.
                     self.add_block(block.clone());
@@ -201,7 +201,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
-                // Ensure the ledger is not peering or syncing.
+                // Ensure the node is not peering or syncing.
                 if !(self.status.is_peering() || self.status.is_syncing()) {
                     // Process the unconfirmed transaction.
                     self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await

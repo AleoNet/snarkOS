@@ -895,17 +895,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     // Retrieve the last seen timestamp of the received block.
                                     let last_seen = peer.seen_inbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
-                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+                                    let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the received block.
                                     peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
 
                                     // Ensure the unconfirmed block is at least within 3 blocks of the latest block height.
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
-                                    let is_fresh = block.height() + 3 > ledger_reader.read().await.latest_block_height();
+                                    let is_fresh_state = block.height() + 3 > ledger_reader.read().await.latest_block_height();
+
+                                    // Ensure the node is not peering or syncing.
+                                    let is_node_ready = !(local_status.is_peering() || local_status.is_syncing());
 
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route || !is_fresh {
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_fresh_state || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
                                     } else {
                                         // Route the `UnconfirmedBlock` to the ledger.
@@ -928,13 +931,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     // Retrieve the last seen timestamp of the received transaction.
                                     let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
-                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+                                    let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the received transaction.
                                     peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
 
+                                    // Ensure the node is not peering or syncing.
+                                    let is_node_ready = !(local_status.is_peering() || local_status.is_syncing());
+
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route {
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
                                     } else {
                                         // Route the `UnconfirmedTransaction` to the ledger.
