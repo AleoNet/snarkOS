@@ -80,7 +80,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize;
     /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 9;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 11;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
     const MAXIMUM_CONNECTION_FAILURES: u32 = 5;
     /// The maximum number of candidate peers permitted to be stored in the node.
@@ -125,7 +125,7 @@ impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
     const SYNC_NODES: [&'static str; 5] = ["159.223.117.248:4132", "206.189.97.241:4132", "128.199.11.231:4132", "137.184.107.141:4132", "188.166.80.131:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 7;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 11;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 128;
 }
 
