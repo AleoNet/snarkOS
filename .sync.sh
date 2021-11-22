@@ -19,7 +19,7 @@ do
   git pull
 
   cargo clean
-  $COMMAND & sleep 1800; kill $!
+  $COMMAND & sleep 3600; kill $!
 
   sleep 2;
 done
