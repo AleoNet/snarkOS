@@ -192,18 +192,23 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         }
 
         let read_ledger = self.ledger.read().await;
-        let canon_records = records.iter().filter(|(_, rs)| {
-            let canon: Vec<&Transaction<N>> = rs
-                .iter()
-                .filter(|r| {
-                    read_ledger
-                        .contains_transaction(&r.transaction_id())
-                        .expect("Should be able to check if commitment exists")
-                })
-                .collect();
-            !canon.is_empty()
-        });
-        Ok(serde_json::json!({"num_records": num_records, "records": records}))
+        let canon_records: Vec<&Transaction<N>> = records
+            .iter()
+            .filter(|(_, rs)| {
+                let canon: Vec<&Transaction<N>> = rs
+                    .iter()
+                    .filter(|r| {
+                        read_ledger
+                            .contains_transaction(&r.transaction_id())
+                            .expect("Should be able to check if commitment exists")
+                    })
+                    .collect();
+                !canon.is_empty()
+            })
+            .map(|(_, rs)| rs)
+            .flatten()
+            .collect();
+        Ok(serde_json::json!({"canon_blocks_mined": canon_records.len(), "total_blocks_mined": num_records}))
     }
 
     /// Returns the transactions from the block of the given block height.
