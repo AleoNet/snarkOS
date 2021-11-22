@@ -115,6 +115,7 @@ pub struct SyncNode<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
+    const SYNC_NODES: [&'static str; 3] = ["159.223.117.248:4132", "206.189.97.241:4132", "128.199.11.231:4132"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 5;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 128;
 }
