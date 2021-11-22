@@ -848,10 +848,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     let ledger_reader = ledger_reader.read().await;
                                     let is_fork = match ledger_reader.get_block_hash(block_height) {
                                         Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
-                                        Err(error) => {
-                                            trace!("is_fork error: {}", error);
-                                            None
-                                        },
+                                        Err(error) => None,
                                     };
                                     // Send a `Pong` message to the peer.
                                     if let Err(error) = peer.send(Message::Pong(is_fork, ledger_reader.latest_block_locators())).await {
