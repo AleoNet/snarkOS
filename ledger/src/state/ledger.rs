@@ -126,51 +126,10 @@ impl<N: Network> LedgerState<N> {
         let latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
             (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
                 true => latest_block_height_0,
-                false => {
-                    // Attempt to resolve the inconsistent state.
-                    if latest_block_height_0 > latest_block_height_1 {
-                        debug!("Attempting to automatically resolve inconsistent ledger state");
-                        // Set the starting block height as the height of the ledger roots block height.
-                        let mut current_block_height = latest_block_height_0;
-
-                        // Decrement down to the block height stored in the block heights map.
-                        while current_block_height > latest_block_height_1 {
-                            // Find the corresponding ledger root that was not removed.
-                            let mut candidate_ledger_root = None;
-                            // Attempt to find the previous ledger root corresponding to the current block height.
-                            for (previous_ledger_root, block_height) in ledger.ledger_roots.iter() {
-                                // If found, set the previous ledger root, and break.
-                                if block_height == current_block_height {
-                                    candidate_ledger_root = Some(previous_ledger_root);
-                                    break;
-                                }
-                            }
-
-                            // Update the internal state of the ledger roots, if a candidate was found.
-                            if let Some(previous_ledger_root) = candidate_ledger_root {
-                                ledger.ledger_roots.remove(&previous_ledger_root)?;
-                                current_block_height = current_block_height.saturating_sub(1);
-                            } else {
-                                return Err(anyhow!(
-                                    "Loaded a ledger with inconsistent state ({} != {}) (failed to automatically resolve)",
-                                    current_block_height,
-                                    latest_block_height_1
-                                ));
-                            }
-                        }
-
-                        // If this is reached, the inconsistency was automatically resolved,
-                        // proceed to return the new block height and continue on.
-                        debug!("Successfully resolved inconsistent ledger state");
-                        current_block_height
-                    } else {
-                        return Err(anyhow!(
-                            "Loaded a ledger with inconsistent state ({} != {}) (unable to automatically resolve)",
-                            latest_block_height_0,
-                            latest_block_height_1
-                        ));
-                    }
-                }
+                false => match ledger.try_fixing_inconsistent_state() {
+                    Ok(current_block_height) => current_block_height,
+                    Err(error) => return Err(error),
+                },
             },
             (None, None) => 0u32,
             _ => return Err(anyhow!("Ledger storage state is inconsistent")),
@@ -956,6 +915,68 @@ impl<N: Network> LedgerState<N> {
                 thread::sleep(std::time::Duration::from_secs(6));
             }
         });
+    }
+
+    /// Attempts to automatically resolve inconsistent ledger state.
+    fn try_fixing_inconsistent_state(&self) -> Result<u32> {
+        // If the storage is *not* in read-only mode, this method cannot be called.
+        if !self.is_read_only() {
+            return Err(anyhow!("Ledger must be writable in order to fix inconsistent state"));
+        }
+
+        // Determine the latest block height.
+        match (self.ledger_roots.values().max(), self.blocks.block_heights.keys().max()) {
+            (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
+                true => Ok(latest_block_height_0),
+                false => {
+                    // Attempt to resolve the inconsistent state.
+                    if latest_block_height_0 > latest_block_height_1 {
+                        debug!("Attempting to automatically resolve inconsistent ledger state");
+                        // Set the starting block height as the height of the ledger roots block height.
+                        let mut current_block_height = latest_block_height_0;
+
+                        // Decrement down to the block height stored in the block heights map.
+                        while current_block_height > latest_block_height_1 {
+                            // Find the corresponding ledger root that was not removed.
+                            let mut candidate_ledger_root = None;
+                            // Attempt to find the previous ledger root corresponding to the current block height.
+                            for (previous_ledger_root, block_height) in self.ledger_roots.iter() {
+                                // If found, set the previous ledger root, and break.
+                                if block_height == current_block_height {
+                                    candidate_ledger_root = Some(previous_ledger_root);
+                                    break;
+                                }
+                            }
+
+                            // Update the internal state of the ledger roots, if a candidate was found.
+                            if let Some(previous_ledger_root) = candidate_ledger_root {
+                                self.ledger_roots.remove(&previous_ledger_root)?;
+                                current_block_height = current_block_height.saturating_sub(1);
+                            } else {
+                                return Err(anyhow!(
+                                    "Loaded a ledger with inconsistent state ({} != {}) (failed to automatically resolve)",
+                                    current_block_height,
+                                    latest_block_height_1
+                                ));
+                            }
+                        }
+
+                        // If this is reached, the inconsistency was automatically resolved,
+                        // proceed to return the new block height and continue on.
+                        debug!("Successfully resolved inconsistent ledger state");
+                        Ok(current_block_height)
+                    } else {
+                        Err(anyhow!(
+                            "Loaded a ledger with inconsistent state ({} != {}) (unable to automatically resolve)",
+                            latest_block_height_0,
+                            latest_block_height_1
+                        ))
+                    }
+                }
+            },
+            (None, None) => Ok(0u32),
+            _ => Err(anyhow!("Ledger storage state is inconsistent")),
+        }
     }
 }
 
