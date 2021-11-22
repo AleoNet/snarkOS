@@ -389,13 +389,21 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Add an entry for this `Peer` in the candidate peers.
                 self.candidate_peers.insert(peer_ip);
 
-                // Clear the peer's seen blocks/transactions.
+                // Remove an entry for this `Peer` from the seen blocks.
                 self.seen_outbound_blocks.remove(&peer_ip);
+                // Remove an entry for this `Peer` from the seen transactions.
                 self.seen_outbound_transactions.remove(&peer_ip);
             }
             PeersRequest::PeerRestricted(peer_ip) => {
+                // Remove an entry for this `Peer` in the connected peers, if it exists.
+                self.connected_peers.remove(&peer_ip);
                 // Add an entry for this `Peer` in the restricted peers.
                 self.restricted_peers.insert(peer_ip, Instant::now());
+
+                // Remove an entry for this `Peer` from the seen blocks.
+                self.seen_outbound_blocks.remove(&peer_ip);
+                // Remove an entry for this `Peer` from the seen transactions.
+                self.seen_outbound_transactions.remove(&peer_ip);
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
