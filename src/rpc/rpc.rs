@@ -448,7 +448,7 @@ mod tests {
 
     /// Initializes a new instance of the `Peers` struct.
     fn peers<N: Network, E: Environment>() -> Arc<RwLock<Peers<N, E>>> {
-        Arc::new(RwLock::new(Peers::new("0.0.0.0:4130".parse().unwrap(), None)))
+        Arc::new(RwLock::new(Peers::new("0.0.0.0:4130".parse().unwrap(), None, Status::new())))
     }
 
     /// Initializes a new instance of the ledger state.

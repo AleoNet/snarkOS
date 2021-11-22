@@ -14,7 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType};
+use crate::{
+    helpers::{State, Status},
+    Environment,
+    LedgerReader,
+    LedgerRequest,
+    LedgerRouter,
+    Message,
+    NodeType,
+};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -75,6 +83,8 @@ pub struct Peers<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The local nonce for this node session.
     local_nonce: u64,
+    /// The local status of this node.
+    local_status: Status,
     /// The map connected peer IPs to their nonce and outbound message router.
     connected_peers: HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>,
     /// The set of candidate peer IPs.
@@ -95,7 +105,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers`.
     ///
-    pub(crate) fn new(local_ip: SocketAddr, local_nonce: Option<u64>) -> Self {
+    pub(crate) fn new(local_ip: SocketAddr, local_nonce: Option<u64>, local_status: Status) -> Self {
         let local_nonce = match local_nonce {
             Some(nonce) => nonce,
             None => thread_rng().gen(),
@@ -104,6 +114,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
         Self {
             local_ip,
             local_nonce,
+            local_status,
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
@@ -210,6 +221,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         stream,
                                         self.local_ip,
                                         self.local_nonce,
+                                        self.local_status.clone(),
                                         peers_router,
                                         ledger_reader,
                                         ledger_router,
@@ -287,7 +299,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
-                self.propagate(self.local_ip, &Message::PeerRequest).await;
+                for peer_ip in self.connected_peers().iter().choose_multiple(&mut OsRng::default(), 1) {
+                    self.send(*peer_ip, &Message::PeerRequest).await;
+                }
             }
             PeersRequest::MessagePropagate(sender, message) => {
                 self.propagate(sender, &message).await;
@@ -353,6 +367,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             stream,
                             self.local_ip,
                             self.local_nonce,
+                            self.local_status.clone(),
                             peers_router,
                             ledger_reader,
                             ledger_router,
@@ -500,6 +515,8 @@ struct Peer<N: Network, E: Environment> {
     version: u32,
     /// The node type of the peer.
     node_type: NodeType,
+    /// The node type of the peer.
+    status: State,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -519,6 +536,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         stream: TcpStream,
         local_ip: SocketAddr,
         local_nonce: u64,
+        local_status: &Status,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
         connected_nonces: &[u64],
@@ -537,7 +555,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
             let latest_block_hash = ledger_reader.latest_block_hash();
 
             // Send a `Ping` request to the peer.
-            let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, latest_block_height, latest_block_hash);
+            let message = Message::Ping(
+                E::MESSAGE_VERSION,
+                E::NODE_TYPE,
+                local_status.get(),
+                latest_block_height,
+                latest_block_hash,
+            );
             trace!("Sending '{}' to {}", message.name(), peer_ip);
             outbound_socket.send(message).await?;
         }
@@ -554,6 +578,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             listener_ip: peer_ip,
             version: 0,
             node_type: NodeType::Client,
+            status: State::Peering,
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -677,10 +702,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
+    #[allow(clippy::too_many_arguments)]
     async fn handler<'a, T: Iterator<Item = &'a u64> + Send>(
         stream: TcpStream,
         local_ip: SocketAddr,
         local_nonce: u64,
+        local_status: Status,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N, E>,
@@ -690,7 +717,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let peers_router = peers_router.clone();
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, local_nonce, &peers_router, &ledger_reader, &connected_nonces).await {
+            let mut peer = match Peer::new(
+                stream,
+                local_ip,
+                local_nonce,
+                &local_status,
+                &peers_router,
+                &ledger_reader,
+                &connected_nonces,
+            )
+            .await
+            {
                 Ok(peer) => peer,
                 Err(error) => {
                     trace!("{}", error);
@@ -797,7 +834,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version, node_type, block_height, block_hash) => {
+                                Message::Ping(version, node_type, status, block_height, block_hash) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
@@ -807,6 +844,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.version = version;
                                     // Update the node type of the peer.
                                     peer.node_type = node_type;
+                                    // Update the status of the peer.
+                                    peer.status = status;
 
                                     // Determine if the peer is on a fork (or unknown).
                                     let ledger_reader = ledger_reader.read().await;
@@ -821,12 +860,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 },
                                 Message::Pong(is_fork, block_locators) => {
                                     // Route the `Pong` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, is_fork, block_locators)).await {
+                                    let request = LedgerRequest::Pong(peer_ip, peer.node_type, peer.status, is_fork, block_locators);
+                                    if let Err(error) = ledger_router.send(request).await {
                                         warn!("[Pong] {}", error);
                                     }
                                     // Spawn an asynchronous task for the `Ping` request.
-                                    let ledger_reader = ledger_reader.clone();
+                                    let local_status = local_status.clone();
                                     let peers_router = peers_router.clone();
+                                    let ledger_reader = ledger_reader.clone();
                                     task::spawn(async move {
                                         // Sleep for the preset time before sending a `Ping` request.
                                         tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
@@ -837,7 +878,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_hash = ledger_reader.latest_block_hash();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, latest_block_height, latest_block_hash);
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_height, latest_block_hash);
                                         let request = PeersRequest::MessageSend(peer_ip, message);
                                         if let Err(error) = peers_router.send(request).await {
                                             warn!("[Ping] {}", error);
@@ -858,17 +899,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     // Retrieve the last seen timestamp of the received block.
                                     let last_seen = peer.seen_inbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
-                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+                                    let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the received block.
                                     peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
 
                                     // Ensure the unconfirmed block is at least within 3 blocks of the latest block height.
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
-                                    let is_fresh = block.height() + 3 > ledger_reader.read().await.latest_block_height();
+                                    let is_fresh_state = block.height() + 3 > ledger_reader.read().await.latest_block_height();
+
+                                    // Ensure the node is not peering or syncing.
+                                    let is_node_ready = !(local_status.is_peering() || local_status.is_syncing());
 
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route || !is_fresh {
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_fresh_state || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
                                     } else {
                                         // Route the `UnconfirmedBlock` to the ledger.
@@ -891,13 +935,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     // Retrieve the last seen timestamp of the received transaction.
                                     let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
-                                    let is_ready_to_route = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+                                    let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the received transaction.
                                     peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
 
+                                    // Ensure the node is not peering or syncing.
+                                    let is_node_ready = !(local_status.is_peering() || local_status.is_syncing());
+
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_ready_to_route {
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
                                     } else {
                                         // Route the `UnconfirmedTransaction` to the ledger.

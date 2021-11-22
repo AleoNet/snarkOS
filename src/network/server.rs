@@ -81,7 +81,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let mut tasks = Tasks::new();
 
         // Initialize a new instance for managing peers.
-        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip);
+        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone());
         // Initialize a new instance for managing the ledger.
         let (ledger_reader, ledger_router) = Self::initialize_ledger(&mut tasks, &storage_path, &status, &peers_router)?;
 
@@ -142,9 +142,13 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     #[allow(clippy::type_complexity)]
-    fn initialize_peers(tasks: &mut Tasks<task::JoinHandle<()>>, local_ip: SocketAddr) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
+    fn initialize_peers(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        local_ip: SocketAddr,
+        local_status: Status,
+    ) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
-        let peers = Arc::new(RwLock::new(Peers::new(local_ip, None)));
+        let peers = Arc::new(RwLock::new(Peers::new(local_ip, None, local_status)));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
@@ -173,7 +177,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance for managing the ledger.
     ///
     #[inline]
-    #[allow(clippy::type_complexity)]
     fn initialize_ledger(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_path: &str,

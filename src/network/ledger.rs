@@ -66,8 +66,8 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Heartbeat(LedgerRouter<N, E>),
     /// Mine := (local_ip, miner_address, ledger_router)
     Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
-    /// Pong := (peer_ip, is_fork, block_locators)
-    Pong(SocketAddr, Option<bool>, BlockLocators<N>),
+    /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
+    Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
     /// UnconfirmedBlock := (peer_ip, block)
     UnconfirmedBlock(SocketAddr, Block<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
@@ -90,8 +90,8 @@ pub struct Ledger<N: Network, E: Environment> {
     memory_pool: MemoryPool<N>,
     /// A terminator bit for the miner.
     terminator: Arc<AtomicBool>,
-    /// The map of each peer to their ledger state := (is_fork, latest_block_height, block_locators).
-    peers_state: HashMap<SocketAddr, Option<(Option<bool>, u32, BlockLocators<N>)>>,
+    /// The map of each peer to their ledger state := (node_type, status, is_fork, latest_block_height, block_locators).
+    peers_state: HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>,
     /// The map of each peer to their block requests := HashMap<(block_height, block_hash), timestamp>
     block_requests: HashMap<SocketAddr, HashMap<(u32, Option<N::BlockHash>), i64>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
@@ -182,14 +182,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Process the request to mine the next block.
                 self.mine_next_block(local_ip, recipient, ledger_router).await;
             }
-            LedgerRequest::Pong(peer_ip, is_fork, block_locators) => {
+            LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip);
                 // Process the pong.
-                self.update_peer(peer_ip, is_fork, block_locators).await;
+                self.update_peer(peer_ip, node_type, status, is_fork, block_locators).await;
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
-                // Ensure the ledger is not peering or syncing.
+                // Ensure the node is not peering or syncing.
                 if !(self.status.is_peering() || self.status.is_syncing()) {
                     // Process the unconfirmed block.
                     self.add_block(block.clone());
@@ -201,7 +201,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
             LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
-                // Ensure the ledger is not peering or syncing.
+                // Ensure the node is not peering or syncing.
                 if !(self.status.is_peering() || self.status.is_syncing()) {
                     // Process the unconfirmed transaction.
                     self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
@@ -291,8 +291,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Retrieve the latest block height of this node.
             let latest_block_height = self.canon.latest_block_height();
             // Iterate through the connected peers, to determine if the ledger state is out of date.
-            for (_, ledger_state) in self.peers_state.iter() {
-                if let Some((_, block_height, _)) = ledger_state {
+            for (_, peer_state) in self.peers_state.iter() {
+                if let Some((_, _, _, block_height, _)) = peer_state {
                     if *block_height > latest_block_height {
                         // Sync if this ledger has fallen behind by 3 or more blocks.
                         if block_height - latest_block_height > 2 {
@@ -503,7 +503,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Updates the state of the given peer.
     ///
-    async fn update_peer(&mut self, peer_ip: SocketAddr, is_fork: Option<bool>, block_locators: BlockLocators<N>) {
+    async fn update_peer(
+        &mut self,
+        peer_ip: SocketAddr,
+        node_type: NodeType,
+        status: State,
+        is_fork: Option<bool>,
+        block_locators: BlockLocators<N>,
+    ) {
         // Ensure the list of block locators is not empty.
         if block_locators.is_empty() {
             self.add_failure(peer_ip, "Received a sync response with no block locators".to_string());
@@ -559,17 +566,28 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 },
             };
 
+            // If the given fork status is None, check if it can be updated.
+            let is_fork = match is_fork {
+                Some(is_fork) => Some(is_fork),
+                None => match common_ancestor == self.canon.latest_block_height() {
+                    // If the common ancestor matches the latest block height of this node,
+                    // the peer is likely on the same canonical chain as this node.
+                    true => Some(false),
+                    false => None,
+                },
+            };
+
             let fork_status = match is_fork {
                 Some(boolean) => format!("{}", boolean),
                 None => "undecided".to_string(),
             };
             debug!(
-                "Peer {} is at block {} (is_fork = {}, common_ancestor = {})",
-                peer_ip, latest_block_height_of_peer, fork_status, common_ancestor,
+                "Peer {} is at block {} (type = {}, status = {}, is_fork = {}, common_ancestor = {})",
+                peer_ip, latest_block_height_of_peer, node_type, status, fork_status, common_ancestor,
             );
 
             match self.peers_state.get_mut(&peer_ip) {
-                Some(status) => *status = Some((is_fork, latest_block_height_of_peer, block_locators)),
+                Some(peer_state) => *peer_state = Some((node_type, status, is_fork, latest_block_height_of_peer, block_locators)),
                 None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)),
             };
         }
@@ -622,10 +640,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // Check if any of the peers are ahead and have a larger block height.
-        for (peer_ip, ledger_state) in self.peers_state.iter() {
+        for (peer_ip, peer_state) in self.peers_state.iter() {
             // Only update the maximal peer if there are no sync nodes or the peer is a sync node.
             if !peers_contains_sync_node || sync_nodes.contains(peer_ip) {
-                if let Some((is_fork, block_height, block_locators)) = ledger_state {
+                if let Some((_, _, is_fork, block_height, block_locators)) = peer_state {
                     // Update the maximal peer state if the peer is ahead and the peer knows if you are a fork or not.
                     // This accounts for (Case 1 and Case 2(a))
                     if *block_height > maximum_block_height && is_fork.is_some() {
