@@ -702,7 +702,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
-    #[allow(clippy::type_complexity)]
+    #[allow(clippy::too_many_arguments)]
     async fn handler<'a, T: Iterator<Item = &'a u64> + Send>(
         stream: TcpStream,
         local_ip: SocketAddr,
