@@ -509,24 +509,27 @@ impl<N: Network> LedgerState<N> {
         // Check that the remaining block hashes are formed correctly (power of two).
         if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
             // Iterate through all the quadratic ranged block locators excluding the genesis locator.
-            let mut _previous_block_height = u32::MAX;
-            for (_block_height, (_block_hash, block_header)) in block_locators
+            let mut previous_block_height = u32::MAX;
+            let mut accumulator = 1;
+
+            for (block_height, (_block_hash, block_header)) in block_locators
                 .iter()
                 .rev()
                 .skip(num_linear_block_headers + 1)
                 .take(num_quadratic_block_headers - 1)
             {
-                // // Check that the block heights decrement by a power of two.
-                // if previous_block_height != u32::MAX && previous_block_height / 2 != *block_height {
-                //     return Ok(false);
-                // }
+                // Check that the block heights decrement by a power of two.
+                if previous_block_height != u32::MAX && previous_block_height.saturating_sub(accumulator) != *block_height {
+                    return Ok(false);
+                }
 
                 // Check that there is no block header.
                 if block_header.is_some() {
                     return Ok(false);
                 }
 
-                // previous_block_height = *block_height;
+                previous_block_height = *block_height;
+                accumulator *= 2;
             }
         }
 
