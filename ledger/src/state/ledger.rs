@@ -509,7 +509,7 @@ impl<N: Network> LedgerState<N> {
         if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
             // Iterate through all the quadratic ranged block locators excluding the genesis locator.
             let mut _previous_block_height = u32::MAX;
-            for (block_height, (_block_hash, block_header)) in block_locators
+            for (_block_height, (_block_hash, block_header)) in block_locators
                 .iter()
                 .rev()
                 .skip(num_linear_block_headers + 1)
