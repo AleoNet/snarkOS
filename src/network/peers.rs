@@ -14,15 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    helpers::{State, Status},
-    Environment,
-    LedgerReader,
-    LedgerRequest,
-    LedgerRouter,
-    Message,
-    NodeType,
-};
+use crate::{helpers::Status, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -524,7 +516,7 @@ struct Peer<N: Network, E: Environment> {
     /// The node type of the peer.
     node_type: NodeType,
     /// The node type of the peer.
-    status: State,
+    status: Status,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -586,7 +578,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             listener_ip: peer_ip,
             version: 0,
             node_type: NodeType::Client,
-            status: State::Peering,
+            status: Status::new(),
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -853,7 +845,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the node type of the peer.
                                     peer.node_type = node_type;
                                     // Update the status of the peer.
-                                    peer.status = status;
+                                    peer.status.update(status);
 
                                     // Determine if the peer is on a fork (or unknown).
                                     let ledger_reader = ledger_reader.read().await;
@@ -868,7 +860,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 },
                                 Message::Pong(is_fork, block_locators) => {
                                     // Route the `Pong` to the ledger.
-                                    let request = LedgerRequest::Pong(peer_ip, peer.node_type, peer.status, is_fork, block_locators);
+                                    let request = LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators);
                                     if let Err(error) = ledger_router.send(request).await {
                                         warn!("[Pong] {}", error);
                                     }
