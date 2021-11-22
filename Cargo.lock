@@ -1242,6 +1242,9 @@ name = "once_cell"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
+dependencies = [
+ "parking_lot",
+]
 
 [[package]]
 name = "opaque-debug"
@@ -1312,6 +1315,25 @@ name = "paste"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
+
+[[package]]
+name = "pea2pea"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70e767de612eda2b1c42146b90ead2e67d8851b1b632023a071172ad91d1b3ab"
+dependencies = [
+ "async-trait",
+ "once_cell",
+ "parking_lot",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "peak_alloc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ae5ca2a4f36e9bba393e6711350dde5d11f5aacca3660fcca7877fe6b6e9d98"
 
 [[package]]
 name = "peeking_take_while"
@@ -1881,6 +1903,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snarkos-ledger",
+ "snarkos-testing",
  "snarkvm",
  "structopt",
  "tempfile",
@@ -1911,6 +1934,25 @@ dependencies = [
  "snarkvm",
  "tempfile",
  "tracing",
+]
+
+[[package]]
+name = "snarkos-testing"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "pea2pea",
+ "peak_alloc",
+ "rand",
+ "snarkos",
+ "snarkos-ledger",
+ "snarkvm",
+ "structopt",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2319,6 +2361,7 @@ dependencies = [
  "memchr",
  "mio",
  "num_cpus",
+ "parking_lot",
  "pin-project-lite",
  "tokio-macros",
  "winapi",
@@ -2437,6 +2480,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "lazy_static",
  "matchers",
+ "parking_lot",
  "regex",
  "sharded-slab",
  "smallvec",
