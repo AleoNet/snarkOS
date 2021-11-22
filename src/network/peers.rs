@@ -248,7 +248,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Exceeded maximum number of connected peers");
 
                     // Determine the peers to disconnect from.
-                    let num_excess_peers = self.number_of_connected_peers() - E::MAXIMUM_NUMBER_OF_PEERS;
+                    let num_excess_peers = self.number_of_connected_peers().saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
                     let peer_ips_to_disconnect = self
                         .connected_peers
                         .iter()

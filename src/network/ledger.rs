@@ -792,7 +792,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                 // Determine the peers to disconnect from.
                 // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
-                let num_excess_peers = self.peers_state.len() - E::MINIMUM_NUMBER_OF_PEERS;
+                let num_excess_peers = self.peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
                 let peer_ips_to_disconnect = self
                     .peers_state
                     .iter()
@@ -805,6 +805,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     .take(num_excess_peers)
                     .map(|(&ip, _)| ip)
                     .collect::<Vec<SocketAddr>>();
+
+                trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
 
                 // Proceed to send disconnect requests to these peers.
                 for peer_ip in peer_ips_to_disconnect {
