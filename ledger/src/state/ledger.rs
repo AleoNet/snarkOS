@@ -35,6 +35,7 @@ use std::{
         Arc,
     },
     thread,
+    thread::JoinHandle,
 };
 
 /// The number of seconds in two hours.
@@ -93,7 +94,7 @@ pub struct LedgerState<N: Network> {
     /// The blocks of the ledger in storage.
     blocks: BlockState<N>,
     /// The indicator bit and tracker for a ledger in read-only mode.
-    read_only: (bool, Arc<AtomicU32>),
+    read_only: (bool, Arc<AtomicU32>, Option<Arc<JoinHandle<()>>>),
 }
 
 impl<N: Network> LedgerState<N> {
@@ -119,7 +120,7 @@ impl<N: Network> LedgerState<N> {
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, Arc::new(AtomicU32::new(0))),
+            read_only: (is_read_only, Arc::new(AtomicU32::new(0)), None),
         };
 
         // Determine the latest block height.
@@ -211,7 +212,7 @@ impl<N: Network> LedgerState<N> {
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, Arc::new(AtomicU32::new(0))),
+            read_only: (is_read_only, Arc::new(AtomicU32::new(0)), None),
         };
 
         // Determine the latest block height.
@@ -241,7 +242,7 @@ impl<N: Network> LedgerState<N> {
         // Update the ledger tree state.
         ledger.regenerate_ledger_tree()?;
         // As the ledger is in read-only mode, proceed to start a process to keep the reader in sync.
-        ledger.initialize_reader_heartbeat(latest_block_height);
+        ledger.read_only.2 = Some(Arc::new(ledger.initialize_reader_heartbeat(latest_block_height)?));
 
         trace!("[Read-Only] Ledger successfully loaded at block {}", ledger.latest_block_height());
         Ok(ledger)
@@ -508,8 +509,8 @@ impl<N: Network> LedgerState<N> {
         // Check that the remaining block hashes are formed correctly (power of two).
         if block_locators.len() > MAXIMUM_LINEAR_BLOCK_LOCATORS as usize {
             // Iterate through all the quadratic ranged block locators excluding the genesis locator.
-            let mut previous_block_height = u32::MAX;
-            for (block_height, (_block_hash, block_header)) in block_locators
+            let mut _previous_block_height = u32::MAX;
+            for (_block_height, (_block_hash, block_header)) in block_locators
                 .iter()
                 .rev()
                 .skip(num_linear_block_headers + 1)
@@ -525,7 +526,7 @@ impl<N: Network> LedgerState<N> {
                     return Ok(false);
                 }
 
-                previous_block_height = *block_height;
+                // previous_block_height = *block_height;
             }
         }
 
@@ -883,14 +884,14 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Initializes a heartbeat to keep the ledger reader in sync, with the given starting block height.
-    fn initialize_reader_heartbeat(&self, starting_block_height: u32) {
+    fn initialize_reader_heartbeat(&self, starting_block_height: u32) -> Result<JoinHandle<()>> {
         // If the storage is *not* in read-only mode, this method cannot be called.
         if !self.is_read_only() {
-            return;
+            return Err(anyhow!("Ledger must be read-only to initialize a reader heartbeat"));
         }
 
         let mut ledger = self.clone();
-        thread::spawn(move || {
+        Ok(thread::spawn(move || {
             let last_seen_block_height = ledger.read_only.1.clone();
             ledger.read_only.1.store(starting_block_height, Ordering::SeqCst);
 
@@ -925,14 +926,14 @@ impl<N: Network> LedgerState<N> {
                 }
                 thread::sleep(std::time::Duration::from_secs(6));
             }
-        });
+        }))
     }
 
     /// Attempts to automatically resolve inconsistent ledger state.
     fn try_fixing_inconsistent_state(&self) -> Result<u32> {
-        // If the storage is *not* in read-only mode, this method cannot be called.
-        if !self.is_read_only() {
-            return Err(anyhow!("Ledger must be writable in order to fix inconsistent state"));
+        // If the storage is in read-only mode, this method cannot be called.
+        if self.is_read_only() {
+            return Err(anyhow!("Ledger must be writable to fix inconsistent state"));
         }
 
         // Determine the latest block height.
