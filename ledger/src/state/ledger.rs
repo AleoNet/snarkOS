@@ -561,7 +561,7 @@ impl<N: Network> LedgerState<N> {
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
         // TODO (howardwu): Improve the performance and design of this.
         let mut transactions: Vec<Transaction<N>> = transactions
-            .into_iter()
+            .iter()
             .filter(|transaction| {
                 let mut is_new = true;
 
