@@ -31,8 +31,6 @@ enables applications to verify and store state in a publicly verifiable manner.
 
 ## 2. Build Guide
 
-Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
-
 ### 2.1 Requirements
 
 The following are **minimum** requirements to run an Aleo node:
@@ -44,6 +42,8 @@ The following are **minimum** requirements to run an Aleo node:
 Please note to run an Aleo mining node that is **competitive**, the machine will require more than these requirements.
 
 ### 2.2 Installation
+
+Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
 Start by cloning the snarkOS Github repository:
 ```
@@ -104,10 +104,16 @@ aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## 4. Testnet2 FAQs
 
-### 1. The node is unable to connect to peers on the network.
+### 1. My node is unable to compile.
+
+- Ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+- If large errors appear during compilation, try running `cargo clean`.
+- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
+
+### 2. My node is unable to connect to peers on the network.
 
 - Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
-- Ensure snarkOS is started using `run-client.sh` or `run-miner.sh`
+- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
 
 ## 5. Command Line Interface
 
@@ -144,7 +150,7 @@ SUBCOMMANDS:
 
 In one terminal, start the first node by running:
 ```
-cargo run --release -- --node 4135 --rpc 3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
+cargo run --release -- --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
 ```
 
 After the first node starts, in a second terminal, run:
