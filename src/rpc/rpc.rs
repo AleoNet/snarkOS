@@ -103,18 +103,17 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
 
     let server = Server::bind(&rpc_addr).serve(service);
 
-    let (tx, rx) = oneshot::channel();
-    let task_handle = tokio::spawn(async move {
+    // TODO (howardwu): I do not know what this section does. Someone document me please.
+    let (router, handler) = oneshot::channel();
+    let task = tokio::spawn(async move {
         // Notify the outer function that the task is ready.
-        let _ = tx.send(());
-
-        server.await.expect("The RPC server couldn't be started!");
+        let _ = router.send(());
+        server.await.expect("Failed to start the RPC server");
     });
-
     // Wait until the spawned task is ready.
-    let _ = rx.await;
+    let _ = handler.await;
 
-    task_handle
+    task
 }
 
 async fn handle_rpc<N: Network, E: Environment>(
