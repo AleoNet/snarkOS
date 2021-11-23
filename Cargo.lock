@@ -1883,6 +1883,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "bytes",
+ "cfg-if",
  "chrono",
  "circular-queue",
  "colored",

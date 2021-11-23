@@ -15,10 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{common::display_bytes, wait_until};
+use snarkos_testing::{ClientNode, TestNode};
 
 use pea2pea::Pea2Pea;
 use peak_alloc::PeakAlloc;
-use snarkos_testing::{SnarkosNode, TestNode};
 
 // Configure a custom allocator that will measure memory use.
 #[global_allocator]
@@ -31,7 +31,7 @@ async fn measure_node_overhead() {
     let initial_mem = PEAK_ALLOC.current_usage();
 
     // Start a snarkOS node.
-    let _snarkos_node = SnarkosNode::default().await;
+    let _client_node = ClientNode::default().await;
 
     // Register memory use caused by the node.
     let node_mem_use = PEAK_ALLOC.current_usage() - initial_mem;
@@ -47,7 +47,7 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
     let test_node = TestNode::default().await;
 
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Register initial memory use.
     let pre_connection_mem = PEAK_ALLOC.current_usage();
@@ -56,12 +56,12 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
     let mut first_conn_mem = None;
     for i in 0..10 {
         // Connect the test node to the snarkOS node (inbound for snarkOS).
-        test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
+        test_node.node().connect(client_node.local_addr()).await.unwrap();
 
         // Disconnect the test node from the snarkOS node.
-        assert!(test_node.node().disconnect(snarkos_node.local_addr()).await);
-        wait_until!(1, snarkos_node.connected_peers().await.is_empty());
-        snarkos_node.reset_known_peers().await;
+        assert!(test_node.node().disconnect(client_node.local_addr()).await);
+        wait_until!(1, client_node.connected_peers().await.is_empty());
+        client_node.reset_known_peers().await;
 
         if i == 0 {
             // Measure memory use caused by the 1st connect and disconnect.
@@ -85,7 +85,7 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
 #[ignore = "TODO: indicates a potential leak (12424B - around 1.2kB/connection); investigate further"]
 async fn outbound_connect_and_disconnect_doesnt_leak() {
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Start a test node.
     let test_node = TestNode::default().await;
@@ -98,14 +98,14 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
     let mut first_conn_mem = None;
     for i in 0..10 {
         // Connect the snarkOS node to the test node (outbound for snarkOS).
-        snarkos_node.connect(test_node_addr).await.unwrap();
+        client_node.connect(test_node_addr).await.unwrap();
 
         // Disconnect the test node from the snarkOS node.
         wait_until!(1, test_node.node().num_connected() == 1);
-        let snarkos_node_addr = test_node.node().connected_addrs()[0];
-        assert!(test_node.node().disconnect(snarkos_node_addr).await);
-        wait_until!(1, snarkos_node.connected_peers().await.is_empty());
-        snarkos_node.reset_known_peers().await;
+        let client_node_addr = test_node.node().connected_addrs()[0];
+        assert!(test_node.node().disconnect(client_node_addr).await);
+        wait_until!(1, client_node.connected_peers().await.is_empty());
+        client_node.reset_known_peers().await;
 
         if i == 0 {
             // Measure memory use caused by the 1st connect and disconnect.

@@ -15,24 +15,23 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{common::spawn_test_node_with_nonce, wait_until};
+use snarkos_testing::{ClientNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
 
 use pea2pea::Pea2Pea;
-use snarkos_testing::{SnarkosNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
-use tokio::task;
-
 use std::sync::{
     atomic::{AtomicU8, Ordering::*},
     Arc,
 };
+use tokio::task;
 
 #[tokio::test]
-async fn snarkos_nodes_can_connect_to_each_other() {
+async fn client_nodes_can_connect_to_each_other() {
     // Start 2 snarkOS nodes.
-    let snarkos_node1 = SnarkosNode::default().await;
-    let snarkos_node2 = SnarkosNode::default().await;
+    let client_node1 = ClientNode::default().await;
+    let client_node2 = ClientNode::default().await;
 
     // Connect one to the other.
-    snarkos_node1.connect(snarkos_node2.local_addr()).await.unwrap();
+    client_node1.connect(client_node2.local_addr()).await.unwrap();
 }
 
 #[tokio::test]
@@ -59,10 +58,10 @@ async fn handshake_as_initiator_works() {
     let test_node_addr = test_node.node().listening_addr().unwrap();
 
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Connect the snarkOS node to the test node.
-    snarkos_node.connect(test_node_addr).await.unwrap();
+    client_node.connect(test_node_addr).await.unwrap();
 
     // Double-check with the test node.
     // note: the small wait is due to the handshake responder (test node) finishing
@@ -76,22 +75,22 @@ async fn handshake_as_responder_works() {
     let test_node = TestNode::default().await;
 
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // The test node should be able to connect to the snarkOS node.
-    test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
+    test_node.node().connect(client_node.local_addr()).await.unwrap();
 
     // Double-check with the snarkOS node.
-    assert!(snarkos_node.connected_peers().await.len() == 1)
+    assert!(client_node.connected_peers().await.len() == 1)
 }
 
 #[tokio::test]
 async fn node_cant_connect_to_itself() {
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Ensure it can't connect to itself
-    assert!(snarkos_node.connect(snarkos_node.local_addr()).await.is_err());
+    assert!(client_node.connect(client_node.local_addr()).await.is_err());
 }
 
 #[tokio::test]
@@ -101,13 +100,13 @@ async fn node_cant_connect_to_another_twice() {
     let test_node_addr = test_node.node().listening_addr().unwrap();
 
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Connect the snarkOS node to the test node.
-    snarkos_node.connect(test_node_addr).await.unwrap();
+    client_node.connect(test_node_addr).await.unwrap();
 
     // The second connection attempt should fail.
-    assert!(snarkos_node.connect(test_node_addr).await.is_err());
+    assert!(client_node.connect(test_node_addr).await.is_err());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -122,10 +121,10 @@ async fn concurrent_duplicate_connection_attempts_fail() {
     }
 
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Register the snarkOS node address and prepare a connection error counter.
-    let snarkos_node_addr = snarkos_node.local_addr();
+    let client_node_addr = client_node.local_addr();
     let error_count = Arc::new(AtomicU8::new(0));
 
     // Concurrently connect to the snarkOS node, attempting to bypass the nonce uniqueness rule.
@@ -134,7 +133,7 @@ async fn concurrent_duplicate_connection_attempts_fail() {
         let error_count = error_count.clone();
 
         task::spawn(async move {
-            if test_node.node().connect(snarkos_node_addr).await.is_err() {
+            if test_node.node().connect(client_node_addr).await.is_err() {
                 error_count.fetch_add(1, Relaxed);
             }
         });
@@ -148,7 +147,7 @@ async fn concurrent_duplicate_connection_attempts_fail() {
 #[tokio::test]
 async fn connection_limits_are_obeyed() {
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Start the maximum number of test nodes the snarkOS node is permitted to connect to at once.
     let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS);
@@ -158,7 +157,7 @@ async fn connection_limits_are_obeyed() {
 
     // All the test nodes should be able to connect to the snarkOS node.
     for test_node in &test_nodes {
-        test_node.node().connect(snarkos_node.local_addr()).await.unwrap();
+        test_node.node().connect(client_node.local_addr()).await.unwrap();
     }
 
     // Create one additional test node.
@@ -166,41 +165,41 @@ async fn connection_limits_are_obeyed() {
     let extra_test_node_addr = extra_test_node.node().listening_addr().unwrap();
 
     // Assert that snarkOS can't connect to it.
-    assert!(snarkos_node.connect(extra_test_node_addr).await.is_err());
+    assert!(client_node.connect(extra_test_node_addr).await.is_err());
 
     // Assert that the test node can't connect to the snarkOS node either.
-    assert!(extra_test_node.node().connect(snarkos_node.local_addr()).await.is_err());
+    assert!(extra_test_node.node().connect(client_node.local_addr()).await.is_err());
 }
 
 #[tokio::test]
 async fn peer_accounting_works() {
     // Start a snarkOS node.
-    let snarkos_node = SnarkosNode::default().await;
+    let client_node = ClientNode::default().await;
 
     // Start a test node.
     let test_node = TestNode::default().await;
     let test_node_addr = test_node.node().listening_addr().unwrap();
 
     // Double-check that the initial list of peers is empty.
-    assert!(snarkos_node.connected_peers().await.is_empty());
+    assert!(client_node.connected_peers().await.is_empty());
 
     // Perform the connect+disconnect routine a few fimes.
     for _ in 0..3 {
         // Connect the snarkOS node to the test node.
-        snarkos_node.connect(test_node_addr).await.unwrap();
+        client_node.connect(test_node_addr).await.unwrap();
 
         // Verify that the list of peers is not empty anymore.
-        assert!(snarkos_node.connected_peers().await.len() == 1);
+        assert!(client_node.connected_peers().await.len() == 1);
 
         // The test node disconnects from the snarkOS node.
         wait_until!(1, test_node.node().num_connected() == 1);
-        let snarkos_node_addr = test_node.node().connected_addrs()[0];
-        assert!(test_node.node().disconnect(snarkos_node_addr).await);
+        let client_node_addr = test_node.node().connected_addrs()[0];
+        assert!(test_node.node().disconnect(client_node_addr).await);
 
         // The list of snarkOS peers should be empty again.
-        wait_until!(1, snarkos_node.connected_peers().await.is_empty());
+        wait_until!(1, client_node.connected_peers().await.is_empty());
 
         // The snarkOS node should not attempt to connect on its own.
-        snarkos_node.reset_known_peers().await;
+        client_node.reset_known_peers().await;
     }
 }

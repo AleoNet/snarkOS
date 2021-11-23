@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_testing::SnarkosNode;
+use snarkos_testing::ClientNode;
 
 use std::time::Instant;
 
@@ -24,7 +24,7 @@ async fn measure_node_startup() {
     let now = Instant::now();
 
     // Start a snarkOS node.
-    let _snarkos_node = SnarkosNode::default().await;
+    let _snarkos_node = ClientNode::default().await;
 
     // Display the result.
     println!("snarkOS start-up time: {}ms", now.elapsed().as_millis());

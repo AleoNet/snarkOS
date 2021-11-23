@@ -16,22 +16,22 @@
 
 use snarkos::{helpers::Tasks, Client, Server};
 use snarkvm::dpc::testnet2::Testnet2;
-use structopt::StructOpt;
 
 use std::{fs, net::SocketAddr};
+use structopt::StructOpt;
 
-/// A facade for a snarkOS node.
-pub struct SnarkosNode {
+/// A facade for a snarkOS client node.
+pub struct ClientNode {
     pub server: Server<Testnet2, Client<Testnet2>>,
 }
 
-impl SnarkosNode {
-    /// Returns the node's local listening address.
+impl ClientNode {
+    /// Returns the local listening address of the node.
     pub fn local_addr(&self) -> SocketAddr {
         self.server.local_ip()
     }
 
-    /// Returns the list of node's connected peers.
+    /// Returns the list of connected peers of the node.
     pub async fn connected_peers(&self) -> Vec<SocketAddr> {
         self.server.peers().read().await.connected_peers()
     }
@@ -47,32 +47,30 @@ impl SnarkosNode {
         self.server.connect_to(addr).await
     }
 
-    /// Starts a snarkOS node with all the default characteristics from `SnarkosNode::with_args` and with
-    /// any available port (as opposed to the default snarkOS network port).
+    /// Starts a snarkOS node with all the default characteristics from `ClientNode::with_args`,
+    /// and with any available port (as opposed to the default snarkOS network port).
     pub async fn default() -> Self {
-        SnarkosNode::with_args(&["--node", "0"]).await
+        ClientNode::with_args(&["--node", "0"]).await
     }
 
-    /// Starts a snarkOS node with a local address and the RPC server disabled; extra arguments can be passed
-    /// via `extra_args`.
+    /// Starts a snarkOS node with a local address and the RPC server disabled;
+    /// extra arguments may be passed via `extra_args`.
     pub async fn with_args(extra_args: &[&str]) -> Self {
-        let permanent_args = &["snarkos", "--disable-rpc", "--ip", "127.0.0.1"];
+        let permanent_args = &["snarkos", "--norpc", "--node", "127.0.0.1:4132"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
         let config = snarkos::Node::from_iter(combined_args);
-
         let server = Server::<Testnet2, Client<Testnet2>>::initialize(&config, None, Tasks::new())
             .await
             .unwrap();
 
-        SnarkosNode { server }
+        ClientNode { server }
     }
 }
 
 // Remove the storage artifacts after each test.
-impl Drop for SnarkosNode {
+impl Drop for ClientNode {
     fn drop(&mut self) {
         let db_path = format!("/tmp/snarkos-test-ledger-{}", self.local_addr().port());
-
         assert!(
             fs::remove_dir_all(&db_path).is_ok(),
             "Storage cleanup failed! The expected path \"{}\" doesn't exist",

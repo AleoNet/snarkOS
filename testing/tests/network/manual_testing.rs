@@ -15,14 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::common::start_logger;
+use snarkos_testing::TestNode;
 
 use pea2pea::{
     protocols::{Handshake, Reading, Writing},
     Config,
     Node as Pea2PeaNode,
 };
-use snarkos_testing::TestNode;
-
 use std::net::{IpAddr, Ipv4Addr};
 
 /// This test is intended to be run manually in order to monitor the behavior of

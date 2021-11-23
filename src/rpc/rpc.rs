@@ -103,7 +103,6 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
 
     let server = Server::bind(&rpc_addr).serve(service);
 
-    // TODO (howardwu): I do not know what this section does. Someone document me please.
     let (router, handler) = oneshot::channel();
     let task = tokio::spawn(async move {
         // Notify the outer function that the task is ready.

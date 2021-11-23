@@ -16,16 +16,16 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies.snarkvm]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "040825e"
-
 [dependencies.snarkos]
 path = ".."
 features = ["test"]
 
 [dependencies.snarkos-ledger]
 path = "../ledger"
+
+[dependencies.snarkvm]
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "040825e"
 
 [dependencies.anyhow]
 version = "1"
@@ -45,12 +45,12 @@ version = "0.1"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.structopt]
+version = "0.3"
+
 [dependencies.tokio]
 version = "1"
 features = ["macros", "rt-multi-thread", "time"]
-
-[dependencies.structopt]
-version = "0.3"
 
 [dependencies.tracing]
 version = "0.1"

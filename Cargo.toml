@@ -37,10 +37,6 @@ tui = { version = "0.16.0", features = ["crossterm"] }
 path = "./ledger"
 version = "2.0.0"
 
-[dev-dependencies.snarkos-testing]
-path = "./testing"
-version = "2.0.0"
-
 [dependencies.anyhow]
 version = "1"
 
@@ -54,6 +50,9 @@ version = "1.0"
 version = "0.4"
 default-features = false
 features = [ "clock", "serde" ]
+
+[dependencies.cfg-if]
+version = "1.0"
 
 [dependencies.circular-queue]
 version = "0.2"
@@ -134,6 +133,10 @@ version = "0.3"
 
 [dev-dependencies.rusty-hook]
 version = "0.11"
+
+[dev-dependencies.snarkos-testing]
+path = "./testing"
+version = "2.0.0"
 
 [dev-dependencies.tempfile]
 version = "3.2"

@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod snarkos_node;
-pub use snarkos_node::*;
+pub mod client_node;
+pub use client_node::*;
 
 pub mod test_node;
 pub use test_node::*;

@@ -70,13 +70,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         };
 
         // Initialize the ledger storage path.
-        #[cfg(not(feature = "test"))]
-        let storage_path = format!(".ledger-{}", (node_port - 4130));
-        // Tests can use any available ports, and they remove the storage artifacts afterwards, so there
-        // is no need to adhere to a specific number assignment logic.
-        #[cfg(feature = "test")]
-        let storage_path = format!("/tmp/snarkos-test-ledger-{}", local_ip.port());
-
+        let storage_path = node.storage_path(local_ip);
         // Initialize the status indicator.
         let status = Status::new();
         // Initialize a new instance for managing peers.
