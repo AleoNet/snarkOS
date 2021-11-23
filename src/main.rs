@@ -21,6 +21,14 @@ use structopt::StructOpt;
 use tokio::runtime;
 
 fn main() -> Result<()> {
+    // Parse the provided arguments.
+    let node = Node::from_args();
+
+    // Start logging, if enabled.
+    if !node.display {
+        node.initialize_logger();
+    }
+
     // Initialize the runtime configuration.
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
@@ -37,7 +45,7 @@ fn main() -> Result<()> {
         .unwrap();
 
     runtime.block_on(async move {
-        Node::from_args().start().await.expect("Failed to start the node");
+        node.start().await.expect("Failed to start the node");
         std::future::pending::<()>().await;
     });
 

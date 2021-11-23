@@ -134,17 +134,13 @@ impl Node {
         // Initialize the tasks handler.
         let tasks = Tasks::new();
 
-        // Initialize either the display or logger.
-        let server = if self.display {
+        // Initialize the node's server.
+        let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
+
+        // Initialize the display, if enabled.
+        if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            // Initialize the node server.
-            let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
             let _display = Display::<N, E>::start(server.clone())?;
-            server
-        } else {
-            self.initialize_logger();
-            // Initialize the node server.
-            Server::<N, E>::initialize(self, miner, tasks.clone()).await?
         };
 
         // Connect to a peer if one was given as an argument.
@@ -160,7 +156,7 @@ impl Node {
         Ok(())
     }
 
-    fn initialize_logger(&self) {
+    pub fn initialize_logger(&self) {
         match self.verbosity {
             0 => std::env::set_var("RUST_LOG", "info"),
             1 => std::env::set_var("RUST_LOG", "debug"),
