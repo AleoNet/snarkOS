@@ -41,7 +41,7 @@ pub type LedgerReader<N> = Arc<RwLock<LedgerState<N>>>;
 ///
 #[derive(Clone)]
 pub struct Server<N: Network, E: Environment> {
-    /// The local address of this node.
+    /// The local address of the node.
     local_ip: SocketAddr,
     /// The status of the node.
     status: Status,
@@ -81,7 +81,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let status = Status::new();
 
         // Initialize a new instance for managing peers.
-        let (peers, peers_router) = Self::initialize_peers(tasks.clone(), local_ip, status.clone()).await;
+        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone()).await;
         // Initialize a new instance for managing the ledger.
         let (ledger_reader, ledger_router) =
             Self::initialize_ledger(&mut tasks, storage_path.to_string(), status.clone(), &peers_router).await?;
@@ -140,10 +140,15 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
-        let (tx, rx) = oneshot::channel();
-        let message = PeersRequest::Connect(peer_ip, self.ledger_reader.clone(), self.ledger_router.clone(), tx);
+        // Initialize the connection process.
+        let (router, handler) = oneshot::channel();
+
+        // Route a `Connect` request to the peer manager.
+        let message = PeersRequest::Connect(peer_ip, self.ledger_reader.clone(), self.ledger_router.clone(), router);
         self.peers_router.send(message).await?;
-        rx.await.map(|_| ()).map_err(|e| e.into())
+
+        // Wait until the connection task is initialized.
+        handler.await.map(|_| ()).map_err(|e| e.into())
     }
 
     ///
@@ -161,7 +166,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[inline]
     #[allow(clippy::type_complexity)]
     async fn initialize_peers(
-        tasks: Tasks<task::JoinHandle<()>>,
+        tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         local_status: Status,
     ) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
@@ -172,30 +177,28 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
 
         // Initialize the peers router process.
-        let peers_clone = peers.clone();
-        let peers_router_clone = peers_router.clone();
-        let tasks_clone = tasks.clone();
-
-        let (tx, rx) = oneshot::channel();
-        let task_handle = task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = tx.send(());
-
-            // Asynchronously wait for a peers request.
-            // Channel is routing a request to peers.
-            while let Some(request) = peers_handler.recv().await {
-                let peers = peers_clone.clone();
-                let peers_router = peers_router_clone.clone();
-                tasks_clone.append(task::spawn(async move {
-                    // Hold the peers write lock briefly, to update the state of the peers.
-                    peers.write().await.update(request, &peers_router).await;
-                }));
-            }
-        });
-        tasks.append(task_handle);
-
-        // Wait until the spawned task is ready.
-        let _ = rx.await;
+        {
+            let peers = peers.clone();
+            let peers_router = peers_router.clone();
+            let tasks_clone = tasks.clone();
+            let (router, handler) = oneshot::channel();
+            tasks.append(task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a peers request.
+                while let Some(request) = peers_handler.recv().await {
+                    let peers = peers.clone();
+                    let peers_router = peers_router.clone();
+                    // Asynchronously process a peers request.
+                    tasks_clone.append(task::spawn(async move {
+                        // Hold the peers write lock briefly, to update the state of the peers.
+                        peers.write().await.update(request, &peers_router).await;
+                    }));
+                }
+            }));
+            // Wait until the peers router task is ready.
+            let _ = handler.await;
+        }
 
         (peers, peers_router)
     }
@@ -222,12 +225,10 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the ledger router process.
         let peers_router = peers_router.clone();
-
-        let (tx, rx) = oneshot::channel();
-        let task_handle = task::spawn(async move {
+        let (router, handler) = oneshot::channel();
+        tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.
-            let _ = tx.send(());
-
+            let _ = router.send(());
             // Asynchronously wait for a ledger request.
             while let Some(request) = ledger_handler.recv().await {
                 // Hold the ledger write lock briefly, to update the state of the ledger.
@@ -235,11 +236,9 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // will end up being processed out of order.
                 ledger.write().await.update(request, &peers_router).await;
             }
-        });
-        tasks.append(task_handle);
-
-        // Wait until the spawned task is ready.
-        let _ = rx.await;
+        }));
+        // Wait until the ledger router task is ready.
+        let _ = handler.await;
 
         Ok((ledger_reader, ledger_router))
     }
@@ -256,15 +255,14 @@ impl<N: Network, E: Environment> Server<N, E> {
         ledger_reader: &LedgerReader<N>,
         ledger_router: &LedgerRouter<N, E>,
     ) {
+        // Initialize the listener process.
         let peers_router = peers_router.clone();
         let ledger_reader = ledger_reader.clone();
         let ledger_router = ledger_router.clone();
-
-        let (tx, rx) = oneshot::channel();
-        let task_handle = task::spawn(async move {
+        let (router, handler) = oneshot::channel();
+        tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.
-            let _ = tx.send(());
-
+            let _ = router.send(());
             info!("Listening for peers at {}", local_ip);
             loop {
                 // Asynchronously wait for an inbound TcpStream.
@@ -281,11 +279,9 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Add a small delay to prevent overloading the network from handshakes.
                 tokio::time::sleep(Duration::from_millis(150)).await;
             }
-        });
-        tasks.append(task_handle);
-
-        // Wait until the spawned task is ready.
-        let _ = rx.await;
+        }));
+        // Wait until the listener task is ready.
+        let _ = handler.await;
     }
 
     ///
@@ -298,15 +294,14 @@ impl<N: Network, E: Environment> Server<N, E> {
         ledger_reader: &LedgerReader<N>,
         ledger_router: &LedgerRouter<N, E>,
     ) {
+        // Initialize the heartbeat process.
         let peers_router = peers_router.clone();
         let ledger_reader = ledger_reader.clone();
         let ledger_router = ledger_router.clone();
-
-        let (tx, rx) = oneshot::channel();
+        let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.
-            let _ = tx.send(());
-
+            let _ = router.send(());
             loop {
                 // Transmit a heartbeat request to the peers.
                 let request = PeersRequest::Heartbeat(ledger_reader.clone(), ledger_router.clone());
@@ -322,9 +317,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                 tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
             }
         }));
-
-        // Wait until the spawned task is ready.
-        let _ = rx.await;
+        // Wait until the heartbeat task is ready.
+        let _ = handler.await;
     }
 
     ///
@@ -339,12 +333,12 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         if E::NODE_TYPE == NodeType::Miner {
             if let Some(recipient) = miner {
+                // Initialize the miner process.
                 let ledger_router = ledger_router.clone();
-                let (tx, rx) = oneshot::channel();
+                let (router, handler) = oneshot::channel();
                 tasks.append(task::spawn(async move {
                     // Notify the outer function that the task is ready.
-                    let _ = tx.send(());
-
+                    let _ = router.send(());
                     loop {
                         // Start the mining process.
                         let request = LedgerRequest::Mine(local_ip, recipient, ledger_router.clone());
@@ -355,9 +349,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                         tokio::time::sleep(Duration::from_secs(2)).await;
                     }
                 }));
-
-                // Wait until the spawned task is ready.
-                let _ = rx.await;
+                // Wait until the miner task is ready.
+                let _ = handler.await;
             } else {
                 error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
