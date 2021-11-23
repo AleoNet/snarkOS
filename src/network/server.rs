@@ -83,8 +83,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone()).await;
         // Initialize a new instance for managing the ledger.
-        let (ledger_reader, ledger_router) =
-            Self::initialize_ledger(&mut tasks, storage_path.to_string(), status.clone(), &peers_router).await?;
+        let (ledger_reader, ledger_router) = Self::initialize_ledger(&mut tasks, storage_path, status.clone(), &peers_router).await?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_reader, &ledger_router).await;
@@ -214,11 +213,13 @@ impl<N: Network, E: Environment> Server<N, E> {
         peers_router: &PeersRouter<N, E>,
     ) -> Result<(LedgerReader<N>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
-        let path_clone = storage_path.clone();
+        let path = storage_path.clone();
         let ledger = Arc::new(RwLock::new(
-            task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path_clone, &status)).await??,
+            task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status)).await??,
         ));
-        let ledger_reader = Arc::new(RwLock::new(LedgerState::<N>::open_reader::<RocksDB, _>(storage_path)?));
+
+        // Open a ledger reader from storage.
+        let ledger_reader = Arc::new(RwLock::new(LedgerState::<N>::open_reader::<RocksDB, _>(&storage_path)?));
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
