@@ -98,27 +98,21 @@ impl Node {
     }
 
     /// Returns the storage path of the node.
-    pub(crate) fn storage_path(&self, local_ip: SocketAddr) -> String {
-        // TODO (howardwu): Remove this check after introducing proper configurations.
-        assert!(
-            self.node.port() >= 4130,
-            "Until configuration files are established, the node port must be at least 4130 or greater"
-        );
-        format!(".ledger-{}", (self.node.port() - 4130))
-        // cfg_if::cfg_if! {
-        //     if #[cfg(feature = "test")] {
-        //         // Tests may use any available ports, and removes the storage artifacts afterwards,
-        //         // so that there is no need to adhere to a specific number assignment logic.
-        //         format!("/tmp/snarkos-test-ledger-{}", local_ip.port())
-        //     } else {
-        //         // TODO (howardwu): Remove this check after introducing proper configurations.
-        //         assert!(
-        //             self.node.port() >= 4130,
-        //             "Until configuration files are established, the node port must be at least 4130 or greater"
-        //         );
-        //         format!(".ledger-{}", (self.node.port() - 4130))
-        //     }
-        // }
+    pub(crate) fn storage_path(&self, _local_ip: SocketAddr) -> String {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "test")] {
+                // Tests may use any available ports, and removes the storage artifacts afterwards,
+                // so that there is no need to adhere to a specific number assignment logic.
+                format!("/tmp/snarkos-test-ledger-{}", _local_ip.port())
+            } else {
+                // TODO (howardwu): Remove this check after introducing proper configurations.
+                assert!(
+                    self.node.port() >= 4130,
+                    "Until configuration files are established, the node port must be at least 4130 or greater"
+                );
+                format!(".ledger-{}", (self.node.port() - 4130))
+            }
+        }
     }
 
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
@@ -140,17 +134,13 @@ impl Node {
         // Initialize the tasks handler.
         let tasks = Tasks::new();
 
-        // Initialize either the display or logger.
-        let server = if self.display {
+        // Initialize the node's server.
+        let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
+
+        // Initialize the display, if enabled.
+        if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            // Initialize the node server.
-            let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
             let _display = Display::<N, E>::start(server.clone())?;
-            server
-        } else {
-            self.initialize_logger();
-            // Initialize the node server.
-            Server::<N, E>::initialize(self, miner, tasks.clone()).await?
         };
 
         // Connect to a peer if one was given as an argument.
@@ -166,7 +156,7 @@ impl Node {
         Ok(())
     }
 
-    fn initialize_logger(&self) {
+    pub fn initialize_logger(&self) {
         match self.verbosity {
             0 => std::env::set_var("RUST_LOG", "info"),
             1 => std::env::set_var("RUST_LOG", "debug"),
