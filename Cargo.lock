@@ -1904,7 +1904,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snarkos-ledger",
- "snarkos-testing",
  "snarkvm",
  "structopt",
  "tempfile",
