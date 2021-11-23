@@ -36,7 +36,6 @@ use snarkvm::{
 use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
 use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc};
-use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
@@ -65,7 +64,7 @@ impl From<RpcError> for std::io::Error {
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
     status: Status,
-    peers: Arc<RwLock<Peers<N, E>>>,
+    peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     ledger_router: LedgerRouter<N, E>,
     /// RPC credentials for accessing guarded endpoints
@@ -90,7 +89,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
     pub fn new(
         credentials: RpcCredentials,
         status: Status,
-        peers: Arc<RwLock<Peers<N, E>>>,
+        peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
         ledger_router: LedgerRouter<N, E>,
     ) -> Self {
@@ -203,17 +202,22 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
 
     /// Returns the peers currently connected to this node.
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError> {
-        Ok(self.peers.read().await.connected_peers())
+        Ok(self.peers.connected_peers().await)
     }
 
     /// Returns the current state of this node.
     async fn get_node_state(&self) -> Result<Value, RpcError> {
+        let candidate_peers = self.peers.candidate_peers().await;
+        let connected_peers = self.peers.connected_peers().await;
+        let number_of_candidate_peers = candidate_peers.len();
+        let number_of_connected_peers = connected_peers.len();
+
         Ok(serde_json::json!({
-            "candidate_peers": self.peers.read().await.candidate_peers(),
-            "connected_peers": self.peers.read().await.connected_peers(),
+            "candidate_peers": candidate_peers,
+            "connected_peers": connected_peers,
             "latest_block_height": self.ledger.read().await.latest_block_height(),
-            "number_of_candidate_peers": self.peers.read().await.number_of_candidate_peers(),
-            "number_of_connected_peers": self.peers.read().await.number_of_connected_peers(),
+            "number_of_candidate_peers": number_of_candidate_peers,
+            "number_of_connected_peers": number_of_connected_peers,
             "status": self.status.to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,
