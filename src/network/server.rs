@@ -27,11 +27,7 @@ use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
-use std::{
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{mpsc, oneshot, RwLock},
@@ -67,19 +63,13 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     pub async fn initialize(node: &Node, miner: Option<Address<N>>, mut tasks: Tasks<task::JoinHandle<()>>) -> Result<Self> {
-        let node_ip: IpAddr = node.ip;
-        let node_port = node.node.unwrap_or(E::DEFAULT_NODE_PORT);
-        let rpc_ip: IpAddr = node.rpc_ip;
-        let rpc_port = node.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
-
-        #[cfg(not(feature = "test"))]
         assert!(
-            !(node_port < 4130),
+            node.node.port() >= 4130,
             "Until configuration files are established, the node port must be at least 4130 or greater"
         );
 
         // Initialize a new TCP listener at the given IP.
-        let (local_ip, listener) = match TcpListener::bind(SocketAddr::from((node_ip, node_port))).await {
+        let (local_ip, listener) = match TcpListener::bind(node.node).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
@@ -108,11 +98,11 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router).await;
 
-        if !node.disable_rpc {
+        if !node.norpc {
             // Initialize a new instance of the RPC server.
             tasks.append(
                 initialize_rpc_server::<N, E>(
-                    SocketAddr::from((rpc_ip, rpc_port)),
+                    node.rpc,
                     node.rpc_username.clone(),
                     node.rpc_password.clone(),
                     &status,
@@ -136,13 +126,18 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     /// Returns the IP address of this node.
-    fn local_ip(&self) -> SocketAddr {
+    pub fn local_ip(&self) -> SocketAddr {
         self.local_ip
     }
 
     /// Returns the status of this node.
     pub fn status(&self) -> Status {
         self.status.clone()
+    }
+
+    /// Returns the peer manager of this node.
+    pub fn peers(&self) -> Arc<RwLock<Peers<N, E>>> {
+        self.peers.clone()
     }
 
     ///

@@ -30,7 +30,7 @@ use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;
 use colored::*;
-use std::{net::IpAddr, str::FromStr};
+use std::{net::SocketAddr, str::FromStr};
 use structopt::StructOpt;
 use tokio::task;
 use tracing_subscriber::EnvFilter;
@@ -47,21 +47,12 @@ pub struct Node {
     /// Specify the network of this node.
     #[structopt(default_value = "2", short = "n", long = "network")]
     pub network: u16,
-    /// The listener IP of the node.
-    #[structopt(parse(try_from_str), default_value = "0.0.0.0", long = "ip")]
-    pub ip: IpAddr,
-    /// Specify the port for the node server.
-    #[structopt(long = "node")]
-    pub node: Option<u16>,
-    /// Disable the RPC server.
-    #[structopt(long = "disable-rpc")]
-    pub disable_rpc: bool,
-    /// The IP address of the RPC server.
-    #[structopt(parse(try_from_str), default_value = "0.0.0.0", long = "rpc-ip")]
-    pub rpc_ip: IpAddr,
-    /// Specify the port for the RPC server.
-    #[structopt(long = "rpc")]
-    pub rpc: Option<u16>,
+    /// Specify the IP address and port for the node server.
+    #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
+    pub node: SocketAddr,
+    /// Specify the IP address and port for the RPC server.
+    #[structopt(parse(try_from_str), default_value = "0.0.0.0:3032", long = "rpc")]
+    pub rpc: SocketAddr,
     /// Specify the username for the RPC server.
     #[structopt(default_value = "root", long = "username")]
     pub rpc_username: String,
@@ -74,6 +65,9 @@ pub struct Node {
     /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
     pub display: bool,
+    /// If the flag is set, the node will not initialize the RPC server.
+    #[structopt(long)]
+    pub norpc: bool,
     #[structopt(hidden = true, long)]
     pub trial: bool,
     #[structopt(hidden = true, long)]
@@ -121,28 +115,25 @@ impl Node {
 
         // Initialize the tasks handler.
         let tasks = Tasks::new();
-        let tasks_clone = tasks.clone();
-
-        let server = Server::<N, E>::initialize(self, miner, tasks_clone).await?;
-
+        // Initialize the node server.
+        let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
+        // Initialize either the display or logger.
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-
-            let server_clone = server.clone();
-            let _display = Display::<N, E>::start(server_clone)?;
+            let _display = Display::<N, E>::start(server.clone())?;
         } else {
             self.initialize_logger();
         }
 
+        // Connect to a peer if one was given as an argument.
         if let Some(peer_ip) = &self.connect {
             let _ = server.connect_to(peer_ip.parse().unwrap()).await;
         }
-
-        let server_task = task::spawn(async move {
+        // Spawn a task to handle the server.
+        tasks.append(task::spawn(async move {
             let _server = server;
             std::future::pending::<()>().await
-        });
-        tasks.append(server_task);
+        }));
 
         Ok(())
     }

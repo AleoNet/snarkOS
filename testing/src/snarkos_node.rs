@@ -28,18 +28,18 @@ pub struct SnarkosNode {
 impl SnarkosNode {
     /// Returns the node's local listening address.
     pub fn local_addr(&self) -> SocketAddr {
-        self.server.local_ip
+        self.server.local_ip()
     }
 
     /// Returns the list of node's connected peers.
     pub async fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.server.peers.read().await.connected_peers()
+        self.server.peers().read().await.connected_peers()
     }
 
     /// Resets the node's known peers. This is practical, as it makes the node not reconnect
     /// to known peers in test cases where it's undesirable.
     pub async fn reset_known_peers(&self) {
-        self.server.peers.write().await.reset_known_peers()
+        self.server.peers().write().await.reset_known_peers()
     }
 
     /// Attempts to connect the node to the given address.
