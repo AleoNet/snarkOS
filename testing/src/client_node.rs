@@ -50,7 +50,7 @@ impl ClientNode {
     /// Starts a snarkOS node with all the default characteristics from `ClientNode::with_args`,
     /// and with any available port (as opposed to the default snarkOS network port).
     pub async fn default() -> Self {
-        ClientNode::with_args(&["--node", "0"]).await
+        ClientNode::with_args(&[]).await
     }
 
     /// Starts a snarkOS node with a local address and the RPC server disabled;
