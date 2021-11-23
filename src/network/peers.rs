@@ -45,13 +45,16 @@ pub(crate) type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
 /// Shorthand for the child half of the `Peers` message channel.
 type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 
+/// Shorthand for the parent half of the connection result channel.
+type ConnectionResult = oneshot::Sender<Result<()>>;
+
 ///
 /// An enum of requests that the `Peers` struct processes.
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, ledger_router, result_notifier)
-    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, oneshot::Sender<Result<()>>),
+    /// Connect := (peer_ip, ledger_reader, ledger_router, connection_result)
+    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, ConnectionResult),
     /// Heartbeat := (ledger_reader, ledger_router)
     Heartbeat(LedgerReader<N>, LedgerRouter<N, E>),
     /// MessagePropagate := (peer_ip, message)
@@ -180,7 +183,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&mut self, request: PeersRequest<N, E>, peers_router: &PeersRouter<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, result_notifier) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, connection_result) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -223,7 +226,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         ledger_reader,
                                         ledger_router,
                                         &mut self.connected_nonces(),
-                                        Some(result_notifier),
+                                        Some(connection_result),
                                     )
                                     .await
                                 }
@@ -740,7 +743,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N, E>,
         connected_nonces: &mut T,
-        conn_result_notifier: Option<oneshot::Sender<Result<()>>>,
+        connection_result: Option<ConnectionResult>,
     ) {
         let connected_nonces = connected_nonces.cloned().collect::<Vec<u64>>();
         let peers_router = peers_router.clone();
@@ -758,26 +761,26 @@ impl<N: Network, E: Environment> Peer<N, E> {
             )
             .await
             {
-                Ok(peer) => peer,
+                Ok(peer) => {
+                    // If the optional connection result router is given, report a successful connection result.
+                    if let Some(router) = connection_result {
+                        if router.send(Ok(())).is_err() {
+                            error!("Failed to report a successful connection");
+                        }
+                    }
+                    peer
+                }
                 Err(error) => {
                     trace!("{}", error);
-
-                    // If there was an outbound connection call, notify the caller of its failure.
-                    if let Some(tx) = conn_result_notifier {
-                        if tx.send(Err(error)).is_err() {
-                            error!("Couldn't deliver the notification with a connection result!");
+                    // If the optional connection result router is given, report a failed connection result.
+                    if let Some(router) = connection_result {
+                        if router.send(Err(error)).is_err() {
+                            error!("Failed to report a failed connection");
                         }
                     }
                     return;
                 }
             };
-
-            // If there was an outbound connection call, notify the caller of its success.
-            if let Some(tx) = conn_result_notifier {
-                if tx.send(Ok(())).is_err() {
-                    error!("Couldn't deliver the notification with a connection result!");
-                }
-            }
 
             // Retrieve the peer IP.
             let peer_ip = peer.peer_ip();
