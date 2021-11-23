@@ -139,15 +139,19 @@ impl Node {
 
         // Initialize the tasks handler.
         let tasks = Tasks::new();
-        // Initialize the node server.
-        let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
+
         // Initialize either the display or logger.
-        if self.display {
+        let server = if self.display {
             println!("\nThe snarkOS console is initializing...\n");
+            // Initialize the node server.
+            let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
             let _display = Display::<N, E>::start(server.clone())?;
+            server
         } else {
             self.initialize_logger();
-        }
+            // Initialize the node server.
+            Server::<N, E>::initialize(self, miner, tasks.clone()).await?
+        };
 
         // Connect to a peer if one was given as an argument.
         if let Some(peer_ip) = &self.connect {
