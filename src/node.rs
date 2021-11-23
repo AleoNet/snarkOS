@@ -38,7 +38,7 @@ use tracing_subscriber::EnvFilter;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
 pub struct Node {
-    /// Specify the IP address of a peer to connect to.
+    /// Specify the IP address and port of a peer to connect to.
     #[structopt(long = "connect")]
     pub connect: Option<String>,
     /// Specify this as a mining node, with the given miner address.

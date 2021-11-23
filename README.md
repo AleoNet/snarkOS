@@ -134,7 +134,7 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-        --connect <connect>          Specify the IP address of a peer to connect to
+        --connect <connect>          Specify the IP address and port of a peer to connect to
         --miner <miner>              Specify this as a mining node, with the given miner address
     -n, --network <network>          Specify the network of this node [default: 2]
         --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
