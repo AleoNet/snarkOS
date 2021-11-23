@@ -31,8 +31,6 @@ enables applications to verify and store state in a publicly verifiable manner.
 
 ## 2. Build Guide
 
-Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
-
 ### 2.1 Requirements
 
 The following are **minimum** requirements to run an Aleo node:
@@ -44,6 +42,8 @@ The following are **minimum** requirements to run an Aleo node:
 Please note to run an Aleo mining node that is **competitive**, the machine will require more than these requirements.
 
 ### 2.2 Installation
+
+Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
 Start by cloning the snarkOS Github repository:
 ```
@@ -104,10 +104,16 @@ aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## 4. Testnet2 FAQs
 
-### 1. The node is unable to connect to peers on the network.
+### 1. My node is unable to compile.
+
+- Ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+- If large errors appear during compilation, try running `cargo clean`.
+- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
+
+### 2. My node is unable to connect to peers on the network.
 
 - Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
-- Ensure snarkOS is started using `run-client.sh` or `run-miner.sh`
+- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
 
 ## 5. Command Line Interface
 
@@ -119,32 +125,35 @@ snarkos
 The Aleo Team <hello@aleo.org>
 
 USAGE:
-    snarkos [FLAGS] [OPTIONS]
+    snarkos [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
         --display    If the flag is set, the node will render a read-only display
     -h, --help       Prints help information
+        --norpc      If the flag is set, the node will not initialize the RPC server
     -V, --version    Prints version information
 
 OPTIONS:
+        --connect <connect>          Specify the IP address and port of a peer to connect to
         --miner <miner>              Specify this as a mining node, with the given miner address
     -n, --network <network>          Specify the network of this node [default: 2]
-        --node <node>                Specify the port for the node server
-        --rpc <rpc>                  Specify the port for the RPC server
-        --username <rpc-username>    Specify the username for the RPC server [default: root]
+        --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
+        --rpc <rpc>                  Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
         --password <rpc-password>    Specify the password for the RPC server [default: pass]
+        --username <rpc-username>    Specify the username for the RPC server [default: root]
         --verbosity <verbosity>      Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
 
 SUBCOMMANDS:
-    help      Prints this message or the help of the given subcommand(s)
-    update    Updates snarkOS to the latest version
+    experimental    Experimental features
+    help            Prints this message or the help of the given subcommand(s)
+    update          Updates snarkOS to the latest version
 ```
 
 ## 6. Development Guide
 
 In one terminal, start the first node by running:
 ```
-cargo run --release -- --node 4135 --rpc 3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
+cargo run --release -- --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
 ```
 
 After the first node starts, in a second terminal, run:

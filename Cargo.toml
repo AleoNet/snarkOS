@@ -17,7 +17,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["ledger"]
+members = ["ledger", "testing"]
+
+[features]
+default = []
+test = []
 
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "040825e" }
@@ -46,6 +50,9 @@ version = "1.0"
 version = "0.4"
 default-features = false
 features = [ "clock", "serde" ]
+
+[dependencies.cfg-if]
+version = "1.0"
 
 [dependencies.circular-queue]
 version = "0.2"
@@ -119,7 +126,7 @@ version = "0.1"
 
 [dependencies.tracing-subscriber]
 version = "0.3"
-features = ["env-filter"]
+features = ["env-filter", "parking_lot"]
 
 [dev-dependencies.rand_chacha]
 version = "0.3"

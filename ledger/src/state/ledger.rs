@@ -561,8 +561,31 @@ impl<N: Network> LedgerState<N> {
         let amount = Block::<N>::block_reward(block_height);
         let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
 
+        // Filter the transactions to ensure they are new, and append the coinbase transaction.
+        // TODO (howardwu): Improve the performance and design of this.
+        let mut transactions: Vec<Transaction<N>> = transactions
+            .iter()
+            .filter(|transaction| {
+                for serial_number in transaction.serial_numbers() {
+                    if let Ok(true) = self.contains_serial_number(serial_number) {
+                        return false;
+                    }
+                }
+
+                for commitment in transaction.commitments() {
+                    if let Ok(true) = self.contains_commitment(commitment) {
+                        return false;
+                    }
+                }
+
+                true
+            })
+            .cloned()
+            .collect();
+        transactions.push(coinbase_transaction);
+
         // Construct the new block transactions.
-        let transactions = Transactions::from(&[&[coinbase_transaction], transactions].concat())?;
+        let transactions = Transactions::from(&transactions)?;
 
         // Mine the next block.
         match Block::mine(

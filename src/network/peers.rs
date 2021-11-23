@@ -30,7 +30,12 @@ use std::{
     net::SocketAddr,
     time::{Duration, Instant, SystemTime},
 };
-use tokio::{net::TcpStream, sync::mpsc, task, time::timeout};
+use tokio::{
+    net::TcpStream,
+    sync::{mpsc, oneshot},
+    task,
+    time::timeout,
+};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -45,13 +50,16 @@ pub(crate) type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
 /// Shorthand for the child half of the `Peers` message channel.
 type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 
+/// Shorthand for the parent half of the connection result channel.
+type ConnectionResult = oneshot::Sender<Result<()>>;
+
 ///
 /// An enum of requests that the `Peers` struct processes.
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, ledger_router)
-    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N, E>),
+    /// Connect := (peer_ip, ledger_reader, ledger_router, connection_result)
+    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, ConnectionResult),
     /// Heartbeat := (ledger_reader, ledger_router)
     Heartbeat(LedgerReader<N>, LedgerRouter<N, E>),
     /// MessagePropagate := (peer_ip, message)
@@ -142,7 +150,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the list of connected peers.
     ///
-    pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
+    pub fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.keys().cloned().collect()
     }
 
@@ -180,7 +188,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&mut self, request: PeersRequest<N, E>, peers_router: &PeersRouter<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, connection_result) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -223,6 +231,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         ledger_reader,
                                         ledger_router,
                                         &mut self.connected_nonces(),
+                                        Some(connection_result),
                                     )
                                     .await
                                 }
@@ -286,14 +295,22 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 for peer_ip in self
                     .candidate_peers()
                     .iter()
+                    .copied()
                     .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
                 {
-                    if !self.is_connected_to(*peer_ip) {
+                    if !self.is_connected_to(peer_ip) {
                         trace!("Attempting connection to {}...", peer_ip);
-                        let request = PeersRequest::Connect(*peer_ip, ledger_reader.clone(), ledger_router.clone());
+
+                        // Initialize the connection process.
+                        let (router, handler) = oneshot::channel();
+                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), ledger_router.clone(), router);
                         if let Err(error) = peers_router.send(request).await {
-                            error!("Failed to transmit the request: '{}'", error);
+                            warn!("Failed to transmit the request: '{}'", error);
                         }
+                        // Do not wait for the result of each connection.
+                        task::spawn(async move {
+                            let _ = handler.await;
+                        });
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
@@ -370,6 +387,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             ledger_reader,
                             ledger_router,
                             &mut self.connected_nonces(),
+                            None,
                         )
                         .await;
                     }
@@ -518,6 +536,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
         }) {
             self.send(*peer, message).await;
         }
+    }
+
+    ///
+    /// Removes the addresses of all known peers.
+    ///
+    #[cfg(feature = "test")]
+    pub fn reset_known_peers(&mut self) {
+        self.candidate_peers.clear();
+        self.restricted_peers.clear();
+        self.seen_inbound_connections.clear();
+        self.seen_outbound_connections.clear();
     }
 }
 
@@ -734,9 +763,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N, E>,
         connected_nonces: &mut T,
+        connection_result: Option<ConnectionResult>,
     ) {
         let connected_nonces = connected_nonces.cloned().collect::<Vec<u64>>();
         let peers_router = peers_router.clone();
+
         task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(
@@ -750,9 +781,23 @@ impl<N: Network, E: Environment> Peer<N, E> {
             )
             .await
             {
-                Ok(peer) => peer,
+                Ok(peer) => {
+                    // If the optional connection result router is given, report a successful connection result.
+                    if let Some(router) = connection_result {
+                        if router.send(Ok(())).is_err() {
+                            warn!("Failed to report a successful connection");
+                        }
+                    }
+                    peer
+                }
                 Err(error) => {
                     trace!("{}", error);
+                    // If the optional connection result router is given, report a failed connection result.
+                    if let Some(router) = connection_result {
+                        if router.send(Err(error)).is_err() {
+                            warn!("Failed to report a failed connection");
+                        }
+                    }
                     return;
                 }
             };

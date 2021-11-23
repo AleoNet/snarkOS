@@ -36,7 +36,7 @@ use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
+use tokio::sync::{oneshot, RwLock};
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -83,7 +83,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
 
 /// Starts a local RPC HTTP server at `rpc_port` in a dedicated `tokio` task.
 /// RPC failures do not affect the rest of the node.
-pub fn initialize_rpc_server<N: Network, E: Environment>(
+pub async fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,
     password: String,
@@ -103,9 +103,16 @@ pub fn initialize_rpc_server<N: Network, E: Environment>(
 
     let server = Server::bind(&rpc_addr).serve(service);
 
-    tokio::spawn(async move {
-        server.await.expect("The RPC server couldn't be started!");
-    })
+    let (router, handler) = oneshot::channel();
+    let task = tokio::spawn(async move {
+        // Notify the outer function that the task is ready.
+        let _ = router.send(());
+        server.await.expect("Failed to start the RPC server");
+    });
+    // Wait until the spawned task is ready.
+    let _ = handler.await;
+
+    task
 }
 
 async fn handle_rpc<N: Network, E: Environment>(
