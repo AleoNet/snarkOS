@@ -442,7 +442,7 @@ mod tests {
         str::FromStr,
         sync::atomic::AtomicBool,
     };
-    use tokio::sync::{mpsc, RwLock};
+    use tokio::sync::mpsc;
 
     fn temp_dir() -> std::path::PathBuf {
         tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -472,7 +472,7 @@ mod tests {
             username: "root".to_string(),
             password: "pass".to_string(),
         };
-        let ledger = Arc::new(RwLock::new(new_ledger_state::<N, S, P>(path)));
+        let ledger = Arc::new(new_ledger_state::<N, S, P>(path));
 
         // Create a dummy mpsc channel for Ledger requests. todo (@collinc97): only get requests will work until this is changed
         let (ledger_router, _ledger_handler) = mpsc::channel(1024);
@@ -707,7 +707,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
+        let ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -823,7 +823,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
+        let ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
@@ -975,7 +975,7 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let mut ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
+        let ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
