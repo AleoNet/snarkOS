@@ -554,10 +554,6 @@ impl<N: Network> LedgerState<N> {
         // Construct the ledger root.
         let ledger_root = self.latest_ledger_root();
 
-        // Craft a coinbase transaction.
-        let amount = Block::<N>::block_reward(block_height);
-        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
-
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
         // TODO (howardwu): Improve the performance and design of this.
         let mut transactions: Vec<Transaction<N>> = transactions
@@ -579,6 +575,26 @@ impl<N: Network> LedgerState<N> {
             })
             .cloned()
             .collect();
+
+        // Fetch the transaction fee from the given transactions.
+        // Non-coinbase value balances should be negative,
+        // so we use `sub` to represent the fees as a positive value.
+        let transaction_fees: AleoAmount = transactions
+            .iter()
+            .map(Transaction::value_balance)
+            .fold(AleoAmount::ZERO, |a, b| a.sub(b));
+
+        // Enforce that the transaction fee is positive or zero.
+        if transaction_fees.is_negative() {
+            return Err(anyhow!("Invalid transaction fees"));
+        }
+
+        // Calculate the miner reward. (block reward + transaction fees)
+        let amount = Block::<N>::block_reward(block_height).add(transaction_fees);
+
+        // Craft a coinbase transaction.
+        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
+
         transactions.push(coinbase_transaction);
 
         // Construct the new block transactions.
