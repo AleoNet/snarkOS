@@ -125,25 +125,28 @@ snarkos
 The Aleo Team <hello@aleo.org>
 
 USAGE:
-    snarkos [FLAGS] [OPTIONS]
+    snarkos [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
         --display    If the flag is set, the node will render a read-only display
     -h, --help       Prints help information
+        --norpc      If the flag is set, the node will not initialize the RPC server
     -V, --version    Prints version information
 
 OPTIONS:
+        --connect <connect>          Specify the IP address of a peer to connect to
         --miner <miner>              Specify this as a mining node, with the given miner address
     -n, --network <network>          Specify the network of this node [default: 2]
-        --node <node>                Specify the port for the node server
-        --rpc <rpc>                  Specify the port for the RPC server
-        --username <rpc-username>    Specify the username for the RPC server [default: root]
+        --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
+        --rpc <rpc>                  Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
         --password <rpc-password>    Specify the password for the RPC server [default: pass]
+        --username <rpc-username>    Specify the username for the RPC server [default: root]
         --verbosity <verbosity>      Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
 
 SUBCOMMANDS:
-    help      Prints this message or the help of the given subcommand(s)
-    update    Updates snarkOS to the latest version
+    experimental    Experimental features
+    help            Prints this message or the help of the given subcommand(s)
+    update          Updates snarkOS to the latest version
 ```
 
 ## 6. Development Guide
