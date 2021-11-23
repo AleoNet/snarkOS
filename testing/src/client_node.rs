@@ -49,13 +49,13 @@ impl ClientNode {
 
     /// Starts a snarkOS node with all the default characteristics from `ClientNode::with_args`.
     pub async fn default() -> Self {
-        ClientNode::with_args(&[]).await
+        ClientNode::with_args(&["--node", "127.0.0.1:4133"]).await
     }
 
     /// Starts a snarkOS node with a local address and the RPC server disabled;
     /// extra arguments may be passed via `extra_args`.
     pub async fn with_args(extra_args: &[&str]) -> Self {
-        let permanent_args = &["snarkos", "--norpc", "--node", "127.0.0.1:4132"];
+        let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
         let config = snarkos::Node::from_iter(combined_args);
         let server = Server::<Testnet2, Client<Testnet2>>::initialize(&config, None, Tasks::new())
