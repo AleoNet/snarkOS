@@ -14,19 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Updater, network::Server, Client, ClientTrial, Display, Environment, Miner, MinerTrial, NodeType, SyncNode};
+use crate::{
+    helpers::{Tasks, Updater},
+    network::Server,
+    Client,
+    ClientTrial,
+    Display,
+    Environment,
+    Miner,
+    MinerTrial,
+    NodeType,
+    SyncNode,
+};
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;
 use colored::*;
-use std::str::FromStr;
+use std::{net::SocketAddr, str::FromStr};
 use structopt::StructOpt;
+use tokio::task;
 use tracing_subscriber::EnvFilter;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
 pub struct Node {
-    /// Specify the IP address of a peer to connect to.
+    /// Specify the IP address and port of a peer to connect to.
     #[structopt(long = "connect")]
     pub connect: Option<String>,
     /// Specify this as a mining node, with the given miner address.
@@ -35,12 +47,12 @@ pub struct Node {
     /// Specify the network of this node.
     #[structopt(default_value = "2", short = "n", long = "network")]
     pub network: u16,
-    /// Specify the port for the node server.
-    #[structopt(long = "node")]
-    pub node: Option<u16>,
-    /// Specify the port for the RPC server.
-    #[structopt(long = "rpc")]
-    pub rpc: Option<u16>,
+    /// Specify the IP address and port for the node server.
+    #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
+    pub node: SocketAddr,
+    /// Specify the IP address and port for the RPC server.
+    #[structopt(parse(try_from_str), default_value = "0.0.0.0:3032", long = "rpc")]
+    pub rpc: SocketAddr,
     /// Specify the username for the RPC server.
     #[structopt(default_value = "root", long = "username")]
     pub rpc_username: String,
@@ -53,6 +65,9 @@ pub struct Node {
     /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
     pub display: bool,
+    /// If the flag is set, the node will not initialize the RPC server.
+    #[structopt(long)]
+    pub norpc: bool,
     #[structopt(hidden = true, long)]
     pub trial: bool,
     #[structopt(hidden = true, long)]
@@ -82,14 +97,25 @@ impl Node {
         }
     }
 
-    async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
-        let node_port = self.node.unwrap_or(E::DEFAULT_NODE_PORT);
-        let rpc_port = self.rpc.unwrap_or(E::DEFAULT_RPC_PORT);
-        assert!(
-            !(node_port < 4130),
-            "Until configuration files are established, the node port must be at least 4130 or greater"
-        );
+    /// Returns the storage path of the node.
+    pub(crate) fn storage_path(&self, local_ip: SocketAddr) -> String {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "test")] {
+                // Tests may use any available ports, and removes the storage artifacts afterwards,
+                // so that there is no need to adhere to a specific number assignment logic.
+                format!("/tmp/snarkos-test-ledger-{}", local_ip.port())
+            } else {
+                // TODO (howardwu): Remove this check after introducing proper configurations.
+                assert!(
+                    self.node.port() >= 4130,
+                    "Until configuration files are established, the node port must be at least 4130 or greater"
+                );
+                format!(".ledger-{}", (self.node.port() - 4130))
+            }
+        }
+    }
 
+    async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
         let miner = match (E::NODE_TYPE, &self.miner) {
             (NodeType::Miner, Some(address)) => {
                 let miner_address = Address::<N>::from_str(address)?;
@@ -105,37 +131,29 @@ impl Node {
             }
         };
 
+        // Initialize the tasks handler.
+        let tasks = Tasks::new();
+        // Initialize the node server.
+        let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
+        // Initialize either the display or logger.
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            match Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await {
-                Ok(server) => {
-                    if let Some(peer_ip) = &self.connect {
-                        server.connect_to(peer_ip.parse().unwrap()).await?;
-                    }
-                    let _display = Display::<N, E>::start(server)?;
-                    Ok(())
-                }
-                Err(error) => {
-                    error!("{}", error);
-                    Err(error)
-                }
-            }
+            let _display = Display::<N, E>::start(server.clone())?;
         } else {
             self.initialize_logger();
-            match Server::<N, E>::initialize(node_port, rpc_port, self.rpc_username.clone(), self.rpc_password.clone(), miner).await {
-                Ok(server) => {
-                    if let Some(peer_ip) = &self.connect {
-                        server.connect_to(peer_ip.parse().unwrap()).await?;
-                    }
-                    std::future::pending::<()>().await;
-                    Ok(())
-                }
-                Err(error) => {
-                    error!("{}", error);
-                    Err(error)
-                }
-            }
         }
+
+        // Connect to a peer if one was given as an argument.
+        if let Some(peer_ip) = &self.connect {
+            let _ = server.connect_to(peer_ip.parse().unwrap()).await;
+        }
+        // Spawn a task to handle the server.
+        tasks.append(task::spawn(async move {
+            let _server = server;
+            std::future::pending::<()>().await
+        }));
+
+        Ok(())
     }
 
     fn initialize_logger(&self) {
@@ -156,10 +174,10 @@ impl Node {
             .add_directive("hyper::proto::h1::role=off".parse().unwrap());
 
         // Initialize tracing.
-        tracing_subscriber::fmt()
+        let _ = tracing_subscriber::fmt()
             .with_env_filter(filter)
             .with_target(self.verbosity == 3)
-            .init();
+            .try_init();
     }
 }
 
