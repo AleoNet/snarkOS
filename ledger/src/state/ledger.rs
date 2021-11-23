@@ -563,23 +563,19 @@ impl<N: Network> LedgerState<N> {
         let mut transactions: Vec<Transaction<N>> = transactions
             .iter()
             .filter(|transaction| {
-                let mut is_new = true;
-
                 for serial_number in transaction.serial_numbers() {
                     if let Ok(true) = self.contains_serial_number(serial_number) {
-                        is_new = false;
-                        break;
+                        return false;
                     }
                 }
 
                 for commitment in transaction.commitments() {
                     if let Ok(true) = self.contains_commitment(commitment) {
-                        is_new = false;
-                        break;
+                        return false;
                     }
                 }
 
-                is_new
+                true
             })
             .cloned()
             .collect();
