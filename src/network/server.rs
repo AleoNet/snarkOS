@@ -57,8 +57,6 @@ pub struct Server<N: Network, E: Environment> {
     ledger_router: LedgerRouter<N, E>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
-    /// The node's local listening address.
-    local_ip: SocketAddr,
 }
 
 impl<N: Network, E: Environment> Server<N, E> {
@@ -131,7 +129,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             ledger_reader,
             ledger_router,
             tasks,
-            local_ip,
         })
     }
 
