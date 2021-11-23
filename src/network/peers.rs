@@ -19,7 +19,12 @@ use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
 use futures::SinkExt;
-use rand::{prelude::IteratorRandom, rngs::OsRng, thread_rng, Rng};
+use rand::{
+    prelude::{IteratorRandom, SliceRandom},
+    rngs::OsRng,
+    thread_rng,
+    Rng,
+};
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -268,7 +273,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 };
 
                 // Add the sync nodes to the list of candidate peers.
-                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+                let mut sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+                sync_nodes.shuffle(&mut OsRng::default());
                 self.add_candidate_peers(&sync_nodes);
 
                 // Add the peer nodes to the list of candidate peers.
@@ -414,6 +420,15 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// as the peer providing this list could be subverting the protocol.
     ///
     fn add_candidate_peers(&mut self, peers: &[SocketAddr]) {
+        // TODO (raychu86): Make this variable globally accessible.
+        const MAXIMUM_CONNECTED_SYNC_NODES: usize = 3;
+
+        let connected_peers: HashSet<SocketAddr> = self.connected_peers.keys().into_iter().cloned().collect();
+        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+
+        // Fetch the number of connected sync nodes.
+        let num_connected_sync_nodes = connected_peers.intersection(&sync_nodes).count();
+
         // Ensure the combined number of peers does not surpass the threshold.
         if self.candidate_peers.len() + peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
             // Proceed to insert each new candidate peer IP.
@@ -421,7 +436,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Ensure the peer is not self and is a new candidate peer.
                 let is_self = *peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
-                if !is_self && !self.is_connected_to(*peer_ip) && !self.candidate_peers.contains(peer_ip) {
+
+                // Ensure that the node has not connected to more than `MAXIMUM_CONNECTED_SYNC_NODES` sync nodes.
+                let is_valid_sync_node = match sync_nodes.contains(peer_ip) {
+                    true => num_connected_sync_nodes < MAXIMUM_CONNECTED_SYNC_NODES,
+                    false => true,
+                };
+
+                if !is_self && is_valid_sync_node && !self.is_connected_to(*peer_ip) && !self.candidate_peers.contains(peer_ip) {
                     self.candidate_peers.insert(*peer_ip);
                 }
             }
