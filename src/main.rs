@@ -37,7 +37,7 @@ fn main() -> Result<()> {
         .unwrap();
 
     runtime.block_on(async move {
-        Node::from_args().start().await.expect("Couldn't start the node!");
+        Node::from_args().start().await.expect("Failed to start the node");
         std::future::pending::<()>().await;
     });
 
