@@ -48,7 +48,7 @@ pub struct Server<N: Network, E: Environment> {
     /// The status of the node.
     status: Status,
     /// The list of peers for the node.
-    pub peers: Arc<RwLock<Peers<N, E>>>,
+    peers: Arc<RwLock<Peers<N, E>>>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
@@ -58,7 +58,7 @@ pub struct Server<N: Network, E: Environment> {
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
     /// The node's local listening address.
-    pub local_ip: SocketAddr,
+    local_ip: SocketAddr,
 }
 
 impl<N: Network, E: Environment> Server<N, E> {
