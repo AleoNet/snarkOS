@@ -63,11 +63,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     pub async fn initialize(node: &Node, miner: Option<Address<N>>, mut tasks: Tasks<task::JoinHandle<()>>) -> Result<Self> {
-        assert!(
-            node.node.port() >= 4130,
-            "Until configuration files are established, the node port must be at least 4130 or greater"
-        );
-
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node.node).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),

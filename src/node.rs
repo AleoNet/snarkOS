@@ -98,6 +98,12 @@ impl Node {
     }
 
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
+        // TODO (howardwu): Remove this check after introducing proper configurations.
+        assert!(
+            self.node.port() >= 4130,
+            "Until configuration files are established, the node port must be at least 4130 or greater"
+        );
+
         let miner = match (E::NODE_TYPE, &self.miner) {
             (NodeType::Miner, Some(address)) => {
                 let miner_address = Address::<N>::from_str(address)?;
