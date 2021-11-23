@@ -45,6 +45,8 @@ pub type LedgerReader<N> = Arc<RwLock<LedgerState<N>>>;
 ///
 #[derive(Clone)]
 pub struct Server<N: Network, E: Environment> {
+    /// The local address of this node.
+    local_ip: SocketAddr,
     /// The status of the node.
     status: Status,
     /// The list of peers for the node.
@@ -123,6 +125,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         }
 
         Ok(Self {
+            local_ip,
             status,
             peers,
             peers_router,
@@ -130,6 +133,11 @@ impl<N: Network, E: Environment> Server<N, E> {
             ledger_router,
             tasks,
         })
+    }
+
+    /// Returns the IP address of this node.
+    fn local_ip(&self) -> SocketAddr {
+        self.local_ip
     }
 
     /// Returns the status of this node.
