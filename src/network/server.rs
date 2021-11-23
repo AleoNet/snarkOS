@@ -79,7 +79,6 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the status indicator.
         let status = Status::new();
-
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone()).await;
         // Initialize a new instance for managing the ledger.
@@ -91,22 +90,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_reader, &ledger_router).await;
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router).await;
-
-        if !node.norpc {
-            // Initialize a new instance of the RPC server.
-            tasks.append(
-                initialize_rpc_server::<N, E>(
-                    node.rpc,
-                    node.rpc_username.clone(),
-                    node.rpc_password.clone(),
-                    &status,
-                    &peers,
-                    &ledger_reader,
-                    &ledger_router,
-                )
-                .await,
-            );
-        }
+        // Initialize a new instance of the RPC server.
+        Self::initialize_rpc(&mut tasks, node, &status, &peers, &ledger_reader, &ledger_router).await;
 
         Ok(Self {
             local_ip,
@@ -355,6 +340,35 @@ impl<N: Network, E: Environment> Server<N, E> {
             } else {
                 error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
+        }
+    }
+
+    ///
+    /// Initialize a new instance of the RPC server.
+    ///
+    #[inline]
+    async fn initialize_rpc(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        node: &Node,
+        status: &Status,
+        peers: &Arc<RwLock<Peers<N, E>>>,
+        ledger_reader: &LedgerReader<N>,
+        ledger_router: &LedgerRouter<N, E>,
+    ) {
+        if !node.norpc {
+            // Initialize a new instance of the RPC server.
+            tasks.append(
+                initialize_rpc_server::<N, E>(
+                    node.rpc,
+                    node.rpc_username.clone(),
+                    node.rpc_password.clone(),
+                    status,
+                    peers,
+                    ledger_reader,
+                    ledger_router,
+                )
+                .await,
+            );
         }
     }
 }
