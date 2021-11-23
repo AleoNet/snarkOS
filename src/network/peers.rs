@@ -295,17 +295,15 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     if !self.is_connected_to(peer_ip) {
                         trace!("Attempting connection to {}...", peer_ip);
 
-                        let (tx, rx) = oneshot::channel();
-                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), ledger_router.clone(), tx);
+                        // Initialize the connection process.
+                        let (router, handler) = oneshot::channel();
+                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), ledger_router.clone(), router);
                         if let Err(error) = peers_router.send(request).await {
-                            error!("Failed to transmit the request: '{}'", error);
+                            warn!("Failed to transmit the request: '{}'", error);
                         }
-
-                        // Don't wait for the result of each connection.
+                        // Do not wait for the result of each connection.
                         task::spawn(async move {
-                            if let Err(error) = rx.await {
-                                error!("Failed to transmit the request: '{}'", error);
-                            }
+                            let _ = handler.await;
                         });
                     }
                 }
@@ -765,7 +763,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     // If the optional connection result router is given, report a successful connection result.
                     if let Some(router) = connection_result {
                         if router.send(Ok(())).is_err() {
-                            error!("Failed to report a successful connection");
+                            warn!("Failed to report a successful connection");
                         }
                     }
                     peer
@@ -775,7 +773,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     // If the optional connection result router is given, report a failed connection result.
                     if let Some(router) = connection_result {
                         if router.send(Err(error)).is_err() {
-                            error!("Failed to report a failed connection");
+                            warn!("Failed to report a failed connection");
                         }
                     }
                     return;
