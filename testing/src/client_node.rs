@@ -47,8 +47,7 @@ impl ClientNode {
         self.server.connect_to(addr).await
     }
 
-    /// Starts a snarkOS node with all the default characteristics from `ClientNode::with_args`,
-    /// and with any available port (as opposed to the default snarkOS network port).
+    /// Starts a snarkOS node with all the default characteristics from `ClientNode::with_args`.
     pub async fn default() -> Self {
         ClientNode::with_args(&[]).await
     }
