@@ -124,7 +124,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             block_requests_lock: Mutex::new(()),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
-            miner: Arc::new(ThreadPoolBuilder::new().num_threads(4).build()?),
+            miner: Arc::new(ThreadPoolBuilder::new().num_threads((num_cpus::get() / 8 * 2).max(1)).build()?),
             _phantom: PhantomData,
         })
     }
