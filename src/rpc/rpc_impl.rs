@@ -211,6 +211,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let connected_peers = self.peers.connected_peers().await;
         let number_of_candidate_peers = candidate_peers.len();
         let number_of_connected_peers = connected_peers.len();
+        let number_of_connected_sync_nodes = self.peers.number_of_connected_sync_nodes().await;
 
         Ok(serde_json::json!({
             "candidate_peers": candidate_peers,
@@ -218,6 +219,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             "latest_block_height": self.ledger.read().await.latest_block_height(),
             "number_of_candidate_peers": number_of_candidate_peers,
             "number_of_connected_peers": number_of_connected_peers,
+            "number_of_connected_sync_nodes": number_of_connected_sync_nodes,
             "status": self.status.to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,
