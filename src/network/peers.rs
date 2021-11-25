@@ -288,7 +288,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in peer_ips_to_disconnect {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
-                        self.send(peer_ip, &Message::Disconnect).await;
+                        self.send(peer_ip, Message::Disconnect).await;
                         // Add an entry for this `Peer` in the restricted peers.
                         self.restricted_peers.write().await.insert(peer_ip, Instant::now());
                     }
@@ -342,14 +342,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
                 // Request more peers if the number of connected peers is below the threshold.
                 for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 1) {
-                    self.send(*peer_ip, &Message::PeerRequest).await;
+                    self.send(*peer_ip, Message::PeerRequest).await;
                 }
             }
             PeersRequest::MessagePropagate(sender, message) => {
-                self.propagate(sender, &message).await;
+                self.propagate(sender, message).await;
             }
             PeersRequest::MessageSend(sender, message) => {
-                self.send(sender, &message).await;
+                self.send(sender, message).await;
             }
             PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router) => {
                 // Ensure the peer IP is not this node.
@@ -457,7 +457,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
                 let connected_peers = self.connected_peers().await;
-                self.send(recipient, &Message::PeerResponse(connected_peers)).await;
+                self.send(recipient, Message::PeerResponse(connected_peers)).await;
             }
             PeersRequest::ReceivePeerResponse(peer_ips) => {
                 self.add_candidate_peers(&peer_ips).await;
@@ -491,13 +491,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to specified peer.
     ///
-    async fn send(&self, peer: SocketAddr, message: &Message<N, E>) {
+    async fn send(&self, peer: SocketAddr, message: Message<N, E>) {
         let target_peer = self.connected_peers.read().await.get(&peer).cloned();
         match target_peer {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
-                    Message::UnconfirmedBlock(block) => {
+                    Message::UnconfirmedBlock(ref block) => {
                         let block = if let MaybeSerialized::Deserialized(block) = block {
                             block
                         } else {
@@ -520,7 +520,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         }
                         is_ready_to_send
                     }
-                    Message::UnconfirmedTransaction(transaction) => {
+                    Message::UnconfirmedTransaction(ref transaction) => {
                         // Lock seen_outbound_transactions for further processing.
                         let mut seen_outbound_transactions = self.seen_outbound_transactions.write().await;
 
@@ -561,7 +561,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to every connected peer, excluding the sender.
     ///
-    async fn propagate(&self, sender: SocketAddr, message: &Message<N, E>) {
+    async fn propagate(&self, sender: SocketAddr, message: Message<N, E>) {
         // Iterate through all peers that are not the sender, sync node, or peer node.
         for peer in self
             .connected_peers()
@@ -574,7 +574,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             .copied()
             .collect::<Vec<_>>()
         {
-            self.send(peer, message).await;
+            self.send(peer, message.clone()).await;
         }
     }
 
