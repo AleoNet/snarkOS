@@ -1043,22 +1043,21 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         trace!("Skipping 'UnconfirmedBlock {}' from {}", block_height, peer_ip)
                                     } else {
                                         // Perform the deferred non-blocking deserialization of the block.
-                                        match block.deserialize().await {
+                                        let request = match block.deserialize().await {
                                             // Ensure the claimed block height and block hash matches in the deserialized block.
                                             Ok(block) => match block_height == block.height() && block_hash == block.hash() {
                                                 // Route the `UnconfirmedBlock` to the ledger.
-                                                true => if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
-                                                    warn!("[UnconfirmedBlock] {}", error);
-                                                },
+                                                true => LedgerRequest::UnconfirmedBlock(peer_ip, block),
                                                 // Route the `Failure` to the ledger.
-                                                false => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, "Mismatch in UnconfirmedBlock message".to_string())).await {
-                                                    warn!("[Failure] {}", error);
-                                                }
+                                                false => LedgerRequest::Failure(peer_ip, "Malformed UnconfirmedBlock message".to_string())
                                             },
                                             // Route the `Failure` to the ledger.
-                                            Err(error) => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-                                                warn!("[Failure] {}", error);
-                                            },
+                                            Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
+                                        };
+
+                                        // Route the request to the ledger.
+                                        if let Err(error) = ledger_router.send(request).await {
+                                            warn!("[UnconfirmedBlock] {}", error);
                                         }
                                     }
                                 }
