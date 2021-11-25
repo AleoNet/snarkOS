@@ -36,7 +36,7 @@ use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::oneshot;
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -88,7 +88,7 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     username: String,
     password: String,
     status: &Status,
-    peers: &Arc<RwLock<Peers<N, E>>>,
+    peers: &Arc<Peers<N, E>>,
     ledger: &LedgerReader<N>,
     ledger_router: &LedgerRouter<N, E>,
 ) -> tokio::task::JoinHandle<()> {
@@ -442,7 +442,7 @@ mod tests {
         str::FromStr,
         sync::atomic::AtomicBool,
     };
-    use tokio::sync::mpsc;
+    use tokio::sync::{mpsc, RwLock};
 
     fn temp_dir() -> std::path::PathBuf {
         tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -454,8 +454,8 @@ mod tests {
     }
 
     /// Initializes a new instance of the `Peers` struct.
-    fn peers<N: Network, E: Environment>() -> Arc<RwLock<Peers<N, E>>> {
-        Arc::new(RwLock::new(Peers::new("0.0.0.0:4130".parse().unwrap(), None, Status::new())))
+    fn peers<N: Network, E: Environment>() -> Arc<Peers<N, E>> {
+        Arc::new(Peers::new("0.0.0.0:4130".parse().unwrap(), None, Status::new()))
     }
 
     /// Initializes a new instance of the ledger state.

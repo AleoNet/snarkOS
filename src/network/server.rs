@@ -46,7 +46,7 @@ pub struct Server<N: Network, E: Environment> {
     /// The status of the node.
     status: Status,
     /// The list of peers for the node.
-    peers: Arc<RwLock<Peers<N, E>>>,
+    peers: Arc<Peers<N, E>>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
@@ -109,7 +109,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     /// Returns the peer manager of this node.
-    pub fn peers(&self) -> Arc<RwLock<Peers<N, E>>> {
+    pub fn peers(&self) -> Arc<Peers<N, E>> {
         self.peers.clone()
     }
 
@@ -133,7 +133,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Disconnects from peers and proceeds to shut down the node.
     ///
     #[inline]
-    pub(crate) fn shut_down(&self) {
+    pub fn shut_down(&self) {
         info!("Shutting down...");
         self.tasks.flush();
     }
@@ -147,9 +147,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         local_status: Status,
-    ) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
+    ) -> (Arc<Peers<N, E>>, PeersRouter<N, E>) {
         // Initialize the `Peers` struct.
-        let peers = Arc::new(RwLock::new(Peers::new(local_ip, None, local_status)));
+        let peers = Arc::new(Peers::new(local_ip, None, local_status));
 
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
@@ -170,7 +170,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     // Asynchronously process a peers request.
                     tasks_clone.append(task::spawn(async move {
                         // Hold the peers write lock briefly, to update the state of the peers.
-                        peers.write().await.update(request, &peers_router).await;
+                        peers.update(request, &peers_router).await;
                     }));
                 }
             }));
@@ -345,7 +345,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         node: &Node,
         status: &Status,
-        peers: &Arc<RwLock<Peers<N, E>>>,
+        peers: &Arc<Peers<N, E>>,
         ledger_reader: &LedgerReader<N>,
         ledger_router: &LedgerRouter<N, E>,
     ) {
