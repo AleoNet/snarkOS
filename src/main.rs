@@ -33,8 +33,8 @@ fn main() -> Result<()> {
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(8 * 1024 * 1024)
-        .worker_threads(num_cpus::get().saturating_sub(1).max(1)) // Don't use 100% of the cores
-        .max_blocking_threads(num_cpus::get().saturating_sub(1).max(1)) // Don't use 100% of the cores
+        .worker_threads((num_cpus::get() / 4).max(1))
+        .max_blocking_threads((num_cpus::get() / 4).max(1))
         .build()?;
 
     // Initialize the parallelization parameters.
