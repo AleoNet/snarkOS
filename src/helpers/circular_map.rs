@@ -77,11 +77,15 @@ impl<K: Clone + PartialEq, V: Clone, const N: u32> CircularMap<K, V, N> {
     }
 
     ///
-    /// Inserts the given key-value pair into the circular map.
+    /// Inserts the given key-value pair into the circular map, returning a `bool`
+    /// indicating whether the insertion took place.
     ///
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert(&mut self, key: K, value: V) -> bool {
         if !self.contains_key(&key) {
             self.queue.push((key, value));
+            true
+        } else {
+            false
         }
     }
 

@@ -30,11 +30,11 @@ use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, oneshot, RwLock},
+    sync::{mpsc, oneshot},
     task,
 };
 
-pub type LedgerReader<N> = Arc<RwLock<LedgerState<N>>>;
+pub type LedgerReader<N> = Arc<LedgerState<N>>;
 
 ///
 /// A set of operations to initialize the node server for a specific network.
@@ -193,12 +193,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) -> Result<(LedgerReader<N>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
         let path = storage_path.clone();
-        let ledger = Arc::new(RwLock::new(
-            task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status)).await??,
-        ));
+        let ledger = Arc::new(task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status)).await??);
 
         // Open a ledger reader from storage.
-        let ledger_reader = Arc::new(RwLock::new(LedgerState::<N>::open_reader::<RocksDB, _>(&storage_path)?));
+        let ledger_reader = LedgerState::<N>::open_reader::<RocksDB, _>(&storage_path)?;
 
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
@@ -214,7 +212,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Hold the ledger write lock briefly, to update the state of the ledger.
                 // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
                 // will end up being processed out of order.
-                ledger.write().await.update(request, &peers_router).await;
+                ledger.update(request, &peers_router).await;
             }
         }));
         // Wait until the ledger router task is ready.
