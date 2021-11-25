@@ -985,15 +985,19 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the timestamp for the received block.
                                     peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
 
-                                    // Ensure the unconfirmed block is at least within 3 blocks of the latest block height.
+                                    // Ensure the unconfirmed block is at least within 3 blocks of the latest block height,
+                                    // and no more that 100 blocks ahead of the latest block height.
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
-                                    let is_fresh_state = block.height() + 3 > ledger_reader.read().await.latest_block_height();
+                                    let latest_block_height = ledger_reader.read().await.latest_block_height();
+                                    let lower_bound = latest_block_height.saturating_sub(3);
+                                    let upper_bound = latest_block_height.saturating_add(100);
+                                    let is_within_range = block.height() >= lower_bound && block.height() <= upper_bound;
 
                                     // Ensure the node is not peering.
                                     let is_node_ready = !local_status.is_peering();
 
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_fresh_state || !is_node_ready {
+                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_within_range || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
                                     } else {
                                         // Route the `UnconfirmedBlock` to the ledger.
