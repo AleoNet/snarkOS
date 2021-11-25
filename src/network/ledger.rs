@@ -427,14 +427,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 Err(error) => warn!("{}", error),
             }
         } else {
-            // Register the block's height.
+            // Retrieve the unconfirmed block height.
             let block_height = block.height();
 
             // Add the block to the unconfirmed blocks.
-            if !self.unconfirmed_blocks.write().await.insert(block.previous_block_hash(), block) {
-                trace!("Memory pool already contains unconfirmed block {}", block_height);
-            } else {
+            if self.unconfirmed_blocks.write().await.insert(block.previous_block_hash(), block) {
                 trace!("Added unconfirmed block {} to memory pool", block_height);
+            } else {
+                trace!("Memory pool already contains unconfirmed block {}", block_height);
             }
         }
         false
