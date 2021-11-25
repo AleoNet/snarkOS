@@ -17,6 +17,7 @@
 use crate::{
     helpers::{CircularMap, State, Status},
     Environment,
+    MaybeSerialized,
     Message,
     NodeType,
     PeersRequest,
@@ -202,6 +203,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Process the unconfirmed block.
                     self.add_block(block.clone()).await;
                     // Propagate the unconfirmed block to the connected peers.
+                    let block = MaybeSerialized::Deserialized(block);
                     let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(block));
                     if let Err(error) = peers_router.send(request).await {
                         warn!("[UnconfirmedBlock] {}", error);

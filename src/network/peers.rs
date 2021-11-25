@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Status, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType};
+use crate::{helpers::Status, Environment, LedgerReader, LedgerRequest, LedgerRouter, MaybeSerialized, Message, NodeType};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -498,6 +498,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
                     Message::UnconfirmedBlock(block) => {
+                        let block = if let MaybeSerialized::Deserialized(block) = block {
+                            block
+                        } else {
+                            panic!("Logic error: the block shouldn't have been serialized yet.");
+                        };
+
                         // Lock seen_outbound_blocks for further processing.
                         let mut seen_outbound_blocks = self.seen_outbound_blocks.write().await;
 
@@ -737,7 +743,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             return Err(anyhow!("Already connected to a peer with nonce {}", peer_nonce));
                         }
                         // Send the challenge response.
-                        let message = Message::ChallengeResponse(genesis_block_header.clone());
+                        let genesis_block_header = MaybeSerialized::Deserialized(genesis_block_header.clone());
+                        let message = Message::ChallengeResponse(genesis_block_header);
                         trace!("Sending '{}-B' to {}", message.name(), peer_ip);
                         outbound_socket.send(message).await?;
 
@@ -765,6 +772,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 trace!("Received '{}-A' from {}", message.name(), peer_ip);
                 match message {
                     Message::ChallengeResponse(block_header) => {
+                        // Perform deferred non-blocking deserialization of the block header.
+                        let block_header = block_header.deserialize().await?;
+
                         match block_header.height() == CHALLENGE_HEIGHT && &block_header == genesis_block_header && block_header.is_valid()
                         {
                             true => Ok((peer_ip, peer_nonce)),
@@ -897,6 +907,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Send a `BlockResponse` message for each block to the peer.
                                     for block in blocks {
                                         trace!("Sending 'BlockResponse {}' to {}", block.height(), peer_ip);
+                                        let block = MaybeSerialized::Deserialized(block);
                                         if let Err(error) = peer.outbound_socket.send(Message::BlockResponse(block)).await {
                                             warn!("[BlockResponse] {}", error);
                                             break;
@@ -904,6 +915,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 },
                                 Message::BlockResponse(block) => {
+                                    // Perform deferred non-blocking deserialization of the block.
+                                    let block = match block.deserialize().await {
+                                        Ok(block) => block,
+                                        Err(_) => break,
+                                    };
+
                                     // Route the `BlockResponse` to the ledger.
                                     if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block)).await {
                                         warn!("[BlockResponse] {}", error);
@@ -952,11 +969,18 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Err(_) => None,
                                     };
                                     // Send a `Pong` message to the peer.
-                                    if let Err(error) = peer.send(Message::Pong(is_fork, ledger_reader.latest_block_locators())).await {
+                                    let block_locators = MaybeSerialized::Deserialized(ledger_reader.latest_block_locators());
+                                    if let Err(error) = peer.send(Message::Pong(is_fork, block_locators)).await {
                                         warn!("[Pong] {}", error);
                                     }
                                 },
                                 Message::Pong(is_fork, block_locators) => {
+                                    // Perform deferred non-blocking deserialization of block locators.
+                                    let block_locators = match block_locators.deserialize().await {
+                                        Ok(locators) => locators,
+                                        Err(_) => break,
+                                    };
+
                                     // Route the `Pong` to the ledger.
                                     let request = LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators);
                                     if let Err(error) = ledger_router.send(request).await {
@@ -983,6 +1007,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     });
                                 }
                                 Message::UnconfirmedBlock(block) => {
+                                    // Perform deferred non-blocking deserialization of the block.
+                                    let block = match block.deserialize().await {
+                                        Ok(block) => block,
+                                        Err(_) => break,
+                                    };
+
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 5 {
