@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Status, Environment, LedgerReader, LedgerRequest, LedgerRouter, MaybeSerialized, Message, NodeType};
+use crate::{helpers::Status, Data, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -497,8 +497,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
-                    Message::UnconfirmedBlock(ref mut block) => {
-                        let deserialized_block = if let MaybeSerialized::Deserialized(block) = block {
+                    Message::UnconfirmedBlock(ref mut data) => {
+                        let block = if let Data::Object(block) = data {
                             block
                         } else {
                             panic!("Logic error: the block shouldn't have been serialized yet.");
@@ -509,19 +509,19 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Retrieve the last seen timestamp of this block for this peer.
                         let seen_blocks = seen_outbound_blocks.entry(peer).or_insert_with(Default::default);
-                        let last_seen = seen_blocks.entry(deserialized_block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                        let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
                         let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                         // Update the timestamp for the peer and sent block.
-                        seen_blocks.insert(deserialized_block.hash(), SystemTime::now());
+                        seen_blocks.insert(block.hash(), SystemTime::now());
                         // Report the unconfirmed block height.
                         if is_ready_to_send {
-                            trace!("Preparing to send 'UnconfirmedBlock {}' to {}", deserialized_block.height(), peer);
+                            trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block.height(), peer);
                         }
 
                         // Perform non-blocking serialization of the block.
-                        let serialized_block = bincode::serialize(&deserialized_block).expect("Block serialization is bugged");
-                        let _ = std::mem::replace(block, MaybeSerialized::Serialized(serialized_block));
+                        let serialized_block = bincode::serialize(&block).expect("Block serialization is bugged");
+                        let _ = std::mem::replace(data, Data::Buffer(serialized_block));
 
                         is_ready_to_send
                     }
@@ -748,8 +748,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             return Err(anyhow!("Already connected to a peer with nonce {}", peer_nonce));
                         }
                         // Send the challenge response.
-                        let genesis_block_header = MaybeSerialized::Deserialized(genesis_block_header.clone());
-                        let message = Message::ChallengeResponse(genesis_block_header);
+                        let message = Message::ChallengeResponse(Data::Object(genesis_block_header.clone()));
                         trace!("Sending '{}-B' to {}", message.name(), peer_ip);
                         outbound_socket.send(message).await?;
 
@@ -912,8 +911,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Send a `BlockResponse` message for each block to the peer.
                                     for block in blocks {
                                         trace!("Sending 'BlockResponse {}' to {}", block.height(), peer_ip);
-                                        let block = MaybeSerialized::Deserialized(block);
-                                        if let Err(error) = peer.outbound_socket.send(Message::BlockResponse(block)).await {
+                                        if let Err(error) = peer.outbound_socket.send(Message::BlockResponse(Data::Object(block))).await {
                                             warn!("[BlockResponse] {}", error);
                                             break;
                                         }
@@ -974,8 +972,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Err(_) => None,
                                     };
                                     // Send a `Pong` message to the peer.
-                                    let block_locators = MaybeSerialized::Deserialized(ledger_reader.latest_block_locators());
-                                    if let Err(error) = peer.send(Message::Pong(is_fork, block_locators)).await {
+                                    if let Err(error) = peer.send(Message::Pong(is_fork, Data::Object(ledger_reader.latest_block_locators()))).await {
                                         warn!("[Pong] {}", error);
                                     }
                                 },

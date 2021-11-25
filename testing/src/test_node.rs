@@ -17,8 +17,8 @@
 use snarkos::{
     helpers::{State, Status},
     Client,
+    Data,
     Environment,
-    MaybeSerialized,
     Message,
     NodeType,
 };
@@ -227,7 +227,7 @@ impl Handshake for TestNode {
             };
 
         // Respond with own challenge request.
-        let own_response = ClientMessage::ChallengeResponse(MaybeSerialized::Deserialized(genesis_block_header.clone()));
+        let own_response = ClientMessage::ChallengeResponse(Data::Object(genesis_block_header.clone()));
         trace!(parent: self.node().span(), "sending a challenge response to {}", peer_ip);
         let msg = own_response.serialize().unwrap();
         let len = u32::to_le_bytes(msg.len() as u32);
@@ -385,7 +385,7 @@ impl TestNode {
         let genesis = Testnet2::genesis_block();
         let msg = ClientMessage::Pong(
             None,
-            MaybeSerialized::Deserialized(BlockLocators::<Testnet2>::from(
+            Data::Object(BlockLocators::<Testnet2>::from(
                 vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect(),
             )),
         );
