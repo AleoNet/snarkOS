@@ -146,7 +146,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Returns the list of connected peers.
     ///
     pub async fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.connected_peers.read().await.keys().cloned().collect()
+        self.connected_peers.read().await.keys().copied().collect()
     }
 
     ///
@@ -438,7 +438,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
-                self.send(recipient, &Message::PeerResponse(self.connected_peers().await)).await;
+                let connected_peers = self.connected_peers().await;
+                self.send(recipient, &Message::PeerResponse(connected_peers)).await;
             }
             PeersRequest::ReceivePeerResponse(peer_ips) => {
                 self.add_candidate_peers(&peer_ips).await;
@@ -472,7 +473,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Sends the given message to specified peer.
     ///
     async fn send(&self, peer: SocketAddr, message: &Message<N, E>) {
-        match self.connected_peers.read().await.get(&peer).cloned() {
+        let target_peer = self.connected_peers.read().await.get(&peer).cloned();
+        match target_peer {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
@@ -899,7 +901,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if let Err(error) = ledger_router.send(LedgerRequest::Disconnect(peer_ip)).await {
                                         warn!("[Disconnect] {}", error);
                                     }
-                                    break;
+                                    return;
                                 }
                                 Message::PeerRequest => {
                                     // Send a `PeerResponse` message.
