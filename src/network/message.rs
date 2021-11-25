@@ -107,8 +107,8 @@ pub enum Message<N: Network, E: Environment> {
     Ping(u32, NodeType, State, u32, N::BlockHash),
     /// Pong := (is_fork, block_locators)
     Pong(Option<bool>, Data<BlockLocators<N>>),
-    /// UnconfirmedBlock := (block)
-    UnconfirmedBlock(Data<Block<N>>),
+    /// UnconfirmedBlock := (block_height, block_hash, block)
+    UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
     /// Unused
@@ -182,7 +182,12 @@ impl<N: Network, E: Environment> Message<N, E> {
 
                 Ok([vec![serialized_is_fork], block_locators.serialize_blocking()?].concat())
             }
-            Self::UnconfirmedBlock(block) => Ok(block.serialize_blocking()?),
+            Self::UnconfirmedBlock(block_height, block_hash, block) => Ok([
+                block_height.to_le_bytes().to_vec(),
+                block_hash.to_bytes_le()?,
+                block.serialize_blocking()?,
+            ]
+            .concat()),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
             Self::Unused(_) => Ok(vec![]),
         }
@@ -239,7 +244,11 @@ impl<N: Network, E: Environment> Message<N, E> {
 
                 Self::Pong(is_fork, Data::Buffer(data[1..].to_vec()))
             }
-            9 => Self::UnconfirmedBlock(Data::Buffer(data.to_vec())),
+            9 => Self::UnconfirmedBlock(
+                bincode::deserialize(&data[0..4])?,
+                bincode::deserialize(&data[4..36])?,
+                Data::Buffer(data[36..].to_vec()),
+            ),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };

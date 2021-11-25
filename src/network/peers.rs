@@ -497,7 +497,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
-                    Message::UnconfirmedBlock(ref mut data) => {
+                    Message::UnconfirmedBlock(_, _, ref mut data) => {
                         let block = if let Data::Object(block) = data {
                             block
                         } else {
@@ -1008,13 +1008,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         }
                                     });
                                 }
-                                Message::UnconfirmedBlock(block) => {
-                                    // Perform deferred non-blocking deserialization of the block.
-                                    let block = match block.deserialize().await {
-                                        Ok(block) => block,
-                                        Err(_) => break,
-                                    };
-
+                                Message::UnconfirmedBlock(block_height, block_hash, block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 5 {
@@ -1027,11 +1021,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
 
                                     // Retrieve the last seen timestamp of the received block.
-                                    let last_seen = peer.seen_inbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let last_seen = peer.seen_inbound_blocks.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH);
                                     let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the received block.
-                                    peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
+                                    peer.seen_inbound_blocks.insert(block_hash, SystemTime::now());
 
                                     // Ensure the unconfirmed block is at least within 3 blocks of the latest block height,
                                     // and no more that 10 blocks ahead of the latest block height.
@@ -1039,18 +1033,32 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     let latest_block_height = ledger_reader.latest_block_height();
                                     let lower_bound = latest_block_height.saturating_sub(3);
                                     let upper_bound = latest_block_height.saturating_add(10);
-                                    let is_within_range = block.height() >= lower_bound && block.height() <= upper_bound;
+                                    let is_within_range = block_height >= lower_bound && block_height <= upper_bound;
 
                                     // Ensure the node is not peering.
                                     let is_node_ready = !local_status.is_peering();
 
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
                                     if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_within_range || !is_node_ready {
-                                        trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
+                                        trace!("Skipping 'UnconfirmedBlock {}' from {}", block_height, peer_ip)
                                     } else {
-                                        // Route the `UnconfirmedBlock` to the ledger.
-                                        if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
-                                            warn!("[UnconfirmedBlock] {}", error);
+                                        // Perform the deferred non-blocking deserialization of the block.
+                                        match block.deserialize().await {
+                                            // Ensure the claimed block height and block hash matches in the deserialized block.
+                                            Ok(block) => match block_height == block.height() && block_hash == block.hash() {
+                                                // Route the `UnconfirmedBlock` to the ledger.
+                                                true => if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
+                                                    warn!("[UnconfirmedBlock] {}", error);
+                                                },
+                                                // Route the `Failure` to the ledger.
+                                                false => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, "Mismatch in UnconfirmedBlock message".to_string())).await {
+                                                    warn!("[Failure] {}", error);
+                                                }
+                                            },
+                                            // Route the `Failure` to the ledger.
+                                            Err(error) => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
+                                                warn!("[Failure] {}", error);
+                                            },
                                         }
                                     }
                                 }
