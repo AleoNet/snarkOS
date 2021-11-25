@@ -1034,11 +1034,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
 
                                     // Ensure the unconfirmed block is at least within 3 blocks of the latest block height,
-                                    // and no more that 100 blocks ahead of the latest block height.
+                                    // and no more that 10 blocks ahead of the latest block height.
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
                                     let latest_block_height = ledger_reader.latest_block_height();
                                     let lower_bound = latest_block_height.saturating_sub(3);
-                                    let upper_bound = latest_block_height.saturating_add(100);
+                                    let upper_bound = latest_block_height.saturating_add(10);
                                     let is_within_range = block.height() >= lower_bound && block.height() <= upper_bound;
 
                                     // Ensure the node is not peering.
