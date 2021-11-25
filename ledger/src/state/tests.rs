@@ -61,7 +61,7 @@ fn test_add_next_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -107,7 +107,7 @@ fn test_remove_last_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -151,7 +151,7 @@ fn test_remove_last_2_blocks() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -200,7 +200,7 @@ fn test_get_block_locators() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
