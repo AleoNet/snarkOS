@@ -266,24 +266,26 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
             }
             PeersRequest::Heartbeat(ledger_reader, ledger_router) => {
+                // Procure connected_peers once to reduce locking.
+                let connected_peers = self.connected_peers().await;
+                let number_of_connected_peers = connected_peers.len();
+
+                // Procure well-typed pre-configured addresses.
+                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+                let peer_nodes: Vec<SocketAddr> = E::PEER_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+
                 // Ensure the number of connected peers is below the maximum threshold.
-                if self.number_of_connected_peers().await > E::MAXIMUM_NUMBER_OF_PEERS {
+                if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Exceeded maximum number of connected peers");
 
                     // Determine the peers to disconnect from.
-                    let num_excess_peers = self.number_of_connected_peers().await.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
-                    let peer_ips_to_disconnect = self
-                        .connected_peers
-                        .read()
-                        .await
+                    let num_excess_peers = number_of_connected_peers.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
+                    let peer_ips_to_disconnect = connected_peers
                         .iter()
-                        .filter(|(&peer_ip, _)| {
-                            let peer_str = peer_ip.to_string();
-                            !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::PEER_NODES.contains(&peer_str.as_str())
-                        })
+                        .copied()
+                        .filter(|peer_ip| !sync_nodes.contains(peer_ip) && !peer_nodes.contains(peer_ip))
                         .take(num_excess_peers)
-                        .map(|(&peer_ip, _)| peer_ip)
-                        .collect::<Vec<SocketAddr>>();
+                        .collect::<Vec<_>>();
 
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in peer_ips_to_disconnect {
@@ -295,17 +297,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
 
                 // Skip if the number of connected peers is above the minimum threshold.
-                match self.number_of_connected_peers().await < E::MINIMUM_NUMBER_OF_PEERS {
+                // note: it's unlikely that this number will differ from the one procured before
+                match number_of_connected_peers < E::MINIMUM_NUMBER_OF_PEERS {
                     true => trace!("Sending request for more peer connections"),
                     false => return,
                 };
 
                 // Add the sync nodes to the list of candidate peers.
-                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                 self.add_candidate_peers(&sync_nodes).await;
 
                 // Add the peer nodes to the list of candidate peers.
-                let peer_nodes: Vec<SocketAddr> = E::PEER_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                 self.add_candidate_peers(&peer_nodes).await;
 
                 // Retrieve the number of connected sync nodes.
@@ -316,8 +317,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 for peer_ip in self
                     .candidate_peers()
                     .await
-                    .iter()
-                    .copied()
+                    .into_iter()
                     .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
@@ -341,7 +341,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
                 // Request more peers if the number of connected peers is below the threshold.
-                for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 1) {
+                for peer_ip in connected_peers.iter().choose_multiple(&mut OsRng::default(), 1) {
                     self.send(*peer_ip, &Message::PeerRequest).await;
                 }
             }
