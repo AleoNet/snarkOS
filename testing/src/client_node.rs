@@ -33,13 +33,13 @@ impl ClientNode {
 
     /// Returns the list of connected peers of the node.
     pub async fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.server.peers().read().await.connected_peers()
+        self.server.peers().connected_peers().await
     }
 
     /// Resets the node's known peers. This is practical, as it makes the node not reconnect
     /// to known peers in test cases where it's undesirable.
     pub async fn reset_known_peers(&self) {
-        self.server.peers().write().await.reset_known_peers()
+        self.server.peers().reset_known_peers().await
     }
 
     /// Attempts to connect the node to the given address.
