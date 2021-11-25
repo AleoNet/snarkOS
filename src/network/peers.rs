@@ -169,6 +169,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
+    /// TODO (howardwu): Make this operation more efficient.
+    /// Returns the number of connected sync nodes.
+    ///
+    pub(crate) async fn number_of_connected_sync_nodes(&self) -> usize {
+        let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
+        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+        connected_peers.intersection(&sync_nodes).count()
+    }
+
+    ///
     /// Returns the number of connected peers.
     ///
     pub(crate) async fn number_of_connected_peers(&self) -> usize {
@@ -298,6 +308,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let peer_nodes: Vec<SocketAddr> = E::PEER_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                 self.add_candidate_peers(&peer_nodes).await;
 
+                // Retrieve the number of connected sync nodes.
+                let number_of_connected_sync_nodes = self.number_of_connected_sync_nodes().await;
+
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
                 for peer_ip in self
@@ -307,6 +320,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     .copied()
                     .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
                 {
+                    // Ensure this node is not connected to more than the permitted number of sync nodes.
+                    if sync_nodes.contains(&peer_ip) && number_of_connected_sync_nodes >= E::MAXIMUM_CONNECTED_SYNC_NODES {
+                        continue;
+                    }
+
                     if !self.is_connected_to(peer_ip).await {
                         trace!("Attempting connection to {}...", peer_ip);
 
@@ -454,6 +472,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// as the peer providing this list could be subverting the protocol.
     ///
     async fn add_candidate_peers(&self, peers: &[SocketAddr]) {
+        // Acquire the candidate peers write lock.
         let mut candidate_peers = self.candidate_peers.write().await;
         // Ensure the combined number of peers does not surpass the threshold.
         if candidate_peers.len() + peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
