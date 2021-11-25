@@ -69,6 +69,8 @@ impl ClientNode {
 // Remove the storage artifacts after each test.
 impl Drop for ClientNode {
     fn drop(&mut self) {
+        self.server.shut_down();
+
         let db_path = format!("/tmp/snarkos-test-ledger-{}", self.local_addr().port());
         assert!(
             fs::remove_dir_all(&db_path).is_ok(),

@@ -133,7 +133,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Disconnects from peers and proceeds to shut down the node.
     ///
     #[inline]
-    pub(crate) fn shut_down(&self) {
+    pub fn shut_down(&self) {
         info!("Shutting down...");
         self.tasks.flush();
     }
