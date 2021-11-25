@@ -29,6 +29,7 @@ use snarkvm::dpc::prelude::*;
 use anyhow::Result;
 use chrono::Utc;
 use rand::thread_rng;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
@@ -104,6 +105,8 @@ pub struct Ledger<N: Network, E: Environment> {
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
+    /// The thread pool for the miner.
+    miner: Arc<ThreadPool>,
     _phantom: PhantomData<E>,
 }
 
@@ -121,6 +124,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             block_requests_lock: Mutex::new(()),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
+            miner: Arc::new(ThreadPoolBuilder::new().num_threads(4).build()?),
             _phantom: PhantomData,
         })
     }
@@ -364,6 +368,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.status.update(State::Mining);
 
             // Prepare the unconfirmed transactions, terminator, and status.
+            let miner = self.miner.clone();
             let canon = self.canon.clone(); // This is *safe* as the ledger only reads.
             let unconfirmed_transactions = self.memory_pool.read().await.transactions();
             let terminator = self.terminator.clone();
@@ -372,7 +377,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             task::spawn(async move {
                 // Mine the next block.
                 let result = task::spawn_blocking(move || {
-                    canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng())
+                    miner.install(move || canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng()))
                 })
                 .await
                 .map_err(|e| e.into());
