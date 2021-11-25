@@ -980,16 +980,18 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 },
                                 Message::Pong(is_fork, block_locators) => {
                                     // Perform the deferred non-blocking deserialization of block locators.
-                                    let block_locators = match block_locators.deserialize().await {
-                                        Ok(locators) => locators,
-                                        Err(_) => break,
+                                    let request = match block_locators.deserialize().await {
+                                        // Route the `Pong` to the ledger.
+                                        Ok(block_locators) => LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators),
+                                        // Route the `Failure` to the ledger.
+                                        Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
                                     };
 
-                                    // Route the `Pong` to the ledger.
-                                    let request = LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators);
+                                    // Route the request to the ledger.
                                     if let Err(error) = ledger_router.send(request).await {
                                         warn!("[Pong] {}", error);
                                     }
+
                                     // Spawn an asynchronous task for the `Ping` request.
                                     let local_status = local_status.clone();
                                     let peers_router = peers_router.clone();
