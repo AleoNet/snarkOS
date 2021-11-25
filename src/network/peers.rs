@@ -296,8 +296,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 };
 
                 // Add the sync nodes to the list of candidate peers.
-                let mut sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-                sync_nodes.shuffle(&mut OsRng::default());
+                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                 self.add_candidate_peers(&sync_nodes).await;
 
                 // Add the peer nodes to the list of candidate peers.
@@ -470,7 +469,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
         // Fetch the number of connected sync nodes.
         let num_connected_sync_nodes = connected_peers.intersection(&sync_nodes).count();
-      
+
         // Ensure the combined number of peers does not surpass the threshold.
         if candidate_peers.len() + peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
             // Proceed to insert each new candidate peer IP.
