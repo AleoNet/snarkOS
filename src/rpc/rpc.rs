@@ -442,7 +442,7 @@ mod tests {
         str::FromStr,
         sync::atomic::AtomicBool,
     };
-    use tokio::sync::mpsc;
+    use tokio::sync::{mpsc, RwLock};
 
     fn temp_dir() -> std::path::PathBuf {
         tempfile::tempdir().expect("Failed to open temporary directory").into_path()
