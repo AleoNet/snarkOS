@@ -25,8 +25,8 @@ use std::{marker::PhantomData, net::SocketAddr};
 use tokio::task;
 use tokio_util::codec::{Decoder, Encoder};
 
-/// This object enables deferred deserialization for objects that take a while to deserialize, in order
-/// to allow message processing to be non-blocking.
+/// This object enables deferred deserialization / ahead-of-time serialization for objects that
+/// take a while to deserialize / serialize, in order to allow these operations to be non-blocking.
 #[derive(Clone, Debug)]
 pub enum MaybeSerialized<T> {
     Deserialized(T),
@@ -60,13 +60,29 @@ impl<T> MaybeSerialized<T> {
         }
     }
 
-    pub fn serialize(&self) -> bincode::Result<Vec<u8>>
+    pub fn serialize_blocking(&self) -> bincode::Result<Vec<u8>>
     where
         T: Serialize,
     {
         match self {
-            Self::Deserialized(x) => bincode::serialize(&x),
-            Self::Serialized(bytes) => Ok(bytes.to_owned()),
+            Self::Deserialized(x) => bincode::serialize(x),
+            Self::Serialized(bytes) => Ok(bytes.to_vec()),
+        }
+    }
+
+    pub async fn serialize(self) -> bincode::Result<Vec<u8>>
+    where
+        T: Serialize + Send + 'static,
+    {
+        match self {
+            Self::Deserialized(x) => match task::spawn_blocking(move || bincode::serialize(&x)).await {
+                Ok(bytes) => bytes,
+                Err(err) => Err(Box::new(bincode::ErrorKind::Custom(format!(
+                    "Dedicated serialization task failed: {}",
+                    err
+                )))),
+            },
+            Self::Serialized(bytes) => Ok(bytes),
         }
     }
 }
@@ -144,11 +160,11 @@ impl<N: Network, E: Environment> Message<N, E> {
     pub fn data(&self) -> Result<Vec<u8>> {
         match self {
             Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
-            Self::BlockResponse(block) => Ok(block.serialize()?),
+            Self::BlockResponse(block) => Ok(block.serialize_blocking()?),
             Self::ChallengeRequest(version, listener_port, nonce, block_height) => {
                 Ok(to_bytes_le![version, listener_port, nonce, block_height]?)
             }
-            Self::ChallengeResponse(block_header) => Ok(block_header.serialize()?),
+            Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking()?),
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
@@ -164,9 +180,9 @@ impl<N: Network, E: Environment> Message<N, E> {
                     },
                 };
 
-                Ok([vec![serialized_is_fork], block_locators.serialize()?].concat())
+                Ok([vec![serialized_is_fork], block_locators.serialize_blocking()?].concat())
             }
-            Self::UnconfirmedBlock(block) => Ok(block.serialize()?),
+            Self::UnconfirmedBlock(block) => Ok(block.serialize_blocking()?),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
             Self::Unused(_) => Ok(vec![]),
         }

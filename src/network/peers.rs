@@ -491,14 +491,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to specified peer.
     ///
-    async fn send(&self, peer: SocketAddr, message: Message<N, E>) {
+    async fn send(&self, peer: SocketAddr, mut message: Message<N, E>) {
         let target_peer = self.connected_peers.read().await.get(&peer).cloned();
         match target_peer {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
-                    Message::UnconfirmedBlock(ref block) => {
-                        let block = if let MaybeSerialized::Deserialized(block) = block {
+                    Message::UnconfirmedBlock(ref mut block) => {
+                        let deserialized_block = if let MaybeSerialized::Deserialized(block) = block {
                             block
                         } else {
                             panic!("Logic error: the block shouldn't have been serialized yet.");
@@ -509,15 +509,20 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Retrieve the last seen timestamp of this block for this peer.
                         let seen_blocks = seen_outbound_blocks.entry(peer).or_insert_with(Default::default);
-                        let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                        let last_seen = seen_blocks.entry(deserialized_block.hash()).or_insert(SystemTime::UNIX_EPOCH);
                         let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                         // Update the timestamp for the peer and sent block.
-                        seen_blocks.insert(block.hash(), SystemTime::now());
+                        seen_blocks.insert(deserialized_block.hash(), SystemTime::now());
                         // Report the unconfirmed block height.
                         if is_ready_to_send {
-                            trace!("Preparing to send '{} {}' to {}", message.name(), block.height(), peer);
+                            trace!("Preparing to send 'UnconfirmedBlock {}' to {}", deserialized_block.height(), peer);
                         }
+
+                        // Perform non-blocking serialization of the block.
+                        let serialized_block = bincode::serialize(&deserialized_block).expect("Block serialization is bugged");
+                        let _ = std::mem::replace(block, MaybeSerialized::Serialized(serialized_block));
+
                         is_ready_to_send
                     }
                     Message::UnconfirmedTransaction(ref transaction) => {
