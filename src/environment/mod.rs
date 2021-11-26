@@ -29,8 +29,8 @@ pub enum NodeType {
     Client = 0,
     /// A mining node is a full node, capable of producing new blocks.
     Miner,
-    /// A peer node is a discovery node, capable of sharing peers of the network.
-    Peer,
+    /// A beacon node is a discovery node, capable of sharing peers of the network.
+    Beacon,
     /// A sync node is a discovery node, capable of syncing nodes for the network.
     Sync,
 }
@@ -48,19 +48,16 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
     const MESSAGE_VERSION: u32 = 8;
-
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
-    /// If `true`, a node will remote fetch blocks from genesis.
-    const FAST_SYNC: bool = true;
 
     /// The port for communicating with the node server.
     const DEFAULT_NODE_PORT: u16 = 4130 + Self::Network::NETWORK_ID;
     /// The port for communicating with the RPC server.
     const DEFAULT_RPC_PORT: u16 = 3030 + Self::Network::NETWORK_ID;
 
-    /// The list of peer nodes to bootstrap the node server with.
-    const PEER_NODES: [&'static str; 0] = [];
+    /// The list of beacon nodes to bootstrap the node server with.
+    const BEACON_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
     const SYNC_NODES: [&'static str; 5] = ["127.0.0.1:4132", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136"];
 
@@ -70,7 +67,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 2;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 30;
+    const PING_SLEEP_IN_SECS: u64 = 60;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
@@ -140,7 +137,7 @@ impl<N: Network> Environment for ClientTrial<N> {
     const NODE_TYPE: NodeType = NodeType::Client;
     const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 7;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 15;
 }
 
 #[derive(Clone, Debug, Default)]
