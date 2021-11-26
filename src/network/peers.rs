@@ -14,7 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Status, Data, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType};
+use crate::{
+    helpers::Status,
+    Data,
+    Environment,
+    LedgerReader,
+    LedgerRequest,
+    LedgerRouter,
+    Message,
+    NodeType,
+    ProverRequest,
+    ProverRouter,
+};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -53,16 +64,16 @@ type ConnectionResult = oneshot::Sender<Result<()>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, ledger_router, connection_result)
-    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, ConnectionResult),
-    /// Heartbeat := (ledger_reader, ledger_router)
-    Heartbeat(LedgerReader<N>, LedgerRouter<N, E>),
+    /// Connect := (peer_ip, ledger_reader, ledger_router, prover_router, connection_result)
+    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, ProverRouter<N>, ConnectionResult),
+    /// Heartbeat := (ledger_reader, ledger_router, prover_router)
+    Heartbeat(LedgerReader<N>, LedgerRouter<N, E>, ProverRouter<N>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router)
-    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, LedgerRouter<N, E>),
+    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, prover_router)
+    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, ProverRouter<N>),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -198,7 +209,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N, E>, peers_router: &PeersRouter<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, connection_result) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, prover_router, connection_result) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -247,6 +258,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         peers_router,
                                         ledger_reader,
                                         ledger_router,
+                                        prover_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
                                     )
@@ -265,7 +277,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::Heartbeat(ledger_reader, ledger_router) => {
+            PeersRequest::Heartbeat(ledger_reader, ledger_router, prover_router) => {
                 // Ensure the number of connected peers is below the maximum threshold.
                 if self.number_of_connected_peers().await > E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Exceeded maximum number of connected peers");
@@ -330,7 +342,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), ledger_router.clone(), router);
+                        let request =
+                            PeersRequest::Connect(peer_ip, ledger_reader.clone(), ledger_router.clone(), prover_router.clone(), router);
                         if let Err(error) = peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -351,7 +364,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, prover_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -419,6 +432,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             peers_router,
                             ledger_reader,
                             ledger_router,
+                            prover_router,
                             self.connected_nonces().await,
                             None,
                         )
@@ -810,6 +824,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         peers_router: &PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N, E>,
+        prover_router: ProverRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
     ) {
@@ -1090,8 +1105,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
                                     } else {
-                                        // Route the `UnconfirmedTransaction` to the ledger.
-                                        if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
+                                        // Route the `UnconfirmedTransaction` to the prover.
+                                        if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
                                             warn!("[UnconfirmedTransaction] {}", error);
                                         }
                                     }

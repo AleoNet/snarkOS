@@ -21,8 +21,8 @@ use crate::{
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
-    LedgerRouter,
     Peers,
+    ProverRouter,
 };
 use snarkvm::dpc::Network;
 
@@ -90,10 +90,10 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     status: &Status,
     peers: &Arc<Peers<N, E>>,
     ledger: &LedgerReader<N>,
-    ledger_router: &LedgerRouter<N, E>,
+    prover_router: &ProverRouter<N>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger.clone(), ledger_router.clone());
+    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger.clone(), prover_router.clone());
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -474,10 +474,10 @@ mod tests {
         };
         let ledger = Arc::new(new_ledger_state::<N, S, P>(path));
 
-        // Create a dummy mpsc channel for Ledger requests. todo (@collinc97): only get requests will work until this is changed
-        let (ledger_router, _ledger_handler) = mpsc::channel(1024);
+        // Create a dummy mpsc channel for Prover requests. todo (@collinc97): only get requests will work until this is changed
+        let (prover_router, _prover_handler) = mpsc::channel(1024);
 
-        RpcImpl::<N, E>::new(credentials, Status::new(), peers::<N, E>(), ledger, ledger_router)
+        RpcImpl::<N, E>::new(credentials, Status::new(), peers::<N, E>(), ledger, prover_router)
     }
 
     /// Deserializes a rpc response into the given type.

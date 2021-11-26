@@ -28,8 +28,6 @@ use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
 use chrono::Utc;
-use rand::thread_rng;
-use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
@@ -41,10 +39,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::{
-    sync::{mpsc, Mutex, RwLock},
-    task,
-};
+use tokio::sync::{mpsc, Mutex, RwLock};
 
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 50;
@@ -68,14 +63,10 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     Failure(SocketAddr, String),
     /// Heartbeat := ()
     Heartbeat(LedgerRouter<N, E>),
-    /// Mine := (local_ip, miner_address, ledger_router)
-    Mine(SocketAddr, Address<N>, LedgerRouter<N, E>),
     /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
     Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
     /// UnconfirmedBlock := (peer_ip, block)
     UnconfirmedBlock(SocketAddr, Block<N>),
-    /// UnconfirmedTransaction := (peer_ip, transaction)
-    UnconfirmedTransaction(SocketAddr, Transaction<N>),
 }
 
 ///
@@ -105,8 +96,6 @@ pub struct Ledger<N: Network, E: Environment> {
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
-    /// The thread pool for the miner.
-    miner: Arc<ThreadPool>,
     _phantom: PhantomData<E>,
 }
 
@@ -124,7 +113,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             block_requests_lock: Mutex::new(()),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
-            miner: Arc::new(ThreadPoolBuilder::new().num_threads((num_cpus::get() / 8 * 2).max(1)).build()?),
             _phantom: PhantomData,
         })
     }
@@ -191,10 +179,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     self.peers_state.read().await.len()
                 );
             }
-            LedgerRequest::Mine(local_ip, recipient, ledger_router) => {
-                // Process the request to mine the next block.
-                self.mine_next_block(local_ip, recipient, ledger_router).await;
-            }
             LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip).await;
@@ -214,13 +198,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if let Err(error) = peers_router.send(request).await {
                         warn!("[UnconfirmedBlock] {}", error);
                     }
-                }
-            }
-            LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
-                // Ensure the node is not peering.
-                if !self.status.is_peering() {
-                    // Process the unconfirmed transaction.
-                    self.add_unconfirmed_transaction(peer_ip, transaction, peers_router).await
                 }
             }
         }
@@ -350,60 +327,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     ///
-    /// Mines a new block and adds it to the canon blocks.
-    ///
-    async fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>, ledger_router: LedgerRouter<N, E>) {
-        // If the node type is not a miner, it should not be mining.
-        if E::NODE_TYPE != NodeType::Miner {
-            return;
-        }
-        // If there is an insufficient number of connected peers, it should not be mining.
-        if self.peers_state.read().await.len() < E::MINIMUM_NUMBER_OF_PEERS {
-            return;
-        }
-        // If `terminator` is `true`, it should not be mining.
-        if self.terminator.load(Ordering::SeqCst) {
-            return;
-        }
-        // If the status is `Ready`, mine the next block.
-        if self.status.is_ready() {
-            // Set the status to `Mining`.
-            self.status.update(State::Mining);
-
-            // Prepare the unconfirmed transactions, terminator, and status.
-            let miner = self.miner.clone();
-            let canon = self.canon.clone(); // This is *safe* as the ledger only reads.
-            let unconfirmed_transactions = self.memory_pool.read().await.transactions();
-            let terminator = self.terminator.clone();
-            let status = self.status.clone();
-
-            task::spawn(async move {
-                // Mine the next block.
-                let result = task::spawn_blocking(move || {
-                    miner.install(move || canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng()))
-                })
-                .await
-                .map_err(|e| e.into());
-
-                // Set the status to `Ready`.
-                status.update(State::Ready);
-
-                match result {
-                    Ok(Ok(block)) => {
-                        debug!("Miner has found an unconfirmed candidate for block {}", block.height());
-                        // Broadcast the next block.
-                        let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
-                        if let Err(error) = ledger_router.send(request).await {
-                            warn!("Failed to broadcast mined block: {}", error);
-                        }
-                    }
-                    Ok(Err(error)) | Err(error) => trace!("{}", error),
-                }
-            });
-        }
-    }
-
-    ///
     /// Adds the given block:
     ///     1) as the next block in the ledger if the block height increments by one, or
     ///     2) to the memory pool for later use.
@@ -447,29 +370,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
         }
         false
-    }
-
-    ///
-    /// Adds the given unconfirmed transaction to the memory pool.
-    ///
-    async fn add_unconfirmed_transaction(&self, peer_ip: SocketAddr, transaction: Transaction<N>, peers_router: &PeersRouter<N, E>) {
-        // Process the unconfirmed transaction.
-        trace!("Received unconfirmed transaction {} from {}", transaction.transaction_id(), peer_ip);
-        // Ensure the unconfirmed transaction is new.
-        if let Ok(false) = self.canon.contains_transaction(&transaction.transaction_id()) {
-            debug!("Adding unconfirmed transaction {} to memory pool", transaction.transaction_id());
-            // Attempt to add the unconfirmed transaction to the memory pool.
-            match self.memory_pool.write().await.add_transaction(&transaction) {
-                Ok(()) => {
-                    // Upon success, propagate the unconfirmed transaction to the connected peers.
-                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(transaction));
-                    if let Err(error) = peers_router.send(request).await {
-                        warn!("[UnconfirmedTransaction] {}", error);
-                    }
-                }
-                Err(error) => error!("{}", error),
-            }
-        }
     }
 
     ///
