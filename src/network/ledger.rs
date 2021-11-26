@@ -32,7 +32,6 @@ use anyhow::Result;
 use chrono::Utc;
 use std::{
     collections::{HashMap, HashSet},
-    marker::PhantomData,
     net::SocketAddr,
     path::Path,
     sync::{
@@ -104,8 +103,6 @@ pub struct Ledger<N: Network, E: Environment> {
     terminator: Arc<AtomicBool>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
-    /// PhantomData
-    _phantom: PhantomData<E>,
 }
 
 impl<N: Network, E: Environment> Ledger<N, E> {
@@ -133,7 +130,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             status: status.clone(),
             terminator: terminator.clone(),
             peers_router,
-            _phantom: PhantomData,
         });
 
         // Initialize the handler for the ledger.
