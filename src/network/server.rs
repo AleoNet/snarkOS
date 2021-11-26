@@ -87,7 +87,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone()).await;
         // Initialize a new instance for managing the ledger.
-        let (ledger_reader, ledger_router) = Self::initialize_ledger(&mut tasks, storage_path, status.clone(), &peers_router).await?;
+        let (ledger_reader, ledger_router) =
+            Self::initialize_ledger(&mut tasks, storage_path, status.clone(), terminator.clone(), &peers_router).await?;
         // Initialize a new instance for managing the prover.
         let (prover, prover_router) =
             Self::initialize_prover(&mut tasks, &status, &terminator, &peers_router, &ledger_reader, &ledger_router).await?;
@@ -220,11 +221,12 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         storage_path: String,
         status: Status,
+        terminator: Arc<AtomicBool>,
         peers_router: &PeersRouter<N, E>,
     ) -> Result<(LedgerReader<N>, LedgerRouter<N, E>)> {
         // Open the ledger from storage.
         let path = storage_path.clone();
-        let ledger = Arc::new(task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status)).await??);
+        let ledger = Arc::new(task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status, &terminator)).await??);
 
         // Open a ledger reader from storage.
         let ledger_reader = LedgerState::<N>::open_reader::<RocksDB, _>(&storage_path)?;

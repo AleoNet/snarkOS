@@ -77,14 +77,12 @@ pub enum LedgerRequest<N: Network, E: Environment> {
 pub struct Ledger<N: Network, E: Environment> {
     /// The status of the node.
     status: Status,
+    /// A terminator bit for the prover.
+    terminator: Arc<AtomicBool>,
     /// The canonical chain of blocks.
     canon: Arc<LedgerState<N>>,
     /// A map of previous block hashes to unconfirmed blocks.
     unconfirmed_blocks: RwLock<CircularMap<N::BlockHash, Block<N>, { MAXIMUM_UNCONFIRMED_BLOCKS }>>,
-    /// The pool of unconfirmed transactions.
-    memory_pool: RwLock<MemoryPool<N>>,
-    /// A terminator bit for the miner.
-    terminator: Arc<AtomicBool>,
     /// The map of each peer to their ledger state := (node_type, status, is_fork, latest_block_height, block_locators).
     peers_state: RwLock<HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>>,
     /// The map of each peer to their block requests := HashMap<(block_height, block_hash), timestamp>
@@ -101,13 +99,12 @@ pub struct Ledger<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub fn open<S: Storage, P: AsRef<Path> + Copy>(path: P, status: &Status) -> Result<Self> {
+    pub fn open<S: Storage, P: AsRef<Path> + Copy>(path: P, status: &Status, terminator: &Arc<AtomicBool>) -> Result<Self> {
         Ok(Self {
             status: status.clone(),
+            terminator: terminator.clone(),
             canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
             unconfirmed_blocks: Default::default(),
-            memory_pool: RwLock::new(MemoryPool::new()),
-            terminator: Arc::new(AtomicBool::new(false)),
             peers_state: Default::default(),
             block_requests: Default::default(),
             block_requests_lock: Mutex::new(()),
@@ -259,7 +256,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Release the lock over unconfirmed_blocks.
             drop(unconfirmed_blocks);
 
-            *self.memory_pool.write().await = MemoryPool::new();
             self.block_requests
                 .write()
                 .await
@@ -329,7 +325,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Adds the given block:
     ///     1) as the next block in the ledger if the block height increments by one, or
-    ///     2) to the memory pool for later use.
+    ///     2) to the unconfirmed queue for later use.
     ///
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
@@ -349,8 +345,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     *self.last_block_update_timestamp.write().await = Instant::now();
                     // Set the terminator bit to `true` to ensure the miner updates state.
                     self.terminator.store(true, Ordering::SeqCst);
-                    // On success, filter the memory pool of its transactions, if they exist.
-                    self.memory_pool.write().await.remove_transactions(block.transactions());
                     // On success, filter the unconfirmed blocks of this block, if it exists.
                     self.unconfirmed_blocks.write().await.remove(&block.previous_block_hash());
 
@@ -364,9 +358,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Add the block to the unconfirmed blocks.
             if self.unconfirmed_blocks.write().await.insert(block.previous_block_hash(), block) {
-                trace!("Added unconfirmed block {} to memory pool", block_height);
+                trace!("Added block {} to unconfirmed queue", block_height);
             } else {
-                trace!("Memory pool already contains unconfirmed block {}", block_height);
+                trace!("Unconfirmed queue already contains block {}", block_height);
             }
         }
         false
