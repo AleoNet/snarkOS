@@ -33,11 +33,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
-use tokio::{
-    net::TcpListener,
-    sync::{mpsc, oneshot},
-    task,
-};
+use tokio::{net::TcpListener, sync::oneshot, task};
 
 pub type LedgerReader<N> = Arc<LedgerState<N>>;
 
@@ -52,8 +48,6 @@ pub struct Server<N: Network, E: Environment> {
     status: Status,
     /// The list of peers for the node.
     peers: Arc<Peers<N, E>>,
-    /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
     /// The prover of the node.
@@ -87,26 +81,25 @@ impl<N: Network, E: Environment> Server<N, E> {
         let terminator = Arc::new(AtomicBool::new(false));
 
         // Initialize a new instance for managing peers.
-        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone()).await;
-
+        let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &storage_path, &status, &terminator, &peers_router).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &storage_path, &status, &terminator, peers.router()).await?;
         // Initialize a new instance for managing the prover.
-        let prover = Prover::new(&mut tasks, &status, &terminator, &peers_router, &ledger_reader, ledger.router()).await?;
+        let prover = Prover::new(&mut tasks, &status, &terminator, peers.router(), &ledger_reader, ledger.router()).await?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(
             &mut tasks,
             local_ip,
             listener,
-            &peers_router,
+            peers.router(),
             &ledger_reader,
             ledger.router(),
             prover.router(),
         )
         .await;
         // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_reader, ledger.router(), prover.router()).await;
+        Self::initialize_heartbeat(&mut tasks, peers.router(), &ledger_reader, ledger.router(), prover.router()).await;
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, prover.router()).await;
         // Initialize a new instance of the RPC server.
@@ -116,7 +109,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             local_ip,
             status,
             peers,
-            peers_router,
             ledger_reader,
             ledger,
             prover,
@@ -155,7 +147,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             self.prover.router(),
             router,
         );
-        self.peers_router.send(message).await?;
+        self.peers.router().send(message).await?;
 
         // Wait until the connection task is initialized.
         handler.await.map(|_| ()).map_err(|e| e.into())
@@ -171,49 +163,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     ///
-    /// Initialize a new instance for managing peers.
-    ///
-    #[inline]
-    #[allow(clippy::type_complexity)]
-    async fn initialize_peers(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        local_ip: SocketAddr,
-        local_status: Status,
-    ) -> (Arc<Peers<N, E>>, PeersRouter<N, E>) {
-        // Initialize the `Peers` struct.
-        let peers = Arc::new(Peers::new(local_ip, None, local_status));
-
-        // Initialize an mpsc channel for sending requests to the `Peers` struct.
-        let (peers_router, mut peers_handler) = mpsc::channel(1024);
-
-        // Initialize the peers router process.
-        {
-            let peers = peers.clone();
-            let peers_router = peers_router.clone();
-            let tasks_clone = tasks.clone();
-            let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a peers request.
-                while let Some(request) = peers_handler.recv().await {
-                    let peers = peers.clone();
-                    let peers_router = peers_router.clone();
-                    // Asynchronously process a peers request.
-                    tasks_clone.append(task::spawn(async move {
-                        // Hold the peers write lock briefly, to update the state of the peers.
-                        peers.update(request, &peers_router).await;
-                    }));
-                }
-            }));
-            // Wait until the peers router task is ready.
-            let _ = handler.await;
-        }
-
-        (peers, peers_router)
-    }
-
-    ///
     /// Initialize the connection listener for new peers.
     ///
     #[inline]
@@ -221,13 +170,12 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         listener: TcpListener,
-        peers_router: &PeersRouter<N, E>,
+        peers_router: PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
         // Initialize the listener process.
-        let peers_router = peers_router.clone();
         let ledger_reader = ledger_reader.clone();
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
@@ -266,13 +214,12 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[inline]
     async fn initialize_heartbeat(
         tasks: &mut Tasks<task::JoinHandle<()>>,
-        peers_router: &PeersRouter<N, E>,
+        peers_router: PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
         // Initialize the heartbeat process.
-        let peers_router = peers_router.clone();
         let ledger_reader = ledger_reader.clone();
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {

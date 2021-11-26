@@ -91,7 +91,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         tasks: &mut Tasks<JoinHandle<()>>,
         status: &Status,
         terminator: &Arc<AtomicBool>,
-        peers_router: &PeersRouter<N, E>,
+        peers_router: PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
     ) -> Result<Arc<Self>> {
@@ -110,7 +110,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             memory_pool: RwLock::new(MemoryPool::new()),
             status: status.clone(),
             terminator: terminator.clone(),
-            peers_router: peers_router.clone(),
+            peers_router,
             ledger_reader: ledger_reader.clone(),
             ledger_router,
         });

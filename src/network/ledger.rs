@@ -115,7 +115,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         path: P,
         status: &Status,
         terminator: &Arc<AtomicBool>,
-        peers_router: &PeersRouter<N, E>,
+        peers_router: PeersRouter<N, E>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
@@ -132,7 +132,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             failures: Default::default(),
             status: status.clone(),
             terminator: terminator.clone(),
-            peers_router: peers_router.clone(),
+            peers_router,
             _phantom: PhantomData,
         });
 
