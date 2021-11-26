@@ -89,11 +89,11 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     password: String,
     status: &Status,
     peers: &Arc<Peers<N, E>>,
-    ledger: &LedgerReader<N>,
+    ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger.clone(), prover_router);
+    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger, prover_router);
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();

@@ -18,6 +18,7 @@ use crate::{
     helpers::{CircularMap, State, Status, Tasks},
     Data,
     Environment,
+    LedgerReader,
     Message,
     NodeType,
     PeersRequest,
@@ -84,6 +85,8 @@ pub struct Ledger<N: Network, E: Environment> {
     ledger_router: LedgerRouter<N>,
     /// The canonical chain of blocks.
     canon: Arc<LedgerState<N>>,
+    /// The canonical chain of blocks in read-only mode.
+    canon_reader: Arc<LedgerState<N>>,
     /// A map of previous block hashes to unconfirmed blocks.
     unconfirmed_blocks: RwLock<CircularMap<N::BlockHash, Block<N>, { MAXIMUM_UNCONFIRMED_BLOCKS }>>,
     /// The map of each peer to their ledger state := (node_type, status, is_fork, latest_block_height, block_locators).
@@ -121,6 +124,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let ledger = Arc::new(Self {
             ledger_router,
             canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
+            canon_reader: LedgerState::open_reader::<S, P>(path)?,
             unconfirmed_blocks: Default::default(),
             peers_state: Default::default(),
             block_requests: Default::default(),
@@ -152,6 +156,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         Ok(ledger)
+    }
+
+    /// Returns an instance of the ledger reader.
+    pub fn reader(&self) -> LedgerReader<N> {
+        self.canon_reader.clone()
     }
 
     /// Returns an instance of the ledger router.

@@ -92,7 +92,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         status: &Status,
         terminator: &Arc<AtomicBool>,
         peers_router: PeersRouter<N, E>,
-        ledger_reader: &LedgerReader<N>,
+        ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
@@ -111,7 +111,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             status: status.clone(),
             terminator: terminator.clone(),
             peers_router,
-            ledger_reader: ledger_reader.clone(),
+            ledger_reader,
             ledger_router,
         });
 
