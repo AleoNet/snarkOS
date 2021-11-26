@@ -80,7 +80,7 @@ pub struct Prover<N: Network, E: Environment> {
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
-    ledger_router: LedgerRouter<N, E>,
+    ledger_router: LedgerRouter<N>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
 }
@@ -93,7 +93,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         terminator: &Arc<AtomicBool>,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N, E>,
+        ledger_router: &LedgerRouter<N>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (prover_router, mut prover_handler) = mpsc::channel(1024);

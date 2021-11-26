@@ -47,16 +47,16 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 50;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
-pub(crate) type LedgerRouter<N, E> = mpsc::Sender<LedgerRequest<N, E>>;
+pub(crate) type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
 #[allow(unused)]
 /// Shorthand for the child half of the `Ledger` message channel.
-type LedgerHandler<N, E> = mpsc::Receiver<LedgerRequest<N, E>>;
+type LedgerHandler<N> = mpsc::Receiver<LedgerRequest<N>>;
 
 ///
 /// An enum of requests that the `Ledger` struct processes.
 ///
 #[derive(Debug)]
-pub enum LedgerRequest<N: Network, E: Environment> {
+pub enum LedgerRequest<N: Network> {
     /// BlockResponse := (peer_ip, block, prover_router)
     BlockResponse(SocketAddr, Block<N>, ProverRouter<N>),
     /// Disconnect := (peer_ip)
@@ -64,7 +64,7 @@ pub enum LedgerRequest<N: Network, E: Environment> {
     /// Failure := (peer_ip, failure)
     Failure(SocketAddr, String),
     /// Heartbeat := (ledger_router, prover_router)
-    Heartbeat(LedgerRouter<N, E>, ProverRouter<N>),
+    Heartbeat(LedgerRouter<N>, ProverRouter<N>),
     /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
     Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
     /// UnconfirmedBlock := (peer_ip, block, prover_router)
@@ -120,7 +120,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: LedgerRequest<N, E>, peers_router: &PeersRouter<N, E>) {
+    pub(super) async fn update(&self, request: LedgerRequest<N>, peers_router: &PeersRouter<N, E>) {
         match request {
             LedgerRequest::BlockResponse(peer_ip, block, prover_router) => {
                 // Remove the block request from the ledger.
@@ -867,7 +867,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Disconnects from connected peers who exhibit frequent failures.
     ///
-    async fn disconnect_from_failing_peers(&self, ledger_router: &LedgerRouter<N, E>) {
+    async fn disconnect_from_failing_peers(&self, ledger_router: &LedgerRouter<N>) {
         let peers_to_disconnect = self
             .failures
             .read()

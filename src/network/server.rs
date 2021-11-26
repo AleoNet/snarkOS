@@ -57,7 +57,7 @@ pub struct Server<N: Network, E: Environment> {
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
-    ledger_router: LedgerRouter<N, E>,
+    ledger_router: LedgerRouter<N>,
     /// The prover of the node.
     prover: Arc<Prover<N, E>>,
     /// The list of tasks spawned by the node.
@@ -220,7 +220,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         status: Status,
         terminator: Arc<AtomicBool>,
         peers_router: &PeersRouter<N, E>,
-    ) -> Result<(LedgerReader<N>, LedgerRouter<N, E>)> {
+    ) -> Result<(LedgerReader<N>, LedgerRouter<N>)> {
         // Open the ledger from storage.
         let path = storage_path.clone();
         let ledger = Arc::new(task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status, &terminator)).await??);
@@ -261,7 +261,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         listener: TcpListener,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N, E>,
+        ledger_router: &LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
         // Initialize the listener process.
@@ -307,7 +307,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N, E>,
+        ledger_router: &LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
         // Initialize the heartbeat process.

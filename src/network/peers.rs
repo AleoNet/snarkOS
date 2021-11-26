@@ -65,15 +65,15 @@ type ConnectionResult = oneshot::Sender<Result<()>>;
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
     /// Connect := (peer_ip, ledger_reader, ledger_router, prover_router, connection_result)
-    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, ProverRouter<N>, ConnectionResult),
+    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>, ConnectionResult),
     /// Heartbeat := (ledger_reader, ledger_router, prover_router)
-    Heartbeat(LedgerReader<N>, LedgerRouter<N, E>, ProverRouter<N>),
+    Heartbeat(LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
     /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, prover_router)
-    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, LedgerRouter<N, E>, ProverRouter<N>),
+    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -823,7 +823,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         local_status: Status,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N, E>,
+        ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
