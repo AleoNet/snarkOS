@@ -48,7 +48,7 @@ use tokio::{
 };
 
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
-const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 60;
+const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 100;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub(crate) type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
