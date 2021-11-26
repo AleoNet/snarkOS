@@ -472,9 +472,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Adds an entry for the given peer IP to every data structure in `State`.
     ///
     async fn initialize_peer(&self, peer_ip: SocketAddr) {
-        self.peers_state.write().await.entry(peer_ip).or_insert(None);
-        self.block_requests.write().await.entry(peer_ip).or_insert_with(Default::default);
-        self.failures.write().await.entry(peer_ip).or_insert_with(Default::default);
+        // Since the peer state already existing is the most probable scenario,
+        // use a read() first to avoid using write() if possible.
+        let peer_state_exists = self.peers_state.read().await.contains_key(&peer_ip);
+
+        if !peer_state_exists {
+            self.peers_state.write().await.entry(peer_ip).or_insert(None);
+            self.block_requests.write().await.entry(peer_ip).or_insert_with(Default::default);
+            self.failures.write().await.entry(peer_ip).or_insert_with(Default::default);
+        }
     }
 
     ///
