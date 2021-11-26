@@ -164,7 +164,7 @@ impl<N: Network> LedgerState<N> {
                     return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", end_block_height));
                 }
 
-                // Check 2- Ensure the saved block height corresponding to this ledger root matches the expected block height.
+                // Check 2 - Ensure the saved block height corresponding to this ledger root matches the expected block height.
                 let candidate_height = match ledger.ledger_roots.get(&ledger_root)? {
                     Some(candidate_height) => candidate_height,
                     None => return Err(anyhow!("Ledger is missing ledger root for block {}", end_block_height)),
