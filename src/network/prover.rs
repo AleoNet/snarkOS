@@ -137,6 +137,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             if let Some(recipient) = miner {
                 // Initialize the prover process.
                 let prover = prover.clone();
+                let tasks_clone = tasks.clone();
                 let (router, handler) = oneshot::channel();
                 tasks.append(task::spawn(async move {
                     // Notify the outer function that the task is ready.
@@ -156,7 +157,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             let ledger_router = prover.ledger_router.clone();
                             let prover_router = prover.prover_router.clone();
 
-                            task::spawn(async move {
+                            tasks_clone.append(task::spawn(async move {
                                 // Mine the next block.
                                 let result = task::spawn_blocking(move || {
                                     miner.install(move || {
@@ -180,7 +181,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     }
                                     Ok(Err(error)) | Err(error) => trace!("{}", error),
                                 }
-                            });
+                            }));
                         }
                         // Sleep for 2 seconds.
                         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
