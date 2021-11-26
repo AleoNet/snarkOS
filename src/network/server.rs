@@ -56,8 +56,8 @@ pub struct Server<N: Network, E: Environment> {
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N>,
+    /// The prover of the node.
+    ledger: Arc<Ledger<N, E>>,
     /// The prover of the node.
     prover: Arc<Prover<N, E>>,
     /// The list of tasks spawned by the node.
@@ -78,6 +78,9 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the ledger storage path.
         let storage_path = node.storage_path(local_ip);
+        // Open a ledger reader from storage.
+        let ledger_reader = LedgerState::<N>::open_reader::<RocksDB, _>(&storage_path)?;
+
         // Initialize the status indicator.
         let status = Status::new();
         // Initialize the terminator bit.
@@ -85,11 +88,11 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize a new instance for managing peers.
         let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone()).await;
+
         // Initialize a new instance for managing the ledger.
-        let (ledger_reader, ledger_router) =
-            Self::initialize_ledger(&mut tasks, storage_path, status.clone(), terminator.clone(), &peers_router).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &storage_path, &status, &terminator, &peers_router).await?;
         // Initialize a new instance for managing the prover.
-        let prover = Prover::new(&mut tasks, &status, &terminator, &peers_router, &ledger_reader, &ledger_router).await?;
+        let prover = Prover::new(&mut tasks, &status, &terminator, &peers_router, &ledger_reader, ledger.router()).await?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(
@@ -98,12 +101,12 @@ impl<N: Network, E: Environment> Server<N, E> {
             listener,
             &peers_router,
             &ledger_reader,
-            &ledger_router,
+            ledger.router(),
             prover.router(),
         )
         .await;
         // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_reader, &ledger_router, prover.router()).await;
+        Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_reader, ledger.router(), prover.router()).await;
         // Initialize a new instance of the miner.
         Self::initialize_miner(&mut tasks, local_ip, miner, prover.router()).await;
         // Initialize a new instance of the RPC server.
@@ -115,7 +118,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             peers,
             peers_router,
             ledger_reader,
-            ledger_router,
+            ledger,
             prover,
             tasks,
         })
@@ -148,7 +151,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let message = PeersRequest::Connect(
             peer_ip,
             self.ledger_reader.clone(),
-            self.ledger_router.clone(),
+            self.ledger.router(),
             self.prover.router(),
             router,
         );
@@ -211,47 +214,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     ///
-    /// Initialize a new instance for managing the ledger.
-    ///
-    #[inline]
-    async fn initialize_ledger(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        storage_path: String,
-        status: Status,
-        terminator: Arc<AtomicBool>,
-        peers_router: &PeersRouter<N, E>,
-    ) -> Result<(LedgerReader<N>, LedgerRouter<N>)> {
-        // Open the ledger from storage.
-        let path = storage_path.clone();
-        let ledger = Arc::new(task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status, &terminator)).await??);
-
-        // Open a ledger reader from storage.
-        let ledger_reader = LedgerState::<N>::open_reader::<RocksDB, _>(&storage_path)?;
-
-        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
-        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
-
-        // Initialize the ledger router process.
-        let peers_router = peers_router.clone();
-        let (router, handler) = oneshot::channel();
-        tasks.append(task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = router.send(());
-            // Asynchronously wait for a ledger request.
-            while let Some(request) = ledger_handler.recv().await {
-                // Hold the ledger write lock briefly, to update the state of the ledger.
-                // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
-                // will end up being processed out of order.
-                ledger.update(request, &peers_router).await;
-            }
-        }));
-        // Wait until the ledger router task is ready.
-        let _ = handler.await;
-
-        Ok((ledger_reader, ledger_router))
-    }
-
-    ///
     /// Initialize the connection listener for new peers.
     ///
     #[inline]
@@ -261,13 +223,12 @@ impl<N: Network, E: Environment> Server<N, E> {
         listener: TcpListener,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N>,
+        ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
         // Initialize the listener process.
         let peers_router = peers_router.clone();
         let ledger_reader = ledger_reader.clone();
-        let ledger_router = ledger_router.clone();
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.
@@ -307,13 +268,12 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N>,
+        ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
         // Initialize the heartbeat process.
         let peers_router = peers_router.clone();
         let ledger_reader = ledger_reader.clone();
-        let ledger_router = ledger_router.clone();
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.

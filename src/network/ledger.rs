@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{CircularMap, State, Status},
+    helpers::{CircularMap, State, Status, Tasks},
     Data,
     Environment,
     Message,
@@ -41,7 +41,11 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::{
+    sync::{mpsc, oneshot, Mutex, RwLock},
+    task,
+    task::JoinHandle,
+};
 
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 50;
@@ -77,6 +81,8 @@ pub enum LedgerRequest<N: Network> {
 #[derive(Debug)]
 #[allow(clippy::type_complexity)]
 pub struct Ledger<N: Network, E: Environment> {
+    /// The ledger router of the node.
+    ledger_router: LedgerRouter<N>,
     /// The status of the node.
     status: Status,
     /// A terminator bit for the prover.
@@ -96,13 +102,25 @@ pub struct Ledger<N: Network, E: Environment> {
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
+    /// PhantomData
     _phantom: PhantomData<E>,
 }
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub fn open<S: Storage, P: AsRef<Path> + Copy>(path: P, status: &Status, terminator: &Arc<AtomicBool>) -> Result<Self> {
-        Ok(Self {
+    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
+        tasks: &mut Tasks<JoinHandle<()>>,
+        path: P,
+        status: &Status,
+        terminator: &Arc<AtomicBool>,
+        peers_router: &PeersRouter<N, E>,
+    ) -> Result<Arc<Self>> {
+        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
+        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
+
+        // Initialize the ledger.
+        let ledger = Arc::new(Self {
+            ledger_router,
             status: status.clone(),
             terminator: terminator.clone(),
             canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
@@ -113,7 +131,34 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
             _phantom: PhantomData,
-        })
+        });
+
+        // Initialize the handler for the ledger.
+        {
+            let ledger = ledger.clone();
+            let peers_router = peers_router.clone();
+            let (router, handler) = oneshot::channel();
+            tasks.append(task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a ledger request.
+                while let Some(request) = ledger_handler.recv().await {
+                    // Hold the ledger write lock briefly, to update the state of the ledger.
+                    // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
+                    // will end up being processed out of order.
+                    ledger.update(request, &peers_router).await;
+                }
+            }));
+            // Wait until the ledger handler is ready.
+            let _ = handler.await;
+        }
+
+        Ok(ledger)
+    }
+
+    /// Returns an instance of the ledger router.
+    pub fn router(&self) -> LedgerRouter<N> {
+        self.ledger_router.clone()
     }
 
     ///

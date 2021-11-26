@@ -69,6 +69,8 @@ pub enum ProverRequest<N: Network> {
 pub struct Prover<N: Network, E: Environment> {
     /// The thread pool for the prover.
     prover: Arc<ThreadPool>,
+    /// The prover router of the node.
+    prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: RwLock<MemoryPool<N>>,
     /// The status of the node.
@@ -81,8 +83,6 @@ pub struct Prover<N: Network, E: Environment> {
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
-    /// The prover router of the node.
-    prover_router: ProverRouter<N>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
@@ -93,7 +93,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         terminator: &Arc<AtomicBool>,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N>,
+        ledger_router: LedgerRouter<N>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (prover_router, mut prover_handler) = mpsc::channel(1024);
@@ -106,13 +106,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover.
         let prover = Arc::new(Self {
             prover: Arc::new(pool),
+            prover_router,
             memory_pool: RwLock::new(MemoryPool::new()),
             status: status.clone(),
             terminator: terminator.clone(),
             peers_router: peers_router.clone(),
             ledger_reader: ledger_reader.clone(),
-            ledger_router: ledger_router.clone(),
-            prover_router,
+            ledger_router,
         });
 
         // Initialize the handler for the prover.
