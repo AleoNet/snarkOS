@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     // Initialize the parallelization parameters.
     rayon::ThreadPoolBuilder::new()
         .stack_size(8 * 1024 * 1024)
-        .num_threads((num_cpus::get() / 8 * 3).max(1))
+        .num_threads((num_cpus::get() / 8 * 4).max(1))
         .build_global()
         .unwrap();
 

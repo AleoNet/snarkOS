@@ -97,10 +97,15 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (prover_router, mut prover_handler) = mpsc::channel(1024);
+        // Initialize the prover pool.
+        let pool = ThreadPoolBuilder::new()
+            .stack_size(8 * 1024 * 1024)
+            .num_threads((num_cpus::get() / 4).max(1))
+            .build()?;
 
         // Initialize the prover.
         let prover = Arc::new(Self {
-            prover: Arc::new(ThreadPoolBuilder::new().num_threads((num_cpus::get() / 8 * 2).max(1)).build()?),
+            prover: Arc::new(pool),
             memory_pool: RwLock::new(MemoryPool::new()),
             status: status.clone(),
             terminator: terminator.clone(),
