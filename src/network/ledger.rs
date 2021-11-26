@@ -302,10 +302,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Check for candidate blocks to fast forward the ledger.
         let mut block = &self.canon.latest_block();
 
-        // Lock unconfirmed_blocks for further processing.
-        let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
-
-        let unconfirmed_blocks_snapshot = unconfirmed_blocks.clone();
+        let mut unconfirmed_blocks_to_remove = Vec::new();
+        let unconfirmed_blocks_snapshot = self.unconfirmed_blocks.read().await.clone();
         while let Some(unconfirmed_block) = unconfirmed_blocks_snapshot.get(&block.hash()) {
             // Update the block iterator.
             block = unconfirmed_block;
@@ -324,16 +322,23 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // If the block is on a fork, remove the unconfirmed block, and break the loop.
             if is_forked_block {
-                unconfirmed_blocks.remove(&block.previous_block_hash());
+                unconfirmed_blocks_to_remove.push(block.previous_block_hash());
                 break;
             }
             // Attempt to add the unconfirmed block.
             else {
                 match self.add_block(block.clone(), prover_router).await {
                     // Upon success, remove the unconfirmed block, as it is now confirmed.
-                    true => unconfirmed_blocks.remove(&block.previous_block_hash()),
+                    true => unconfirmed_blocks_to_remove.push(block.previous_block_hash()),
                     false => break,
                 }
+            }
+        }
+
+        if !unconfirmed_blocks_to_remove.is_empty() {
+            let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
+            for hash in unconfirmed_blocks_to_remove {
+                unconfirmed_blocks.remove(&hash);
             }
         }
 
@@ -346,10 +351,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let _block_request_lock = self.block_requests_lock.lock().await;
 
             trace!("Ledger state has become stale, clearing queue and reverting by one block");
-            *unconfirmed_blocks = Default::default();
-
-            // Release the lock over unconfirmed_blocks.
-            drop(unconfirmed_blocks);
+            *self.unconfirmed_blocks.write().await = Default::default();
 
             // Reset the memory pool of its transactions.
             if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(None)).await {
