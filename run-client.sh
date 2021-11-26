@@ -24,8 +24,6 @@ do
     cargo clean
   fi
 
-  echo "Running the node..."
-  cargo clean
   $COMMAND & sleep 1800; kill $!
 
   sleep 2;
