@@ -23,9 +23,9 @@ use crate::{
     rpc::{rpc::*, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
-    LedgerRequest,
-    LedgerRouter,
     Peers,
+    ProverRequest,
+    ProverRouter,
 };
 use snarkos_ledger::Metadata;
 use snarkvm::{
@@ -66,7 +66,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     status: Status,
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
-    ledger_router: LedgerRouter<N, E>,
+    prover_router: ProverRouter<N>,
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
@@ -91,13 +91,13 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
         status: Status,
         peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
-        ledger_router: LedgerRouter<N, E>,
+        prover_router: ProverRouter<N>,
     ) -> Self {
         Self(Arc::new(RpcInner {
             status,
             peers,
             ledger,
-            ledger_router,
+            prover_router,
             credentials,
         }))
     }
@@ -229,9 +229,9 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
     async fn send_transaction(&self, transaction_hex: String) -> Result<N::TransactionID, RpcError> {
         let transaction: Transaction<N> = FromBytes::from_bytes_le(&hex::decode(transaction_hex)?)?;
-        // Route an `UnconfirmedTransaction` to the ledger.
-        let request = LedgerRequest::UnconfirmedTransaction("0.0.0.0:3032".parse().unwrap(), transaction.clone());
-        if let Err(error) = self.ledger_router.send(request).await {
+        // Route an `UnconfirmedTransaction` to the prover.
+        let request = ProverRequest::UnconfirmedTransaction("0.0.0.0:3032".parse().unwrap(), transaction.clone());
+        if let Err(error) = self.prover_router.send(request).await {
             warn!("[UnconfirmedTransaction] {}", error);
         }
         Ok(transaction.transaction_id())
