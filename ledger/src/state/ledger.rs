@@ -143,33 +143,53 @@ impl<N: Network> LedgerState<N> {
             ledger.blocks.add_block(genesis)?;
         }
 
-        // Retrieve each block from genesis to validate state.
-        for block_height in 0..=latest_block_height {
-            // Validate the ledger root every 500 blocks.
-            if block_height % 500 == 0 || block_height == latest_block_height {
-                // Log the progress of the ledger root validation procedure.
-                let progress = (block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-                debug!("Validating the ledger root up to block {} ({}%)", block_height, progress);
+        // Iterate and append each block hash from genesis to tip to validate ledger state.
+        const INCREMENT: u32 = 500;
+        let mut start_block_height = 0u32;
+        while start_block_height < latest_block_height {
+            // Log the progress of the validation procedure.
+            let progress = (start_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+            debug!("Validating the ledger up to block {} ({}%)", start_block_height, progress);
 
-                // Ensure the ledger roots match their expected block heights.
-                let expected_ledger_root = ledger.get_previous_ledger_root(block_height)?;
-                match ledger.ledger_roots.get(&expected_ledger_root)? {
-                    Some(height) => {
-                        if block_height != height {
-                            return Err(anyhow!("Ledger expected block {}, found block {}", block_height, height));
-                        }
-                    }
-                    None => return Err(anyhow!("Ledger is missing ledger root for block {}", block_height)),
+            // Compute the end block height (inclusive) for this iteration.
+            let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
+
+            // Retrieve the block hashes.
+            let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
+
+            // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
+            if let Some((end_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
+                // Add the block hashes (up to penultimate) to the ledger tree.
+                ledger.ledger_tree.write().add_all(&block_hashes_excluding_last)?;
+
+                // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
+                let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
+                if ledger_root != ledger.ledger_tree.read().root() {
+                    return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", end_block_height));
                 }
 
-                // Ensure the ledger tree matches the state of ledger roots.
-                if expected_ledger_root != ledger.ledger_tree.read().root() {
-                    return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", block_height));
+                // Check 2- Ensure the saved block height corresponding to this ledger root matches the expected block height.
+                let candidate_height = match ledger.ledger_roots.get(&ledger_root)? {
+                    Some(candidate_height) => candidate_height,
+                    None => return Err(anyhow!("Ledger is missing ledger root for block {}", end_block_height)),
+                };
+                if end_block_height != candidate_height {
+                    return Err(anyhow!(
+                        "Ledger expected block {}, found block {}",
+                        end_block_height,
+                        candidate_height
+                    ));
                 }
+
+                // Add the last block hash to the ledger tree.
+                ledger.ledger_tree.write().add(&end_block_hash)?;
+            } else {
+                // Add the genesis block hash to the ledger tree.
+                ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
             }
 
-            // Add the block hash to the ledger tree.
-            ledger.ledger_tree.write().add(&ledger.get_block_hash(block_height)?)?;
+            // Update the starting block height for the next iteration.
+            start_block_height = std::cmp::min(end_block_height.saturating_add(1), latest_block_height);
         }
 
         // Update the latest ledger state.
