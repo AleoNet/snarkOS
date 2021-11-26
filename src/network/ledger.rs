@@ -813,6 +813,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
 
             // Filter out any pre-existing block requests for the peer.
+            let mut missing_block_requests = false;
             let mut new_block_heights = Vec::new();
             if let Some(block_requests) = self.block_requests.read().await.get(&peer_ip) {
                 for block_height in start_block_height..=end_block_height {
@@ -822,24 +823,27 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             } else {
                 self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)).await;
+                missing_block_requests = true;
             }
 
-            // Log each block request to ensure the peer responds with all requested blocks.
-            if let Some(locked_block_requests) = self.block_requests.write().await.get_mut(&peer_ip) {
-                for block_height in new_block_heights {
-                    // If the ledger was reverted, include the expected new block hash for the fork.
-                    match ledger_reverted {
-                        true => {
-                            self.add_block_request(
-                                peer_ip,
-                                block_height,
-                                maximum_block_locators.get_block_hash(block_height),
-                                locked_block_requests,
-                            )
-                            .await
-                        }
-                        false => self.add_block_request(peer_ip, block_height, None, locked_block_requests).await,
-                    };
+            if !missing_block_requests && !new_block_heights.is_empty() {
+                // Log each block request to ensure the peer responds with all requested blocks.
+                if let Some(locked_block_requests) = self.block_requests.write().await.get_mut(&peer_ip) {
+                    for block_height in new_block_heights {
+                        // If the ledger was reverted, include the expected new block hash for the fork.
+                        match ledger_reverted {
+                            true => {
+                                self.add_block_request(
+                                    peer_ip,
+                                    block_height,
+                                    maximum_block_locators.get_block_hash(block_height),
+                                    locked_block_requests,
+                                )
+                                .await
+                            }
+                            false => self.add_block_request(peer_ip, block_height, None, locked_block_requests).await,
+                        };
+                    }
                 }
             }
 
