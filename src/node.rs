@@ -150,8 +150,12 @@ impl Node {
         // Spawn a task to handle the server.
         tasks.append(task::spawn(async move {
             let _server = server;
-            std::future::pending::<()>().await
+            std::future::pending::<()>().await;
         }));
+
+        // Note: Do not move this. The pending await must be here otherwise
+        // other snarkOS commands will not exit.
+        std::future::pending::<()>().await;
 
         Ok(())
     }

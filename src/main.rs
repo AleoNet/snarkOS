@@ -46,7 +46,6 @@ fn main() -> Result<()> {
 
     runtime.block_on(async move {
         node.start().await.expect("Failed to start the node");
-        std::future::pending::<()>().await;
     });
 
     Ok(())
