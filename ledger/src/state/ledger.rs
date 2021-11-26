@@ -150,6 +150,12 @@ impl<N: Network> LedgerState<N> {
             // Compute the end block height (inclusive) for this iteration.
             let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
 
+            // Perform a spot check that the block headers for this iteration exists in storage.
+            if start_block_height % 2 == 0 {
+                let block_headers = ledger.get_block_headers(start_block_height, end_block_height)?;
+                assert_eq!(end_block_height - start_block_height + 1, block_headers.len() as u32);
+            }
+
             // Retrieve the block hashes.
             let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
 
