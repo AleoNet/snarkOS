@@ -67,7 +67,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 1;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 75;
+    const PING_SLEEP_IN_SECS: u64 = 90;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
@@ -126,7 +126,7 @@ impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
     const SYNC_NODES: [&'static str; 5] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 35;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 256;
 }
 
@@ -138,8 +138,8 @@ impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
     const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 11;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 35;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 51;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -150,7 +150,7 @@ impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
     const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 11;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 35;
     const COINBASE_IS_PUBLIC: bool = true;
 }
