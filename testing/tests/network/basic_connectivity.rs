@@ -24,7 +24,6 @@ use std::sync::{
 };
 use tokio::task;
 
-#[ignore]
 #[tokio::test]
 async fn client_nodes_can_connect_to_each_other() {
     // Start 2 snarkOS nodes.
@@ -35,7 +34,6 @@ async fn client_nodes_can_connect_to_each_other() {
     client_node1.connect(client_node2.local_addr()).await.unwrap();
 }
 
-#[ignore]
 #[tokio::test]
 async fn test_nodes_can_connect_to_each_other() {
     // Start 2 test nodes.
@@ -53,7 +51,6 @@ async fn test_nodes_can_connect_to_each_other() {
     assert!(test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
 }
 
-#[ignore]
 #[tokio::test]
 async fn handshake_as_initiator_works() {
     // Start a test node.
@@ -72,7 +69,6 @@ async fn handshake_as_initiator_works() {
     wait_until!(1, test_node.node().num_connected() == 1);
 }
 
-#[ignore]
 #[tokio::test]
 async fn handshake_as_responder_works() {
     // Start a test node.
@@ -88,7 +84,6 @@ async fn handshake_as_responder_works() {
     assert!(client_node.connected_peers().await.len() == 1)
 }
 
-#[ignore]
 #[tokio::test]
 async fn node_cant_connect_to_itself() {
     // Start a snarkOS node.
@@ -98,7 +93,6 @@ async fn node_cant_connect_to_itself() {
     assert!(client_node.connect(client_node.local_addr()).await.is_err());
 }
 
-#[ignore]
 #[tokio::test]
 async fn node_cant_connect_to_another_twice() {
     // Start a test node.
@@ -115,7 +109,6 @@ async fn node_cant_connect_to_another_twice() {
     assert!(client_node.connect(test_node_addr).await.is_err());
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn concurrent_duplicate_connection_attempts_fail() {
     // The number of concurrent connection attempts.
@@ -151,7 +144,6 @@ async fn concurrent_duplicate_connection_attempts_fail() {
     wait_until!(5, error_count.load(Relaxed) == NUM_CONCURRENT_ATTEMPTS - 1);
 }
 
-#[ignore]
 #[tokio::test]
 async fn connection_limits_are_obeyed() {
     // Start a snarkOS node.
@@ -179,7 +171,6 @@ async fn connection_limits_are_obeyed() {
     assert!(extra_test_node.node().connect(client_node.local_addr()).await.is_err());
 }
 
-#[ignore]
 #[tokio::test]
 async fn peer_accounting_works() {
     // Start a snarkOS node.
