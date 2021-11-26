@@ -625,7 +625,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Lock peers_state for further processing.
         let peers_state = self.peers_state.read().await;
 
-        let mut peers_contains_sync_node = false;
+        let peers_contains_sync_node = false;
         // for ip in peers_state.keys() {
         //     peers_contains_sync_node |= sync_nodes.contains(ip);
         // }
