@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{State, Status},
+    helpers::{State, Status, Tasks},
     Environment,
     LedgerReader,
     LedgerRequest,
@@ -38,8 +38,9 @@ use std::{
     },
 };
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{mpsc, oneshot, RwLock},
     task,
+    task::JoinHandle,
 };
 
 /// Shorthand for the parent half of the `Prover` message channel.
@@ -53,6 +54,8 @@ type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
 ///
 #[derive(Debug)]
 pub enum ProverRequest<N: Network> {
+    /// MemoryPoolClear := (block)
+    MemoryPoolClear(Option<Block<N>>),
     /// Mine := (local_ip, prover_address)
     Mine(SocketAddr, Address<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
@@ -63,7 +66,6 @@ pub enum ProverRequest<N: Network> {
 /// A prover for a specific network on the node server.
 ///
 #[derive(Debug)]
-#[allow(clippy::type_complexity)]
 pub struct Prover<N: Network, E: Environment> {
     /// The thread pool for the prover.
     prover: Arc<ThreadPool>,
@@ -79,18 +81,25 @@ pub struct Prover<N: Network, E: Environment> {
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N, E>,
+    /// The prover router of the node.
+    prover_router: ProverRouter<N>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
     /// Initializes a new instance of the prover.
-    pub fn open(
+    pub async fn new(
+        tasks: &mut Tasks<JoinHandle<()>>,
         status: &Status,
         terminator: &Arc<AtomicBool>,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
         ledger_router: &LedgerRouter<N, E>,
-    ) -> Result<Self> {
-        Ok(Self {
+    ) -> Result<Arc<Self>> {
+        // Initialize an mpsc channel for sending requests to the `Prover` struct.
+        let (prover_router, mut prover_handler) = mpsc::channel(1024);
+
+        // Initialize the prover.
+        let prover = Arc::new(Self {
             prover: Arc::new(ThreadPoolBuilder::new().num_threads((num_cpus::get() / 8 * 2).max(1)).build()?),
             memory_pool: RwLock::new(MemoryPool::new()),
             status: status.clone(),
@@ -98,7 +107,32 @@ impl<N: Network, E: Environment> Prover<N, E> {
             peers_router: peers_router.clone(),
             ledger_reader: ledger_reader.clone(),
             ledger_router: ledger_router.clone(),
-        })
+            prover_router,
+        });
+
+        // Initialize the handler for the prover.
+        {
+            let prover = prover.clone();
+            let (router, handler) = oneshot::channel();
+            tasks.append(task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a prover request.
+                while let Some(request) = prover_handler.recv().await {
+                    // Hold the prover write lock briefly, to update the state of the prover.
+                    prover.update(request).await;
+                }
+            }));
+            // Wait until the prover handler is ready.
+            let _ = handler.await;
+        }
+
+        Ok(prover)
+    }
+
+    /// Returns an instance of the prover router.
+    pub fn router(&self) -> ProverRouter<N> {
+        self.prover_router.clone()
     }
 
     ///
@@ -107,6 +141,10 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     pub(super) async fn update(&self, request: ProverRequest<N>) {
         match request {
+            ProverRequest::MemoryPoolClear(block) => match block {
+                Some(block) => self.memory_pool.write().await.remove_transactions(block.transactions()),
+                None => *self.memory_pool.write().await = MemoryPool::new(),
+            },
             ProverRequest::Mine(local_ip, recipient) => {
                 // Process the request to mine the next block.
                 self.mine_next_block(local_ip, recipient).await;
@@ -145,6 +183,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             let terminator = self.terminator.clone();
             let status = self.status.clone();
             let ledger_router = self.ledger_router.clone();
+            let prover_router = self.prover_router.clone();
 
             task::spawn(async move {
                 // Mine the next block.
@@ -161,7 +200,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     Ok(Ok(block)) => {
                         debug!("Miner has found an unconfirmed candidate for block {}", block.height());
                         // Broadcast the next block.
-                        let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
+                        let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
                         if let Err(error) = ledger_router.send(request).await {
                             warn!("Failed to broadcast mined block: {}", error);
                         }

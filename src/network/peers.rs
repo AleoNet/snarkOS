@@ -937,7 +937,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Perform the deferred non-blocking deserialization of the block.
                                     match block.deserialize().await {
                                         // Route the `BlockResponse` to the ledger.
-                                        Ok(block) => if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block)).await {
+                                        Ok(block) => if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await {
                                             warn!("[BlockResponse] {}", error);
                                         },
                                         // Route the `Failure` to the ledger.
@@ -1065,7 +1065,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             // Ensure the claimed block height and block hash matches in the deserialized block.
                                             Ok(block) => match block_height == block.height() && block_hash == block.hash() {
                                                 // Route the `UnconfirmedBlock` to the ledger.
-                                                true => LedgerRequest::UnconfirmedBlock(peer_ip, block),
+                                                true => LedgerRequest::UnconfirmedBlock(peer_ip, block, prover_router.clone()),
                                                 // Route the `Failure` to the ledger.
                                                 false => LedgerRequest::Failure(peer_ip, "Malformed UnconfirmedBlock message".to_string())
                                             },
