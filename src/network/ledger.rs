@@ -302,10 +302,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Check for candidate blocks to fast forward the ledger.
         let mut block = &self.canon.latest_block();
 
-        // Lock unconfirmed_blocks for further processing.
-        let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
-
-        let unconfirmed_blocks_snapshot = unconfirmed_blocks.clone();
+        let mut unconfirmed_blocks_to_remove = Vec::new();
+        let unconfirmed_blocks_snapshot = self.unconfirmed_blocks.read().await.clone();
         while let Some(unconfirmed_block) = unconfirmed_blocks_snapshot.get(&block.hash()) {
             // Update the block iterator.
             block = unconfirmed_block;
@@ -324,16 +322,23 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // If the block is on a fork, remove the unconfirmed block, and break the loop.
             if is_forked_block {
-                unconfirmed_blocks.remove(&block.previous_block_hash());
+                unconfirmed_blocks_to_remove.push(block.previous_block_hash());
                 break;
             }
             // Attempt to add the unconfirmed block.
             else {
                 match self.add_block(block.clone(), prover_router).await {
                     // Upon success, remove the unconfirmed block, as it is now confirmed.
-                    true => unconfirmed_blocks.remove(&block.previous_block_hash()),
+                    true => unconfirmed_blocks_to_remove.push(block.previous_block_hash()),
                     false => break,
                 }
+            }
+        }
+
+        if !unconfirmed_blocks_to_remove.is_empty() {
+            let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
+            for hash in unconfirmed_blocks_to_remove {
+                unconfirmed_blocks.remove(&hash);
             }
         }
 
@@ -346,10 +351,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let _block_request_lock = self.block_requests_lock.lock().await;
 
             trace!("Ledger state has become stale, clearing queue and reverting by one block");
-            *unconfirmed_blocks = Default::default();
-
-            // Release the lock over unconfirmed_blocks.
-            drop(unconfirmed_blocks);
+            *self.unconfirmed_blocks.write().await = Default::default();
 
             // Reset the memory pool of its transactions.
             if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(None)).await {
@@ -430,13 +432,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
     async fn add_block(&self, block: Block<N>, prover_router: &ProverRouter<N>) -> bool {
-        // Acquire the lock for block requests.
-        let _block_requests_lock = self.block_requests_lock.lock().await;
-
         // Ensure the given block is new.
         if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
             trace!("Canon chain already contains block {}", block.height());
         } else if block.height() == self.canon.latest_block_height() + 1 && block.previous_block_hash() == self.canon.latest_block_hash() {
+            // Acquire the lock for block requests.
+            let _block_requests_lock = self.block_requests_lock.lock().await;
+
             match self.canon.add_next_block(&block) {
                 Ok(()) => {
                     info!("Ledger successfully advanced to block {}", self.canon.latest_block_height());
@@ -650,9 +652,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
 
-        // Acquire the lock for block requests.
-        let _block_requests_lock = self.block_requests_lock.lock().await;
-
         // Retrieve the latest block height of this ledger.
         let latest_block_height = self.canon.latest_block_height();
 
@@ -698,6 +697,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         if latest_block_height >= maximum_block_height {
             return;
         }
+
+        // Acquire the lock for block requests.
+        let _block_requests_lock = self.block_requests_lock.lock().await;
 
         // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let (Some(peer_ip), Some(is_fork)) = (maximal_peer, maximal_peer_is_fork) {
@@ -812,16 +814,39 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 return;
             }
 
-            // Log each block request to ensure the peer responds with all requested blocks.
-            for block_height in start_block_height..=end_block_height {
-                // If the ledger was reverted, include the expected new block hash for the fork.
-                match ledger_reverted {
-                    true => {
-                        self.add_block_request(peer_ip, block_height, maximum_block_locators.get_block_hash(block_height))
-                            .await
+            // Filter out any pre-existing block requests for the peer.
+            let mut missing_block_requests = false;
+            let mut new_block_heights = Vec::new();
+            if let Some(block_requests) = self.block_requests.read().await.get(&peer_ip) {
+                for block_height in start_block_height..=end_block_height {
+                    if !block_requests.contains_key(&block_height.into()) {
+                        new_block_heights.push(block_height);
                     }
-                    false => self.add_block_request(peer_ip, block_height, None).await,
-                };
+                }
+            } else {
+                self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)).await;
+                missing_block_requests = true;
+            }
+
+            if !missing_block_requests && !new_block_heights.is_empty() {
+                // Log each block request to ensure the peer responds with all requested blocks.
+                if let Some(locked_block_requests) = self.block_requests.write().await.get_mut(&peer_ip) {
+                    for block_height in new_block_heights {
+                        // If the ledger was reverted, include the expected new block hash for the fork.
+                        match ledger_reverted {
+                            true => {
+                                self.add_block_request(
+                                    peer_ip,
+                                    block_height,
+                                    maximum_block_locators.get_block_hash(block_height),
+                                    locked_block_requests,
+                                )
+                                .await
+                            }
+                            false => self.add_block_request(peer_ip, block_height, None, locked_block_requests).await,
+                        };
+                    }
+                }
             }
 
             // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
@@ -882,16 +907,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Adds a block request for the given block height to the specified peer.
     ///
-    async fn add_block_request(&self, peer_ip: SocketAddr, block_height: u32, block_hash: Option<N::BlockHash>) {
-        // Ensure the block request does not already exist.
-        if !self.contains_block_request(peer_ip, block_height).await {
-            match self.block_requests.write().await.get_mut(&peer_ip) {
-                Some(requests) => match requests.insert((block_height, block_hash).into(), Utc::now().timestamp()) {
-                    None => debug!("Requesting block {} from {}", block_height, peer_ip),
-                    Some(_old_request) => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)).await,
-                },
-                None => self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)).await,
-            };
+    async fn add_block_request(
+        &self,
+        peer_ip: SocketAddr,
+        block_height: u32,
+        block_hash: Option<N::BlockHash>,
+        locked_block_requests: &mut HashMap<BlockRequest<N>, i64>,
+    ) {
+        match locked_block_requests.insert((block_height, block_hash).into(), Utc::now().timestamp()) {
+            None => debug!("Requesting block {} from {}", block_height, peer_ip),
+            Some(_old_request) => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)).await,
         }
     }
 
