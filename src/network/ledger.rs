@@ -86,6 +86,7 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The canonical chain of blocks.
     canon: Arc<LedgerState<N>>,
     /// The canonical chain of blocks in read-only mode.
+    #[allow(unused)]
     canon_reader: Arc<LedgerState<N>>,
     /// A map of previous block hashes to unconfirmed blocks.
     unconfirmed_blocks: RwLock<CircularMap<N::BlockHash, Block<N>, { MAXIMUM_UNCONFIRMED_BLOCKS }>>,
