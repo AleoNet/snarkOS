@@ -115,6 +115,7 @@ async fn node_cant_connect_to_another_twice() {
     assert!(client_node.connect(test_node_addr).await.is_err());
 }
 
+#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn concurrent_duplicate_connection_attempts_fail() {
     // The number of concurrent connection attempts.
@@ -150,6 +151,7 @@ async fn concurrent_duplicate_connection_attempts_fail() {
     wait_until!(5, error_count.load(Relaxed) == NUM_CONCURRENT_ATTEMPTS - 1);
 }
 
+#[ignore]
 #[tokio::test]
 async fn connection_limits_are_obeyed() {
     // Start a snarkOS node.
