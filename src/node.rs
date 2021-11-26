@@ -30,9 +30,9 @@ use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;
 use colored::*;
-use std::{net::SocketAddr, str::FromStr};
+use std::{io, net::SocketAddr, str::FromStr};
 use structopt::StructOpt;
-use tokio::task;
+use tokio::{sync::mpsc, task};
 use tracing_subscriber::EnvFilter;
 
 #[derive(StructOpt, Debug)]
@@ -140,7 +140,7 @@ impl Node {
         // Initialize the display, if enabled.
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            let _display = Display::<N, E>::start(server.clone())?;
+            let _display = Display::<N, E>::start(server.clone(), self.verbosity)?;
         };
 
         // Connect to a peer if one was given as an argument.
@@ -155,30 +155,32 @@ impl Node {
 
         Ok(())
     }
+}
 
-    pub fn initialize_logger(&self) {
-        match self.verbosity {
-            0 => std::env::set_var("RUST_LOG", "info"),
-            1 => std::env::set_var("RUST_LOG", "debug"),
-            2 | 3 => std::env::set_var("RUST_LOG", "trace"),
-            _ => std::env::set_var("RUST_LOG", "info"),
-        };
+pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>>) {
+    match verbosity {
+        0 => std::env::set_var("RUST_LOG", "info"),
+        1 => std::env::set_var("RUST_LOG", "debug"),
+        2 | 3 => std::env::set_var("RUST_LOG", "trace"),
+        _ => std::env::set_var("RUST_LOG", "info"),
+    };
 
-        // Filter out undesirable logs.
-        let filter = EnvFilter::from_default_env()
-            .add_directive("mio=off".parse().unwrap())
-            .add_directive("tokio_util=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::io=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::role=off".parse().unwrap());
+    // Filter out undesirable logs.
+    let filter = EnvFilter::from_default_env()
+        .add_directive("mio=off".parse().unwrap())
+        .add_directive("tokio_util=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::io=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::role=off".parse().unwrap());
 
-        // Initialize tracing.
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(filter)
-            .with_target(self.verbosity == 3)
-            .try_init();
-    }
+    // Initialize tracing.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_ansi(log_sender.is_none())
+        .with_writer(move || LogWriter::new(&log_sender))
+        .with_target(verbosity == 3)
+        .try_init();
 }
 
 #[derive(StructOpt, Debug)]
@@ -195,6 +197,38 @@ impl Command {
             Self::Update(command) => command.parse(),
             Self::Experimental(command) => command.parse(),
         }
+    }
+}
+
+enum LogWriter {
+    Stdout(io::Stdout),
+    Sender(mpsc::Sender<Vec<u8>>),
+}
+
+impl LogWriter {
+    fn new(log_sender: &Option<mpsc::Sender<Vec<u8>>>) -> Self {
+        if let Some(sender) = log_sender {
+            Self::Sender(sender.clone())
+        } else {
+            Self::Stdout(io::stdout())
+        }
+    }
+}
+
+impl io::Write for LogWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Stdout(stdout) => stdout.write(buf),
+            Self::Sender(sender) => {
+                let log = buf.to_vec();
+                let _ = sender.try_send(log);
+                Ok(buf.len())
+            }
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
