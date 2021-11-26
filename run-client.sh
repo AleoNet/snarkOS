@@ -16,7 +16,13 @@ echo "Running client node..."
 while :
 do
   echo "Checking for updates..."
-  git pull
+  STATUS=$(git pull)
+
+  echo "Running the node..."
+  
+  if [ "$STATUS" != "Already up to date." ]; then
+    cargo clean
+  fi
 
   echo "Running the node..."
   cargo clean
