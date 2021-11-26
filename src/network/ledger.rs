@@ -430,13 +430,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
     async fn add_block(&self, block: Block<N>, prover_router: &ProverRouter<N>) -> bool {
-        // Acquire the lock for block requests.
-        let _block_requests_lock = self.block_requests_lock.lock().await;
-
         // Ensure the given block is new.
         if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
             trace!("Canon chain already contains block {}", block.height());
         } else if block.height() == self.canon.latest_block_height() + 1 && block.previous_block_hash() == self.canon.latest_block_hash() {
+            // Acquire the lock for block requests.
+            let _block_requests_lock = self.block_requests_lock.lock().await;
+
             match self.canon.add_next_block(&block) {
                 Ok(()) => {
                     info!("Ledger successfully advanced to block {}", self.canon.latest_block_height());
@@ -650,9 +650,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
 
-        // Acquire the lock for block requests.
-        let _block_requests_lock = self.block_requests_lock.lock().await;
-
         // Retrieve the latest block height of this ledger.
         let latest_block_height = self.canon.latest_block_height();
 
@@ -698,6 +695,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         if latest_block_height >= maximum_block_height {
             return;
         }
+
+        // Acquire the lock for block requests.
+        let _block_requests_lock = self.block_requests_lock.lock().await;
 
         // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let (Some(peer_ip), Some(is_fork)) = (maximal_peer, maximal_peer_is_fork) {
