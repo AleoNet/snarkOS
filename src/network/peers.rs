@@ -970,7 +970,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     };
                                     // Send a `BlockResponse` message for each block to the peer.
                                     for block in blocks {
-                                        trace!("Sending 'BlockResponse {}' to {}", block.height(), peer_ip);
+                                        debug!("Sending 'BlockResponse {}' to {}", block.height(), peer_ip);
                                         if let Err(error) = peer.outbound_socket.send(Message::BlockResponse(Data::Object(block))).await {
                                             warn!("[BlockResponse] {}", error);
                                             break;
