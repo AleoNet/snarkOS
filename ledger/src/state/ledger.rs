@@ -147,10 +147,6 @@ impl<N: Network> LedgerState<N> {
         const INCREMENT: u32 = 500;
         let mut start_block_height = 0u32;
         while start_block_height < latest_block_height {
-            // Log the progress of the validation procedure.
-            let progress = (start_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-            debug!("Validating the ledger up to block {} ({}%)", start_block_height, progress);
-
             // Compute the end block height (inclusive) for this iteration.
             let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
 
@@ -187,6 +183,10 @@ impl<N: Network> LedgerState<N> {
 
             // Update the starting block height for the next iteration.
             start_block_height = std::cmp::min(end_block_height.saturating_add(1), latest_block_height);
+
+            // Log the progress of the validation procedure.
+            let progress = (start_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+            debug!("Validating the ledger up to block {} ({}%)", start_block_height, progress);
         }
 
         // If this is new storage, the while loop above did not execute,
