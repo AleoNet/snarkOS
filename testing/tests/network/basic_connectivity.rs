@@ -24,6 +24,7 @@ use std::sync::{
 };
 use tokio::task;
 
+#[ignore]
 #[tokio::test]
 async fn client_nodes_can_connect_to_each_other() {
     // Start 2 snarkOS nodes.
@@ -52,6 +53,7 @@ async fn test_nodes_can_connect_to_each_other() {
     assert!(test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
 }
 
+#[ignore]
 #[tokio::test]
 async fn handshake_as_initiator_works() {
     // Start a test node.
@@ -70,6 +72,7 @@ async fn handshake_as_initiator_works() {
     wait_until!(1, test_node.node().num_connected() == 1);
 }
 
+#[ignore]
 #[tokio::test]
 async fn handshake_as_responder_works() {
     // Start a test node.
@@ -85,6 +88,7 @@ async fn handshake_as_responder_works() {
     assert!(client_node.connected_peers().await.len() == 1)
 }
 
+#[ignore]
 #[tokio::test]
 async fn node_cant_connect_to_itself() {
     // Start a snarkOS node.
@@ -94,6 +98,7 @@ async fn node_cant_connect_to_itself() {
     assert!(client_node.connect(client_node.local_addr()).await.is_err());
 }
 
+#[ignore]
 #[tokio::test]
 async fn node_cant_connect_to_another_twice() {
     // Start a test node.
@@ -172,6 +177,7 @@ async fn connection_limits_are_obeyed() {
     assert!(extra_test_node.node().connect(client_node.local_addr()).await.is_err());
 }
 
+#[ignore]
 #[tokio::test]
 async fn peer_accounting_works() {
     // Start a snarkOS node.
