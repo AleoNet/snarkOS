@@ -160,7 +160,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
     /// Returns an instance of the ledger reader.
     pub fn reader(&self) -> LedgerReader<N> {
-        self.canon_reader.clone()
+        // TODO (howardwu): Switch this from `canon` to `canon_reader`.
+        //  RocksDB at v6.22 has a rollback error with its sequence numbers.
+        //  Currently, v6.25 has this issue patched, however rust-rocksdb has not released it.
+        self.canon.clone()
+        // self.canon_reader.clone()
     }
 
     /// Returns an instance of the ledger router.
