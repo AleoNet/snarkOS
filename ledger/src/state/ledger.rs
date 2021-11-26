@@ -160,7 +160,7 @@ impl<N: Network> LedgerState<N> {
             // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
             if let Some((end_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
                 // Add the block hashes (up to penultimate) to the ledger tree.
-                ledger.ledger_tree.write().add_all(&block_hashes_excluding_last)?;
+                ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
 
                 // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
                 let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
@@ -182,10 +182,10 @@ impl<N: Network> LedgerState<N> {
                 }
 
                 // Add the last block hash to the ledger tree.
-                ledger.ledger_tree.write().add(&end_block_hash)?;
+                ledger.ledger_tree.write().add(end_block_hash)?;
             } else {
                 // Add the genesis block hash to the ledger tree.
-                ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
+                ledger.ledger_tree.write().add(&N::genesis_block().previous_block_hash())?;
             }
 
             // Update the starting block height for the next iteration.
