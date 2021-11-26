@@ -33,6 +33,7 @@ use anyhow::Result;
 use chrono::Utc;
 use std::{
     collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
     net::SocketAddr,
     path::Path,
     sync::{
@@ -76,6 +77,43 @@ pub enum LedgerRequest<N: Network> {
 }
 
 ///
+/// A request for a block with the specified height and possibly a hash.
+///
+#[derive(Clone, Debug)]
+pub struct BlockRequest<N: Network> {
+    height: u32,
+    hash: Option<N::BlockHash>,
+}
+
+// The height is the primary key, so use only it for hashing purposes.
+impl<N: Network> PartialEq for BlockRequest<N> {
+    fn eq(&self, other: &Self) -> bool {
+        self.height == other.height
+    }
+}
+
+impl<N: Network> Eq for BlockRequest<N> {}
+
+// The k1 == k2 -> hash(k1) == hash(k2) rule must hold.
+impl<N: Network> Hash for BlockRequest<N> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.height.hash(state);
+    }
+}
+
+impl<N: Network> From<u32> for BlockRequest<N> {
+    fn from(height: u32) -> Self {
+        Self { height, hash: None }
+    }
+}
+
+impl<N: Network> From<(u32, Option<N::BlockHash>)> for BlockRequest<N> {
+    fn from((height, hash): (u32, Option<N::BlockHash>)) -> Self {
+        Self { height, hash }
+    }
+}
+
+///
 /// A ledger for a specific network on the node server.
 ///
 #[derive(Debug)]
@@ -93,7 +131,7 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The map of each peer to their ledger state := (node_type, status, is_fork, latest_block_height, block_locators).
     peers_state: RwLock<HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>>,
     /// The map of each peer to their block requests := HashMap<(block_height, block_hash), timestamp>
-    block_requests: RwLock<HashMap<SocketAddr, HashMap<(u32, Option<N::BlockHash>), i64>>>,
+    block_requests: RwLock<HashMap<SocketAddr, HashMap<BlockRequest<N>, i64>>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
     /// In this context, `update_ledger`, `add_block`, and `update_block_requests` must be mutually-exclusive.
     block_requests_lock: Mutex<()>,
@@ -181,7 +219,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         match request {
             LedgerRequest::BlockResponse(peer_ip, block, prover_router) => {
                 // Remove the block request from the ledger.
-                if self.remove_block_request(peer_ip, block.height(), block.hash()).await {
+                if self.remove_block_request(peer_ip, block.height()).await {
                     // On success, process the block response.
                     self.add_block(block, &prover_router).await;
                     // Check if syncing with this peer is complete.
@@ -275,9 +313,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Ensure the block height is not part of a block request in a fork.
             let mut is_forked_block = false;
             for requests in self.block_requests.read().await.values() {
-                for (block_height, block_hash) in requests.keys() {
+                for block_request in requests.keys() {
                     // If the block is part of a fork, then don't attempt to add it again.
-                    if block_height == &block.height() && block_hash.is_some() {
+                    if block_request.height == block.height() && block_request.hash.is_some() {
                         is_forked_block = true;
                         break;
                     }
@@ -846,9 +884,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn add_block_request(&self, peer_ip: SocketAddr, block_height: u32, block_hash: Option<N::BlockHash>) {
         // Ensure the block request does not already exist.
-        if !self.contains_block_request(peer_ip, block_height, block_hash).await {
+        if !self.contains_block_request(peer_ip, block_height).await {
             match self.block_requests.write().await.get_mut(&peer_ip) {
-                Some(requests) => match requests.insert((block_height, block_hash), Utc::now().timestamp()) {
+                Some(requests) => match requests.insert((block_height, block_hash).into(), Utc::now().timestamp()) {
                     None => debug!("Requesting block {} from {}", block_height, peer_ip),
                     Some(_old_request) => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)).await,
                 },
@@ -860,9 +898,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Returns `true` if the block request for the given block height to the specified peer exists.
     ///
-    async fn contains_block_request(&self, peer_ip: SocketAddr, block_height: u32, block_hash: Option<N::BlockHash>) -> bool {
+    async fn contains_block_request(&self, peer_ip: SocketAddr, block_height: u32) -> bool {
         match self.block_requests.read().await.get(&peer_ip) {
-            Some(requests) => requests.contains_key(&(block_height, block_hash)) || requests.contains_key(&(block_height, None)),
+            Some(requests) => requests.contains_key(&block_height.into()),
             None => false,
         }
     }
@@ -871,15 +909,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Removes a block request for the given block height to the specified peer.
     /// On success, returns `true`, otherwise returns `false`.
     ///
-    async fn remove_block_request(&self, peer_ip: SocketAddr, block_height: u32, block_hash: N::BlockHash) -> bool {
+    async fn remove_block_request(&self, peer_ip: SocketAddr, block_height: u32) -> bool {
         // Ensure the block height corresponds to a requested block.
-        if !self.contains_block_request(peer_ip, block_height, Some(block_hash)).await {
+        if !self.contains_block_request(peer_ip, block_height).await {
             self.add_failure(peer_ip, "Received an invalid block response".to_string()).await;
             false
         } else {
             if let Some(requests) = self.block_requests.write().await.get_mut(&peer_ip) {
-                let is_success =
-                    requests.remove(&(block_height, Some(block_hash))).is_some() || requests.remove(&(block_height, None)).is_some();
+                let is_success = requests.remove(&block_height.into()).is_some();
                 match is_success {
                     true => return true,
                     false => {
