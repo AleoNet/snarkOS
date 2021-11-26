@@ -785,7 +785,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     .filter(|(&peer_ip, _)| {
                         let peer_str = peer_ip.to_string();
                         !E::SYNC_NODES.contains(&peer_str.as_str())
-                            && !E::PEER_NODES.contains(&peer_str.as_str())
+                            && !E::BEACON_NODES.contains(&peer_str.as_str())
                             && !block_requests.contains_key(&peer_ip)
                     })
                     .take(num_excess_peers)

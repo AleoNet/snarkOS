@@ -29,8 +29,8 @@ pub enum NodeType {
     Client = 0,
     /// A mining node is a full node, capable of producing new blocks.
     Miner,
-    /// A peer node is a discovery node, capable of sharing peers of the network.
-    Peer,
+    /// A beacon node is a discovery node, capable of sharing peers of the network.
+    Beacon,
     /// A sync node is a discovery node, capable of syncing nodes for the network.
     Sync,
 }
@@ -48,19 +48,16 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
     const MESSAGE_VERSION: u32 = 8;
-
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
-    /// If `true`, a node will remote fetch blocks from genesis.
-    const FAST_SYNC: bool = true;
 
     /// The port for communicating with the node server.
     const DEFAULT_NODE_PORT: u16 = 4130 + Self::Network::NETWORK_ID;
     /// The port for communicating with the RPC server.
     const DEFAULT_RPC_PORT: u16 = 3030 + Self::Network::NETWORK_ID;
 
-    /// The list of peer nodes to bootstrap the node server with.
-    const PEER_NODES: [&'static str; 0] = [];
+    /// The list of beacon nodes to bootstrap the node server with.
+    const BEACON_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
     const SYNC_NODES: [&'static str; 5] = ["127.0.0.1:4132", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136"];
 

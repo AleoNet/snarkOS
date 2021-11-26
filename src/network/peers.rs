@@ -335,7 +335,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .iter()
                         .filter(|(&peer_ip, _)| {
                             let peer_str = peer_ip.to_string();
-                            !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::PEER_NODES.contains(&peer_str.as_str())
+                            !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::BEACON_NODES.contains(&peer_str.as_str())
                         })
                         .take(num_excess_peers)
                         .map(|(&peer_ip, _)| peer_ip)
@@ -360,9 +360,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                 self.add_candidate_peers(&sync_nodes).await;
 
-                // Add the peer nodes to the list of candidate peers.
-                let peer_nodes: Vec<SocketAddr> = E::PEER_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-                self.add_candidate_peers(&peer_nodes).await;
+                // Add the beacon nodes to the list of candidate peers.
+                let beacon_nodes: Vec<SocketAddr> = E::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+                self.add_candidate_peers(&beacon_nodes).await;
 
                 // Retrieve the number of connected sync nodes.
                 let number_of_connected_sync_nodes = self.number_of_connected_sync_nodes().await;
@@ -625,14 +625,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Sends the given message to every connected peer, excluding the sender.
     ///
     async fn propagate(&self, sender: SocketAddr, message: Message<N, E>) {
-        // Iterate through all peers that are not the sender, sync node, or peer node.
+        // Iterate through all peers that are not the sender, sync node, or beacon node.
         for peer in self
             .connected_peers()
             .await
             .iter()
             .filter(|peer_ip| {
                 let peer_str = peer_ip.to_string();
-                *peer_ip != &sender && !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::PEER_NODES.contains(&peer_str.as_str())
+                *peer_ip != &sender && !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::BEACON_NODES.contains(&peer_str.as_str())
             })
             .copied()
             .collect::<Vec<_>>()
@@ -1100,8 +1100,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Ensure the node is not peering.
                                     let is_node_ready = !local_status.is_peering();
 
-                                    // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_within_range || !is_node_ready {
+                                    // If this node is a beacon or sync node, skip this message, after updating the timestamp.
+                                    if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_within_range || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedBlock {}' from {}", block_height, peer_ip)
                                     } else {
                                         // Perform the deferred non-blocking deserialization of the block.
@@ -1145,8 +1145,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Ensure the node is not peering.
                                     let is_node_ready = !local_status.is_peering();
 
-                                    // If this node is a peer or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
+                                    // If this node is a beacon or sync node, skip this message, after updating the timestamp.
+                                    if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
                                         trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
                                     } else {
                                         // Route the `UnconfirmedTransaction` to the prover.
