@@ -1,6 +1,6 @@
 #!/bin/bash
 
-COMMAND='cargo run --release -- --trial --verbosity 1'
+COMMAND='cargo run --release -- --trial --verbosity 2'
 
 function exit_node()
 {
