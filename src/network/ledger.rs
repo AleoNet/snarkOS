@@ -67,8 +67,8 @@ pub enum LedgerRequest<N: Network> {
     Disconnect(SocketAddr),
     /// Failure := (peer_ip, failure)
     Failure(SocketAddr, String),
-    /// Heartbeat := (ledger_router, prover_router)
-    Heartbeat(LedgerRouter<N>, ProverRouter<N>),
+    /// Heartbeat := (prover_router)
+    Heartbeat(ProverRouter<N>),
     /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
     Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
     /// UnconfirmedBlock := (peer_ip, block, prover_router)
@@ -83,10 +83,6 @@ pub enum LedgerRequest<N: Network> {
 pub struct Ledger<N: Network, E: Environment> {
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
-    /// The status of the node.
-    status: Status,
-    /// A terminator bit for the prover.
-    terminator: Arc<AtomicBool>,
     /// The canonical chain of blocks.
     canon: Arc<LedgerState<N>>,
     /// A map of previous block hashes to unconfirmed blocks.
@@ -102,6 +98,12 @@ pub struct Ledger<N: Network, E: Environment> {
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
+    /// The status of the node.
+    status: Status,
+    /// A terminator bit for the prover.
+    terminator: Arc<AtomicBool>,
+    /// The peers router of the node.
+    peers_router: PeersRouter<N, E>,
     /// PhantomData
     _phantom: PhantomData<E>,
 }
@@ -121,8 +123,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             ledger_router,
-            status: status.clone(),
-            terminator: terminator.clone(),
             canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
             unconfirmed_blocks: Default::default(),
             peers_state: Default::default(),
@@ -130,13 +130,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             block_requests_lock: Mutex::new(()),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
+            status: status.clone(),
+            terminator: terminator.clone(),
+            peers_router: peers_router.clone(),
             _phantom: PhantomData,
         });
 
         // Initialize the handler for the ledger.
         {
             let ledger = ledger.clone();
-            let peers_router = peers_router.clone();
             let (router, handler) = oneshot::channel();
             tasks.append(task::spawn(async move {
                 // Notify the outer function that the task is ready.
@@ -146,7 +148,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Hold the ledger write lock briefly, to update the state of the ledger.
                     // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
                     // will end up being processed out of order.
-                    ledger.update(request, &peers_router).await;
+                    ledger.update(request).await;
                 }
             }));
             // Wait until the ledger handler is ready.
@@ -165,7 +167,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: LedgerRequest<N>, peers_router: &PeersRouter<N, E>) {
+    pub(super) async fn update(&self, request: LedgerRequest<N>) {
         match request {
             LedgerRequest::BlockResponse(peer_ip, block, prover_router) => {
                 // Remove the block request from the ledger.
@@ -182,7 +184,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         .unwrap_or(false)
                     {
                         trace!("All block requests with {} have been processed", peer_ip);
-                        self.update_block_requests(peers_router).await;
+                        self.update_block_requests().await;
                     }
                 }
             }
@@ -193,14 +195,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Update the status of the ledger.
                 self.update_status().await;
                 // Route a `PeerDisconnected` to the peers.
-                if let Err(error) = peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
+                if let Err(error) = self.peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
                     warn!("[Disconnect] {}", error);
                 }
             }
             LedgerRequest::Failure(peer_ip, failure) => {
                 self.add_failure(peer_ip, failure).await;
             }
-            LedgerRequest::Heartbeat(ledger_router, prover_router) => {
+            LedgerRequest::Heartbeat(prover_router) => {
                 // Update the ledger.
                 self.update_ledger(&prover_router).await;
                 // Update the status of the ledger.
@@ -210,9 +212,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Remove expired failures.
                 self.remove_expired_failures().await;
                 // Disconnect from peers with frequent failures.
-                self.disconnect_from_failing_peers(&ledger_router).await;
+                self.disconnect_from_failing_peers().await;
                 // Update the block requests.
-                self.update_block_requests(peers_router).await;
+                self.update_block_requests().await;
 
                 debug!(
                     "Status Report (type = {}, status = {}, latest_block_height = {}, block_requests = {}, connected_peers = {})",
@@ -239,7 +241,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         peer_ip,
                         Message::UnconfirmedBlock(block.height(), block.hash(), Data::Object(block)),
                     );
-                    if let Err(error) = peers_router.send(request).await {
+                    if let Err(error) = self.peers_router.send(request).await {
                         warn!("[UnconfirmedBlock] {}", error);
                     }
                 }
@@ -590,7 +592,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///                  Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
     ///                      - Revert to most common ancestor and send block requests to sync.
     ///
-    async fn update_block_requests(&self, peers_router: &PeersRouter<N, E>) {
+    async fn update_block_requests(&self) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
         if self.number_of_block_requests().await > 0 {
             return;
@@ -727,7 +729,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                             debug!("Peer {} is outside of the fork range of this ledger, disconnecting", peer_ip);
                             // Send a `Disconnect` message to the peer.
                             let request = PeersRequest::MessageSend(peer_ip, Message::Disconnect);
-                            if let Err(error) = peers_router.send(request).await {
+                            if let Err(error) = self.peers_router.send(request).await {
                                 warn!("[Disconnect] {}", error);
                             }
                             return;
@@ -753,7 +755,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Send a `BlockRequest` message to the peer.
             let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
-            if let Err(error) = peers_router.send(request).await {
+            if let Err(error) = self.peers_router.send(request).await {
                 warn!("[BlockRequest] {}", error);
                 return;
             }
@@ -810,7 +812,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Update the status of the ledger.
                     self.update_status().await;
                     // Route a `PeerRestricted` to the peers.
-                    if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+                    if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
                         warn!("[PeerRestricted] {}", error);
                     }
                 }
@@ -912,7 +914,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Disconnects from connected peers who exhibit frequent failures.
     ///
-    async fn disconnect_from_failing_peers(&self, ledger_router: &LedgerRouter<N>) {
+    async fn disconnect_from_failing_peers(&self) {
         let peers_to_disconnect = self
             .failures
             .read()
@@ -923,7 +925,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             .collect::<Vec<_>>();
 
         for peer_ip in peers_to_disconnect {
-            if let Err(error) = ledger_router.send(LedgerRequest::Disconnect(peer_ip)).await {
+            if let Err(error) = self.ledger_router.send(LedgerRequest::Disconnect(peer_ip)).await {
                 warn!("Failed to send disconnect message to failing peer {}: {}", peer_ip, error);
             }
         }

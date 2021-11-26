@@ -285,8 +285,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     error!("Failed to send heartbeat to peers: {}", error)
                 }
                 // Transmit a heartbeat request to the ledger.
-                let request = LedgerRequest::Heartbeat(ledger_router.clone(), prover_router.clone());
-                if let Err(error) = ledger_router.send(request).await {
+                if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
                     error!("Failed to send heartbeat to ledger: {}", error)
                 }
                 // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
