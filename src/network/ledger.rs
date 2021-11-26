@@ -621,14 +621,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // Determine if the peers state has any sync nodes.
         let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-        let mut peers_contains_sync_node = false;
 
         // Lock peers_state for further processing.
         let peers_state = self.peers_state.read().await;
 
-        for ip in peers_state.keys() {
-            peers_contains_sync_node |= sync_nodes.contains(ip);
-        }
+        let mut peers_contains_sync_node = false;
+        // for ip in peers_state.keys() {
+        //     peers_contains_sync_node |= sync_nodes.contains(ip);
+        // }
 
         // Check if any of the peers are ahead and have a larger block height.
         for (peer_ip, peer_state) in peers_state.iter() {
