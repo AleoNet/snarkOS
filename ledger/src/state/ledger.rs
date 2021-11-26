@@ -183,13 +183,17 @@ impl<N: Network> LedgerState<N> {
 
                 // Add the last block hash to the ledger tree.
                 ledger.ledger_tree.write().add(end_block_hash)?;
-            } else {
-                // Add the genesis block hash to the ledger tree.
-                ledger.ledger_tree.write().add(&N::genesis_block().previous_block_hash())?;
             }
 
             // Update the starting block height for the next iteration.
             start_block_height = std::cmp::min(end_block_height.saturating_add(1), latest_block_height);
+        }
+
+        // If this is new storage, the while loop above did not execute,
+        // and proceed to add the genesis block hash into the ledger tree.
+        if start_block_height == 0u32 {
+            // Add the genesis block hash to the ledger tree.
+            ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
         }
 
         // Update the latest ledger state.
