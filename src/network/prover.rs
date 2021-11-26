@@ -56,8 +56,6 @@ type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
 pub enum ProverRequest<N: Network> {
     /// MemoryPoolClear := (block)
     MemoryPoolClear(Option<Block<N>>),
-    /// Mine := (local_ip, prover_address)
-    Mine(SocketAddr, Address<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
     UnconfirmedTransaction(SocketAddr, Transaction<N>),
 }
@@ -67,8 +65,8 @@ pub enum ProverRequest<N: Network> {
 ///
 #[derive(Debug)]
 pub struct Prover<N: Network, E: Environment> {
-    /// The thread pool for the prover.
-    prover: Arc<ThreadPool>,
+    /// The thread pool for the miner.
+    miner: Arc<ThreadPool>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
@@ -89,6 +87,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Initializes a new instance of the prover.
     pub async fn new(
         tasks: &mut Tasks<JoinHandle<()>>,
+        miner: Option<Address<N>>,
+        local_ip: SocketAddr,
         status: &Status,
         terminator: &Arc<AtomicBool>,
         peers_router: PeersRouter<N, E>,
@@ -105,7 +105,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
         // Initialize the prover.
         let prover = Arc::new(Self {
-            prover: Arc::new(pool),
+            miner: Arc::new(pool),
             prover_router,
             memory_pool: RwLock::new(MemoryPool::new()),
             status: status.clone(),
@@ -132,6 +132,67 @@ impl<N: Network, E: Environment> Prover<N, E> {
             let _ = handler.await;
         }
 
+        // Initialize a new instance of the miner.
+        if E::NODE_TYPE == NodeType::Miner {
+            if let Some(recipient) = miner {
+                // Initialize the prover process.
+                let prover = prover.clone();
+                let (router, handler) = oneshot::channel();
+                tasks.append(task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    loop {
+                        // If `terminator` is `false` and the status is `Ready`, mine the next block.
+                        if !prover.terminator.load(Ordering::SeqCst) && prover.status.is_ready() {
+                            // Set the status to `Mining`.
+                            prover.status.update(State::Mining);
+
+                            // Prepare the unconfirmed transactions, terminator, and status.
+                            let miner = prover.miner.clone();
+                            let canon = prover.ledger_reader.clone(); // This is *safe* as the ledger only reads.
+                            let unconfirmed_transactions = prover.memory_pool.read().await.transactions();
+                            let terminator = prover.terminator.clone();
+                            let status = prover.status.clone();
+                            let ledger_router = prover.ledger_router.clone();
+                            let prover_router = prover.prover_router.clone();
+
+                            task::spawn(async move {
+                                // Mine the next block.
+                                let result = task::spawn_blocking(move || {
+                                    miner.install(move || {
+                                        canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng())
+                                    })
+                                })
+                                .await
+                                .map_err(|e| e.into());
+
+                                // Set the status to `Ready`.
+                                status.update(State::Ready);
+
+                                match result {
+                                    Ok(Ok(block)) => {
+                                        debug!("Miner has found an unconfirmed candidate for block {}", block.height());
+                                        // Broadcast the next block.
+                                        let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
+                                        if let Err(error) = ledger_router.send(request).await {
+                                            warn!("Failed to broadcast mined block: {}", error);
+                                        }
+                                    }
+                                    Ok(Err(error)) | Err(error) => trace!("{}", error),
+                                }
+                            });
+                        }
+                        // Sleep for 2 seconds.
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    }
+                }));
+                // Wait until the miner task is ready.
+                let _ = handler.await;
+            } else {
+                error!("Missing miner address. Please specify an Aleo address in order to mine");
+            }
+        }
+
         Ok(prover)
     }
 
@@ -150,10 +211,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 Some(block) => self.memory_pool.write().await.remove_transactions(block.transactions()),
                 None => *self.memory_pool.write().await = MemoryPool::new(),
             },
-            ProverRequest::Mine(local_ip, recipient) => {
-                // Process the request to mine the next block.
-                self.mine_next_block(local_ip, recipient).await;
-            }
             ProverRequest::UnconfirmedTransaction(peer_ip, transaction) => {
                 // Ensure the node is not peering.
                 if !self.status.is_peering() {
@@ -161,58 +218,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     self.add_unconfirmed_transaction(peer_ip, transaction).await
                 }
             }
-        }
-    }
-
-    ///
-    /// Mines a new block and adds it to the canon blocks.
-    ///
-    async fn mine_next_block(&self, local_ip: SocketAddr, recipient: Address<N>) {
-        // If the node type is not a miner, it should not be mining.
-        if E::NODE_TYPE != NodeType::Miner {
-            return;
-        }
-        // If `terminator` is `true`, it should not be mining.
-        if self.terminator.load(Ordering::SeqCst) {
-            return;
-        }
-        // If the status is `Ready`, mine the next block.
-        if self.status.is_ready() {
-            // Set the status to `Mining`.
-            self.status.update(State::Mining);
-
-            // Prepare the unconfirmed transactions, terminator, and status.
-            let prover = self.prover.clone();
-            let canon = self.ledger_reader.clone(); // This is *safe* as the ledger only reads.
-            let unconfirmed_transactions = self.memory_pool.read().await.transactions();
-            let terminator = self.terminator.clone();
-            let status = self.status.clone();
-            let ledger_router = self.ledger_router.clone();
-            let prover_router = self.prover_router.clone();
-
-            task::spawn(async move {
-                // Mine the next block.
-                let result = task::spawn_blocking(move || {
-                    prover.install(move || canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng()))
-                })
-                .await
-                .map_err(|e| e.into());
-
-                // Set the status to `Ready`.
-                status.update(State::Ready);
-
-                match result {
-                    Ok(Ok(block)) => {
-                        debug!("Miner has found an unconfirmed candidate for block {}", block.height());
-                        // Broadcast the next block.
-                        let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
-                        if let Err(error) = ledger_router.send(request).await {
-                            warn!("Failed to broadcast mined block: {}", error);
-                        }
-                    }
-                    Ok(Err(error)) | Err(error) => trace!("{}", error),
-                }
-            });
         }
     }
 

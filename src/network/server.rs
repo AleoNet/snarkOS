@@ -18,11 +18,10 @@ use crate::{
     helpers::{Status, Tasks},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
-    prover::{Prover, ProverRequest, ProverRouter},
+    prover::{Prover, ProverRouter},
     rpc::initialize_rpc_server,
     Environment,
     Node,
-    NodeType,
 };
 use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
@@ -85,7 +84,17 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing the ledger.
         let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &storage_path, &status, &terminator, peers.router()).await?;
         // Initialize a new instance for managing the prover.
-        let prover = Prover::new(&mut tasks, &status, &terminator, peers.router(), &ledger_reader, ledger.router()).await?;
+        let prover = Prover::new(
+            &mut tasks,
+            miner,
+            local_ip,
+            &status,
+            &terminator,
+            peers.router(),
+            &ledger_reader,
+            ledger.router(),
+        )
+        .await?;
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(
@@ -100,8 +109,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         .await;
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(&mut tasks, peers.router(), &ledger_reader, ledger.router(), prover.router()).await;
-        // Initialize a new instance of the miner.
-        Self::initialize_miner(&mut tasks, local_ip, miner, prover.router()).await;
         // Initialize a new instance of the RPC server.
         Self::initialize_rpc(&mut tasks, node, &status, &peers, &ledger_reader, prover.router()).await;
 
@@ -140,14 +147,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (router, handler) = oneshot::channel();
 
         // Route a `Connect` request to the peer manager.
-        let message = PeersRequest::Connect(
-            peer_ip,
-            self.ledger_reader.clone(),
-            self.ledger.router(),
-            self.prover.router(),
-            router,
-        );
-        self.peers.router().send(message).await?;
+        self.peers
+            .router()
+            .send(PeersRequest::Connect(
+                peer_ip,
+                self.ledger_reader.clone(),
+                self.ledger.router(),
+                self.prover.router(),
+                router,
+            ))
+            .await?;
 
         // Wait until the connection task is initialized.
         handler.await.map(|_| ()).map_err(|e| e.into())
@@ -241,41 +250,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         }));
         // Wait until the heartbeat task is ready.
         let _ = handler.await;
-    }
-
-    ///
-    /// Initialize a new instance of the miner.
-    ///
-    #[inline]
-    async fn initialize_miner(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        local_ip: SocketAddr,
-        miner: Option<Address<N>>,
-        prover_router: ProverRouter<N>,
-    ) {
-        if E::NODE_TYPE == NodeType::Miner {
-            if let Some(recipient) = miner {
-                // Initialize the prover process.
-                let (router, handler) = oneshot::channel();
-                tasks.append(task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    loop {
-                        // Start the mining process.
-                        let request = ProverRequest::Mine(local_ip, recipient);
-                        if let Err(error) = prover_router.send(request).await {
-                            error!("Failed to send request to prover: {}", error);
-                        }
-                        // Sleep for 2 seconds.
-                        tokio::time::sleep(Duration::from_secs(2)).await;
-                    }
-                }));
-                // Wait until the prover task is ready.
-                let _ = handler.await;
-            } else {
-                error!("Missing miner address. Please specify an Aleo address in order to mine");
-            }
-        }
     }
 
     ///
