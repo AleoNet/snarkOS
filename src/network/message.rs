@@ -28,58 +28,46 @@ use tokio_util::codec::{Decoder, Encoder};
 /// This object enables deferred deserialization / ahead-of-time serialization for objects that
 /// take a while to deserialize / serialize, in order to allow these operations to be non-blocking.
 #[derive(Clone, Debug)]
-pub enum Data<T> {
+pub enum Data<T: 'static + Serialize + DeserializeOwned + Send> {
     Object(T),
     Buffer(Vec<u8>),
 }
 
-impl<T> Data<T> {
-    pub fn deserialize_blocking(self) -> bincode::Result<T>
-    where
-        T: DeserializeOwned,
-    {
+impl<T: 'static + Serialize + DeserializeOwned + Send> Data<T> {
+    pub fn deserialize_blocking(self) -> bincode::Result<T> {
         match self {
             Self::Object(x) => Ok(x),
             Self::Buffer(bytes) => bincode::deserialize(&bytes),
         }
     }
 
-    pub async fn deserialize(self) -> bincode::Result<T>
-    where
-        T: DeserializeOwned + Send + 'static,
-    {
+    pub async fn deserialize(self) -> bincode::Result<T> {
         match self {
             Self::Object(x) => Ok(x),
             Self::Buffer(bytes) => match task::spawn_blocking(move || bincode::deserialize(&bytes)).await {
                 Ok(x) => x,
-                Err(err) => Err(Box::new(bincode::ErrorKind::Custom(format!(
-                    "Dedicated deserialization task failed: {}",
-                    err
+                Err(error) => Err(Box::new(bincode::ErrorKind::Custom(format!(
+                    "Dedicated deserialization failed: {}",
+                    error
                 )))),
             },
         }
     }
 
-    pub fn serialize_blocking(&self) -> bincode::Result<Vec<u8>>
-    where
-        T: Serialize,
-    {
+    pub fn serialize_blocking(&self) -> bincode::Result<Vec<u8>> {
         match self {
             Self::Object(x) => bincode::serialize(x),
             Self::Buffer(bytes) => Ok(bytes.to_vec()),
         }
     }
 
-    pub async fn serialize(self) -> bincode::Result<Vec<u8>>
-    where
-        T: Serialize + Send + 'static,
-    {
+    pub async fn serialize(self) -> bincode::Result<Vec<u8>> {
         match self {
             Self::Object(x) => match task::spawn_blocking(move || bincode::serialize(&x)).await {
                 Ok(bytes) => bytes,
-                Err(err) => Err(Box::new(bincode::ErrorKind::Custom(format!(
-                    "Dedicated serialization task failed: {}",
-                    err
+                Err(error) => Err(Box::new(bincode::ErrorKind::Custom(format!(
+                    "Dedicated serialization failed: {}",
+                    error
                 )))),
             },
             Self::Buffer(bytes) => Ok(bytes),
@@ -107,8 +95,8 @@ pub enum Message<N: Network, E: Environment> {
     Ping(u32, NodeType, State, u32, N::BlockHash),
     /// Pong := (is_fork, block_locators)
     Pong(Option<bool>, Data<BlockLocators<N>>),
-    /// UnconfirmedBlock := (block)
-    UnconfirmedBlock(Data<Block<N>>),
+    /// UnconfirmedBlock := (block_height, block_hash, block)
+    UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
     /// Unused
@@ -162,7 +150,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
             Self::BlockResponse(block) => Ok(block.serialize_blocking()?),
             Self::ChallengeRequest(version, listener_port, nonce, block_height) => {
-                Ok(to_bytes_le![version, listener_port, nonce, block_height]?)
+                Ok(bincode::serialize(&(version, listener_port, nonce, block_height))?)
             }
             Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking()?),
             Self::Disconnect => Ok(vec![]),
@@ -182,7 +170,12 @@ impl<N: Network, E: Environment> Message<N, E> {
 
                 Ok([vec![serialized_is_fork], block_locators.serialize_blocking()?].concat())
             }
-            Self::UnconfirmedBlock(block) => Ok(block.serialize_blocking()?),
+            Self::UnconfirmedBlock(block_height, block_hash, block) => Ok([
+                block_height.to_le_bytes().to_vec(),
+                block_hash.to_bytes_le()?,
+                block.serialize_blocking()?,
+            ]
+            .concat()),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
             Self::Unused(_) => Ok(vec![]),
         }
@@ -209,12 +202,10 @@ impl<N: Network, E: Environment> Message<N, E> {
         let message = match id {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
             1 => Self::BlockResponse(Data::Buffer(data.to_vec())),
-            2 => Self::ChallengeRequest(
-                bincode::deserialize(&data[0..4])?,
-                bincode::deserialize(&data[4..6])?,
-                bincode::deserialize(&data[6..14])?,
-                bincode::deserialize(&data[14..18])?,
-            ),
+            2 => {
+                let (version, listener_port, nonce, block_height) = bincode::deserialize(data)?;
+                Self::ChallengeRequest(version, listener_port, nonce, block_height)
+            }
             3 => Self::ChallengeResponse(Data::Buffer(data.to_vec())),
             4 => match data.is_empty() {
                 true => Self::Disconnect,
@@ -239,7 +230,11 @@ impl<N: Network, E: Environment> Message<N, E> {
 
                 Self::Pong(is_fork, Data::Buffer(data[1..].to_vec()))
             }
-            9 => Self::UnconfirmedBlock(Data::Buffer(data.to_vec())),
+            9 => Self::UnconfirmedBlock(
+                bincode::deserialize(&data[0..4])?,
+                bincode::deserialize(&data[4..36])?,
+                Data::Buffer(data[36..].to_vec()),
+            ),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };

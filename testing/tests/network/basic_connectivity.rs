@@ -34,6 +34,7 @@ async fn client_nodes_can_connect_to_each_other() {
     client_node1.connect(client_node2.local_addr()).await.unwrap();
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_nodes_can_connect_to_each_other() {
     // Start 2 test nodes.

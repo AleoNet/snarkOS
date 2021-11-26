@@ -304,7 +304,7 @@ impl Reading for TestNode {
                 self.process_ping(source, version, block_height).await?
             }
             ClientMessage::Pong(_is_fork, _block_locators) => {}
-            ClientMessage::UnconfirmedBlock(_block) => {}
+            ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
             ClientMessage::UnconfirmedTransaction(_transaction) => {}
             _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
         }

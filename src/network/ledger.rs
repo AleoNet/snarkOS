@@ -207,7 +207,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Process the unconfirmed block.
                     self.add_block(block.clone()).await;
                     // Propagate the unconfirmed block to the connected peers.
-                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedBlock(Data::Object(block)));
+                    let request = PeersRequest::MessagePropagate(
+                        peer_ip,
+                        Message::UnconfirmedBlock(block.height(), block.hash(), Data::Object(block)),
+                    );
                     if let Err(error) = peers_router.send(request).await {
                         warn!("[UnconfirmedBlock] {}", error);
                     }

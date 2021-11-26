@@ -497,7 +497,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
-                    Message::UnconfirmedBlock(ref mut data) => {
+                    Message::UnconfirmedBlock(_, _, ref mut data) => {
                         let block = if let Data::Object(block) = data {
                             block
                         } else {
@@ -594,12 +594,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
         self.seen_outbound_connections.write().await.clear();
     }
 }
-
-// TODO (howardwu): Consider changing this to a random challenge height.
-//  The tradeoff is that checking genesis ensures your peer is starting at the same genesis block.
-//  Choosing a random height also requires knowing upfront the height of the peer.
-//  As such, leaving it at the genesis block height may be the best option here.
-const CHALLENGE_HEIGHT: u32 = 0;
 
 ///
 /// The state for each connected client.
@@ -704,11 +698,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
+        // TODO (howardwu): Consider changing this to a random challenge height.
+        //  The tradeoff is that checking genesis ensures your peer is starting at the same genesis block.
+        //  Choosing a random height also requires knowing upfront the height of the peer.
+        //  As such, leaving it at the genesis block height may be the best option here.
         // Retrieve the genesis block header.
-        let genesis_block_header = N::genesis_block().header();
+        let genesis_header = N::genesis_block().header();
+        let genesis_height = N::genesis_block().height();
 
         // Send a challenge request to the peer.
-        let message = Message::<N, E>::ChallengeRequest(E::MESSAGE_VERSION, local_ip.port(), local_nonce, CHALLENGE_HEIGHT);
+        let message = Message::<N, E>::ChallengeRequest(E::MESSAGE_VERSION, local_ip.port(), local_nonce, genesis_height);
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
 
@@ -718,11 +717,23 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 // Process the message.
                 trace!("Received '{}-B' from {}", message.name(), peer_ip);
                 match message {
-                    Message::ChallengeRequest(version, listener_port, peer_nonce, _block_height) => {
+                    Message::ChallengeRequest(version, listener_port, peer_nonce, block_height) => {
                         // Ensure the message protocol version is not outdated.
                         if version < E::MESSAGE_VERSION {
                             warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                             return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
+                        }
+                        // Ensure the block height is correct.
+                        if block_height != genesis_height {
+                            return Err(anyhow!("Incorrect block height of {}", block_height));
+                        }
+                        // Ensure the peer is not this node.
+                        if local_nonce == peer_nonce {
+                            return Err(anyhow!("Attempted to connect to self (nonce = {})", peer_nonce));
+                        }
+                        // Ensure the peer is not already connected to this node.
+                        if connected_nonces.contains(&peer_nonce) {
+                            return Err(anyhow!("Already connected to a peer with nonce {}", peer_nonce));
                         }
                         // Verify the listener port.
                         if peer_ip.port() != listener_port {
@@ -739,16 +750,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 return Err(anyhow!("Unable to reach '{}': '{}'", peer_ip, error));
                             }
                         }
-                        // Ensure the peer is not this node.
-                        if local_nonce == peer_nonce {
-                            return Err(anyhow!("Attempted to connect to self (nonce = {})", peer_nonce));
-                        }
-                        // Ensure the peer is not already connected to this node.
-                        if connected_nonces.contains(&peer_nonce) {
-                            return Err(anyhow!("Already connected to a peer with nonce {}", peer_nonce));
-                        }
                         // Send the challenge response.
-                        let message = Message::ChallengeResponse(Data::Object(genesis_block_header.clone()));
+                        let message = Message::ChallengeResponse(Data::Object(genesis_header.clone()));
                         trace!("Sending '{}-B' to {}", message.name(), peer_ip);
                         outbound_socket.send(message).await?;
 
@@ -776,11 +779,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 trace!("Received '{}-A' from {}", message.name(), peer_ip);
                 match message {
                     Message::ChallengeResponse(block_header) => {
-                        // Perform deferred non-blocking deserialization of the block header.
+                        // Perform the deferred non-blocking deserialization of the block header.
                         let block_header = block_header.deserialize().await?;
-
-                        match block_header.height() == CHALLENGE_HEIGHT && &block_header == genesis_block_header && block_header.is_valid()
-                        {
+                        match block_header.height() == genesis_height && &block_header == genesis_header {
                             true => Ok((peer_ip, peer_nonce)),
                             false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
@@ -918,15 +919,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 },
                                 Message::BlockResponse(block) => {
-                                    // Perform deferred non-blocking deserialization of the block.
-                                    let block = match block.deserialize().await {
-                                        Ok(block) => block,
-                                        Err(_) => break,
-                                    };
-
-                                    // Route the `BlockResponse` to the ledger.
-                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block)).await {
-                                        warn!("[BlockResponse] {}", error);
+                                    // Perform the deferred non-blocking deserialization of the block.
+                                    match block.deserialize().await {
+                                        // Route the `BlockResponse` to the ledger.
+                                        Ok(block) => if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block)).await {
+                                            warn!("[BlockResponse] {}", error);
+                                        },
+                                        // Route the `Failure` to the ledger.
+                                        Err(error) => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
+                                            warn!("[Failure] {}", error);
+                                        }
                                     }
                                 }
                                 Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
@@ -977,17 +979,19 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 },
                                 Message::Pong(is_fork, block_locators) => {
-                                    // Perform deferred non-blocking deserialization of block locators.
-                                    let block_locators = match block_locators.deserialize().await {
-                                        Ok(locators) => locators,
-                                        Err(_) => break,
+                                    // Perform the deferred non-blocking deserialization of block locators.
+                                    let request = match block_locators.deserialize().await {
+                                        // Route the `Pong` to the ledger.
+                                        Ok(block_locators) => LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators),
+                                        // Route the `Failure` to the ledger.
+                                        Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
                                     };
 
-                                    // Route the `Pong` to the ledger.
-                                    let request = LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators);
+                                    // Route the request to the ledger.
                                     if let Err(error) = ledger_router.send(request).await {
                                         warn!("[Pong] {}", error);
                                     }
+
                                     // Spawn an asynchronous task for the `Ping` request.
                                     let local_status = local_status.clone();
                                     let peers_router = peers_router.clone();
@@ -1002,19 +1006,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                         // Send a `Ping` request to the peer.
                                         let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_height, latest_block_hash);
-                                        let request = PeersRequest::MessageSend(peer_ip, message);
-                                        if let Err(error) = peers_router.send(request).await {
+                                        if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
                                     });
                                 }
-                                Message::UnconfirmedBlock(block) => {
-                                    // Perform deferred non-blocking deserialization of the block.
-                                    let block = match block.deserialize().await {
-                                        Ok(block) => block,
-                                        Err(_) => break,
-                                    };
-
+                                Message::UnconfirmedBlock(block_height, block_hash, block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 5 {
@@ -1027,11 +1024,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
 
                                     // Retrieve the last seen timestamp of the received block.
-                                    let last_seen = peer.seen_inbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let last_seen = peer.seen_inbound_blocks.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH);
                                     let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the received block.
-                                    peer.seen_inbound_blocks.insert(block.hash(), SystemTime::now());
+                                    peer.seen_inbound_blocks.insert(block_hash, SystemTime::now());
 
                                     // Ensure the unconfirmed block is at least within 3 blocks of the latest block height,
                                     // and no more that 10 blocks ahead of the latest block height.
@@ -1039,17 +1036,30 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     let latest_block_height = ledger_reader.latest_block_height();
                                     let lower_bound = latest_block_height.saturating_sub(3);
                                     let upper_bound = latest_block_height.saturating_add(10);
-                                    let is_within_range = block.height() >= lower_bound && block.height() <= upper_bound;
+                                    let is_within_range = block_height >= lower_bound && block_height <= upper_bound;
 
                                     // Ensure the node is not peering.
                                     let is_node_ready = !local_status.is_peering();
 
                                     // If this node is a peer or sync node, skip this message, after updating the timestamp.
                                     if E::NODE_TYPE == NodeType::Peer || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_within_range || !is_node_ready {
-                                        trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip)
+                                        trace!("Skipping 'UnconfirmedBlock {}' from {}", block_height, peer_ip)
                                     } else {
-                                        // Route the `UnconfirmedBlock` to the ledger.
-                                        if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedBlock(peer_ip, block)).await {
+                                        // Perform the deferred non-blocking deserialization of the block.
+                                        let request = match block.deserialize().await {
+                                            // Ensure the claimed block height and block hash matches in the deserialized block.
+                                            Ok(block) => match block_height == block.height() && block_hash == block.hash() {
+                                                // Route the `UnconfirmedBlock` to the ledger.
+                                                true => LedgerRequest::UnconfirmedBlock(peer_ip, block),
+                                                // Route the `Failure` to the ledger.
+                                                false => LedgerRequest::Failure(peer_ip, "Malformed UnconfirmedBlock message".to_string())
+                                            },
+                                            // Route the `Failure` to the ledger.
+                                            Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
+                                        };
+
+                                        // Route the request to the ledger.
+                                        if let Err(error) = ledger_router.send(request).await {
                                             warn!("[UnconfirmedBlock] {}", error);
                                         }
                                     }
