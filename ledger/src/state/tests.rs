@@ -283,7 +283,11 @@ fn test_transaction_fees() {
 
     let available_balance = AleoAmount::from_bytes(-1 * coinbase_transaction.value_balance().0);
     let fee = AleoAmount::from_bytes(rng.gen_range(1..available_balance.0));
-    let amount = available_balance.sub(fee.clone());
+
+    // TODO (raychu86): VALUE ERROR - IF WE USE A NEGATIVE VALUE HERE, WE ARE MINTING MONEY.
+    // let amount = available_balance.sub(fee.clone()); // Correct positive amount
+    let amount = AleoAmount::from_bytes(coinbase_transaction.value_balance().0).sub(fee.clone()); // TODO (raychu86): VALUE ERROR - Incorrect positive amount
+
     let coinbase_record = coinbase_transaction.to_decrypted_records(view_key);
 
     let ledger_proof = ledger.get_ledger_inclusion_proof(coinbase_record[0].commitment()).unwrap();
@@ -315,10 +319,25 @@ fn test_transaction_fees() {
 
     // Mine the next block.
     let block_2 = ledger
-        .mine_next_block(address, &[new_transaction], &terminator, rng)
+        .mine_next_block(address, &[new_transaction.clone()], &terminator, rng)
         .expect("Failed to mine");
-    ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
+    ledger.add_next_block(&block_2).expect("Failed to add next block to ledger"); // TODO (raychu86): VALUE ERROR - This block was valid???
     assert_eq!(2, ledger.latest_block_height());
+
+    // TODO (raychu86): VALUE ERROR - LOOK AT THE RECORD VALUES HERE.
+    {
+        assert_eq!(&new_transaction, &block_2.transactions()[0]);
+        let new_transaction_output_to_recipient = &new_transaction.to_decrypted_records(recipient_view_key)[0];
+        let new_transaction_output_to_miner = &new_transaction.to_decrypted_records(view_key)[0]; // TODO (raychu86): VALUE ERROR - This shouldn't even exists, but it became a "change" output record? Not sure
+
+        println!("amount: {:?}", amount);
+        println!("fee: {:?}", fee);
+
+        // Value is `18446744073474770042` which is u64::MAX + (negative amount);
+        println!("\ntransaction record owned by recipient: {:?}", new_transaction_output_to_recipient);
+        // Value is always `300000000`. Where does this even come from?
+        println!("\ntransaction record owned by miner: {:?}", new_transaction_output_to_miner);
+    }
 
     let expected_block_reward = Block::<Testnet2>::block_reward(2).add(fee);
     let output_record = &block_2.transactions()[0].to_decrypted_records(recipient_view_key)[0];
