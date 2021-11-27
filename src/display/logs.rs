@@ -32,7 +32,7 @@ pub(super) struct Logs {
 
 impl Logs {
     pub(super) fn new(log_receiver: mpsc::Receiver<Vec<u8>>) -> Self {
-        let log_limit = 57; // an arbitrary number fitting the testing terminal room
+        let log_limit = 128; // an arbitrary number fitting the testing terminal room
 
         Self {
             log_receiver,
@@ -50,11 +50,13 @@ impl Logs {
 
         let mut new_logs = Vec::new();
         while let Ok(log) = self.log_receiver.try_recv() {
-            new_logs.push(String::from_utf8(log).unwrap());
+            new_logs.push(match String::from_utf8(log) {
+                Ok(log) => log,
+                _ => String::new(),
+            });
         }
 
         let all_logs = self.log_cache.len() + new_logs.len();
-
         if all_logs > self.log_limit {
             let remaining_room = self.log_limit - self.log_cache.len();
             let overflow = all_logs - self.log_cache.len();
