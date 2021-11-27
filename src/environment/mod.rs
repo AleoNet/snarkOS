@@ -150,7 +150,7 @@ impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
     const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 35;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 9;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 15;
     const COINBASE_IS_PUBLIC: bool = true;
 }
