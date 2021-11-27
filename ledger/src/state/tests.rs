@@ -344,6 +344,6 @@ fn test_transaction_fees() {
     let new_coinbase_record = &block_2.transactions()[1].to_decrypted_records(view_key)[0];
 
     // Check that the output record balances are correct.
-    assert_eq!(new_coinbase_record.value(), expected_block_reward.0 as u64);
-    assert_eq!(output_record.value(), amount.0 as u64);
+    assert_eq!(new_coinbase_record.value() as i64, expected_block_reward.0);
+    assert_eq!(output_record.value() as i64, amount.0);
 }
