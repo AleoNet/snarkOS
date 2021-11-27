@@ -43,6 +43,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
+    runtime::Runtime,
     sync::{mpsc, oneshot, Mutex, RwLock},
     task,
     task::JoinHandle,
@@ -209,6 +210,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns an instance of the ledger router.
     pub fn router(&self) -> LedgerRouter<N> {
         self.ledger_router.clone()
+    }
+
+    /// Returns a snapshot of the peers state.
+    pub fn peers_state_snapshot(&self) -> Result<HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>> {
+        // Execute the future, blocking the current thread until completion.
+        Runtime::new()?.block_on(async { Ok(self.peers_state.read().await.clone()) })
     }
 
     ///

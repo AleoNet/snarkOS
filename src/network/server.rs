@@ -15,19 +15,21 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    helpers::{State, Status, Tasks},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
     rpc::initialize_rpc_server,
     Environment,
     Node,
+    NodeType,
 };
-use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_ledger::{storage::rocksdb::RocksDB, BlockLocators, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
 use std::{
+    collections::HashMap,
     net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
@@ -130,6 +132,11 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Returns the peer manager of this node.
     pub fn peers(&self) -> Arc<Peers<N, E>> {
         self.peers.clone()
+    }
+
+    /// Returns a snapshot of the peers state.
+    pub fn peers_state_snapshot(&self) -> Result<HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>> {
+        self.ledger.peers_state_snapshot()
     }
 
     ///
