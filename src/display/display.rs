@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    display::{logs::Logs, overview::Overview},
+    display::{logs::Logs, overview::Overview, peers_status::PeersStatus},
     initialize_logger,
     network::Server,
     Environment,
@@ -72,6 +72,7 @@ pub(crate) struct Display<'a, N: Network, E: Environment> {
     tabs: TabsState<'a>,
     tick_rate: Duration,
     logs: Logs,
+    peers_status: PeersStatus,
 }
 
 impl<'a, N: Network, E: Environment> Display<'a, N, E> {
@@ -89,9 +90,10 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
         // Initialize the display.
         let mut display = Display::<'a, N, E> {
             server,
-            tabs: TabsState::new(vec![" Overview ", " Logs "]),
+            tabs: TabsState::new(vec![" Overview ", " Logs ", " Peers "]),
             tick_rate: Duration::from_secs(1),
             logs: Logs::new(log_receiver),
+            peers_status: PeersStatus::new(),
         };
 
         let res = display.render(&mut terminal);
@@ -124,6 +126,8 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
                         }
                         KeyCode::Left => self.tabs.previous(),
                         KeyCode::Right => self.tabs.next(),
+                        KeyCode::Up => self.peers_status.previous(),
+                        KeyCode::Down => self.peers_status.next(),
                         _ => {}
                     }
                 }
@@ -137,6 +141,7 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
     }
 
     fn heartbeat(&mut self) {
+        self.peers_status.update_data(&self.server);
         thread::sleep(Duration::from_millis(50));
     }
 
@@ -179,6 +184,7 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
         match self.tabs.index {
             0 => Overview.draw(f, chunks[1]),
             1 => self.logs.draw(f, chunks[1]),
+            2 => self.peers_status.draw(f, chunks[1]),
             _ => unreachable!(),
         };
     }

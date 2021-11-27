@@ -23,3 +23,5 @@ pub(crate) use display::*;
 pub(super) mod logs;
 
 pub(super) mod overview;
+
+pub(super) mod peers_status;
