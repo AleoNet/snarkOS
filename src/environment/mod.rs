@@ -83,7 +83,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of sync nodes that the node may be connected to at any time.
-    const MAXIMUM_CONNECTED_SYNC_NODES: usize = 2;
+    const MAXIMUM_CONNECTED_SYNC_NODES: usize = 1;
 
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
@@ -127,7 +127,7 @@ impl<N: Network> Environment for SyncNode<N> {
     const NODE_TYPE: NodeType = NodeType::Sync;
     const SYNC_NODES: [&'static str; 5] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 35;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 256;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 512;
 }
 
 #[derive(Clone, Debug, Default)]
