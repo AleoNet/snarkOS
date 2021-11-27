@@ -577,12 +577,11 @@ impl<N: Network> LedgerState<N> {
             .collect();
 
         // Fetch the transaction fee from the given transactions.
-        // Non-coinbase value balances should be negative,
-        // so we use `sub` to represent the fees as a positive value.
+        // Non-coinbase value balances should be positive.
         let transaction_fees: AleoAmount = transactions
             .iter()
             .map(Transaction::value_balance)
-            .fold(AleoAmount::ZERO, |a, b| a.sub(b));
+            .fold(AleoAmount::ZERO, |a, b| a.add(b));
 
         // Enforce that the transaction fee is positive or zero.
         if transaction_fees.is_negative() {
