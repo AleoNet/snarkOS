@@ -325,7 +325,7 @@ fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
     task::spawn(async move {
         match signal::ctrl_c().await {
             Ok(()) => {
-                server.shut_down();
+                server.shut_down().await;
                 std::process::exit(0);
             }
             Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
