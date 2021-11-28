@@ -183,14 +183,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns `true` if the node is connected to the given IP.
     ///
-    pub(crate) async fn is_connected_to(&self, ip: SocketAddr) -> bool {
+    pub async fn is_connected_to(&self, ip: SocketAddr) -> bool {
         self.connected_peers.read().await.contains_key(&ip)
     }
 
     ///
     /// Returns `true` if the given IP is restricted.
     ///
-    pub(crate) async fn is_restricted(&self, ip: SocketAddr) -> bool {
+    pub async fn is_restricted(&self, ip: SocketAddr) -> bool {
         match self.restricted_peers.read().await.get(&ip) {
             Some(timestamp) => timestamp.elapsed().as_secs() < E::RADIO_SILENCE_IN_SECS,
             None => false,
@@ -205,6 +205,47 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
+    /// Returns the list of candidate peers.
+    ///
+    pub async fn candidate_peers(&self) -> HashSet<SocketAddr> {
+        self.candidate_peers.read().await.clone()
+    }
+
+    ///
+    /// TODO (howardwu): Make this operation more efficient.
+    /// Returns the number of connected sync nodes.
+    ///
+    pub async fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
+        let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
+        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+        connected_peers.intersection(&sync_nodes).copied().collect()
+    }
+
+    ///
+    /// TODO (howardwu): Make this operation more efficient.
+    /// Returns the number of connected sync nodes.
+    ///
+    pub async fn number_of_connected_sync_nodes(&self) -> usize {
+        let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
+        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+        connected_peers.intersection(&sync_nodes).count()
+    }
+
+    ///
+    /// Returns the number of connected peers.
+    ///
+    pub async fn number_of_connected_peers(&self) -> usize {
+        self.connected_peers.read().await.len()
+    }
+
+    ///
+    /// Returns the number of candidate peers.
+    ///
+    pub async fn number_of_candidate_peers(&self) -> usize {
+        self.candidate_peers.read().await.len()
+    }
+
+    ///
     /// Returns the list of nonces for the connected peers.
     ///
     pub(crate) async fn connected_nonces(&self) -> Vec<u64> {
@@ -214,37 +255,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
             .values()
             .map(|(peer_nonce, _)| *peer_nonce)
             .collect()
-    }
-
-    ///
-    /// Returns the list of candidate peers.
-    ///
-    pub(crate) async fn candidate_peers(&self) -> HashSet<SocketAddr> {
-        self.candidate_peers.read().await.clone()
-    }
-
-    ///
-    /// TODO (howardwu): Make this operation more efficient.
-    /// Returns the number of connected sync nodes.
-    ///
-    pub(crate) async fn number_of_connected_sync_nodes(&self) -> usize {
-        let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
-        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-        connected_peers.intersection(&sync_nodes).count()
-    }
-
-    ///
-    /// Returns the number of connected peers.
-    ///
-    pub(crate) async fn number_of_connected_peers(&self) -> usize {
-        self.connected_peers.read().await.len()
-    }
-
-    ///
-    /// Returns the number of candidate peers.
-    ///
-    pub(crate) async fn number_of_candidate_peers(&self) -> usize {
-        self.candidate_peers.read().await.len()
     }
 
     ///
@@ -328,7 +338,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                     // Determine the peers to disconnect from.
                     let num_excess_peers = self.number_of_connected_peers().await.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
-                    let peer_ips_to_disconnect = self
+                    let mut peer_ips_to_disconnect = self
                         .connected_peers
                         .read()
                         .await
@@ -340,6 +350,19 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .take(num_excess_peers)
                         .map(|(&peer_ip, _)| peer_ip)
                         .collect::<Vec<SocketAddr>>();
+
+                    // TODO (howardwu): This logic can be optimized and unified with the context around it.
+                    // Determine if the node is connected to more sync nodes than expected.
+                    let connected_sync_nodes = self.connected_sync_nodes().await;
+                    let num_excess_sync_nodes = connected_sync_nodes.len().saturating_sub(E::MAXIMUM_CONNECTED_SYNC_NODES);
+                    if num_excess_sync_nodes > 0 {
+                        peer_ips_to_disconnect.extend_from_slice(
+                            &connected_sync_nodes
+                                .iter()
+                                .copied()
+                                .choose_multiple(&mut OsRng::default(), num_excess_sync_nodes),
+                        );
+                    }
 
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in peer_ips_to_disconnect {
