@@ -59,7 +59,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of beacon nodes to bootstrap the node server with.
     const BEACON_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: [&'static str; 5] = ["127.0.0.1:4132", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136"];
+    const SYNC_NODES: [&'static str; 10] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136", "127.0.0.1:4137", "127.0.0.1:4138", "127.0.0.1:4139", "127.0.0.1:4140", "127.0.0.1:4141"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 8;
@@ -125,7 +125,6 @@ pub struct SyncNode<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
-    const SYNC_NODES: [&'static str; 5] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136"];
     const MINIMUM_NUMBER_OF_PEERS: usize = 35;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 512;
 }
@@ -137,7 +136,10 @@ pub struct ClientTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
-    const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
+    const SYNC_NODES: [&'static str; 10] = [
+        "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
+        "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
+    ];
     const MINIMUM_NUMBER_OF_PEERS: usize = 21;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 51;
 }
@@ -149,7 +151,10 @@ pub struct MinerTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
-    const SYNC_NODES: [&'static str; 5] = ["144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132"];
+    const SYNC_NODES: [&'static str; 10] = [
+        "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
+        "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
+    ];
     const MINIMUM_NUMBER_OF_PEERS: usize = 9;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 15;
     const COINBASE_IS_PUBLIC: bool = true;
