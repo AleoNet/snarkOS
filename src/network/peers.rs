@@ -338,7 +338,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                     // Determine the peers to disconnect from.
                     let num_excess_peers = self.number_of_connected_peers().await.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
-                    let mut peer_ips_to_disconnect = self
+                    let peer_ips_to_disconnect = self
                         .connected_peers
                         .read()
                         .await
@@ -351,21 +351,27 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .map(|(&peer_ip, _)| peer_ip)
                         .collect::<Vec<SocketAddr>>();
 
-                    // TODO (howardwu): This logic can be optimized and unified with the context around it.
-                    // Determine if the node is connected to more sync nodes than expected.
-                    let connected_sync_nodes = self.connected_sync_nodes().await;
-                    let num_excess_sync_nodes = connected_sync_nodes.len().saturating_sub(E::MAXIMUM_CONNECTED_SYNC_NODES);
-                    if num_excess_sync_nodes > 0 {
-                        peer_ips_to_disconnect.extend_from_slice(
-                            &connected_sync_nodes
-                                .iter()
-                                .copied()
-                                .choose_multiple(&mut OsRng::default(), num_excess_sync_nodes),
-                        );
-                    }
-
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in peer_ips_to_disconnect {
+                        info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
+                        self.send(peer_ip, Message::Disconnect).await;
+                        // Add an entry for this `Peer` in the restricted peers.
+                        self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                    }
+                }
+
+                // TODO (howardwu): This logic can be optimized and unified with the context around it.
+                // Determine if the node is connected to more sync nodes than expected.
+                let connected_sync_nodes = self.connected_sync_nodes().await;
+                let number_of_connected_sync_nodes = connected_sync_nodes.len();
+                let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(E::MAXIMUM_CONNECTED_SYNC_NODES);
+                if num_excess_sync_nodes > 0 {
+                    // Proceed to send disconnect requests to these peers.
+                    for peer_ip in connected_sync_nodes
+                        .iter()
+                        .copied()
+                        .choose_multiple(&mut OsRng::default(), num_excess_sync_nodes)
+                    {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
                         self.send(peer_ip, Message::Disconnect).await;
                         // Add an entry for this `Peer` in the restricted peers.
@@ -386,9 +392,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Add the beacon nodes to the list of candidate peers.
                 let beacon_nodes: Vec<SocketAddr> = E::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                 self.add_candidate_peers(&beacon_nodes).await;
-
-                // Retrieve the number of connected sync nodes.
-                let number_of_connected_sync_nodes = self.number_of_connected_sync_nodes().await;
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
