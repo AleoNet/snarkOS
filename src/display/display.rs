@@ -16,6 +16,7 @@
 
 use crate::{
     display::{logs::Logs, overview::Overview},
+    initialize_logger,
     network::Server,
     Environment,
 };
@@ -29,8 +30,10 @@ use crossterm::{
 };
 use std::{
     io,
+    thread,
     time::{Duration, Instant},
 };
+use tokio::sync::mpsc;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -68,10 +71,16 @@ pub(crate) struct Display<'a, N: Network, E: Environment> {
     server: Server<N, E>,
     tabs: TabsState<'a>,
     tick_rate: Duration,
+    logs: Logs,
 }
 
 impl<'a, N: Network, E: Environment> Display<'a, N, E> {
-    pub fn start(server: Server<N, E>) -> Result<()> {
+    pub fn start(server: Server<N, E>, verbosity: u8) -> Result<()> {
+        // Initialize the log channel.
+        let (log_sender, log_receiver) = mpsc::channel(1024);
+
+        initialize_logger(verbosity, Some(log_sender));
+
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -82,6 +91,7 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
             server,
             tabs: TabsState::new(vec![" Overview ", " Logs "]),
             tick_rate: Duration::from_secs(1),
+            logs: Logs::new(log_receiver),
         };
 
         let res = display.render(&mut terminal);
@@ -126,9 +136,11 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
         }
     }
 
-    fn heartbeat(&mut self) {}
+    fn heartbeat(&mut self) {
+        thread::sleep(Duration::from_millis(50));
+    }
 
-    fn draw<B: Backend>(&self, f: &mut Frame<B>) {
+    fn draw<B: Backend>(&mut self, f: &mut Frame<B>) {
         // Initialize the layout of the page.
         let chunks = Layout::default()
             .margin(1)
@@ -166,7 +178,7 @@ impl<'a, N: Network, E: Environment> Display<'a, N, E> {
         // Initialize the page.
         match self.tabs.index {
             0 => Overview.draw(f, chunks[1]),
-            1 => Logs.draw(f, chunks[1]),
+            1 => self.logs.draw(f, chunks[1]),
             _ => unreachable!(),
         };
     }

@@ -1313,9 +1313,9 @@ checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
 
 [[package]]
 name = "pea2pea"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e767de612eda2b1c42146b90ead2e67d8851b1b632023a071172ad91d1b3ab"
+checksum = "d2af9404f23eec288e35d3915ca93ac8019e3257dc929d4d0e189b777bf5d641"
 dependencies = [
  "async-trait",
  "once_cell",
@@ -1767,9 +1767,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.71"
+version = "1.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "063bf466a64011ac24040a49009724ee60a57da1b437617ceb32e53ad61bfb19"
+checksum = "d0ffa0837f2dfa6fb90868c2b5468cad482e175f7dad97e7421951e663f2b527"
 dependencies = [
  "itoa",
  "ryu",

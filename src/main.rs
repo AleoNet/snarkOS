@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::Node;
+use snarkos::{initialize_logger, Node};
 
 use anyhow::Result;
 use structopt::StructOpt;
@@ -26,7 +26,7 @@ fn main() -> Result<()> {
 
     // Start logging, if enabled.
     if !node.display {
-        node.initialize_logger();
+        initialize_logger(node.verbosity, None);
     }
 
     // Initialize the runtime configuration.
@@ -46,7 +46,6 @@ fn main() -> Result<()> {
 
     runtime.block_on(async move {
         node.start().await.expect("Failed to start the node");
-        std::future::pending::<()>().await;
     });
 
     Ok(())

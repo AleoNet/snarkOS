@@ -8,7 +8,7 @@ then
   MINER_ADDRESS="aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah"
 fi
 
-COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial --verbosity 1"
+COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial --verbosity 2"
 
 function exit_node()
 {
@@ -24,10 +24,13 @@ echo "Running miner node..."
 while :
 do
   echo "Checking for updates..."
-  git pull
+  STATUS=$(git pull)
 
   echo "Running the node..."
-  cargo clean
+  
+  if [ "$STATUS" != "Already up to date." ]; then
+    cargo clean
+  fi
   $COMMAND & sleep 1800; kill $!
 
   sleep 2;
