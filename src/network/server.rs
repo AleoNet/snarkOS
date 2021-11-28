@@ -106,6 +106,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_heartbeat(&mut tasks, peers.router(), ledger.reader(), ledger.router(), prover.router()).await;
         // Initialize a new instance of the RPC server.
         Self::initialize_rpc(&mut tasks, node, &status, &peers, ledger.reader(), prover.router()).await;
+        // Initialize a new instance of the notification.
+        Self::initialize_notification(&mut tasks).await;
 
         Ok(Self {
             local_ip,
@@ -271,5 +273,37 @@ impl<N: Network, E: Environment> Server<N, E> {
                 .await,
             );
         }
+    }
+
+    ///
+    /// Initialize a new instance of the notification.
+    ///
+    #[inline]
+    async fn initialize_notification(tasks: &mut Tasks<task::JoinHandle<()>>) {
+        // Initialize the heartbeat process.
+        let (router, handler) = oneshot::channel();
+        tasks.append(task::spawn(async move {
+            // Notify the outer function that the task is ready.
+            let _ = router.send(());
+            loop {
+                info!(
+                    r"
+===========================================================================================================
+                                  Aleo Testnet2 - Incentivization Period
+===========================================================================================================
+
+    In preparation for the incentivization period, testnet2 will automatically reset within 48 hours.
+    Please ensure your Aleo node is runnning either the `run-client.sh` or `run-miner.sh` script,
+    in order to automatically upgrade to the incentivized testnet.
+
+===========================================================================================================
+                "
+                );
+                // Sleep for `60` seconds.
+                tokio::time::sleep(Duration::from_secs(60)).await;
+            }
+        }));
+        // Wait until the heartbeat task is ready.
+        let _ = handler.await;
     }
 }
