@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{CircularMap, State, Status, Tasks},
+    helpers::{handle_block_requests, CircularMap, State, Status, Tasks},
     Data,
     Environment,
     LedgerReader,
@@ -629,23 +629,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
     ///
-    /// Case 1 - You are ahead of your peer:
-    ///     - Do nothing
-    /// Case 2 - You are behind your peer:
-    ///     Case 2(a) - `is_fork` is `None`:
-    ///         - Peer is being malicious or thinks you are ahead. Both are issues,
-    ///           pick a different peer to sync with.
-    ///     Case 2(b) - `is_fork` is `Some(false)`:
-    ///         - Request blocks from your latest state
-    ///     Case 2(c) - `is_fork` is `Some(true)`:
-    ///             Case 2(c)(a) - Common ancestor is within `MAXIMUM_FORK_DEPTH`:
-    ///                  - Revert to common ancestor, and send block requests to sync.
-    ///             Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`:
-    ///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
-    ///                      - Disconnect from peer.
-    ///                  Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
-    ///                      - Revert to most common ancestor and send block requests to sync.
-    ///
     async fn update_block_requests(&self) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
         if self.number_of_block_requests().await > 0 {
@@ -693,205 +676,160 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Release the lock over peers_state.
         drop(peers_state);
 
-        // Case 1 - Ensure the peer has a higher block height than this ledger.
-        if latest_block_height >= maximum_block_height {
-            return;
+        let peer_ip = match maximal_peer {
+            Some(peer) => peer,
+            None => return,
+        };
+
+        // Determine the common ancestor block height between this ledger and the peer.
+        let mut maximum_common_ancestor = 0;
+        // Determine the first locator (smallest height) that does not exist in this ledger.
+        let mut first_deviating_locator = None;
+
+        // Verify the integrity of the block hashes sent by the peer.
+        for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
+            // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
+            if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
+                if expected_block_height != *block_height {
+                    let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                    trace!("{}", error);
+                    self.add_failure(peer_ip, error).await;
+                    return;
+                } else {
+                    // Update the common ancestor, as this block hash exists in this ledger.
+                    if expected_block_height > maximum_common_ancestor {
+                        maximum_common_ancestor = expected_block_height;
+                    }
+                }
+            } else {
+                // Update the first deviating locator.
+                match first_deviating_locator {
+                    None => first_deviating_locator = Some(block_height),
+                    Some(saved_height) => {
+                        if block_height < saved_height {
+                            first_deviating_locator = Some(block_height);
+                        }
+                    }
+                }
+            }
         }
 
         // Acquire the lock for block requests.
         let _block_requests_lock = self.block_requests_lock.lock().await;
 
-        // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
-        if let (Some(peer_ip), Some(is_fork)) = (maximal_peer, maximal_peer_is_fork) {
-            // Determine the common ancestor block height between this ledger and the peer.
-            let mut maximum_common_ancestor = 0;
-            // Determine the first locator (smallest height) that does not exist in this ledger.
-            let mut first_deviating_locator = None;
+        // Case 1 - Ensure the peer has a higher block height than this ledger.
+        if latest_block_height >= maximum_block_height {
+            return;
+        }
 
-            // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
-                // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
-                    if expected_block_height != *block_height {
-                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
-                        trace!("{}", error);
-                        self.add_failure(peer_ip, error).await;
-                        return;
-                    } else {
-                        // Update the common ancestor, as this block hash exists in this ledger.
-                        if expected_block_height > maximum_common_ancestor {
-                            maximum_common_ancestor = expected_block_height;
-                        }
-                    }
-                } else {
-                    // Update the first deviating locator.
-                    match first_deviating_locator {
-                        None => first_deviating_locator = Some(block_height),
-                        Some(saved_height) => {
-                            if block_height < saved_height {
-                                first_deviating_locator = Some(block_height);
-                            }
-                        }
-                    }
-                }
-            }
+        // Process peer information and determine what requests to send.
+        let (start_block_height, end_block_height, requires_fork) = match handle_block_requests::<N, E>(
+            latest_block_height,
+            maximal_peer,
+            maximal_peer_is_fork,
+            maximum_block_height,
+            maximum_common_ancestor,
+            first_deviating_locator,
+            &self.peers_router,
+        )
+        .await
+        {
+            Some(result) => result,
+            None => return,
+        };
 
-            // Ensure the latest common ancestor is not greater than the latest block request.
-            if latest_block_height < maximum_common_ancestor {
-                warn!(
-                    "The common ancestor {} cannot be greater than the latest block {}",
-                    maximum_common_ancestor, latest_block_height
-                );
+        // Revert the state of the ledger if required.
+        if requires_fork {
+            let latest_common_ancestor = start_block_height.saturating_sub(1);
+            if !self.revert_to_block_height(latest_common_ancestor).await {
                 return;
             }
+        }
 
-            // Determine the latest common ancestor.
-            let (latest_common_ancestor, ledger_reverted) =
-                // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
-                if !is_fork {
-                    // Continue to sync from the latest block height of this ledger, if the peer is honest.
-                    match first_deviating_locator.is_none() {
-                        true => (maximum_common_ancestor, false),
-                        false => (latest_block_height, false),
-                    }
-                }
-                // Case 2(c) - This ledger is on a fork of the peer.
-                else {
-                    // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger,
-                    // proceed to switch to the fork.
-                    if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH
-                    {
-                        info!("Found a longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
-                        // If the latest block is the same as the maximum common ancestor, do not revert.
-                        if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor).await {
-                            return;
-                        }
-                        (maximum_common_ancestor, true)
-                    }
-                    // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
-                    else
-                    {
-                        // Ensure that the first deviating locator exists.
-                        let first_deviating_locator = match first_deviating_locator {
-                            Some(locator) => locator,
-                            None => return,
-                        };
+        // Send a `BlockRequest` message to the peer.
+        let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
+        if let Err(error) = self.peers_router.send(request).await {
+            warn!("[BlockRequest] {}", error);
+            return;
+        }
 
-                        // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
-                        // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
-                        if latest_block_height.saturating_sub(*first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
-                            debug!("Peer {} is outside of the fork range of this ledger, disconnecting", peer_ip);
-                            // Send a `Disconnect` message to the peer.
-                            let request = PeersRequest::MessageSend(peer_ip, Message::Disconnect);
-                            if let Err(error) = self.peers_router.send(request).await {
-                                warn!("[Disconnect] {}", error);
-                            }
-                            return;
-                        }
-                        // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `MAXIMUM_FORK_DEPTH`.
-                        // Revert to the common ancestor anyways.
-                        else {
-                            info!("Found a potentially longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
-                            match self.revert_to_block_height(maximum_common_ancestor).await {
-                                true => (maximum_common_ancestor, true),
-                                false => return
-                            }
-                        }
-                    }
-                };
-
-            // TODO (howardwu): Ensure the start <= end.
-            // Determine the start and end block heights to request.
-            let number_of_block_requests = std::cmp::min(maximum_block_height - latest_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
-            let start_block_height = latest_common_ancestor + 1;
-            let end_block_height = start_block_height + number_of_block_requests - 1;
-            debug!("Requesting blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
-
-            // Send a `BlockRequest` message to the peer.
-            let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
-            if let Err(error) = self.peers_router.send(request).await {
-                warn!("[BlockRequest] {}", error);
-                return;
-            }
-
-            // Filter out any pre-existing block requests for the peer.
-            let mut missing_block_requests = false;
-            let mut new_block_heights = Vec::new();
-            if let Some(block_requests) = self.block_requests.read().await.get(&peer_ip) {
-                for block_height in start_block_height..=end_block_height {
-                    if !block_requests.contains_key(&block_height.into()) {
-                        new_block_heights.push(block_height);
-                    }
-                }
-            } else {
-                self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)).await;
-                missing_block_requests = true;
-            }
-
-            if !missing_block_requests && !new_block_heights.is_empty() {
-                // Log each block request to ensure the peer responds with all requested blocks.
-                if let Some(locked_block_requests) = self.block_requests.write().await.get_mut(&peer_ip) {
-                    for block_height in new_block_heights {
-                        // If the ledger was reverted, include the expected new block hash for the fork.
-                        match ledger_reverted {
-                            true => {
-                                self.add_block_request(
-                                    peer_ip,
-                                    block_height,
-                                    maximum_block_locators.get_block_hash(block_height),
-                                    locked_block_requests,
-                                )
-                                .await
-                            }
-                            false => self.add_block_request(peer_ip, block_height, None, locked_block_requests).await,
-                        };
-                    }
+        // Filter out any pre-existing block requests for the peer.
+        let mut missing_block_requests = false;
+        let mut new_block_heights = Vec::new();
+        if let Some(block_requests) = self.block_requests.read().await.get(&peer_ip) {
+            for block_height in start_block_height..=end_block_height {
+                if !block_requests.contains_key(&block_height.into()) {
+                    new_block_heights.push(block_height);
                 }
             }
+        } else {
+            self.add_failure(peer_ip, format!("Missing block requests for {}", peer_ip)).await;
+            missing_block_requests = true;
+        }
 
-            // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
-            // If the node is a sync node and the node is currently syncing,
-            // reduce the number of connections down to the minimum threshold,
-            // to improve the speed with which the node syncs back to tip.
-            if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() && self.number_of_block_requests().await > 0 {
-                debug!("Temporarily reducing the number of connected peers to sync");
+        if !missing_block_requests && !new_block_heights.is_empty() {
+            // Log each block request to ensure the peer responds with all requested blocks.
+            if let Some(locked_block_requests) = self.block_requests.write().await.get_mut(&peer_ip) {
+                for block_height in new_block_heights {
+                    // If the ledger was reverted, include the expected new block hash for the fork.
+                    match requires_fork {
+                        true => {
+                            self.add_block_request(
+                                peer_ip,
+                                block_height,
+                                maximum_block_locators.get_block_hash(block_height),
+                                locked_block_requests,
+                            )
+                            .await
+                        }
+                        false => self.add_block_request(peer_ip, block_height, None, locked_block_requests).await,
+                    };
+                }
+            }
+        }
 
-                // Lock peers_state and block_requests for further processing.
-                let peers_state = self.peers_state.read().await;
-                let block_requests = self.block_requests.read().await;
+        // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
+        // If the node is a sync node and the node is currently syncing,
+        // reduce the number of connections down to the minimum threshold,
+        // to improve the speed with which the node syncs back to tip.
+        if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() && self.number_of_block_requests().await > 0 {
+            debug!("Temporarily reducing the number of connected peers to sync");
 
-                // Determine the peers to disconnect from.
-                // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
-                let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
-                let peer_ips_to_disconnect = peers_state
-                    .iter()
-                    .filter(|(&peer_ip, _)| {
-                        let peer_str = peer_ip.to_string();
-                        !E::SYNC_NODES.contains(&peer_str.as_str())
-                            && !E::BEACON_NODES.contains(&peer_str.as_str())
-                            && !block_requests.contains_key(&peer_ip)
-                    })
-                    .take(num_excess_peers)
-                    .map(|(&ip, _)| ip)
-                    .collect::<Vec<SocketAddr>>();
+            // Lock peers_state and block_requests for further processing.
+            let peers_state = self.peers_state.read().await;
+            let block_requests = self.block_requests.read().await;
 
-                // Release the lock over peers_state and block_requests.
-                drop(peers_state);
-                drop(block_requests);
+            // Determine the peers to disconnect from.
+            // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
+            let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
+            let peer_ips_to_disconnect = peers_state
+                .iter()
+                .filter(|(&peer_ip, _)| {
+                    let peer_str = peer_ip.to_string();
+                    !E::SYNC_NODES.contains(&peer_str.as_str())
+                        && !E::BEACON_NODES.contains(&peer_str.as_str())
+                        && !block_requests.contains_key(&peer_ip)
+                })
+                .take(num_excess_peers)
+                .map(|(&ip, _)| ip)
+                .collect::<Vec<SocketAddr>>();
 
-                trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
+            // Release the lock over peers_state and block_requests.
+            drop(peers_state);
+            drop(block_requests);
 
-                // Proceed to send disconnect requests to these peers.
-                for peer_ip in peer_ips_to_disconnect {
-                    info!("Disconnecting from {} (disconnecting to sync)", peer_ip);
-                    // Remove all entries of the peer from the ledger.
-                    self.remove_peer(&peer_ip).await;
-                    // Update the status of the ledger.
-                    self.update_status().await;
-                    // Route a `PeerRestricted` to the peers.
-                    if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
-                        warn!("[PeerRestricted] {}", error);
-                    }
+            trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
+
+            // Proceed to send disconnect requests to these peers.
+            for peer_ip in peer_ips_to_disconnect {
+                info!("Disconnecting from {} (disconnecting to sync)", peer_ip);
+                // Remove all entries of the peer from the ledger.
+                self.remove_peer(&peer_ip).await;
+                // Update the status of the ledger.
+                self.update_status().await;
+                // Route a `PeerRestricted` to the peers.
+                if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+                    warn!("[PeerRestricted] {}", error);
                 }
             }
         }
