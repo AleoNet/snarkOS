@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    helpers::{State, Status, Tasks},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
@@ -162,8 +162,17 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Disconnects from peers and proceeds to shut down the node.
     ///
     #[inline]
-    pub fn shut_down(&self) {
+    pub async fn shut_down(&self) {
         info!("Shutting down...");
+        // Update the node status.
+        self.status.update(State::ShuttingDown);
+
+        // Shut down the ledger.
+        let ledger_lock = self.ledger.shut_down().await;
+        // Acquire the lock for ledger.
+        let _ledger_lock = ledger_lock.lock().await;
+
+        // Flush the tasks.
         self.tasks.flush();
     }
 

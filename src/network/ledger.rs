@@ -64,8 +64,8 @@ type LedgerHandler<N> = mpsc::Receiver<LedgerRequest<N>>;
 pub enum LedgerRequest<N: Network> {
     /// BlockResponse := (peer_ip, block, prover_router)
     BlockResponse(SocketAddr, Block<N>, ProverRouter<N>),
-    /// Disconnect := (peer_ip)
-    Disconnect(SocketAddr),
+    /// Disconnect := (peer_ip, message)
+    Disconnect(SocketAddr, String),
     /// Failure := (peer_ip, failure)
     Failure(SocketAddr, String),
     /// Heartbeat := (prover_router)
@@ -134,7 +134,7 @@ pub struct Ledger<N: Network, E: Environment> {
     block_requests: RwLock<HashMap<SocketAddr, HashMap<BlockRequest<N>, i64>>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
     /// In this context, `update_ledger`, `add_block`, and `update_block_requests` must be mutually-exclusive.
-    block_requests_lock: Mutex<()>,
+    block_requests_lock: Arc<Mutex<()>>,
     /// The timestamp of the last successful block update.
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
@@ -167,7 +167,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             unconfirmed_blocks: Default::default(),
             peers_state: Default::default(),
             block_requests: Default::default(),
-            block_requests_lock: Mutex::new(()),
+            block_requests_lock: Arc::new(Mutex::new(())),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
             status: status.clone(),
@@ -211,6 +211,19 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.ledger_router.clone()
     }
 
+    pub(super) async fn shut_down(&self) -> Arc<Mutex<()>> {
+        // Set the terminator bit to `true` to ensure it stops mining.
+        self.terminator.store(true, Ordering::SeqCst);
+        // Clear the unconfirmed blocks.
+        *self.unconfirmed_blocks.write().await = Default::default();
+        // Disconnect all connected peers.
+        for peer_ip in self.peers_state.write().await.keys() {
+            self.disconnect(*peer_ip, "shutting down").await;
+        }
+        // Return the lock for block requests.
+        self.block_requests_lock.clone()
+    }
+
     ///
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -236,16 +249,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     }
                 }
             }
-            LedgerRequest::Disconnect(peer_ip) => {
-                info!("Disconnecting from {}", peer_ip);
-                // Remove all entries of the peer from the ledger.
-                self.remove_peer(&peer_ip).await;
-                // Update the status of the ledger.
-                self.update_status().await;
-                // Route a `PeerDisconnected` to the peers.
-                if let Err(error) = self.peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
-                    warn!("[Disconnect] {}", error);
-                }
+            LedgerRequest::Disconnect(peer_ip, message) => {
+                self.disconnect(peer_ip, &message).await;
             }
             LedgerRequest::Failure(peer_ip, failure) => {
                 self.add_failure(peer_ip, failure).await;
@@ -292,6 +297,29 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     }
                 }
             }
+        }
+    }
+
+    ///
+    /// Disconnects the given peer from the ledger.
+    ///
+    async fn disconnect(&self, peer_ip: SocketAddr, message: &str) {
+        info!("Disconnecting from {} ({})", peer_ip, message);
+        // Remove all entries of the peer from the ledger.
+        self.remove_peer(&peer_ip).await;
+        // Update the status of the ledger.
+        self.update_status().await;
+        // Send a `Disconnect` message to the peer.
+        if let Err(error) = self
+            .peers_router
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect))
+            .await
+        {
+            warn!("[Disconnect] {}", error);
+        }
+        // Route a `PeerDisconnected` to the peers.
+        if let Err(error) = self.peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
+            warn!("[PeerDisconnected] {}", error);
         }
     }
 
@@ -781,11 +809,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
                         if latest_block_height.saturating_sub(*first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
                             debug!("Peer {} is outside of the fork range of this ledger, disconnecting", peer_ip);
-                            // Send a `Disconnect` message to the peer.
-                            let request = PeersRequest::MessageSend(peer_ip, Message::Disconnect);
-                            if let Err(error) = self.peers_router.send(request).await {
-                                warn!("[Disconnect] {}", error);
-                            }
+                            self.disconnect(peer_ip, "exceeded fork range").await;
                             return;
                         }
                         // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `MAXIMUM_FORK_DEPTH`.
@@ -1001,9 +1025,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             .collect::<Vec<_>>();
 
         for peer_ip in peers_to_disconnect {
-            if let Err(error) = self.ledger_router.send(LedgerRequest::Disconnect(peer_ip)).await {
-                warn!("Failed to send disconnect message to failing peer {}: {}", peer_ip, error);
-            }
+            self.disconnect(peer_ip, "exceeded failure limit").await;
         }
     }
 }

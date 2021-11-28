@@ -32,7 +32,7 @@ use anyhow::Result;
 use colored::*;
 use std::{io, net::SocketAddr, str::FromStr};
 use structopt::StructOpt;
-use tokio::{sync::mpsc, task};
+use tokio::{signal, sync::mpsc, task};
 use tracing_subscriber::EnvFilter;
 
 #[derive(StructOpt, Debug)]
@@ -137,6 +137,11 @@ impl Node {
         // Initialize the node's server.
         let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
 
+        // Initialize signal handling; it also maintains ownership of the Server
+        // in order for it to not go out of scope.
+        let server_clone = server.clone();
+        handle_signals(server_clone);
+
         // Initialize the display, if enabled.
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
@@ -147,11 +152,6 @@ impl Node {
         if let Some(peer_ip) = &self.connect {
             let _ = server.connect_to(peer_ip.parse().unwrap()).await;
         }
-        // Spawn a task to handle the server.
-        tasks.append(task::spawn(async move {
-            let _server = server;
-            std::future::pending::<()>().await;
-        }));
 
         // Note: Do not move this. The pending await must be here otherwise
         // other snarkOS commands will not exit.
@@ -316,4 +316,19 @@ impl NewAccount {
 
         Ok(output)
     }
+}
+
+// This function is responsible for handling OS signals in order for the node to be able to intercept them
+// and perform a clean shutdown.
+// note: only Ctrl-C is currently supported, but it should work on both Unix-family systems and Windows.
+fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
+    task::spawn(async move {
+        match signal::ctrl_c().await {
+            Ok(()) => {
+                server.shut_down().await;
+                std::process::exit(0);
+            }
+            Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
+        }
+    });
 }
