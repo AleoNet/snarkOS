@@ -28,7 +28,7 @@ snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "040825e" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
-futures = { version = "0.3.0", features = ["thread-pool"]}
+futures = { version = "0.3.18", features = ["thread-pool"]}
 
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", features = ["crossterm"] }
@@ -110,6 +110,7 @@ features = [
     "macros",
     "net",
     "rt-multi-thread",
+    "signal",
     "sync",
     "time"
 ]

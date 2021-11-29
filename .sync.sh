@@ -16,9 +16,12 @@ echo "Do not run a sync node, it does nothing..."
 while :
 do
   echo "Checking for updates..."
-  git pull
+  STATUS=$(git pull)
 
-  cargo clean
+  if [ "$STATUS" != "Already up to date." ]; then
+    cargo clean
+  fi
+
   $COMMAND & sleep 1800; kill $!
 
   sleep 2;
