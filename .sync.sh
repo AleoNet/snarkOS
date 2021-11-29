@@ -5,7 +5,7 @@ COMMAND='cargo run --release -- --sync --trial'
 function exit_node()
 {
     echo "Exiting..."
-    kill $!
+    kill -INT $!
     exit
 }
 
@@ -22,7 +22,7 @@ do
     cargo clean
   fi
 
-  $COMMAND & sleep 1800; kill $!
+  $COMMAND & sleep 1800; kill -INT $!
 
   sleep 2;
 done
