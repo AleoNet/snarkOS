@@ -1289,10 +1289,6 @@ impl<N: Network> BlockState<N> {
         if block_height == 0 {
             Err(anyhow!("Block {} cannot be removed from storage", block_height))
         }
-        // Ensure the block at the given block height exists.
-        else if !self.block_heights.contains_key(&block_height)? {
-            Err(anyhow!("Block {} does not exist in storage", block_height))
-        }
         // Remove the block at the given block height.
         else {
             // Retrieve the block hash.
@@ -1470,43 +1466,38 @@ impl<N: Network> TransactionState<N> {
 
     /// Removes the given transaction ID from storage.
     fn remove_transaction(&self, transaction_id: &N::TransactionID) -> Result<()> {
-        // Ensure the transaction exists.
-        if !self.transactions.contains_key(transaction_id)? {
-            Err(anyhow!("Transaction {} does not exist in storage", transaction_id))
-        } else {
-            // Retrieve the transition IDs from the transaction.
-            let transition_ids = match self.transactions.get(transaction_id)? {
-                Some((_, transition_ids, _)) => transition_ids,
-                None => return Err(anyhow!("Transaction {} missing from transactions map", transaction_id)),
+        // Retrieve the transition IDs from the transaction.
+        let transition_ids = match self.transactions.get(transaction_id)? {
+            Some((_, transition_ids, _)) => transition_ids,
+            None => return Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
+        };
+
+        // Remove the transaction entry.
+        self.transactions.remove(transaction_id)?;
+
+        for (_, transition_id) in transition_ids.iter().enumerate() {
+            // Retrieve the transition from the transition ID.
+            let transition = match self.transitions.get(transition_id)? {
+                Some((_, _, transition)) => transition,
+                None => return Err(anyhow!("Transition {} missing from transitions map", transition_id)),
             };
 
-            // Remove the transaction entry.
-            self.transactions.remove(transaction_id)?;
+            // Remove the transition.
+            self.transitions.remove(transition_id)?;
 
-            for (_, transition_id) in transition_ids.iter().enumerate() {
-                // Retrieve the transition from the transition ID.
-                let transition = match self.transitions.get(transition_id)? {
-                    Some((_, _, transition)) => transition,
-                    None => return Err(anyhow!("Transition {} missing from transitions map", transition_id)),
-                };
-
-                // Remove the transition.
-                self.transitions.remove(transition_id)?;
-
-                // Remove the serial numbers.
-                for serial_number in transition.serial_numbers() {
-                    self.serial_numbers.remove(serial_number)?;
-                }
-                // Remove the commitments.
-                for commitment in transition.commitments() {
-                    self.commitments.remove(commitment)?;
-                }
+            // Remove the serial numbers.
+            for serial_number in transition.serial_numbers() {
+                self.serial_numbers.remove(serial_number)?;
             }
-
-            // Remove the transaction events.
-            self.events.remove(transaction_id)?;
-
-            Ok(())
+            // Remove the commitments.
+            for commitment in transition.commitments() {
+                self.commitments.remove(commitment)?;
+            }
         }
+
+        // Remove the transaction events.
+        self.events.remove(transaction_id)?;
+
+        Ok(())
     }
 }

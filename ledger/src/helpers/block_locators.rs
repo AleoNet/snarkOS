@@ -61,6 +61,14 @@ impl<N: Network> BlockLocators<N> {
     pub fn get_block_hash(&self, block_height: u32) -> Option<N::BlockHash> {
         self.block_locators.get(&block_height).map(|(block_hash, _)| *block_hash)
     }
+
+    #[inline]
+    pub fn get_cumulative_weight(&self, block_height: u32) -> Option<u128> {
+        match self.block_locators.get(&block_height) {
+            Some((_, header)) => header.as_ref().and_then(|header| Some(header.cumulative_weight())),
+            _ => None,
+        }
+    }
 }
 
 impl<N: Network> FromBytes for BlockLocators<N> {

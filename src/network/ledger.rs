@@ -655,9 +655,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 Some(boolean) => format!("{}", boolean),
                 None => "undecided".to_string(),
             };
+            let cumulative_weight = match block_locators.get_cumulative_weight(latest_block_height_of_peer) {
+                Some(weight) => format!("{}", weight),
+                _ => "unknown".to_string(),
+            };
             debug!(
-                "Peer {} is at block {} (type = {}, status = {}, is_fork = {}, common_ancestor = {})",
-                peer_ip, latest_block_height_of_peer, node_type, status, fork_status, common_ancestor,
+                "Peer {} is at block {} (type = {}, status = {}, is_fork = {}, cumulative_weight = {}, common_ancestor = {})",
+                peer_ip, latest_block_height_of_peer, node_type, status, fork_status, cumulative_weight, common_ancestor,
             );
 
             match self.peers_state.write().await.get_mut(&peer_ip) {
