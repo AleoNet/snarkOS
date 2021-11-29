@@ -223,8 +223,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         trace!("[ShuttingDown] Pending queue has been cleared");
 
         // Disconnect all connected peers.
-        for peer_ip in self.peers_state.write().await.keys() {
-            self.disconnect(*peer_ip, "shutting down").await;
+        let connected_peers = self.peers_state.read().await.keys().copied().collect::<Vec<_>>();
+        for peer_ip in connected_peers {
+            self.disconnect(peer_ip, "shutting down").await;
         }
         trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
 
@@ -281,10 +282,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_block_requests().await;
 
                 debug!(
-                    "Status Report (type = {}, status = {}, latest_block_height = {}, block_requests = {}, connected_peers = {})",
+                    "Status Report (type = {}, status = {}, latest_block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
                     E::NODE_TYPE,
                     self.status,
                     self.canon.latest_block_height(),
+                    self.canon.latest_cumulative_weight(),
                     self.number_of_block_requests().await,
                     self.peers_state.read().await.len()
                 );
