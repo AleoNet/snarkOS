@@ -383,6 +383,11 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_transaction_metadata(transaction_id)
     }
 
+    /// Returns the cumulative weight up to a given block height (inclusive) for the canonical chain.
+    pub fn get_cumulative_weight(&self, block_height: u32) -> Result<u128> {
+        self.blocks.get_cumulative_weight(block_height)
+    }
+
     /// Returns the block height for the given block hash.
     pub fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
         self.blocks.get_block_height(block_hash)
@@ -1126,6 +1131,11 @@ impl<N: Network> BlockState<N> {
     /// Returns the transaction metadata for a given transaction ID.
     fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
         self.transactions.get_transaction_metadata(transaction_id)
+    }
+
+    /// Returns the cumulative weight up to a given block height (inclusive) for the canonical chain.
+    fn get_cumulative_weight(&self, block_height: u32) -> Result<u128> {
+        Ok(self.get_block_header(block_height)?.cumulative_weight())
     }
 
     /// Returns the block height for the given block hash.
