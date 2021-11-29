@@ -128,7 +128,6 @@ USAGE:
     snarkos [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
-        --dev        If the flag is set, the node will start in development mode
         --display    If the flag is set, the node will render a read-only display
     -h, --help       Prints help information
         --norpc      If the flag is set, the node will not initialize the RPC server
@@ -136,6 +135,7 @@ FLAGS:
 
 OPTIONS:
         --connect <connect>          Specify the IP address and port of a peer to connect to
+        --dev <dev>                  Enables development mode, specify a unique ID for the local node
         --miner <miner>              Specify this as a mining node, with the given miner address
         --network <network>          Specify the network of this node [default: 2]
         --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
@@ -155,12 +155,12 @@ SUBCOMMANDS:
 
 In one terminal, start the first node by running:
 ```
-cargo run --release -- --dev --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
+cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
 ```
 
 After the first node starts, in a second terminal, run:
 ```
-cargo run --release --dev
+cargo run --release --dev 2
 ```
 
 We welcome all contributions to snarkOS. Please refer to the [license](#7-license) for the terms of contributions.

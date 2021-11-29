@@ -62,9 +62,9 @@ pub struct Node {
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
-    /// If the flag is set, the node will start in development mode.
+    /// Enables development mode, specify a unique ID for the local node.
     #[structopt(long)]
-    pub dev: bool,
+    pub dev: Option<u16>,
     /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
     pub display: bool,
@@ -242,9 +242,9 @@ pub struct Clean {
     /// Specify the network of the ledger to remove from storage.
     #[structopt(default_value = "2", long = "network")]
     pub network: u16,
-    /// If the flag is set, only the development ledger will be removed from storage.
+    /// Enables development mode, specify the unique ID of the local node to clean.
     #[structopt(long)]
-    pub dev: bool,
+    pub dev: Option<u16>,
 }
 
 impl Clean {
@@ -254,9 +254,9 @@ impl Clean {
     }
 
     /// Removes the specified ledger from storage.
-    fn remove_ledger(network: u16, is_dev: bool) -> Result<String> {
+    fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let path = aleo_std::aleo_ledger_dir(network, is_dev);
+        let path = aleo_std::aleo_ledger_dir(network, dev);
         // Check if the path to the ledger exists in storage.
         if path.exists() {
             // Remove the ledger files from storage.
