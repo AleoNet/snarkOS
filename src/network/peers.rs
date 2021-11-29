@@ -364,7 +364,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Determine if the node is connected to more sync nodes than expected.
                 let connected_sync_nodes = self.connected_sync_nodes().await;
                 let number_of_connected_sync_nodes = connected_sync_nodes.len();
-                let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(E::MAXIMUM_CONNECTED_SYNC_NODES);
+                let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
                 if num_excess_sync_nodes > 0 {
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in connected_sync_nodes
@@ -403,7 +403,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
-                    if sync_nodes.contains(&peer_ip) && number_of_connected_sync_nodes >= E::MAXIMUM_CONNECTED_SYNC_NODES {
+                    if sync_nodes.contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
                         continue;
                     }
 
