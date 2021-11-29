@@ -24,8 +24,9 @@ features = ["test"]
 path = "../ledger"
 
 [dependencies.snarkvm]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "040825e"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#rev = "040825e"
+path = "../../snarkVM"
 
 [dependencies.anyhow]
 version = "1"

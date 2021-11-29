@@ -430,7 +430,7 @@ mod tests {
         LedgerState,
     };
     use snarkvm::{
-        dpc::{testnet2::Testnet2, AccountScheme, AleoAmount, RecordCiphertext, Transaction, Transactions, Transition},
+        dpc::{testnet2::Testnet2, AccountScheme, AleoAmount, Transaction, Transactions, Transition},
         prelude::{Account, Block, BlockHeader},
         utilities::ToBytes,
     };
@@ -955,7 +955,7 @@ mod tests {
             .expect("Test rpc failed to process request");
 
         // Process the response into a ciphertext.
-        let actual: RecordCiphertext<Testnet2> = process_response(response).await;
+        let actual: <Testnet2 as Network>::RecordCiphertext = process_response(response).await;
 
         // Check the ciphertext.
         assert!(

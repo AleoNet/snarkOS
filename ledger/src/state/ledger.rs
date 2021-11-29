@@ -308,6 +308,11 @@ impl<N: Network> LedgerState<N> {
         self.latest_block.read().difficulty_target()
     }
 
+    /// Returns the latest cumulative weight.
+    pub fn latest_cumulative_weight(&self) -> u64 {
+        self.latest_block.read().cumulative_weight()
+    }
+
     /// Returns the latest block header.
     pub fn latest_block_header(&self) -> BlockHeader<N> {
         self.latest_block.read().header().clone()
@@ -358,14 +363,9 @@ impl<N: Network> LedgerState<N> {
         self.blocks.contains_commitment(commitment)
     }
 
-    /// Returns `true` if the given ciphertext ID exists in storage.
-    pub fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
-        self.blocks.contains_ciphertext_id(ciphertext_id)
-    }
-
-    /// Returns the record ciphertext for a given ciphertext ID.
-    pub fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
-        self.blocks.get_ciphertext(ciphertext_id)
+    /// Returns the record ciphertext for a given commitment.
+    pub fn get_ciphertext(&self, commitment: &N::Commitment) -> Result<N::RecordCiphertext> {
+        self.blocks.get_ciphertext(commitment)
     }
 
     /// Returns the transition for a given transition ID.
@@ -583,6 +583,7 @@ impl<N: Network> LedgerState<N> {
         let previous_difficulty_target = self.latest_block_difficulty_target();
         let block_timestamp = chrono::Utc::now().timestamp();
         let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+        let cumulative_weight = self.latest_cumulative_weight().saturating_add(u64::MAX - difficulty_target);
 
         // Construct the ledger root.
         let ledger_root = self.latest_ledger_root();
@@ -623,6 +624,7 @@ impl<N: Network> LedgerState<N> {
             block_height,
             block_timestamp,
             difficulty_target,
+            cumulative_weight,
             ledger_root,
             transactions,
             terminator,
@@ -1092,14 +1094,9 @@ impl<N: Network> BlockState<N> {
         self.transactions.contains_commitment(commitment)
     }
 
-    /// Returns `true` if the given ciphertext ID exists in storage.
-    fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
-        self.transactions.contains_ciphertext_id(ciphertext_id)
-    }
-
-    /// Returns the record ciphertext for a given ciphertext ID.
-    fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
-        self.transactions.get_ciphertext(ciphertext_id)
+    /// Returns the record ciphertext for a given commitment.
+    fn get_ciphertext(&self, commitment: &N::Commitment) -> Result<N::RecordCiphertext> {
+        self.transactions.get_ciphertext(commitment)
     }
 
     /// Returns the transition for a given transition ID.
@@ -1317,7 +1314,6 @@ struct TransactionState<N: Network> {
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
     serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
     commitments: DataMap<N::Commitment, N::TransitionID>,
-    ciphertext_ids: DataMap<N::CiphertextID, N::TransitionID>,
     events: DataMap<N::TransactionID, Vec<Event<N>>>,
 }
 
@@ -1329,7 +1325,6 @@ impl<N: Network> TransactionState<N> {
             transitions: storage.open_map("transitions")?,
             serial_numbers: storage.open_map("serial_numbers")?,
             commitments: storage.open_map("commitments")?,
-            ciphertext_ids: storage.open_map("ciphertext_ids")?,
             events: storage.open_map("events")?,
         })
     }
@@ -1349,17 +1344,12 @@ impl<N: Network> TransactionState<N> {
         self.commitments.contains_key(commitment)
     }
 
-    /// Returns `true` if the given ciphertext ID exists in storage.
-    fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
-        self.ciphertext_ids.contains_key(ciphertext_id)
-    }
-
-    /// Returns the record ciphertext for a given ciphertext ID.
-    fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
+    /// Returns the record ciphertext for a given commitment.
+    fn get_ciphertext(&self, commitment: &N::Commitment) -> Result<N::RecordCiphertext> {
         // Retrieve the transition ID.
-        let transition_id = match self.ciphertext_ids.get(ciphertext_id)? {
+        let transition_id = match self.commitments.get(commitment)? {
             Some(transition_id) => transition_id,
-            None => return Err(anyhow!("Ciphertext {} does not exist in storage", ciphertext_id)),
+            None => return Err(anyhow!("Commitment {} does not exist in storage", commitment)),
         };
 
         // Retrieve the transition.
@@ -1369,13 +1359,13 @@ impl<N: Network> TransactionState<N> {
         };
 
         // Retrieve the ciphertext.
-        for (candidate_ciphertext_id, candidate_ciphertext) in transition.to_ciphertext_ids().zip_eq(transition.ciphertexts()) {
-            if candidate_ciphertext_id? == *ciphertext_id {
+        for (candidate_commitment, candidate_ciphertext) in transition.commitments().zip_eq(transition.ciphertexts()) {
+            if candidate_commitment == commitment {
                 return Ok(candidate_ciphertext.clone());
             }
         }
 
-        Err(anyhow!("Ciphertext {} is missing in storage", ciphertext_id))
+        Err(anyhow!("Commitment {} is missing in storage", commitment))
     }
 
     /// Returns the transition for a given transition ID.
@@ -1445,10 +1435,6 @@ impl<N: Network> TransactionState<N> {
                 for commitment in transition.commitments() {
                     self.commitments.insert(commitment, &transition_id)?;
                 }
-                // Insert the ciphertext IDs.
-                for ciphertext_id in transition.to_ciphertext_ids() {
-                    self.ciphertext_ids.insert(&*ciphertext_id?, &transition_id)?;
-                }
             }
 
             // Insert the transaction events.
@@ -1490,10 +1476,6 @@ impl<N: Network> TransactionState<N> {
                 // Remove the commitments.
                 for commitment in transition.commitments() {
                     self.commitments.remove(commitment)?;
-                }
-                // Remove the ciphertext IDs.
-                for ciphertext_id in transition.to_ciphertext_ids() {
-                    self.ciphertext_ids.remove(&*ciphertext_id?)?;
                 }
             }
 

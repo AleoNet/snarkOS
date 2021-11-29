@@ -30,7 +30,7 @@ use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::Result;
 use colored::*;
-use std::{io, net::SocketAddr, str::FromStr};
+use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 use tokio::{signal, sync::mpsc, task};
 use tracing_subscriber::EnvFilter;
@@ -235,6 +235,76 @@ impl io::Write for LogWriter {
         Ok(())
     }
 }
+
+// #[derive(StructOpt, Debug)]
+// pub struct Clean {
+//     /// The ledger storage number (.ledger-[number]) to remove. Removes all storage by default.
+//     #[structopt(short, long)]
+//     number: Option<u8>,
+// }
+//
+// impl Clean {
+//     /// Returns the result of executing the snarkos clean command.
+//     pub fn parse<N: Network>(self) -> Result<String> {
+//         // Compute the path to the aleo directory.
+//         let mut path = aleo_std::aleo_dir();
+//         path.push(N::NETWORK_NAME);
+//
+//         // Check if the aleo directory exists.
+//         if !path.exists() {
+//             return Ok("Aleo directory not found. No ledger storage files to remove".to_string());
+//         }
+//
+//         // Remove one or more ledger storage directories.
+//         match self.number {
+//             Some(number) => Self::remove_ledger(path, number),
+//             None => Self::remove_all_ledgers(path),
+//         }
+//     }
+//
+//     /// Removes a single ledger storage directory at `ledger-[number]` in the given path.
+//     fn remove_ledger(mut path: PathBuf, number: u8) -> Result<String> {
+//         // Compute the path to the ledger storage directory.
+//         path.push(format!("ledger-{}", number));
+//
+//         // Check if the directory exists.
+//         if !path.exists() {
+//             return Ok(format!("No ledger storage files found at {}", path.display()));
+//         }
+//
+//         // Remove the directory.
+//         println!("Removing {}", path.display());
+//         fs::remove_dir_all(path)?;
+//
+//         Ok("Successfully removed ledger storage files".to_string())
+//     }
+//
+//     /// Removes all ledger storage directories in the given path.
+//     fn remove_all_ledgers(path: PathBuf) -> Result<String> {
+//         // Filter for ledger storage directories.
+//         let ledgers = fs::read_dir(path)?
+//             .filter_map(|entry| entry.ok())
+//             .filter(|entry| {
+//                 entry.file_type().expect("Unable to read file type").is_dir() && entry.path().display().to_string().contains("ledger-")
+//             })
+//             .collect::<Vec<_>>();
+//
+//         // Check if there are any directories to remove.
+//         if ledgers.len() == 0 {
+//             return Ok("No ledger storage files to remove".to_string());
+//         }
+//
+//         // Remove the directories.
+//         for entry in ledgers {
+//             let path = entry.path();
+//             println!("Removing {}", path.display());
+//
+//             fs::remove_dir_all(path)?;
+//         }
+//
+//         Ok("Successfully removed all ledger storage files".to_string())
+//     }
+// }
 
 #[derive(StructOpt, Debug)]
 pub struct Update {

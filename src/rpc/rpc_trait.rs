@@ -17,7 +17,7 @@
 //! Definition of the public and private RPC endpoints.
 
 use crate::rpc::rpc_impl::RpcError;
-use snarkvm::dpc::{Block, BlockHeader, Network, RecordCiphertext, Transactions, Transition};
+use snarkvm::dpc::{Block, BlockHeader, Network, Transactions, Transition};
 
 use std::net::SocketAddr;
 
@@ -63,8 +63,11 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError>;
 
-    #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
-    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError>;
+    // TODO (howardwu): @collin - I have commented out the previous function signature for reference.
+    //  Notice both the input and return type have changed.
+    // #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
+    // async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError>;
+    async fn get_ciphertext(&self, commitment: serde_json::Value) -> Result<N::RecordCiphertext, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getledgerproof.md")]
     async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError>;

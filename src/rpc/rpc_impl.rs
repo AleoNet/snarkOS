@@ -29,7 +29,7 @@ use crate::{
 };
 use snarkos_ledger::Metadata;
 use snarkvm::{
-    dpc::{Block, BlockHeader, Network, RecordCiphertext, Transaction, Transactions, Transition},
+    dpc::{Block, BlockHeader, Network, Transaction, Transactions, Transition},
     utilities::FromBytes,
 };
 
@@ -173,10 +173,10 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.get_block_transactions(block_height)?)
     }
 
-    /// Returns the ciphertext given the ciphertext ID.
-    async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError> {
-        let ciphertext_id: N::CiphertextID = serde_json::from_value(ciphertext_id)?;
-        Ok(self.ledger.get_ciphertext(&ciphertext_id)?)
+    /// Returns the ciphertext given the commitment.
+    async fn get_ciphertext(&self, commitment: serde_json::Value) -> Result<N::RecordCiphertext, RpcError> {
+        let commitment: N::Commitment = serde_json::from_value(commitment)?;
+        Ok(self.ledger.get_ciphertext(&commitment)?)
     }
 
     /// Returns the ledger proof for a given record commitment.
