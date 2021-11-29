@@ -7,16 +7,17 @@ None
 
 ### Response
 
-|        Parameter            |  Type  | Description |
-|:--------------------------- |:------:|:----------- |
-| `candidate_peers`           | array  | The list of candidate peer IPs addresses. |
-| `connected_peers`           | array  | The list of connected peer IP addresses. |
-| `latest_block_height`       | number | The latest block height. |
-| `number_of_candidate_peers` | number | The number of candidate peers. |
-| `number_of_connected_peers` | number | The number of connected peers. |
-| `status`                    | string | The state of the node. |
-| `type`                      | string | The type of the node. |
-| `version`                   | number | The version of the network protocol. |
+|             Parameter            |  Type  | Description |
+|:-------------------------------- |:------:|:----------- |
+| `candidate_peers`                | array  | The list of candidate peer IPs addresses. |
+| `connected_peers`                | array  | The list of connected peer IP addresses. |
+| `latest_block_height`            | number | The latest block height. |
+| `number_of_candidate_peers`      | number | The number of candidate peers. |
+| `number_of_connected_peers`      | number | The number of connected peers. |
+| `number_of_connected_sync_nodes` | number | The number of connected peers. |
+| `status`                         | string | The state of the node. |
+| `type`                           | string | The type of the node. |
+| `version`                        | number | The version of the network protocol. |
 
 ### Example Request
 ```ignore
@@ -44,6 +45,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getnodes
     "latest_block_height": 34817,
     "number_of_candidate_peers": 5,
     "number_of_connected_peers": 2,
+    "number_of_connected_sync_nodes": 0,
     "status": "Ready",
     "type": "Client",
     "version": 7
