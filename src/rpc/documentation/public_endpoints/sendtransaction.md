@@ -24,7 +24,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "sendtran
 ```json
 {
    "jsonrpc":"2.0",
-   "result":"at1mka6m3kfsgt5dpnfurk2ydjefqjzng4aawj7lkpc32pjkg86hyysrke9nf",
+   "result":"at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",
    "id":"1"
 }
 ```

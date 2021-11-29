@@ -18,7 +18,7 @@ Returns the block given the block height.
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock", "params": [6160] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 
@@ -26,57 +26,51 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 
 ```json
 {
-   "jsonrpc":"2.0",
-   "result":{
-      "block_hash":"ab1mkgcrwag6avnp0a0ntxr9y4lt7y2fq9t0tqglkkuysk6jg2rhqrqa9788l",
-      "header":{
-         "metadata":{
-            "difficulty_target":18446744073709551615,
-            "height":6160,
-            "nonce":"5141009373721822405820512044696916600360683867327778483074084451822398628111",
-            "timestamp":1636486761
-         },
-         "previous_ledger_root":"al1u0rtgkhsd94mucjmxsy3ze76xap67aj4hx4jgfysehaes4vrvu8s227n0d",
-         "proof":"hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqp2ek5pandazcszav4fnt4nsutfgxfwy5sc508xhgrkfjsa6aur3l0cls9supd0mcuzd9l6mlswfmqf5ln5c7ylf52yynx5wy8fw478az4z6emxeu3f5p8375zzgk7sra3gujf3g7d3hsz0knq7qk87trwq6955kjkyq2dvqt0lztlwmjg39x6fn84w6fva6czxhnu5v2nnttzewdl0z908kqmt53u8m7mtcul5pep7lsplhgne6pdrtgz8c4p8d9rllky48ezm8waqta5lmtmk26g9pvkmqy4ke7dpp0z97f239pwcqqqcqqqqqqqqqqp8qvzj40qqg4hd4e30593sxj8725xfury39f67gfw359ufcx0t3kcue42phlgpvhf6akqlzfh5y5q2qdead436q0n5cpnh5jrpc2urnqfqxe56neyxkc55wgh8zyx0l29qpmhm567gp8as92wzw3p2vgwq3cvcdfltq45mle2c5pgz8dfw0sg7up9yf9wq6zxxu5mf3kplxs5c77ww097jp7l6pe55r0kw2gmqpqgqqqqqqqqqqqdm0n57r5w2qnpgggujfyrfv4vsyhulqfpmc7ujnxrrzw2ct8lusus7zx2m9rcce9y3xmamqhw29srtfh7waqzp3yta54f29uezsh40tjuncpe2z8kjlyjr77la8clt78qkg8lxwfvjr02xg58jj20d7wqqyqqqqqqqqqqq2lpumrtvvs8srlldr00c3qdwqhhdcpm8ufhuruzd26e0utjxnsr78umtcmge7peglwsf6d3adpwvq4u8ylddupuc66g6n2gtresw6qr940ywqxl9vdallel8ghyzutjh9y7mzxk6cdgj2mhra86vphep3949hdux84xyytydfx8mup5lyhqs2pyv6rg64lr772wg5hlzr43gyqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqq59hacw5f6gcw39een200h0q7ahe5fpk5gm7f4h55ncmv5k0vzstzw8g0xgzc598wq2wswg5ea2mgqqgrw854s7zqncef060fxu5qvquf24gz73tqvww2mhrw2s3a5343puqf06zyj6kk5ltwvrxkrpamachqate665muvjvl5ayw3ncl7clyc4lj9y63xa3rvgawt72cd3hd2qqqqqd0jlq2",
-         "transactions_root":"ht1w3s2c6mnc3e6crtkv40gfmmjvykxgh88ac6tv6cy7jucmsxlxsgql99vqh"
+  "jsonrpc": "2.0",
+  "result": {
+    "block_hash": "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
+    "header": {
+      "metadata": {
+        "difficulty_target": 18446744073709551615,
+        "height": 0,
+        "nonce": "605189531586914990276139803763573111245566376445087174167030943959527940992",
+        "timestamp": 0
       },
-      "previous_block_hash":"ab1frc9xutuzphcu2gqsvf29d755wdyztuulxhxt9h7d6xwck74zcfq4lv6u8",
-      "transactions":{
-         "transactions":[
+      "previous_ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
+      "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqqdtf45rfuetk7swgcn03h4q2mcpu7vakgfz4w7y2g37lfyvw0zraerguvut37ydajmh0kh2s2xt8q8cvqarnl47cr9zm2e4rrjcjwpq4zhaslamjraky7xkr3jl9llgpf7g695t4v6up6f8qsmtcu5gtvqa60nkcjkfyfdvzjkt3lct5rxrewetkpgh0r460t68qed0s994rc7rdc3u7svjxmrs5eud4l4st8yqhreeqtc2c5u7au7n6jk6kdpjwezvaytnmkklpjs6sfwffsee7h6d5txdpmzw2rhlagfst4fkxsngzqcqqqqqqqqqqrhtgwync0a7cnhh4nl6grmqs4qahzq704pfhgsdsh0mrzlqt22w8uxykuyn8kw953vx2yjzk90ayqp7l28u0hgvgq5y8etlg07gj06hacrwyhe9lkvkde698243zuvrjhhnry97s9pegqx66qrpng3vpxqaty5gu6cwrdthmqjluyhl70x08dta9c27wsvjserrvezf7s9mgaf60x9a4a6kcyh2qc2z4eq7xzspqgqqqqqqqqqqqve93e6t5ftqhrfku4g4tey59hztng0tke5leyr5rjzwnqvd0eegusz9rtpccl5ky6kp28cft7nksxujtwg8ut00u6newqqqp0gdhpu0kpmmfnevfzy2r3z7ma734vk8c457epffq0xx8ycfxfpcmfenfqgyqqqqqqqqqqqr7396rqsutqvyjd0l6jvum0vvl9w7agvr2ef5tkuruqtgywevzp6k08gwh57lmf4xk6jg8k8n29hnqdet3kxwttq8aqfh072jzclxz9cjdsqzz4aw57aeyp8gwu4m4wghcgu8nr9qel2sc55866rawqwqssy6uqxqy3uax8a8ul5fpvttcyf3d6u0wda5rfc04lydclhctjcpqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqqcdwhfdar5rudlxqf4mllawtuu47vg6dgt38hyakkg25hc23jpqqmkmp3egt3h0rlundyugccsewgzqgs87yhdnev6lz97dae3yz5dvwylf39fmns5gd97asvzrhkjp68q520zgzmuw7cgheg5t9nn62u4j473t8p4f97daps76u4gu4f7ldm0jpk5pphxzv9fw44y89w0zkayqqqqqwqqnkx",
+      "transactions_root": "ht1s3hd25d25zxfvnsxa789w594n7qarzuzm49n6h23mr5yhzh7ysgq426nk5"
+    },
+    "previous_block_hash": "ab1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5g436j",
+    "transactions": {
+      "transactions": [
+        {
+          "events": [],
+          "inner_circuit_id": "ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
+          "ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
+          "transaction_id": "at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",
+          "transitions": [
             {
-               "events":[
-                  
-               ],
-               "inner_circuit_id":"ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
-               "ledger_root":"al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-               "transaction_id":"at1wqa7u4unjc3p5nah9rgwrcy6cm0nxhykmtpaxlmkuj53v57q6q8sw7s8yp",
-               "transitions":[
-                  {
-                     "ciphertext_ids":[
-                        "ar1j0ak2ahmmhv58nnedk5klp0pvapy4pku30hkzx4j4mtxpnyuwqqqa7s5a2",
-                        "ar1ac980j3ha20pwpqrh56pd4wd2vsqla93xq33lc52lvftt0t82qzsc4r48e"
-                     ],
-                     "ciphertexts":[
-                        "4e74f8677f988b4a2a9f5a1d6d5ed17d8e9c94bc8de39cf60795b6722bacc5066d0743473d47e22cda0765f10556601200ff1b0234e005993b4a121a5c593a07218dfeea0512a1f8f9c40f15f5788998af5d9f0ff988d506631fc5418b024910941b9e696f68517d186c4ad45c6368c71c2bdaea3ecbf37f149e3491d94f260dce9a226095df1c5ab0b6a625b29a878bdeecf466299804b999c30182450d37128b8a91b27b63a028ffe64163b88efdb50a9ed554161be0ec59502678417050089cc5d3bc3092539581e0fb2885cb4eaa59f353a57c78763822716047a858e10c4081efa99d66d79076813216bd97d85d8be39ac07ecc056246c9bf087a20fd04d5c20f3cf5076ecd9f6f8cfeb22d5f0baaab5f628809049f36654d6df83a7c0ad47aef89b99b4fee12006c37a7eb921746135fee398654ad47ce969db19a2610",
-                        "1f51b8a3f69bc9b30345cc782bfa95fd420b15c09f435b92ae450efc7c936d034783f67bdece49660b38e4f257b705f82377aff23680b6d3be7abb93628148083bfa001b40fc439da9f47f09f03f7c395956c5a6a9f548cd79d041cba780bb075144bd4d80d44dd54cf3405f5d82699195f73aa97c2d156147c33c262bdda80e54eedbab214a9a8cc067abb5ee1c4dff2aa0cb91c2978660267a1672680976011cdd073ad56eeefc871d590e8771a47ccf0ded9346b46627e48f99b1219fee00addeea3358c264228454ff3621422abe8910510ab69f66fba6a04c11f7a9c90c3bf93975827a1dd12a19f1d0d7c7bebf1e6b94f2028f197bc9627435586ed00120de877290afdb77927c9b381407bf35a7169aa4e489ec0886c5fc525e28c5031e1b8a4381cbe2a84ff995467109bb946b379b20879b282fa69307846a76a709"
-                     ],
-                     "commitments":[
-                        "cm13marlfxutm46mltm9svuw3zz5ljvdqpv4qdcdemmlrytgj90xcxst2ezcl",
-                        "cm1yc2fxyxf6yuvp9e8qt6r7gw05pzhavca3959muqef74360590ypsncn6jt"
-                     ],
-                     "proof":"ozkp1cljn66grygrsrfa0nv6ynmc83sf5myfqn2ndhtldnna6k3srwd3fq5sgf6vtlvzedccp7xh6zyua4jmm88kj0ga3kcfqnelteyuwxx9xh7sqlrgalcwrjt0td83ljsmxryw78ffwuh8fcph8772kxpnvspngk3q3f3zzzep4s7uldkw5ank7pux8r3cy0pxf4mhlr2g8vkydklq90z6lcvvkqpxjs7j4lelpa0y2g76whz0rgaca4xgqvf6x077wm72jzpzp6elrk68xxlc8ls4z0fvhpjnhs2dzqk8g9t26avjezzqux2jwz2r9sx2ttgjhu8xe2t9hmcpmx3d3tw20xxwchrs6vcn38m962kdxusuea8kv6n69m9rd3xf5ha0ykqwncw7p2mazhe63tg0yzjenskhuz7fwau720ut3tdmprlajtsg0r4drh8qjqtl7xfpuveusqqghqpqqk",
-                     "serial_numbers":[
-                        "sn1d4nmmksyuul63zmsf56p4maf6hd9edpaxjs4mglv6wfs8gmqjggsk8nucl",
-                        "sn1ffck8gzh0gnsqsjujgsg6fpc8jfvfl8krhwceegs7gu6v6s9zgysh83rmr"
-                     ],
-                     "transition_id":"as1lwzgt7r0d22kewedvpwjexwypewjpwzq5e6383fxu0y0esft2yzqxhs6ek",
-                     "value_balance":-150000000
-                  }
-               ]
+              "ciphertexts": [
+                "580a3b830d17818b866c8f4f7bc4f518dcd775adce1274e902d07edc49e3e9005418da88939bac4437a271cb34cf792e3bad3385fe05ec086b5e5c485b291209a7ced29b1f6f169dd13504a71ce57c3348fe8778c7a102e26791fb298a7a0a0edfae8e065599cd3869d08a91ffa06fb6e41f68033d9b8d9269fa6f948f167f07c7d57ab6f3198c3d568a60525cb4959df7655dc8de9751d3cd8ec6b5aa834c0b0b081c6734fb62670b80cc885210392e6f56cd2b4aec22c53257a3422fe474041540a950c102b00c36cb6e889a7cefe2822a003e9332f3536a18fd3bc1690e11094593d25543c3df7e2fc4a24754eafdf4e0002ed4673c1a84c49ddcc510870efef1b4f95f0cf7d1a2e0e754eaa188a22cefb4938e616506154135091874c10ed4abe8bf94915a782e545acc07663237c2c826fd2c516fd14a2f9d2c570afe0d",
+                "3bba8e8ac95b43c3bc4be5792cf73f05458113641d7b15946e169188a7534f0ff6b7328b7549d042dfaeea13b81f8ea6eac72d68ea68681874a823fd08fa44043f074b48823758688ab1114ab0b5f2143ceaf1d8ef448ab21fd874a4e3ffb30919b8cddae76870d0e766fb43e847cb6f02fc18041e709695f9b03ffea5d7f206977a06b37c5a0f8b1a576b351233446bfaf6f8cc310bfcc1fa1138c310a3810d98f6cba62e95230e7966b59d3e383ab87a9f61760922b538e81004e6ab7efb02d811a7198af891db3eaa2d4e589643cf1d0f3c2b87c39d5d2cf163a59728b001d3e23485afe77843d2e3ab8554face8e7a8b3b68f3f87c164f58ad3da18c22073143de79f68e127a2eca9e51b60806502cd73d9aa9d728411edabc5d09e1160324358a0a5d7d307ba6b915c3c79942401f469c4cb0b0adcd25177c939768f110"
+              ],
+              "commitments": [
+                "cm1uc8hl5umr8u7dgxxsrhp8e7rkwj8ue5qcjsuunfkt8s5dfld3grqwjnyvh",
+                "cm1u0exutsg529akllpatxnmnsuzcjcyu5q7j9nfxe30d9dj5ntjgpsyvempu"
+              ],
+              "proof": "ozkp10wlufvmlyze6wk6zg8m5sghzl75zzuswa3yp4l5zs3k8ngsfhxqdkcg2x4l0f7eunqd2309hemc4u0lveqmgv38xemqsheu5xh8qvcxyuj4z5600k9dm6uxndcww40s3phecn4c3zs7hjakd7mlua23rqze7cpul8qjd2p3jf7g4yhy97ph5cmqp3vj8naa90zxpl678hentktuh6gc000kctmdl0k9xgmt39lstaf0kkew7aw0khvvyxfk8l46z8sqn79y26s834j4v9rsk2gdgw3pgy39gfl8jc7563wn2p76007qw8wzvsfahshktyeul2838qvhepfq7l3gg8kz97stekzy8unwvyausznnkpc88ms8nv9cyvxsm4ew5hg94e7xs5zgsfn047v8fl2jzs80jhf8g5c49u774rvuq7l2elcj7j0f2s58a9yqp6mlmwlm8emrsqqgcnmsq8",
+              "serial_numbers": [
+                "sn19my835fmg0yqte5pycgm9h3j7quvc2s6s8dmngvce0ew8xvvpvfqgqpsej",
+                "sn17w9vn0n4hf0a038e8jhm4qjdcq2r2wp63sdu98cjmwxn3xl4kcpqa0jcvz"
+              ],
+              "transition_id": "as15d8a5nrc86xn5cqmfd208wmn3xa9ul3y9l7w8eys4gj6637awvqskxa3ef",
+              "value_balance": -500000000000
             }
-         ]
-      }
-   },
-   "id":"1"
+          ]
+        }
+      ]
+    }
+  },
+  "id": "1"
 }
 ```

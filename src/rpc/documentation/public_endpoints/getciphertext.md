@@ -15,15 +15,15 @@ Returns a ciphertext given the ciphertext ID.
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getciphertext", "params": ["ar1k2rwg8tlg79zmgwzesyf4r3l2vyx27mtlrnjqanugx72l0jpfqxqt7sf3u"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getciphertext", "params": ["ar18gr9hxzr40ve9238eddus8vq7ka8a07wk63666hmdqk7ess5mqqsh5xazm"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": "a379350c60e4c22bd8ff75808b90cf4fa8f0ef887386f60ce1af948e0069ed06f46382f7d8a2a7f1ba1435492b5f327bb7e91d16cc4939ee6c69bc56f6264409a3a91dea4599e7ec489816cfd7e966242deecb669b13a7175ca6d49b9e6cbe0a9accda04da9532850f35ef3ae6ab13a726435fb00154774e9daea6c07b627110c9edf3b477cb2850e2734a1b0fefd1a99406e8620a0f4b1549b68f9cbb112d06161487d93570f0be62e383fdc0bc80f4c53a729f44bfc2c2f1a193e0d5cfd1071d04219124da47a6b172cd55c819b6fa5450561a2aa32b489ceecadedb02280a179dc270acc9fcdfc2d3c91765c3a01011824b878e87f9206adcd683e7b5a008e26f7a24ecf8d0ee4031fc76b5cc8025324755d2becf2279ddd1ae1b7f4ffa0350b5686dbe317b77a46e5609408fc2e4497fb003e1efd306d4a5445c742f3b04",
-    "id": "1"
+  "jsonrpc": "2.0",
+  "result": "580a3b830d17818b866c8f4f7bc4f518dcd775adce1274e902d07edc49e3e9005418da88939bac4437a271cb34cf792e3bad3385fe05ec086b5e5c485b291209a7ced29b1f6f169dd13504a71ce57c3348fe8778c7a102e26791fb298a7a0a0edfae8e065599cd3869d08a91ffa06fb6e41f68033d9b8d9269fa6f948f167f07c7d57ab6f3198c3d568a60525cb4959df7655dc8de9751d3cd8ec6b5aa834c0b0b081c6734fb62670b80cc885210392e6f56cd2b4aec22c53257a3422fe474041540a950c102b00c36cb6e889a7cefe2822a003e9332f3536a18fd3bc1690e11094593d25543c3df7e2fc4a24754eafdf4e0002ed4673c1a84c49ddcc510870efef1b4f95f0cf7d1a2e0e754eaa188a22cefb4938e616506154135091874c10ed4abe8bf94915a782e545acc07663237c2c826fd2c516fd14a2f9d2c570afe0d",
+  "id": "1"
 }
 ```

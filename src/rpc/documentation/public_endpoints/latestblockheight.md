@@ -20,7 +20,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "latestbl
 ```json
 {
    "jsonrpc":"2.0",
-   "result":6531,
+   "result":0,
    "id":"1"
 }
 ```

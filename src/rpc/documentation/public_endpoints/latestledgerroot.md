@@ -20,7 +20,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "latestle
 ```json
 {
    "jsonrpc":"2.0",
-   "result":"al1a0970pr25xy9gmh2qak2kajxmnwp5zvkwuk9kcjx3vneatwaxygs7trezp",
+   "result":"al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
    "id":"1"
 }
 ```

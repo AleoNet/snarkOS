@@ -15,14 +15,14 @@ Returns the block hash for the given block height, if it exists in the canonical
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 ```json
 {
     "jsonrpc": "2.0",
-    "result": "ab1mkgcrwag6avnp0a0ntxr9y4lt7y2fq9t0tqglkkuysk6jg2rhqrqa9788l",
+    "result": "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
     "id": 1
 }
 ```

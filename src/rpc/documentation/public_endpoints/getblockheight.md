@@ -15,14 +15,14 @@ Returns the block height for the given the block hash.
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockheight", "params": ["ab1mkgcrwag6avnp0a0ntxr9y4lt7y2fq9t0tqglkkuysk6jg2rhqrqa9788l"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockheight", "params": ["ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": 6160,
-    "id": "1"
+  "jsonrpc": "2.0",
+  "result": 0,
+  "id": "1"
 }
 ```

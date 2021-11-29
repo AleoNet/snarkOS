@@ -25,48 +25,42 @@ Returns the transactions from the block of the given block height.
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocktransactions", "params": [6164] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblocktransactions", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 ```json
 {
-  "jsonrpc":"2.0",
-  "result":{
-    "transactions":[
+  "jsonrpc": "2.0",
+  "result": {
+    "transactions": [
       {
-        "events":[
-
-        ],
-        "inner_circuit_id":"ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
-        "ledger_root":"al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-        "transaction_id":"at1vkepkvxw29fnhh7g4m2q8r3tjj8cr8sk69p3w3e5df89tkkfzyps3qv3lt",
-        "transitions":[
+        "events": [],
+        "inner_circuit_id": "ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
+        "ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
+        "transaction_id": "at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",
+        "transitions": [
           {
-            "ciphertext_ids":[
-              "ar1k2rwg8tlg79zmgwzesyf4r3l2vyx27mtlrnjqanugx72l0jpfqxqt7sf3u",
-              "ar175fezhx60h7e0c5nfv99ke3fhhwms7wrreq6t4pv538mnknksgfq04333e"
+            "ciphertexts": [
+              "580a3b830d17818b866c8f4f7bc4f518dcd775adce1274e902d07edc49e3e9005418da88939bac4437a271cb34cf792e3bad3385fe05ec086b5e5c485b291209a7ced29b1f6f169dd13504a71ce57c3348fe8778c7a102e26791fb298a7a0a0edfae8e065599cd3869d08a91ffa06fb6e41f68033d9b8d9269fa6f948f167f07c7d57ab6f3198c3d568a60525cb4959df7655dc8de9751d3cd8ec6b5aa834c0b0b081c6734fb62670b80cc885210392e6f56cd2b4aec22c53257a3422fe474041540a950c102b00c36cb6e889a7cefe2822a003e9332f3536a18fd3bc1690e11094593d25543c3df7e2fc4a24754eafdf4e0002ed4673c1a84c49ddcc510870efef1b4f95f0cf7d1a2e0e754eaa188a22cefb4938e616506154135091874c10ed4abe8bf94915a782e545acc07663237c2c826fd2c516fd14a2f9d2c570afe0d",
+              "3bba8e8ac95b43c3bc4be5792cf73f05458113641d7b15946e169188a7534f0ff6b7328b7549d042dfaeea13b81f8ea6eac72d68ea68681874a823fd08fa44043f074b48823758688ab1114ab0b5f2143ceaf1d8ef448ab21fd874a4e3ffb30919b8cddae76870d0e766fb43e847cb6f02fc18041e709695f9b03ffea5d7f206977a06b37c5a0f8b1a576b351233446bfaf6f8cc310bfcc1fa1138c310a3810d98f6cba62e95230e7966b59d3e383ab87a9f61760922b538e81004e6ab7efb02d811a7198af891db3eaa2d4e589643cf1d0f3c2b87c39d5d2cf163a59728b001d3e23485afe77843d2e3ab8554face8e7a8b3b68f3f87c164f58ad3da18c22073143de79f68e127a2eca9e51b60806502cd73d9aa9d728411edabc5d09e1160324358a0a5d7d307ba6b915c3c79942401f469c4cb0b0adcd25177c939768f110"
             ],
-            "ciphertexts":[
-              "a379350c60e4c22bd8ff75808b90cf4fa8f0ef887386f60ce1af948e0069ed06f46382f7d8a2a7f1ba1435492b5f327bb7e91d16cc4939ee6c69bc56f6264409a3a91dea4599e7ec489816cfd7e966242deecb669b13a7175ca6d49b9e6cbe0a9accda04da9532850f35ef3ae6ab13a726435fb00154774e9daea6c07b627110c9edf3b477cb2850e2734a1b0fefd1a99406e8620a0f4b1549b68f9cbb112d06161487d93570f0be62e383fdc0bc80f4c53a729f44bfc2c2f1a193e0d5cfd1071d04219124da47a6b172cd55c819b6fa5450561a2aa32b489ceecadedb02280a179dc270acc9fcdfc2d3c91765c3a01011824b878e87f9206adcd683e7b5a008e26f7a24ecf8d0ee4031fc76b5cc8025324755d2becf2279ddd1ae1b7f4ffa0350b5686dbe317b77a46e5609408fc2e4497fb003e1efd306d4a5445c742f3b04",
-              "b2d1ed016804bdda77e515ec41eca8aaae48ae93eb943a67dac645b174cdfe0738945884b114001c58921450eff0ae0aafd294ffc4d383812b2e9d58f9ea7d0a66d30dc5951df95b77bf565d293d65e2aeeaa62f5e39440d97bbb996acd34106c0b64e53adee41e48b195f143ad1089f9314554260a1786f3c588e8093a4d1090b23fa322183893f57497fc661eaefa1a3f6565d755a7bae2465e8433240c90e16b15de9decccc4e67550788866b5730e454bfd45b51ba453e3a07402bf2070f732d63878c6671f6b109d9af312e6ce259bac24f48157f7d3c5c6af600204d079b08ace49b32afd44e58c5ec6d6d500fc862b5862b9daf8374a438b364bcef0c198a0657f0935551e8b115f3bcf154b9c0470164eef0812a56ba2d97fdb2df012de08f8e59be6cf253323915164fb34005718ef61fdff647d1b9ad096d104e10"
+            "commitments": [
+              "cm1uc8hl5umr8u7dgxxsrhp8e7rkwj8ue5qcjsuunfkt8s5dfld3grqwjnyvh",
+              "cm1u0exutsg529akllpatxnmnsuzcjcyu5q7j9nfxe30d9dj5ntjgpsyvempu"
             ],
-            "commitments":[
-              "cm162h6gpq9cdtjk9usfwh7hkjw7zm9uxm9f7ey93zsu6alyev3tcps90k0an",
-              "cm1qs29nvxnkn8utcgmhtpmyzsxwxdfck4884ujwss3ff2zx60alupsdy6t39"
+            "proof": "ozkp10wlufvmlyze6wk6zg8m5sghzl75zzuswa3yp4l5zs3k8ngsfhxqdkcg2x4l0f7eunqd2309hemc4u0lveqmgv38xemqsheu5xh8qvcxyuj4z5600k9dm6uxndcww40s3phecn4c3zs7hjakd7mlua23rqze7cpul8qjd2p3jf7g4yhy97ph5cmqp3vj8naa90zxpl678hentktuh6gc000kctmdl0k9xgmt39lstaf0kkew7aw0khvvyxfk8l46z8sqn79y26s834j4v9rsk2gdgw3pgy39gfl8jc7563wn2p76007qw8wzvsfahshktyeul2838qvhepfq7l3gg8kz97stekzy8unwvyausznnkpc88ms8nv9cyvxsm4ew5hg94e7xs5zgsfn047v8fl2jzs80jhf8g5c49u774rvuq7l2elcj7j0f2s58a9yqp6mlmwlm8emrsqqgcnmsq8",
+            "serial_numbers": [
+              "sn19my835fmg0yqte5pycgm9h3j7quvc2s6s8dmngvce0ew8xvvpvfqgqpsej",
+              "sn17w9vn0n4hf0a038e8jhm4qjdcq2r2wp63sdu98cjmwxn3xl4kcpqa0jcvz"
             ],
-            "proof":"ozkp1t87t3wr8tygarh58sqy5s3xuzlgw8syxe6902ke3zznmfh0us2ywltgaw88yhx39qxpenfugvh3r2nldnnp88zj2avkpnrrvckark2encwc7wt9j6e7rv062rzt3r2mxrq5zmvlmtqpdm3gwlkh0f0waqz3ah7zm7p4jpmw77lw75vwey3y6uu4uvn7rrf0su06zjh3m6jhj93020djnscmt8y3rdnvrwpa25yl4a92njkjt8pylr7l0rn900rjqy5a72qhyk3vyruezxhrpt9wsn75h3j68juz027jzt5xkp7vuy2q36f0ldqhsaylmrmdj65tvsv3dhtxqkl97429wqy6sn7ay2kqk67tm4v2wp53p47pv6lxfzj0us0k0q9e393s73seane3xekw6c673plq6kqve95dxvlvc4mcal6h76w60wm2n5d062awlrl8e7g7tmv3qzqg84vp38",
-            "serial_numbers":[
-              "sn12e9v23npctlrtpdmv02gxawj9kjfjs3u98l7lqles9e2y4kwfqgqkmjp5w",
-              "sn1mg7jlqsyk0fetjy376g6tjf5pylyqp0mhc0h5nl90dvaqahsuuxstly6mt"
-            ],
-            "transition_id":"as1ltse2tzr5wysqv8xtepdw4zq5mvz4nkgfxmcp7vs694acym80yzsel6h2j",
-            "value_balance":-150000000
+            "transition_id": "as15d8a5nrc86xn5cqmfd208wmn3xa9ul3y9l7w8eys4gj6637awvqskxa3ef",
+            "value_balance": -500000000000
           }
         ]
       }
     ]
   },
-  "id":"1"
+  "id": 1
 }
 ```

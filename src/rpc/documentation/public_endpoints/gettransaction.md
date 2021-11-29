@@ -41,46 +41,40 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "gettrans
 ### Example Response 
 ```json
 {
-   "jsonrpc":"2.0",
-   "result":{
-      "metadata":{
-         "block_hash":"ab18z5tqgels9vrqmq6rygwxwfhj9rn8273wdjkh0fwykyz2l7l0srqa5jl8g",
-         "block_height":6471,
-         "block_timestamp":1636492571,
-         "transaction_index":0
-      },
-      "transaction":{
-         "events":[
-            
-         ],
-         "inner_circuit_id":"ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
-         "ledger_root":"al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-         "transaction_id":"at1mka6m3kfsgt5dpnfurk2ydjefqjzng4aawj7lkpc32pjkg86hyysrke9nf",
-         "transitions":[
-            {
-               "ciphertext_ids":[
-                  "ar102yu5z68da204tplj4zs326jhnk02za7wceg6pnnv5mu9t8wpvqq3yvsks",
-                  "ar18q4twnjfw93yh8k440ypx9mkyvhmcwnm4s627gw6cptjyh85jqzqxhfl53"
-               ],
-               "ciphertexts":[
-                  "6ae72cc574bbf433dcd715936cc7ca0b5ad64f34e5e7d9065de862293980410577adf0004c18898534ab5abb2e037ceeafadd3cfc9b1cfad231b5488b12dfc11223b691edd66acd238ab08b9c93df4ebbb7fdacd7e99c26718676176992f83049142a55d5eb9bdbdd219d421bdabc3efa87c6f1d249ed79d69569e4bc0054202adea2b4bea16548e12536e45629345fa0f37c0ce9f629d16af3c87c08776da0efc7defc571fe32d33cb9071f5a7b32da42133211cd3de62bd5083956ae9f9609296aedc1e64282a9f2787f543a3dfe97486d79e508332fda2e6b050b0845e702d12d0af378dd70cb275c974f4e46107fa8503c521d65df17e523b1828fe40500c78c1f38de4179df61b3fba2e43f42cddc5d37d019c440819ca3a1e32efa960a004086347a10973bbe8faf621d1b57c33fce66463552b7fd794523a8ea77b104",
-                  "b2016b1196291b6898296d86f1b351314b5440274f0f231ceb0bd6e2355e4a0d71f711cc8a3861d0d6e2f22913645225be41a60d332ed315b080061e498f6103d8a0034bbad2473f5819202e895d97282e9e163e6cb9a9767878d0978fd42505aede5841b9931e80171b1fe9aa13b6e2d2c8efaf619d79bf121b2bbdef132e0743e8e44ab89ba3d9a9f8a5cacadec5de5f7529d63b6f379201468c7cb6c0c90da4a6d5982f7ad4ea98883a20b7b4beb87b3675b3819d96dc7b3fb747e35df30fa8ba03907c80b649931a445f07bf89daeccf9ca2569f8cc93a280ca5018007030f109b30bdce29aa322c925a973ff15cbb17507ca607dce69eb742ca9e956a0d2294656daad7363ad148eb03c35457094c9eea8a7c87de73bd2bb4ee6e9649031544a52e382bbd26fbbe7f03e8821a4e39bf4491cb64de75e1c33c87bddfca0f"
-               ],
-               "commitments":[
-                  "cm1guhe607n4vthtxcfnhmheref4mzu090lkrfmzw5r3s74qg5vvvzqc82y8p",
-                  "cm17g8s6aca957v5e86gy2nvcjtau82j5zs6rylmzfkfqhg4hzs8cps6e6zhg"
-               ],
-               "proof":"ozkp140k7v0jrpwslj5j25y3tyhdlp0hzkw4jwcmdr09xzn6l6md5zr72w7vqd9fvkg3jv9ddfphkys2zzwhavc678rj39qlg2jafaars6txwv64zwzaj9l7mvjqd3kwujunl0jge8k7ah9um87gqlxxlwdcmsr3ehqqtnnltqt3tx0kaes2f8yhs4lwl8q9772334znemuyje46s5f5fkurlhxh0e4rzj9a38579nmtnfrd2xunr8lhzvygnnhxsjl6d285acv3seq46fe3ncnklff57qhht64cn80ucns3jt3mp0lu0pwqsqydkdpkyplr9pwlzuhf3car59ra6zlez5se8fgvf0l8qm68d22f28lhj2sdppfnty5wsrsssm8gg06q43l2l82y3gpm3ttzakg4kvd8yhl5czv9te5cxqn9u5jstmq6q749xkw62va724qwkrnpsc5zgqqghwmlxe",
-               "serial_numbers":[
-                  "sn1429p78ykjz8v9haw69nu7ky22hjzcqjqj0wph9ptlrqzm5r5jcpq5h9fpk",
-                  "sn1z7wdn0spy4q6vgjs9dqgu6jt7njasufzgfalhvwrnkjjmnrdzvyse5kdjk"
-               ],
-               "transition_id":"as1v7dvwcwy8430kvt74chprep904mvw4wmy3svll4tlt7vqpgutspsf79ek0",
-               "value_balance":-150000000
-            }
-         ]
-      }
-   },
-   "id":"1"
+  "jsonrpc": "2.0",
+  "result": {
+    "metadata": {
+      "block_hash": "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
+      "block_height": 0,
+      "block_timestamp": 0,
+      "transaction_index": 0
+    },
+    "transaction": {
+      "events": [],
+      "inner_circuit_id": "ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
+      "ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
+      "transaction_id": "at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",
+      "transitions": [
+        {
+          "ciphertexts": [
+            "580a3b830d17818b866c8f4f7bc4f518dcd775adce1274e902d07edc49e3e9005418da88939bac4437a271cb34cf792e3bad3385fe05ec086b5e5c485b291209a7ced29b1f6f169dd13504a71ce57c3348fe8778c7a102e26791fb298a7a0a0edfae8e065599cd3869d08a91ffa06fb6e41f68033d9b8d9269fa6f948f167f07c7d57ab6f3198c3d568a60525cb4959df7655dc8de9751d3cd8ec6b5aa834c0b0b081c6734fb62670b80cc885210392e6f56cd2b4aec22c53257a3422fe474041540a950c102b00c36cb6e889a7cefe2822a003e9332f3536a18fd3bc1690e11094593d25543c3df7e2fc4a24754eafdf4e0002ed4673c1a84c49ddcc510870efef1b4f95f0cf7d1a2e0e754eaa188a22cefb4938e616506154135091874c10ed4abe8bf94915a782e545acc07663237c2c826fd2c516fd14a2f9d2c570afe0d",
+            "3bba8e8ac95b43c3bc4be5792cf73f05458113641d7b15946e169188a7534f0ff6b7328b7549d042dfaeea13b81f8ea6eac72d68ea68681874a823fd08fa44043f074b48823758688ab1114ab0b5f2143ceaf1d8ef448ab21fd874a4e3ffb30919b8cddae76870d0e766fb43e847cb6f02fc18041e709695f9b03ffea5d7f206977a06b37c5a0f8b1a576b351233446bfaf6f8cc310bfcc1fa1138c310a3810d98f6cba62e95230e7966b59d3e383ab87a9f61760922b538e81004e6ab7efb02d811a7198af891db3eaa2d4e589643cf1d0f3c2b87c39d5d2cf163a59728b001d3e23485afe77843d2e3ab8554face8e7a8b3b68f3f87c164f58ad3da18c22073143de79f68e127a2eca9e51b60806502cd73d9aa9d728411edabc5d09e1160324358a0a5d7d307ba6b915c3c79942401f469c4cb0b0adcd25177c939768f110"
+          ],
+          "commitments": [
+            "cm1uc8hl5umr8u7dgxxsrhp8e7rkwj8ue5qcjsuunfkt8s5dfld3grqwjnyvh",
+            "cm1u0exutsg529akllpatxnmnsuzcjcyu5q7j9nfxe30d9dj5ntjgpsyvempu"
+          ],
+          "proof": "ozkp10wlufvmlyze6wk6zg8m5sghzl75zzuswa3yp4l5zs3k8ngsfhxqdkcg2x4l0f7eunqd2309hemc4u0lveqmgv38xemqsheu5xh8qvcxyuj4z5600k9dm6uxndcww40s3phecn4c3zs7hjakd7mlua23rqze7cpul8qjd2p3jf7g4yhy97ph5cmqp3vj8naa90zxpl678hentktuh6gc000kctmdl0k9xgmt39lstaf0kkew7aw0khvvyxfk8l46z8sqn79y26s834j4v9rsk2gdgw3pgy39gfl8jc7563wn2p76007qw8wzvsfahshktyeul2838qvhepfq7l3gg8kz97stekzy8unwvyausznnkpc88ms8nv9cyvxsm4ew5hg94e7xs5zgsfn047v8fl2jzs80jhf8g5c49u774rvuq7l2elcj7j0f2s58a9yqp6mlmwlm8emrsqqgcnmsq8",
+          "serial_numbers": [
+            "sn19my835fmg0yqte5pycgm9h3j7quvc2s6s8dmngvce0ew8xvvpvfqgqpsej",
+            "sn17w9vn0n4hf0a038e8jhm4qjdcq2r2wp63sdu98cjmwxn3xl4kcpqa0jcvz"
+          ],
+          "transition_id": "as15d8a5nrc86xn5cqmfd208wmn3xa9ul3y9l7w8eys4gj6637awvqskxa3ef",
+          "value_balance": -500000000000
+        }
+      ]
+    }
+  },
+  "id": "1"
 }
 ```

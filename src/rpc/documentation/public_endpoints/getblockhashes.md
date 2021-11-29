@@ -22,11 +22,11 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 ### Example Response
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": [
-        "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
-        "ab1zfygptd2x8hacsgjeew39fnpurahvqhdj7qe4kc050rhzrdclcqsgng7rk"
-    ],
-    "id": "1"
+  "jsonrpc": "2.0",
+  "result": [
+    "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
+    "ab1r7yn5khy3q7pch0zkgdt34xv6k0fwmdx4krzkyq4xv3fv8jg5q8sd2nmq9"
+  ],
+  "id": "1"
 }
 ```

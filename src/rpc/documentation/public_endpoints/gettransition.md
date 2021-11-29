@@ -11,7 +11,6 @@ Returns a transition given the transition ID.
 
 |    Parameter      |  Type  | Description |
 |:-----------------:|:------:|:-----------:|
-| `ciphertext_ids`  | array  | The ciphertext IDs of the output records. |
 | `ciphertexts`     | array  | The ciphertexts of the output records. |
 | `commitments`     | array  | The commitments of the output records. |
 | `proof`           | string | The zero-knowledge proof attesting to the validity of this transition. |
@@ -30,10 +29,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "gettrans
 {
   "jsonrpc":"2.0",
   "result":{
-    "ciphertext_ids":[
-      "ar102yu5z68da204tplj4zs326jhnk02za7wceg6pnnv5mu9t8wpvqq3yvsks",
-      "ar18q4twnjfw93yh8k440ypx9mkyvhmcwnm4s627gw6cptjyh85jqzqxhfl53"
-    ],
     "ciphertexts":[
       "6ae72cc574bbf433dcd715936cc7ca0b5ad64f34e5e7d9065de862293980410577adf0004c18898534ab5abb2e037ceeafadd3cfc9b1cfad231b5488b12dfc11223b691edd66acd238ab08b9c93df4ebbb7fdacd7e99c26718676176992f83049142a55d5eb9bdbdd219d421bdabc3efa87c6f1d249ed79d69569e4bc0054202adea2b4bea16548e12536e45629345fa0f37c0ce9f629d16af3c87c08776da0efc7defc571fe32d33cb9071f5a7b32da42133211cd3de62bd5083956ae9f9609296aedc1e64282a9f2787f543a3dfe97486d79e508332fda2e6b050b0845e702d12d0af378dd70cb275c974f4e46107fa8503c521d65df17e523b1828fe40500c78c1f38de4179df61b3fba2e43f42cddc5d37d019c440819ca3a1e32efa960a004086347a10973bbe8faf621d1b57c33fce66463552b7fd794523a8ea77b104",
       "b2016b1196291b6898296d86f1b351314b5440274f0f231ceb0bd6e2355e4a0d71f711cc8a3861d0d6e2f22913645225be41a60d332ed315b080061e498f6103d8a0034bbad2473f5819202e895d97282e9e163e6cb9a9767878d0978fd42505aede5841b9931e80171b1fe9aa13b6e2d2c8efaf619d79bf121b2bbdef132e0743e8e44ab89ba3d9a9f8a5cacadec5de5f7529d63b6f379201468c7cb6c0c90da4a6d5982f7ad4ea98883a20b7b4beb87b3675b3819d96dc7b3fb747e35df30fa8ba03907c80b649931a445f07bf89daeccf9ca2569f8cc93a280ca5018007030f109b30bdce29aa322c925a973ff15cbb17507ca607dce69eb742ca9e956a0d2294656daad7363ad148eb03c35457094c9eea8a7c87de73bd2bb4ee6e9649031544a52e382bbd26fbbe7f03e8821a4e39bf4491cb64de75e1c33c87bddfca0f"
