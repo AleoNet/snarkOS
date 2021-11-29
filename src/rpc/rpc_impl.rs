@@ -220,6 +220,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             "number_of_candidate_peers": number_of_candidate_peers,
             "number_of_connected_peers": number_of_connected_peers,
             "number_of_connected_sync_nodes": number_of_connected_sync_nodes,
+            "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
             "status": self.status.to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,

@@ -1843,6 +1843,7 @@ checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 name = "snarkos"
 version = "2.0.0"
 dependencies = [
+ "aleo-std",
  "anyhow",
  "async-trait",
  "bincode",

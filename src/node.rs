@@ -28,7 +28,7 @@ use crate::{
 };
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::*;
 use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
@@ -45,7 +45,7 @@ pub struct Node {
     #[structopt(long = "miner")]
     pub miner: Option<String>,
     /// Specify the network of this node.
-    #[structopt(default_value = "2", short = "n", long = "network")]
+    #[structopt(default_value = "2", long = "network")]
     pub network: u16,
     /// Specify the IP address and port for the node server.
     #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
@@ -189,6 +189,8 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
+    #[structopt(name = "clean", about = "Removes the ledger from storage")]
+    Clean(Clean),
     #[structopt(name = "update", about = "Updates snarkOS to the latest version")]
     Update(Update),
     #[structopt(name = "experimental", about = "Experimental features")]
@@ -198,6 +200,7 @@ pub enum Command {
 impl Command {
     pub fn parse(self) -> Result<String> {
         match self {
+            Self::Clean(command) => command.parse(),
             Self::Update(command) => command.parse(),
             Self::Experimental(command) => command.parse(),
         }
@@ -236,75 +239,55 @@ impl io::Write for LogWriter {
     }
 }
 
-// #[derive(StructOpt, Debug)]
-// pub struct Clean {
-//     /// The ledger storage number (.ledger-[number]) to remove. Removes all storage by default.
-//     #[structopt(short, long)]
-//     number: Option<u8>,
-// }
-//
-// impl Clean {
-//     /// Returns the result of executing the snarkos clean command.
-//     pub fn parse<N: Network>(self) -> Result<String> {
-//         // Compute the path to the aleo directory.
-//         let mut path = aleo_std::aleo_dir();
-//         path.push(N::NETWORK_NAME);
-//
-//         // Check if the aleo directory exists.
-//         if !path.exists() {
-//             return Ok("Aleo directory not found. No ledger storage files to remove".to_string());
-//         }
-//
-//         // Remove one or more ledger storage directories.
-//         match self.number {
-//             Some(number) => Self::remove_ledger(path, number),
-//             None => Self::remove_all_ledgers(path),
-//         }
-//     }
-//
-//     /// Removes a single ledger storage directory at `ledger-[number]` in the given path.
-//     fn remove_ledger(mut path: PathBuf, number: u8) -> Result<String> {
-//         // Compute the path to the ledger storage directory.
-//         path.push(format!("ledger-{}", number));
-//
-//         // Check if the directory exists.
-//         if !path.exists() {
-//             return Ok(format!("No ledger storage files found at {}", path.display()));
-//         }
-//
-//         // Remove the directory.
-//         println!("Removing {}", path.display());
-//         fs::remove_dir_all(path)?;
-//
-//         Ok("Successfully removed ledger storage files".to_string())
-//     }
-//
-//     /// Removes all ledger storage directories in the given path.
-//     fn remove_all_ledgers(path: PathBuf) -> Result<String> {
-//         // Filter for ledger storage directories.
-//         let ledgers = fs::read_dir(path)?
-//             .filter_map(|entry| entry.ok())
-//             .filter(|entry| {
-//                 entry.file_type().expect("Unable to read file type").is_dir() && entry.path().display().to_string().contains("ledger-")
-//             })
-//             .collect::<Vec<_>>();
-//
-//         // Check if there are any directories to remove.
-//         if ledgers.len() == 0 {
-//             return Ok("No ledger storage files to remove".to_string());
-//         }
-//
-//         // Remove the directories.
-//         for entry in ledgers {
-//             let path = entry.path();
-//             println!("Removing {}", path.display());
-//
-//             fs::remove_dir_all(path)?;
-//         }
-//
-//         Ok("Successfully removed all ledger storage files".to_string())
-//     }
-// }
+#[derive(StructOpt, Debug)]
+pub struct Clean {
+    /// Specify the network of the ledger to remove from storage.
+    #[structopt(default_value = "2", long = "network")]
+    pub network: u16,
+    /// If the flag is set, only the development ledger will be removed from storage.
+    #[structopt(long)]
+    pub dev: bool,
+}
+
+impl Clean {
+    pub fn parse(self) -> Result<String> {
+        // Remove the specified ledger from storage.
+        Self::remove_ledger(self.network, self.dev)
+    }
+
+    /// Removes the specified ledger from storage.
+    fn remove_ledger(network: u16, is_dev: bool) -> Result<String> {
+        // Retrieve the starting directory.
+        let mut path = match is_dev {
+            // In development mode, the ledger is stored in the snarkOS root directory.
+            true => PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+            // In production mode, the ledger is stored in the `~/.aleo/` directory.
+            false => aleo_std::aleo_dir()
+        };
+
+        // Construct the path to the ledger in storage.
+        match is_dev {
+            // In development mode, the ledger files are stored in a hidden folder.
+            true => path.push(format!(".ledger-{}", network)),
+            // In production mode, the ledger files are stored in a visible folder.
+            false => {
+                path.push("storage");
+                path.push(format!("ledger-{}", network));
+            }
+        };
+
+        // Check if the path to the ledger exists in storage.
+        if path.exists() {
+            // Remove the ledger files from storage.
+            match std::fs::remove_dir_all(&path) {
+                Ok(_) => Ok(format!("Successfully removed the ledger files from storage. ({})", path.display())),
+                Err(error) => Err(anyhow!("Failed to remove the ledger files from storage. ({})\n{}", path.display(), error))
+            }
+        } else {
+            Ok(format!("No ledger files were found in storage. ({})", path.display()))
+        }
+    }
+}
 
 #[derive(StructOpt, Debug)]
 pub struct Update {
