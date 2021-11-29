@@ -212,16 +212,28 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     pub(super) async fn shut_down(&self) -> Arc<Mutex<()>> {
+        debug!("Ledger is shutting down...");
+
         // Set the terminator bit to `true` to ensure it stops mining.
         self.terminator.store(true, Ordering::SeqCst);
+        trace!("[ShuttingDown] Terminator bit has been enabled");
+
         // Clear the unconfirmed blocks.
         *self.unconfirmed_blocks.write().await = Default::default();
+        trace!("[ShuttingDown] Pending queue has been cleared");
+
         // Disconnect all connected peers.
-        for peer_ip in self.peers_state.write().await.keys() {
-            self.disconnect(*peer_ip, "shutting down").await;
+        let connected_peers = self.peers_state.read().await.keys().copied().collect::<Vec<_>>();
+        for peer_ip in connected_peers {
+            self.disconnect(peer_ip, "shutting down").await;
         }
+        trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
+
         // Return the lock for block requests.
-        self.block_requests_lock.clone()
+        let lock = self.block_requests_lock.clone();
+        trace!("[ShuttingDown] Block requests lock has been cloned");
+
+        lock
     }
 
     ///
