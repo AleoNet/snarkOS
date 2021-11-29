@@ -169,6 +169,8 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Shut down the ledger.
         let ledger_lock = self.ledger.shut_down().await;
+        trace!("Ledger has shut down, proceeding to lock...");
+
         // Acquire the lock for ledger.
         let _ledger_lock = ledger_lock.lock().await;
 

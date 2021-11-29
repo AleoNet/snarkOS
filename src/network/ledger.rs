@@ -212,16 +212,27 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     }
 
     pub(super) async fn shut_down(&self) -> Arc<Mutex<()>> {
+        debug!("Ledger is shutting down...");
+
         // Set the terminator bit to `true` to ensure it stops mining.
         self.terminator.store(true, Ordering::SeqCst);
+        trace!("[ShuttingDown] Terminator bit has been enabled");
+
         // Clear the unconfirmed blocks.
         *self.unconfirmed_blocks.write().await = Default::default();
+        trace!("[ShuttingDown] Pending queue has been cleared");
+
         // Disconnect all connected peers.
         for peer_ip in self.peers_state.write().await.keys() {
             self.disconnect(*peer_ip, "shutting down").await;
         }
+        trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
+
         // Return the lock for block requests.
-        self.block_requests_lock.clone()
+        let lock = self.block_requests_lock.clone();
+        trace!("[ShuttingDown] Block requests lock has been cloned");
+
+        lock
     }
 
     ///
@@ -455,14 +466,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Adds the given block:
     ///     1) as the next block in the ledger if the block height increments by one, or
-    ///     2) to the unconfirmed queue for later use.
+    ///     2) to the pending queue for later use.
     ///
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
     async fn add_block(&self, block: Block<N>, prover_router: &ProverRouter<N>) -> bool {
         // Ensure the given block is new.
         if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
-            trace!("Canon chain already contains block {}", block.height());
+            trace!("Canonical chain already contains block {}", block.height());
         } else if block.height() == self.canon.latest_block_height() + 1 && block.previous_block_hash() == self.canon.latest_block_hash() {
             // Acquire the lock for block requests.
             let _block_requests_lock = self.block_requests_lock.lock().await;
@@ -493,9 +504,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Add the block to the unconfirmed blocks.
             if self.unconfirmed_blocks.write().await.insert(block.previous_block_hash(), block) {
-                trace!("Added block {} to unconfirmed queue", block_height);
+                trace!("Added unconfirmed block {} to pending queue", block_height);
             } else {
-                trace!("Unconfirmed queue already contains block {}", block_height);
+                trace!("Pending queue already contains unconfirmed block {}", block_height);
             }
         }
         false
