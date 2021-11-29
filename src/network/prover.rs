@@ -100,7 +100,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover pool.
         let pool = ThreadPoolBuilder::new()
             .stack_size(8 * 1024 * 1024)
-            .num_threads((num_cpus::get() / 8 * 1).max(1))
+            .num_threads((num_cpus::get() / 8 * 3).max(1))
             .build()?;
 
         // Initialize the prover.
@@ -161,7 +161,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 // Mine the next block.
                                 let result = task::spawn_blocking(move || {
                                     miner.install(move || {
-                                        canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng())
+                                        canon.mine_next_block(
+                                            recipient,
+                                            E::COINBASE_IS_PUBLIC,
+                                            &unconfirmed_transactions,
+                                            &terminator,
+                                            &mut thread_rng(),
+                                        )
                                     })
                                 })
                                 .await

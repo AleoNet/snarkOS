@@ -710,7 +710,7 @@ mod tests {
 
         // Mine the next block.
         let block_1 = ledger_state
-            .mine_next_block(address, &[], &terminator, rng)
+            .mine_next_block(address, true, &[], &terminator, rng)
             .expect("Failed to mine");
         ledger_state.add_next_block(&block_1).expect("Failed to add next block to ledger");
         assert_eq!(1, ledger_state.latest_block_height());
@@ -830,7 +830,7 @@ mod tests {
 
         // Mine the next block.
         let block_1 = ledger_state
-            .mine_next_block(address, &[], &terminator, rng)
+            .mine_next_block(address, true, &[], &terminator, rng)
             .expect("Failed to mine");
         ledger_state.add_next_block(&block_1).expect("Failed to add next block to ledger");
         assert_eq!(1, ledger_state.latest_block_height());
@@ -990,7 +990,7 @@ mod tests {
 
         // Mine the next block.
         let block_1 = ledger_state
-            .mine_next_block(address, &[], &terminator, &mut rng)
+            .mine_next_block(address, true, &[], &terminator, &mut rng)
             .expect("Failed to mine");
         ledger_state.add_next_block(&block_1).expect("Failed to add next block to ledger");
         assert_eq!(1, ledger_state.latest_block_height());
@@ -1161,8 +1161,8 @@ mod tests {
         let address = account.address();
 
         // Initialize a new transaction.
-        let transaction =
-            Transaction::<Testnet2>::new_coinbase(address, AleoAmount(1234), &mut rng).expect("Failed to create a coinbase transaction");
+        let transaction = Transaction::<Testnet2>::new_coinbase(address, AleoAmount(1234), true, &mut rng)
+            .expect("Failed to create a coinbase transaction");
 
         // Initialize a new rpc.
         let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;

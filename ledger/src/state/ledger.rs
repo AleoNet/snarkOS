@@ -575,6 +575,7 @@ impl<N: Network> LedgerState<N> {
     pub fn mine_next_block<R: Rng + CryptoRng>(
         &self,
         recipient: Address<N>,
+        is_public: bool,
         transactions: &[Transaction<N>],
         terminator: &AtomicBool,
         rng: &mut R,
@@ -597,7 +598,7 @@ impl<N: Network> LedgerState<N> {
 
         // Craft a coinbase transaction.
         let amount = Block::<N>::block_reward(block_height);
-        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
+        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
 
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
         // TODO (howardwu): Improve the performance and design of this.
