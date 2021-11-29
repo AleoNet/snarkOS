@@ -722,22 +722,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, local_nonce, connected_nonces).await?;
 
         // Send the first `Ping` message to the peer.
-        {
-            // Retrieve the latest ledger state.
-            let latest_block_hash = ledger_reader.latest_block_hash();
-            let latest_block_header = ledger_reader.latest_block_header();
-
-            // Send a `Ping` request to the peer.
-            let message = Message::Ping(
-                E::MESSAGE_VERSION,
-                E::NODE_TYPE,
-                local_status.get(),
-                latest_block_hash,
-                latest_block_header,
-            );
-            trace!("Sending '{}' to {}", message.name(), peer_ip);
-            outbound_socket.send(message).await?;
-        }
+        let message = Message::Ping(
+            E::MESSAGE_VERSION,
+            E::NODE_TYPE,
+            local_status.get(),
+            ledger_reader.latest_block_hash(),
+            ledger_reader.latest_block_header(),
+        );
+        trace!("Sending '{}' to {}", message.name(), peer_ip);
+        outbound_socket.send(message).await?;
 
         // Create a channel for this peer.
         let (outbound_router, outbound_handler) = mpsc::channel(1024);
