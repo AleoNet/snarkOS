@@ -298,19 +298,19 @@ impl<N: Network, E: Environment> Server<N, E> {
                 info!(
                     r"
 
-===========================================================================================================
+==========================================================================================================
                                   Aleo Testnet2 - Incentivization Period
-===========================================================================================================
+==========================================================================================================
 
     In preparation for the incentivization period, testnet2 will automatically reset within 48 hours.
     Please ensure your Aleo node is running either the `run-client.sh` or `run-miner.sh` script,
     in order to automatically upgrade to the incentivized testnet.
 
-===========================================================================================================
+==========================================================================================================
                 "
                 );
-                // Sleep for `60` seconds.
-                tokio::time::sleep(Duration::from_secs(60)).await;
+                // Sleep for `120` seconds.
+                tokio::time::sleep(Duration::from_secs(120)).await;
             }
         }));
         // Wait until the heartbeat task is ready.

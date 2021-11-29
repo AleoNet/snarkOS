@@ -62,15 +62,15 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const SYNC_NODES: [&'static str; 10] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136", "127.0.0.1:4137", "127.0.0.1:4138", "127.0.0.1:4139", "127.0.0.1:4140", "127.0.0.1:4141"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
-    const HEARTBEAT_IN_SECS: u64 = 8;
+    const HEARTBEAT_IN_SECS: u64 = 9;
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 1;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 90;
+    const PING_SLEEP_IN_SECS: u64 = 100;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
     /// The duration in seconds after which to expire a failure from a peer.
     const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
 
@@ -140,8 +140,8 @@ impl<N: Network> Environment for ClientTrial<N> {
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
     ];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 51;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 15;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 35;
 }
 
 #[derive(Clone, Debug, Default)]
