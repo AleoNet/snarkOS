@@ -38,7 +38,8 @@ path = "./ledger"
 version = "2.0.0"
 
 [dependencies.aleo-std]
-version = "0.1"
+#version = "0.1"
+path = "../aleo-std"
 
 [dependencies.anyhow]
 version = "1"

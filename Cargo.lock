@@ -25,13 +25,30 @@ dependencies = [
 [[package]]
 name = "aleo-std"
 version = "0.1.0"
+dependencies = [
+ "aleo-std-storage 0.1.0",
+ "aleo-std-time 0.1.0",
+ "aleo-std-timed 0.1.0",
+ "aleo-std-timer 0.1.0",
+]
+
+[[package]]
+name = "aleo-std"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36881e97e954a112082ee4557998ede9a0ba0da10501e2b04e865e8f4ddd2da6"
 dependencies = [
- "aleo-std-storage",
- "aleo-std-time",
- "aleo-std-timed",
- "aleo-std-timer",
+ "aleo-std-storage 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aleo-std-time 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aleo-std-timed 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aleo-std-timer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "aleo-std-storage"
+version = "0.1.0"
+dependencies = [
+ "dirs",
 ]
 
 [[package]]
@@ -41,6 +58,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2b0e216e47e31901ba23b7c1efe1909ab3d819cf29e168c1cfdde7219c746ef"
 dependencies = [
  "dirs",
+]
+
+[[package]]
+name = "aleo-std-time"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
 ]
 
 [[package]]
@@ -57,12 +83,28 @@ dependencies = [
 [[package]]
 name = "aleo-std-timed"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2 1.0.32",
+ "quote 1.0.10",
+ "syn 1.0.82",
+]
+
+[[package]]
+name = "aleo-std-timed"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b85aed1b7ca965b6613d14ab243c746316180401cbb9ba3b2cb22bff16fc08f"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
  "syn 1.0.82",
+]
+
+[[package]]
+name = "aleo-std-timer"
+version = "0.1.0"
+dependencies = [
+ "colored",
 ]
 
 [[package]]
@@ -1843,7 +1885,7 @@ checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 name = "snarkos"
 version = "2.0.0"
 dependencies = [
- "aleo-std",
+ "aleo-std 0.1.0",
  "anyhow",
  "async-trait",
  "bincode",
@@ -2070,7 +2112,7 @@ dependencies = [
 name = "snarkvm-parameters"
 version = "0.7.5"
 dependencies = [
- "aleo-std",
+ "aleo-std 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "anyhow",
  "cfg-if",
  "curl",

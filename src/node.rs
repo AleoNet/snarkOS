@@ -62,6 +62,9 @@ pub struct Node {
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
+    /// If the flag is set, the node will start in development mode.
+    #[structopt(long)]
+    pub dev: bool,
     /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
     pub display: bool,
@@ -98,19 +101,14 @@ impl Node {
     }
 
     /// Returns the storage path of the node.
-    pub(crate) fn storage_path(&self, _local_ip: SocketAddr) -> String {
+    pub(crate) fn storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
         cfg_if::cfg_if! {
             if #[cfg(feature = "test")] {
                 // Tests may use any available ports, and removes the storage artifacts afterwards,
                 // so that there is no need to adhere to a specific number assignment logic.
-                format!("/tmp/snarkos-test-ledger-{}", _local_ip.port())
+                PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
             } else {
-                // TODO (howardwu): Remove this check after introducing proper configurations.
-                assert!(
-                    self.node.port() >= 4130,
-                    "Until configuration files are established, the node port must be at least 4130 or greater"
-                );
-                format!(".ledger-{}", (self.node.port() - 4130))
+                aleo_std::aleo_ledger_dir(self.network, self.dev)
             }
         }
     }
@@ -189,7 +187,7 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
-    #[structopt(name = "clean", about = "Removes the ledger from storage")]
+    #[structopt(name = "clean", about = "Removes the ledger files from storage")]
     Clean(Clean),
     #[structopt(name = "update", about = "Updates snarkOS to the latest version")]
     Update(Update),
@@ -257,31 +255,18 @@ impl Clean {
 
     /// Removes the specified ledger from storage.
     fn remove_ledger(network: u16, is_dev: bool) -> Result<String> {
-        // Retrieve the starting directory.
-        let mut path = match is_dev {
-            // In development mode, the ledger is stored in the snarkOS root directory.
-            true => PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-            // In production mode, the ledger is stored in the `~/.aleo/` directory.
-            false => aleo_std::aleo_dir()
-        };
-
         // Construct the path to the ledger in storage.
-        match is_dev {
-            // In development mode, the ledger files are stored in a hidden folder.
-            true => path.push(format!(".ledger-{}", network)),
-            // In production mode, the ledger files are stored in a visible folder.
-            false => {
-                path.push("storage");
-                path.push(format!("ledger-{}", network));
-            }
-        };
-
+        let path = aleo_std::aleo_ledger_dir(network, is_dev);
         // Check if the path to the ledger exists in storage.
         if path.exists() {
             // Remove the ledger files from storage.
             match std::fs::remove_dir_all(&path) {
                 Ok(_) => Ok(format!("Successfully removed the ledger files from storage. ({})", path.display())),
-                Err(error) => Err(anyhow!("Failed to remove the ledger files from storage. ({})\n{}", path.display(), error))
+                Err(error) => Err(anyhow!(
+                    "Failed to remove the ledger files from storage. ({})\n{}",
+                    path.display(),
+                    error
+                )),
             }
         } else {
             Ok(format!("No ledger files were found in storage. ({})", path.display()))
@@ -294,7 +279,6 @@ pub struct Update {
     /// Lists all available versions of snarkOS
     #[structopt(short = "l", long)]
     list: bool,
-
     /// Suppress outputs to terminal
     #[structopt(short = "q", long)]
     quiet: bool,
