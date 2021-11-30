@@ -218,8 +218,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             },
             6 => Self::PeerResponse(bincode::deserialize(data)?),
             7 => {
-                let (version, node_type, status, block_hash) = bincode::deserialize(data)?;
-                let block_header = Data::Buffer(data[16..].to_vec());
+                let (version, node_type, status, block_hash) = bincode::deserialize(&data[0..44])?;
+                let block_header = Data::Buffer(data[44..].to_vec());
 
                 Self::Ping(version, node_type, status, block_hash, block_header)
             }
