@@ -102,6 +102,8 @@ Enter your Aleo miner address:
 aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+### Mining Report
+
 After the mining node has booted up, a periodic report is provided with the status of mined blocks:
 ```
 INFO Mining Report (confirmed_blocks = 1, pending_blocks = 5, miner_address = aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
