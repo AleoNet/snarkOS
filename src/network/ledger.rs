@@ -819,7 +819,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 else {
                     // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger, proceed to switch to the fork.
                     if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
-                        info!("Discovered a canonical chain from {} at block {} with cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
+                        info!("Discovered a canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                         // If the latest block is the same as the maximum common ancestor, do not revert.
                         if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor).await {
                             return;
@@ -845,7 +845,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `MAXIMUM_FORK_DEPTH`.
                         // Revert to the common ancestor anyways.
                         else {
-                            info!("Discovered a potentially better canonical chain from {} at block {} with cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
+                            info!("Discovered a potentially better canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                             match self.revert_to_block_height(maximum_common_ancestor).await {
                                 true => (maximum_common_ancestor, true),
                                 false => return

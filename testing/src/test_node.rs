@@ -139,7 +139,13 @@ impl TestNode {
         let node = self.clone();
         task::spawn(async move {
             let genesis = Testnet2::genesis_block();
-            let ping_msg = ClientMessage::Ping(MESSAGE_VERSION, node.node_type(), node.state(), genesis.hash(), genesis.header().clone());
+            let ping_msg = ClientMessage::Ping(
+                MESSAGE_VERSION,
+                node.node_type(),
+                node.state(),
+                genesis.hash(),
+                genesis.header().clone(),
+            );
 
             loop {
                 if node.node().num_connected() != 0 {
