@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    display::notification_message,
     helpers::{State, Status, Tasks},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
@@ -22,8 +23,9 @@ use crate::{
     rpc::initialize_rpc_server,
     Environment,
     Node,
+    NodeType,
 };
-use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
@@ -68,7 +70,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         };
 
         // Initialize the ledger storage path.
-        let storage_path = node.storage_path(local_ip);
+        let ledger_storage_path = node.ledger_storage_path(local_ip);
+        // Initialize the prover storage path.
+        let prover_storage_path = node.prover_storage_path(local_ip);
         // Initialize the status indicator.
         let status = Status::new();
         // Initialize the terminator bit.
@@ -77,11 +81,12 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing peers.
         let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &storage_path, &status, &terminator, peers.router()).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &status, &terminator, peers.router()).await?;
         // Initialize a new instance for managing the prover.
-        let prover = Prover::new(
+        let prover = Prover::open::<RocksDB, _>(
             &mut tasks,
-            miner,
+            &prover_storage_path,
+            miner.clone(),
             local_ip,
             &status,
             &terminator,
@@ -107,7 +112,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the RPC server.
         Self::initialize_rpc(&mut tasks, node, &status, &peers, ledger.reader(), prover.router()).await;
         // Initialize a new instance of the notification.
-        Self::initialize_notification(&mut tasks).await;
+        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner.clone()).await;
 
         Ok(Self {
             local_ip,
@@ -169,6 +174,8 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Shut down the ledger.
         let ledger_lock = self.ledger.shut_down().await;
+        trace!("Ledger has shut down, proceeding to lock...");
+
         // Acquire the lock for ledger.
         let _ledger_lock = ledger_lock.lock().await;
 
@@ -288,27 +295,53 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance of the notification.
     ///
     #[inline]
-    async fn initialize_notification(tasks: &mut Tasks<task::JoinHandle<()>>) {
+    async fn initialize_notification(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        ledger: LedgerReader<N>,
+        prover: Arc<Prover<N, E>>,
+        miner: Option<Address<N>>,
+    ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
-                info!(
-                    r"
+                info!("{}", notification_message(miner.clone()));
 
-==========================================================================================================
-                                  Aleo Testnet2 - Incentivization Period
-==========================================================================================================
+                if E::NODE_TYPE == NodeType::Miner {
+                    if let Some(miner) = miner {
+                        // Retrieve the latest block height.
+                        let latest_block_height = ledger.latest_block_height();
 
-    In preparation for the incentivization period, testnet2 will automatically reset within 48 hours.
-    Please ensure your Aleo node is running either the `run-client.sh` or `run-miner.sh` script,
-    in order to automatically upgrade to the incentivized testnet.
+                        // Prepare a list of confirmed and pending coinbase records.
+                        let mut confirmed = vec![];
+                        let mut pending = vec![];
 
-==========================================================================================================
-                "
-                );
+                        // Iterate through the coinbase records from storage.
+                        for (block_height, record) in prover.to_coinbase_records() {
+                            // Filter the coinbase records by determining if they exist on the canonical chain.
+                            if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                                // Ensure the record owner matches.
+                                if record.owner() == miner {
+                                    // Add the block to the appropriate list.
+                                    match block_height + 1024 < latest_block_height {
+                                        true => confirmed.push((block_height, record)),
+                                        false => pending.push((block_height, record)),
+                                    }
+                                }
+                            }
+                        }
+
+                        info!(
+                            "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+                            confirmed.len(),
+                            pending.len(),
+                            miner
+                        );
+                    }
+                }
+
                 // Sleep for `120` seconds.
                 tokio::time::sleep(Duration::from_secs(120)).await;
             }

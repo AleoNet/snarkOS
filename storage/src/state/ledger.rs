@@ -308,6 +308,11 @@ impl<N: Network> LedgerState<N> {
         self.latest_block.read().difficulty_target()
     }
 
+    /// Returns the latest cumulative weight.
+    pub fn latest_cumulative_weight(&self) -> u128 {
+        self.latest_block.read().cumulative_weight()
+    }
+
     /// Returns the latest block header.
     pub fn latest_block_header(&self) -> BlockHeader<N> {
         self.latest_block.read().header().clone()
@@ -358,14 +363,9 @@ impl<N: Network> LedgerState<N> {
         self.blocks.contains_commitment(commitment)
     }
 
-    /// Returns `true` if the given ciphertext ID exists in storage.
-    pub fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
-        self.blocks.contains_ciphertext_id(ciphertext_id)
-    }
-
-    /// Returns the record ciphertext for a given ciphertext ID.
-    pub fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
-        self.blocks.get_ciphertext(ciphertext_id)
+    /// Returns the record ciphertext for a given commitment.
+    pub fn get_ciphertext(&self, commitment: &N::Commitment) -> Result<N::RecordCiphertext> {
+        self.blocks.get_ciphertext(commitment)
     }
 
     /// Returns the transition for a given transition ID.
@@ -381,6 +381,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the transaction metadata for a given transaction ID.
     pub fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
         self.blocks.get_transaction_metadata(transaction_id)
+    }
+
+    /// Returns the cumulative weight up to a given block height (inclusive) for the canonical chain.
+    pub fn get_cumulative_weight(&self, block_height: u32) -> Result<u128> {
+        self.blocks.get_cumulative_weight(block_height)
     }
 
     /// Returns the block height for the given block hash.
@@ -570,10 +575,11 @@ impl<N: Network> LedgerState<N> {
     pub fn mine_next_block<R: Rng + CryptoRng>(
         &self,
         recipient: Address<N>,
+        is_public: bool,
         transactions: &[Transaction<N>],
         terminator: &AtomicBool,
         rng: &mut R,
-    ) -> Result<Block<N>> {
+    ) -> Result<(Block<N>, Record<N>)> {
         // Prepare the new block.
         let previous_block_hash = self.latest_block_hash();
         let block_height = self.latest_block_height() + 1;
@@ -583,13 +589,16 @@ impl<N: Network> LedgerState<N> {
         let previous_difficulty_target = self.latest_block_difficulty_target();
         let block_timestamp = chrono::Utc::now().timestamp();
         let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+        let cumulative_weight = self
+            .latest_cumulative_weight()
+            .saturating_add((u64::MAX / difficulty_target) as u128);
 
         // Construct the ledger root.
         let ledger_root = self.latest_ledger_root();
 
         // Craft a coinbase transaction.
         let amount = Block::<N>::block_reward(block_height);
-        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, rng)?;
+        let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
 
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
         // TODO (howardwu): Improve the performance and design of this.
@@ -598,16 +607,27 @@ impl<N: Network> LedgerState<N> {
             .filter(|transaction| {
                 for serial_number in transaction.serial_numbers() {
                     if let Ok(true) = self.contains_serial_number(serial_number) {
+                        trace!(
+                            "Miner is filtering out transaction {} (serial_number {})",
+                            transaction.transaction_id(),
+                            serial_number
+                        );
                         return false;
                     }
                 }
 
                 for commitment in transaction.commitments() {
                     if let Ok(true) = self.contains_commitment(commitment) {
+                        trace!(
+                            "Miner is filtering out transaction {} (commitment {})",
+                            transaction.transaction_id(),
+                            commitment
+                        );
                         return false;
                     }
                 }
 
+                trace!("Miner is adding transaction {}", transaction.transaction_id());
                 true
             })
             .cloned()
@@ -623,12 +643,13 @@ impl<N: Network> LedgerState<N> {
             block_height,
             block_timestamp,
             difficulty_target,
+            cumulative_weight,
             ledger_root,
             transactions,
             terminator,
             rng,
         ) {
-            Ok(block) => Ok(block),
+            Ok(block) => Ok((block, coinbase_record)),
             Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }
     }
@@ -688,6 +709,18 @@ impl<N: Network> LedgerState<N> {
                 block_height,
                 block.difficulty_target(),
                 expected_difficulty_target
+            ));
+        }
+
+        // Ensure the expected cumulative weight is computed correctly.
+        let expected_cumulative_weight = current_block
+            .cumulative_weight()
+            .saturating_add((u64::MAX / expected_difficulty_target) as u128);
+        if block.cumulative_weight() != expected_cumulative_weight {
+            return Err(anyhow!(
+                "The given cumulative weight is incorrect. Found {}, but expected {}",
+                block.cumulative_weight(),
+                expected_cumulative_weight
             ));
         }
 
@@ -1092,14 +1125,9 @@ impl<N: Network> BlockState<N> {
         self.transactions.contains_commitment(commitment)
     }
 
-    /// Returns `true` if the given ciphertext ID exists in storage.
-    fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
-        self.transactions.contains_ciphertext_id(ciphertext_id)
-    }
-
-    /// Returns the record ciphertext for a given ciphertext ID.
-    fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
-        self.transactions.get_ciphertext(ciphertext_id)
+    /// Returns the record ciphertext for a given commitment.
+    fn get_ciphertext(&self, commitment: &N::Commitment) -> Result<N::RecordCiphertext> {
+        self.transactions.get_ciphertext(commitment)
     }
 
     /// Returns the transition for a given transition ID.
@@ -1115,6 +1143,11 @@ impl<N: Network> BlockState<N> {
     /// Returns the transaction metadata for a given transaction ID.
     fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
         self.transactions.get_transaction_metadata(transaction_id)
+    }
+
+    /// Returns the cumulative weight up to a given block height (inclusive) for the canonical chain.
+    fn get_cumulative_weight(&self, block_height: u32) -> Result<u128> {
+        Ok(self.get_block_header(block_height)?.cumulative_weight())
     }
 
     /// Returns the block height for the given block hash.
@@ -1268,10 +1301,6 @@ impl<N: Network> BlockState<N> {
         if block_height == 0 {
             Err(anyhow!("Block {} cannot be removed from storage", block_height))
         }
-        // Ensure the block at the given block height exists.
-        else if !self.block_heights.contains_key(&block_height)? {
-            Err(anyhow!("Block {} does not exist in storage", block_height))
-        }
         // Remove the block at the given block height.
         else {
             // Retrieve the block hash.
@@ -1317,8 +1346,6 @@ struct TransactionState<N: Network> {
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
     serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
     commitments: DataMap<N::Commitment, N::TransitionID>,
-    ciphertext_ids: DataMap<N::CiphertextID, N::TransitionID>,
-    events: DataMap<N::TransactionID, Vec<Event<N>>>,
 }
 
 impl<N: Network> TransactionState<N> {
@@ -1329,8 +1356,6 @@ impl<N: Network> TransactionState<N> {
             transitions: storage.open_map("transitions")?,
             serial_numbers: storage.open_map("serial_numbers")?,
             commitments: storage.open_map("commitments")?,
-            ciphertext_ids: storage.open_map("ciphertext_ids")?,
-            events: storage.open_map("events")?,
         })
     }
 
@@ -1349,17 +1374,12 @@ impl<N: Network> TransactionState<N> {
         self.commitments.contains_key(commitment)
     }
 
-    /// Returns `true` if the given ciphertext ID exists in storage.
-    fn contains_ciphertext_id(&self, ciphertext_id: &N::CiphertextID) -> Result<bool> {
-        self.ciphertext_ids.contains_key(ciphertext_id)
-    }
-
-    /// Returns the record ciphertext for a given ciphertext ID.
-    fn get_ciphertext(&self, ciphertext_id: &N::CiphertextID) -> Result<RecordCiphertext<N>> {
+    /// Returns the record ciphertext for a given commitment.
+    fn get_ciphertext(&self, commitment: &N::Commitment) -> Result<N::RecordCiphertext> {
         // Retrieve the transition ID.
-        let transition_id = match self.ciphertext_ids.get(ciphertext_id)? {
+        let transition_id = match self.commitments.get(commitment)? {
             Some(transition_id) => transition_id,
-            None => return Err(anyhow!("Ciphertext {} does not exist in storage", ciphertext_id)),
+            None => return Err(anyhow!("Commitment {} does not exist in storage", commitment)),
         };
 
         // Retrieve the transition.
@@ -1369,13 +1389,13 @@ impl<N: Network> TransactionState<N> {
         };
 
         // Retrieve the ciphertext.
-        for (candidate_ciphertext_id, candidate_ciphertext) in transition.to_ciphertext_ids().zip_eq(transition.ciphertexts()) {
-            if candidate_ciphertext_id? == *ciphertext_id {
+        for (candidate_commitment, candidate_ciphertext) in transition.commitments().zip_eq(transition.ciphertexts()) {
+            if candidate_commitment == commitment {
                 return Ok(candidate_ciphertext.clone());
             }
         }
 
-        Err(anyhow!("Ciphertext {} is missing in storage", ciphertext_id))
+        Err(anyhow!("Commitment {} is missing in storage", commitment))
     }
 
     /// Returns the transition for a given transition ID.
@@ -1403,7 +1423,7 @@ impl<N: Network> TransactionState<N> {
             };
         }
 
-        Transaction::from(*N::inner_circuit_id(), ledger_root, transitions, vec![])
+        Transaction::from(*N::inner_circuit_id(), ledger_root, transitions)
     }
 
     /// Returns the transaction metadata for a given transaction ID.
@@ -1445,62 +1465,41 @@ impl<N: Network> TransactionState<N> {
                 for commitment in transition.commitments() {
                     self.commitments.insert(commitment, &transition_id)?;
                 }
-                // Insert the ciphertext IDs.
-                for ciphertext_id in transition.to_ciphertext_ids() {
-                    self.ciphertext_ids.insert(&*ciphertext_id?, &transition_id)?;
-                }
             }
-
-            // Insert the transaction events.
-            self.events.insert(&transaction_id, transaction.events())?;
-
             Ok(())
         }
     }
 
     /// Removes the given transaction ID from storage.
     fn remove_transaction(&self, transaction_id: &N::TransactionID) -> Result<()> {
-        // Ensure the transaction exists.
-        if !self.transactions.contains_key(transaction_id)? {
-            Err(anyhow!("Transaction {} does not exist in storage", transaction_id))
-        } else {
-            // Retrieve the transition IDs from the transaction.
-            let transition_ids = match self.transactions.get(transaction_id)? {
-                Some((_, transition_ids, _)) => transition_ids,
-                None => return Err(anyhow!("Transaction {} missing from transactions map", transaction_id)),
+        // Retrieve the transition IDs from the transaction.
+        let transition_ids = match self.transactions.get(transaction_id)? {
+            Some((_, transition_ids, _)) => transition_ids,
+            None => return Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
+        };
+
+        // Remove the transaction entry.
+        self.transactions.remove(transaction_id)?;
+
+        for (_, transition_id) in transition_ids.iter().enumerate() {
+            // Retrieve the transition from the transition ID.
+            let transition = match self.transitions.get(transition_id)? {
+                Some((_, _, transition)) => transition,
+                None => return Err(anyhow!("Transition {} missing from transitions map", transition_id)),
             };
 
-            // Remove the transaction entry.
-            self.transactions.remove(transaction_id)?;
+            // Remove the transition.
+            self.transitions.remove(transition_id)?;
 
-            for (_, transition_id) in transition_ids.iter().enumerate() {
-                // Retrieve the transition from the transition ID.
-                let transition = match self.transitions.get(transition_id)? {
-                    Some((_, _, transition)) => transition,
-                    None => return Err(anyhow!("Transition {} missing from transitions map", transition_id)),
-                };
-
-                // Remove the transition.
-                self.transitions.remove(transition_id)?;
-
-                // Remove the serial numbers.
-                for serial_number in transition.serial_numbers() {
-                    self.serial_numbers.remove(serial_number)?;
-                }
-                // Remove the commitments.
-                for commitment in transition.commitments() {
-                    self.commitments.remove(commitment)?;
-                }
-                // Remove the ciphertext IDs.
-                for ciphertext_id in transition.to_ciphertext_ids() {
-                    self.ciphertext_ids.remove(&*ciphertext_id?)?;
-                }
+            // Remove the serial numbers.
+            for serial_number in transition.serial_numbers() {
+                self.serial_numbers.remove(serial_number)?;
             }
-
-            // Remove the transaction events.
-            self.events.remove(transaction_id)?;
-
-            Ok(())
+            // Remove the commitments.
+            for commitment in transition.commitments() {
+                self.commitments.remove(commitment)?;
+            }
         }
+        Ok(())
     }
 }

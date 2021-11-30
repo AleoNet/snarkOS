@@ -691,6 +691,8 @@ struct Peer<N: Network, E: Environment> {
     node_type: NodeType,
     /// The node type of the peer.
     status: Status,
+    /// The block header of the peer.
+    block_header: BlockHeader<N>,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -722,22 +724,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, local_nonce, connected_nonces).await?;
 
         // Send the first `Ping` message to the peer.
-        {
-            // Retrieve the latest ledger state.
-            let latest_block_height = ledger_reader.latest_block_height();
-            let latest_block_hash = ledger_reader.latest_block_hash();
-
-            // Send a `Ping` request to the peer.
-            let message = Message::Ping(
-                E::MESSAGE_VERSION,
-                E::NODE_TYPE,
-                local_status.get(),
-                latest_block_height,
-                latest_block_hash,
-            );
-            trace!("Sending '{}' to {}", message.name(), peer_ip);
-            outbound_socket.send(message).await?;
-        }
+        let message = Message::Ping(
+            E::MESSAGE_VERSION,
+            E::NODE_TYPE,
+            local_status.get(),
+            ledger_reader.latest_block_hash(),
+            ledger_reader.latest_block_header(),
+        );
+        trace!("Sending '{}' to {}", message.name(), peer_ip);
+        outbound_socket.send(message).await?;
 
         // Create a channel for this peer.
         let (outbound_router, outbound_handler) = mpsc::channel(1024);
@@ -752,6 +747,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             version: 0,
             node_type: NodeType::Client,
             status: Status::new(),
+            block_header: N::genesis_block().header().clone(),
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -1034,21 +1030,24 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version, node_type, status, block_height, block_hash) => {
+                                Message::Ping(version, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
+
                                     // Update the version of the peer.
                                     peer.version = version;
                                     // Update the node type of the peer.
                                     peer.node_type = node_type;
                                     // Update the status of the peer.
                                     peer.status.update(status);
+                                    // Update the block header of the peer.
+                                    peer.block_header = block_header;
 
                                     // Determine if the peer is on a fork (or unknown).
-                                    let is_fork = match ledger_reader.get_block_hash(block_height) {
+                                    let is_fork = match ledger_reader.get_block_hash(peer.block_header.height()) {
                                         Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
                                         Err(_) => None,
                                     };
@@ -1080,11 +1079,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
 
                                         // Retrieve the latest ledger state.
-                                        let latest_block_height = ledger_reader.latest_block_height();
                                         let latest_block_hash = ledger_reader.latest_block_hash();
+                                        let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_height, latest_block_hash);
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, latest_block_header);
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }

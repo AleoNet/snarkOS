@@ -14,8 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod ledger;
-pub use ledger::{LedgerState, Metadata, MAXIMUM_BLOCK_LOCATORS, MAXIMUM_LINEAR_BLOCK_LOCATORS, MAXIMUM_QUADRATIC_BLOCK_LOCATORS};
+#[macro_use]
+extern crate tracing;
 
-#[cfg(test)]
-mod tests;
+mod helpers;
+pub use helpers::BlockLocators;
+
+pub(crate) mod state;
+pub use state::{
+    LedgerState,
+    Metadata,
+    ProverState,
+    MAXIMUM_BLOCK_LOCATORS,
+    MAXIMUM_LINEAR_BLOCK_LOCATORS,
+    MAXIMUM_QUADRATIC_BLOCK_LOCATORS,
+};
+
+pub mod storage;

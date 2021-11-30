@@ -25,6 +25,7 @@ use crate::{
     PeersRequest,
     PeersRouter,
 };
+use snarkos_storage::{storage::Storage, ProverState};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -32,6 +33,7 @@ use rand::thread_rng;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     net::SocketAddr,
+    path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -65,6 +67,8 @@ pub enum ProverRequest<N: Network> {
 ///
 #[derive(Debug)]
 pub struct Prover<N: Network, E: Environment> {
+    /// The state storage of the prover.
+    state: Arc<ProverState<N>>,
     /// The thread pool for the miner.
     miner: Arc<ThreadPool>,
     /// The prover router of the node.
@@ -85,8 +89,9 @@ pub struct Prover<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Prover<N, E> {
     /// Initializes a new instance of the prover.
-    pub async fn new(
+    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         tasks: &mut Tasks<JoinHandle<()>>,
+        path: P,
         miner: Option<Address<N>>,
         local_ip: SocketAddr,
         status: &Status,
@@ -100,11 +105,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover pool.
         let pool = ThreadPoolBuilder::new()
             .stack_size(8 * 1024 * 1024)
-            .num_threads((num_cpus::get() / 8).max(1))
+            .num_threads(num_cpus::get().max(1))
             .build()?;
 
         // Initialize the prover.
         let prover = Arc::new(Self {
+            state: Arc::new(ProverState::open_writer::<S, P>(path)?),
             miner: Arc::new(pool),
             prover_router,
             memory_pool: RwLock::new(MemoryPool::new()),
@@ -149,6 +155,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             prover.status.update(State::Mining);
 
                             // Prepare the unconfirmed transactions, terminator, and status.
+                            let state = prover.state.clone();
                             let miner = prover.miner.clone();
                             let canon = prover.ledger_reader.clone(); // This is *safe* as the ledger only reads.
                             let unconfirmed_transactions = prover.memory_pool.read().await.transactions();
@@ -161,7 +168,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 // Mine the next block.
                                 let result = task::spawn_blocking(move || {
                                     miner.install(move || {
-                                        canon.mine_next_block(recipient, &unconfirmed_transactions, &terminator, &mut thread_rng())
+                                        canon.mine_next_block(
+                                            recipient,
+                                            E::COINBASE_IS_PUBLIC,
+                                            &unconfirmed_transactions,
+                                            &terminator,
+                                            &mut thread_rng(),
+                                        )
                                     })
                                 })
                                 .await
@@ -171,12 +184,17 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 status.update(State::Ready);
 
                                 match result {
-                                    Ok(Ok(block)) => {
+                                    Ok(Ok((block, coinbase_record))) => {
                                         debug!("Miner has found an unconfirmed candidate for block {}", block.height());
+                                        // Store the coinbase record.
+                                        if let Err(error) = state.add_coinbase_record(block.height(), coinbase_record) {
+                                            warn!("[Miner] Failed to store coinbase record - {}", error);
+                                        }
+
                                         // Broadcast the next block.
                                         let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
                                         if let Err(error) = ledger_router.send(request).await {
-                                            warn!("Failed to broadcast mined block: {}", error);
+                                            warn!("Failed to broadcast mined block - {}", error);
                                         }
                                     }
                                     Ok(Err(error)) | Err(error) => trace!("{}", error),
@@ -200,6 +218,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Returns an instance of the prover router.
     pub fn router(&self) -> ProverRouter<N> {
         self.prover_router.clone()
+    }
+
+    /// Returns all coinbase records in storage.
+    pub fn to_coinbase_records(&self) -> Vec<(u32, Record<N>)> {
+        self.state.to_coinbase_records()
     }
 
     ///

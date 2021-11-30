@@ -22,7 +22,7 @@ do
     cargo clean
   fi
 
-  $COMMAND & sleep 1800; kill $!
+  $COMMAND & sleep 1800; kill -INT $!
 
   sleep 2;
 done

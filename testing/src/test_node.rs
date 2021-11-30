@@ -22,7 +22,7 @@ use snarkos::{
     Message,
     NodeType,
 };
-use snarkos_ledger::BlockLocators;
+use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
 use pea2pea::{
@@ -139,7 +139,13 @@ impl TestNode {
         let node = self.clone();
         task::spawn(async move {
             let genesis = Testnet2::genesis_block();
-            let ping_msg = ClientMessage::Ping(MESSAGE_VERSION, node.node_type(), node.state(), genesis.height(), genesis.hash());
+            let ping_msg = ClientMessage::Ping(
+                MESSAGE_VERSION,
+                node.node_type(),
+                node.state(),
+                genesis.hash(),
+                genesis.header().clone(),
+            );
 
             loop {
                 if node.node().num_connected() != 0 {
@@ -300,8 +306,8 @@ impl Reading for TestNode {
             ClientMessage::Disconnect => {}
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
-            ClientMessage::Ping(version, _peer_type, _peer_state, block_height, _block_hash) => {
-                self.process_ping(source, version, block_height).await?
+            ClientMessage::Ping(version, _peer_type, _peer_state, _block_hash, block_header) => {
+                self.process_ping(source, version, block_header.height()).await?
             }
             ClientMessage::Pong(_is_fork, _block_locators) => {}
             ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}

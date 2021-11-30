@@ -102,6 +102,14 @@ Enter your Aleo miner address:
 aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+After the mining node has booted up, a periodic report is provided with the status of mined blocks:
+```
+INFO Mining Report (confirmed_blocks = 1, pending_blocks = 5, miner_address = aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
+```
+This report can also be queried after the mining node has already ran,
+by running `cargo run --release -- miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+in the snarkOS directory, or `snarkos miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
+
 ## 4. Testnet2 FAQs
 
 ### 1. My node is unable to compile.
@@ -135,8 +143,9 @@ FLAGS:
 
 OPTIONS:
         --connect <connect>          Specify the IP address and port of a peer to connect to
+        --dev <dev>                  Enables development mode, specify a unique ID for the local node
         --miner <miner>              Specify this as a mining node, with the given miner address
-    -n, --network <network>          Specify the network of this node [default: 2]
+        --network <network>          Specify the network of this node [default: 2]
         --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
         --rpc <rpc>                  Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
         --password <rpc-password>    Specify the password for the RPC server [default: pass]
@@ -144,8 +153,10 @@ OPTIONS:
         --verbosity <verbosity>      Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
 
 SUBCOMMANDS:
+    clean           Removes the ledger files from storage
     experimental    Experimental features
     help            Prints this message or the help of the given subcommand(s)
+    miner           Miner commands and settings
     update          Updates snarkOS to the latest version
 ```
 
@@ -153,12 +164,12 @@ SUBCOMMANDS:
 
 In one terminal, start the first node by running:
 ```
-cargo run --release -- --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
+cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
 ```
 
 After the first node starts, in a second terminal, run:
 ```
-cargo run --release
+cargo run --release --dev 2
 ```
 
 We welcome all contributions to snarkOS. Please refer to the [license](#7-license) for the terms of contributions.
