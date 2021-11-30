@@ -1057,6 +1057,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the status of the peer.
                                     peer.status.update(status);
 
+                                    // Perform the deferred non-blocking deserialization of the block header.
                                     match block_header.deserialize().await {
                                         Ok(block_header) => {
                                             // Update the block header of the peer.
