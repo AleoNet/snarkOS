@@ -187,7 +187,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     Ok(Ok((block, coinbase_record))) => {
                                         debug!("Miner has found an unconfirmed candidate for block {}", block.height());
                                         // Store the coinbase record.
-                                        if let Err(error) = state.add_coinbase_record(&coinbase_record) {
+                                        if let Err(error) = state.add_coinbase_record(block.height(), coinbase_record) {
                                             warn!("[Miner] Failed to store coinbase record - {}", error);
                                         }
 
@@ -218,6 +218,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Returns an instance of the prover router.
     pub fn router(&self) -> ProverRouter<N> {
         self.prover_router.clone()
+    }
+
+    /// Returns all coinbase records in storage.
+    pub fn to_coinbase_records(&self) -> Vec<(u32, Record<N>)> {
+        self.state.to_coinbase_records()
     }
 
     ///

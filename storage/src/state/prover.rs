@@ -56,18 +56,18 @@ impl<N: Network> ProverState<N> {
     }
 
     /// Returns all coinbase records in storage.
-    pub fn to_coinbase_records(&self) -> Vec<Record<N>> {
+    pub fn to_coinbase_records(&self) -> Vec<(u32, Record<N>)> {
         self.coinbase.to_records()
     }
 
     /// Returns the coinbase record for a given commitment.
-    pub fn get_coinbase_record(&self, commitment: &N::Commitment) -> Result<Record<N>> {
+    pub fn get_coinbase_record(&self, commitment: &N::Commitment) -> Result<(u32, Record<N>)> {
         self.coinbase.get_record(commitment)
     }
 
     /// Adds the given coinbase record to storage.
-    pub fn add_coinbase_record(&self, record: &Record<N>) -> Result<()> {
-        self.coinbase.add_record(record)
+    pub fn add_coinbase_record(&self, block_height: u32, record: Record<N>) -> Result<()> {
+        self.coinbase.add_record(block_height, record)
     }
 
     /// Removes the given record from storage.
@@ -79,7 +79,7 @@ impl<N: Network> ProverState<N> {
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
 struct CoinbaseState<N: Network> {
-    records: DataMap<N::Commitment, Record<N>>,
+    records: DataMap<N::Commitment, (u32, Record<N>)>,
 }
 
 impl<N: Network> CoinbaseState<N> {
@@ -96,27 +96,27 @@ impl<N: Network> CoinbaseState<N> {
     }
 
     /// Returns all records in storage.
-    fn to_records(&self) -> Vec<Record<N>> {
+    fn to_records(&self) -> Vec<(u32, Record<N>)> {
         self.records.values().collect()
     }
 
     /// Returns the record for a given commitment.
-    fn get_record(&self, commitment: &N::Commitment) -> Result<Record<N>> {
+    fn get_record(&self, commitment: &N::Commitment) -> Result<(u32, Record<N>)> {
         match self.records.get(commitment)? {
-            Some(record) => Ok(record),
+            Some((block_height, record)) => Ok((block_height, record)),
             None => return Err(anyhow!("Record with commitment {} does not exist in storage", commitment)),
         }
     }
 
-    /// Adds the given record to storage.
-    fn add_record(&self, record: &Record<N>) -> Result<()> {
+    /// Adds the given block height and record to storage.
+    fn add_record(&self, block_height: u32, record: Record<N>) -> Result<()> {
         // Ensure the record does not exist.
         let commitment = record.commitment();
         if self.records.contains_key(&commitment)? {
             Err(anyhow!("Record with commitment {} already exists in storage", commitment))
         } else {
             // Insert the record.
-            self.records.insert(&commitment, &record)?;
+            self.records.insert(&commitment, &(block_height, record))?;
             Ok(())
         }
     }

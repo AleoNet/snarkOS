@@ -20,7 +20,7 @@ use crate::{
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
     rpc::initialize_rpc_server,
-    Environment,
+    Environment,NodeType,
     Node,
 };
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
@@ -110,7 +110,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the RPC server.
         Self::initialize_rpc(&mut tasks, node, &status, &peers, ledger.reader(), prover.router()).await;
         // Initialize a new instance of the notification.
-        Self::initialize_notification(&mut tasks).await;
+        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone()).await;
 
         Ok(Self {
             local_ip,
@@ -293,7 +293,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance of the notification.
     ///
     #[inline]
-    async fn initialize_notification(tasks: &mut Tasks<task::JoinHandle<()>>) {
+    async fn initialize_notification(tasks: &mut Tasks<task::JoinHandle<()>>, ledger: LedgerReader<N>, prover: Arc<Prover<N, E>>) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
@@ -314,6 +314,30 @@ impl<N: Network, E: Environment> Server<N, E> {
 ==========================================================================================================
                 "
                 );
+
+                if E::NODE_TYPE == NodeType::Miner {
+                    // Retrieve the latest block height.
+                    let latest_block_height = ledger.latest_block_height();
+
+                    // Prepare a list of confirmed and pending coinbase records.
+                    let mut confirmed = vec![];
+                    let mut pending = vec![];
+
+                    // Iterate through the coinbase records from storage.
+                    for (block_height, record) in prover.to_coinbase_records() {
+                        // Filter the coinbase records by determining if they exist on the canonical chain.
+                        if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                            // Add the block to the appropriate list.
+                            match block_height + 2000 > latest_block_height {
+                                true => confirmed.push((block_height, record)),
+                                false => pending.push((block_height, record)),
+                            }
+                        }
+                    }
+
+                    info!("Mining Report (confirmed_blocks = {}, pending_blocks = {})", confirmed.len(), pending.len());
+                }
+
                 // Sleep for `120` seconds.
                 tokio::time::sleep(Duration::from_secs(120)).await;
             }
