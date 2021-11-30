@@ -691,6 +691,8 @@ struct Peer<N: Network, E: Environment> {
     node_type: NodeType,
     /// The node type of the peer.
     status: Status,
+    /// The block header of the peer.
+    block_header: BlockHeader<N>,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -727,7 +729,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
-            ledger_reader.latest_block_header(),
+            Data::Object(ledger_reader.latest_block_header()),
         );
         trace!("Sending '{}' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
@@ -745,6 +747,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             version: 0,
             node_type: NodeType::Client,
             status: Status::new(),
+            block_header: N::genesis_block().header().clone(),
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -1033,6 +1036,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
+                                    // Update the block header of the peer.
+                                    // Perform the deferred non-blocking deserialization of the block header.
+                                    peer.block_header = match block_header.deserialize().await {
+                                        Ok(block_header) => block_header,
+                                        Err(error) => {
+                                            warn!("[Ping] {}", error);
+                                            continue
+                                        },
+                                    };
+
                                     // Update the version of the peer.
                                     peer.version = version;
                                     // Update the node type of the peer.
@@ -1041,7 +1054,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.status.update(status);
 
                                     // Determine if the peer is on a fork (or unknown).
-                                    let is_fork = match ledger_reader.get_block_hash(block_header.height()) {
+                                    let is_fork = match ledger_reader.get_block_hash(peer.block_header.height()) {
                                         Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
                                         Err(_) => None,
                                     };
@@ -1077,7 +1090,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, latest_block_header);
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }

@@ -92,7 +92,7 @@ pub enum Message<N: Network, E: Environment> {
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>),
     /// Ping := (version, node_type, status, block_hash, block_header)
-    Ping(u32, NodeType, State, N::BlockHash, BlockHeader<N>),
+    Ping(u32, NodeType, State, N::BlockHash, Data<BlockHeader<N>>),
     /// Pong := (is_fork, block_locators)
     Pong(Option<bool>, Data<BlockLocators<N>>),
     /// UnconfirmedBlock := (block_height, block_hash, block)
@@ -156,9 +156,13 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version, node_type, status, block_hash, block_header) => {
-                Ok(bincode::serialize(&(version, node_type, status, block_hash, block_header))?)
-            }
+            Self::Ping(version, node_type, status, block_hash, block_header) => Ok(bincode::serialize(&(
+                version,
+                node_type,
+                status,
+                block_hash,
+                block_header.serialize_blocking()?,
+            ))?),
             Self::Pong(is_fork, block_locators) => {
                 let serialized_is_fork: u8 = match is_fork {
                     None => 0,
@@ -217,7 +221,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             },
             6 => Self::PeerResponse(bincode::deserialize(data)?),
             7 => {
-                let (version, node_type, status, block_hash, block_header) = bincode::deserialize(data)?;
+                let (version, node_type, status, block_hash) = bincode::deserialize(&data[0..38])?;
+                let block_header = Data::Buffer(data[38..].to_vec());
                 Self::Ping(version, node_type, status, block_hash, block_header)
             }
             8 => {
