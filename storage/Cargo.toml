@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-ledger"
+name = "snarkos-storage"
 version = "2.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A ledger for a decentralized operating system"
+description = "Storage for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [

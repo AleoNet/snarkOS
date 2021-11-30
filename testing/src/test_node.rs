@@ -22,7 +22,7 @@ use snarkos::{
     Message,
     NodeType,
 };
-use snarkos_ledger::BlockLocators;
+use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
 use pea2pea::{

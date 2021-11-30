@@ -20,8 +20,8 @@ edition = "2018"
 path = ".."
 features = ["test"]
 
-[dependencies.snarkos-ledger]
-path = "../ledger"
+[dependencies.snarkos-storage]
+path = "../storage"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"

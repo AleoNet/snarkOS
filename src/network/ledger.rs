@@ -26,7 +26,7 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
-use snarkos_ledger::{storage::Storage, BlockLocators, LedgerState};
+use snarkos_storage::{storage::Storage, BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;

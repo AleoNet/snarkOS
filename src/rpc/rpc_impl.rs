@@ -27,7 +27,7 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
-use snarkos_ledger::Metadata;
+use snarkos_storage::Metadata;
 use snarkvm::{
     dpc::{Block, BlockHeader, Network, Transaction, Transactions, Transition},
     utilities::FromBytes,

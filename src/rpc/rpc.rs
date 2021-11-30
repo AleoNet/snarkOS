@@ -418,7 +418,7 @@ mod tests {
     use crate::Client;
 
     use crate::helpers::Tasks;
-    use snarkos_ledger::{
+    use snarkos_storage::{
         storage::{rocksdb::RocksDB, Storage},
         LedgerState,
     };
@@ -1041,7 +1041,7 @@ mod tests {
         #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
         pub struct GetTransactionResponse {
             pub transaction: Transaction<Testnet2>,
-            pub metadata: snarkos_ledger::Metadata<Testnet2>,
+            pub metadata: snarkos_storage::Metadata<Testnet2>,
         }
 
         // Initialize a new ledger.

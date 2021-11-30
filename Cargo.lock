@@ -1868,7 +1868,7 @@ dependencies = [
  "self_update",
  "serde",
  "serde_json",
- "snarkos-ledger",
+ "snarkos-storage",
  "snarkvm",
  "structopt",
  "tempfile",
@@ -1882,7 +1882,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-ledger"
+name = "snarkos-storage"
 version = "2.0.0"
 dependencies = [
  "anyhow",
@@ -1912,7 +1912,7 @@ dependencies = [
  "peak_alloc",
  "rand",
  "snarkos",
- "snarkos-ledger",
+ "snarkos-storage",
  "snarkvm",
  "structopt",
  "tokio",

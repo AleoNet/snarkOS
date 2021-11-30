@@ -23,7 +23,7 @@ use crate::{
     Environment,
     Node,
 };
-use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;

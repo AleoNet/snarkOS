@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["ledger", "testing"]
+members = ["storage", "testing"]
 
 [features]
 default = []
@@ -33,8 +33,8 @@ futures = { version = "0.3.18", features = ["thread-pool"]}
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", features = ["crossterm"] }
 
-[dependencies.snarkos-ledger]
-path = "./ledger"
+[dependencies.snarkos-storage]
+path = "./storage"
 version = "2.0.0"
 
 [dependencies.aleo-std]

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{helpers::State, Environment, NodeType};
-use snarkos_ledger::BlockLocators;
+use snarkos_storage::BlockLocators;
 use snarkvm::prelude::*;
 
 use ::bytes::{Buf, BytesMut};
