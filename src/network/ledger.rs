@@ -435,14 +435,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 _ => State::Ready,
             };
 
-            // Retrieve the latest block height of this node.
-            let latest_block_height = self.canon.latest_block_height();
+            // Retrieve the latest cumulative weight of this node.
+            let latest_cumulative_weight = self.canon.latest_cumulative_weight();
             // Iterate through the connected peers, to determine if the ledger state is out of date.
             for (_, peer_state) in self.peers_state.read().await.iter() {
-                if let Some((_, _, _, block_height, _)) = peer_state {
-                    if *block_height > latest_block_height {
-                        // Sync if this ledger has fallen behind by 3 or more blocks.
-                        if block_height - latest_block_height > 2 {
+                if let Some((_, _, is_fork, block_height, block_locators)) = peer_state {
+                    // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
+                    let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
+                        Some(cumulative_weight) => cumulative_weight,
+                        None => *block_height as u128,
+                    };
+                    // If the cumulative weight is more, set the status to `Syncing`.
+                    if cumulative_weight > latest_cumulative_weight && is_fork.is_some() {
+                        // Sync if this difference in cumulative weight is greater than 2.
+                        if cumulative_weight - latest_cumulative_weight > 2 {
                             // Set the status to `Syncing`.
                             status = State::Syncing;
                             break;
