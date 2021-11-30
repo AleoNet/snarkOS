@@ -29,13 +29,14 @@ use crate::{
 };
 use snarkos_storage::Metadata;
 use snarkvm::{
-    dpc::{Block, BlockHeader, Network, Transaction, Transactions, Transition},
+    dpc::{Block, BlockHeader, MemoryPool, Network, Transaction, Transactions, Transition},
     utilities::FromBytes,
 };
 
 use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
 use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
@@ -184,6 +185,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
         let ledger_proof = self.ledger.get_ledger_inclusion_proof(record_commitment)?;
         Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
+    }
+
+    /// Returns transactions in the node's memory pool.
+    async fn get_memory_pool(&self) -> Result<Vec<Transaction<N>>, RpcError> {
+        Ok(vec![])
     }
 
     /// Returns a transaction with metadata given the transaction ID.

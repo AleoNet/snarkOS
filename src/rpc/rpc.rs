@@ -290,6 +290,10 @@ async fn handle_rpc<N: Network, E: Environment>(
             let result = rpc.get_ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
+        "getmemorypool" => {
+            let result = rpc.get_memory_pool().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "gettransaction" => {
             let result = rpc.get_transaction(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
