@@ -2,6 +2,11 @@
 
 COMMAND='cargo run --release -- --trial --verbosity 2'
 
+for word in $*;
+do
+  COMMAND="${COMMAND} ${word}"
+done
+
 function exit_node()
 {
     echo "Exiting..."
