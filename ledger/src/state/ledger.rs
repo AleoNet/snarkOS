@@ -591,7 +591,7 @@ impl<N: Network> LedgerState<N> {
         let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
         let cumulative_weight = self
             .latest_cumulative_weight()
-            .saturating_add(u64::MAX.saturating_sub(difficulty_target) as u128);
+            .saturating_add((u64::MAX / difficulty_target) as u128);
 
         // Construct the ledger root.
         let ledger_root = self.latest_ledger_root();
@@ -704,7 +704,7 @@ impl<N: Network> LedgerState<N> {
         // Ensure the expected cumulative weight is computed correctly.
         let expected_cumulative_weight = current_block
             .cumulative_weight()
-            .saturating_add(u64::MAX.saturating_sub(expected_difficulty_target) as u128);
+            .saturating_add((u64::MAX / expected_difficulty_target) as u128);
         if block.cumulative_weight() != expected_cumulative_weight {
             return Err(anyhow!(
                 "The given cumulative weight is incorrect. Found {}, but expected {}",
