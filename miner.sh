@@ -1,5 +1,5 @@
 #!/bin/bash
-
+   
 echo "Enter your miner address:";
 read MINER_ADDRESS
 
