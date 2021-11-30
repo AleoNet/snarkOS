@@ -68,7 +68,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         };
 
         // Initialize the ledger storage path.
-        let storage_path = node.storage_path(local_ip);
+        let ledger_storage_path = node.ledger_storage_path(local_ip);
+        // Initialize the prover storage path.
+        let prover_storage_path = node.prover_storage_path(local_ip);
         // Initialize the status indicator.
         let status = Status::new();
         // Initialize the terminator bit.
@@ -77,10 +79,11 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing peers.
         let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &storage_path, &status, &terminator, peers.router()).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &status, &terminator, peers.router()).await?;
         // Initialize a new instance for managing the prover.
-        let prover = Prover::new(
+        let prover = Prover::open::<RocksDB, _>(
             &mut tasks,
+            &prover_storage_path,
             miner,
             local_ip,
             &status,

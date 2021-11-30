@@ -100,8 +100,8 @@ impl Node {
         }
     }
 
-    /// Returns the storage path of the node.
-    pub(crate) fn storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+    /// Returns the storage path of the ledger.
+    pub(crate) fn ledger_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
         cfg_if::cfg_if! {
             if #[cfg(feature = "test")] {
                 // Tests may use any available ports, and removes the storage artifacts afterwards,
@@ -109,6 +109,19 @@ impl Node {
                 PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
             } else {
                 aleo_std::aleo_ledger_dir(self.network, self.dev)
+            }
+        }
+    }
+
+    /// Returns the storage path of the prover.
+    pub(crate) fn prover_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "test")] {
+                // Tests may use any available ports, and removes the storage artifacts afterwards,
+                // so that there is no need to adhere to a specific number assignment logic.
+                PathBuf::from(format!("/tmp/snarkos-test-prover-{}", _local_ip.port()))
+            } else {
+                aleo_std::aleo_prover_dir(self.network, self.dev)
             }
         }
     }

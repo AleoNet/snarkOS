@@ -55,6 +55,11 @@ impl<N: Network> ProverState<N> {
         self.coinbase.contains_record(commitment)
     }
 
+    /// Returns all coinbase records in storage.
+    pub fn to_coinbase_records(&self) -> Vec<Record<N>> {
+        self.coinbase.to_records()
+    }
+
     /// Returns the coinbase record for a given commitment.
     pub fn get_coinbase_record(&self, commitment: &N::Commitment) -> Result<Record<N>> {
         self.coinbase.get_record(commitment)
@@ -88,6 +93,11 @@ impl<N: Network> CoinbaseState<N> {
     /// Returns `true` if the given commitment exists in storage.
     fn contains_record(&self, commitment: &N::Commitment) -> Result<bool> {
         self.records.contains_key(commitment)
+    }
+
+    /// Returns all records in storage.
+    fn to_records(&self) -> Vec<Record<N>> {
+        self.records.values().collect()
     }
 
     /// Returns the record for a given commitment.

@@ -579,7 +579,7 @@ impl<N: Network> LedgerState<N> {
         transactions: &[Transaction<N>],
         terminator: &AtomicBool,
         rng: &mut R,
-    ) -> Result<Block<N>> {
+    ) -> Result<(Block<N>, Record<N>)> {
         // Prepare the new block.
         let previous_block_hash = self.latest_block_hash();
         let block_height = self.latest_block_height() + 1;
@@ -598,7 +598,7 @@ impl<N: Network> LedgerState<N> {
 
         // Craft a coinbase transaction.
         let amount = Block::<N>::block_reward(block_height);
-        let coinbase_transaction = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
+        let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
 
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
         // TODO (howardwu): Improve the performance and design of this.
@@ -638,7 +638,7 @@ impl<N: Network> LedgerState<N> {
             terminator,
             rng,
         ) {
-            Ok(block) => Ok(block),
+            Ok(block) => Ok((block, coinbase_record)),
             Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }
     }
@@ -1335,7 +1335,6 @@ struct TransactionState<N: Network> {
     transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
     serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
     commitments: DataMap<N::Commitment, N::TransitionID>,
-    events: DataMap<N::TransactionID, Vec<Event<N>>>,
 }
 
 impl<N: Network> TransactionState<N> {
@@ -1346,7 +1345,6 @@ impl<N: Network> TransactionState<N> {
             transitions: storage.open_map("transitions")?,
             serial_numbers: storage.open_map("serial_numbers")?,
             commitments: storage.open_map("commitments")?,
-            events: storage.open_map("events")?,
         })
     }
 
@@ -1414,7 +1412,7 @@ impl<N: Network> TransactionState<N> {
             };
         }
 
-        Transaction::from(*N::inner_circuit_id(), ledger_root, transitions, vec![])
+        Transaction::from(*N::inner_circuit_id(), ledger_root, transitions)
     }
 
     /// Returns the transaction metadata for a given transaction ID.
@@ -1457,10 +1455,6 @@ impl<N: Network> TransactionState<N> {
                     self.commitments.insert(commitment, &transition_id)?;
                 }
             }
-
-            // Insert the transaction events.
-            self.events.insert(&transaction_id, transaction.events())?;
-
             Ok(())
         }
     }
@@ -1495,10 +1489,6 @@ impl<N: Network> TransactionState<N> {
                 self.commitments.remove(commitment)?;
             }
         }
-
-        // Remove the transaction events.
-        self.events.remove(transaction_id)?;
-
         Ok(())
     }
 }

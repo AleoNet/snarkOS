@@ -709,7 +709,7 @@ mod tests {
         let address = account.address();
 
         // Mine the next block.
-        let block_1 = ledger_state
+        let (block_1, _) = ledger_state
             .mine_next_block(address, true, &[], &terminator, rng)
             .expect("Failed to mine");
         ledger_state.add_next_block(&block_1).expect("Failed to add next block to ledger");
@@ -829,7 +829,7 @@ mod tests {
         let address = account.address();
 
         // Mine the next block.
-        let block_1 = ledger_state
+        let (block_1, _) = ledger_state
             .mine_next_block(address, true, &[], &terminator, rng)
             .expect("Failed to mine");
         ledger_state.add_next_block(&block_1).expect("Failed to add next block to ledger");
@@ -989,7 +989,7 @@ mod tests {
         let address = account.address();
 
         // Mine the next block.
-        let block_1 = ledger_state
+        let (block_1, _) = ledger_state
             .mine_next_block(address, true, &[], &terminator, &mut rng)
             .expect("Failed to mine");
         ledger_state.add_next_block(&block_1).expect("Failed to add next block to ledger");
@@ -1161,7 +1161,7 @@ mod tests {
         let address = account.address();
 
         // Initialize a new transaction.
-        let transaction = Transaction::<Testnet2>::new_coinbase(address, AleoAmount(1234), true, &mut rng)
+        let (transaction, _) = Transaction::<Testnet2>::new_coinbase(address, AleoAmount(1234), true, &mut rng)
             .expect("Failed to create a coinbase transaction");
 
         // Initialize a new rpc.
