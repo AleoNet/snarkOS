@@ -282,7 +282,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.update_block_requests().await;
 
                 debug!(
-                    "Status Report (type = {}, status = {}, latest_block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
+                    "Status Report (type = {}, status = {}, block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
                     E::NODE_TYPE,
                     self.status,
                     self.canon.latest_block_height(),
