@@ -890,51 +890,51 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
 
-            // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
-            // If the node is a sync node and the node is currently syncing,
-            // reduce the number of connections down to the minimum threshold,
-            // to improve the speed with which the node syncs back to tip.
-            if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() && self.number_of_block_requests().await > 0 {
-                debug!("Temporarily reducing the number of connected peers to sync");
-
-                // Lock peers_state and block_requests for further processing.
-                let peers_state = self.peers_state.read().await;
-                let block_requests = self.block_requests.read().await;
-
-                // Determine the peers to disconnect from.
-                // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
-                let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
-                let peer_ips_to_disconnect = peers_state
-                    .iter()
-                    .filter(|(&peer_ip, _)| {
-                        let peer_str = peer_ip.to_string();
-                        !E::SYNC_NODES.contains(&peer_str.as_str())
-                            && !E::BEACON_NODES.contains(&peer_str.as_str())
-                            && !block_requests.contains_key(&peer_ip)
-                    })
-                    .take(num_excess_peers)
-                    .map(|(&ip, _)| ip)
-                    .collect::<Vec<SocketAddr>>();
-
-                // Release the lock over peers_state and block_requests.
-                drop(peers_state);
-                drop(block_requests);
-
-                trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
-
-                // Proceed to send disconnect requests to these peers.
-                for peer_ip in peer_ips_to_disconnect {
-                    info!("Disconnecting from {} (disconnecting to sync)", peer_ip);
-                    // Remove all entries of the peer from the ledger.
-                    self.remove_peer(&peer_ip).await;
-                    // Update the status of the ledger.
-                    self.update_status().await;
-                    // Route a `PeerRestricted` to the peers.
-                    if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
-                        warn!("[PeerRestricted] {}", error);
-                    }
-                }
-            }
+            // // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
+            // // If the node is a sync node and the node is currently syncing,
+            // // reduce the number of connections down to the minimum threshold,
+            // // to improve the speed with which the node syncs back to tip.
+            // if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() && self.number_of_block_requests().await > 0 {
+            //     debug!("Temporarily reducing the number of connected peers to sync");
+            //
+            //     // Lock peers_state and block_requests for further processing.
+            //     let peers_state = self.peers_state.read().await;
+            //     let block_requests = self.block_requests.read().await;
+            //
+            //     // Determine the peers to disconnect from.
+            //     // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
+            //     let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
+            //     let peer_ips_to_disconnect = peers_state
+            //         .iter()
+            //         .filter(|(&peer_ip, _)| {
+            //             let peer_str = peer_ip.to_string();
+            //             !E::SYNC_NODES.contains(&peer_str.as_str())
+            //                 && !E::BEACON_NODES.contains(&peer_str.as_str())
+            //                 && !block_requests.contains_key(&peer_ip)
+            //         })
+            //         .take(num_excess_peers)
+            //         .map(|(&ip, _)| ip)
+            //         .collect::<Vec<SocketAddr>>();
+            //
+            //     // Release the lock over peers_state and block_requests.
+            //     drop(peers_state);
+            //     drop(block_requests);
+            //
+            //     trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
+            //
+            //     // Proceed to send disconnect requests to these peers.
+            //     for peer_ip in peer_ips_to_disconnect {
+            //         info!("Disconnecting from {} (disconnecting to sync)", peer_ip);
+            //         // Remove all entries of the peer from the ledger.
+            //         self.remove_peer(&peer_ip).await;
+            //         // Update the status of the ledger.
+            //         self.update_status().await;
+            //         // Route a `PeerRestricted` to the peers.
+            //         if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+            //             warn!("[PeerRestricted] {}", error);
+            //         }
+            //     }
+            // }
         }
     }
 
