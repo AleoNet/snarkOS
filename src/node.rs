@@ -26,6 +26,7 @@ use crate::{
     NodeType,
     SyncNode,
 };
+use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::{anyhow, Result};
@@ -86,7 +87,7 @@ impl Node {
         // Parse optional subcommands first.
         match self.commands {
             Some(command) => {
-                println!("{}", command.parse()?);
+                println!("{}", command.parse().await?);
                 Ok(())
             }
             None => match (self.network, self.miner.is_some(), self.trial, self.sync) {
@@ -206,14 +207,17 @@ pub enum Command {
     Update(Update),
     #[structopt(name = "experimental", about = "Experimental features")]
     Experimental(Experimental),
+    #[structopt(name = "miner", about = "Miner statistics")]
+    Miner(MinerSubcommand),
 }
 
 impl Command {
-    pub fn parse(self) -> Result<String> {
+    pub async fn parse(self) -> Result<String> {
         match self {
             Self::Clean(command) => command.parse(),
             Self::Update(command) => command.parse(),
             Self::Experimental(command) => command.parse(),
+            Self::Miner(command) => command.parse().await,
         }
     }
 }
@@ -365,6 +369,82 @@ impl NewAccount {
         output += &format!(" {:>12}  {}\n", "Address".cyan().bold(), account.address());
 
         Ok(output)
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct MinerSubcommand {
+    #[structopt(subcommand)]
+    commands: MinerCommands,
+}
+
+impl MinerSubcommand {
+    pub async fn parse(self) -> Result<String> {
+        match self.commands {
+            MinerCommands::Stats(command) => command.parse().await,
+        }
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub enum MinerCommands {
+    #[structopt(name = "stats", about = "Get stats about a miner.")]
+    Stats(MinerStats),
+}
+
+#[derive(StructOpt, Debug)]
+pub struct MinerStats {
+    #[structopt()]
+    address: String,
+}
+
+impl MinerStats {
+    pub async fn parse(self) -> Result<String> {
+        // Parse the input address.
+        let miner = Address::<Testnet2>::from_str(&self.address)?;
+
+        // Initialize the node.
+        let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
+
+        // Initialize a new TCP listener at the given IP.
+        let local_ip = match tokio::net::TcpListener::bind(node.node).await {
+            Ok(listener) => listener.local_addr().expect("Failed to fetch the local IP"),
+            Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
+        };
+
+        // Initialize the ledger storage.
+        let ledger_storage_path = node.ledger_storage_path(local_ip);
+        let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
+
+        // Initialize the prover storage.
+        let prover_storage_path = node.prover_storage_path(local_ip);
+        let prover = snarkos_storage::ProverState::<Testnet2>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
+
+        // Retrieve the latest block height.
+        let latest_block_height = ledger.latest_block_height();
+
+        // Prepare a list of confirmed and pending coinbase records.
+        let mut confirmed = vec![];
+        let mut pending = vec![];
+
+        // Iterate through the coinbase records from storage.
+        for (block_height, record) in prover.to_coinbase_records() {
+            // Filter the coinbase records by determining if they exist on the canonical chain.
+            if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                // Add the block to the appropriate list.
+                match block_height + 2000 < latest_block_height {
+                    true => confirmed.push((block_height, record)),
+                    false => pending.push((block_height, record)),
+                }
+            }
+        }
+
+        return Ok(format!(
+            "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+            confirmed.len(),
+            pending.len(),
+            miner
+        ));
     }
 }
 
