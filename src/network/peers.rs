@@ -729,7 +729,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
-            Data::Object(ledger_reader.latest_block_header()),
+            ledger_reader.latest_block_header(),
         );
         trace!("Sending '{}' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
@@ -1036,15 +1036,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
-                                    // Update the block header of the peer.
-                                    // Perform the deferred non-blocking deserialization of the block header.
-                                    peer.block_header = match block_header.deserialize().await {
-                                        Ok(block_header) => block_header,
-                                        Err(error) => {
-                                            warn!("[Ping] {}", error);
-                                            continue
-                                        },
-                                    };
 
                                     // Update the version of the peer.
                                     peer.version = version;
@@ -1052,6 +1043,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.node_type = node_type;
                                     // Update the status of the peer.
                                     peer.status.update(status);
+                                    // Update the block header of the peer.
+                                    peer.block_header = block_header;
 
                                     // Determine if the peer is on a fork (or unknown).
                                     let is_fork = match ledger_reader.get_block_hash(peer.block_header.height()) {
@@ -1090,7 +1083,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, latest_block_header);
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }

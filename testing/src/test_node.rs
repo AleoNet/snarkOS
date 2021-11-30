@@ -144,7 +144,7 @@ impl TestNode {
                 node.node_type(),
                 node.state(),
                 genesis.hash(),
-                Data::Object(genesis.header().clone()),
+                genesis.header().clone(),
             );
 
             loop {
@@ -307,8 +307,7 @@ impl Reading for TestNode {
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
             ClientMessage::Ping(version, _peer_type, _peer_state, _block_hash, block_header) => {
-                self.process_ping(source, version, block_header.deserialize().await.height())
-                    .await?
+                self.process_ping(source, version, block_header.height()).await?
             }
             ClientMessage::Pong(_is_fork, _block_locators) => {}
             ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
