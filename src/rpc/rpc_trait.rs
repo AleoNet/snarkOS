@@ -78,7 +78,7 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
     async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError>;
 
-    #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getconnectedpeers.md")]
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError>;
 
     // #[doc = include_str!("../documentation/public_endpoints/getnodestate.md")]

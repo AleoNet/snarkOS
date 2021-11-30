@@ -24,8 +24,8 @@ default = []
 test = []
 
 [dependencies]
-#snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "040825e" }
-snarkvm = { path = "../snarkVM" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "29bfb3a" }
+#snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
 futures = { version = "0.3.18", features = ["thread-pool"]}
