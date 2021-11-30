@@ -144,7 +144,7 @@ impl TestNode {
                 node.node_type(),
                 node.state(),
                 genesis.hash(),
-                genesis.header().clone(),
+                Data::Object(genesis.header().clone()),
             );
 
             loop {
@@ -307,6 +307,8 @@ impl Reading for TestNode {
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
             ClientMessage::Ping(version, _peer_type, _peer_state, _block_hash, block_header) => {
+                // Deserialise the block header.
+                let block_header = block_header.deserialize().await.unwrap();
                 self.process_ping(source, version, block_header.height()).await?
             }
             ClientMessage::Pong(_is_fork, _block_locators) => {}
