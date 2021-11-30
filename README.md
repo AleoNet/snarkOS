@@ -75,7 +75,7 @@ Start by following the instructions in the [Build Guide](#2-build-guide).
 
 Next, to generate an Aleo miner address, run:
 ```
-snarkos experimental new_account
+snarkos experimental new_account 
 ```
 or from the snarkOS directory, run:
 ```
@@ -114,6 +114,17 @@ aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 - Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
 - Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
+
+### 3. I can't generate a new address ### 
+
+- Before running the command above (`snarkos experimental new_account`) try `source ~/.bashrc` 
+- Also double check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
+
+### 4. Can I coordinate mining across multiple machines/instances of snarkOS? ### 
+ 
+- Yes. Just spin up multiple instances of snarkOS across multiple machines (not the same machine) and input
+  the same miner address. At the moment, Aleo does not integrate with any other mining pool protocols (like
+  [stratum](https://braiins.com/stratum-v2)). But if anyone wants to implement, please apply for a grant!
 
 ## 5. Command Line Interface
 
