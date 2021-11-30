@@ -408,18 +408,12 @@ impl MinerStats {
         // Initialize the node.
         let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
 
-        // Initialize a new TCP listener at the given IP.
-        let local_ip = match tokio::net::TcpListener::bind(node.node).await {
-            Ok(listener) => listener.local_addr().expect("Failed to fetch the local IP"),
-            Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
-        };
-
         // Initialize the ledger storage.
-        let ledger_storage_path = node.ledger_storage_path(local_ip);
+        let ledger_storage_path = node.ledger_storage_path("0.0.0.0".parse().unwrap());
         let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
 
         // Initialize the prover storage.
-        let prover_storage_path = node.prover_storage_path(local_ip);
+        let prover_storage_path = node.prover_storage_path("0.0.0.0".parse().unwrap());
         let prover = snarkos_storage::ProverState::<Testnet2>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
 
         // Retrieve the latest block height.
@@ -434,7 +428,7 @@ impl MinerStats {
             // Filter the coinbase records by determining if they exist on the canonical chain.
             if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
                 // Add the block to the appropriate list.
-                match block_height + 2000 < latest_block_height {
+                match block_height + 1024 < latest_block_height {
                     true => confirmed.push((block_height, record)),
                     false => pending.push((block_height, record)),
                 }
