@@ -17,5 +17,8 @@
 pub(crate) mod ledger;
 pub use ledger::{LedgerState, Metadata, MAXIMUM_BLOCK_LOCATORS, MAXIMUM_LINEAR_BLOCK_LOCATORS, MAXIMUM_QUADRATIC_BLOCK_LOCATORS};
 
+pub(crate) mod prover;
+pub use prover::ProverState;
+
 #[cfg(test)]
 mod tests;
