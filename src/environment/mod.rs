@@ -62,12 +62,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const SYNC_NODES: [&'static str; 13] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136", "127.0.0.1:4137", "127.0.0.1:4138", "127.0.0.1:4139", "127.0.0.1:4140", "127.0.0.1:4141", "127.0.0.1:4142", "127.0.0.1:4143", "127.0.0.1:4144"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
-    const HEARTBEAT_IN_SECS: u64 = 11;
+    const HEARTBEAT_IN_SECS: u64 = 9;
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 1;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 95;
+    const PING_SLEEP_IN_SECS: u64 = 60;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes

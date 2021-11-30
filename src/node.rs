@@ -429,10 +429,13 @@ impl MinerStats {
         for (block_height, record) in prover.to_coinbase_records() {
             // Filter the coinbase records by determining if they exist on the canonical chain.
             if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
-                // Add the block to the appropriate list.
-                match block_height + 1024 < latest_block_height {
-                    true => confirmed.push((block_height, record)),
-                    false => pending.push((block_height, record)),
+                // Ensure the record owner matches.
+                if record.owner() == miner {
+                    // Add the block to the appropriate list.
+                    match block_height + 1024 < latest_block_height {
+                        true => confirmed.push((block_height, record)),
+                        false => pending.push((block_height, record)),
+                    }
                 }
             }
         }
