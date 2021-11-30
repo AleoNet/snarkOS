@@ -20,8 +20,9 @@ use crate::{
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
     rpc::initialize_rpc_server,
-    Environment,NodeType,
+    Environment,
     Node,
+    NodeType,
 };
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
@@ -335,7 +336,11 @@ impl<N: Network, E: Environment> Server<N, E> {
                         }
                     }
 
-                    info!("Mining Report (confirmed_blocks = {}, pending_blocks = {})", confirmed.len(), pending.len());
+                    info!(
+                        "Mining Report (confirmed_blocks = {}, pending_blocks = {})",
+                        confirmed.len(),
+                        pending.len()
+                    );
                 }
 
                 // Sleep for `120` seconds.
