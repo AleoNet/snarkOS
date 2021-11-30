@@ -156,13 +156,10 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version, node_type, status, block_hash, block_header) => Ok(bincode::serialize(&(
-                version,
-                node_type,
-                status,
-                block_hash,
-                block_header.serialize_blocking()?,
-            ))?),
+            Self::Ping(version, node_type, status, block_hash, block_header) => {
+                let first_part = bincode::serialize(&(version, node_type, status, block_hash))?;
+                Ok([first_part, block_header.serialize_blocking()?].concat())
+            }
             Self::Pong(is_fork, block_locators) => {
                 let serialized_is_fork: u8 = match is_fork {
                     None => 0,
