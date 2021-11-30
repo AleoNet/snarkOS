@@ -2,7 +2,7 @@
 
 SCRIPTNAME="miner.sh"
 ARGS="$@"
-BRANCH="testnet2"
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 self_update() {
     git fetch
