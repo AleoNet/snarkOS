@@ -46,7 +46,7 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
 
  ==================================================================================================
 
-                               Aleo Testnet2 - Incentivization Period
+                         Welcome to Aleo Testnet2 - Incentivization Period
 
  ==================================================================================================
 
@@ -74,7 +74,7 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
 
          1. Participants will be required to KYC at the end of incentivized testnet2.
          2. Participants must demonstrate ownership of their Aleo miner address.
-         3. [For United States & Canada] Participants must demonstrate accreditation status.
+         3. [For United States & Canada] Participants must be accredited investors.
          4. The Aleo team reserves the right to maintain discretion in rewarding participants.
 
      Thank you for participating in incentivized testnet2 and for supporting privacy!

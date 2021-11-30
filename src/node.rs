@@ -408,12 +408,18 @@ impl MinerStats {
         // Initialize the node.
         let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
 
+        // Initialize a new TCP listener at the given IP.
+        let local_ip = match tokio::net::TcpListener::bind(node.node).await {
+            Ok(listener) => listener.local_addr().expect("Failed to fetch the local IP"),
+            Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
+        };
+
         // Initialize the ledger storage.
-        let ledger_storage_path = node.ledger_storage_path("0.0.0.0".parse().unwrap());
+        let ledger_storage_path = node.ledger_storage_path(local_ip);
         let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
 
         // Initialize the prover storage.
-        let prover_storage_path = node.prover_storage_path("0.0.0.0".parse().unwrap());
+        let prover_storage_path = node.prover_storage_path(local_ip);
         let prover = snarkos_storage::ProverState::<Testnet2>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
 
         // Retrieve the latest block height.
