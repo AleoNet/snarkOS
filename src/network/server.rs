@@ -307,7 +307,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
-                info!("{}", notification_message());
+                info!("{}", notification_message(miner.clone()));
 
                 if E::NODE_TYPE == NodeType::Miner {
                     if let Some(miner) = miner {

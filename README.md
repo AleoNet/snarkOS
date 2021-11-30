@@ -148,6 +148,7 @@ SUBCOMMANDS:
     clean           Removes the ledger files from storage
     experimental    Experimental features
     help            Prints this message or the help of the given subcommand(s)
+    miner           Miner commands and settings
     update          Updates snarkOS to the latest version
 ```
 

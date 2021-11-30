@@ -133,14 +133,14 @@ impl Node {
                 let miner_address = Address::<N>::from_str(address)?;
                 println!("{}", crate::display::welcome_message());
                 println!("Your Aleo address is {}.\n", miner_address);
-                println!("Starting a mining node on {}.\n", N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message());
+                println!("Starting a mining node on {}.", N::NETWORK_NAME);
+                println!("{}", crate::display::notification_message::<N>(Some(miner_address)));
                 Some(miner_address)
             }
             _ => {
                 println!("{}", crate::display::welcome_message());
-                println!("Starting a client node on {}.\n", N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message());
+                println!("Starting a client node on {}.", N::NETWORK_NAME);
+                println!("{}", crate::display::notification_message::<N>(None));
                 None
             }
         };
@@ -209,7 +209,7 @@ pub enum Command {
     Update(Update),
     #[structopt(name = "experimental", about = "Experimental features")]
     Experimental(Experimental),
-    #[structopt(name = "miner", about = "Miner statistics")]
+    #[structopt(name = "miner", about = "Miner commands and settings")]
     Miner(MinerSubcommand),
 }
 
@@ -390,7 +390,7 @@ impl MinerSubcommand {
 
 #[derive(StructOpt, Debug)]
 pub enum MinerCommands {
-    #[structopt(name = "stats", about = "Get stats about a miner.")]
+    #[structopt(name = "stats", about = "Prints statistics for the miner.")]
     Stats(MinerStats),
 }
 
