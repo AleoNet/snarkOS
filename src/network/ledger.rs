@@ -697,14 +697,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             return;
         }
 
-        // Retrieve the latest block height of this ledger.
+        // Retrieve the latest block height and cumulative weight of this ledger.
         let latest_block_height = self.canon.latest_block_height();
+        let latest_cumulative_weight = self.canon.latest_cumulative_weight();
 
         // Iterate through the peers to check if this node needs to catch up, and determine a peer to sync with.
         // Prioritize the sync nodes before regular peers.
         let mut maximal_peer = None;
         let mut maximal_peer_is_fork = None;
         let mut maximum_block_height = latest_block_height;
+        let mut maximum_cumulative_weight = latest_cumulative_weight;
         let mut maximum_block_locators = Default::default();
 
         // Determine if the peers state has any sync nodes.
@@ -722,13 +724,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         for (peer_ip, peer_state) in peers_state.iter() {
             // Only update the maximal peer if there are no sync nodes or the peer is a sync node.
             if !peers_contains_sync_node || sync_nodes.contains(peer_ip) {
+                // Update the maximal peer state if the peer is ahead and the peer knows if you are a fork or not.
+                // This accounts for (Case 1 and Case 2(a))
                 if let Some((_, _, is_fork, block_height, block_locators)) = peer_state {
-                    // Update the maximal peer state if the peer is ahead and the peer knows if you are a fork or not.
-                    // This accounts for (Case 1 and Case 2(a))
-                    if *block_height > maximum_block_height && is_fork.is_some() {
+                    // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
+                    let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
+                        Some(cumulative_weight) => cumulative_weight,
+                        None => *block_height as u128,
+                    };
+                    // If the cumulative weight is more, set this peer as the maximal peer.
+                    if cumulative_weight > maximum_cumulative_weight && is_fork.is_some() {
                         maximal_peer = Some(*peer_ip);
                         maximal_peer_is_fork = *is_fork;
                         maximum_block_height = *block_height;
+                        maximum_cumulative_weight = cumulative_weight;
                         maximum_block_locators = block_locators.clone();
                     }
                 }
@@ -738,8 +747,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Release the lock over peers_state.
         drop(peers_state);
 
-        // Case 1 - Ensure the peer has a higher block height than this ledger.
-        if latest_block_height >= maximum_block_height {
+        // Case 1 - Ensure the peer has a heavier canonical chain than this ledger.
+        if latest_cumulative_weight >= maximum_cumulative_weight {
             return;
         }
 
@@ -802,11 +811,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
                 // Case 2(c) - This ledger is on a fork of the peer.
                 else {
-                    // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger,
-                    // proceed to switch to the fork.
-                    if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH
-                    {
-                        info!("Found a longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
+                    // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger, proceed to switch to the fork.
+                    if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
+                        info!("Discovered a canonical chain from {} at block {} with cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                         // If the latest block is the same as the maximum common ancestor, do not revert.
                         if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor).await {
                             return;
@@ -825,14 +832,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                         // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
                         if latest_block_height.saturating_sub(*first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
-                            debug!("Peer {} is outside of the fork range of this ledger, disconnecting", peer_ip);
+                            debug!("Peer {} has exceeded the permitted fork range of the protocol, disconnecting", peer_ip);
                             self.disconnect(peer_ip, "exceeded fork range").await;
                             return;
                         }
                         // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `MAXIMUM_FORK_DEPTH`.
                         // Revert to the common ancestor anyways.
                         else {
-                            info!("Found a potentially longer chain from {} starting at block {}", peer_ip, maximum_common_ancestor);
+                            info!("Discovered a potentially better canonical chain from {} at block {} with cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                             match self.revert_to_block_height(maximum_common_ancestor).await {
                                 true => (maximum_common_ancestor, true),
                                 false => return
