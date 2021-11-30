@@ -85,7 +85,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let prover = Prover::open::<RocksDB, _>(
             &mut tasks,
             &prover_storage_path,
-            miner,
+            miner.clone(),
             local_ip,
             &status,
             &terminator,
@@ -111,7 +111,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the RPC server.
         Self::initialize_rpc(&mut tasks, node, &status, &peers, ledger.reader(), prover.router()).await;
         // Initialize a new instance of the notification.
-        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone()).await;
+        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner.clone()).await;
 
         Ok(Self {
             local_ip,
@@ -294,7 +294,12 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance of the notification.
     ///
     #[inline]
-    async fn initialize_notification(tasks: &mut Tasks<task::JoinHandle<()>>, ledger: LedgerReader<N>, prover: Arc<Prover<N, E>>) {
+    async fn initialize_notification(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        ledger: LedgerReader<N>,
+        prover: Arc<Prover<N, E>>,
+        miner: Option<Address<N>>,
+    ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
@@ -304,43 +309,51 @@ impl<N: Network, E: Environment> Server<N, E> {
                 info!(
                     r"
 
-==========================================================================================================
-                                  Aleo Testnet2 - Incentivization Period
-==========================================================================================================
+ =========================================================================================================
+                                   Aleo Testnet2 - Incentivization Period
+ =========================================================================================================
 
-    In preparation for the incentivization period, testnet2 will automatically reset within 48 hours.
-    Please ensure your Aleo node is running either the `run-client.sh` or `run-miner.sh` script,
-    in order to automatically upgrade to the incentivized testnet.
+     The incentivized testnet is about to begin:
+         1. Generate one Aleo account, and save the account private key and view key.
+         2. Ensure your Aleo node is running the `run-client.sh` or `run-miner.sh` script,
+            in order to automatically stay up to date on the incentivized testnet.
+         3. File all issues on Github at https://github.com/AleoHQ/snarkOS/issues/new/choose
+         4. Please be respectful to all members of the Aleo community.
 
-==========================================================================================================
+     Thank you for participating in the incentivized testnet and for supporting privacy!
+
+ =========================================================================================================
                 "
                 );
 
                 if E::NODE_TYPE == NodeType::Miner {
-                    // Retrieve the latest block height.
-                    let latest_block_height = ledger.latest_block_height();
+                    if let Some(miner) = miner {
+                        // Retrieve the latest block height.
+                        let latest_block_height = ledger.latest_block_height();
 
-                    // Prepare a list of confirmed and pending coinbase records.
-                    let mut confirmed = vec![];
-                    let mut pending = vec![];
+                        // Prepare a list of confirmed and pending coinbase records.
+                        let mut confirmed = vec![];
+                        let mut pending = vec![];
 
-                    // Iterate through the coinbase records from storage.
-                    for (block_height, record) in prover.to_coinbase_records() {
-                        // Filter the coinbase records by determining if they exist on the canonical chain.
-                        if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
-                            // Add the block to the appropriate list.
-                            match block_height + 2000 < latest_block_height {
-                                true => confirmed.push((block_height, record)),
-                                false => pending.push((block_height, record)),
+                        // Iterate through the coinbase records from storage.
+                        for (block_height, record) in prover.to_coinbase_records() {
+                            // Filter the coinbase records by determining if they exist on the canonical chain.
+                            if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                                // Add the block to the appropriate list.
+                                match block_height + 2000 < latest_block_height {
+                                    true => confirmed.push((block_height, record)),
+                                    false => pending.push((block_height, record)),
+                                }
                             }
                         }
-                    }
 
-                    info!(
-                        "Mining Report (confirmed_blocks = {}, pending_blocks = {})",
-                        confirmed.len(),
-                        pending.len()
-                    );
+                        info!(
+                            "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+                            confirmed.len(),
+                            pending.len(),
+                            miner
+                        );
+                    }
                 }
 
                 // Sleep for `120` seconds.
