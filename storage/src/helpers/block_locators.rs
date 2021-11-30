@@ -222,7 +222,7 @@ mod tests {
         // Serialize
         let expected_bytes = expected_block_locators.to_bytes_le().unwrap();
         let candidate_bytes = bincode::serialize(&expected_block_locators).unwrap();
-        assert_eq!(936, expected_bytes.len(), "Update me if serialization has changed");
+        assert_eq!(944, expected_bytes.len(), "Update me if serialization has changed");
         // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
         assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
 

@@ -83,11 +83,14 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
     .bold();
 
     if let Some(miner) = miner {
-        output += &format!("
+        output += &format!(
+            "
      Your Aleo miner address is {}
 
  ==================================================================================================
-", miner);
+",
+            miner
+        );
     }
 
     output
