@@ -59,18 +59,18 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The list of beacon nodes to bootstrap the node server with.
     const BEACON_NODES: [&'static str; 0] = [];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: [&'static str; 10] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136", "127.0.0.1:4137", "127.0.0.1:4138", "127.0.0.1:4139", "127.0.0.1:4140", "127.0.0.1:4141"];
+    const SYNC_NODES: [&'static str; 13] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136", "127.0.0.1:4137", "127.0.0.1:4138", "127.0.0.1:4139", "127.0.0.1:4140", "127.0.0.1:4141", "127.0.0.1:4142", "127.0.0.1:4143", "127.0.0.1:4144"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
-    const HEARTBEAT_IN_SECS: u64 = 8;
+    const HEARTBEAT_IN_SECS: u64 = 9;
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 1;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 90;
+    const PING_SLEEP_IN_SECS: u64 = 100;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
     /// The duration in seconds after which to expire a failure from a peer.
     const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
 
@@ -82,8 +82,6 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const MAXIMUM_CONNECTION_FAILURES: u32 = 5;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
-    /// The maximum number of sync nodes that the node may be connected to at any time.
-    const MAXIMUM_CONNECTED_SYNC_NODES: usize = 1;
 
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
@@ -136,12 +134,13 @@ pub struct ClientTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
-    const SYNC_NODES: [&'static str; 10] = [
+    const SYNC_NODES: [&'static str; 13] = [
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
+        "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 51;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 15;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 35;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -151,11 +150,12 @@ pub struct MinerTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
-    const SYNC_NODES: [&'static str; 10] = [
+    const SYNC_NODES: [&'static str; 13] = [
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
+        "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 9;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 7;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 15;
     const COINBASE_IS_PUBLIC: bool = true;
 }

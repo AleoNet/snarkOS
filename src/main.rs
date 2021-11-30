@@ -21,6 +21,10 @@ use structopt::StructOpt;
 use tokio::runtime;
 
 fn main() -> Result<()> {
+    if num_cpus::get() < 16 {
+        eprintln!("\nWARNING - Your machine must have at least 16-cores to run a node.\n");
+    }
+
     // Parse the provided arguments.
     let node = Node::from_args();
 
