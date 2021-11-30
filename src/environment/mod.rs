@@ -47,7 +47,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The specified type of node.
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 9;
+    const MESSAGE_VERSION: u32 = 10;
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
 
@@ -155,7 +155,7 @@ impl<N: Network> Environment for MinerTrial<N> {
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 5;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 15;
     const COINBASE_IS_PUBLIC: bool = true;
 }
