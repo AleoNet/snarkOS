@@ -87,7 +87,7 @@ impl Node {
         // Parse optional subcommands first.
         match self.commands {
             Some(command) => {
-                println!("{}", command.parse().await?);
+                println!("{}", command.parse()?);
                 Ok(())
             }
             None => match (self.network, self.miner.is_some(), self.trial, self.sync) {
@@ -214,12 +214,12 @@ pub enum Command {
 }
 
 impl Command {
-    pub async fn parse(self) -> Result<String> {
+    pub fn parse(self) -> Result<String> {
         match self {
             Self::Clean(command) => command.parse(),
             Self::Update(command) => command.parse(),
             Self::Experimental(command) => command.parse(),
-            Self::Miner(command) => command.parse().await,
+            Self::Miner(command) => command.parse(),
         }
     }
 }
@@ -381,9 +381,9 @@ pub struct MinerSubcommand {
 }
 
 impl MinerSubcommand {
-    pub async fn parse(self) -> Result<String> {
+    pub fn parse(self) -> Result<String> {
         match self.commands {
-            MinerCommands::Stats(command) => command.parse().await,
+            MinerCommands::Stats(command) => command.parse(),
         }
     }
 }
@@ -401,25 +401,21 @@ pub struct MinerStats {
 }
 
 impl MinerStats {
-    pub async fn parse(self) -> Result<String> {
+    pub fn parse(self) -> Result<String> {
         // Parse the input address.
         let miner = Address::<Testnet2>::from_str(&self.address)?;
 
         // Initialize the node.
         let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
 
-        // Initialize a new TCP listener at the given IP.
-        let local_ip = match tokio::net::TcpListener::bind(node.node).await {
-            Ok(listener) => listener.local_addr().expect("Failed to fetch the local IP"),
-            Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
-        };
+        let ip = "0.0.0.0:1000".parse().unwrap();
 
         // Initialize the ledger storage.
-        let ledger_storage_path = node.ledger_storage_path(local_ip);
+        let ledger_storage_path = node.ledger_storage_path(ip);
         let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
 
         // Initialize the prover storage.
-        let prover_storage_path = node.prover_storage_path(local_ip);
+        let prover_storage_path = node.prover_storage_path(ip);
         let prover = snarkos_storage::ProverState::<Testnet2>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
 
         // Retrieve the latest block height.
