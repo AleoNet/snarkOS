@@ -35,7 +35,7 @@ use hyper::{
 use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::oneshot;
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
@@ -405,7 +405,9 @@ fn result_to_response<T: Serialize>(
 ) -> jrt::Response<serde_json::Value, String> {
     match result {
         Ok(res) => {
-            let result = serde_json::to_value(&res).unwrap_or_default();
+            let candidate_string = serde_json::to_string(&res).unwrap_or_default();
+            let result = serde_json::Value::from_str(&candidate_string).unwrap_or_default();
+
             jrt::Response::result(jrt::Version::V2, result, request.id.clone())
         }
         Err(err) => jrt::Response::error(jrt::Version::V2, err, request.id.clone()),
