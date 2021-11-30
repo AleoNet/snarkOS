@@ -139,8 +139,8 @@ impl<N: Network> Environment for ClientTrial<N> {
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 50;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 25;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 65;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -155,7 +155,7 @@ impl<N: Network> Environment for MinerTrial<N> {
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 11;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 15;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 25;
     const COINBASE_IS_PUBLIC: bool = true;
 }
