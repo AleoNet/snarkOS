@@ -607,14 +607,22 @@ impl<N: Network> LedgerState<N> {
             .filter(|transaction| {
                 for serial_number in transaction.serial_numbers() {
                     if let Ok(true) = self.contains_serial_number(serial_number) {
-                        trace!("Miner is filtering out transaction {}", transaction.transaction_id());
+                        trace!(
+                            "Miner is filtering out transaction {} (serial_number {})",
+                            transaction.transaction_id(),
+                            serial_number
+                        );
                         return false;
                     }
                 }
 
                 for commitment in transaction.commitments() {
                     if let Ok(true) = self.contains_commitment(commitment) {
-                        trace!("Miner is filtering out transaction {}", transaction.transaction_id());
+                        trace!(
+                            "Miner is filtering out transaction {} (commitment {})",
+                            transaction.transaction_id(),
+                            commitment
+                        );
                         return false;
                     }
                 }
