@@ -102,6 +102,14 @@ Enter your Aleo miner address:
 aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+After the mining node has booted up, a periodic report is provided with the status of mined blocks:
+```
+INFO Mining Report (confirmed_blocks = 1, pending_blocks = 5, miner_address = aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
+```
+This report can also be queried after the mining node has already ran,
+by running `cargo run --release -- miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+in the snarkOS directory, or `snarkos miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
+
 ## 4. Testnet2 FAQs
 
 ### 1. My node is unable to compile.
