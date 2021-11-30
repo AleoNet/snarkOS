@@ -37,3 +37,27 @@ pub fn welcome_message() -> String {
     output += &"Welcome to Aleo! We thank you for running a network node and supporting privacy.\n".bold();
     output
 }
+
+pub fn notification_message() -> String {
+    let mut output = String::new();
+    output += &r#"
+
+ =================================================================================================
+                               Aleo Testnet2 - Incentivization Period
+ =================================================================================================
+
+     The incentivized testnet is about to begin:
+         1. Generate one Aleo account, and save the account private key and view key.
+         2. Ensure your Aleo node is running the `run-client.sh` or `run-miner.sh` script,
+            in order to automatically stay up to date on the incentivized testnet.
+         3. File all issues on Github at https://github.com/AleoHQ/snarkOS/issues/new/choose
+         4. Please be respectful to all members of the Aleo community.
+
+     Thank you for participating in the incentivized testnet and for supporting privacy!
+
+ =================================================================================================
+"#
+    .white()
+    .bold();
+    output
+}

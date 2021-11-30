@@ -5,7 +5,7 @@ COMMAND='cargo run --release -- --trial --verbosity 2'
 function exit_node()
 {
     echo "Exiting..."
-    kill -INT $!
+    kill $!
     exit
 }
 
