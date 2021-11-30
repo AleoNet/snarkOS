@@ -5,7 +5,7 @@ COMMAND='cargo run --release -- --sync --trial'
 function exit_node()
 {
     echo "Exiting..."
-    kill -INT $!
+    kill $!
     exit
 }
 
