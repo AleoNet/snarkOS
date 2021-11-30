@@ -45,7 +45,9 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
     output += &r#"
 
  ==================================================================================================
+
                                Aleo Testnet2 - Incentivization Period
+
  ==================================================================================================
 
      The incentivized testnet will be announced on Discord. Visit https://discord.gg/5v2ynrw2ds
