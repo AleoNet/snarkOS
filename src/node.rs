@@ -26,11 +26,12 @@ use crate::{
     NodeType,
     SyncNode,
 };
+use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::*;
-use std::{io, net::SocketAddr, str::FromStr};
+use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 use tokio::{signal, sync::mpsc, task};
 use tracing_subscriber::EnvFilter;
@@ -45,7 +46,7 @@ pub struct Node {
     #[structopt(long = "miner")]
     pub miner: Option<String>,
     /// Specify the network of this node.
-    #[structopt(default_value = "2", short = "n", long = "network")]
+    #[structopt(default_value = "2", long = "network")]
     pub network: u16,
     /// Specify the IP address and port for the node server.
     #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
@@ -62,6 +63,9 @@ pub struct Node {
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
+    /// Enables development mode, specify a unique ID for the local node.
+    #[structopt(long)]
+    pub dev: Option<u16>,
     /// If the flag is set, the node will render a read-only display.
     #[structopt(long)]
     pub display: bool,
@@ -97,20 +101,28 @@ impl Node {
         }
     }
 
-    /// Returns the storage path of the node.
-    pub(crate) fn storage_path(&self, _local_ip: SocketAddr) -> String {
+    /// Returns the storage path of the ledger.
+    pub(crate) fn ledger_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
         cfg_if::cfg_if! {
             if #[cfg(feature = "test")] {
                 // Tests may use any available ports, and removes the storage artifacts afterwards,
                 // so that there is no need to adhere to a specific number assignment logic.
-                format!("/tmp/snarkos-test-ledger-{}", _local_ip.port())
+                PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
             } else {
-                // TODO (howardwu): Remove this check after introducing proper configurations.
-                assert!(
-                    self.node.port() >= 4130,
-                    "Until configuration files are established, the node port must be at least 4130 or greater"
-                );
-                format!(".ledger-{}", (self.node.port() - 4130))
+                aleo_std::aleo_ledger_dir(self.network, self.dev)
+            }
+        }
+    }
+
+    /// Returns the storage path of the prover.
+    pub(crate) fn prover_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "test")] {
+                // Tests may use any available ports, and removes the storage artifacts afterwards,
+                // so that there is no need to adhere to a specific number assignment logic.
+                PathBuf::from(format!("/tmp/snarkos-test-prover-{}", _local_ip.port()))
+            } else {
+                aleo_std::aleo_prover_dir(self.network, self.dev)
             }
         }
     }
@@ -121,12 +133,14 @@ impl Node {
                 let miner_address = Address::<N>::from_str(address)?;
                 println!("{}", crate::display::welcome_message());
                 println!("Your Aleo address is {}.\n", miner_address);
-                println!("Starting a mining node on {}.\n", N::NETWORK_NAME);
+                println!("Starting a mining node on {}.", N::NETWORK_NAME);
+                println!("{}", crate::display::notification_message::<N>(Some(miner_address)));
                 Some(miner_address)
             }
             _ => {
                 println!("{}", crate::display::welcome_message());
-                println!("Starting a client node on {}.\n", N::NETWORK_NAME);
+                println!("Starting a client node on {}.", N::NETWORK_NAME);
+                println!("{}", crate::display::notification_message::<N>(None));
                 None
             }
         };
@@ -189,17 +203,23 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
+    #[structopt(name = "clean", about = "Removes the ledger files from storage")]
+    Clean(Clean),
     #[structopt(name = "update", about = "Updates snarkOS to the latest version")]
     Update(Update),
     #[structopt(name = "experimental", about = "Experimental features")]
     Experimental(Experimental),
+    #[structopt(name = "miner", about = "Miner commands and settings")]
+    Miner(MinerSubcommand),
 }
 
 impl Command {
     pub fn parse(self) -> Result<String> {
         match self {
+            Self::Clean(command) => command.parse(),
             Self::Update(command) => command.parse(),
             Self::Experimental(command) => command.parse(),
+            Self::Miner(command) => command.parse(),
         }
     }
 }
@@ -237,11 +257,47 @@ impl io::Write for LogWriter {
 }
 
 #[derive(StructOpt, Debug)]
+pub struct Clean {
+    /// Specify the network of the ledger to remove from storage.
+    #[structopt(default_value = "2", long = "network")]
+    pub network: u16,
+    /// Enables development mode, specify the unique ID of the local node to clean.
+    #[structopt(long)]
+    pub dev: Option<u16>,
+}
+
+impl Clean {
+    pub fn parse(self) -> Result<String> {
+        // Remove the specified ledger from storage.
+        Self::remove_ledger(self.network, self.dev)
+    }
+
+    /// Removes the specified ledger from storage.
+    fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
+        // Construct the path to the ledger in storage.
+        let path = aleo_std::aleo_ledger_dir(network, dev);
+        // Check if the path to the ledger exists in storage.
+        if path.exists() {
+            // Remove the ledger files from storage.
+            match std::fs::remove_dir_all(&path) {
+                Ok(_) => Ok(format!("Successfully removed the ledger files from storage. ({})", path.display())),
+                Err(error) => Err(anyhow!(
+                    "Failed to remove the ledger files from storage. ({})\n{}",
+                    path.display(),
+                    error
+                )),
+            }
+        } else {
+            Ok(format!("No ledger files were found in storage. ({})", path.display()))
+        }
+    }
+}
+
+#[derive(StructOpt, Debug)]
 pub struct Update {
     /// Lists all available versions of snarkOS
     #[structopt(short = "l", long)]
     list: bool,
-
     /// Suppress outputs to terminal
     #[structopt(short = "q", long)]
     quiet: bool,
@@ -264,13 +320,13 @@ impl Update {
                             } else if status.updated() {
                                 Ok(format!("\nsnarkOS has updated to version {}", status.version()))
                             } else {
-                                Ok(format!(""))
+                                Ok(String::new())
                             }
                         }
                         Err(e) => Ok(format!("\nFailed to update snarkOS to the latest version\n{}\n", e)),
                     }
                 } else {
-                    Ok(format!(""))
+                    Ok(String::new())
                 }
             }
         }
@@ -315,6 +371,81 @@ impl NewAccount {
         output += &format!(" {:>12}  {}\n", "Address".cyan().bold(), account.address());
 
         Ok(output)
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct MinerSubcommand {
+    #[structopt(subcommand)]
+    commands: MinerCommands,
+}
+
+impl MinerSubcommand {
+    pub fn parse(self) -> Result<String> {
+        match self.commands {
+            MinerCommands::Stats(command) => command.parse(),
+        }
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub enum MinerCommands {
+    #[structopt(name = "stats", about = "Prints statistics for the miner.")]
+    Stats(MinerStats),
+}
+
+#[derive(StructOpt, Debug)]
+pub struct MinerStats {
+    #[structopt()]
+    address: String,
+}
+
+impl MinerStats {
+    pub fn parse(self) -> Result<String> {
+        // Parse the input address.
+        let miner = Address::<Testnet2>::from_str(&self.address)?;
+
+        // Initialize the node.
+        let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
+
+        let ip = "0.0.0.0:1000".parse().unwrap();
+
+        // Initialize the ledger storage.
+        let ledger_storage_path = node.ledger_storage_path(ip);
+        let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
+
+        // Initialize the prover storage.
+        let prover_storage_path = node.prover_storage_path(ip);
+        let prover = snarkos_storage::ProverState::<Testnet2>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
+
+        // Retrieve the latest block height.
+        let latest_block_height = ledger.latest_block_height();
+
+        // Prepare a list of confirmed and pending coinbase records.
+        let mut confirmed = vec![];
+        let mut pending = vec![];
+
+        // Iterate through the coinbase records from storage.
+        for (block_height, record) in prover.to_coinbase_records() {
+            // Filter the coinbase records by determining if they exist on the canonical chain.
+            if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                // Ensure the record owner matches.
+                if record.owner() == miner {
+                    // Add the block to the appropriate list.
+                    match block_height + 1024 < latest_block_height {
+                        true => confirmed.push((block_height, record)),
+                        false => pending.push((block_height, record)),
+                    }
+                }
+            }
+        }
+
+        return Ok(format!(
+            "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+            confirmed.len(),
+            pending.len(),
+            miner
+        ));
     }
 }
 

@@ -61,6 +61,14 @@ impl<N: Network> BlockLocators<N> {
     pub fn get_block_hash(&self, block_height: u32) -> Option<N::BlockHash> {
         self.block_locators.get(&block_height).map(|(block_hash, _)| *block_hash)
     }
+
+    #[inline]
+    pub fn get_cumulative_weight(&self, block_height: u32) -> Option<u128> {
+        match self.block_locators.get(&block_height) {
+            Some((_, header)) => header.as_ref().and_then(|header| Some(header.cumulative_weight())),
+            _ => None,
+        }
+    }
 }
 
 impl<N: Network> FromBytes for BlockLocators<N> {
@@ -195,7 +203,7 @@ mod tests {
         // Serialize
         let expected_string = expected_block_locators.to_string();
         let candidate_string = serde_json::to_string(&expected_block_locators).unwrap();
-        assert_eq!(1684, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(1692, candidate_string.len(), "Update me if serialization has changed");
         assert_eq!(expected_string, candidate_string);
 
         // Deserialize
@@ -214,7 +222,7 @@ mod tests {
         // Serialize
         let expected_bytes = expected_block_locators.to_bytes_le().unwrap();
         let candidate_bytes = bincode::serialize(&expected_block_locators).unwrap();
-        assert_eq!(928, expected_bytes.len(), "Update me if serialization has changed");
+        assert_eq!(944, expected_bytes.len(), "Update me if serialization has changed");
         // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
         assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
 

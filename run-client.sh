@@ -2,6 +2,11 @@
 
 COMMAND='cargo run --release -- --trial --verbosity 2'
 
+for word in $*;
+do
+  COMMAND="${COMMAND} ${word}"
+done
+
 function exit_node()
 {
     echo "Exiting..."
@@ -16,6 +21,7 @@ echo "Running client node..."
 while :
 do
   echo "Checking for updates..."
+  git stash
   STATUS=$(git pull)
 
   echo "Running the node..."
@@ -24,7 +30,7 @@ do
     cargo clean
   fi
 
-  $COMMAND & sleep 1800; kill $!
+  $COMMAND & sleep 1800; kill -INT $!
 
   sleep 2;
 done

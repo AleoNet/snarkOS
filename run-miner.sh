@@ -10,6 +10,11 @@ fi
 
 COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial --verbosity 2"
 
+for word in $*;
+do
+  COMMAND="${COMMAND} ${word}"
+done
+
 function exit_node()
 {
     echo "Exiting..."
@@ -24,14 +29,15 @@ echo "Running miner node..."
 while :
 do
   echo "Checking for updates..."
+  git stash
   STATUS=$(git pull)
 
   echo "Running the node..."
-  
+
   if [ "$STATUS" != "Already up to date." ]; then
     cargo clean
   fi
-  $COMMAND & sleep 1800; kill $!
+  $COMMAND & sleep 1800; kill -INT $!
 
   sleep 2;
 done
