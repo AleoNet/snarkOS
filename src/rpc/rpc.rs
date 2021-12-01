@@ -469,16 +469,7 @@ mod tests {
 
         // Derive the storage paths.
         let (ledger_path, prover_path) = match &path {
-            Some(p) => {
-                let path = p.as_ref().to_path_buf();
-
-                let mut ledger_path = path.clone();
-                ledger_path.push("/snarkos-test-ledger");
-                let mut prover_path = path;
-                prover_path.push("/snarkos-test-prover");
-
-                (ledger_path, prover_path)
-            }
+            Some(p) => (p.as_ref().to_path_buf(), temp_dir()),
             None => (temp_dir(), temp_dir()),
         };
 
