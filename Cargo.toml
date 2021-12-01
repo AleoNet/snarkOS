@@ -95,10 +95,10 @@ version = "1"
 version = "0.27"
 
 [dependencies.serde]
-version = "1.0.130"
+version = "1"
 
 [dependencies.serde_json]
-version = "1.0.72"
+version = "1"
 features = [ "arbitrary_precision" ]
 
 [dependencies.structopt]

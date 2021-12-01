@@ -19,10 +19,7 @@
 use crate::{
     helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
-    Environment,
-    LedgerReader,
-    Peers,
-    ProverRouter,
+    Environment, LedgerReader, Peers, ProverRouter,
 };
 use snarkvm::dpc::Network;
 
@@ -35,7 +32,7 @@ use hyper::{
 use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, net::SocketAddr, str::FromStr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 use tokio::sync::oneshot;
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
@@ -409,8 +406,7 @@ fn result_to_response<T: Serialize>(
 ) -> jrt::Response<serde_json::Value, String> {
     match result {
         Ok(res) => {
-            let candidate_string = serde_json::to_string(&res).unwrap_or_default();
-            let result = serde_json::Value::from_str(&candidate_string).unwrap_or_default();
+            let result = serde_json::to_value(&res).unwrap_or_default();
 
             jrt::Response::result(jrt::Version::V2, result, request.id.clone())
         }
@@ -968,14 +964,12 @@ mod tests {
         let actual: <Testnet2 as Network>::RecordCiphertext = process_response(response).await;
 
         // Check the ciphertext.
-        assert!(
-            Testnet2::genesis_block()
-                .transactions()
-                .first()
-                .unwrap()
-                .ciphertexts()
-                .any(|expected| *expected == actual)
-        );
+        assert!(Testnet2::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .ciphertexts()
+            .any(|expected| *expected == actual));
     }
 
     #[tokio::test]
@@ -1163,15 +1157,13 @@ mod tests {
         let actual: Transition<Testnet2> = process_response(response).await;
 
         // Check the transition.
-        assert!(
-            Testnet2::genesis_block()
-                .transactions()
-                .first()
-                .unwrap()
-                .transitions()
-                .iter()
-                .any(|expected| *expected == actual)
-        );
+        assert!(Testnet2::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .transitions()
+            .iter()
+            .any(|expected| *expected == actual));
     }
 
     #[tokio::test]
