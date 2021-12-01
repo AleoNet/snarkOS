@@ -124,7 +124,7 @@ impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
     const MINIMUM_NUMBER_OF_PEERS: usize = 35;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 512;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 768;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -140,7 +140,7 @@ impl<N: Network> Environment for ClientTrial<N> {
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
     const MINIMUM_NUMBER_OF_PEERS: usize = 15;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 35;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 31;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -156,6 +156,6 @@ impl<N: Network> Environment for MinerTrial<N> {
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
     const MINIMUM_NUMBER_OF_PEERS: usize = 11;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 25;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
     const COINBASE_IS_PUBLIC: bool = true;
 }
