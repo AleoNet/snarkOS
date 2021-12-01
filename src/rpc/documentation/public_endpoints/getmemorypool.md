@@ -14,13 +14,13 @@ None
 
 #### Transaction
 
-|      Parameter      |  Type  | Description |
-|:-------------------:|:------:|:-----------:|
-| `events`            | array  | The events emitted from the transaction |
-| `inner_circuit_id`  | string | The ID of the inner circuit used to execute each transition. |
-| `ledger_root`       | string | The ledger root used to prove inclusion of ledger-consumed records. |
-| `transaction_id`    | string | The ID of this transaction. |
-| `transitions`       | array  | The state transitions. |
+|      Parameter     |  Type  |                             Description                             |
+|:------------------:|:------:|:-------------------------------------------------------------------:|
+| `events`           | array  | The events emitted from the transaction                             |
+| `inner_circuit_id` | string | The ID of the inner circuit used to execute each transition.        |
+| `ledger_root`      | string | The ledger root used to prove inclusion of ledger-consumed records. |
+| `transaction_id`   | string | The ID of this transaction.                                         |
+| `transitions`      | array  | The state transitions.                                              |
 
 ### Example Request
 ```ignore
