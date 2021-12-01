@@ -366,9 +366,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn update_sync_nodes(&self) {
         if E::NODE_TYPE == NodeType::Sync {
-            // Lock peers_state and block_requests for further processing.
+            // Lock peers_state for further processing.
             let peers_state = self.peers_state.read().await;
-            let block_requests = self.block_requests.read().await;
 
             // Retrieve the latest cumulative weight of this ledger.
             let latest_cumulative_weight = self.canon.latest_cumulative_weight();
@@ -390,21 +389,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if cumulative_weight > maximum_cumulative_weight {
                         maximum_cumulative_weight = cumulative_weight;
                     }
-                    // If the peer is not a sync node, beacon node, or sending block responses back,
-                    // append the peer and their cumulative weight.
-                    let peer_str = peer_ip.to_string();
-                    if !E::SYNC_NODES.contains(&peer_str.as_str())
-                        && !E::BEACON_NODES.contains(&peer_str.as_str())
-                        && block_requests.get(&peer_ip).is_none()
-                    {
-                        peers.insert(*peer_ip, cumulative_weight);
-                    }
+                    // Append the peer and their cumulative weight.
+                    peers.insert(*peer_ip, cumulative_weight);
                 }
             }
 
-            // Release the lock over peers_state and block_requests.
+            // Release the lock over peers_state.
             drop(peers_state);
-            drop(block_requests);
 
             // Determine a safe boundary from the maximum cumulative weight to drop from.
             // The idea is that the sync node still needs some maximal peers to sync with.
