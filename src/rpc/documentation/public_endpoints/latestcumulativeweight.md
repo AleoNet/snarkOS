@@ -1,5 +1,5 @@
 # Latest Cumulative Weight
-Returns the latest cumulative weight from the canonical chain.
+Returns the latest cumulative weight of the canonical chain.
 
 ### Arguments
 
@@ -9,7 +9,7 @@ None
 
 | Parameter |  Type  |                  Description                 |
 |:---------:|:------:|:--------------------------------------------:|
-| `result`  | number | The latest cumulative weight from the canonical chain. |
+| `result`  | number | The latest cumulative weight of the canonical chain. |
 
 ### Example Request
 ```ignore

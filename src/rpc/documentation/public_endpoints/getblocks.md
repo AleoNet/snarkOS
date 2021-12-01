@@ -37,43 +37,55 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
   "jsonrpc": "2.0",
   "result": [
     {
-      "block_hash": "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
+      "block_hash": "ab18946qsq2ppqylhk03ftpg7wjuknp4gwpqz0hhp8hl2ahn94sg5zqxd8qw8",
       "header": {
         "metadata": {
+          "cumulative_weight": 0,
           "difficulty_target": 18446744073709551615,
           "height": 0,
-          "nonce": "605189531586914990276139803763573111245566376445087174167030943959527940992",
           "timestamp": 0
         },
+        "nonce": "hn1lrw8l2w7m74caxxngv57ps28ng49gdn77tgq26sm78qhxz9qwcyqc9djn4",
         "previous_ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-        "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqqdtf45rfuetk7swgcn03h4q2mcpu7vakgfz4w7y2g37lfyvw0zraerguvut37ydajmh0kh2s2xt8q8cvqarnl47cr9zm2e4rrjcjwpq4zhaslamjraky7xkr3jl9llgpf7g695t4v6up6f8qsmtcu5gtvqa60nkcjkfyfdvzjkt3lct5rxrewetkpgh0r460t68qed0s994rc7rdc3u7svjxmrs5eud4l4st8yqhreeqtc2c5u7au7n6jk6kdpjwezvaytnmkklpjs6sfwffsee7h6d5txdpmzw2rhlagfst4fkxsngzqcqqqqqqqqqqrhtgwync0a7cnhh4nl6grmqs4qahzq704pfhgsdsh0mrzlqt22w8uxykuyn8kw953vx2yjzk90ayqp7l28u0hgvgq5y8etlg07gj06hacrwyhe9lkvkde698243zuvrjhhnry97s9pegqx66qrpng3vpxqaty5gu6cwrdthmqjluyhl70x08dta9c27wsvjserrvezf7s9mgaf60x9a4a6kcyh2qc2z4eq7xzspqgqqqqqqqqqqqve93e6t5ftqhrfku4g4tey59hztng0tke5leyr5rjzwnqvd0eegusz9rtpccl5ky6kp28cft7nksxujtwg8ut00u6newqqqp0gdhpu0kpmmfnevfzy2r3z7ma734vk8c457epffq0xx8ycfxfpcmfenfqgyqqqqqqqqqqqr7396rqsutqvyjd0l6jvum0vvl9w7agvr2ef5tkuruqtgywevzp6k08gwh57lmf4xk6jg8k8n29hnqdet3kxwttq8aqfh072jzclxz9cjdsqzz4aw57aeyp8gwu4m4wghcgu8nr9qel2sc55866rawqwqssy6uqxqy3uax8a8ul5fpvttcyf3d6u0wda5rfc04lydclhctjcpqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqqcdwhfdar5rudlxqf4mllawtuu47vg6dgt38hyakkg25hc23jpqqmkmp3egt3h0rlundyugccsewgzqgs87yhdnev6lz97dae3yz5dvwylf39fmns5gd97asvzrhkjp68q520zgzmuw7cgheg5t9nn62u4j473t8p4f97daps76u4gu4f7ldm0jpk5pphxzv9fw44y89w0zkayqqqqqwqqnkx",
-        "transactions_root": "ht1s3hd25d25zxfvnsxa789w594n7qarzuzm49n6h23mr5yhzh7ysgq426nk5"
+        "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqqwpcgtfx3p968slxsgm0ej54pyp46df56ufnmwz3d2rjajg2fj62hq5en9nnx2cdnrww8d9nw9qdqf67m8ctxnk6xyk8tu5gthjjd48f085wvua32px9mw29g7ee2562wjt2fz2ncklpgefeefrfmv90xqgha5r42svfn9nktlpjvtezspwm2l4ejg7kqyydg5s5hgcq2c6taxxtlz4yww43dz0gvxdj4uex9sq83dp9hq3kgcfvgu47mquptj20cyzu0jdksqq2annt72wg4ysfskpsj0kayf9m6t73xs8qhwczrscqqcqqqqqqqqqqqj5d5uw7jep7kmnssfjv3utj97d2pghy0u3wjmlj750dv5y3wc9axdhvj3qs60u9wfl96d2r39qqq9ek8fy8dckr6an58arfrawnuemmqw464rud6r50t8x5cxfn9lhtj6jtma82rahw4zmv2emt8r5h5qfvnd34p93ejxrn6rph8r9ul8tfe65l8t4pvxnpltmcxjnn8wsgvr3d3qc7n39y8wlwz3f0kn3z8yqqgqqqqqqqqqqp2lrqkejgksx2vasrwssl4plmt05vk9he22x0k5uca6k0kehyda6cxu5vrj0q4qqe75elekpj086qpcjqrvgq5tk7cp6q9dj8g0unzvwwg8c5459ug3h3k6r077s8lrh3z63s262jfa5y528f0nnmc89wqgyqqqqqqqqqqqyfekfkkzzgr94sdfzkvyzgh3kag03evgmczdyteaaznnjgla87y3959mxv74c2pk3k5fs3hx4lcgwajgjn8h5x7aj2fc7mns9qegmzr9d8ljnrlwvzwhu0f7r9czwevwq3zeevkkt2033yexr55d3v93swzke3tvcdmlqyrsaey46wqxcvm4l7gzxvlca9a8p7wcls4a9mccsqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqqm8jv4psnamnzyqqwp9svtmekgysu5gcns7tk4rf2x9g6vay36afuhszk4kyd3t9m72g3kgf57y8gzq00zpcr7l9lyulduxxqe0658j2kyct252hhmvdt7u9t9029z7cazxr40dcx8glm3xg429v2tly3fm70mkmcu56r37czya0elz79cjcfuap9qzgpjd2y6ng6h7uyflzxvqqqqqf9tevv",
+        "transactions_root": "ht1gl4pv2jw4vyjtdrxn4806vttajn3k3fm2yrfe8akt36zqs72psxsv8rw4c"
       },
       "previous_block_hash": "ab1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5g436j",
       "transactions": {
         "transactions": [
           {
-            "events": [],
-            "inner_circuit_id": "ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
+            "inner_circuit_id": "ic13cstkmt5j4qqzfu5am8jx2rhxm0hqplyzcgzyueefz7n32xl4h53n4xmxvhjyzaq2c0f7l70a4xszau2ryc",
             "ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-            "transaction_id": "at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",
+            "transaction_id": "at1ky80ktk2tcyytgg3dvg3jqtu64kc6nzdrwg75nv0c6u78grkh5qqdu804w",
             "transitions": [
               {
                 "ciphertexts": [
-                  "580a3b830d17818b866c8f4f7bc4f518dcd775adce1274e902d07edc49e3e9005418da88939bac4437a271cb34cf792e3bad3385fe05ec086b5e5c485b291209a7ced29b1f6f169dd13504a71ce57c3348fe8778c7a102e26791fb298a7a0a0edfae8e065599cd3869d08a91ffa06fb6e41f68033d9b8d9269fa6f948f167f07c7d57ab6f3198c3d568a60525cb4959df7655dc8de9751d3cd8ec6b5aa834c0b0b081c6734fb62670b80cc885210392e6f56cd2b4aec22c53257a3422fe474041540a950c102b00c36cb6e889a7cefe2822a003e9332f3536a18fd3bc1690e11094593d25543c3df7e2fc4a24754eafdf4e0002ed4673c1a84c49ddcc510870efef1b4f95f0cf7d1a2e0e754eaa188a22cefb4938e616506154135091874c10ed4abe8bf94915a782e545acc07663237c2c826fd2c516fd14a2f9d2c570afe0d",
-                  "3bba8e8ac95b43c3bc4be5792cf73f05458113641d7b15946e169188a7534f0ff6b7328b7549d042dfaeea13b81f8ea6eac72d68ea68681874a823fd08fa44043f074b48823758688ab1114ab0b5f2143ceaf1d8ef448ab21fd874a4e3ffb30919b8cddae76870d0e766fb43e847cb6f02fc18041e709695f9b03ffea5d7f206977a06b37c5a0f8b1a576b351233446bfaf6f8cc310bfcc1fa1138c310a3810d98f6cba62e95230e7966b59d3e383ab87a9f61760922b538e81004e6ab7efb02d811a7198af891db3eaa2d4e589643cf1d0f3c2b87c39d5d2cf163a59728b001d3e23485afe77843d2e3ab8554face8e7a8b3b68f3f87c164f58ad3da18c22073143de79f68e127a2eca9e51b60806502cd73d9aa9d728411edabc5d09e1160324358a0a5d7d307ba6b915c3c79942401f469c4cb0b0adcd25177c939768f110"
+                  "recd1v76mftwzagt9k9nsjjpdqgytv4ddk24e9q7f240daar7avcv3q9gd9rx6c230n99jhxfj24xpvkrr5vk04fl2kapa0a0a895hvevzq7tnwuat9lzwpy4c4rxys6uaj34098295t9fff7khqctvkcglumqlvg47rwzhqhw9u5zxfhug9dde67dyjc6uflp4x028mrmzkhfa6qn0l6jju8lfhmy5crcqqefjv8m4zwv34tvk03d65gdmv4fe35wtgy6rmy4heq89uwh0hqe40k2g7nyj2rk6xlgqnf724pt6ynkefxwypmvhhjzk806re4njej552jfq74ej0ykhrcxa93l9n6rkchlhuuzz2fpqtt2npqz8avnv442ng4djm8lve4dlqfelpjjn5yj425rs98pvn5k54gvn5vku3wek3ytxe8zpen7n2saf060j97u8yyygt4y9zqklnek3v",
+                  "recd1u5chlqz8n80rwem25de9npujv2uh006yajgyum9p5kn4rsu9s5ymgrwgle39pz87s0726g4rg47dx5nl330680gxmyxffyg7p77qvppfql3p3hxncp9fpus8upsa5nlfwfnck7k4hzcjskrnrfza6tqcpgvquuv663ahswju6s3wcawh9ktz87ewzgpj2nc8gc9wd30zc8zsgu5xyen4q352u7y6l985kv2hq6nx9hu4n4mhgglacw7dc026y6qglwh0l302gwxs0s804waax472h4tv2npmprtvp5hkzg7hhm360squhgnxtpdthh0ncyrdklqy57nlfr6z5dm080xd2z9uw3h9fpu9vqsy9q4vakw00wk0prwf92ekmnh9e00v4l2a4sldmcnzcj90p75nqlrd5ek80e6l3xz559meskjeq7kpyhftsxcptc9d009xuh6nxlyszq7uktv"
                 ],
                 "commitments": [
-                  "cm1uc8hl5umr8u7dgxxsrhp8e7rkwj8ue5qcjsuunfkt8s5dfld3grqwjnyvh",
-                  "cm1u0exutsg529akllpatxnmnsuzcjcyu5q7j9nfxe30d9dj5ntjgpsyvempu"
+                  "cm1xck4eyf3a3qnz69yyrr3jf698mqzwpjgkqu0j359p0sdr5wyjyqsn0604p",
+                  "cm1up0j5cq0k3w96skhsq750m6alw8dcau5msn390h8fpkgny5zdvps9h9dp8"
                 ],
-                "proof": "ozkp10wlufvmlyze6wk6zg8m5sghzl75zzuswa3yp4l5zs3k8ngsfhxqdkcg2x4l0f7eunqd2309hemc4u0lveqmgv38xemqsheu5xh8qvcxyuj4z5600k9dm6uxndcww40s3phecn4c3zs7hjakd7mlua23rqze7cpul8qjd2p3jf7g4yhy97ph5cmqp3vj8naa90zxpl678hentktuh6gc000kctmdl0k9xgmt39lstaf0kkew7aw0khvvyxfk8l46z8sqn79y26s834j4v9rsk2gdgw3pgy39gfl8jc7563wn2p76007qw8wzvsfahshktyeul2838qvhepfq7l3gg8kz97stekzy8unwvyausznnkpc88ms8nv9cyvxsm4ew5hg94e7xs5zgsfn047v8fl2jzs80jhf8g5c49u774rvuq7l2elcj7j0f2s58a9yqp6mlmwlm8emrsqqgcnmsq8",
+                "events": [
+                  {
+                    "id": 1,
+                    "index": 0,
+                    "record_view_key": "rcvk1mujt98tc2r04l58haxjv48s5a7vnhx8ws24fxpdruuk3z37vscqsjtvlg5"
+                  },
+                  {
+                    "id": 1,
+                    "index": 1,
+                    "record_view_key": "rcvk1yuqvyczasq876gjt8xwz7d2dxzs3umlp8nccpcg3nmlp4qxs35yqgflhy6"
+                  }
+                ],
+                "proof": "ozkp1fhewv363wgl04jcxdnmaznkeszy2svj6ncxr9pl5f5l3lm6mgsr8e6tqxpkhhtxc6pesfd40hxfgwz7luqwwa00uwzu5s8jfq9n743n4y4dldf9htr20jv9zpw59cf4xxwurnpckq0wt8r5hfdn5m2d9qryk20yz9zfeyvv7hrexxvd707qx730q2qeppnu70y0q3rpnqzprtxrclgqptrwlx2cdzg5ywkayn8f04xelpge4d73a3tmyvlyuj5phlv5lxq2afh4zaxnxw8f2e5k32xu9w0vmq7xldqmyv7pxjfj2mzqrwyagg7nzsay34kx2zutx33r0eugfqgtqlhrzrnhqu2npk0kxwcx27rgvpfcwemsns56d7xn0zety5mkcje3ud0usjfhmdwhh3eypzh0x3svs5jhm9nhtpqc7j7ms3gu4rc7d352g42fzv2vvv5lsxuygzqgxrha3j",
                 "serial_numbers": [
-                  "sn19my835fmg0yqte5pycgm9h3j7quvc2s6s8dmngvce0ew8xvvpvfqgqpsej",
-                  "sn17w9vn0n4hf0a038e8jhm4qjdcq2r2wp63sdu98cjmwxn3xl4kcpqa0jcvz"
+                  "sn1m70m3egkxqq5dmalym3hf5arz296k37h87kv4ztge48c3a6hmcysw22avz",
+                  "sn1q8y49taxgquprav54nkd42n8dd8egj0rghjfg834q0zlfv3p9cpst9mkj5"
                 ],
-                "transition_id": "as15d8a5nrc86xn5cqmfd208wmn3xa9ul3y9l7w8eys4gj6637awvqskxa3ef",
-                "value_balance": -500000000000
+                "transition_id": "as1xuppwj4x7eswxppdlg3pt49vue2kwfw3cw8m8k3uqxe5e7945g9s4s8lz5",
+                "value_balance": -1000000000000000
               }
             ]
           }
@@ -81,43 +93,55 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
       }
     },
     {
-      "block_hash": "ab1r7yn5khy3q7pch0zkgdt34xv6k0fwmdx4krzkyq4xv3fv8jg5q8sd2nmq9",
+      "block_hash": "ab1a04ehlymquvlsuht7ssyh59p68z9249fla2dpque8rzke6s7gyqshxg4dn",
       "header": {
         "metadata": {
+          "cumulative_weight": 1,
           "difficulty_target": 18446744073709551615,
           "height": 1,
-          "nonce": "3239127888019359521940590329882854030117464324755981128795956159677250090177",
-          "timestamp": 1636713935
+          "timestamp": 1638274968
         },
-        "previous_ledger_root": "al10lg7n89s4tw7gy6wylgz0upjyr76y0mmj5azaqplnf3kkpksnyrsgyzsvg",
-        "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqqet96rsum59pt9frxtp33cf26n3tmxs59cky8yp8xw54j4pl2xrqsalcxd6r0snktpz77auk2czxqgn0zmaduucnzjrtv8c0wfmgk84cywysy9p8903p0lu6se4ld3v522fs0pqw72hrezw7vqv7gd74sqvwf270yft6fsfgepq70dd7dy7ys3nn54yj4wwagq8w8vfsh6fl726u2s5qe683lkdpqjvk5mlttvqtzsw586qh0d8llqdhx49fc3gnnsg9w9pj9jty8dmmtr4sc2ymjny4d3sk4mchryvr29ppkwcyyeqzqcqqqqqqqqqqqmrwthnlcnx9lvf3p4uvkdpkjhh9pw5yzm47hmn6kvyc53lpxnkq5uev7mmy69etzd2frle4jh9nqy6vjytkzwmvp9hxx4vactvfrgqt4gn6yymktvc587e3s52vna5agsvmzr6h3u0r3j2f23vghjarkqvhht0nw59gytnptacdh5wtp9tpem9hpw9w8c6t2456lpzrrt8uzpy4mwtavmq5vjj4k7fa5p5m7cqqgqqqqqqqqqqp3l780n9jv3k28sucgu0846vyjdy67npdjelz4ngxa6hq580kh9jdh25wgmdafap2zplc7ku772jqqzuvdaqjqjtg0h5kdudm0mgmspnvczmurld4wty8dan5kvy8pccp7mt5vrw9efsvvh3m44qdw8kvqqyqqqqqqqqqqq2lmue6u8pn4nv9ryffxuky0qc6627gwlz7zq98m9mhcgwm9zvkremg40gdtfj36guzyawsk0qmse7tecaa6vjlnq698hvgdh6566cpxcc7h5qd6mk2cjzrpkt8yvr0ylq9wj0r8kxkrmf9crgftck6edqt5wul97zaelshrctcjl7f0nlqjglc9rhyq29rm6sgfaqrq7hnjg9qvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqquhjdfwmvrt2znj9mfuzzkwyzuq0nmztvej0wgafsfmarya8pxmv5cgu3nlu8qpu0ddfkc0u4w7kqzq2k6jg5aq3msu393pe0vyp048gqvgq8gktlwmkpfzkpgd0sg6evqhrhfparrprctpjq0pdm4vsy2hy8p5u4exvfy9vgts2wm3nzeg6vpntg6a9kx675mduc30pc9m5reqgqqq84eppp",
-        "transactions_root": "ht1mqtt44jlurraz5h3g6phxva5a24zevtk7lhhdf8s8ttpq4frmggq7qn6n6"
+        "nonce": "hn1h4wq7dfrzhvcz8l5wvqle54pur4mqc6tnpk3r897zam3dpk0hqxss8h6a2",
+        "previous_ledger_root": "al1rwfdyp6xk39cuh2gnj6pxhndqy44tch93paudslwnvx5qcr3esyql9efpw",
+        "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqq9k3uuaywk8u46es2w5dvudg88gp9v287frk55ayszvl6wvjrynsmnmx2fx0yd5dxahee9v0qzsqqqn8yqfe0x7j7f7ckg7fdevycy99vhws87zskmrctfvyk48ra33kt8alreacccgxc8xp67ewjxgpcqwd0qrxtquzly66kghx2nqd4l5d0v72xdldelpj47xxjmjtctaf3ymjc7ehvw6k6n9rw25cht23rupng3ssecd454wrlpxq34ee7vjafv2dhxxlw49cs2ncvmplralazvhqe6lgcvm93sxtw0ulda505cszqcqqqqqqqqqqzwfkpkxrdnwgkfgxefeteg832ac9r448ht6ekas2ncgs89v4slauzwwh3puwcdryx2nng35rtxe9qfcsmrt5d5rqc94lvj8s87qjm8vzs7ajxjdd6kapsaqdeqjepv3d53tz24njhaq7wq5dc66fwuyr6q8rzht3thg92yvrlkckqjzers6v7ezhxvx77s7udlc43ttqprs7v7jeavns08jygmmvz00n4dfkvqpqgqqqqqqqqqqqe9ravrh3uqxfsyf5ej4dccml7ktjr2sugsft0aelrsw7hydhzajussav7m4a8ntdahw744ykx5nqre6c04vjt8k8e2wqgq4slgqg76lvtmnwzlyv6e2ltx8z7xuz6sphq9xurtgfywwwhjl70czajlxlqgyqqqqqqqqqqqylequa2vwvms9jt6p80ka6nj9s6wlnna79xy757xaj3kmwv8j7r6w3zcfcremkvser6hnm7n4v239utytk9v53rutd83kpv2cjd0lqanrvmm62yk5x20l9qn4wkmkxvwqdvp2t8d0tphzwqr809uy0w8qezc4gw8xkwth50n083vllax758ghhma9upt3p7drv79sj6fa2yc0qvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqq3v8ffmhfputspdfrp8lzymqyxwh8e7gvxeztfevdw9c27q67rg94knsxvkshz4ws9kdd7e8tx23cqq0vl8rc9trczszqmmlq6fqt52rwfvnt204lh9y9zlfldwjj8ncqqqkylx4d3862m2eetvt2kvq3uycfe8at8xzp55du4ks2s4pkwnrqj8azhgmf593y0fdqhnfuvxs7eqqqqqdz3n7e",
+        "transactions_root": "ht1fa84m5qgqxm52p2sxfg3xvv5c0zjpvd0wr0g64w8ggnhdxd2gc8quc9gg8"
       },
-      "previous_block_hash": "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
+      "previous_block_hash": "ab18946qsq2ppqylhk03ftpg7wjuknp4gwpqz0hhp8hl2ahn94sg5zqxd8qw8",
       "transactions": {
         "transactions": [
           {
-            "events": [],
-            "inner_circuit_id": "ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
+            "inner_circuit_id": "ic13cstkmt5j4qqzfu5am8jx2rhxm0hqplyzcgzyueefz7n32xl4h53n4xmxvhjyzaq2c0f7l70a4xszau2ryc",
             "ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-            "transaction_id": "at19pk9vcrwh8k8emypk9gx2zn6lsd43frn74gtgfcpechk2qvgyqys8ufph5",
+            "transaction_id": "at1sklmmp43ufyfev4rk9a8v68la2v29s8suplg2duxes7aju3c7uqs3qkw8k",
             "transitions": [
               {
                 "ciphertexts": [
-                  "a095b00a6b5460c4eb295a84add45dc19a26c5a60955fc8006ef04809d6b2b0a95e2d0bc69e5abc5ae8efcb32d85c03758eac4ab37ba6536114f6c59294ed90cafdb6fc5f255ac74da43e67d5fe8cd942f91a1e33d36303e7bd41a6828b1cd11cb53764427bda7e9ff5fb876990f38e2204c11c9736215bfc21dc57b1c0b6e03aad8e56a55fa4e314134cb02377f9b83baaf19008eab657109b20d45c4aafd10eac63afb71a0d717129407c8555e25d34f3b80b59a506054e29f308d4485060c6b350dcf670f4d3dd7e22f7850c74d7ea1d79a2da743192e9c842ccd61bc721179d65eb2b3d2fb1ad1660a023ed4197b46ded2c648fafd321df8456b5b3b6f0e4db4d0b2eba03ad1396c8a985239e4715366a02458f495217884ae0adeebf611c16a9c18bbefeee278a33c44dc3915e6e66ab472d6b1927a862c6800db76d611",
-                  "06862973484e3b63cdfc5cc66aa8ba48cf695ffd10e8e79301bea07d568b26097d160bdc338c8b195d78de4d5f27dc095e00eadf341388ceb776177338e17b0fb26df9be1b2ebae2411f1c8fb34bdc3cdd689f8bacc519581cd878d27ecca902cf5d385a796f7c9b3818a2c8b2e7eaf2c2434d409fd36e286b7c5d23e63809072cd860c691e52acec84a95d90fd1bd669a0fc479293bc96b899f0d4aca9ff10abc59f22669fc3e986ecf9203fadd60a0b79a27fedd2d47876e66ecd2274d230580a862b8b39f7d0647a74d1cd674a87e0f04a98a685212173760a2998b247b109ba40c08d8cf76335d926c66ac7378d405fda3156b803c2d0b9e8dbb41d7570f9239a0d74130c68b077b912525382abebc88b5d222baee6c3aff3d5ef7d42d11adb416cc3236d7b8734cbc0e6a039491b0628f55c28a2841aa26964ee88cb711"
+                  "recd1d4q7x6w0mgctwdh20qy2wn63d5dey07syr8vs7ka8fezfd395qppxguxktedhny8ndrmc7pfftu5mrj7agd342s9vz6vzccets60kplr3mpjzhhg7lwlpwj0fvhmp8vy4q49uy607zamxupcd65txzg2q38gxj0m6cdt5xdz0encr8wp9kt2rmeqe36yf4yrqgl5kssf0ypqv5mazvm3ltwlynuurzzw0lfdmxwfz5dqgtueltt5h0msn5k47rqjqgps6qx3pjk5sucz9jdrq322f25ghgk826tfy98pje7amrd5scxpea4dzq7t7wtgh6re5cdhp7wjupgpnpgfhw55l8hc6ax8dmtwcpeunngs68dlmq68vsh0jehlj7pw8zkyrsja3gmffatfmk6xw26szpkdgnxjjdvy3vahj6ppegl4dq7kcga6km84h2zzwds7lnccxufskd4fvfp",
+                  "recd1rr50fxwrw2ztjx4rd432tqjr6updgy3ufn6q5vqsqemllevgtuxq9u8tugszkvvfdzpncwe7r3clfmms87z003v3ms2cg93cjlc6ypya0xyfv9hekah25wvar4y39ueg0dyzekmk07wk86tfzez7yfl4prh2laztfn86zqt43jefkrsa5525903x29jjz55nlxhlkjfvh68sn8ahaj4y4dxlwx9acps9xnak6yapzmw59cck2ft9a55mrvlhzpsj68tp560y27044207xae4va400prhpsn72ft84y2kmv8xuk6e45zx7kqvyudxesy83td59l7rfa498cn6mnxf389m7jfhrle0604v7zsr4caewgr5hnw0mqmrt5w0u3hhv5p0wm8faswgv40ddrya8kl6pk4ewp67yae3g2z6jyxtlc5tkdxkkt4l9hlu9jurhe3t02lmsjlqgjf8frt"
                 ],
                 "commitments": [
-                  "cm1jryt2uza3rhtjrm55nt4kg05aph0aus39nanlc0ckk4t7gvt0ugqxqwmgc",
-                  "cm17hp0npw6xa9kpq86kt9afp89d249lzfksjlje5tczxgcz9q2hg8skxf4tp"
+                  "cm1vlsf9jy46esuylztvz7pmf95kvjv39hh82knvlty9jplrcl0lsyspr3nqh",
+                  "cm19ftu455wcrad2hzf92g8dzm7vvza3uuwjyc84wt9hv6pdz4gcsrqfy5m78"
                 ],
-                "proof": "ozkp1s5cpvlnqerc4f7f8pq2x2j6cl22wdwnuhjug2erejq29mqw4frxtup35hhqevjqtnd6dr0hvvwta4ps93hzkj5h55md0vk9rdkhhm558sw3vkk7zwpj6m0zg0tx5nmjysqsqp4elwgpaczyq55us23s8qxwh43sk6l5lsdwucu40a7fh57jzllye70y4y75aj56lqzmzwf8hexd50nva66gjn3k5gcvsuq4kvm6g7hdmk28txqd992rr6clvzkry3p6smlndd3cn5m7jaqt2qyf3p2kw9frsgtlqpcy4p5mzst6sxcqdg3zrfwsfpgdxzhdnu03lesklvragye770carayzw6elju0zz67ul86gfg9c0sykl7ldwrkh2ydr2dhz7s39gh3dtelmqy9at2qvh5745nkzx2xujdrwlkgkhtzu4lwvn6lfch50mta4txwg8an32j3xgqqg44lh3q",
+                "events": [
+                  {
+                    "id": 1,
+                    "index": 0,
+                    "record_view_key": "rcvk1hd2ey0r8rj4958hz8tjmnguq0zqelnak0l04px5nl7fdk2du3yqq4fpdqq"
+                  },
+                  {
+                    "id": 1,
+                    "index": 1,
+                    "record_view_key": "rcvk1rcuxgt9zy6cae8q2m35mhqchmeg8vthj8vrt732j8f7hvhx5lsys6n86v0"
+                  }
+                ],
+                "proof": "ozkp1kgecjacsyaelc8cdltfzcwxyye9c6ulljrpsahtyyqh9g4swqyj7j4yy9vnw5zuc9xkssl56z2wh95s00szp09ma8ydh5uld8zr7ng2848l6sjppr9atll4d49wm46e4qc2hlvz8a45xa369073jd84usza20rrg5ax0p6q2w26zrzvlyat0fk6qv2u4c3glz9ey6x395h70jsu885wsu53rzypldhr6awh89pakuruvlc9wqs5j2phn38kncrkk2ct7a796kd5n6p6m2n20a8jnffg6p87wj3sc9g8t2cgzkha4u7qy0wg9lzwm9n6ekpy0c4ljs2gp06aat58mge4uqqkzag38crcyjpukzucxzpvyswrkzn0uxwfx05frx7xvtfn5yzq94xexnwemmtgcr3y66mc6ghtlacqmw2wfetdf7l6wlwcazucs4aw7txgdt7j6jkagqqgq5c480",
                 "serial_numbers": [
-                  "sn1wvwfy003qzne0zaahpugw6n3449p7z93xg4uux5re7c9evz4cgqqrx4n6k",
-                  "sn1aqq7gh4n8ufkpxtwl9rxw05r3cxj8l0e2vv5zhy9crqyuapuuuyswq2cds"
+                  "sn1ja4wheq75k5rtqu9ang77y4gmmr3xv6rmuj0zfrr4pntna7yl5pqudefjp",
+                  "sn17nm844zsddvyp8q3ths8th3mchr3jc7s7r30gm6le485yc4tyqpq6k905x"
                 ],
-                "transition_id": "as1mxpwn230r2gywfarjulp2am52pvg79qsazsla0alr0xu493duuqss6gee8",
-                "value_balance": -150000000
+                "transition_id": "as1z796upddadydzww87v6udtdrpmj9m35029ehn4qxkej20ztjdg9smx65ek",
+                "value_balance": -100000000
               }
             ]
           }
@@ -126,4 +150,5 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
     }
   ],
   "id": "1"
+}
 ```

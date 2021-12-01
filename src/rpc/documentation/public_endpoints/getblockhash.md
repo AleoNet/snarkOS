@@ -22,7 +22,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 ```json
 {
     "jsonrpc": "2.0",
-    "result": "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
+    "result": "ab18946qsq2ppqylhk03ftpg7wjuknp4gwpqz0hhp8hl2ahn94sg5zqxd8qw8",
     "id": 1
 }
 ```

@@ -24,8 +24,8 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
 {
   "jsonrpc": "2.0",
   "result": [
-    "ab1h6ypdvq3347kqd34ka68nx66tq8z2grsjrhtzxncd2z7rsplgcrsde9prh",
-    "ab1r7yn5khy3q7pch0zkgdt34xv6k0fwmdx4krzkyq4xv3fv8jg5q8sd2nmq9"
+    "ab18946qsq2ppqylhk03ftpg7wjuknp4gwpqz0hhp8hl2ahn94sg5zqxd8qw8",
+    "ab1a04ehlymquvlsuht7ssyh59p68z9249fla2dpque8rzke6s7gyqshxg4dn"
   ],
   "id": "1"
 }
