@@ -268,6 +268,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.add_failure(peer_ip, failure).await;
             }
             LedgerRequest::Heartbeat(prover_router) => {
+                // Update for sync nodes.
+                self.update_sync_nodes().await;
                 // Update the ledger.
                 self.update_ledger(&prover_router).await;
                 // Update the status of the ledger.
@@ -356,6 +358,73 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Route a `PeerRestricted` to the peers.
         if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
             warn!("[PeerRestricted] {}", error);
+        }
+    }
+
+    ///
+    /// Performs a heartbeat update for the sync nodes.
+    ///
+    async fn update_sync_nodes(&self) {
+        if E::NODE_TYPE == NodeType::Sync {
+            // Lock peers_state and block_requests for further processing.
+            let peers_state = self.peers_state.read().await;
+            let block_requests = self.block_requests.read().await;
+
+            // Retrieve the latest cumulative weight of this ledger.
+            let latest_cumulative_weight = self.canon.latest_cumulative_weight();
+
+            // Iterate through the peers to find the maximum cumulative weight.
+            let mut maximum_cumulative_weight = latest_cumulative_weight;
+            // Initialize a HashMap to store the peers with their cumulative weight.
+            let mut peers = HashMap::with_capacity(peers_state.len());
+
+            // Check if any of the peers are ahead and have a larger block height.
+            for (peer_ip, peer_state) in peers_state.iter() {
+                if let Some((_, _, Some(_), block_height, block_locators)) = peer_state {
+                    // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
+                    let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
+                        Some(cumulative_weight) => cumulative_weight,
+                        None => *block_height as u128,
+                    };
+                    // If the cumulative weight is more, set this peer as the maximal peer.
+                    if cumulative_weight > maximum_cumulative_weight {
+                        maximum_cumulative_weight = cumulative_weight;
+                    }
+                    // If the peer is not a sync node, beacon node, or sending block responses back,
+                    // append the peer and their cumulative weight.
+                    let peer_str = peer_ip.to_string();
+                    if !E::SYNC_NODES.contains(&peer_str.as_str())
+                        && !E::BEACON_NODES.contains(&peer_str.as_str())
+                        && block_requests.get(&peer_ip).is_none()
+                    {
+                        peers.insert(*peer_ip, cumulative_weight);
+                    }
+                }
+            }
+
+            // Release the lock over peers_state and block_requests.
+            drop(peers_state);
+            drop(block_requests);
+
+            // Determine a safe boundary from the maximum cumulative weight to drop from.
+            // The idea is that the sync node still needs some maximal peers to sync with.
+            let threshold_cumulative_weight = std::cmp::max(latest_cumulative_weight, maximum_cumulative_weight.saturating_sub(50));
+
+            // Disconnect from peers that are ahead of this node, but not a maximal peer.
+            let peer_ips_to_disconnect = peers
+                .iter()
+                .filter(|(_, cumulative_weight)| {
+                    *cumulative_weight >= &latest_cumulative_weight && *cumulative_weight < &threshold_cumulative_weight
+                })
+                .map(|(&ip, _)| ip)
+                .collect::<Vec<SocketAddr>>();
+
+            trace!("Found {} peers to disconnect", peer_ips_to_disconnect.len());
+
+            // Proceed to disconnect and restrict these peers.
+            for peer_ip in peer_ips_to_disconnect {
+                self.disconnect_and_restrict(peer_ip, "peer has synced").await;
+            }
         }
     }
 
@@ -458,25 +527,33 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 _ => State::Ready,
             };
 
-            // Retrieve the latest cumulative weight of this node.
-            let latest_cumulative_weight = self.canon.latest_cumulative_weight();
-            // Iterate through the connected peers, to determine if the ledger state is out of date.
-            for (_, peer_state) in self.peers_state.read().await.iter() {
-                if let Some((_, _, is_fork, block_height, block_locators)) = peer_state {
-                    // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
-                    let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
-                        Some(cumulative_weight) => cumulative_weight,
-                        None => *block_height as u128,
-                    };
-                    // If the cumulative weight is more, set the status to `Syncing`.
-                    if cumulative_weight > latest_cumulative_weight && is_fork.is_some() {
-                        // Sync if this difference in cumulative weight is greater than 2.
-                        if cumulative_weight - latest_cumulative_weight > 2 {
-                            // Set the status to `Syncing`.
-                            status = State::Syncing;
-                            break;
+            if E::NODE_TYPE == NodeType::Miner {
+                // Retrieve the latest cumulative weight of this node.
+                let latest_cumulative_weight = self.canon.latest_cumulative_weight();
+                // Iterate through the connected peers, to determine if the ledger state is out of date.
+                for (_, peer_state) in self.peers_state.read().await.iter() {
+                    if let Some((_, _, is_fork, block_height, block_locators)) = peer_state {
+                        // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
+                        let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
+                            Some(cumulative_weight) => cumulative_weight,
+                            None => *block_height as u128,
+                        };
+                        // If the cumulative weight is more, set the status to `Syncing`.
+                        if cumulative_weight > latest_cumulative_weight && is_fork.is_some() {
+                            // Sync if this difference in cumulative weight is greater than 2.
+                            if cumulative_weight - latest_cumulative_weight > 2 {
+                                // Set the status to `Syncing`.
+                                status = State::Syncing;
+                                break;
+                            }
                         }
                     }
+                }
+            } else {
+                // If there are pending block requests, set the status to `Syncing`.
+                if self.number_of_block_requests().await > 0 {
+                    // Set the status to `Syncing`.
+                    status = State::Syncing;
                 }
             }
         }
@@ -946,7 +1023,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         let peer_str = peer_ip.to_string();
                         !E::SYNC_NODES.contains(&peer_str.as_str())
                             && !E::BEACON_NODES.contains(&peer_str.as_str())
-                            && !block_requests.get(&peer_ip).is_some()
+                            && block_requests.get(&peer_ip).is_none()
                     })
                     .take(num_excess_peers)
                     .map(|(&ip, _)| ip)
