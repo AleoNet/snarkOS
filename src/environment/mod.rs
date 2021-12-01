@@ -124,7 +124,8 @@ impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
     const MINIMUM_NUMBER_OF_PEERS: usize = 35;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 768;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 512;
+    const HEARTBEAT_IN_SECS: u64 = 5;
 }
 
 #[derive(Clone, Debug, Default)]
