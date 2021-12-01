@@ -1010,12 +1010,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
                 let peer_ips_to_disconnect = peers_state
                     .iter()
-                    .filter(|(&peer_ip, _)| {
-                        let peer_str = peer_ip.to_string();
-                        !E::SYNC_NODES.contains(&peer_str.as_str())
-                            && !E::BEACON_NODES.contains(&peer_str.as_str())
-                            && block_requests.get(&peer_ip).is_none()
-                    })
+                    .filter(|(&peer_ip, _)| block_requests.get(&peer_ip).is_none())
                     .take(num_excess_peers)
                     .map(|(&ip, _)| ip)
                     .collect::<Vec<SocketAddr>>();
