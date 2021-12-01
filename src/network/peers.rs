@@ -1052,21 +1052,26 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         break;
                                     }
 
+                                    // Perform the deferred non-blocking deserialization of the block header.
+                                    match block_header.deserialize().await {
+                                        Ok(block_header) => {
+                                            // If the peer is a sync node, and this node is ahead, proceed to disconnect.
+                                            if node_type == NodeType::Sync && ledger_reader.latest_block_height() > block_header.height() {
+                                                trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
+                                                break;
+                                            }
+                                            // Update the block header of the peer.
+                                            peer.block_header = block_header;
+                                        }
+                                        Err(error) => warn!("[Ping] {}", error),
+                                    }
+
                                     // Update the version of the peer.
                                     peer.version = version;
                                     // Update the node type of the peer.
                                     peer.node_type = node_type;
                                     // Update the status of the peer.
                                     peer.status.update(status);
-
-                                    // Perform the deferred non-blocking deserialization of the block header.
-                                    match block_header.deserialize().await {
-                                        Ok(block_header) => {
-                                            // Update the block header of the peer.
-                                            peer.block_header = block_header;
-                                        }
-                                        Err(error) => warn!("[Ping] {}", error),
-                                    }
 
                                     // Determine if the peer is on a fork (or unknown).
                                     let is_fork = match ledger_reader.get_block_hash(peer.block_header.height()) {
