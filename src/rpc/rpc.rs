@@ -187,6 +187,10 @@ async fn handle_rpc<N: Network, E: Environment>(
             let result = rpc.latest_block_height().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
+        "latestcumulativeweight" => {
+            let result = rpc.latest_cumulative_weight().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "latestblockhash" => {
             let result = rpc.latest_block_hash().await.map_err(convert_crate_err);
             result_to_response(&req, result)

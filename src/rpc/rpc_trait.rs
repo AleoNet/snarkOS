@@ -30,6 +30,9 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/latestblockheight.md")]
     async fn latest_block_height(&self) -> Result<u32, RpcError>;
 
+    // #[doc = include_str!("./documentation/public_endpoints/latestcumulativeweight.md")]
+    async fn latest_cumulative_weight(&self) -> Result<u128, RpcError>;
+
     #[doc = include_str!("./documentation/public_endpoints/latestblockhash.md")]
     async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError>;
 

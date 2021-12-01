@@ -485,6 +485,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     // Ensure the connecting peer has not surpassed the connection attempt limit.
                     if *initial_port < peer_port && *num_attempts > E::MAXIMUM_CONNECTION_FAILURES {
                         trace!("Dropping connection request from {} (tried {} secs ago)", peer_ip, elapsed);
+                        // Add an entry for this `Peer` in the restricted peers.
+                        self.restricted_peers.write().await.insert(peer_ip, Instant::now());
                     } else {
                         debug!("Received a connection request from {}", peer_ip);
                         // Update the number of attempts for this peer.
@@ -581,6 +583,19 @@ impl<N: Network, E: Environment> Peers<N, E> {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
+                    Message::Ping(_, _, _, _, ref mut data) => {
+                        let block_header = if let Data::Object(block_header) = data {
+                            block_header
+                        } else {
+                            panic!("Logic error: the block header shouldn't have been serialized yet.");
+                        };
+
+                        // Perform non-blocking serialisation of the block header.
+                        let serialized_header = bincode::serialize(&block_header).expect("Block header serialization is bugged");
+                        let _ = std::mem::replace(data, Data::Buffer(serialized_header));
+
+                        true
+                    }
                     Message::UnconfirmedBlock(_, _, ref mut data) => {
                         let block = if let Data::Object(block) = data {
                             block
@@ -729,7 +744,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
-            ledger_reader.latest_block_header(),
+            Data::Object(ledger_reader.latest_block_header()),
         );
         trace!("Sending '{}' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
@@ -1037,14 +1052,26 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         break;
                                     }
 
+                                    // Perform the deferred non-blocking deserialization of the block header.
+                                    match block_header.deserialize().await {
+                                        Ok(block_header) => {
+                                            // If the peer is a sync node, and this node is ahead, proceed to disconnect.
+                                            if node_type == NodeType::Sync && ledger_reader.latest_block_height() > block_header.height() {
+                                                trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
+                                                break;
+                                            }
+                                            // Update the block header of the peer.
+                                            peer.block_header = block_header;
+                                        }
+                                        Err(error) => warn!("[Ping] {}", error),
+                                    }
+
                                     // Update the version of the peer.
                                     peer.version = version;
                                     // Update the node type of the peer.
                                     peer.node_type = node_type;
                                     // Update the status of the peer.
                                     peer.status.update(status);
-                                    // Update the block header of the peer.
-                                    peer.block_header = block_header;
 
                                     // Determine if the peer is on a fork (or unknown).
                                     let is_fork = match ledger_reader.get_block_hash(peer.block_header.height()) {
@@ -1083,7 +1110,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, latest_block_header);
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
@@ -1108,12 +1135,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Update the timestamp for the received block.
                                     peer.seen_inbound_blocks.insert(block_hash, SystemTime::now());
 
-                                    // Ensure the unconfirmed block is at least within 3 blocks of the latest block height,
-                                    // and no more that 5 blocks ahead of the latest block height.
+                                    // Ensure the unconfirmed block is at least within 2 blocks of the latest block height,
+                                    // and no more that 3 blocks ahead of the latest block height.
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
                                     let latest_block_height = ledger_reader.latest_block_height();
-                                    let lower_bound = latest_block_height.saturating_sub(3);
-                                    let upper_bound = latest_block_height.saturating_add(5);
+                                    let lower_bound = latest_block_height.saturating_sub(2);
+                                    let upper_bound = latest_block_height.saturating_add(3);
                                     let is_within_range = block_height >= lower_bound && block_height <= upper_bound;
 
                                     // Ensure the node is not peering.

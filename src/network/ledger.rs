@@ -268,6 +268,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 self.add_failure(peer_ip, failure).await;
             }
             LedgerRequest::Heartbeat(prover_router) => {
+                // Update for sync nodes.
+                self.update_sync_nodes().await;
                 // Update the ledger.
                 self.update_ledger(&prover_router).await;
                 // Update the status of the ledger.
@@ -333,6 +335,87 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Route a `PeerDisconnected` to the peers.
         if let Err(error) = self.peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
             warn!("[PeerDisconnected] {}", error);
+        }
+    }
+
+    ///
+    /// Disconnects and restricts the given peer from the ledger.
+    ///
+    async fn disconnect_and_restrict(&self, peer_ip: SocketAddr, message: &str) {
+        info!("Disconnecting and restricting {} ({})", peer_ip, message);
+        // Remove all entries of the peer from the ledger.
+        self.remove_peer(&peer_ip).await;
+        // Update the status of the ledger.
+        self.update_status().await;
+        // Send a `Disconnect` message to the peer.
+        if let Err(error) = self
+            .peers_router
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect))
+            .await
+        {
+            warn!("[Disconnect] {}", error);
+        }
+        // Route a `PeerRestricted` to the peers.
+        if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+            warn!("[PeerRestricted] {}", error);
+        }
+    }
+
+    ///
+    /// Performs a heartbeat update for the sync nodes.
+    ///
+    async fn update_sync_nodes(&self) {
+        if E::NODE_TYPE == NodeType::Sync {
+            // Lock peers_state for further processing.
+            let peers_state = self.peers_state.read().await;
+
+            // Retrieve the latest cumulative weight of this ledger.
+            let latest_cumulative_weight = self.canon.latest_cumulative_weight();
+
+            // Iterate through the peers to find the maximum cumulative weight.
+            let mut maximum_cumulative_weight = latest_cumulative_weight;
+            // Initialize a HashMap to store the peers with their cumulative weight.
+            let mut peers = HashMap::with_capacity(peers_state.len());
+
+            // Check if any of the peers are ahead and have a larger block height.
+            for (peer_ip, peer_state) in peers_state.iter() {
+                if let Some((_, _, Some(_), block_height, block_locators)) = peer_state {
+                    // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
+                    let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
+                        Some(cumulative_weight) => cumulative_weight,
+                        None => *block_height as u128,
+                    };
+                    // If the cumulative weight is more, set this peer as the maximal peer.
+                    if cumulative_weight > maximum_cumulative_weight {
+                        maximum_cumulative_weight = cumulative_weight;
+                    }
+                    // Append the peer and their cumulative weight.
+                    peers.insert(*peer_ip, cumulative_weight);
+                }
+            }
+
+            // Release the lock over peers_state.
+            drop(peers_state);
+
+            // Determine a safe boundary from the maximum cumulative weight to drop from.
+            // The idea is that the sync node still needs some maximal peers to sync with.
+            let threshold_cumulative_weight = std::cmp::max(latest_cumulative_weight, maximum_cumulative_weight.saturating_sub(50));
+
+            // Disconnect from peers that are ahead of this node, but not a maximal peer.
+            let peer_ips_to_disconnect = peers
+                .iter()
+                .filter(|(_, cumulative_weight)| {
+                    *cumulative_weight >= &latest_cumulative_weight && *cumulative_weight < &threshold_cumulative_weight
+                })
+                .map(|(&ip, _)| ip)
+                .collect::<Vec<SocketAddr>>();
+
+            trace!("Found {} peers to disconnect", peer_ips_to_disconnect.len());
+
+            // Proceed to disconnect and restrict these peers.
+            for peer_ip in peer_ips_to_disconnect {
+                self.disconnect_and_restrict(peer_ip, "peer has synced").await;
+            }
         }
     }
 
@@ -447,8 +530,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     };
                     // If the cumulative weight is more, set the status to `Syncing`.
                     if cumulative_weight > latest_cumulative_weight && is_fork.is_some() {
-                        // Sync if this difference in cumulative weight is greater than 2.
-                        if cumulative_weight - latest_cumulative_weight > 2 {
+                        // Sync if this difference in cumulative weight is greater than 4.
+                        if cumulative_weight - latest_cumulative_weight > 4 {
                             // Set the status to `Syncing`.
                             status = State::Syncing;
                             break;
@@ -903,51 +986,36 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             }
 
-            // // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
-            // // If the node is a sync node and the node is currently syncing,
-            // // reduce the number of connections down to the minimum threshold,
-            // // to improve the speed with which the node syncs back to tip.
-            // if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() && self.number_of_block_requests().await > 0 {
-            //     debug!("Temporarily reducing the number of connected peers to sync");
-            //
-            //     // Lock peers_state and block_requests for further processing.
-            //     let peers_state = self.peers_state.read().await;
-            //     let block_requests = self.block_requests.read().await;
-            //
-            //     // Determine the peers to disconnect from.
-            //     // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
-            //     let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
-            //     let peer_ips_to_disconnect = peers_state
-            //         .iter()
-            //         .filter(|(&peer_ip, _)| {
-            //             let peer_str = peer_ip.to_string();
-            //             !E::SYNC_NODES.contains(&peer_str.as_str())
-            //                 && !E::BEACON_NODES.contains(&peer_str.as_str())
-            //                 && !block_requests.contains_key(&peer_ip)
-            //         })
-            //         .take(num_excess_peers)
-            //         .map(|(&ip, _)| ip)
-            //         .collect::<Vec<SocketAddr>>();
-            //
-            //     // Release the lock over peers_state and block_requests.
-            //     drop(peers_state);
-            //     drop(block_requests);
-            //
-            //     trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
-            //
-            //     // Proceed to send disconnect requests to these peers.
-            //     for peer_ip in peer_ips_to_disconnect {
-            //         info!("Disconnecting from {} (disconnecting to sync)", peer_ip);
-            //         // Remove all entries of the peer from the ledger.
-            //         self.remove_peer(&peer_ip).await;
-            //         // Update the status of the ledger.
-            //         self.update_status().await;
-            //         // Route a `PeerRestricted` to the peers.
-            //         if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
-            //             warn!("[PeerRestricted] {}", error);
-            //         }
-            //     }
-            // }
+            // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
+            // If the node is a sync node and the node is currently syncing,
+            // reduce the number of connections down to the minimum threshold,
+            // to improve the speed with which the node syncs back to tip.
+            if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() {
+                debug!("Temporarily reducing the number of connected peers to sync");
+
+                // Lock peers_state for further processing.
+                let peers_state = self.peers_state.read().await;
+
+                // Determine the peers to disconnect from.
+                // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
+                let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
+                let peer_ips_to_disconnect = peers_state
+                    .iter()
+                    .filter(|(&ip, _)| ip != peer_ip)
+                    .take(num_excess_peers)
+                    .map(|(&ip, _)| ip)
+                    .collect::<Vec<SocketAddr>>();
+
+                // Release the lock over peers_state.
+                drop(peers_state);
+
+                trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
+
+                // Proceed to disconnect and restrict these peers.
+                for peer_ip in peer_ips_to_disconnect {
+                    self.disconnect_and_restrict(peer_ip, "disconnecting to sync").await;
+                }
+            }
         }
     }
 
