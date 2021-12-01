@@ -477,7 +477,16 @@ mod tests {
         // Create a dummy mpsc channel for Prover requests. todo (@collinc97): only get requests will work until this is changed
         let (prover_router, _prover_handler) = mpsc::channel(1024);
 
-        RpcImpl::<N, E>::new(credentials, Status::new(), peers::<N, E>().await, ledger, prover_router)
+        let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
+
+        RpcImpl::<N, E>::new(
+            credentials,
+            Status::new(),
+            peers::<N, E>().await,
+            ledger,
+            prover_router,
+            memory_pool,
+        )
     }
 
     /// Deserializes a rpc response into the given type.
@@ -1198,5 +1207,32 @@ mod tests {
         // Check the transaction id.
         let expected = transaction.transaction_id();
         assert_eq!(expected, actual);
+    }
+
+    #[tokio::test]
+    async fn test_get_memory_pool() {
+        // Initialize a new RPC.
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+
+        // Initialize a new request that calls the `getmemorypool` endpoint.
+        let request = Request::new(Body::from(
+            r#"{
+	"jsonrpc":"2.0",
+	"id": "1",
+	"method": "getmemorypool"
+}"#,
+        ));
+
+        // Send the request to the RPC.
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Process the response into transactions.
+        let actual: Vec<Transaction<Testnet2>> = process_response(response).await;
+
+        // Check the transactions.
+        let expected = Vec::<Transaction<Testnet2>>::new();
+        assert_eq!(*expected, actual);
     }
 }
