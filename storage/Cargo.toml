@@ -52,10 +52,10 @@ version = "0.17"
 optional = true
 
 [dependencies.serde]
-version = "1"
+version = "1.0.130"
 
 [dependencies.serde_json]
-version = "1"
+version = "1.0.72"
 
 [dependencies.tracing]
 version = "0.1"

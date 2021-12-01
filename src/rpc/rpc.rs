@@ -1042,6 +1042,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_node_state() {
+        // Initialize a new RPC.
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+
+        // Declare the expected node state.
+        let expected = serde_json::json!({
+            "candidate_peers": Vec::<SocketAddr>::new(),
+            "connected_peers": Vec::<SocketAddr>::new(),
+            "latest_block_height": 0,
+            "latest_cumulative_weight": 0,
+            "number_of_candidate_peers": 0,
+            "number_of_connected_peers": 0,
+            "number_of_connected_sync_nodes": 0,
+            "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
+            "status": rpc.status.to_string(),
+            "type": Client::<Testnet2>::NODE_TYPE,
+            "version": Client::<Testnet2>::MESSAGE_VERSION,
+        });
+
+        // Initialize a new request that calls the `getnodestate` endpoint.
+        let request = Request::new(Body::from(
+            r#"{
+	"jsonrpc":"2.0",
+	"id": "1",
+	"method": "getnodestate"
+}"#,
+        ));
+
+        // Send the request to the RPC.
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Process the response into a ledger root.
+        let actual: serde_json::Value = process_response(response).await;
+
+        println!("get_node_state: {:?}", actual);
+
+        // Check the ledger root.
+        assert_eq!(expected, actual);
+    }
+
+    #[tokio::test]
     async fn test_get_transaction() {
         /// Additional metadata included with a transaction response
         #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
