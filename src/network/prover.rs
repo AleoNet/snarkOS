@@ -220,6 +220,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
         self.prover_router.clone()
     }
 
+    /// Returns an instance of the memory pool.
+    pub(crate) fn memory_pool(&self) -> Arc<RwLock<MemoryPool<N>>> {
+        self.memory_pool.clone()
+    }
+
     /// Returns all coinbase records in storage.
     pub fn to_coinbase_records(&self) -> Vec<(u32, Record<N>)> {
         self.state.to_coinbase_records()

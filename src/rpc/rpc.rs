@@ -24,7 +24,7 @@ use crate::{
     Peers,
     ProverRouter,
 };
-use snarkvm::dpc::Network;
+use snarkvm::dpc::{MemoryPool, Network};
 
 use hyper::{
     body::HttpBody,
@@ -36,7 +36,7 @@ use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, net::SocketAddr, str::FromStr, sync::Arc};
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, RwLock};
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -91,9 +91,10 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     peers: &Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
+    memory_pool: Arc<RwLock<MemoryPool<N>>>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger, prover_router);
+    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger, prover_router, memory_pool);
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();

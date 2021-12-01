@@ -68,6 +68,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
+    memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
@@ -93,12 +94,14 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
         peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
         prover_router: ProverRouter<N>,
+        memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) -> Self {
         Self(Arc::new(RpcInner {
             status,
             peers,
             ledger,
             prover_router,
+            memory_pool,
             credentials,
         }))
     }
@@ -189,7 +192,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
 
     /// Returns transactions in the node's memory pool.
     async fn get_memory_pool(&self) -> Result<Vec<Transaction<N>>, RpcError> {
-        Ok(vec![])
+        Ok(self.memory_pool.read().await.transactions())
     }
 
     /// Returns a transaction with metadata given the transaction ID.
