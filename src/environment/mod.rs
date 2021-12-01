@@ -67,7 +67,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
     const CONNECTION_TIMEOUT_IN_SECS: u64 = 1;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 60;
+    const PING_SLEEP_IN_SECS: u64 = 65;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
@@ -140,7 +140,7 @@ impl<N: Network> Environment for ClientTrial<N> {
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
     ];
-    const MINIMUM_NUMBER_OF_PEERS: usize = 15;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 11;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 31;
 }
 

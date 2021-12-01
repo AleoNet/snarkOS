@@ -530,8 +530,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     };
                     // If the cumulative weight is more, set the status to `Syncing`.
                     if cumulative_weight > latest_cumulative_weight && is_fork.is_some() {
-                        // Sync if this difference in cumulative weight is greater than 2.
-                        if cumulative_weight - latest_cumulative_weight > 2 {
+                        // Sync if this difference in cumulative weight is greater than 4.
+                        if cumulative_weight - latest_cumulative_weight > 4 {
                             // Set the status to `Syncing`.
                             status = State::Syncing;
                             break;
