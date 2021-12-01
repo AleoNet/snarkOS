@@ -29,6 +29,7 @@ echo "Running miner node..."
 while :
 do
   echo "Checking for updates..."
+  git stash
   STATUS=$(git pull)
 
   echo "Running the node..."

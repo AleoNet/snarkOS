@@ -16,6 +16,7 @@ echo "Do not run a sync node, it does nothing..."
 while :
 do
   echo "Checking for updates..."
+  git stash
   STATUS=$(git pull)
 
   if [ "$STATUS" != "Already up to date." ]; then
