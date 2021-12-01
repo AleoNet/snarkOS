@@ -115,6 +115,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.latest_block_height())
     }
 
+    /// Returns the latest cumulative weight from the canonical chain.
+    async fn latest_cumulative_weight(&self) -> Result<u128, RpcError> {
+        Ok(self.ledger.latest_cumulative_weight())
+    }
+
     /// Returns the latest block hash from the canonical chain.
     async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError> {
         Ok(self.ledger.latest_block_hash())
@@ -217,6 +222,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             "candidate_peers": candidate_peers,
             "connected_peers": connected_peers,
             "latest_block_height": self.ledger.latest_block_height(),
+            "latest_cumulative_weight": self.ledger.latest_cumulative_weight(),
             "number_of_candidate_peers": number_of_candidate_peers,
             "number_of_connected_peers": number_of_connected_peers,
             "number_of_connected_sync_nodes": number_of_connected_sync_nodes,
