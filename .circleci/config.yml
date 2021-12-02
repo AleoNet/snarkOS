@@ -52,6 +52,7 @@ jobs:
     docker:
       - image: cimg/rust:1.56.1
     resource_class: 2xlarge
+    parallelism: 20
     steps:
       - checkout
       - setup_environment:
@@ -59,7 +60,13 @@ jobs:
       - run:
           name: Build and run tests
           no_output_timeout: 35m
-          command: RUST_MIN_STACK=8388608 cargo test --workspace --release
+          command: |
+            cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
+            TEST_NAMES=$(circleci tests split test_names.txt)
+            for i in $(echo $TEST_NAMES | sed "s/ / /g")
+            do
+                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+            done
       - clear_environment:
           cache_key: snarkos-stable-cache
 
