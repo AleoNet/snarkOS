@@ -289,7 +289,9 @@ fn test_transaction_fees() {
     let address = account.address();
 
     // Mine the next block.
-    let block = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block, _record) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
 
     // Craft the transaction variables.
