@@ -17,7 +17,7 @@
 //! Definition of the public and private RPC endpoints.
 
 use crate::rpc::rpc_impl::RpcError;
-use snarkvm::dpc::{Block, BlockHeader, Network, Transactions, Transition};
+use snarkvm::dpc::{Block, BlockHeader, Network, Transaction, Transactions, Transition};
 
 use std::net::SocketAddr;
 
@@ -63,6 +63,9 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getblockheader.md")]
     async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError>;
 
+    // #[doc = include_str!("./documentation/public_endpoints/getblocktemplate.md")]
+    async fn get_block_template(&self) -> Result<serde_json::Value, RpcError>;
+
     #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError>;
 
@@ -74,6 +77,9 @@ pub trait RpcFunctions<N: Network> {
 
     #[doc = include_str!("./documentation/public_endpoints/getledgerproof.md")]
     async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError>;
+
+    #[doc = include_str!("./documentation/public_endpoints/getmemorypool.md")]
+    async fn get_memory_pool(&self) -> Result<Vec<Transaction<N>>, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/gettransaction.md")]
     async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<serde_json::Value, RpcError>;

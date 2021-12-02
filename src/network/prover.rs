@@ -74,7 +74,7 @@ pub struct Prover<N: Network, E: Environment> {
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
-    memory_pool: RwLock<MemoryPool<N>>,
+    memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The status of the node.
     status: Status,
     /// A terminator bit for the prover.
@@ -113,7 +113,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             state: Arc::new(ProverState::open_writer::<S, P>(path)?),
             miner: Arc::new(pool),
             prover_router,
-            memory_pool: RwLock::new(MemoryPool::new()),
+            memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
             status: status.clone(),
             terminator: terminator.clone(),
             peers_router,
@@ -218,6 +218,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Returns an instance of the prover router.
     pub fn router(&self) -> ProverRouter<N> {
         self.prover_router.clone()
+    }
+
+    /// Returns an instance of the memory pool.
+    pub(crate) fn memory_pool(&self) -> Arc<RwLock<MemoryPool<N>>> {
+        self.memory_pool.clone()
     }
 
     /// Returns all coinbase records in storage.
