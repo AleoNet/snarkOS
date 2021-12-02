@@ -340,7 +340,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                                 // Ensure the record owner matches.
                                 if record.owner() == miner {
                                     // Add the block to the appropriate list.
-                                    match block_height + 1024 < latest_block_height {
+                                    match block_height + 2048 < latest_block_height {
                                         true => confirmed.push((block_height, record)),
                                         false => pending.push((block_height, record)),
                                     }

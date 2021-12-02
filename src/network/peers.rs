@@ -395,12 +395,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
+                let midpoint_number_of_peers = E::MINIMUM_NUMBER_OF_PEERS.saturating_add(E::MAXIMUM_NUMBER_OF_PEERS) / 2;
                 for peer_ip in self
                     .candidate_peers()
                     .await
                     .iter()
                     .copied()
-                    .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
+                    .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
                     if sync_nodes.contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
