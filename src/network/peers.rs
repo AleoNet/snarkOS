@@ -584,14 +584,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
                     Message::Ping(_, _, _, _, ref mut data) => {
-                        let block_header = if let Data::Object(block_header) = data {
-                            block_header
-                        } else {
-                            panic!("Logic error: the block header shouldn't have been serialized yet.");
-                        };
-
                         // Perform non-blocking serialisation of the block header.
-                        let serialized_header = bincode::serialize(&block_header).expect("Block header serialization is bugged");
+                        let serialized_header = Data::serialize(data.clone()).await.expect("Block header serialization is bugged");
                         let _ = std::mem::replace(data, Data::Buffer(serialized_header));
 
                         true
@@ -619,7 +613,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         }
 
                         // Perform non-blocking serialization of the block.
-                        let serialized_block = bincode::serialize(&block).expect("Block serialization is bugged");
+                        let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
                         let _ = std::mem::replace(data, Data::Buffer(serialized_block));
 
                         is_ready_to_send
