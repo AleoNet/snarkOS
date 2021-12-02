@@ -733,7 +733,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
-        let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, local_nonce, connected_nonces).await?;
+        let (peer_ip, peer_nonce, node_type, status) =
+            Peer::handshake(&mut outbound_socket, local_ip, local_nonce, local_status, connected_nonces).await?;
 
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(
@@ -758,8 +759,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
         Ok(Peer {
             listener_ip: peer_ip,
             version: 0,
-            node_type: NodeType::Client,
-            status: Status::new(),
+            node_type,
+            status,
             block_header: N::genesis_block().header().clone(),
             last_seen: Instant::now(),
             outbound_socket,
@@ -786,8 +787,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
         outbound_socket: &mut Framed<TcpStream, Message<N, E>>,
         local_ip: SocketAddr,
         local_nonce: u64,
+        local_status: &Status,
         connected_nonces: &[u64],
-    ) -> Result<(SocketAddr, u64)> {
+    ) -> Result<(SocketAddr, u64, NodeType, Status)> {
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
@@ -803,6 +805,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let message = Message::<N, E>::ChallengeRequest(
             E::MESSAGE_VERSION,
             E::MAXIMUM_FORK_DEPTH,
+            E::NODE_TYPE,
+            local_status.get(),
             local_ip.port(),
             local_nonce,
             genesis_height,
@@ -811,12 +815,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
         outbound_socket.send(message).await?;
 
         // Wait for the counterparty challenge request to come in.
-        let peer_nonce = match outbound_socket.next().await {
+        let (peer_nonce, node_type, status) = match outbound_socket.next().await {
             Some(Ok(message)) => {
                 // Process the message.
                 trace!("Received '{}-B' from {}", message.name(), peer_ip);
                 match message {
-                    Message::ChallengeRequest(version, fork_depth, listener_port, peer_nonce, block_height) => {
+                    Message::ChallengeRequest(version, fork_depth, node_type, peer_status, listener_port, peer_nonce, block_height) => {
                         // Ensure the message protocol version is not outdated.
                         if version < E::MESSAGE_VERSION {
                             warn!("Dropping {} on version {} (outdated)", peer_ip, version);
@@ -862,7 +866,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         trace!("Sending '{}-B' to {}", message.name(), peer_ip);
                         outbound_socket.send(message).await?;
 
-                        peer_nonce
+                        // Initialize a status variable.
+                        let status = Status::new();
+                        status.update(peer_status);
+
+                        (peer_nonce, node_type, status)
                     }
                     message => {
                         return Err(anyhow!(
@@ -889,7 +897,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         // Perform the deferred non-blocking deserialization of the block header.
                         let block_header = block_header.deserialize().await?;
                         match block_header.height() == genesis_height && &block_header == genesis_header {
-                            true => Ok((peer_ip, peer_nonce)),
+                            true => Ok((peer_ip, peer_nonce, node_type, status)),
                             false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
                     }

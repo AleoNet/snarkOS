@@ -81,8 +81,8 @@ pub enum Message<N: Network, E: Environment> {
     BlockRequest(u32, u32),
     /// BlockResponse := (block)
     BlockResponse(Data<Block<N>>),
-    /// ChallengeRequest := (version, fork_depth, listener_port, nonce, block_height)
-    ChallengeRequest(u32, u32, u16, u64, u32),
+    /// ChallengeRequest := (version, fork_depth, node_type, status, listener_port, nonce, block_height)
+    ChallengeRequest(u32, u32, NodeType, State, u16, u64, u32),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(Data<BlockHeader<N>>),
     /// Disconnect := ()
@@ -149,9 +149,9 @@ impl<N: Network, E: Environment> Message<N, E> {
         match self {
             Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
             Self::BlockResponse(block) => Ok(block.serialize_blocking()?),
-            Self::ChallengeRequest(version, fork_depth, listener_port, nonce, block_height) => {
-                Ok(bincode::serialize(&(version, fork_depth, listener_port, nonce, block_height))?)
-            }
+            Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, block_height) => Ok(bincode::serialize(
+                &(version, fork_depth, node_type, status, listener_port, nonce, block_height),
+            )?),
             Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking()?),
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
@@ -204,8 +204,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
             1 => Self::BlockResponse(Data::Buffer(data.to_vec())),
             2 => {
-                let (version, fork_depth, listener_port, nonce, block_height) = bincode::deserialize(data)?;
-                Self::ChallengeRequest(version, fork_depth, listener_port, nonce, block_height)
+                let (version, fork_depth, node_type, status, listener_port, nonce, block_height) = bincode::deserialize(data)?;
+                Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, block_height)
             }
             3 => Self::ChallengeResponse(Data::Buffer(data.to_vec())),
             4 => match data.is_empty() {
