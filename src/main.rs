@@ -14,39 +14,42 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::Node;
+use snarkos::{initialize_logger, Node};
 
 use anyhow::Result;
 use structopt::StructOpt;
 use tokio::runtime;
 
 fn main() -> Result<()> {
+    if num_cpus::get() < 16 {
+        eprintln!("\nWARNING - Your machine must have at least 16-cores to run a node.\n");
+    }
+
     // Parse the provided arguments.
     let node = Node::from_args();
 
     // Start logging, if enabled.
     if !node.display {
-        node.initialize_logger();
+        initialize_logger(node.verbosity, None);
     }
 
     // Initialize the runtime configuration.
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_stack_size(8 * 1024 * 1024)
-        .worker_threads(num_cpus::get().saturating_sub(1).max(1)) // Don't use 100% of the cores
-        .max_blocking_threads(num_cpus::get().saturating_sub(1).max(1)) // Don't use 100% of the cores
+        .worker_threads((num_cpus::get() / 8 * 2).max(1))
+        .max_blocking_threads((num_cpus::get() / 8 * 2).max(1))
         .build()?;
 
     // Initialize the parallelization parameters.
     rayon::ThreadPoolBuilder::new()
         .stack_size(8 * 1024 * 1024)
-        .num_threads((num_cpus::get() / 4 * 3).max(1))
+        .num_threads((num_cpus::get() / 8 * 5).max(1))
         .build_global()
         .unwrap();
 
     runtime.block_on(async move {
         node.start().await.expect("Failed to start the node");
-        std::future::pending::<()>().await;
     });
 
     Ok(())

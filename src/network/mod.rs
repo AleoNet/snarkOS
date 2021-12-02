@@ -23,5 +23,8 @@ pub use message::*;
 pub(crate) mod peers;
 pub(crate) use peers::*;
 
+pub mod prover;
+pub use prover::*;
+
 pub mod server;
 pub use server::{LedgerReader, Server};

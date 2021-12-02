@@ -61,7 +61,7 @@ fn test_add_next_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -75,7 +75,9 @@ fn test_add_next_block() {
     let address = account.address();
 
     // Mine the next block.
-    let block = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
     ledger_tree.add(&block.hash()).expect("Failed to add hash to ledger tree");
 
@@ -107,7 +109,7 @@ fn test_remove_last_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -121,7 +123,9 @@ fn test_remove_last_block() {
     let address = account.address();
 
     // Mine the next block.
-    let block = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
     assert_eq!(1, ledger.latest_block_height());
 
@@ -151,7 +155,7 @@ fn test_remove_last_2_blocks() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -165,12 +169,16 @@ fn test_remove_last_2_blocks() {
     let address = account.address();
 
     // Mine the next block.
-    let block_1 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block_1, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block_1).expect("Failed to add next block to ledger");
     assert_eq!(1, ledger.latest_block_height());
 
     // Mine the next block.
-    let block_2 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block_2, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
     assert_eq!(2, ledger.latest_block_height());
 
@@ -200,7 +208,7 @@ fn test_get_block_locators() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
@@ -214,7 +222,9 @@ fn test_get_block_locators() {
     let address = account.address();
 
     // Mine the next block.
-    let block_1 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block_1, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block_1).expect("Failed to add next block to ledger");
     assert_eq!(1, ledger.latest_block_height());
 
@@ -229,7 +239,9 @@ fn test_get_block_locators() {
     );
 
     // Mine the next block.
-    let block_2 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block_2, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
     assert_eq!(2, ledger.latest_block_height());
 
@@ -244,7 +256,9 @@ fn test_get_block_locators() {
     );
 
     // Mine the next block.
-    let block_3 = ledger.mine_next_block(address, &[], &terminator, rng).expect("Failed to mine");
+    let (block_3, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
     ledger.add_next_block(&block_3).expect("Failed to add next block to ledger");
     assert_eq!(3, ledger.latest_block_height());
 

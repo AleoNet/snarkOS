@@ -17,25 +17,28 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["ledger", "testing"]
+members = ["storage", "testing"]
 
 [features]
 default = []
 test = []
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "040825e" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "471e03b" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
-futures = { version = "0.3.0", features = ["thread-pool"]}
+futures = { version = "0.3.18", features = ["thread-pool"]}
 
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", features = ["crossterm"] }
 
-[dependencies.snarkos-ledger]
-path = "./ledger"
+[dependencies.snarkos-storage]
+path = "./storage"
 version = "2.0.0"
+
+[dependencies.aleo-std]
+version = "0.1.4"
 
 [dependencies.anyhow]
 version = "1"
@@ -96,6 +99,7 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
+features = [ "arbitrary_precision" ]
 
 [dependencies.structopt]
 version = "0.3"
@@ -110,6 +114,7 @@ features = [
     "macros",
     "net",
     "rt-multi-thread",
+    "signal",
     "sync",
     "time"
 ]

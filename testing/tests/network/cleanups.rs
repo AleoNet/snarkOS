@@ -124,3 +124,23 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
     let leaked_mem = final_mem.saturating_sub(first_conn_mem.unwrap());
     assert_eq!(leaked_mem, 0);
 }
+
+#[tokio::test]
+#[ignore = "TODO: currently fails"]
+async fn node_shutdown_doesnt_leak() {
+    // Register initial memory use.
+    let initial_mem = PEAK_ALLOC.current_usage();
+
+    // Start a snarkOS node.
+    let client_node = ClientNode::default().await;
+
+    // Trigger `Server::shut_down` via the `Drop` impl.
+    drop(client_node);
+
+    // Measure memory use after the shutdown.
+    let final_mem = PEAK_ALLOC.current_usage();
+
+    // Check if there are any leaks.
+    let leaked_mem = final_mem.saturating_sub(initial_mem);
+    assert_eq!(leaked_mem, 0);
+}

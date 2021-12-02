@@ -20,12 +20,13 @@ edition = "2018"
 path = ".."
 features = ["test"]
 
-[dependencies.snarkos-ledger]
-path = "../ledger"
+[dependencies.snarkos-storage]
+path = "../storage"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "040825e"
+rev = "471e03b"
+#path = "../../snarkVM"
 
 [dependencies.anyhow]
 version = "1"
@@ -37,7 +38,7 @@ version = "0.1"
 version = "1"
 
 [dependencies.pea2pea]
-version = "0.28"
+version = "0.29"
 
 [dependencies.peak_alloc]
 version = "0.1"

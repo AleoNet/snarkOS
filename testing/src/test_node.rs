@@ -17,11 +17,12 @@
 use snarkos::{
     helpers::{State, Status},
     Client,
+    Data,
     Environment,
     Message,
     NodeType,
 };
-use snarkos_ledger::BlockLocators;
+use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
 use pea2pea::{
@@ -138,7 +139,13 @@ impl TestNode {
         let node = self.clone();
         task::spawn(async move {
             let genesis = Testnet2::genesis_block();
-            let ping_msg = ClientMessage::Ping(MESSAGE_VERSION, node.node_type(), node.state(), genesis.height(), genesis.hash());
+            let ping_msg = ClientMessage::Ping(
+                MESSAGE_VERSION,
+                node.node_type(),
+                node.state(),
+                genesis.hash(),
+                Data::Object(genesis.header().clone()),
+            );
 
             loop {
                 if node.node().num_connected() != 0 {
@@ -226,7 +233,7 @@ impl Handshake for TestNode {
             };
 
         // Respond with own challenge request.
-        let own_response = ClientMessage::ChallengeResponse(genesis_block_header.clone());
+        let own_response = ClientMessage::ChallengeResponse(Data::Object(genesis_block_header.clone()));
         trace!(parent: self.node().span(), "sending a challenge response to {}", peer_ip);
         let msg = own_response.serialize().unwrap();
         let len = u32::to_le_bytes(msg.len() as u32);
@@ -240,6 +247,8 @@ impl Handshake for TestNode {
         let peer_response = ClientMessage::deserialize(&buf[..len]);
 
         if let Ok(Message::ChallengeResponse(block_header)) = peer_response {
+            let block_header = block_header.deserialize().await.unwrap();
+
             trace!(parent: self.node().span(), "received a challenge response from {}", peer_ip);
             if block_header.height() == CHALLENGE_HEIGHT && &block_header == genesis_block_header && block_header.is_valid() {
                 // Register the newly connected snarkOS peer.
@@ -297,11 +306,13 @@ impl Reading for TestNode {
             ClientMessage::Disconnect => {}
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
-            ClientMessage::Ping(version, _peer_type, _peer_state, block_height, _block_hash) => {
-                self.process_ping(source, version, block_height).await?
+            ClientMessage::Ping(version, _peer_type, _peer_state, _block_hash, block_header) => {
+                // Deserialise the block header.
+                let block_header = block_header.deserialize().await.unwrap();
+                self.process_ping(source, version, block_header.height()).await?
             }
             ClientMessage::Pong(_is_fork, _block_locators) => {}
-            ClientMessage::UnconfirmedBlock(_block) => {}
+            ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
             ClientMessage::UnconfirmedTransaction(_transaction) => {}
             _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
         }
@@ -382,7 +393,9 @@ impl TestNode {
         let genesis = Testnet2::genesis_block();
         let msg = ClientMessage::Pong(
             None,
-            BlockLocators::<Testnet2>::from(vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect()),
+            Data::Object(BlockLocators::<Testnet2>::from(
+                vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect(),
+            )),
         );
 
         info!(parent: self.node().span(), "sending a Pong to {}", source);

@@ -15,26 +15,28 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    display::notification_message,
+    helpers::{State, Status, Tasks},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     peers::{Peers, PeersRequest, PeersRouter},
+    prover::{Prover, ProverRouter},
     rpc::initialize_rpc_server,
     Environment,
     Node,
     NodeType,
 };
-use snarkos_ledger::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    net::TcpListener,
-    sync::{mpsc, oneshot, RwLock},
-    task,
+use std::{
+    net::SocketAddr,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
 };
+use tokio::{net::TcpListener, sync::oneshot, task};
 
-pub type LedgerReader<N> = Arc<RwLock<LedgerState<N>>>;
+pub type LedgerReader<N> = Arc<LedgerState<N>>;
 
 ///
 /// A set of operations to initialize the node server for a specific network.
@@ -46,13 +48,11 @@ pub struct Server<N: Network, E: Environment> {
     /// The status of the node.
     status: Status,
     /// The list of peers for the node.
-    peers: Arc<RwLock<Peers<N, E>>>,
-    /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
-    /// The ledger state of the node.
-    ledger_reader: LedgerReader<N>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N, E>,
+    peers: Arc<Peers<N, E>>,
+    /// The prover of the node.
+    ledger: Arc<Ledger<N, E>>,
+    /// The prover of the node.
+    prover: Arc<Prover<N, E>>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
 }
@@ -70,30 +70,56 @@ impl<N: Network, E: Environment> Server<N, E> {
         };
 
         // Initialize the ledger storage path.
-        let storage_path = node.storage_path(local_ip);
+        let ledger_storage_path = node.ledger_storage_path(local_ip);
+        // Initialize the prover storage path.
+        let prover_storage_path = node.prover_storage_path(local_ip);
         // Initialize the status indicator.
         let status = Status::new();
+        // Initialize the terminator bit.
+        let terminator = Arc::new(AtomicBool::new(false));
+
         // Initialize a new instance for managing peers.
-        let (peers, peers_router) = Self::initialize_peers(&mut tasks, local_ip, status.clone()).await;
+        let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
         // Initialize a new instance for managing the ledger.
-        let (ledger_reader, ledger_router) = Self::initialize_ledger(&mut tasks, storage_path, status.clone(), &peers_router).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &status, &terminator, peers.router()).await?;
+        // Initialize a new instance for managing the prover.
+        let prover = Prover::open::<RocksDB, _>(
+            &mut tasks,
+            &prover_storage_path,
+            miner.clone(),
+            local_ip,
+            &status,
+            &terminator,
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+        )
+        .await?;
 
         // Initialize the connection listener for new peers.
-        Self::initialize_listener(&mut tasks, local_ip, listener, &peers_router, &ledger_reader, &ledger_router).await;
+        Self::initialize_listener(
+            &mut tasks,
+            local_ip,
+            listener,
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+            prover.router(),
+        )
+        .await;
         // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(&mut tasks, &peers_router, &ledger_reader, &ledger_router).await;
-        // Initialize a new instance of the miner.
-        Self::initialize_miner(&mut tasks, local_ip, miner, &ledger_router).await;
+        Self::initialize_heartbeat(&mut tasks, peers.router(), ledger.reader(), ledger.router(), prover.router()).await;
         // Initialize a new instance of the RPC server.
-        Self::initialize_rpc(&mut tasks, node, &status, &peers, &ledger_reader, &ledger_router).await;
+        Self::initialize_rpc(&mut tasks, node, &status, &peers, ledger.reader(), prover.router()).await;
+        // Initialize a new instance of the notification.
+        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner.clone()).await;
 
         Ok(Self {
             local_ip,
             status,
             peers,
-            peers_router,
-            ledger_reader,
-            ledger_router,
+            ledger,
+            prover,
             tasks,
         })
     }
@@ -109,7 +135,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     /// Returns the peer manager of this node.
-    pub fn peers(&self) -> Arc<RwLock<Peers<N, E>>> {
+    pub fn peers(&self) -> Arc<Peers<N, E>> {
         self.peers.clone()
     }
 
@@ -122,8 +148,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (router, handler) = oneshot::channel();
 
         // Route a `Connect` request to the peer manager.
-        let message = PeersRequest::Connect(peer_ip, self.ledger_reader.clone(), self.ledger_router.clone(), router);
-        self.peers_router.send(message).await?;
+        self.peers
+            .router()
+            .send(PeersRequest::Connect(
+                peer_ip,
+                self.ledger.reader(),
+                self.ledger.router(),
+                self.prover.router(),
+                router,
+            ))
+            .await?;
 
         // Wait until the connection task is initialized.
         handler.await.map(|_| ()).map_err(|e| e.into())
@@ -133,94 +167,20 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Disconnects from peers and proceeds to shut down the node.
     ///
     #[inline]
-    pub(crate) fn shut_down(&self) {
+    pub async fn shut_down(&self) {
         info!("Shutting down...");
+        // Update the node status.
+        self.status.update(State::ShuttingDown);
+
+        // Shut down the ledger.
+        let ledger_lock = self.ledger.shut_down().await;
+        trace!("Ledger has shut down, proceeding to lock...");
+
+        // Acquire the lock for ledger.
+        let _ledger_lock = ledger_lock.lock().await;
+
+        // Flush the tasks.
         self.tasks.flush();
-    }
-
-    ///
-    /// Initialize a new instance for managing peers.
-    ///
-    #[inline]
-    #[allow(clippy::type_complexity)]
-    async fn initialize_peers(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        local_ip: SocketAddr,
-        local_status: Status,
-    ) -> (Arc<RwLock<Peers<N, E>>>, PeersRouter<N, E>) {
-        // Initialize the `Peers` struct.
-        let peers = Arc::new(RwLock::new(Peers::new(local_ip, None, local_status)));
-
-        // Initialize an mpsc channel for sending requests to the `Peers` struct.
-        let (peers_router, mut peers_handler) = mpsc::channel(1024);
-
-        // Initialize the peers router process.
-        {
-            let peers = peers.clone();
-            let peers_router = peers_router.clone();
-            let tasks_clone = tasks.clone();
-            let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a peers request.
-                while let Some(request) = peers_handler.recv().await {
-                    let peers = peers.clone();
-                    let peers_router = peers_router.clone();
-                    // Asynchronously process a peers request.
-                    tasks_clone.append(task::spawn(async move {
-                        // Hold the peers write lock briefly, to update the state of the peers.
-                        peers.write().await.update(request, &peers_router).await;
-                    }));
-                }
-            }));
-            // Wait until the peers router task is ready.
-            let _ = handler.await;
-        }
-
-        (peers, peers_router)
-    }
-
-    ///
-    /// Initialize a new instance for managing the ledger.
-    ///
-    #[inline]
-    async fn initialize_ledger(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        storage_path: String,
-        status: Status,
-        peers_router: &PeersRouter<N, E>,
-    ) -> Result<(LedgerReader<N>, LedgerRouter<N, E>)> {
-        // Open the ledger from storage.
-        let path = storage_path.clone();
-        let ledger = Arc::new(RwLock::new(
-            task::spawn_blocking(move || Ledger::<N, E>::open::<RocksDB, _>(&path, &status)).await??,
-        ));
-
-        // Open a ledger reader from storage.
-        let ledger_reader = Arc::new(RwLock::new(LedgerState::<N>::open_reader::<RocksDB, _>(&storage_path)?));
-
-        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
-        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
-
-        // Initialize the ledger router process.
-        let peers_router = peers_router.clone();
-        let (router, handler) = oneshot::channel();
-        tasks.append(task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = router.send(());
-            // Asynchronously wait for a ledger request.
-            while let Some(request) = ledger_handler.recv().await {
-                // Hold the ledger write lock briefly, to update the state of the ledger.
-                // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
-                // will end up being processed out of order.
-                ledger.write().await.update(request, &peers_router).await;
-            }
-        }));
-        // Wait until the ledger router task is ready.
-        let _ = handler.await;
-
-        Ok((ledger_reader, ledger_router))
     }
 
     ///
@@ -231,14 +191,12 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         listener: TcpListener,
-        peers_router: &PeersRouter<N, E>,
-        ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N, E>,
+        peers_router: PeersRouter<N, E>,
+        ledger_reader: LedgerReader<N>,
+        ledger_router: LedgerRouter<N>,
+        prover_router: ProverRouter<N>,
     ) {
         // Initialize the listener process.
-        let peers_router = peers_router.clone();
-        let ledger_reader = ledger_reader.clone();
-        let ledger_router = ledger_router.clone();
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.
@@ -249,7 +207,13 @@ impl<N: Network, E: Environment> Server<N, E> {
                 match listener.accept().await {
                     // Process the inbound connection request.
                     Ok((stream, peer_ip)) => {
-                        let request = PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader.clone(), ledger_router.clone());
+                        let request = PeersRequest::PeerConnecting(
+                            stream,
+                            peer_ip,
+                            ledger_reader.clone(),
+                            ledger_router.clone(),
+                            prover_router.clone(),
+                        );
                         if let Err(error) = peers_router.send(request).await {
                             error!("Failed to send request to peers: {}", error)
                         }
@@ -270,27 +234,24 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[inline]
     async fn initialize_heartbeat(
         tasks: &mut Tasks<task::JoinHandle<()>>,
-        peers_router: &PeersRouter<N, E>,
-        ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N, E>,
+        peers_router: PeersRouter<N, E>,
+        ledger_reader: LedgerReader<N>,
+        ledger_router: LedgerRouter<N>,
+        prover_router: ProverRouter<N>,
     ) {
         // Initialize the heartbeat process.
-        let peers_router = peers_router.clone();
-        let ledger_reader = ledger_reader.clone();
-        let ledger_router = ledger_router.clone();
         let (router, handler) = oneshot::channel();
         tasks.append(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
                 // Transmit a heartbeat request to the peers.
-                let request = PeersRequest::Heartbeat(ledger_reader.clone(), ledger_router.clone());
+                let request = PeersRequest::Heartbeat(ledger_reader.clone(), ledger_router.clone(), prover_router.clone());
                 if let Err(error) = peers_router.send(request).await {
                     error!("Failed to send heartbeat to peers: {}", error)
                 }
                 // Transmit a heartbeat request to the ledger.
-                let request = LedgerRequest::Heartbeat(ledger_router.clone());
-                if let Err(error) = ledger_router.send(request).await {
+                if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
                     error!("Failed to send heartbeat to ledger: {}", error)
                 }
                 // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
@@ -302,42 +263,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     ///
-    /// Initialize a new instance of the miner.
-    ///
-    #[inline]
-    async fn initialize_miner(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        local_ip: SocketAddr,
-        miner: Option<Address<N>>,
-        ledger_router: &LedgerRouter<N, E>,
-    ) {
-        if E::NODE_TYPE == NodeType::Miner {
-            if let Some(recipient) = miner {
-                // Initialize the miner process.
-                let ledger_router = ledger_router.clone();
-                let (router, handler) = oneshot::channel();
-                tasks.append(task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    loop {
-                        // Start the mining process.
-                        let request = LedgerRequest::Mine(local_ip, recipient, ledger_router.clone());
-                        if let Err(error) = ledger_router.send(request).await {
-                            error!("Failed to send request to ledger: {}", error);
-                        }
-                        // Sleep for 2 seconds.
-                        tokio::time::sleep(Duration::from_secs(2)).await;
-                    }
-                }));
-                // Wait until the miner task is ready.
-                let _ = handler.await;
-            } else {
-                error!("Missing miner address. Please specify an Aleo address in order to mine");
-            }
-        }
-    }
-
-    ///
     /// Initialize a new instance of the RPC server.
     ///
     #[inline]
@@ -345,9 +270,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         node: &Node,
         status: &Status,
-        peers: &Arc<RwLock<Peers<N, E>>>,
-        ledger_reader: &LedgerReader<N>,
-        ledger_router: &LedgerRouter<N, E>,
+        peers: &Arc<Peers<N, E>>,
+        ledger_reader: LedgerReader<N>,
+        prover_router: ProverRouter<N>,
     ) {
         if !node.norpc {
             // Initialize a new instance of the RPC server.
@@ -359,10 +284,69 @@ impl<N: Network, E: Environment> Server<N, E> {
                     status,
                     peers,
                     ledger_reader,
-                    ledger_router,
+                    prover_router,
                 )
                 .await,
             );
         }
+    }
+
+    ///
+    /// Initialize a new instance of the notification.
+    ///
+    #[inline]
+    async fn initialize_notification(
+        tasks: &mut Tasks<task::JoinHandle<()>>,
+        ledger: LedgerReader<N>,
+        prover: Arc<Prover<N, E>>,
+        miner: Option<Address<N>>,
+    ) {
+        // Initialize the heartbeat process.
+        let (router, handler) = oneshot::channel();
+        tasks.append(task::spawn(async move {
+            // Notify the outer function that the task is ready.
+            let _ = router.send(());
+            loop {
+                info!("{}", notification_message(miner.clone()));
+
+                if E::NODE_TYPE == NodeType::Miner {
+                    if let Some(miner) = miner {
+                        // Retrieve the latest block height.
+                        let latest_block_height = ledger.latest_block_height();
+
+                        // Prepare a list of confirmed and pending coinbase records.
+                        let mut confirmed = vec![];
+                        let mut pending = vec![];
+
+                        // Iterate through the coinbase records from storage.
+                        for (block_height, record) in prover.to_coinbase_records() {
+                            // Filter the coinbase records by determining if they exist on the canonical chain.
+                            if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                                // Ensure the record owner matches.
+                                if record.owner() == miner {
+                                    // Add the block to the appropriate list.
+                                    match block_height + 1024 < latest_block_height {
+                                        true => confirmed.push((block_height, record)),
+                                        false => pending.push((block_height, record)),
+                                    }
+                                }
+                            }
+                        }
+
+                        info!(
+                            "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+                            confirmed.len(),
+                            pending.len(),
+                            miner
+                        );
+                    }
+                }
+
+                // Sleep for `120` seconds.
+                tokio::time::sleep(Duration::from_secs(120)).await;
+            }
+        }));
+        // Wait until the heartbeat task is ready.
+        let _ = handler.await;
     }
 }

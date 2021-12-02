@@ -33,13 +33,13 @@ impl ClientNode {
 
     /// Returns the list of connected peers of the node.
     pub async fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.server.peers().read().await.connected_peers()
+        self.server.peers().connected_peers().await
     }
 
     /// Resets the node's known peers. This is practical, as it makes the node not reconnect
     /// to known peers in test cases where it's undesirable.
     pub async fn reset_known_peers(&self) {
-        self.server.peers().write().await.reset_known_peers()
+        self.server.peers().reset_known_peers().await
     }
 
     /// Attempts to connect the node to the given address.
@@ -69,6 +69,12 @@ impl ClientNode {
 // Remove the storage artifacts after each test.
 impl Drop for ClientNode {
     fn drop(&mut self) {
+        // TODO (howardwu): @ljedrz to implement a wrapping scope for Display within Node/Server.
+        #[allow(unused_must_use)]
+        {
+            self.server.shut_down();
+        }
+
         let db_path = format!("/tmp/snarkos-test-ledger-{}", self.local_addr().port());
         assert!(
             fs::remove_dir_all(&db_path).is_ok(),
