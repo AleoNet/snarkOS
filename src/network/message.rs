@@ -81,7 +81,7 @@ pub enum Message<N: Network, E: Environment> {
     BlockRequest(u32, u32),
     /// BlockResponse := (block)
     BlockResponse(Data<Block<N>>),
-    /// ChallengeRequest := (version, fork_depth, node_type, status, listener_port, nonce, block_height)
+    /// ChallengeRequest := (version, fork_depth, node_type, status, listener_port, nonce, latest_block_height)
     ChallengeRequest(u32, u32, NodeType, State, u16, u64, u32),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(Data<BlockHeader<N>>),

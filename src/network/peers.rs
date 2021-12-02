@@ -733,8 +733,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
-        let (peer_ip, peer_nonce, node_type, status) =
-            Peer::handshake(&mut outbound_socket, local_ip, local_nonce, local_status, connected_nonces).await?;
+        let (peer_ip, peer_nonce, node_type, status) = Peer::handshake(
+            &mut outbound_socket,
+            local_ip,
+            local_nonce,
+            local_status,
+            ledger_reader.latest_block_height(),
+            connected_nonces,
+        )
+        .await?;
 
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(
@@ -788,18 +795,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
         local_ip: SocketAddr,
         local_nonce: u64,
         local_status: &Status,
+        local_block_height: u32,
         connected_nonces: &[u64],
     ) -> Result<(SocketAddr, u64, NodeType, Status)> {
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
-        // TODO (howardwu): Consider changing this to a random challenge height.
-        //  The tradeoff is that checking genesis ensures your peer is starting at the same genesis block.
-        //  Choosing a random height also requires knowing upfront the height of the peer.
-        //  As such, leaving it at the genesis block height may be the best option here.
         // Retrieve the genesis block header.
         let genesis_header = N::genesis_block().header();
-        let genesis_height = N::genesis_block().height();
 
         // Send a challenge request to the peer.
         let message = Message::<N, E>::ChallengeRequest(
@@ -809,7 +812,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             local_status.get(),
             local_ip.port(),
             local_nonce,
-            genesis_height,
+            local_block_height,
         );
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
@@ -820,7 +823,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 // Process the message.
                 trace!("Received '{}-B' from {}", message.name(), peer_ip);
                 match message {
-                    Message::ChallengeRequest(version, fork_depth, node_type, peer_status, listener_port, peer_nonce, block_height) => {
+                    Message::ChallengeRequest(
+                        version,
+                        fork_depth,
+                        node_type,
+                        peer_status,
+                        listener_port,
+                        peer_nonce,
+                        peer_block_height,
+                    ) => {
                         // Ensure the message protocol version is not outdated.
                         if version < E::MESSAGE_VERSION {
                             warn!("Dropping {} on version {} (outdated)", peer_ip, version);
@@ -834,9 +845,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 fork_depth
                             ));
                         }
-                        // Ensure the block height is correct.
-                        if block_height != genesis_height {
-                            return Err(anyhow!("Incorrect block height of {}", block_height));
+                        // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+                        if E::NODE_TYPE != NodeType::Sync
+                            && local_status.is_syncing()
+                            && node_type == NodeType::Sync
+                            && local_block_height > peer_block_height
+                        {
+                            return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
                         }
                         // Ensure the peer is not this node.
                         if local_nonce == peer_nonce {
@@ -896,7 +911,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     Message::ChallengeResponse(block_header) => {
                         // Perform the deferred non-blocking deserialization of the block header.
                         let block_header = block_header.deserialize().await?;
-                        match block_header.height() == genesis_height && &block_header == genesis_header {
+                        match &block_header == genesis_header {
                             true => Ok((peer_ip, peer_nonce, node_type, status)),
                             false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
@@ -1079,8 +1094,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Perform the deferred non-blocking deserialization of the block header.
                                     match block_header.deserialize().await {
                                         Ok(block_header) => {
-                                            // If the peer is a sync node, and this node is ahead, proceed to disconnect.
-                                            if node_type == NodeType::Sync && ledger_reader.latest_block_height() > block_header.height() {
+                                            // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+                                            if E::NODE_TYPE != NodeType::Sync && local_status.is_syncing() && node_type == NodeType::Sync && ledger_reader.latest_block_height() > block_header.height() {
                                                 trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
                                                 break;
                                             }
