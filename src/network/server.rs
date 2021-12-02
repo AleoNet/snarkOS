@@ -258,14 +258,14 @@ impl<N: Network, E: Environment> Server<N, E> {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
+                // Transmit a heartbeat request to the ledger.
+                if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
+                    error!("Failed to send heartbeat to ledger: {}", error)
+                }
                 // Transmit a heartbeat request to the peers.
                 let request = PeersRequest::Heartbeat(ledger_reader.clone(), ledger_router.clone(), prover_router.clone());
                 if let Err(error) = peers_router.send(request).await {
                     error!("Failed to send heartbeat to peers: {}", error)
-                }
-                // Transmit a heartbeat request to the ledger.
-                if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
-                    error!("Failed to send heartbeat to ledger: {}", error)
                 }
                 // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
