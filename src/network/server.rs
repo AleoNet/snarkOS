@@ -34,7 +34,11 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
-use tokio::{net::TcpListener, sync::oneshot, task};
+use tokio::{
+    net::TcpListener,
+    sync::{oneshot, RwLock},
+    task,
+};
 
 pub type LedgerReader<N> = Arc<LedgerState<N>>;
 
@@ -110,7 +114,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(&mut tasks, peers.router(), ledger.reader(), ledger.router(), prover.router()).await;
         // Initialize a new instance of the RPC server.
-        Self::initialize_rpc(&mut tasks, node, &status, &peers, ledger.reader(), prover.router()).await;
+        Self::initialize_rpc(
+            &mut tasks,
+            node,
+            &status,
+            &peers,
+            ledger.reader(),
+            prover.router(),
+            prover.memory_pool(),
+        )
+        .await;
         // Initialize a new instance of the notification.
         Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner.clone()).await;
 
@@ -273,6 +286,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         peers: &Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
         prover_router: ProverRouter<N>,
+        memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) {
         if !node.norpc {
             // Initialize a new instance of the RPC server.
@@ -285,6 +299,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     peers,
                     ledger_reader,
                     prover_router,
+                    memory_pool,
                 )
                 .await,
             );
