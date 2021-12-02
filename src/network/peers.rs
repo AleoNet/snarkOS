@@ -301,7 +301,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         drop(seen_outbound_connections);
 
                         // Initialize the peer handler.
-                        match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
+                        match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                             Ok(stream) => match stream {
                                 Ok(stream) => {
                                     Peer::handler(
@@ -381,7 +381,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Skip if the number of connected peers is above the minimum threshold.
                 match self.number_of_connected_peers().await < E::MINIMUM_NUMBER_OF_PEERS {
-                    true => trace!("Sending request for more peer connections"),
+                    true => {
+                        trace!("Sending request for more peer connections");
+                        // Request more peers if the number of connected peers is below the threshold.
+                        for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 3) {
+                            self.send(*peer_ip, Message::PeerRequest).await;
+                        }
+                    }
                     false => return,
                 };
 
@@ -395,12 +401,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
+                let midpoint_number_of_peers = E::MINIMUM_NUMBER_OF_PEERS.saturating_add(E::MAXIMUM_NUMBER_OF_PEERS) / 2;
                 for peer_ip in self
                     .candidate_peers()
                     .await
                     .iter()
                     .copied()
-                    .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
+                    .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
                     if sync_nodes.contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
@@ -422,10 +429,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             let _ = handler.await;
                         });
                     }
-                }
-                // Request more peers if the number of connected peers is below the threshold.
-                for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 1) {
-                    self.send(*peer_ip, Message::PeerRequest).await;
                 }
             }
             PeersRequest::MessagePropagate(sender, message) => {
@@ -583,7 +586,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
-                    Message::Ping(_, _, _, _, ref mut data) => {
+                    Message::Ping(_, _, _, _, _, ref mut data) => {
                         // Perform non-blocking serialisation of the block header.
                         let serialized_header = Data::serialize(data.clone()).await.expect("Block header serialization is bugged");
                         let _ = std::mem::replace(data, Data::Buffer(serialized_header));
@@ -730,11 +733,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
-        let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, local_nonce, connected_nonces).await?;
+        let (peer_ip, peer_nonce, node_type, status) = Peer::handshake(
+            &mut outbound_socket,
+            local_ip,
+            local_nonce,
+            local_status,
+            ledger_reader.latest_cumulative_weight(),
+            connected_nonces,
+        )
+        .await?;
 
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(
             E::MESSAGE_VERSION,
+            E::MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
@@ -754,8 +766,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
         Ok(Peer {
             listener_ip: peer_ip,
             version: 0,
-            node_type: NodeType::Client,
-            status: Status::new(),
+            node_type,
+            status,
             block_header: N::genesis_block().header().clone(),
             last_seen: Instant::now(),
             outbound_socket,
@@ -782,39 +794,64 @@ impl<N: Network, E: Environment> Peer<N, E> {
         outbound_socket: &mut Framed<TcpStream, Message<N, E>>,
         local_ip: SocketAddr,
         local_nonce: u64,
+        local_status: &Status,
+        local_cumulative_weight: u128,
         connected_nonces: &[u64],
-    ) -> Result<(SocketAddr, u64)> {
+    ) -> Result<(SocketAddr, u64, NodeType, Status)> {
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
-        // TODO (howardwu): Consider changing this to a random challenge height.
-        //  The tradeoff is that checking genesis ensures your peer is starting at the same genesis block.
-        //  Choosing a random height also requires knowing upfront the height of the peer.
-        //  As such, leaving it at the genesis block height may be the best option here.
         // Retrieve the genesis block header.
         let genesis_header = N::genesis_block().header();
-        let genesis_height = N::genesis_block().height();
 
         // Send a challenge request to the peer.
-        let message = Message::<N, E>::ChallengeRequest(E::MESSAGE_VERSION, local_ip.port(), local_nonce, genesis_height);
+        let message = Message::<N, E>::ChallengeRequest(
+            E::MESSAGE_VERSION,
+            E::MAXIMUM_FORK_DEPTH,
+            E::NODE_TYPE,
+            local_status.get(),
+            local_ip.port(),
+            local_nonce,
+            local_cumulative_weight,
+        );
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
 
         // Wait for the counterparty challenge request to come in.
-        let peer_nonce = match outbound_socket.next().await {
+        let (peer_nonce, node_type, status) = match outbound_socket.next().await {
             Some(Ok(message)) => {
                 // Process the message.
                 trace!("Received '{}-B' from {}", message.name(), peer_ip);
                 match message {
-                    Message::ChallengeRequest(version, listener_port, peer_nonce, block_height) => {
+                    Message::ChallengeRequest(
+                        version,
+                        fork_depth,
+                        node_type,
+                        peer_status,
+                        listener_port,
+                        peer_nonce,
+                        peer_cumulative_weight,
+                    ) => {
                         // Ensure the message protocol version is not outdated.
                         if version < E::MESSAGE_VERSION {
                             warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                             return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
                         }
-                        // Ensure the block height is correct.
-                        if block_height != genesis_height {
-                            return Err(anyhow!("Incorrect block height of {}", block_height));
+                        // Ensure the maximum fork depth is correct.
+                        if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                            return Err(anyhow!(
+                                "Dropping {} for an incorrect maximum fork depth of {}",
+                                peer_ip,
+                                fork_depth
+                            ));
+                        }
+                        // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+                        if E::NODE_TYPE != NodeType::Sync
+                            && local_status.is_syncing()
+                            && node_type == NodeType::Sync
+                            && local_cumulative_weight > peer_cumulative_weight
+                        {
+                            return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
                         }
                         // Ensure the peer is not this node.
                         if local_nonce == peer_nonce {
@@ -830,7 +867,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             peer_ip.set_port(listener_port);
                             // Ensure the claimed listener port is open.
                             let stream =
-                                match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
+                                match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                                     Ok(stream) => stream,
                                     Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
                                 };
@@ -844,7 +881,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         trace!("Sending '{}-B' to {}", message.name(), peer_ip);
                         outbound_socket.send(message).await?;
 
-                        peer_nonce
+                        // Initialize a status variable.
+                        let status = Status::new();
+                        status.update(peer_status);
+
+                        (peer_nonce, node_type, status)
                     }
                     message => {
                         return Err(anyhow!(
@@ -870,8 +911,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     Message::ChallengeResponse(block_header) => {
                         // Perform the deferred non-blocking deserialization of the block header.
                         let block_header = block_header.deserialize().await?;
-                        match block_header.height() == genesis_height && &block_header == genesis_header {
-                            true => Ok((peer_ip, peer_nonce)),
+                        match &block_header == genesis_header {
+                            true => Ok((peer_ip, peer_nonce, node_type, status)),
                             false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
                     }
@@ -1039,18 +1080,26 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version, node_type, status, block_hash, block_header) => {
+                                Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
-
+                                    // Ensure the maximum fork depth is correct.
+                                    if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                                        warn!("Dropping {} for an incorrect maximum fork depth of {}", peer_ip, fork_depth);
+                                        break;
+                                    }
                                     // Perform the deferred non-blocking deserialization of the block header.
                                     match block_header.deserialize().await {
                                         Ok(block_header) => {
-                                            // If the peer is a sync node, and this node is ahead, proceed to disconnect.
-                                            if node_type == NodeType::Sync && ledger_reader.latest_block_height() > block_header.height() {
+                                            // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+                                            if E::NODE_TYPE != NodeType::Sync
+                                                && local_status.is_syncing()
+                                                && node_type == NodeType::Sync
+                                                && ledger_reader.latest_cumulative_weight() > block_header.cumulative_weight()
+                                            {
                                                 trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
                                                 break;
                                             }
@@ -1104,7 +1153,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
@@ -1130,11 +1179,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.seen_inbound_blocks.insert(block_hash, SystemTime::now());
 
                                     // Ensure the unconfirmed block is at least within 2 blocks of the latest block height,
-                                    // and no more that 3 blocks ahead of the latest block height.
+                                    // and no more that 2 blocks ahead of the latest block height.
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
                                     let latest_block_height = ledger_reader.latest_block_height();
                                     let lower_bound = latest_block_height.saturating_sub(2);
-                                    let upper_bound = latest_block_height.saturating_add(3);
+                                    let upper_bound = latest_block_height.saturating_add(2);
                                     let is_within_range = block_height >= lower_bound && block_height <= upper_bound;
 
                                     // Ensure the node is not peering.

@@ -105,7 +105,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover pool.
         let pool = ThreadPoolBuilder::new()
             .stack_size(8 * 1024 * 1024)
-            .num_threads(num_cpus::get().max(1))
+            .num_threads((num_cpus::get() / 8 * 7).max(1))
             .build()?;
 
         // Initialize the prover.
@@ -149,8 +149,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     loop {
-                        // If `terminator` is `false` and the status is `Ready`, mine the next block.
-                        if !prover.terminator.load(Ordering::SeqCst) && prover.status.is_ready() {
+                        // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
+                        if !prover.terminator.load(Ordering::SeqCst) && !prover.status.is_peering() && !prover.status.is_mining() {
                             // Set the status to `Mining`.
                             prover.status.update(State::Mining);
 
@@ -185,7 +185,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                 match result {
                                     Ok(Ok((block, coinbase_record))) => {
-                                        debug!("Miner has found an unconfirmed candidate for block {}", block.height());
+                                        debug!("Miner has found unconfirmed block {} ({})", block.height(), block.hash());
                                         // Store the coinbase record.
                                         if let Err(error) = state.add_coinbase_record(block.height(), coinbase_record) {
                                             warn!("[Miner] Failed to store coinbase record - {}", error);
