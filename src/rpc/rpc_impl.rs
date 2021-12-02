@@ -64,7 +64,7 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
-    status: Status,
+    pub(crate) status: Status,
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
@@ -292,7 +292,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let number_of_connected_sync_nodes = self.peers.number_of_connected_sync_nodes().await;
 
         let latest_block_height = self.ledger.latest_block_height();
-        let latest_cumulative_weight = self.ledger.latest_cumulative_weight().to_string();
+        let latest_cumulative_weight = self.ledger.latest_cumulative_weight();
 
         Ok(serde_json::json!({
             "candidate_peers": candidate_peers,

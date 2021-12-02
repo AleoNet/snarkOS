@@ -19,10 +19,7 @@
 use crate::{
     helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
-    Environment,
-    LedgerReader,
-    Peers,
-    ProverRouter,
+    Environment, LedgerReader, Peers, ProverRouter,
 };
 use snarkvm::dpc::{MemoryPool, Network};
 
@@ -35,7 +32,7 @@ use hyper::{
 use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, net::SocketAddr, str::FromStr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, RwLock};
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
@@ -414,9 +411,7 @@ fn result_to_response<T: Serialize>(
 ) -> jrt::Response<serde_json::Value, String> {
     match result {
         Ok(res) => {
-            let candidate_string = serde_json::to_string(&res).unwrap_or_default();
-            let result = serde_json::Value::from_str(&candidate_string).unwrap_or_default();
-
+            let result = serde_json::to_value(&res).unwrap_or_default();
             jrt::Response::result(jrt::Version::V2, result, request.id.clone())
         }
         Err(err) => jrt::Response::error(jrt::Version::V2, err, request.id.clone()),
@@ -1003,14 +998,12 @@ mod tests {
         let actual: <Testnet2 as Network>::RecordCiphertext = process_response(response).await;
 
         // Check the ciphertext.
-        assert!(
-            Testnet2::genesis_block()
-                .transactions()
-                .first()
-                .unwrap()
-                .ciphertexts()
-                .any(|expected| *expected == actual)
-        );
+        assert!(Testnet2::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .ciphertexts()
+            .any(|expected| *expected == actual));
     }
 
     #[tokio::test]
@@ -1073,6 +1066,49 @@ mod tests {
 
         // Check the ledger proof.
         let expected = hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof"));
+        assert_eq!(expected, actual);
+    }
+
+    #[tokio::test]
+    async fn test_get_node_state() {
+        // Initialize a new RPC.
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+
+        // Declare the expected node state.
+        let expected = serde_json::json!({
+            "candidate_peers": Vec::<SocketAddr>::new(),
+            "connected_peers": Vec::<SocketAddr>::new(),
+            "latest_block_height": 0,
+            "latest_cumulative_weight": 0,
+            "number_of_candidate_peers": 0,
+            "number_of_connected_peers": 0,
+            "number_of_connected_sync_nodes": 0,
+            "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
+            "status": rpc.status.to_string(),
+            "type": Client::<Testnet2>::NODE_TYPE,
+            "version": Client::<Testnet2>::MESSAGE_VERSION,
+        });
+
+        // Initialize a new request that calls the `getnodestate` endpoint.
+        let request = Request::new(Body::from(
+            r#"{
+	"jsonrpc":"2.0",
+	"id": "1",
+	"method": "getnodestate"
+}"#,
+        ));
+
+        // Send the request to the RPC.
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Process the response into a ledger root.
+        let actual: serde_json::Value = process_response(response).await;
+
+        println!("get_node_state: {:?}", actual);
+
+        // Check the ledger root.
         assert_eq!(expected, actual);
     }
 
@@ -1155,15 +1191,13 @@ mod tests {
         let actual: Transition<Testnet2> = process_response(response).await;
 
         // Check the transition.
-        assert!(
-            Testnet2::genesis_block()
-                .transactions()
-                .first()
-                .unwrap()
-                .transitions()
-                .iter()
-                .any(|expected| *expected == actual)
-        );
+        assert!(Testnet2::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .transitions()
+            .iter()
+            .any(|expected| *expected == actual));
     }
 
     #[tokio::test]
