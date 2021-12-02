@@ -47,7 +47,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The specified type of node.
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 11;
+    const MESSAGE_VERSION: u32 = 10;
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
 
@@ -70,7 +70,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const PING_SLEEP_IN_SECS: u64 = 65;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 210; // 3.5 minutes
     /// The duration in seconds after which to expire a failure from a peer.
     const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
 

@@ -26,7 +26,7 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
-use snarkos_storage::{storage::Storage, BlockLocators, LedgerState};
+use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -522,26 +522,23 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let latest_cumulative_weight = self.canon.latest_cumulative_weight();
             // Iterate through the connected peers, to determine if the ledger state is out of date.
             for (_, peer_state) in self.peers_state.read().await.iter() {
-                if let Some((_, _, is_fork, block_height, block_locators)) = peer_state {
+                if let Some((_, _, Some(_), block_height, block_locators)) = peer_state {
                     // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
                     let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
                         Some(cumulative_weight) => cumulative_weight,
                         None => *block_height as u128,
                     };
-                    // If the cumulative weight is more, set the status to `Syncing`.
-                    if cumulative_weight > latest_cumulative_weight && is_fork.is_some() {
-                        // Sync if this difference in cumulative weight is greater than 4.
-                        if cumulative_weight - latest_cumulative_weight > 4 {
-                            // Set the status to `Syncing`.
-                            status = State::Syncing;
-                            break;
-                        }
+                    // If the cumulative weight is greater than MAXIMUM_LINEAR_BLOCK_LOCATORS, set the status to `Syncing`.
+                    if cumulative_weight.saturating_sub(latest_cumulative_weight) > MAXIMUM_LINEAR_BLOCK_LOCATORS as u128 {
+                        // Set the status to `Syncing`.
+                        status = State::Syncing;
+                        break;
                     }
                 }
             }
         }
 
-        // If the node is `Peering` or `Syncing`, it should not be mining (yet).
+        // If the node is `Peering` or `Syncing`, it should not be mining.
         if status == State::Peering || status == State::Syncing {
             // Set the terminator bit to `true` to ensure it does not mine.
             self.terminator.store(true, Ordering::SeqCst);
@@ -561,27 +558,44 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
-    async fn add_block(&self, block: Block<N>, prover_router: &ProverRouter<N>) -> bool {
+    async fn add_block(&self, unconfirmed_block: Block<N>, prover_router: &ProverRouter<N>) -> bool {
+        // Retrieve the unconfirmed block height.
+        let unconfirmed_block_height = unconfirmed_block.height();
+        // Retrieve the unconfirmed block hash.
+        let unconfirmed_block_hash = unconfirmed_block.hash();
+        // Retrieve the unconfirmed previous block hash.
+        let unconfirmed_previous_block_hash = unconfirmed_block.previous_block_hash();
+
         // Ensure the given block is new.
-        if let Ok(true) = self.canon.contains_block_hash(&block.hash()) {
-            trace!("Canonical chain already contains block {}", block.height());
-        } else if block.height() == self.canon.latest_block_height() + 1 && block.previous_block_hash() == self.canon.latest_block_hash() {
+        if let Ok(true) = self.canon.contains_block_hash(&unconfirmed_block_hash) {
+            trace!(
+                "Canonical chain already contains block {} ({})",
+                unconfirmed_block_height,
+                unconfirmed_block_hash
+            );
+        } else if unconfirmed_block_height == self.canon.latest_block_height() + 1
+            && unconfirmed_previous_block_hash == self.canon.latest_block_hash()
+        {
             // Acquire the lock for block requests.
             let _block_requests_lock = self.block_requests_lock.lock().await;
 
-            match self.canon.add_next_block(&block) {
+            match self.canon.add_next_block(&unconfirmed_block) {
                 Ok(()) => {
-                    info!("Ledger successfully advanced to block {}", self.canon.latest_block_height());
+                    info!(
+                        "Ledger successfully advanced to block {} ({})",
+                        self.canon.latest_block_height(),
+                        self.canon.latest_block_hash()
+                    );
 
                     // Update the timestamp of the last block increment.
                     *self.last_block_update_timestamp.write().await = Instant::now();
                     // Set the terminator bit to `true` to ensure the miner updates state.
                     self.terminator.store(true, Ordering::SeqCst);
                     // On success, filter the unconfirmed blocks of this block, if it exists.
-                    self.unconfirmed_blocks.write().await.remove(&block.previous_block_hash());
+                    self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
 
                     // On success, filter the memory pool of its transactions, if they exist.
-                    if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(Some(block))).await {
+                    if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block))).await {
                         error!("[MemoryPoolClear]: {}", error);
                     }
 
@@ -590,14 +604,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 Err(error) => warn!("{}", error),
             }
         } else {
-            // Retrieve the unconfirmed block height.
-            let block_height = block.height();
-
             // Add the block to the unconfirmed blocks.
-            if self.unconfirmed_blocks.write().await.insert(block.previous_block_hash(), block) {
-                trace!("Added unconfirmed block {} to pending queue", block_height);
+            if self
+                .unconfirmed_blocks
+                .write()
+                .await
+                .insert(unconfirmed_previous_block_hash, unconfirmed_block)
+            {
+                trace!("Added unconfirmed block {} to the pending queue", unconfirmed_block_height);
             } else {
-                trace!("Pending queue already contains unconfirmed block {}", block_height);
+                trace!(
+                    "Pending queue already contains unconfirmed block {} ({})",
+                    unconfirmed_block_height,
+                    unconfirmed_block_hash
+                );
             }
         }
         false
