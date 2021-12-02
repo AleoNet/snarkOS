@@ -301,7 +301,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         drop(seen_outbound_connections);
 
                         // Initialize the peer handler.
-                        match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
+                        match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                             Ok(stream) => match stream {
                                 Ok(stream) => {
                                     Peer::handler(
@@ -381,7 +381,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Skip if the number of connected peers is above the minimum threshold.
                 match self.number_of_connected_peers().await < E::MINIMUM_NUMBER_OF_PEERS {
-                    true => trace!("Sending request for more peer connections"),
+                    true => {
+                        trace!("Sending request for more peer connections");
+                        // Request more peers if the number of connected peers is below the threshold.
+                        for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 3) {
+                            self.send(*peer_ip, Message::PeerRequest).await;
+                        }
+                    }
                     false => return,
                 };
 
@@ -423,10 +429,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             let _ = handler.await;
                         });
                     }
-                }
-                // Request more peers if the number of connected peers is below the threshold.
-                for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 1) {
-                    self.send(*peer_ip, Message::PeerRequest).await;
                 }
             }
             PeersRequest::MessagePropagate(sender, message) => {
@@ -846,7 +848,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             peer_ip.set_port(listener_port);
                             // Ensure the claimed listener port is open.
                             let stream =
-                                match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
+                                match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                                     Ok(stream) => stream,
                                     Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
                                 };
