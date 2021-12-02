@@ -105,7 +105,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover pool.
         let pool = ThreadPoolBuilder::new()
             .stack_size(8 * 1024 * 1024)
-            .num_threads((num_cpus::get() / 8 * 5).max(1))
+            .num_threads((num_cpus::get() / 8 * 7).max(1))
             .build()?;
 
         // Initialize the prover.
@@ -149,8 +149,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     loop {
-                        // If `terminator` is `false` and the status is not `Peering`, mine the next block.
-                        if !prover.terminator.load(Ordering::SeqCst) && !prover.status.is_peering() {
+                        // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
+                        if !prover.terminator.load(Ordering::SeqCst) && !prover.status.is_peering() && !prover.status.is_mining() {
                             // Set the status to `Mining`.
                             prover.status.update(State::Mining);
 

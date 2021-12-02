@@ -81,8 +81,8 @@ pub enum Message<N: Network, E: Environment> {
     BlockRequest(u32, u32),
     /// BlockResponse := (block)
     BlockResponse(Data<Block<N>>),
-    /// ChallengeRequest := (version, listener_port, nonce, block_height)
-    ChallengeRequest(u32, u16, u64, u32),
+    /// ChallengeRequest := (version, fork_depth, listener_port, nonce, block_height)
+    ChallengeRequest(u32, u32, u16, u64, u32),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(Data<BlockHeader<N>>),
     /// Disconnect := ()
@@ -91,8 +91,8 @@ pub enum Message<N: Network, E: Environment> {
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>),
-    /// Ping := (version, node_type, status, block_hash, block_header)
-    Ping(u32, NodeType, State, N::BlockHash, Data<BlockHeader<N>>),
+    /// Ping := (version, fork_depth, node_type, status, block_hash, block_header)
+    Ping(u32, u32, NodeType, State, N::BlockHash, Data<BlockHeader<N>>),
     /// Pong := (is_fork, block_locators)
     Pong(Option<bool>, Data<BlockLocators<N>>),
     /// UnconfirmedBlock := (block_height, block_hash, block)
@@ -149,15 +149,15 @@ impl<N: Network, E: Environment> Message<N, E> {
         match self {
             Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
             Self::BlockResponse(block) => Ok(block.serialize_blocking()?),
-            Self::ChallengeRequest(version, listener_port, nonce, block_height) => {
-                Ok(bincode::serialize(&(version, listener_port, nonce, block_height))?)
+            Self::ChallengeRequest(version, fork_depth, listener_port, nonce, block_height) => {
+                Ok(bincode::serialize(&(version, fork_depth, listener_port, nonce, block_height))?)
             }
             Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking()?),
             Self::Disconnect => Ok(vec![]),
             Self::PeerRequest => Ok(vec![]),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
-            Self::Ping(version, node_type, status, block_hash, block_header) => {
-                let non_deferred = bincode::serialize(&(version, node_type, status, block_hash))?;
+            Self::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
+                let non_deferred = bincode::serialize(&(version, fork_depth, node_type, status, block_hash))?;
                 Ok([non_deferred, block_header.serialize_blocking()?].concat())
             }
             Self::Pong(is_fork, block_locators) => {
@@ -204,8 +204,8 @@ impl<N: Network, E: Environment> Message<N, E> {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
             1 => Self::BlockResponse(Data::Buffer(data.to_vec())),
             2 => {
-                let (version, listener_port, nonce, block_height) = bincode::deserialize(data)?;
-                Self::ChallengeRequest(version, listener_port, nonce, block_height)
+                let (version, fork_depth, listener_port, nonce, block_height) = bincode::deserialize(data)?;
+                Self::ChallengeRequest(version, fork_depth, listener_port, nonce, block_height)
             }
             3 => Self::ChallengeResponse(Data::Buffer(data.to_vec())),
             4 => match data.is_empty() {
@@ -218,10 +218,10 @@ impl<N: Network, E: Environment> Message<N, E> {
             },
             6 => Self::PeerResponse(bincode::deserialize(data)?),
             7 => {
-                let (version, node_type, status, block_hash) = bincode::deserialize(&data[0..44])?;
-                let block_header = Data::Buffer(data[44..].to_vec());
+                let (version, fork_depth, node_type, status, block_hash) = bincode::deserialize(&data[0..48])?;
+                let block_header = Data::Buffer(data[48..].to_vec());
 
-                Self::Ping(version, node_type, status, block_hash, block_header)
+                Self::Ping(version, fork_depth, node_type, status, block_hash, block_header)
             }
             8 => {
                 let is_fork = match data[0] {

@@ -584,7 +584,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             Some((_, outbound)) => {
                 // Ensure sufficient time has passed before needing to send the message.
                 let is_ready_to_send = match message {
-                    Message::Ping(_, _, _, _, ref mut data) => {
+                    Message::Ping(_, _, _, _, _, ref mut data) => {
                         // Perform non-blocking serialisation of the block header.
                         let serialized_header = Data::serialize(data.clone()).await.expect("Block header serialization is bugged");
                         let _ = std::mem::replace(data, Data::Buffer(serialized_header));
@@ -736,6 +736,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(
             E::MESSAGE_VERSION,
+            E::MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
@@ -797,7 +798,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let genesis_height = N::genesis_block().height();
 
         // Send a challenge request to the peer.
-        let message = Message::<N, E>::ChallengeRequest(E::MESSAGE_VERSION, local_ip.port(), local_nonce, genesis_height);
+        let message = Message::<N, E>::ChallengeRequest(
+            E::MESSAGE_VERSION,
+            E::MAXIMUM_FORK_DEPTH,
+            local_ip.port(),
+            local_nonce,
+            genesis_height,
+        );
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
 
@@ -807,11 +814,19 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 // Process the message.
                 trace!("Received '{}-B' from {}", message.name(), peer_ip);
                 match message {
-                    Message::ChallengeRequest(version, listener_port, peer_nonce, block_height) => {
+                    Message::ChallengeRequest(version, fork_depth, listener_port, peer_nonce, block_height) => {
                         // Ensure the message protocol version is not outdated.
                         if version < E::MESSAGE_VERSION {
                             warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                             return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
+                        }
+                        // Ensure the maximum fork depth is correct.
+                        if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                            return Err(anyhow!(
+                                "Dropping {} for an incorrect maximum fork depth of {}",
+                                peer_ip,
+                                fork_depth
+                            ));
                         }
                         // Ensure the block height is correct.
                         if block_height != genesis_height {
@@ -1040,13 +1055,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version, node_type, status, block_hash, block_header) => {
+                                Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
-
+                                    // Ensure the maximum fork depth is correct.
+                                    if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                                        warn!("Dropping {} for an incorrect maximum fork depth of {}", peer_ip, fork_depth);
+                                        break;
+                                    }
                                     // Perform the deferred non-blocking deserialization of the block header.
                                     match block_header.deserialize().await {
                                         Ok(block_header) => {
@@ -1105,7 +1124,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }

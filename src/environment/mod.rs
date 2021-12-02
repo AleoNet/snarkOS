@@ -47,7 +47,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The specified type of node.
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 10;
+    const MESSAGE_VERSION: u32 = 11;
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
 
@@ -86,7 +86,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks that may be fetched in one request.
-    const MAXIMUM_BLOCK_REQUEST: u32 = 100;
+    const MAXIMUM_BLOCK_REQUEST: u32 = 250;
     /// The maximum number of blocks that a fork can be.
     const MAXIMUM_FORK_DEPTH: u32 = 4096;
     /// The maximum number of failures tolerated before disconnecting from a peer.

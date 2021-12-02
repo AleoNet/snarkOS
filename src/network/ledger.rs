@@ -49,7 +49,7 @@ use tokio::{
 };
 
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
-const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 100;
+const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 250;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub(crate) type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
@@ -81,14 +81,14 @@ pub enum LedgerRequest<N: Network> {
 ///
 #[derive(Clone, Debug)]
 pub struct BlockRequest<N: Network> {
-    height: u32,
-    hash: Option<N::BlockHash>,
+    block_height: u32,
+    block_hash: Option<N::BlockHash>,
 }
 
 // The height is the primary key, so use only it for hashing purposes.
 impl<N: Network> PartialEq for BlockRequest<N> {
     fn eq(&self, other: &Self) -> bool {
-        self.height == other.height
+        self.block_height == other.block_height
     }
 }
 
@@ -97,19 +97,25 @@ impl<N: Network> Eq for BlockRequest<N> {}
 // The k1 == k2 -> hash(k1) == hash(k2) rule must hold.
 impl<N: Network> Hash for BlockRequest<N> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.height.hash(state);
+        self.block_height.hash(state);
     }
 }
 
 impl<N: Network> From<u32> for BlockRequest<N> {
     fn from(height: u32) -> Self {
-        Self { height, hash: None }
+        Self {
+            block_height: height,
+            block_hash: None,
+        }
     }
 }
 
 impl<N: Network> From<(u32, Option<N::BlockHash>)> for BlockRequest<N> {
     fn from((height, hash): (u32, Option<N::BlockHash>)) -> Self {
-        Self { height, hash }
+        Self {
+            block_height: height,
+            block_hash: hash,
+        }
     }
 }
 
@@ -424,45 +430,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn update_ledger(&self, prover_router: &ProverRouter<N>) {
         // Check for candidate blocks to fast forward the ledger.
-        let mut block = &self.canon.latest_block();
-
-        let mut unconfirmed_blocks_to_remove = Vec::new();
+        let mut block_hash = self.canon.latest_block_hash();
         let unconfirmed_blocks_snapshot = self.unconfirmed_blocks.read().await.clone();
-        while let Some(unconfirmed_block) = unconfirmed_blocks_snapshot.get(&block.hash()) {
-            // Update the block iterator.
-            block = unconfirmed_block;
-
-            // Ensure the block height is not part of a block request in a fork.
-            let mut is_forked_block = false;
-            for requests in self.block_requests.read().await.values() {
-                for block_request in requests.keys() {
-                    // If the block is part of a fork, then don't attempt to add it again.
-                    if block_request.height == block.height() && block_request.hash.is_some() {
-                        is_forked_block = true;
-                        break;
-                    }
-                }
-            }
-
-            // If the block is on a fork, remove the unconfirmed block, and break the loop.
-            if is_forked_block {
-                unconfirmed_blocks_to_remove.push(block.previous_block_hash());
-                break;
-            }
+        while let Some(unconfirmed_block) = unconfirmed_blocks_snapshot.get(&block_hash) {
             // Attempt to add the unconfirmed block.
-            else {
-                match self.add_block(block.clone(), prover_router).await {
-                    // Upon success, remove the unconfirmed block, as it is now confirmed.
-                    true => unconfirmed_blocks_to_remove.push(block.previous_block_hash()),
-                    false => break,
-                }
-            }
-        }
-
-        if !unconfirmed_blocks_to_remove.is_empty() {
-            let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
-            for hash in unconfirmed_blocks_to_remove {
-                unconfirmed_blocks.remove(&hash);
+            match self.add_block(unconfirmed_block.clone(), prover_router).await {
+                // Upon success, update the block hash iterator.
+                true => block_hash = unconfirmed_block.hash(),
+                false => break,
             }
         }
 
@@ -579,29 +554,51 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Acquire the lock for block requests.
             let _block_requests_lock = self.block_requests_lock.lock().await;
 
-            match self.canon.add_next_block(&unconfirmed_block) {
-                Ok(()) => {
-                    info!(
-                        "Ledger successfully advanced to block {} ({})",
-                        self.canon.latest_block_height(),
-                        self.canon.latest_block_hash()
-                    );
-
-                    // Update the timestamp of the last block increment.
-                    *self.last_block_update_timestamp.write().await = Instant::now();
-                    // Set the terminator bit to `true` to ensure the miner updates state.
-                    self.terminator.store(true, Ordering::SeqCst);
-                    // On success, filter the unconfirmed blocks of this block, if it exists.
-                    self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
-
-                    // On success, filter the memory pool of its transactions, if they exist.
-                    if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block))).await {
-                        error!("[MemoryPoolClear]: {}", error);
+            // Ensure the block height is not part of a block request on a fork.
+            let mut is_block_on_fork = false;
+            for requests in self.block_requests.read().await.values() {
+                for request in requests.keys() {
+                    // If the unconfirmed block conflicts with a requested block on a fork, skip.
+                    if request.block_height == unconfirmed_block_height {
+                        if let Some(requested_block_hash) = request.block_hash {
+                            if unconfirmed_block.hash() != requested_block_hash {
+                                is_block_on_fork = true;
+                                break;
+                            }
+                        }
                     }
-
-                    return true;
                 }
-                Err(error) => warn!("{}", error),
+            }
+
+            // If the unconfirmed block is not on a fork, attempt to add it as the next block.
+            match is_block_on_fork {
+                // Filter out the undesirable unconfirmed blocks, if it exists.
+                true => self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash),
+                // Attempt to add the unconfirmed block as the next block in the canonical chain.
+                false => match self.canon.add_next_block(&unconfirmed_block) {
+                    Ok(()) => {
+                        info!(
+                            "Ledger successfully advanced to block {} ({})",
+                            self.canon.latest_block_height(),
+                            self.canon.latest_block_hash()
+                        );
+
+                        // Update the timestamp of the last block increment.
+                        *self.last_block_update_timestamp.write().await = Instant::now();
+                        // Set the terminator bit to `true` to ensure the miner updates state.
+                        self.terminator.store(true, Ordering::SeqCst);
+                        // On success, filter the unconfirmed blocks of this block, if it exists.
+                        self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
+
+                        // On success, filter the memory pool of its transactions, if they exist.
+                        if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block))).await {
+                            error!("[MemoryPoolClear]: {}", error);
+                        }
+
+                        return true;
+                    }
+                    Err(error) => warn!("{}", error),
+                },
             }
         } else {
             // Add the block to the unconfirmed blocks.
