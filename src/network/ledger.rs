@@ -16,7 +16,15 @@
 
 use crate::{
     helpers::{CircularMap, State, Status, Tasks},
-    Data, Environment, LedgerReader, Message, NodeType, PeersRequest, PeersRouter, ProverRequest, ProverRouter,
+    Data,
+    Environment,
+    LedgerReader,
+    Message,
+    NodeType,
+    PeersRequest,
+    PeersRouter,
+    ProverRequest,
+    ProverRouter,
 };
 use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
