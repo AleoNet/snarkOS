@@ -186,14 +186,18 @@ impl<N: Network, E: Environment> Server<N, E> {
         self.status.update(State::ShuttingDown);
 
         // Shut down the ledger.
-        let ledger_lock = self.ledger.shut_down().await;
-        trace!("Ledger has shut down, proceeding to lock...");
+        trace!("Proceeding to shut down the ledger...");
+        let (canon_lock, block_requests_lock) = self.ledger.shut_down().await;
 
-        // Acquire the lock for ledger.
-        let _ledger_lock = ledger_lock.lock().await;
+        // Acquire the locks for ledger.
+        trace!("Proceeding to lock the ledger...");
+        let _canon_lock = canon_lock.lock().await;
+        let _block_requests_lock = block_requests_lock.lock().await;
+        trace!("Ledger has shut down, proceeding to flush tasks...");
 
         // Flush the tasks.
         self.tasks.flush();
+        trace!("Node has shut down.");
     }
 
     ///

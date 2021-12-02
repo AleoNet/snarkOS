@@ -132,6 +132,9 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The canonical chain of blocks in read-only mode.
     #[allow(unused)]
     canon_reader: Arc<LedgerState<N>>,
+    /// A lock to ensure methods that need to be mutually-exclusive are enforced.
+    /// In this context, `add_block`, and `revert_to_block_height` must be mutually-exclusive.
+    canon_lock: Arc<Mutex<()>>,
     /// A map of previous block hashes to unconfirmed blocks.
     unconfirmed_blocks: RwLock<CircularMap<N::BlockHash, Block<N>, { MAXIMUM_UNCONFIRMED_BLOCKS }>>,
     /// The map of each peer to their ledger state := (node_type, status, is_fork, latest_block_height, block_locators).
@@ -170,6 +173,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             ledger_router,
             canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
             canon_reader: LedgerState::open_reader::<S, P>(path)?,
+            canon_lock: Arc::new(Mutex::new(())),
             unconfirmed_blocks: Default::default(),
             peers_state: Default::default(),
             block_requests: Default::default(),
@@ -217,7 +221,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.ledger_router.clone()
     }
 
-    pub(super) async fn shut_down(&self) -> Arc<Mutex<()>> {
+    pub(super) async fn shut_down(&self) -> (Arc<Mutex<()>>, Arc<Mutex<()>>) {
         debug!("Ledger is shutting down...");
 
         // Set the terminator bit to `true` to ensure it stops mining.
@@ -235,11 +239,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
         trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
 
-        // Return the lock for block requests.
-        let lock = self.block_requests_lock.clone();
+        // Return the lock for the canon chain and block requests.
+        let canon_lock = self.canon_lock.clone();
+        let block_requests_lock = self.block_requests_lock.clone();
         trace!("[ShuttingDown] Block requests lock has been cloned");
 
-        lock
+        (canon_lock, block_requests_lock)
     }
 
     ///
@@ -551,6 +556,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         } else if unconfirmed_block_height == self.canon.latest_block_height() + 1
             && unconfirmed_previous_block_hash == self.canon.latest_block_hash()
         {
+            // Acquire the lock for the canon chain.
+            let _canon_lock = self.canon_lock.lock().await;
             // Acquire the lock for block requests.
             let _block_requests_lock = self.block_requests_lock.lock().await;
 
@@ -624,6 +631,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Reverts the ledger state back to height `block_height`, returning `true` on success.
     ///
     async fn revert_to_block_height(&self, block_height: u32) -> bool {
+        // Acquire the lock for the canon chain.
+        let _canon_lock = self.canon_lock.lock().await;
+
         match self.canon.revert_to_block_height(block_height) {
             Ok(removed_blocks) => {
                 info!("Ledger successfully reverted to block {}", self.canon.latest_block_height());
