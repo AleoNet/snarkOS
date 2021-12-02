@@ -16,7 +16,6 @@ None
 
 |      Parameter     |  Type  |                             Description                             |
 |:------------------:|:------:|:-------------------------------------------------------------------:|
-| `events`           | array  | The events emitted from the transaction                             |
 | `inner_circuit_id` | string | The ID of the inner circuit used to execute each transition.        |
 | `ledger_root`      | string | The ledger root used to prove inclusion of ledger-consumed records. |
 | `transaction_id`   | string | The ID of this transaction.                                         |
@@ -34,9 +33,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getmemor
    "jsonrpc":"2.0",
    "result":[
      {
-       "events":[
-
-       ],
        "inner_circuit_id":"ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
        "ledger_root":"al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
        "transaction_id":"at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",
