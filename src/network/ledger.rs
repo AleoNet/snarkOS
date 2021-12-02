@@ -636,7 +636,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 for removed_block in removed_blocks {
                     unconfirmed_blocks.remove(&removed_block.previous_block_hash());
 
-                    for transaction in removed_block.transactions().iter() {
+                    // Do not include the coinbase transaction.
+                    for transaction in removed_block.transactions().iter().filter(|tx| !tx.value_balance().is_negative()) {
                         // Route the `UnconfirmedTransaction` to the prover.
                         if let Err(error) = prover_router
                             .send(ProverRequest::UnconfirmedTransaction(
