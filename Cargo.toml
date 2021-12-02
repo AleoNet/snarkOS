@@ -99,6 +99,7 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
+features = [ "arbitrary_precision" ]
 
 [dependencies.structopt]
 version = "0.3"
