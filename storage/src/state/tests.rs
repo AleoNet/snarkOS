@@ -279,7 +279,7 @@ fn test_transaction_fees() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let mut ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new account.
@@ -297,8 +297,8 @@ fn test_transaction_fees() {
     // Craft the transaction variables.
     let coinbase_transaction = &block.transactions()[0];
 
-    let available_balance = AleoAmount::from_bytes(-1 * coinbase_transaction.value_balance().0);
-    let fee = AleoAmount::from_bytes(rng.gen_range(1..available_balance.0));
+    let available_balance = AleoAmount::from_i64(-1 * coinbase_transaction.value_balance().0);
+    let fee = AleoAmount::from_i64(rng.gen_range(1..available_balance.0));
     let amount = available_balance.sub(fee.clone());
     let coinbase_record = coinbase_transaction.to_decrypted_records(view_key);
 
@@ -322,16 +322,16 @@ fn test_transaction_fees() {
     )
     .unwrap();
 
-    let new_transaction = VirtualMachine::new(ledger.latest_ledger_root())
+    let (vm, _response) = VirtualMachine::new(ledger.latest_ledger_root())
         .unwrap()
         .execute(&transfer_request, rng)
-        .unwrap()
-        .finalize()
         .unwrap();
 
+    let new_transaction = vm.finalize().unwrap();
+
     // Mine the next block.
-    let block_2 = ledger
-        .mine_next_block(address, &[new_transaction], &terminator, rng)
+    let (block_2, _record) = ledger
+        .mine_next_block(address, true, &[new_transaction], &terminator, rng)
         .expect("Failed to mine");
     ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
     assert_eq!(2, ledger.latest_block_height());
@@ -341,6 +341,6 @@ fn test_transaction_fees() {
     let new_coinbase_record = &block_2.transactions()[1].to_decrypted_records(view_key)[0];
 
     // Check that the output record balances are correct.
-    assert_eq!(new_coinbase_record.value(), expected_block_reward.0 as u64);
-    assert_eq!(output_record.value(), amount.0 as u64);
+    assert_eq!(new_coinbase_record.value(), expected_block_reward);
+    assert_eq!(output_record.value(), amount);
 }
