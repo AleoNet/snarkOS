@@ -63,7 +63,7 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getblockheader.md")]
     async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/getblocktemplate.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getblocktemplate.md")]
     async fn get_block_template(&self) -> Result<serde_json::Value, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
