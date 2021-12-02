@@ -383,43 +383,28 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Retrieve the latest cumulative weight of this ledger.
             let latest_cumulative_weight = self.canon.latest_cumulative_weight();
 
-            // Iterate through the peers to find the maximum cumulative weight.
-            let mut maximum_cumulative_weight = latest_cumulative_weight;
-            // Initialize a HashMap to store the peers with their cumulative weight.
-            let mut peers = HashMap::with_capacity(peers_state.len());
+            // Initialize a list of peers to disconnect from.
+            let mut peer_ips_to_disconnect = Vec::with_capacity(peers_state.len());
 
             // Check if any of the peers are ahead and have a larger block height.
             for (peer_ip, peer_state) in peers_state.iter() {
-                if let Some((_, _, Some(_), block_height, block_locators)) = peer_state {
+                if let Some((node_type, status, Some(_), block_height, block_locators)) = peer_state {
                     // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
                     let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
                         Some(cumulative_weight) => cumulative_weight,
                         None => *block_height as u128,
                     };
-                    // If the cumulative weight is more, set this peer as the maximal peer.
-                    if cumulative_weight > maximum_cumulative_weight {
-                        maximum_cumulative_weight = cumulative_weight;
+
+                    // If the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
+                    if *node_type != NodeType::Sync && *status == State::Syncing && cumulative_weight > latest_cumulative_weight {
+                        // Append the peer to the list of disconnects.
+                        peer_ips_to_disconnect.push(*peer_ip);
                     }
-                    // Append the peer and their cumulative weight.
-                    peers.insert(*peer_ip, cumulative_weight);
                 }
             }
 
             // Release the lock over peers_state.
             drop(peers_state);
-
-            // Determine a safe boundary from the maximum cumulative weight to drop from.
-            // The idea is that the sync node still needs some maximal peers to sync with.
-            let threshold_cumulative_weight = std::cmp::max(latest_cumulative_weight, maximum_cumulative_weight.saturating_sub(50));
-
-            // Disconnect from peers that are ahead of this node, but not a maximal peer.
-            let peer_ips_to_disconnect = peers
-                .iter()
-                .filter(|(_, cumulative_weight)| {
-                    *cumulative_weight >= &latest_cumulative_weight && *cumulative_weight < &threshold_cumulative_weight
-                })
-                .map(|(&ip, _)| ip)
-                .collect::<Vec<SocketAddr>>();
 
             trace!("Found {} peers to disconnect", peer_ips_to_disconnect.len());
 

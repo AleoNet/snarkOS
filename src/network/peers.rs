@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    helpers::{State, Status, Tasks},
     Data,
     Environment,
     LedgerReader,
@@ -850,6 +850,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             && local_status.is_syncing()
                             && node_type == NodeType::Sync
                             && local_cumulative_weight > peer_cumulative_weight
+                        {
+                            return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
+                        }
+                        // If this node is a sync node, the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
+                        if E::NODE_TYPE == NodeType::Sync
+                            && node_type != NodeType::Sync
+                            && peer_status == State::Syncing
+                            && peer_cumulative_weight > local_cumulative_weight
                         {
                             return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
                         }
