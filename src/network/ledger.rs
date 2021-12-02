@@ -268,7 +268,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         .unwrap_or(false)
                     {
                         trace!("All block requests with {} have been processed", peer_ip);
-                        self.update_block_requests().await;
+                        self.update_block_requests(&prover_router).await;
                     }
                 }
             }
@@ -292,7 +292,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Disconnect from peers with frequent failures.
                 self.disconnect_from_failing_peers().await;
                 // Update the block requests.
-                self.update_block_requests().await;
+                self.update_block_requests(&prover_router).await;
 
                 debug!(
                     "Status Report (type = {}, status = {}, block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
@@ -452,7 +452,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 .await
                 .values_mut()
                 .for_each(|requests| *requests = Default::default());
-            self.revert_to_block_height(self.canon.latest_block_height().saturating_sub(1))
+            self.revert_to_block_height(self.canon.latest_block_height().saturating_sub(1), prover_router)
                 .await;
         }
     }
@@ -615,7 +615,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Reverts the ledger state back to height `block_height`, returning `true` on success.
     ///
-    async fn revert_to_block_height(&self, block_height: u32) -> bool {
+    async fn revert_to_block_height(&self, block_height: u32, prover_router: &ProverRouter<N>) -> bool {
         // Acquire the lock for the canon chain.
         let _canon_lock = self.canon_lock.lock().await;
 
@@ -631,10 +631,25 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Lock unconfirmed_blocks for further processing.
                 let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
 
-                // Ensure the removed blocks are not in the unconfirmed blocks.
+                // Ensure the removed blocks are not in the unconfirmed blocks and the removed
+                // transactions are added back to to the mempool.
                 for removed_block in removed_blocks {
                     unconfirmed_blocks.remove(&removed_block.previous_block_hash());
+
+                    for transaction in removed_block.transactions().iter() {
+                        // Route the `UnconfirmedTransaction` to the prover.
+                        if let Err(error) = prover_router
+                            .send(ProverRequest::UnconfirmedTransaction(
+                                "0.0.0.0:3032".parse().unwrap(),
+                                transaction.clone(),
+                            ))
+                            .await
+                        {
+                            warn!("[UnconfirmedTransaction] {}", error);
+                        }
+                    }
                 }
+
                 true
             }
             Err(error) => {
@@ -792,7 +807,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///                  Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
     ///                      - Revert to most common ancestor and send block requests to sync.
     ///
-    async fn update_block_requests(&self) {
+    async fn update_block_requests(&self, prover_router: &ProverRouter<N>) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
         if self.number_of_block_requests().await > 0 {
             return;
@@ -916,7 +931,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
                         info!("Discovered a canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                         // If the latest block is the same as the maximum common ancestor, do not revert.
-                        if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor).await {
+                        if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor, prover_router).await {
                             return;
                         }
                         (maximum_common_ancestor, true)
@@ -941,7 +956,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Revert to the common ancestor anyways.
                         else {
                             info!("Discovered a potentially better canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
-                            match self.revert_to_block_height(maximum_common_ancestor).await {
+                            match self.revert_to_block_height(maximum_common_ancestor, prover_router).await {
                                 true => (maximum_common_ancestor, true),
                                 false => return
                             }
