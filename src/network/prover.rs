@@ -105,7 +105,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover pool.
         let pool = ThreadPoolBuilder::new()
             .stack_size(8 * 1024 * 1024)
-            .num_threads(num_cpus::get().max(1))
+            .num_threads((num_cpus::get() / 8 * 5).max(1))
             .build()?;
 
         // Initialize the prover.
