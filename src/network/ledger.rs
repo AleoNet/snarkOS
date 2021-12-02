@@ -16,15 +16,7 @@
 
 use crate::{
     helpers::{CircularMap, State, Status, Tasks},
-    Data,
-    Environment,
-    LedgerReader,
-    Message,
-    NodeType,
-    PeersRequest,
-    PeersRouter,
-    ProverRequest,
-    ProverRouter,
+    Data, Environment, LedgerReader, Message, NodeType, PeersRequest, PeersRouter, ProverRequest, ProverRouter,
 };
 use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
@@ -1153,5 +1145,102 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         for peer_ip in peers_to_disconnect {
             self.disconnect(peer_ip, "exceeded failure limit").await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ledger::Ledger, prover::Prover, Client, Peers};
+    use snarkos_storage::storage::rocksdb::RocksDB;
+
+    use rand::thread_rng;
+    use snarkvm::dpc::testnet2::Testnet2;
+
+    fn temp_dir() -> std::path::PathBuf {
+        tempfile::tempdir().expect("Failed to open temporary directory").into_path()
+    }
+
+    #[tokio::test]
+    async fn test_mempool_transactions_from_removed_block() {
+        let rng = &mut thread_rng();
+
+        // Derive the storage paths.
+        let ledger_path = temp_dir();
+        let prover_path = temp_dir();
+
+        // Initialize the node.
+        let local_ip: SocketAddr = "0.0.0.0:3030".parse().expect("Failed to parse ip");
+
+        // Initialize the status indicator.
+        let status = Status::new();
+        status.update(State::Ready);
+
+        // Initialize the terminator bit.
+        let terminator = Arc::new(AtomicBool::new(false));
+        // Initialize the tasks handler.
+        let mut tasks = Tasks::new();
+
+        // Initialize a new instance for managing peers.
+        let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
+        // Initialize a new instance for managing the ledger.
+        let ledger =
+            Ledger::<Testnet2, Client<Testnet2>>::open::<RocksDB, _>(&mut tasks, &ledger_path, &status, &terminator, peers.router())
+                .await
+                .expect("Failed to initialize ledger");
+
+        // Initialize a new instance for managing the prover.
+        let prover = Prover::open::<RocksDB, _>(
+            &mut tasks,
+            &prover_path,
+            None,
+            local_ip,
+            &status,
+            &terminator,
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+        )
+        .await
+        .expect("Failed to initialize prover");
+
+        // Initialize a new ledger tree.
+        let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+        ledger_tree
+            .add(&Testnet2::genesis_block().hash())
+            .expect("Failed to add to ledger tree");
+
+        // Initialize a new account.
+        let account = Account::<Testnet2>::new(&mut thread_rng());
+        let address = account.address();
+
+        // Initialize a new transaction. This is not a real coinbase transaction. It is merely an empty one.
+        let (transaction, _) =
+            Transaction::<Testnet2>::new_coinbase(address, AleoAmount(0), true, rng).expect("Failed to create a transaction");
+
+        // Check that there are no transactions in the memory pool.
+        assert_eq!(prover.memory_pool().read().await.transactions().len(), 0);
+
+        // Mine the next block.
+        let (block, _) = ledger
+            .canon
+            .mine_next_block(address, true, &[transaction.clone()], &terminator, rng)
+            .expect("Failed to mine");
+        ledger.canon.add_next_block(&block).expect("Failed to add next block to ledger");
+        assert_eq!(1, ledger.canon.latest_block_height());
+
+        // Remove the last block.
+        ledger
+            .revert_to_block_height(ledger.canon.latest_block_height() - 1, &prover.router())
+            .await;
+        assert_eq!(0, ledger.canon.latest_block_height());
+
+        // Give the node some time to process the block revert.
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+        // Check that the memory pool includes the transaction from the reverted block.
+        let new_memory_pool = prover.memory_pool().read().await.transactions();
+        assert_eq!(new_memory_pool.len(), 1);
+        assert_eq!(new_memory_pool[0], transaction);
     }
 }
