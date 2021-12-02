@@ -29,13 +29,14 @@ use crate::{
 };
 use snarkos_storage::Metadata;
 use snarkvm::{
-    dpc::{Block, BlockHeader, Network, Transaction, Transactions, Transition},
+    dpc::{AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
     utilities::FromBytes,
 };
 
 use jsonrpc_core::Value;
 use snarkvm::utilities::ToBytes;
 use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
 pub enum RpcError {
@@ -63,10 +64,11 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
-    status: Status,
+    pub(crate) status: Status,
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
+    memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
@@ -92,12 +94,14 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
         peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
         prover_router: ProverRouter<N>,
+        memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) -> Self {
         Self(Arc::new(RpcInner {
             status,
             peers,
             ledger,
             prover_router,
+            memory_pool,
             credentials,
         }))
     }
@@ -173,6 +177,70 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.ledger.get_block_header(block_height)?)
     }
 
+    /// Returns the block template for the next mined block
+    async fn get_block_template(&self) -> Result<Value, RpcError> {
+        // Fetch the latest state from the ledger.
+        let latest_block = self.ledger.latest_block();
+        let ledger_root = self.ledger.latest_ledger_root();
+
+        // Prepare the new block.
+        let previous_block_hash = latest_block.hash();
+        let block_height = self.ledger.latest_block_height() + 1;
+        let block_timestamp = chrono::Utc::now().timestamp();
+
+        // Compute the block difficulty target and cumulative_weight.
+        let previous_timestamp = latest_block.timestamp();
+        let previous_difficulty_target = latest_block.difficulty_target();
+        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+        let cumulative_weight = latest_block
+            .cumulative_weight()
+            .saturating_add((u64::MAX / difficulty_target) as u128);
+
+        // Compute the coinbase reward (not including the transaction fees).
+        let mut coinbase_reward = Block::<N>::block_reward(block_height);
+        let mut transaction_fees = AleoAmount::ZERO;
+
+        // Get and filter the transactions from the mempool.
+        let transactions: Vec<String> = self
+            .memory_pool
+            .read()
+            .await
+            .transactions()
+            .iter()
+            .filter(|transaction| {
+                for serial_number in transaction.serial_numbers() {
+                    if let Ok(true) = self.ledger.contains_serial_number(serial_number) {
+                        return false;
+                    }
+                }
+
+                for commitment in transaction.commitments() {
+                    if let Ok(true) = self.ledger.contains_commitment(commitment) {
+                        return false;
+                    }
+                }
+
+                transaction_fees = transaction_fees.add(transaction.value_balance());
+                true
+            })
+            .map(|tx| tx.to_string())
+            .collect();
+
+        // Calculate the final coinbase reward (including the transaction fees).
+        coinbase_reward = coinbase_reward.add(transaction_fees);
+
+        Ok(serde_json::json!({
+            "previous_block_hash": previous_block_hash,
+            "block_height": block_height,
+            "time": block_timestamp,
+            "difficulty_target": difficulty_target,
+            "cumulative_weight": cumulative_weight,
+            "ledger_root": ledger_root,
+            "transactions": transactions,
+            "coinbase_reward": coinbase_reward,
+        }))
+    }
+
     /// Returns the transactions from the block of the given block height.
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError> {
         Ok(self.ledger.get_block_transactions(block_height)?)
@@ -189,6 +257,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
         let ledger_proof = self.ledger.get_ledger_inclusion_proof(record_commitment)?;
         Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
+    }
+
+    /// Returns transactions in the node's memory pool.
+    async fn get_memory_pool(&self) -> Result<Vec<Transaction<N>>, RpcError> {
+        Ok(self.memory_pool.read().await.transactions())
     }
 
     /// Returns a transaction with metadata given the transaction ID.
@@ -219,7 +292,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let number_of_connected_sync_nodes = self.peers.number_of_connected_sync_nodes().await;
 
         let latest_block_height = self.ledger.latest_block_height();
-        let latest_cumulative_weight = self.ledger.latest_cumulative_weight().to_string();
+        let latest_cumulative_weight = self.ledger.latest_cumulative_weight();
 
         Ok(serde_json::json!({
             "candidate_peers": candidate_peers,
@@ -246,34 +319,4 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         }
         Ok(transaction.transaction_id())
     }
-
-    // /// Returns the current mempool and sync information known by this node.
-    // async fn get_block_template(&self) -> Result<BlockTemplate, RpcError> {
-    //     let canon = self.storage.canon().await?;
-    //
-    //     let block = self.storage.get_block_header(&canon.hash).await?;
-    //
-    //     let time = Utc::now().timestamp();
-    //
-    //     let full_transactions = self.node.expect_sync().consensus.fetch_memory_pool().await;
-    //
-    //     let transaction_strings = full_transactions
-    //         .iter()
-    //         .map(|x| Ok(hex::encode(to_bytes_le![x]?)))
-    //         .collect::<Result<Vec<_>, RpcError>>()?;
-    //
-    //     let mut coinbase_value = get_block_reward(canon.block_height as u32 + 1);
-    //     for transaction in full_transactions.iter() {
-    //         coinbase_value = coinbase_value.add(transaction.value_balance)
-    //     }
-    //
-    //     Ok(BlockTemplate {
-    //         previous_block_hash: hex::encode(&block.hash().0),
-    //         block_height: canon.block_height as u32 + 1,
-    //         time,
-    //         difficulty_target: self.consensus_parameters()?.get_block_difficulty(&block, time),
-    //         transactions: transaction_strings,
-    //         coinbase_value: coinbase_value.0 as u64,
-    //     })
-    // }
 }

@@ -54,6 +54,7 @@ const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
 const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;
 const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
+const MAXIMUM_FORK_DEPTH: u32 = <Client<Testnet2>>::MAXIMUM_FORK_DEPTH;
 
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 
@@ -141,6 +142,7 @@ impl TestNode {
             let genesis = Testnet2::genesis_block();
             let ping_msg = ClientMessage::Ping(
                 MESSAGE_VERSION,
+                MAXIMUM_FORK_DEPTH,
                 node.node_type(),
                 node.state(),
                 genesis.hash(),
@@ -192,7 +194,15 @@ impl Handshake for TestNode {
         let genesis_block_header = Testnet2::genesis_block().header();
 
         // Send a challenge request to the peer.
-        let own_request = ClientMessage::ChallengeRequest(MESSAGE_VERSION, own_ip.port(), self.state.local_nonce, 0);
+        let own_request = ClientMessage::ChallengeRequest(
+            MESSAGE_VERSION,
+            MAXIMUM_FORK_DEPTH,
+            NodeType::Client,
+            State::Ready,
+            own_ip.port(),
+            self.state.local_nonce,
+            0,
+        );
         trace!(parent: self.node().span(), "sending a challenge request to {}", peer_ip);
         let msg = own_request.serialize().unwrap();
         let len = u32::to_le_bytes(msg.len() as u32);
@@ -208,29 +218,37 @@ impl Handshake for TestNode {
         let peer_request = ClientMessage::deserialize(&buf[..len]);
 
         // Register peer's nonce.
-        let (peer_listening_addr, peer_nonce) =
-            if let Ok(Message::ChallengeRequest(peer_version, peer_listening_port, peer_nonce, _block_height)) = peer_request {
-                if peer_version < MESSAGE_VERSION {
-                    warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", peer_ip, peer_version);
-                    return Err(io::ErrorKind::InvalidData.into());
-                }
-
-                let peer_listening_ip = SocketAddr::from((peer_ip.ip(), peer_listening_port));
-
-                if locked_peers
-                    .iter()
-                    .any(|peer| peer.nonce == peer_nonce || peer.listening_addr == peer_listening_ip)
-                {
-                    return Err(io::ErrorKind::AlreadyExists.into());
-                }
-
-                trace!(parent: self.node().span(), "received a challenge request from {}", peer_ip);
-
-                (peer_listening_ip, peer_nonce)
-            } else {
-                error!(parent: self.node().span(), "invalid challenge request from {}", peer_ip);
+        let (peer_listening_addr, peer_nonce) = if let Ok(Message::ChallengeRequest(
+            peer_version,
+            _peer_fork_depth,
+            _peer_node_type,
+            _peer_status,
+            peer_listening_port,
+            peer_nonce,
+            _cumulative_weight,
+        )) = peer_request
+        {
+            if peer_version < MESSAGE_VERSION {
+                warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", peer_ip, peer_version);
                 return Err(io::ErrorKind::InvalidData.into());
-            };
+            }
+
+            let peer_listening_ip = SocketAddr::from((peer_ip.ip(), peer_listening_port));
+
+            if locked_peers
+                .iter()
+                .any(|peer| peer.nonce == peer_nonce || peer.listening_addr == peer_listening_ip)
+            {
+                return Err(io::ErrorKind::AlreadyExists.into());
+            }
+
+            trace!(parent: self.node().span(), "received a challenge request from {}", peer_ip);
+
+            (peer_listening_ip, peer_nonce)
+        } else {
+            error!(parent: self.node().span(), "invalid challenge request from {}", peer_ip);
+            return Err(io::ErrorKind::InvalidData.into());
+        };
 
         // Respond with own challenge request.
         let own_response = ClientMessage::ChallengeResponse(Data::Object(genesis_block_header.clone()));
@@ -306,7 +324,7 @@ impl Reading for TestNode {
             ClientMessage::Disconnect => {}
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
-            ClientMessage::Ping(version, _peer_type, _peer_state, _block_hash, block_header) => {
+            ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
                 // Deserialise the block header.
                 let block_header = block_header.deserialize().await.unwrap();
                 self.process_ping(source, version, block_header.height()).await?

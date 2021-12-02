@@ -34,7 +34,11 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
-use tokio::{net::TcpListener, sync::oneshot, task};
+use tokio::{
+    net::TcpListener,
+    sync::{oneshot, RwLock},
+    task,
+};
 
 pub type LedgerReader<N> = Arc<LedgerState<N>>;
 
@@ -110,7 +114,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(&mut tasks, peers.router(), ledger.reader(), ledger.router(), prover.router()).await;
         // Initialize a new instance of the RPC server.
-        Self::initialize_rpc(&mut tasks, node, &status, &peers, ledger.reader(), prover.router()).await;
+        Self::initialize_rpc(
+            &mut tasks,
+            node,
+            &status,
+            &peers,
+            ledger.reader(),
+            prover.router(),
+            prover.memory_pool(),
+        )
+        .await;
         // Initialize a new instance of the notification.
         Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner.clone()).await;
 
@@ -173,14 +186,18 @@ impl<N: Network, E: Environment> Server<N, E> {
         self.status.update(State::ShuttingDown);
 
         // Shut down the ledger.
-        let ledger_lock = self.ledger.shut_down().await;
-        trace!("Ledger has shut down, proceeding to lock...");
+        trace!("Proceeding to shut down the ledger...");
+        let (canon_lock, block_requests_lock) = self.ledger.shut_down().await;
 
-        // Acquire the lock for ledger.
-        let _ledger_lock = ledger_lock.lock().await;
+        // Acquire the locks for ledger.
+        trace!("Proceeding to lock the ledger...");
+        let _canon_lock = canon_lock.lock().await;
+        let _block_requests_lock = block_requests_lock.lock().await;
+        trace!("Ledger has shut down, proceeding to flush tasks...");
 
         // Flush the tasks.
         self.tasks.flush();
+        trace!("Node has shut down.");
     }
 
     ///
@@ -245,14 +262,14 @@ impl<N: Network, E: Environment> Server<N, E> {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
+                // Transmit a heartbeat request to the ledger.
+                if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
+                    error!("Failed to send heartbeat to ledger: {}", error)
+                }
                 // Transmit a heartbeat request to the peers.
                 let request = PeersRequest::Heartbeat(ledger_reader.clone(), ledger_router.clone(), prover_router.clone());
                 if let Err(error) = peers_router.send(request).await {
                     error!("Failed to send heartbeat to peers: {}", error)
-                }
-                // Transmit a heartbeat request to the ledger.
-                if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
-                    error!("Failed to send heartbeat to ledger: {}", error)
                 }
                 // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
@@ -273,6 +290,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         peers: &Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
         prover_router: ProverRouter<N>,
+        memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) {
         if !node.norpc {
             // Initialize a new instance of the RPC server.
@@ -285,6 +303,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     peers,
                     ledger_reader,
                     prover_router,
+                    memory_pool,
                 )
                 .await,
             );
@@ -325,7 +344,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                                 // Ensure the record owner matches.
                                 if record.owner() == miner {
                                     // Add the block to the appropriate list.
-                                    match block_height + 1024 < latest_block_height {
+                                    match block_height + 2048 < latest_block_height {
                                         true => confirmed.push((block_height, record)),
                                         false => pending.push((block_height, record)),
                                     }
