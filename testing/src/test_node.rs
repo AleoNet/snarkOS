@@ -225,7 +225,7 @@ impl Handshake for TestNode {
             _peer_status,
             peer_listening_port,
             peer_nonce,
-            _block_height,
+            _cumulative_weight,
         )) = peer_request
         {
             if peer_version < MESSAGE_VERSION {

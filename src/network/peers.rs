@@ -738,7 +738,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             local_ip,
             local_nonce,
             local_status,
-            ledger_reader.latest_block_height(),
+            ledger_reader.latest_cumulative_weight(),
             connected_nonces,
         )
         .await?;
@@ -795,7 +795,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         local_ip: SocketAddr,
         local_nonce: u64,
         local_status: &Status,
-        local_block_height: u32,
+        local_cumulative_weight: u128,
         connected_nonces: &[u64],
     ) -> Result<(SocketAddr, u64, NodeType, Status)> {
         // Get the IP address of the peer.
@@ -812,7 +812,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             local_status.get(),
             local_ip.port(),
             local_nonce,
-            local_block_height,
+            local_cumulative_weight,
         );
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
@@ -830,7 +830,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         peer_status,
                         listener_port,
                         peer_nonce,
-                        peer_block_height,
+                        peer_cumulative_weight,
                     ) => {
                         // Ensure the message protocol version is not outdated.
                         if version < E::MESSAGE_VERSION {
@@ -849,7 +849,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         if E::NODE_TYPE != NodeType::Sync
                             && local_status.is_syncing()
                             && node_type == NodeType::Sync
-                            && local_block_height > peer_block_height
+                            && local_cumulative_weight > peer_cumulative_weight
                         {
                             return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
                         }
@@ -1095,7 +1095,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     match block_header.deserialize().await {
                                         Ok(block_header) => {
                                             // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
-                                            if E::NODE_TYPE != NodeType::Sync && local_status.is_syncing() && node_type == NodeType::Sync && ledger_reader.latest_block_height() > block_header.height() {
+                                            if E::NODE_TYPE != NodeType::Sync
+                                                && local_status.is_syncing()
+                                                && node_type == NodeType::Sync
+                                                && ledger_reader.latest_cumulative_weight() > block_header.cumulative_weight()
+                                            {
                                                 trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
                                                 break;
                                             }
