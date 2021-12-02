@@ -393,7 +393,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Add the sync nodes to the list of candidate peers.
                 let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-                self.add_candidate_peers(&sync_nodes).await;
+                if number_of_connected_sync_nodes == 0 {
+                    self.add_candidate_peers(&sync_nodes).await;
+                }
 
                 // Add the beacon nodes to the list of candidate peers.
                 let beacon_nodes: Vec<SocketAddr> = E::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
