@@ -1284,6 +1284,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_send_block() {
+        let mut rng = ChaChaRng::seed_from_u64(123456789);
+        let terminator = AtomicBool::new(false);
+
+        // Initialize a new account.
+        let account = Account::<Testnet2>::new(&mut rng);
+        let address = account.address();
+
+        // Initialize a new temporary directory.
+        let directory = temp_dir();
+
+        // Initialize a new ledger state at the temporary directory.
+        let ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
+        assert_eq!(0, ledger_state.latest_block_height());
+
+        // Generate a new block.
+        let (block_1, _) = ledger_state
+            .mine_next_block(address, true, &[], &terminator, &mut rng)
+            .expect("Failed to mine");
+
+        // Initialize a new rpc.
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        assert_eq!(0, rpc.latest_block_height().await.unwrap());
+
+        // Initialize a new request that calls the `sendtransaction` endpoint.
+        let request = Request::new(Body::from(format!(
+            "{{
+	\"jsonrpc\": \"2.0\",
+	\"id\": \"1\",
+	\"method\": \"sendblock\",
+	\"params\": [
+        \"{}\"
+    ]
+}}",
+            hex::encode(block_1.to_bytes_le().unwrap())
+        )));
+
+        // Send the request to the RPC.
+        let response = handle_rpc(caller(), rpc.clone(), request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Process the response into a ciphertext.
+        let actual: <Testnet2 as Network>::BlockHash = process_response(response).await;
+
+        // Check the block hash.
+        let expected = block_1.hash();
+        assert_eq!(expected, actual);
+
+        // Give the node some time to process the block.
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+        // Check that the ledger has advanced
+        assert_eq!(1, rpc.latest_block_height().await.unwrap());
+    }
+
+    #[tokio::test]
     async fn test_send_transaction() {
         let mut rng = ChaChaRng::seed_from_u64(123456789);
 
