@@ -319,34 +319,4 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         }
         Ok(transaction.transaction_id())
     }
-
-    /// Returns the current mempool and sync information known by this node.
-    async fn test_get_block_template(&self) -> Result<BlockTemplate, RpcError> {
-        let canon = self.storage.canon().await?;
-
-        let block = self.storage.get_block_header(&canon.hash).await?;
-
-        let time = Utc::now().timestamp();
-
-        let full_transactions = self.node.expect_sync().consensus.fetch_memory_pool().await;
-
-        let transaction_strings = full_transactions
-            .iter()
-            .map(|x| Ok(hex::encode(to_bytes_le![x]?)))
-            .collect::<Result<Vec<_>, RpcError>>()?;
-
-        let mut coinbase_value = get_block_reward(canon.block_height as u32 + 1);
-        for transaction in full_transactions.iter() {
-            coinbase_value = coinbase_value.add(transaction.value_balance)
-        }
-
-        Ok(BlockTemplate {
-            previous_block_hash: hex::encode(&block.hash().0),
-            block_height: canon.block_height as u32 + 1,
-            time,
-            difficulty_target: self.consensus_parameters()?.get_block_difficulty(&block, time),
-            transactions: transaction_strings,
-            coinbase_value: coinbase_value.0 as u64,
-        })
-    }
 }

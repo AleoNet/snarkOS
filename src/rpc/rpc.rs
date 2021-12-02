@@ -19,7 +19,10 @@
 use crate::{
     helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
-    Environment, LedgerReader, Peers, ProverRouter,
+    Environment,
+    LedgerReader,
+    Peers,
+    ProverRouter,
 };
 use snarkvm::dpc::{MemoryPool, Network};
 
@@ -274,6 +277,10 @@ async fn handle_rpc<N: Network, E: Environment>(
                 jrt::Response::error(jrt::Version::V2, err, req.id.clone())
             }
         },
+        "getblocktemplate" => {
+            let result = rpc.get_block_template().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "getblocktransactions" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
                 let result = rpc.get_block_transactions(height).await.map_err(convert_crate_err);
@@ -935,6 +942,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_block_template() {
+        // Initialize a new RPC.
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+
+        // Initialize the expected block template values.
+        let expected_previous_block_hash = Testnet2::genesis_block().hash().to_string();
+        let expected_block_height = 1;
+        let expected_ledger_root = rpc.latest_ledger_root().await.unwrap().to_string();
+        let expected_transactions = Vec::<serde_json::Value>::new();
+        let expected_block_reward = Block::<Testnet2>::block_reward(1).0;
+
+        // Initialize a new request that calls the `getblocktemplate` endpoint.
+        let request = Request::new(Body::from(
+            r#"{
+	"jsonrpc":"2.0",
+	"id": "1",
+	"method": "getblocktemplate"
+}"#,
+        ));
+
+        // Send the request to the RPC.
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Process the response into a ledger root.
+        let actual: serde_json::Value = process_response(response).await;
+
+        // Check the block template state.
+        assert_eq!(expected_previous_block_hash, actual["previous_block_hash"]);
+        assert_eq!(expected_block_height, actual["block_height"]);
+        assert_eq!(expected_ledger_root, actual["ledger_root"].as_str().unwrap());
+        assert_eq!(&expected_transactions, actual["transactions"].as_array().unwrap());
+        assert_eq!(expected_block_reward, actual["coinbase_reward"].as_i64().unwrap());
+    }
+
+    #[tokio::test]
     async fn test_get_block_transactions() {
         // Initialize a new RPC.
         let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
@@ -998,12 +1042,14 @@ mod tests {
         let actual: <Testnet2 as Network>::RecordCiphertext = process_response(response).await;
 
         // Check the ciphertext.
-        assert!(Testnet2::genesis_block()
-            .transactions()
-            .first()
-            .unwrap()
-            .ciphertexts()
-            .any(|expected| *expected == actual));
+        assert!(
+            Testnet2::genesis_block()
+                .transactions()
+                .first()
+                .unwrap()
+                .ciphertexts()
+                .any(|expected| *expected == actual)
+        );
     }
 
     #[tokio::test]
@@ -1108,7 +1154,7 @@ mod tests {
 
         println!("get_node_state: {:?}", actual);
 
-        // Check the ledger root.
+        // Check the node state.
         assert_eq!(expected, actual);
     }
 
@@ -1191,13 +1237,15 @@ mod tests {
         let actual: Transition<Testnet2> = process_response(response).await;
 
         // Check the transition.
-        assert!(Testnet2::genesis_block()
-            .transactions()
-            .first()
-            .unwrap()
-            .transitions()
-            .iter()
-            .any(|expected| *expected == actual));
+        assert!(
+            Testnet2::genesis_block()
+                .transactions()
+                .first()
+                .unwrap()
+                .transitions()
+                .iter()
+                .any(|expected| *expected == actual)
+        );
     }
 
     #[tokio::test]
