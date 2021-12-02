@@ -93,6 +93,9 @@ pub trait RpcFunctions<N: Network> {
     // #[doc = include_str!("../documentation/public_endpoints/getnodestate.md")]
     async fn get_node_state(&self) -> Result<serde_json::Value, RpcError>;
 
+    // #[doc = include_str!("./documentation/public_endpoints/sendblock.md")]
+    async fn send_block(&self, block_bytes: String) -> Result<N::BlockHash, RpcError>;
+
     #[doc = include_str!("./documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
 }

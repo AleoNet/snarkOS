@@ -309,6 +309,17 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         }))
     }
 
+    /// Returns the block hash. If the given block is valid, it is added to the ledger and propagated to all peers.
+    async fn send_block(&self, block_hex: String) -> Result<N::BlockHash, RpcError> {
+        let block: Block<N> = FromBytes::from_bytes_le(&hex::decode(block_hex)?)?;
+        // Route an `UnconfirmedBlock` to the prover.
+        let request = ProverRequest::UnconfirmedBlock("0.0.0.0:3032".parse().unwrap(), block.clone());
+        if let Err(error) = self.prover_router.send(request).await {
+            warn!("[UnconfirmedBlock] {}", error);
+        }
+        Ok(block.hash())
+    }
+
     /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
     async fn send_transaction(&self, transaction_hex: String) -> Result<N::TransactionID, RpcError> {
         let transaction: Transaction<N> = FromBytes::from_bytes_le(&hex::decode(transaction_hex)?)?;

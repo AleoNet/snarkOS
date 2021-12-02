@@ -58,6 +58,8 @@ type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
 pub enum ProverRequest<N: Network> {
     /// MemoryPoolClear := (block)
     MemoryPoolClear(Option<Block<N>>),
+    /// UnconfirmedBlock := (peer_ip, block)
+    UnconfirmedBlock(SocketAddr, Block<N>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
     UnconfirmedTransaction(SocketAddr, Transaction<N>),
 }
@@ -240,6 +242,16 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 Some(block) => self.memory_pool.write().await.remove_transactions(block.transactions()),
                 None => *self.memory_pool.write().await = MemoryPool::new(),
             },
+            ProverRequest::UnconfirmedBlock(peer_ip, block) => {
+                // Ensure the node is not peering.
+                if !self.status.is_peering() {
+                    // Process the unconfirmed block.
+                    let req = LedgerRequest::UnconfirmedBlock(peer_ip, block, self.router());
+                    if let Err(error) = self.ledger_router.send(req).await {
+                        warn!("[UnconfirmedBlock] {}", error);
+                    }
+                }
+            }
             ProverRequest::UnconfirmedTransaction(peer_ip, transaction) => {
                 // Ensure the node is not peering.
                 if !self.status.is_peering() {

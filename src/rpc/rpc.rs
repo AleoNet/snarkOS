@@ -56,7 +56,7 @@ pub struct Meta {
 
 impl Metadata for Meta {}
 
-const METHODS_EXPECTING_PARAMS: [&str; 12] = [
+const METHODS_EXPECTING_PARAMS: [&str; 13] = [
     // public
     "getblock",
     "getblocks",
@@ -69,6 +69,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
     "getledgerproof",
     "gettransaction",
     "gettransition",
+    "sendblock",
     "sendtransaction",
     // "validaterawtransaction",
     // // private
@@ -317,6 +318,13 @@ async fn handle_rpc<N: Network, E: Environment>(
         }
         "getnodestate" => {
             let result = rpc.get_node_state().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "sendblock" => {
+            let result = rpc
+                .send_block(params[0].as_str().unwrap_or("").into())
+                .await
+                .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "sendtransaction" => {
