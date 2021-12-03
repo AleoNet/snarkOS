@@ -14,36 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{
-    helpers::{NodeType, State, Status},
-    Client,
-    Data,
-    Environment,
-    Message,
-};
+use snarkos::{Client, Data, Environment, Message};
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     Config,
-    Connection,
     Node as Pea2PeaNode,
     Pea2Pea,
 };
-use rand::{thread_rng, Rng};
 use std::{
     convert::TryInto,
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
     time::Duration,
 };
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    sync::Mutex,
-    task,
-};
+use tokio::task;
 use tracing::*;
 
 use snarkos_snode::{ClientState, SynthNode};
@@ -51,7 +38,6 @@ use std::ops::Deref;
 
 // Consts & aliases.
 const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
-const CHALLENGE_HEIGHT: u32 = 0;
 const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
 const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;

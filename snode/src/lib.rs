@@ -22,37 +22,25 @@ use snarkos::{
     Message,
     NodeType,
 };
-use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
 use pea2pea::{
-    protocols::{Disconnect, Handshake, Reading, Writing},
-    Config,
+    protocols::{Disconnect, Handshake, Writing},
     Connection,
     Node as Pea2PeaNode,
     Pea2Pea,
 };
 use rand::{thread_rng, Rng};
-use std::{
-    convert::TryInto,
-    io,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
+use std::{convert::TryInto, io, net::SocketAddr, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
-    task,
 };
 use tracing::*;
 
 // Consts & aliases.
 const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
 const CHALLENGE_HEIGHT: u32 = 0;
-const PING_INTERVAL_SECS: u64 = 5;
-const PEER_INTERVAL_SECS: u64 = 3;
-const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;
 const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
 const MAXIMUM_FORK_DEPTH: u32 = <Client<Testnet2>>::MAXIMUM_FORK_DEPTH;
 
@@ -226,56 +214,6 @@ impl Handshake for SynthNode {
     }
 }
 
-// /// Inbound message processing logic for the test nodes.
-// #[async_trait::async_trait]
-// impl Reading for SynthNode {
-//     type Message = ClientMessage;
-//
-//     fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
-//         // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
-//         let mut buf = [0u8; 8 * 1024];
-//
-//         reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
-//         let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
-//
-//         if reader.read_exact(&mut buf[..len]).is_err() {
-//             return Ok(None);
-//         }
-//
-//         match ClientMessage::deserialize(&buf[..len]) {
-//             Ok(msg) => {
-//                 info!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
-//                 Ok(Some(msg))
-//             }
-//             Err(e) => {
-//                 error!("a message from {} failed to deserialize: {}", source, e);
-//                 Err(io::ErrorKind::InvalidData.into())
-//             }
-//         }
-//     }
-//
-//     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
-//         match message {
-//             ClientMessage::BlockRequest(_start_block_height, _end_block_height) => {}
-//             ClientMessage::BlockResponse(_block) => {}
-//             ClientMessage::Disconnect => {}
-//             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
-//             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
-//             ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
-//                 // Deserialise the block header.
-//                 let block_header = block_header.deserialize().await.unwrap();
-//                 self.process_ping(source, version, block_header.height()).await?
-//             }
-//             ClientMessage::Pong(_is_fork, _block_locators) => {}
-//             ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
-//             ClientMessage::UnconfirmedTransaction(_transaction) => {}
-//             _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
-//         }
-//
-//         Ok(())
-//     }
-// }
-
 /// Outbound message processing logic for the test nodes.
 impl Writing for SynthNode {
     type Message = ClientMessage;
@@ -297,64 +235,5 @@ impl Disconnect for SynthNode {
         let initial_len = locked_peers.len();
         locked_peers.retain(|peer| peer.connected_addr != disconnecting_addr);
         assert_eq!(locked_peers.len(), initial_len - 1)
-    }
-}
-
-// Helper methods.
-impl SynthNode {
-    async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
-        let peers = self
-            .state
-            .peers
-            .lock()
-            .await
-            .iter()
-            .map(|peer| peer.listening_addr)
-            .collect::<Vec<_>>();
-        let msg = ClientMessage::PeerResponse(peers);
-        info!(parent: self.node().span(), "sending a PeerResponse to {}", source);
-
-        self.send_direct_message(source, msg)
-    }
-
-    async fn process_peer_response(&self, source: SocketAddr, peer_ips: Vec<SocketAddr>) -> io::Result<()> {
-        let num_connections = self.node().num_connected() + self.node().num_connecting();
-        let node = self.clone();
-        task::spawn(async move {
-            for peer_ip in peer_ips
-                .into_iter()
-                .filter(|addr| node.node().listening_addr().unwrap() != *addr)
-                .take(DESIRED_CONNECTIONS.saturating_sub(num_connections))
-            {
-                if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
-                    info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
-                    let _ = node.node().connect(peer_ip).await;
-                }
-            }
-        });
-
-        Ok(())
-    }
-
-    async fn process_ping(&self, source: SocketAddr, version: u32, block_height: u32) -> io::Result<()> {
-        // Ensure the message protocol version is not outdated.
-        if version < <Client<Testnet2>>::MESSAGE_VERSION {
-            warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", source, version);
-            return Err(io::ErrorKind::InvalidData.into());
-        }
-
-        debug!(parent: self.node().span(), "peer {} is at height {}", source, block_height);
-
-        let genesis = Testnet2::genesis_block();
-        let msg = ClientMessage::Pong(
-            None,
-            Data::Object(BlockLocators::<Testnet2>::from(
-                vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect(),
-            )),
-        );
-
-        info!(parent: self.node().span(), "sending a Pong to {}", source);
-
-        self.send_direct_message(source, msg)
     }
 }
