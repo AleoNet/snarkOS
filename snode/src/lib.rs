@@ -64,7 +64,7 @@ pub type ClientNonce = u64;
 /// The test node; it consists of a `Node` that handles networking and `State`
 /// that can be extended freely based on test requirements.
 #[derive(Clone)]
-pub struct TestNode {
+pub struct SynthNode {
     node: Pea2PeaNode,
     state: ClientState,
 }
@@ -97,13 +97,13 @@ impl Default for ClientState {
     }
 }
 
-impl Pea2Pea for TestNode {
+impl Pea2Pea for SynthNode {
     fn node(&self) -> &Pea2PeaNode {
         &self.node
     }
 }
 
-impl TestNode {
+impl SynthNode {
     /// Creates a default test node with the most basic network protocols enabled.
     pub async fn default() -> Self {
         let config = Config {
@@ -183,7 +183,7 @@ impl TestNode {
 
 /// Automated handshake handling for the test nodes.
 #[async_trait::async_trait]
-impl Handshake for TestNode {
+impl Handshake for SynthNode {
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
         // Guard against double (two-sided) connections.
         let mut locked_peers = self.state.peers.lock().await;
@@ -291,7 +291,7 @@ impl Handshake for TestNode {
 
 /// Inbound message processing logic for the test nodes.
 #[async_trait::async_trait]
-impl Reading for TestNode {
+impl Reading for SynthNode {
     type Message = ClientMessage;
 
     fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
@@ -340,7 +340,7 @@ impl Reading for TestNode {
 }
 
 /// Outbound message processing logic for the test nodes.
-impl Writing for TestNode {
+impl Writing for SynthNode {
     type Message = ClientMessage;
 
     fn write_message<W: io::Write>(&self, _target: SocketAddr, payload: &Self::Message, writer: &mut W) -> io::Result<()> {
@@ -354,7 +354,7 @@ impl Writing for TestNode {
 
 /// Disconnect logic for the test nodes.
 #[async_trait::async_trait]
-impl Disconnect for TestNode {
+impl Disconnect for SynthNode {
     async fn handle_disconnect(&self, disconnecting_addr: SocketAddr) {
         let mut locked_peers = self.state.peers.lock().await;
         let initial_len = locked_peers.len();
@@ -364,7 +364,7 @@ impl Disconnect for TestNode {
 }
 
 // Helper methods.
-impl TestNode {
+impl SynthNode {
     async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
         let peers = self
             .state
