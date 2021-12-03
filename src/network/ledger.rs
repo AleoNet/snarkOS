@@ -752,6 +752,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 },
             };
 
+            // If the given fork status is None, check if it can be updated.
+            let is_fork = match is_fork {
+                Some(is_fork) => Some(is_fork),
+                None => match common_ancestor != 0 {
+                    // If the common ancestor is not 0,
+                    // the peer is clearly on the fork.
+                    true => Some(true),
+                    false => None,
+                },
+            };
+
             let fork_status = match is_fork {
                 Some(boolean) => format!("{}", boolean),
                 None => "undecided".to_string(),
