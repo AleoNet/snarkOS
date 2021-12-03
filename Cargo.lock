@@ -2129,6 +2129,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-snode"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "pea2pea",
+ "peak_alloc",
+ "rand",
+ "snarkos",
+ "snarkos-storage",
+ "snarkvm",
+ "structopt",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "snarkos-storage"
 version = "2.0.0"
 dependencies = [
