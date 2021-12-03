@@ -66,7 +66,7 @@ pub async fn handle_block_requests<N: Network, E: Environment>(
         }
 
         // Determine the latest common ancestor.
-        let (latest_common_ancestor, ledger_requires_fork) =
+        let (latest_common_ancestor, ledger_requires_revert) =
             // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
             if !is_fork {
                 // Continue to sync from the latest block height of this ledger, if the peer is honest.
@@ -114,7 +114,7 @@ pub async fn handle_block_requests<N: Network, E: Environment>(
         let start_block_height = latest_common_ancestor + 1;
         let end_block_height = start_block_height + number_of_block_requests - 1;
 
-        return Some((start_block_height, end_block_height, ledger_requires_fork));
+        return Some((start_block_height, end_block_height, ledger_requires_revert));
     }
 
     None
